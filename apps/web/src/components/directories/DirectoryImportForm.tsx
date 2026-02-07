@@ -34,7 +34,7 @@ import type { AnalyzeForLinkingResponseDto } from '@/lib/api/directory';
 
 interface DirectoryImportFormProps {
     user: AuthUser;
-    repoProvider?: string;
+    gitProvider?: string;
     deployProvider?: string;
 }
 
@@ -60,11 +60,7 @@ interface AnalysisResult {
     error?: string;
 }
 
-export function DirectoryImportForm({
-    user,
-    repoProvider,
-    deployProvider,
-}: DirectoryImportFormProps) {
+export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryImportFormProps) {
     const [step, setStep] = useState<ImportStep>('source');
     const [sourceMethod, setSourceMethod] = useState<SourceMethod>('url');
     const [sourceUrl, setSourceUrl] = useState('');
@@ -97,7 +93,7 @@ export function DirectoryImportForm({
         setStep('analyzing');
 
         startTransition(async () => {
-            const result = await analyzeRepository(sourceUrl);
+            const result = await analyzeRepository(sourceUrl, gitProvider);
 
             if (result.success && result.data) {
                 setAnalysisResult(result.data);
@@ -145,9 +141,9 @@ export function DirectoryImportForm({
     const handleModeSelect = async (mode: ImportMode) => {
         if (mode === 'import') {
             setStep('configure');
-        } else if (mode === 'link_existing' && analysisResult && repoProvider) {
+        } else if (mode === 'link_existing' && analysisResult && gitProvider) {
             startTransition(async () => {
-                const result = await analyzeForLinking(analysisResult.sourceUrl, repoProvider);
+                const result = await analyzeForLinking(analysisResult.sourceUrl, gitProvider);
                 if (result.success && result.data) {
                     setLinkAnalysis(result.data);
                     setShowLinkConfirm(true);
@@ -173,7 +169,7 @@ export function DirectoryImportForm({
                 organization,
                 owner: organization ? owner : undefined,
                 createMissingRepos,
-                repoProvider,
+                gitProvider,
                 deployProvider,
             });
 
@@ -213,7 +209,7 @@ export function DirectoryImportForm({
                 organization,
                 owner: organization ? owner : undefined,
                 sync,
-                repoProvider,
+                gitProvider,
                 deployProvider,
             });
 
@@ -293,7 +289,7 @@ export function DirectoryImportForm({
                 />
             ) : (
                 <RepositorySelector
-                    providerId={repoProvider!}
+                    providerId={gitProvider!}
                     onSelect={handleRepositorySelect}
                     selectedUrl={sourceUrl}
                 />
@@ -594,7 +590,7 @@ export function DirectoryImportForm({
                 <div className="space-y-4 p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
                     <OrganizationSelector
                         value={owner}
-                        providerId={repoProvider!}
+                        providerId={gitProvider!}
                         onChange={(value, isOrganization) => {
                             setOwner(value);
                             setOrganization(isOrganization);

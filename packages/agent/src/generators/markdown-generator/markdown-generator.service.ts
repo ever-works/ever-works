@@ -41,7 +41,7 @@ export class MarkdownGeneratorService {
                 organization: directory.organization ? directory.getRepoOwner() : undefined,
                 isPrivate: true,
             },
-            { userId: directoryOwner.id, providerId: directory.repoProvider },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
         // Clone markdown repo
@@ -51,7 +51,7 @@ export class MarkdownGeneratorService {
                 repo: directory.slug,
                 committer,
             },
-            { userId: directoryOwner.id, providerId: directory.repoProvider },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
         // Clone data repo
@@ -61,7 +61,7 @@ export class MarkdownGeneratorService {
                 repo: directory.getDataRepo(),
                 committer,
             },
-            { userId: directoryOwner.id, providerId: directory.repoProvider },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
         const markdownRepo = new MarkdownRepository(markdownPath);
@@ -71,7 +71,7 @@ export class MarkdownGeneratorService {
             const slugs = await fs.readdir(dataRepo.dataDir);
             await markdownRepo.ensureDirectoriesExist();
 
-            const provider = directory.repoProvider;
+            const provider = directory.gitProvider;
             const defaultBranch = await this.gitFacade
                 .getMainBranch(provider, markdownRepo.dir)
                 .catch((err) => {
@@ -186,7 +186,7 @@ export class MarkdownGeneratorService {
             );
             await this.gitFacade.push(
                 { dir: markdownPath },
-                { userId: directoryOwner.id, providerId: directory.repoProvider },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
 
             if (canCreatePR && defaultBranch) {
@@ -204,7 +204,7 @@ export class MarkdownGeneratorService {
                             title: pr_update.title,
                             body: pr_update.body,
                         },
-                        { userId: directoryOwner.id, providerId: directory.repoProvider },
+                        { userId: directoryOwner.id, providerId: directory.gitProvider },
                     )
                     .catch((err) => {
                         this.logger.error('Failed to create PR', err);
@@ -241,14 +241,14 @@ export class MarkdownGeneratorService {
                 repo: directory.slug,
                 committer,
             },
-            { userId: directoryOwner.id, providerId: directory.repoProvider },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
         const markdownRepo = new MarkdownRepository(markdownPath);
 
         if (branch) {
             await this.gitFacade
-                .switchBranch(directory.repoProvider, markdownRepo.dir, branch, true)
+                .switchBranch(directory.gitProvider, markdownRepo.dir, branch, true)
                 .catch((err) => {
                     this.logger.error('Failed to switch to PR branch', err);
                 });
@@ -267,11 +267,11 @@ export class MarkdownGeneratorService {
             // Delete the repository
             await this.gitFacade.deleteRepository(directory.getRepoOwner(), directory.slug, {
                 userId: directoryOwner.id,
-                providerId: directory.repoProvider,
+                providerId: directory.gitProvider,
             });
 
             const dataDir = this.gitFacade.getLocalDir(
-                directory.repoProvider,
+                directory.gitProvider,
                 directory.getRepoOwner(),
                 directory.getMainRepo(),
             );
@@ -292,7 +292,7 @@ export class MarkdownGeneratorService {
 
     async cleanup(directory: Directory) {
         const dataDir = this.gitFacade.getLocalDir(
-            directory.repoProvider,
+            directory.gitProvider,
             directory.getRepoOwner(),
             directory.getMainRepo(),
         );

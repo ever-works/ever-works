@@ -18,13 +18,13 @@ import { ChevronDown, Plus } from 'lucide-react';
 
 interface DirectoryManualFormProps {
     user: AuthUser;
-    repoProvider?: string;
+    gitProvider?: string;
     deployProvider?: string;
 }
 
 export function DirectoryManualForm({
     user,
-    repoProvider,
+    gitProvider,
     deployProvider,
 }: DirectoryManualFormProps) {
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -32,7 +32,7 @@ export function DirectoryManualForm({
     const router = useRouter();
     const t = useTranslations('dashboard.directoryCreation.manual');
 
-    // Form state - repoProvider is determined automatically by backend
+    // Form state - gitProvider is determined automatically by backend
     const [formData, setFormData] = useState<CreateDirectoryDto>({
         slug: '',
         name: '',
@@ -65,7 +65,7 @@ export function DirectoryManualForm({
         }
 
         startTransition(async () => {
-            const result = await createDirectory({ ...formData, repoProvider, deployProvider });
+            const result = await createDirectory({ ...formData, gitProvider, deployProvider });
 
             if (result.success) {
                 toast.success(result.message || t('success.created'));
@@ -202,7 +202,7 @@ export function DirectoryManualForm({
                         {/* Organization Selector */}
                         <OrganizationSelector
                             value={formData.owner || ''}
-                            providerId={repoProvider!}
+                            providerId={gitProvider!}
                             onChange={(value, isOrganization) => {
                                 setFormData({
                                     ...formData,

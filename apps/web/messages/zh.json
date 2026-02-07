@@ -553,7 +553,7 @@
                 "dataRepo": "数据仓库",
                 "websiteRepo": "网站仓库",
                 "mainRepo": "主仓库",
-                "repoProvider": "仓库提供商",
+                "gitProvider": "Git提供商",
                 "organization": "组织",
                 "created": "创建时间",
                 "lastUpdated": "最后更新",

@@ -57,7 +57,7 @@ export class ImportExecutorService {
                     repo: source.repo,
                     committer: user.asCommitter(),
                 },
-                { userId: user.id, providerId: directory.repoProvider, token },
+                { userId: user.id, providerId: directory.gitProvider, token },
             );
 
             const sourceData = await DataRepository.create(sourceDir);
@@ -98,7 +98,7 @@ export class ImportExecutorService {
                     },
                     importRequest: {
                         sourceUrl: this.gitFacade.getWebUrl(
-                            directory.repoProvider,
+                            directory.gitProvider,
                             source.owner,
                             source.repo,
                         ),
@@ -227,7 +227,7 @@ export class ImportExecutorService {
 
         try {
             const linkAnalysis = await this.sourceRepoAnalyzer.analyzeForLinking(
-                this.gitFacade.getWebUrl(directory.repoProvider, source.owner, source.repo),
+                this.gitFacade.getWebUrl(directory.gitProvider, source.owner, source.repo),
                 token,
             );
 
@@ -248,7 +248,7 @@ export class ImportExecutorService {
                     repo: source.repo,
                     committer: user.asCommitter(),
                 },
-                { userId: user.id, providerId: directory.repoProvider, token },
+                { userId: user.id, providerId: directory.gitProvider, token },
             );
 
             const sourceData = await DataRepository.create(dataRepoDir);

@@ -646,7 +646,7 @@
                 "dataRepo": "Репозиторій даних",
                 "websiteRepo": "Репозиторій веб-сайту",
                 "mainRepo": "Основний репозиторій",
-                "repoProvider": "Провайдер репозиторія",
+                "gitProvider": "Git-провайдер",
                 "organization": "Організація",
                 "created": "Створено",
                 "lastUpdated": "Востаннє оновлено",

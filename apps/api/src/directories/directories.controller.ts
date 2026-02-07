@@ -627,7 +627,7 @@ export class DirectoriesController {
     @HttpCode(HttpStatus.OK)
     async getUserRepositories(
         @CurrentUser() auth: AuthenticatedUser,
-        @Query('providerId') providerId: string,
+        @Query('gitProvider') gitProvider: string,
         @Query('page') page?: string,
         @Query('perPage') perPage?: string,
         @Query('search') search?: string,
@@ -637,7 +637,7 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         const dto: GetUserRepositoriesDto = {
-            providerId,
+            gitProvider,
             page: page ? parseInt(page, 10) : undefined,
             perPage: perPage ? parseInt(perPage, 10) : undefined,
             search: search || undefined,

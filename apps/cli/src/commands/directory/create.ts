@@ -5,7 +5,7 @@ import { requireAuth } from '../auth';
 import { getApiService, CreateDirectoryDto } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
-import { RepoProvider } from '@packages/cli-shared';
+import { GitProvider } from '@packages/cli-shared';
 
 export const createCommand = new Command('create')
     .description('Create a new directory')
@@ -19,7 +19,7 @@ export const createCommand = new Command('create')
             const apiService = getApiService();
             const directoryPrompt = new DirectoryPromptService();
 
-            const githubConnected = await apiService.checkConnection(RepoProvider.GITHUB);
+            const githubConnected = await apiService.checkConnection(GitProvider.GITHUB);
 
             if (!githubConnected.connected) {
                 console.log(

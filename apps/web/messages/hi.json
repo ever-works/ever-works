@@ -646,7 +646,7 @@
                 "dataRepo": "डेटा रिपॉजिटरी",
                 "websiteRepo": "वेबसाइट रिपॉजिटरी",
                 "mainRepo": "मुख्य रिपॉजिटरी",
-                "repoProvider": "रिपॉजिटरी प्रदाता",
+                "gitProvider": "Git प्रदाता",
                 "organization": "संगठन",
                 "created": "बनाई गई",
                 "lastUpdated": "अंतिम अपडेट",

@@ -553,7 +553,7 @@
                 "dataRepo": "مستودع البيانات",
                 "websiteRepo": "مستودع الموقع",
                 "mainRepo": "المستودع الرئيسي",
-                "repoProvider": "مزود المستودع",
+                "gitProvider": "مزود Git",
                 "organization": "المنظمة",
                 "created": "تم الإنشاء",
                 "lastUpdated": "آخر تحديث",

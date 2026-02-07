@@ -25,7 +25,7 @@ export default async function DirectoryLayout({ params, children }: LayoutParams
 
         if (directory) {
             oauthConnection = await gitProvidersAPI
-                .checkConnection(directory.repoProvider)
+                .checkConnection(directory.gitProvider)
                 .catch(() => null);
         }
     } catch (error) {

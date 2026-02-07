@@ -21,11 +21,11 @@ export async function deploy(directoryId: string, teamScope?: string) {
         const { directory } = await directoryAPI.get(directoryId);
 
         // Check git provider connection
-        const connectionCheck = await checkGitProviderConnection(directory.repoProvider);
+        const connectionCheck = await checkGitProviderConnection(directory.gitProvider);
         if (!connectionCheck.connected) {
             return {
                 success: false,
-                error: tDirectories('oauthRequired', { provider: directory.repoProvider }),
+                error: tDirectories('oauthRequired', { provider: directory.gitProvider }),
                 requiresGitProvider: true,
             };
         }
@@ -155,11 +155,11 @@ export async function updateWebsiteTemplateSettings(
 
         // When enabling auto-update, verify git provider connection exists
         if (settings.websiteTemplateAutoUpdate === true) {
-            const connectionCheck = await checkGitProviderConnection(directory.repoProvider);
+            const connectionCheck = await checkGitProviderConnection(directory.gitProvider);
             if (!connectionCheck.connected) {
                 return {
                     success: false,
-                    error: tDirectories('oauthRequired', { provider: directory.repoProvider }),
+                    error: tDirectories('oauthRequired', { provider: directory.gitProvider }),
                     requiresGitProvider: true,
                 };
             }

@@ -53,7 +53,7 @@ export function RepositorySelector({ providerId, onSelect, selectedUrl }: Reposi
 
             try {
                 const result = await getUserRepositories({
-                    providerId,
+                    gitProvider: providerId,
                     page: pageNum,
                     perPage,
                     search: searchQuery || undefined,

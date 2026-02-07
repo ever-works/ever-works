@@ -646,7 +646,7 @@
                 "dataRepo": "데이터 리포지토리",
                 "websiteRepo": "웹사이트 리포지토리",
                 "mainRepo": "메인 리포지토리",
-                "repoProvider": "리포지토리 제공자",
+                "gitProvider": "Git 제공자",
                 "organization": "조직",
                 "created": "생성됨",
                 "lastUpdated": "마지막 업데이트",

@@ -292,21 +292,21 @@ export default function NewDirectoryClient({
 
                 {creationMode === 'ai' && (
                     <DirectoryAICreator
-                        repoProvider={selectedProviderId || undefined}
+                        gitProvider={selectedProviderId || undefined}
                         deployProvider={selectedDeployProviderId || undefined}
                     />
                 )}
                 {creationMode === 'manual' && (
                     <DirectoryManualForm
                         user={user}
-                        repoProvider={selectedProviderId || undefined}
+                        gitProvider={selectedProviderId || undefined}
                         deployProvider={selectedDeployProviderId || undefined}
                     />
                 )}
                 {creationMode === 'import' && (
                     <DirectoryImportForm
                         user={user}
-                        repoProvider={selectedProviderId || undefined}
+                        gitProvider={selectedProviderId || undefined}
                         deployProvider={selectedDeployProviderId || undefined}
                     />
                 )}

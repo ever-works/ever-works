@@ -164,7 +164,7 @@ export class DeployFacadeService implements IDeployFacade {
         // Get git token for repository operations
         const gitToken = await this.gitFacade.getAccessToken({
             userId: user.id,
-            providerId: directory.repoProvider,
+            providerId: directory.gitProvider,
         });
 
         if (!gitToken) {

@@ -646,7 +646,7 @@
                 "dataRepo": "Repositório de Dados",
                 "websiteRepo": "Repositório do Site",
                 "mainRepo": "Repositório Principal",
-                "repoProvider": "Provedor de Repositório",
+                "gitProvider": "Provedor Git",
                 "organization": "Organização",
                 "created": "Criado",
                 "lastUpdated": "Última Atualização",

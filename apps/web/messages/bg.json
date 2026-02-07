@@ -646,7 +646,7 @@
                 "dataRepo": "Хранилище за Данни",
                 "websiteRepo": "Хранилище за Уебсайт",
                 "mainRepo": "Основно Хранилище",
-                "repoProvider": "Доставчик на Хранилища",
+                "gitProvider": "Git Доставчик",
                 "organization": "Организация",
                 "created": "Създадена",
                 "lastUpdated": "Последно Актуализирана",

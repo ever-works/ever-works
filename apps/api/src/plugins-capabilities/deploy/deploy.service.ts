@@ -51,7 +51,7 @@ export class DeployService {
         const user = directory.user as User;
         const gitToken = await this.gitFacade.getAccessToken({
             userId: user.id,
-            providerId: directory.repoProvider,
+            providerId: directory.gitProvider,
         });
 
         if (!gitToken) {
@@ -328,7 +328,7 @@ export class DeployService {
                     branch: WEBSITE_TEMPLATE_CONFIG.branch,
                     committer: user.asCommitter(),
                 },
-                { userId: directoryOwner.id, providerId: directory.repoProvider },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
 
             const triggerFile = `${repoDir}/.deployment-trigger`;
@@ -338,16 +338,16 @@ export class DeployService {
                 `Deployment triggered at ${new Date().toISOString()}\n`,
             );
 
-            await this.gitFacade.add(directory.repoProvider, repoDir, '.deployment-trigger');
+            await this.gitFacade.add(directory.gitProvider, repoDir, '.deployment-trigger');
             await this.gitFacade.commit(
-                directory.repoProvider,
+                directory.gitProvider,
                 repoDir,
                 `chore: trigger deployment\n\nTriggered by Ever Works platform`,
                 user.asCommitter(),
             );
             await this.gitFacade.push(
                 { dir: repoDir },
-                { userId: directoryOwner.id, providerId: directory.repoProvider },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
 
             this.logger.log(

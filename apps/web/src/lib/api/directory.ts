@@ -42,7 +42,7 @@ export interface CreateDirectoryDto {
     description: string;
     owner?: string;
     organization: boolean;
-    repoProvider?: string;
+    gitProvider?: string;
     deployProvider?: string;
     readmeConfig?: MarkdownReadmeConfig;
 }
@@ -117,7 +117,7 @@ export interface Directory {
     owner?: string;
     website?: string;
     organization: boolean;
-    repoProvider: string;
+    gitProvider: string;
     deployProvider?: string;
     readmeConfig?: MarkdownReadmeConfig;
     generateStatus?: GenerateStatus;
@@ -311,6 +311,7 @@ export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing';
 
 export interface AnalyzeRepositoryDto {
     sourceUrl: string;
+    gitProvider?: string;
 }
 
 export interface AnalyzeRepositoryResponseDto {
@@ -338,7 +339,7 @@ export interface ImportDirectoryDto {
     organization?: boolean;
     createMissingRepos?: boolean;
     sync?: boolean;
-    repoProvider: string;
+    gitProvider: string;
     deployProvider?: string;
 }
 
@@ -593,7 +594,8 @@ export const directoryAPI = {
         });
     },
 
-    getUserRepositories: async (options?: {
+    getUserRepositories: async (options: {
+        gitProvider: string;
         page?: number;
         perPage?: number;
         search?: string;
@@ -601,11 +603,12 @@ export const directoryAPI = {
         type?: 'user' | 'org';
     }) => {
         const params = new URLSearchParams();
-        if (options?.page !== undefined) params.append('page', String(options.page));
-        if (options?.perPage !== undefined) params.append('perPage', String(options.perPage));
-        if (options?.search) params.append('search', options.search);
-        if (options?.owner) params.append('owner', options.owner);
-        if (options?.type) params.append('type', options.type);
+        params.append('gitProvider', options.gitProvider);
+        if (options.page !== undefined) params.append('page', String(options.page));
+        if (options.perPage !== undefined) params.append('perPage', String(options.perPage));
+        if (options.search) params.append('search', options.search);
+        if (options.owner) params.append('owner', options.owner);
+        if (options.type) params.append('type', options.type);
         const query = params.toString() ? `?${params.toString()}` : '';
 
         return serverFetch<GetUserRepositoriesResponseDto>(

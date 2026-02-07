@@ -14,11 +14,11 @@ import { OrganizationSelector } from './OrganizationSelector';
 import { ChevronDown, Lightbulb, Check } from 'lucide-react';
 
 interface DirectoryAICreatorProps {
-    repoProvider?: string;
+    gitProvider?: string;
     deployProvider?: string;
 }
 
-export function DirectoryAICreator({ repoProvider, deployProvider }: DirectoryAICreatorProps) {
+export function DirectoryAICreator({ gitProvider, deployProvider }: DirectoryAICreatorProps) {
     const [prompt, setPrompt] = useState('');
     const [directoryName, setDirectoryName] = useState('');
     const [organization, setOrganization] = useState(false);
@@ -45,7 +45,7 @@ export function DirectoryAICreator({ repoProvider, deployProvider }: DirectoryAI
                 prompt,
                 organization,
                 owner: organization ? owner : undefined,
-                repoProvider,
+                gitProvider,
                 deployProvider,
             });
 
@@ -143,7 +143,7 @@ export function DirectoryAICreator({ repoProvider, deployProvider }: DirectoryAI
                             {/* Organization Selector */}
                             <OrganizationSelector
                                 value={owner}
-                                providerId={repoProvider!}
+                                providerId={gitProvider!}
                                 onChange={(value, isOrganization) => {
                                     setOwner(value);
                                     setOrganization(isOrganization);

@@ -553,7 +553,7 @@
                 "dataRepo": "Repositorio de Datos",
                 "websiteRepo": "Repositorio del Sitio Web",
                 "mainRepo": "Repositorio Principal",
-                "repoProvider": "Proveedor de Repositorio",
+                "gitProvider": "Proveedor de Git",
                 "organization": "Organización",
                 "created": "Creado",
                 "lastUpdated": "Última Actualización",

@@ -54,7 +54,7 @@ const getCreateDirectorySchema = async () => {
             .optional()
             .transform((val) => val?.trim()),
         organization: z.boolean(),
-        repoProvider: z.string().optional(),
+        gitProvider: z.string().optional(),
         deployProvider: z.string().optional(),
         readmeConfig: readmeConfigSchema.optional(),
     });
@@ -112,7 +112,7 @@ export async function createDirectory(data: CreateDirectoryDto) {
             };
         }
 
-        const providerId = validation.data.repoProvider;
+        const providerId = validation.data.gitProvider;
         if (!providerId) {
             return {
                 success: false,
@@ -138,7 +138,7 @@ export async function createDirectory(data: CreateDirectoryDto) {
 
         validation.data.organization = organization;
         validation.data.owner = owner;
-        validation.data.repoProvider = providerId;
+        validation.data.gitProvider = providerId;
         // Set default deploy provider to vercel if not specified
         validation.data.deployProvider = data.deployProvider || 'vercel';
 
@@ -166,7 +166,7 @@ interface AIDirectoryOptions {
     prompt: string;
     organization?: boolean;
     owner?: string;
-    repoProvider?: string;
+    gitProvider?: string;
     deployProvider?: string;
 }
 
@@ -185,7 +185,7 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
             .min(1, t('name.required'))
             .transform((val) => sanitizeName(val, 100))
             .pipe(z.string().max(100, t('name.maxLength'))),
-        repoProvider: z.string().optional(),
+        gitProvider: z.string().optional(),
     });
 
     const createDirectorySchema = await getCreateDirectorySchema();
@@ -195,7 +195,7 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
         const validation = aiPromptSchema.safeParse({
             prompt: request.prompt,
             name: request.name,
-            repoProvider: request.repoProvider,
+            gitProvider: request.gitProvider,
         });
         if (!validation.success) {
             return {
@@ -204,7 +204,7 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
             };
         }
 
-        const providerId = validation.data.repoProvider;
+        const providerId = validation.data.gitProvider;
         if (!providerId) {
             return {
                 success: false,
@@ -240,7 +240,7 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
             description: directoryDetails.description,
             organization,
             owner,
-            repoProvider: providerId,
+            gitProvider: providerId,
             deployProvider: request.deployProvider || 'vercel',
         };
 
@@ -335,7 +335,7 @@ export async function updateDirectory(directoryId: string, data: UpdateDirectory
         }
 
         const { directory } = await directoryAPI.get(directoryId);
-        const providerId = directory.repoProvider;
+        const providerId = directory.gitProvider;
 
         const connectionCheck = providerId ? await checkGitProviderConnection(providerId) : null;
 
@@ -485,7 +485,10 @@ export async function analyzeRepository(sourceUrl: string, providerId?: string) 
             };
         }
 
-        const result = await directoryAPI.analyzeRepository({ sourceUrl: validation.data });
+        const result = await directoryAPI.analyzeRepository({
+            sourceUrl: validation.data,
+            gitProvider: providerId,
+        });
 
         return {
             success: true,
@@ -508,7 +511,7 @@ interface ImportDirectoryRequest {
     owner?: string;
     createMissingRepos?: boolean;
     sync?: boolean;
-    repoProvider?: string;
+    gitProvider?: string;
     deployProvider?: string;
 }
 
@@ -527,7 +530,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
         owner: z.string().optional(),
         createMissingRepos: z.boolean().optional(),
         sync: z.boolean().optional(),
-        repoProvider: z.string().optional(),
+        gitProvider: z.string().optional(),
     });
 
     try {
@@ -539,7 +542,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
             };
         }
 
-        const providerId = validation.data.repoProvider;
+        const providerId = validation.data.gitProvider;
         if (!providerId) {
             return {
                 success: false,
@@ -571,7 +574,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
             owner: owner || undefined,
             createMissingRepos: validation.data.createMissingRepos,
             sync: validation.data.sync,
-            repoProvider: providerId,
+            gitProvider: providerId,
         });
 
         return {
@@ -594,7 +597,7 @@ interface GetUserRepositoriesParams {
     page?: number;
     perPage?: number;
     search?: string;
-    providerId: string;
+    gitProvider: string;
 }
 
 export async function analyzeForLinking(sourceUrl: string, providerId: string) {
@@ -620,7 +623,10 @@ export async function analyzeForLinking(sourceUrl: string, providerId: string) {
             };
         }
 
-        const result = await directoryAPI.analyzeForLinking({ sourceUrl: validation.data });
+        const result = await directoryAPI.analyzeForLinking({
+            sourceUrl: validation.data,
+            gitProvider: providerId,
+        });
 
         return {
             success: true,
@@ -639,18 +645,19 @@ export async function getUserRepositories(params: GetUserRepositoriesParams) {
     const t = await getTranslations('actions.directories');
 
     try {
-        const { providerId } = params;
+        const { gitProvider } = params;
 
-        const connectionCheck = await checkGitProviderConnection(providerId);
+        const connectionCheck = await checkGitProviderConnection(gitProvider);
         if (!connectionCheck.connected) {
             return {
                 success: false,
-                error: t('oauthRequired', { provider: providerId }),
+                error: t('oauthRequired', { provider: gitProvider }),
                 requiresGitProvider: true,
             };
         }
 
         const result = await directoryAPI.getUserRepositories({
+            gitProvider,
             page: params.page,
             perPage: params.perPage,
             search: params.search,

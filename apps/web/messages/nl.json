@@ -646,7 +646,7 @@
                 "dataRepo": "Data Repository",
                 "websiteRepo": "Website Repository",
                 "mainRepo": "Hoofd Repository",
-                "repoProvider": "Repository Provider",
+                "gitProvider": "Git Provider",
                 "organization": "Organisatie",
                 "created": "Aangemaakt",
                 "lastUpdated": "Laatst Bijgewerkt",

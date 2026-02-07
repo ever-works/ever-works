@@ -553,7 +553,7 @@
                 "dataRepo": "מאגר נתונים",
                 "websiteRepo": "מאגר אתר אינטרנט",
                 "mainRepo": "מאגר ראשי",
-                "repoProvider": "ספק מאגר",
+                "gitProvider": "ספק Git",
                 "organization": "ארגון",
                 "created": "נוצר",
                 "lastUpdated": "עודכן לאחרונה",

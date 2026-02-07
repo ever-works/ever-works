@@ -31,7 +31,7 @@ export class WebsiteGeneratorService {
                 branch: WEBSITE_TEMPLATE_CONFIG.branch,
                 committer,
             },
-            { userId: directoryOwner.id, providerId: directory.repoProvider },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
         // Create target repo
@@ -42,12 +42,12 @@ export class WebsiteGeneratorService {
                 organization: directory.organization ? directory.getRepoOwner() : undefined,
                 isPrivate: true,
             },
-            { userId: directoryOwner.id, providerId: directory.repoProvider },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
         // Push template to target repo
         const targetCloneUrl = this.gitFacade.getCloneUrl(
-            directory.repoProvider,
+            directory.gitProvider,
             directory.getRepoOwner(),
             directory.getWebsiteRepo(),
         );
@@ -58,7 +58,7 @@ export class WebsiteGeneratorService {
         // Push to target
         await this.gitFacade.push(
             { dir: templateDir, force: true },
-            { userId: directoryOwner.id, providerId: directory.repoProvider },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
         return templateDir;
@@ -75,7 +75,7 @@ export class WebsiteGeneratorService {
                 organization: directory.organization ? directory.getRepoOwner() : undefined,
                 isPrivate: true,
             },
-            { userId: directoryOwner.id, providerId: directory.repoProvider },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
     }
 
@@ -130,7 +130,7 @@ export class WebsiteGeneratorService {
                 committer: user.asCommitter(),
                 forcePush: true,
                 branchMapping,
-                providerId: directory.repoProvider,
+                providerId: directory.gitProvider,
             });
 
             this.logger.log(
@@ -155,7 +155,7 @@ export class WebsiteGeneratorService {
         try {
             await this.gitFacade.deleteRepository(directory.getRepoOwner(), websiteRepo, {
                 userId: directoryOwner.id,
-                providerId: directory.repoProvider,
+                providerId: directory.gitProvider,
             });
         } catch (error) {
             throw error;
@@ -164,7 +164,7 @@ export class WebsiteGeneratorService {
 
     public cleanup(directory: Directory) {
         const dataDir = this.gitFacade.getLocalDir(
-            directory.repoProvider,
+            directory.gitProvider,
             directory.getRepoOwner(),
             directory.getWebsiteRepo(),
         );

@@ -41,7 +41,7 @@ export class WebsiteUpdateService {
         const repositoryExists = await this.gitFacade.repositoryExists(
             directory.getRepoOwner(),
             websiteRepo,
-            { userId: directoryOwner.id, providerId: directory.repoProvider },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
         if (!repositoryExists) {
             throw new NotFoundException(
@@ -54,7 +54,7 @@ export class WebsiteUpdateService {
             WEBSITE_TEMPLATE_CONFIG.owner,
             WEBSITE_TEMPLATE_CONFIG.repo,
             branch,
-            { userId: directoryOwner.id, providerId: directory.repoProvider },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
         let updateResult: { method: string; message: string; commitSha?: string };
@@ -117,7 +117,7 @@ export class WebsiteUpdateService {
                 committer: user.asCommitter(),
                 forcePush: true,
                 branchMapping,
-                providerId: directory.repoProvider,
+                providerId: directory.gitProvider,
             });
 
             this.logger.log(
@@ -151,7 +151,7 @@ export class WebsiteUpdateService {
 
         const hasCredentials = await this.gitFacade.hasValidCredentials({
             userId: directoryOwner.id,
-            providerId: directory.repoProvider,
+            providerId: directory.gitProvider,
         });
 
         if (!hasCredentials) {
@@ -166,7 +166,7 @@ export class WebsiteUpdateService {
             WEBSITE_TEMPLATE_CONFIG.owner,
             WEBSITE_TEMPLATE_CONFIG.repo,
             branch,
-            { userId: directoryOwner.id, providerId: directory.repoProvider },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
         if (!latestCommit) {
@@ -197,7 +197,7 @@ export class WebsiteUpdateService {
                     repo: websiteRepo,
                     committer,
                 },
-                { userId: directoryOwner.id, providerId: directory.repoProvider },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
 
             // Check if this is actually a fork by looking for upstream remote
@@ -206,7 +206,7 @@ export class WebsiteUpdateService {
                 websiteRepo,
                 WEBSITE_TEMPLATE_CONFIG.owner,
                 WEBSITE_TEMPLATE_CONFIG.repo,
-                { userId: directoryOwner.id, providerId: directory.repoProvider },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
 
             if (!isActualFork) {
@@ -234,7 +234,7 @@ export class WebsiteUpdateService {
         const websiteRepo = directory.getWebsiteRepo();
 
         await this.gitFacade.removeLocalDir(
-            directory.repoProvider,
+            directory.gitProvider,
             WEBSITE_TEMPLATE_CONFIG.owner,
             WEBSITE_TEMPLATE_CONFIG.repo,
         );
@@ -247,24 +247,24 @@ export class WebsiteUpdateService {
                 branch,
                 committer: user.asCommitter(),
             },
-            { userId: directoryOwner.id, providerId: directory.repoProvider },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
         // Get the target repository URL
         const targetRepoUrl = this.gitFacade.getCloneUrl(
-            directory.repoProvider,
+            directory.gitProvider,
             directory.getRepoOwner(),
             websiteRepo,
         );
 
         // Remove existing origin and add new one
-        await this.gitFacade.switchBranch(directory.repoProvider, originalDir, branch);
+        await this.gitFacade.switchBranch(directory.gitProvider, originalDir, branch);
         await this.updateRemote(originalDir, targetRepoUrl);
 
         // Push to the target repository
         await this.gitFacade.push(
             { dir: originalDir, force: true },
-            { userId: directoryOwner.id, providerId: directory.repoProvider },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
         this.logger.log(
@@ -293,7 +293,7 @@ export class WebsiteUpdateService {
                     branch,
                     committer,
                 },
-                { userId: directoryOwner.id, providerId: directory.repoProvider },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
             ),
 
             this.gitFacade.cloneOrPull(
@@ -303,7 +303,7 @@ export class WebsiteUpdateService {
                     branch,
                     committer,
                 },
-                { userId: directoryOwner.id, providerId: directory.repoProvider },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
             ),
         ]);
 
@@ -311,10 +311,10 @@ export class WebsiteUpdateService {
         await this.copyRepositoryFiles(originalDir, targetDir);
 
         // Add, commit, and push changes
-        await this.gitFacade.add(directory.repoProvider, targetDir, '.');
+        await this.gitFacade.add(directory.gitProvider, targetDir, '.');
 
         await this.gitFacade.commit(
-            directory.repoProvider,
+            directory.gitProvider,
             targetDir,
             `Update website from template (${branch})`,
             committer,
@@ -322,7 +322,7 @@ export class WebsiteUpdateService {
 
         await this.gitFacade.push(
             { dir: targetDir, force: true },
-            { userId: directoryOwner.id, providerId: directory.repoProvider },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
         this.logger.log(

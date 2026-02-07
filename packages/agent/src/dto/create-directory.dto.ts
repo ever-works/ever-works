@@ -1,6 +1,5 @@
 import { Type, Transform } from 'class-transformer';
 import {
-    IsEnum,
     IsBoolean,
     IsNotEmpty,
     IsOptional,
@@ -12,10 +11,6 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MarkdownReadmeConfig } from '../entities/directory.entity';
 import { sanitizeName, sanitizeDescription, sanitizeText } from '../utils/sanitize.util';
-
-export enum RepoProvider {
-    GITHUB = 'github',
-}
 
 export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
     @ApiPropertyOptional({ description: 'Custom header content for the README' })
@@ -103,13 +98,13 @@ export class CreateDirectoryDto {
     organization: boolean;
 
     @ApiPropertyOptional({
-        description: 'Repository provider',
-        enum: RepoProvider,
-        default: RepoProvider.GITHUB,
+        description: 'Git provider plugin ID (e.g., github, gitlab)',
+        default: 'github',
     })
-    @IsEnum(RepoProvider)
+    @IsString()
     @IsOptional()
-    repoProvider: RepoProvider = RepoProvider.GITHUB;
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+    gitProvider: string = 'github';
 
     @ApiPropertyOptional({
         description: 'Deploy provider (e.g., vercel)',

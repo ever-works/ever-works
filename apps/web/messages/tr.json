@@ -646,7 +646,7 @@
                 "dataRepo": "Veri Deposu",
                 "websiteRepo": "Web Sitesi Deposu",
                 "mainRepo": "Ana Depo",
-                "repoProvider": "Depo Sağlayıcı",
+                "gitProvider": "Git Sağlayıcı",
                 "organization": "Organizasyon",
                 "created": "Oluşturuldu",
                 "lastUpdated": "Son Güncelleme",

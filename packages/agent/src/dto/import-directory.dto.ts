@@ -24,6 +24,10 @@ export class AnalyzeRepositoryDto {
     @IsUrl({}, { message: 'Please provide a valid repository URL' })
     @IsNotEmpty()
     sourceUrl: string;
+
+    @IsOptional()
+    @IsString()
+    gitProvider?: string;
 }
 
 export class AnalyzeRepositoryResponseDto {
@@ -77,7 +81,7 @@ export class ImportDirectoryDto {
 
     @IsString()
     @IsNotEmpty({ message: 'Git provider is required' })
-    repoProvider: string;
+    gitProvider: string;
 
     @IsOptional()
     @IsString()
@@ -120,7 +124,7 @@ export class GitRepoDto {
 export class GetUserRepositoriesDto {
     @IsString()
     @IsNotEmpty()
-    providerId: string;
+    gitProvider: string;
 
     @IsOptional()
     @IsNumber()

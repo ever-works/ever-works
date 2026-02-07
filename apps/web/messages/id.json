@@ -646,7 +646,7 @@
                 "dataRepo": "Repositori Data",
                 "websiteRepo": "Repositori Situs Web",
                 "mainRepo": "Repositori Utama",
-                "repoProvider": "Penyedia Repositori",
+                "gitProvider": "Penyedia Git",
                 "organization": "Organisasi",
                 "created": "Dibuat",
                 "lastUpdated": "Terakhir Diperbarui",

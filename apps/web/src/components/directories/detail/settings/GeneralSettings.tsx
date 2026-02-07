@@ -48,7 +48,7 @@ export function GeneralSettings() {
                     <>
                         <OrganizationSelector
                             value={formData.owner || ''}
-                            providerId={directory.repoProvider}
+                            providerId={directory.gitProvider}
                             onChange={(value, isOrganization) => {
                                 setFormData({
                                     ...formData,

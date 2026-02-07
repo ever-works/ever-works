@@ -18,7 +18,7 @@ export interface MarkdownReadmeConfigDto {
 	overwriteDefaultFooter?: boolean;
 }
 
-export enum RepoProvider {
+export enum GitProvider {
 	GITHUB = 'github'
 }
 

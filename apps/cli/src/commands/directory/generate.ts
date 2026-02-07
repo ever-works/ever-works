@@ -7,7 +7,7 @@ import { getApiService, CreateItemsGeneratorDto } from '../../services/api.servi
 import { DirectoryPromptService } from './directory-prompt.service';
 import { GeneratePromptService } from './generate-prompt.service';
 import { handleCliError } from '../../utils/error';
-import { GenerateStatusType, RepoProvider } from '@packages/cli-shared';
+import { GenerateStatusType, GitProvider } from '@packages/cli-shared';
 import { WEB_URL } from '../../utils/constants';
 
 export const generateCommand = new Command('generate')
@@ -59,7 +59,7 @@ export const generateCommand = new Command('generate')
             }
 
             // Check if github is connected
-            const githubConnected = await apiService.checkConnection(RepoProvider.GITHUB);
+            const githubConnected = await apiService.checkConnection(GitProvider.GITHUB);
             if (!githubConnected.connected) {
                 console.log(
                     chalk.yellow(

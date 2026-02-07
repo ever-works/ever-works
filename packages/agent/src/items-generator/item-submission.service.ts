@@ -50,7 +50,7 @@ export class ItemSubmissionService {
                     repo,
                     committer,
                 },
-                { userId: directoryOwner.id, providerId: directory.repoProvider },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
 
             const data = await DataRepository.create(dest);
@@ -75,7 +75,7 @@ export class ItemSubmissionService {
             );
 
             // Get main branch
-            const provider = directory.repoProvider;
+            const provider = directory.gitProvider;
             const defaultBranch = await this.gitFacade.getMainBranch(provider, dest);
 
             let branchName: string | null = null;
@@ -182,7 +182,7 @@ export class ItemSubmissionService {
             // Push changes
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: directoryOwner.id, providerId: directory.repoProvider },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
 
             // If direct commit, return success without PR
@@ -240,7 +240,7 @@ export class ItemSubmissionService {
                     title: prTitle,
                     body: prBody,
                 },
-                { userId: directoryOwner.id, providerId: directory.repoProvider },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
 
             this.logger.log(`PR #${pr.number} created for item "${itemWithMarkdown.name}"`);
@@ -295,7 +295,7 @@ export class ItemSubmissionService {
                     repo,
                     committer,
                 },
-                { userId: directoryOwner.id, providerId: directory.repoProvider },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
 
             const data = await DataRepository.create(dest);
@@ -326,7 +326,7 @@ export class ItemSubmissionService {
             }
 
             const shouldCreatePR = removeItemDto.create_pull_request === true;
-            const provider = directory.repoProvider;
+            const provider = directory.gitProvider;
             const defaultBranch = await this.gitFacade.getMainBranch(provider, dest);
 
             let branchName: string | null = null;
@@ -367,7 +367,7 @@ export class ItemSubmissionService {
             // Push changes
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: directoryOwner.id, providerId: directory.repoProvider },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
 
             if (shouldCreatePR && branchName && defaultBranch) {
@@ -389,7 +389,7 @@ export class ItemSubmissionService {
                         title: prTitle,
                         body: prBody,
                     },
-                    { userId: directoryOwner.id, providerId: directory.repoProvider },
+                    { userId: directoryOwner.id, providerId: directory.gitProvider },
                 );
 
                 return {
@@ -449,7 +449,7 @@ export class ItemSubmissionService {
                     repo,
                     committer,
                 },
-                { userId: directoryOwner.id, providerId: directory.repoProvider },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
 
             const data = await DataRepository.create(dest);
@@ -465,7 +465,7 @@ export class ItemSubmissionService {
                 };
             }
 
-            const provider = directory.repoProvider;
+            const provider = directory.gitProvider;
             const defaultBranch = await this.gitFacade.getMainBranch(provider, dest);
             const shouldCreatePR = updateItemDto.create_pull_request === true;
 
@@ -508,7 +508,7 @@ export class ItemSubmissionService {
             await this.gitFacade.commit(provider, dest, commitMessage, user.asCommitter());
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: directoryOwner.id, providerId: directory.repoProvider },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
 
             if (shouldCreatePR && branchName && defaultBranch) {
@@ -529,7 +529,7 @@ export class ItemSubmissionService {
                         title: prTitle,
                         body: prBody,
                     },
-                    { userId: directoryOwner.id, providerId: directory.repoProvider },
+                    { userId: directoryOwner.id, providerId: directory.gitProvider },
                 );
 
                 return {

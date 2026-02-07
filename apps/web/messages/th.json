@@ -646,7 +646,7 @@
                 "dataRepo": "รีโพสิทอรีข้อมูล",
                 "websiteRepo": "รีโพสิทอรีเว็บไซต์",
                 "mainRepo": "รีโพสิทอรีหลัก",
-                "repoProvider": "ผู้ให้บริการรีโพสิทอรี",
+                "gitProvider": "ผู้ให้บริการ Git",
                 "organization": "องค์กร",
                 "created": "สร้างเมื่อ",
                 "lastUpdated": "อัปเดตล่าสุด",

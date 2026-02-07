@@ -48,7 +48,7 @@ export class Directory {
     owner?: string;
 
     @Column({ default: 'github' })
-    repoProvider: string; // 'github', 'gitlab', etc.
+    gitProvider: string; // 'github', 'gitlab', etc.
 
     @Column({ nullable: true })
     deployProvider?: string; // 'vercel', 'netlify', etc.

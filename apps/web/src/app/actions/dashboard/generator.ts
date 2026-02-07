@@ -91,17 +91,17 @@ export async function generateItems(directoryId: string, data: CreateItemsGenera
         const { directory } = await directoryAPI.get(directoryId);
 
         // Check git provider connection
-        const connectionCheck = await checkGitProviderConnection(directory.repoProvider);
+        const connectionCheck = await checkGitProviderConnection(directory.gitProvider);
         if (!connectionCheck.connected) {
             return {
                 success: false,
-                error: tDirectories('oauthRequired', { provider: directory.repoProvider }),
+                error: tDirectories('oauthRequired', { provider: directory.gitProvider }),
                 requiresGitProvider: true,
             };
         }
 
         // Get organizations from the git provider
-        const orgsResult = await gitProvidersAPI.getOrganizations(directory.repoProvider);
+        const orgsResult = await gitProvidersAPI.getOrganizations(directory.gitProvider);
         const orgs = orgsResult.organizations || [];
 
         // connectionCheck.username is available when connected is true

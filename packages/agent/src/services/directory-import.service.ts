@@ -80,7 +80,7 @@ export class DirectoryImportService {
         dto: AnalyzeRepositoryDto,
         user: User,
     ): Promise<AnalyzeRepositoryResponseDto> {
-        const providerId = this.getProviderFromUrl(dto.sourceUrl);
+        const providerId = dto.gitProvider || this.getProviderFromUrl(dto.sourceUrl);
         const token = await this.getProviderToken(user, providerId);
         return this.sourceRepoAnalyzer.analyzeRepository(dto.sourceUrl, token);
     }
@@ -89,7 +89,7 @@ export class DirectoryImportService {
         dto: AnalyzeRepositoryDto,
         user: User,
     ): Promise<AnalyzeForLinkingResponseDto> {
-        const providerId = this.getProviderFromUrl(dto.sourceUrl);
+        const providerId = dto.gitProvider || this.getProviderFromUrl(dto.sourceUrl);
         const token = await this.getProviderToken(user, providerId);
         if (!token) {
             return {
@@ -113,7 +113,7 @@ export class DirectoryImportService {
         dto: GetUserRepositoriesDto,
         user: User,
     ): Promise<GetUserRepositoriesResponseDto> {
-        const options = { userId: user.id, providerId: dto.providerId };
+        const options = { userId: user.id, providerId: dto.gitProvider };
         const hasCredentials = await this.gitFacade.hasValidCredentials(options);
 
         if (!hasCredentials) {
@@ -194,7 +194,7 @@ export class DirectoryImportService {
         }
 
         try {
-            if (!dto.repoProvider) {
+            if (!dto.gitProvider) {
                 return {
                     status: 'error',
                     message: 'Git provider is required',
@@ -209,7 +209,7 @@ export class DirectoryImportService {
                     userId: user.id,
                     owner: dto.owner,
                     organization: dto.organization || false,
-                    repoProvider: dto.repoProvider,
+                    gitProvider: dto.gitProvider,
                 },
                 user,
             );
@@ -377,7 +377,7 @@ export class DirectoryImportService {
         let result: DirectoryImportResult | null = null;
 
         try {
-            const token = await this.getProviderToken(user, directory.repoProvider);
+            const token = await this.getProviderToken(user, directory.gitProvider);
 
             if (dto.sourceType === ImportSourceTypeEnum.DATA_REPO) {
                 if (!token) {
@@ -559,7 +559,7 @@ export class DirectoryImportService {
         user: User,
         source: { owner: string; repo: string },
     ): Promise<DirectoryImportResult> {
-        const options = { userId: user.id, providerId: directory.repoProvider };
+        const options = { userId: user.id, providerId: directory.gitProvider };
         const hasCredentials = await this.gitFacade.hasValidCredentials(options);
 
         if (!hasCredentials) {
@@ -578,7 +578,7 @@ export class DirectoryImportService {
                     repo: source.repo,
                     committer: user.asCommitter(),
                 },
-                { userId: user.id, providerId: directory.repoProvider },
+                { userId: user.id, providerId: directory.gitProvider },
             );
 
             const sourceData = await DataRepository.create(sourceDir);

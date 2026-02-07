@@ -89,7 +89,7 @@ export class TriggerInternalController {
 
         const gitToken = await this.gitFacade.getAccessToken({
             userId,
-            providerId: directory.repoProvider,
+            providerId: directory.gitProvider,
         });
 
         return {

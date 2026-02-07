@@ -646,7 +646,7 @@
                 "dataRepo": "データリポジトリ",
                 "websiteRepo": "Webサイトリポジトリ",
                 "mainRepo": "メインリポジトリ",
-                "repoProvider": "リポジトリプロバイダー",
+                "gitProvider": "Gitプロバイダー",
                 "organization": "組織",
                 "created": "作成日",
                 "lastUpdated": "最終更新日",

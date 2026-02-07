@@ -646,7 +646,7 @@
                 "dataRepo": "Kho lưu trữ Dữ liệu",
                 "websiteRepo": "Kho lưu trữ Website",
                 "mainRepo": "Kho lưu trữ Chính",
-                "repoProvider": "Nhà cung cấp Kho lưu trữ",
+                "gitProvider": "Nhà cung cấp Git",
                 "organization": "Tổ chức",
                 "created": "Đã tạo",
                 "lastUpdated": "Lần cập nhật cuối",

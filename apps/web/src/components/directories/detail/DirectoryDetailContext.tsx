@@ -77,7 +77,7 @@ function repoLink(directory: Directory, oauthConnection: GitProviderConnectionIn
         return null;
     }
 
-    const providerUrl = getProviderBaseUrl(directory.repoProvider);
+    const providerUrl = getProviderBaseUrl(directory.gitProvider);
     if (!providerUrl) {
         return null;
     }

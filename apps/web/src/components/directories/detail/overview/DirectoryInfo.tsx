@@ -85,8 +85,8 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
             ),
         },
         {
-            label: t('repoProvider'),
-            value: directory.repoProvider,
+            label: t('gitProvider'),
+            value: directory.gitProvider,
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path

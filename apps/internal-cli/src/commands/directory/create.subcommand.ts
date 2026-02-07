@@ -7,7 +7,6 @@ import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
 import { DirectoryLifecycleService } from '@packages/agent/services';
-import { RepoProvider } from '@packages/agent/dto';
 
 const DEFAULT_PROVIDER_ID = 'github';
 
@@ -81,7 +80,7 @@ export class CreateSubCommand extends CommandRunner {
                         slug: directoryData.slug,
                         name: directoryData.name,
                         description: directoryData.description,
-                        repoProvider: RepoProvider.GITHUB,
+                        gitProvider: DEFAULT_PROVIDER_ID,
                         owner: directoryData.owner ?? undefined,
                         organization: !!directoryData.owner,
                     },
