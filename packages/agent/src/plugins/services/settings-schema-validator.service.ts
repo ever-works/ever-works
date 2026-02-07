@@ -216,23 +216,16 @@ export class SettingsSchemaValidatorService {
     /**
      * Check if a property's scope is applicable to the validation scope.
      *
-     * Scope hierarchy: global < user < directory
-     * - global settings are applicable at all scopes
-     * - user settings are applicable at user and directory scopes
-     * - directory settings are only applicable at directory scope
+     * Each scope only validates its own fields plus global fields:
+     * - global fields are applicable at all scopes
+     * - user fields are applicable only at user scope
+     * - directory fields are applicable only at directory scope
      */
     private isScopeApplicable(
         propertyScope: SettingsScope,
         validationScope: SettingsScope,
     ): boolean {
-        const scopeLevel: Record<SettingsScope, number> = {
-            global: 0,
-            user: 1,
-            directory: 2,
-        };
-
-        // A property is applicable if its scope level is <= the validation scope level
-        return scopeLevel[propertyScope] <= scopeLevel[validationScope];
+        return propertyScope === 'global' || propertyScope === validationScope;
     }
 
     /**

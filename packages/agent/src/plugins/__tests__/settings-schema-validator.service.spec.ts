@@ -120,17 +120,29 @@ describe('SettingsSchemaValidatorService', () => {
             );
             expect(userResult.valid).toBe(false);
 
-            // At directory scope, all settings should be validated
+            // At directory scope, only global and directory settings should be validated
             const directoryResult = service.validateSettings(
                 {
                     globalSetting: 'value',
-                    userSetting: 'value',
-                    directorySetting: 123, // Wrong type
+                    userSetting: 123, // Wrong type but should be ignored at directory scope
+                    directorySetting: 123, // Wrong type - should be caught
                 },
                 schema,
                 'directory',
             );
             expect(directoryResult.valid).toBe(false);
+
+            // At directory scope, user-scoped wrong types are ignored
+            const directoryValidResult = service.validateSettings(
+                {
+                    globalSetting: 'value',
+                    userSetting: 123, // Wrong type but ignored at directory scope
+                    directorySetting: 'value',
+                },
+                schema,
+                'directory',
+            );
+            expect(directoryValidResult.valid).toBe(true);
         });
     });
 
@@ -172,6 +184,38 @@ describe('SettingsSchemaValidatorService', () => {
             };
 
             const result = service.validateRequiredFields({ apiKey: '' }, schema, 'global');
+            expect(result.valid).toBe(false);
+        });
+
+        it('should not require user-scoped fields when validating at directory scope', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                required: ['apiKey', 'defaultModel'],
+                properties: {
+                    apiKey: { type: 'string', 'x-scope': 'user' },
+                    defaultModel: { type: 'string', 'x-scope': 'global' },
+                },
+            };
+
+            // At directory scope, only global+directory fields required — apiKey is user-scoped
+            const result = service.validateRequiredFields(
+                { defaultModel: 'gemini-2.5-flash' },
+                schema,
+                'directory',
+            );
+            expect(result.valid).toBe(true);
+        });
+
+        it('should require user-scoped fields when validating at user scope', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                required: ['apiKey'],
+                properties: {
+                    apiKey: { type: 'string', 'x-scope': 'user' },
+                },
+            };
+
+            const result = service.validateRequiredFields({}, schema, 'user');
             expect(result.valid).toBe(false);
         });
 
