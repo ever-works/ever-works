@@ -63,6 +63,7 @@ export function DirectoryPluginSettingsModal({
         initialSettings: plugin.directorySettings || {},
         scopes: ['global', 'directory'],
         onSave,
+        fallbackSettings: plugin.settings,
     });
 
     const handleSaveAndClose = async () => {

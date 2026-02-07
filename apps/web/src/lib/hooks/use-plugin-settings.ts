@@ -17,6 +17,9 @@ interface UsePluginSettingsOptions {
         settings?: Record<string, unknown>;
         secretSettings?: Record<string, unknown>;
     }) => Promise<void>;
+    /** Display-only fallback values shown when a field has no value in initialSettings.
+     *  These are NOT saved — only used by getFieldValue for display purposes. */
+    fallbackSettings?: Record<string, unknown>;
 }
 
 /** Stable empty object to avoid re-renders when initialSettings is undefined */
@@ -41,6 +44,7 @@ export function usePluginSettings({
     initialSettings,
     scopes,
     onSave,
+    fallbackSettings,
 }: UsePluginSettingsOptions): UsePluginSettingsReturn {
     const t = useTranslations('dashboard.plugins');
     const router = useRouter();
@@ -224,12 +228,19 @@ export function usePluginSettings({
 
     const getFieldValue = useCallback(
         (key: string, propSchema: PluginSettingsSchemaProperty): unknown => {
+            let value: unknown;
             if (propSchema.secret) {
-                return key in secretSettings ? secretSettings[key] : settings[key];
+                value = key in secretSettings ? secretSettings[key] : settings[key];
+            } else {
+                value = settings[key];
             }
-            return settings[key];
+            // Fall back to inherited value for display when no local value is set
+            if ((value === undefined || value === null || value === '') && fallbackSettings) {
+                return fallbackSettings[key];
+            }
+            return value;
         },
-        [settings, secretSettings],
+        [settings, secretSettings, fallbackSettings],
     );
 
     return {
