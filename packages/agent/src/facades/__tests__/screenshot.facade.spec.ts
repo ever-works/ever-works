@@ -372,5 +372,23 @@ describe('ScreenshotFacadeService', () => {
 
             expect(url).toBeNull();
         });
+
+        it('should resolve settings and pass to plugin.getScreenshotUrl', async () => {
+            const screenshotPlugin = createMockScreenshotPlugin('screenshotone', 'ScreenshotOne');
+            const registered = createRegisteredPlugin(screenshotPlugin, {
+                capabilities: ['screenshot'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+            settingsService.getSettings.mockResolvedValue({ accessKey: 'abc' });
+
+            await service.getScreenshotUrl({ url: 'https://example.com' }, { userId: 'user-1' });
+
+            expect(screenshotPlugin.getScreenshotUrl).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    url: 'https://example.com',
+                    settings: expect.objectContaining({ accessKey: 'abc' }),
+                }),
+            );
+        });
     });
 });

@@ -11,6 +11,8 @@ import type {
 	EmbeddingResponse
 } from '../contracts/capabilities/ai-provider.interface.js';
 import type { PluginCategory } from '../contracts/plugin-manifest.types.js';
+import type { PluginSettings } from '../settings/settings.types.js';
+import type { AiOperationsConfig } from '../ai/ai-operations.js';
 
 /**
  * Abstract base class for AI provider plugins
@@ -33,17 +35,33 @@ export abstract class BaseAiProvider extends BasePlugin implements IAiProviderPl
 	abstract createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse>;
 
 	/**
+	 * Resolve plugin settings into AiOperations config overrides.
+	 * Standard plugins (openai, anthropic, google, groq, ollama) use this directly.
+	 * OpenRouter overrides it to handle provider-specific mapping.
+	 */
+	protected resolveConfig(settings?: PluginSettings): Partial<AiOperationsConfig> {
+		const s = settings ?? {};
+		const config: Partial<AiOperationsConfig> = {};
+		if (s.apiKey) config.apiKey = s.apiKey as string;
+		if (s.defaultModel) config.model = s.defaultModel as string;
+		if (s.baseUrl) config.baseURL = s.baseUrl as string;
+		if (s.temperature !== undefined) config.temperature = s.temperature as number;
+		if (s.maxTokens !== undefined) config.maxTokens = s.maxTokens as number;
+		return config;
+	}
+
+	/**
 	 * List available models
 	 * Must be implemented by subclasses
 	 */
-	abstract listModels(): Promise<readonly AiModel[]>;
+	abstract listModels(settings?: PluginSettings): Promise<readonly AiModel[]>;
 
 	/**
 	 * Get a specific model
 	 * Default implementation uses listModels
 	 */
-	async getModel(modelId: string): Promise<AiModel | null> {
-		const models = await this.listModels();
+	async getModel(modelId: string, settings?: PluginSettings): Promise<AiModel | null> {
+		const models = await this.listModels(settings);
 		return models.find((m) => m.id === modelId) || null;
 	}
 
@@ -51,9 +69,9 @@ export abstract class BaseAiProvider extends BasePlugin implements IAiProviderPl
 	 * Check if the provider is available
 	 * Default implementation tries to list models
 	 */
-	async isAvailable(): Promise<boolean> {
+	async isAvailable(settings?: PluginSettings): Promise<boolean> {
 		try {
-			await this.listModels();
+			await this.listModels(settings);
 			return true;
 		} catch {
 			return false;
@@ -105,8 +123,8 @@ export abstract class BaseAiProvider extends BasePlugin implements IAiProviderPl
 	 * Validate API key
 	 * Optional - subclasses can override
 	 */
-	async validateApiKey(): Promise<boolean> {
-		return this.isAvailable();
+	async validateApiKey(settings?: PluginSettings): Promise<boolean> {
+		return this.isAvailable(settings);
 	}
 
 	// Helper methods

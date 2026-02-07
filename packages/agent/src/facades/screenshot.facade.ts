@@ -127,7 +127,8 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
             return null;
         }
 
-        return plugin.getScreenshotUrl(options);
+        const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
+        return plugin.getScreenshotUrl({ ...options, settings });
     }
 
     isAvailable(): boolean {

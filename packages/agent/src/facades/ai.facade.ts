@@ -108,7 +108,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             );
         }
 
-        const cost = await this.calculateCost(plugin, response.model, response.usage);
+        const cost = await this.calculateCost(plugin, response.model, response.usage, settings);
 
         return {
             result: validated.data,
@@ -129,11 +129,12 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         plugin: IAiProviderPlugin,
         modelId: string,
         usage?: { promptTokens: number; completionTokens: number; totalTokens: number },
+        settings?: Record<string, unknown>,
     ): Promise<number | null> {
         if (!usage) return null;
 
         try {
-            const modelInfo = await plugin.getModel(modelId);
+            const modelInfo = await plugin.getModel(modelId, settings);
             if (!modelInfo?.inputCostPer1k || !modelInfo?.outputCostPer1k) return null;
 
             const inputCost = (usage.promptTokens * modelInfo.inputCostPer1k) / 1000;
@@ -219,7 +220,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                 facadeOptions?.directoryId,
             );
 
-            const isAvailable = await plugin.isAvailable();
+            const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
+            const isAvailable = await plugin.isAvailable(settings);
 
             return {
                 success: isAvailable,
@@ -291,7 +293,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                 facadeOptions?.userId,
                 facadeOptions?.directoryId,
             );
-            return await plugin.listModels();
+            const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
+            return await plugin.listModels(settings);
         } catch (error) {
             this.logger.warn(`Failed to get available models: ${(error as Error).message}`);
             return [];

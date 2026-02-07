@@ -506,6 +506,21 @@ describe('AiFacadeService', () => {
             expect(result.success).toBe(false);
             expect(result.error).toContain('No AI provider');
         });
+
+        it('should resolve settings and pass to plugin.isAvailable', async () => {
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+            settingsService.getSettings.mockResolvedValue({ apiKey: 'test-key' });
+
+            await service.testConnection({ userId: 'user-1' });
+
+            expect(aiPlugin.isAvailable).toHaveBeenCalledWith(
+                expect.objectContaining({ apiKey: 'test-key' }),
+            );
+        });
     });
 
     describe('model routing', () => {
@@ -737,6 +752,23 @@ describe('AiFacadeService', () => {
             const models = await service.getAvailableModels(defaultFacadeOptions);
 
             expect(models).toHaveLength(0);
+        });
+
+        it('should resolve settings and pass to plugin.listModels', async () => {
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
+            (aiPlugin.listModels as jest.Mock).mockResolvedValue([]);
+
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+            settingsService.getSettings.mockResolvedValue({ apiKey: 'test-key' });
+
+            await service.getAvailableModels({ userId: 'user-1' });
+
+            expect(aiPlugin.listModels).toHaveBeenCalledWith(
+                expect.objectContaining({ apiKey: 'test-key' }),
+            );
         });
     });
 });

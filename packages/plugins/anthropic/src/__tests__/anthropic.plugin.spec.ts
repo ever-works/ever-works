@@ -1,6 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AnthropicPlugin } from '../anthropic.plugin';
 import type { PluginContext } from '@ever-works/plugin';
+import { AiOperations } from '@ever-works/plugin/ai';
+
+vi.mock('@ever-works/plugin/ai', () => {
+	const MockAiOperations = vi.fn().mockImplementation(() => ({
+		createChatCompletion: vi.fn().mockResolvedValue({ id: 'test', choices: [], model: 'claude', created: 0 }),
+		createStreamingChatCompletion: vi.fn(),
+		createEmbedding: vi.fn(),
+		listModels: vi.fn().mockResolvedValue([]),
+		testConnection: vi.fn().mockResolvedValue({ success: true })
+	}));
+	return { AiOperations: MockAiOperations };
+});
 
 describe('AnthropicPlugin', () => {
 	let plugin: AnthropicPlugin;
@@ -159,6 +171,33 @@ describe('AnthropicPlugin', () => {
 			expect(health.status).toBe('healthy');
 			expect(health.message).toBe('Anthropic plugin is ready');
 			expect(health.checkedAt).toBeDefined();
+		});
+	});
+
+	describe('settings threading', () => {
+		const createMockContext = (): PluginContext =>
+			({
+				pluginId: 'anthropic',
+				logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+				getSettings: vi.fn().mockResolvedValue({})
+			}) as unknown as PluginContext;
+
+		it('should pass settings as configOverrides to AiOperations.listModels', async () => {
+			await plugin.onLoad(createMockContext());
+			const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+
+			await plugin.listModels({ apiKey: 'sk-test' });
+
+			expect(aiOpsInstance.listModels).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'sk-test' }));
+		});
+
+		it('should pass settings as configOverrides to AiOperations.testConnection', async () => {
+			await plugin.onLoad(createMockContext());
+			const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+
+			await plugin.isAvailable({ apiKey: 'sk-test' });
+
+			expect(aiOpsInstance.testConnection).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'sk-test' }));
 		});
 	});
 });

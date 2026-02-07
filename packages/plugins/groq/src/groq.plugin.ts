@@ -1,5 +1,5 @@
 import { BaseAiProvider } from '@ever-works/plugin/abstract';
-import { AiOperations, type AiOperationsConfig } from '@ever-works/plugin/ai';
+import { AiOperations } from '@ever-works/plugin/ai';
 import type {
 	PluginContext,
 	PluginManifest,
@@ -128,22 +128,11 @@ export class GroqPlugin extends BaseAiProvider {
 		await super.onUnload();
 	}
 
-	private resolveConfig(options: ChatCompletionOptions): Partial<AiOperationsConfig> {
-		const settings = options.settings ?? {};
-		const config: Partial<AiOperationsConfig> = {};
-		if (settings.apiKey) config.apiKey = settings.apiKey as string;
-		if (settings.defaultModel) config.model = settings.defaultModel as string;
-		if (settings.baseUrl) config.baseURL = settings.baseUrl as string;
-		if (settings.temperature !== undefined) config.temperature = settings.temperature as number;
-		if (settings.maxTokens !== undefined) config.maxTokens = settings.maxTokens as number;
-		return config;
-	}
-
 	async createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse> {
 		if (!this.aiOps) {
 			throw new Error('Groq plugin not loaded');
 		}
-		const resolvedConfig = this.resolveConfig(options);
+		const resolvedConfig = this.resolveConfig(options.settings);
 		return this.aiOps.createChatCompletion(options, resolvedConfig);
 	}
 
@@ -151,7 +140,7 @@ export class GroqPlugin extends BaseAiProvider {
 		if (!this.aiOps) {
 			throw new Error('Groq plugin not loaded');
 		}
-		const resolvedConfig = this.resolveConfig(options);
+		const resolvedConfig = this.resolveConfig(options.settings);
 		yield* this.aiOps.createStreamingChatCompletion(options, resolvedConfig);
 	}
 
@@ -159,18 +148,18 @@ export class GroqPlugin extends BaseAiProvider {
 		throw new Error('Embeddings not supported by Groq');
 	}
 
-	async listModels(): Promise<readonly AiModel[]> {
+	async listModels(settings?: PluginSettings): Promise<readonly AiModel[]> {
 		if (!this.aiOps) {
 			throw new Error('Groq plugin not loaded');
 		}
-		return this.aiOps.listModels();
+		return this.aiOps.listModels(this.resolveConfig(settings));
 	}
 
-	async isAvailable(): Promise<boolean> {
+	async isAvailable(settings?: PluginSettings): Promise<boolean> {
 		if (!this.aiOps) {
 			return false;
 		}
-		const result = await this.aiOps.testConnection();
+		const result = await this.aiOps.testConnection(this.resolveConfig(settings));
 		return result.success;
 	}
 

@@ -249,22 +249,22 @@ export interface IAiProviderPlugin extends IPlugin {
 	/**
 	 * List available models
 	 */
-	listModels(): Promise<readonly AiModel[]>;
+	listModels(settings?: PluginSettings): Promise<readonly AiModel[]>;
 
 	/**
 	 * Get a specific model
 	 */
-	getModel(modelId: string): Promise<AiModel | null>;
+	getModel(modelId: string, settings?: PluginSettings): Promise<AiModel | null>;
 
 	/**
 	 * Check if the provider is available
 	 */
-	isAvailable(): Promise<boolean>;
+	isAvailable(settings?: PluginSettings): Promise<boolean>;
 
 	/**
 	 * Validate API key
 	 */
-	validateApiKey?(): Promise<boolean>;
+	validateApiKey?(settings?: PluginSettings): Promise<boolean>;
 
 	/**
 	 * Get provider capabilities

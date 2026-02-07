@@ -7,9 +7,7 @@ import type {
 	ChatCompletionResponse,
 	ChatCompletionChunk,
 	EmbeddingOptions,
-	EmbeddingResponse
-} from '@ever-works/plugin';
-import type {
+	EmbeddingResponse,
 	PluginContext,
 	PluginManifest,
 	PluginHealthCheck,
@@ -160,7 +158,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			throw new Error('OpenRouter plugin not loaded');
 		}
 
-		const config = this.resolveConfig(options);
+		const config = this.resolveConfig(options.settings);
 		return this.aiOps.createChatCompletion(options, config);
 	}
 
@@ -169,7 +167,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			throw new Error('OpenRouter plugin not loaded');
 		}
 
-		const config = this.resolveConfig(options);
+		const config = this.resolveConfig(options.settings);
 		yield* this.aiOps.createStreamingChatCompletion(options, config);
 	}
 
@@ -181,21 +179,21 @@ export class OpenRouterPlugin extends BaseAiProvider {
 		return this.aiOps.createEmbedding(options);
 	}
 
-	async listModels(): Promise<readonly AiModel[]> {
+	async listModels(settings?: PluginSettings): Promise<readonly AiModel[]> {
 		if (!this.aiOps) {
 			throw new Error('OpenRouter plugin not loaded');
 		}
 
-		return this.aiOps.listModels();
+		return this.aiOps.listModels(this.resolveConfig(settings));
 	}
 
-	async isAvailable(): Promise<boolean> {
+	async isAvailable(settings?: PluginSettings): Promise<boolean> {
 		if (!this.aiOps) {
 			return false;
 		}
 
 		try {
-			const result = await this.aiOps.testConnection();
+			const result = await this.aiOps.testConnection(this.resolveConfig(settings));
 			return result.success;
 		} catch {
 			return false;
@@ -289,39 +287,30 @@ export class OpenRouterPlugin extends BaseAiProvider {
 		};
 	}
 
-	// Private helpers
+	// Protected helpers
 
 	/**
-	 * Resolve configuration from options.settings (user > admin > plugin defaults).
-	 * When the facade calls createChatCompletion, it passes the resolved settings
-	 * in options.settings. This method extracts relevant config overrides from those settings.
+	 * Resolve configuration from plugin settings (user > admin > plugin defaults).
+	 * OpenRouter overrides the base implementation to use stricter type checks.
 	 */
-	private resolveConfig(options: ChatCompletionOptions): Partial<AiOperationsConfig> {
-		const settings = options.settings;
-		if (!settings) {
-			return {};
-		}
-
+	protected override resolveConfig(settings?: PluginSettings): Partial<AiOperationsConfig> {
+		const s = settings ?? {};
 		const config: Partial<AiOperationsConfig> = {};
 
-		if (settings.apiKey && typeof settings.apiKey === 'string') {
-			config.apiKey = settings.apiKey;
+		if (s.apiKey && typeof s.apiKey === 'string') {
+			config.apiKey = s.apiKey;
 		}
 
-		if (settings.baseUrl && typeof settings.baseUrl === 'string') {
-			config.baseURL = settings.baseUrl;
+		if (s.baseUrl && typeof s.baseUrl === 'string') {
+			config.baseURL = s.baseUrl;
 		}
 
-		const temperature =
-			options.temperature ?? (typeof settings.temperature === 'number' ? settings.temperature : undefined);
-		if (temperature !== undefined) {
-			config.temperature = temperature;
+		if (typeof s.temperature === 'number') {
+			config.temperature = s.temperature;
 		}
 
-		const maxTokens =
-			options.maxTokens ?? (typeof settings.maxTokens === 'number' ? settings.maxTokens : undefined);
-		if (maxTokens !== undefined) {
-			config.maxTokens = maxTokens;
+		if (typeof s.maxTokens === 'number') {
+			config.maxTokens = s.maxTokens;
 		}
 
 		return config;
