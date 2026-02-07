@@ -106,6 +106,13 @@ export class PluginBootstrapService {
             this.logger.log(`Auto-enabled ${systemEnabled} system plugins`);
         }
 
+        // Auto-enable plugins with autoEnable: true in their manifest
+        const autoEnableResults = await this.lifecycleManager.enableAutoEnablePlugins();
+        const autoEnabled = autoEnableResults.filter((r) => r.success).length;
+        if (autoEnabled > 0) {
+            this.logger.log(`Auto-enabled ${autoEnabled} plugins with autoEnable manifest flag`);
+        }
+
         // Mark as initialized
         PluginBootstrapService.initialized = true;
         this.logger.log('Plugin system bootstrapped successfully');
@@ -114,7 +121,7 @@ export class PluginBootstrapService {
             executed: true,
             loaded: result.loaded,
             failed: result.failed,
-            systemEnabled,
+            systemEnabled: systemEnabled + autoEnabled,
         };
     }
 

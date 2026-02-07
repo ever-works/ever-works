@@ -47,7 +47,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 				description: 'Used for all AI tasks unless a tier-specific model is set',
 				default: 'gpt-5-nano',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			simpleModel: {
 				type: 'string',
@@ -55,7 +55,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 				description: 'Handles tags, short descriptions, and quick classifications',
 				default: 'gpt-5-nano',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			mediumModel: {
 				type: 'string',
@@ -63,7 +63,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 				description: 'Handles listings, summaries, and content reformatting',
 				default: 'gpt-4o-mini',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			complexModel: {
 				type: 'string',
@@ -71,7 +71,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 				description: 'Handles full page generation and multi-step analysis',
 				default: 'gpt-4o',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			temperature: {
 				type: 'number',

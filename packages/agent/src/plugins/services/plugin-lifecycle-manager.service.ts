@@ -337,6 +337,22 @@ export class PluginLifecycleManagerService {
     }
 
     /** Enable plugins marked with systemPlugin: true in manifest */
+    /** Enable plugins with autoEnable: true in their manifest (non-system) */
+    async enableAutoEnablePlugins(): Promise<LifecycleResult[]> {
+        const results: LifecycleResult[] = [];
+        const loaded = this.registry.getByState('loaded');
+
+        for (const registered of loaded) {
+            if (registered.manifest.autoEnable) {
+                const result = await this.enable(registered.plugin.id);
+                results.push(result);
+            }
+        }
+
+        return results;
+    }
+
+    /** Enable plugins marked with systemPlugin: true in manifest */
     async enableSystemPlugins(): Promise<LifecycleResult[]> {
         const results: LifecycleResult[] = [];
         const loaded = this.registry.getByState('loaded');

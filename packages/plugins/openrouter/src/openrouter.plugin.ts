@@ -57,7 +57,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				description: 'Used for all AI tasks unless a tier-specific model is set',
 				default: 'openai/gpt-5-nano',
 				'x-widget': 'model-select',
-				'x-scope': 'user',
+				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_DEFAULT_MODEL'
 			},
 			simpleModel: {
@@ -66,7 +66,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				description: 'Handles tags, short descriptions, and quick classifications',
 				default: 'openai/gpt-5-nano',
 				'x-widget': 'model-select',
-				'x-scope': 'user',
+				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_SIMPLE_MODEL'
 			},
 			mediumModel: {
@@ -75,7 +75,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				description: 'Handles listings, summaries, and content reformatting',
 				default: 'moonshotai/kimi-k2.5',
 				'x-widget': 'model-select',
-				'x-scope': 'user',
+				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_MEDIUM_MODEL'
 			},
 			complexModel: {
@@ -84,7 +84,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				description: 'Handles full page generation and multi-step analysis',
 				default: 'moonshotai/kimi-k2.5',
 				'x-widget': 'model-select',
-				'x-scope': 'user',
+				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_COMPLEX_MODEL'
 			},
 			baseUrl: {

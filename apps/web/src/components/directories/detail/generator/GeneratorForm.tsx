@@ -291,13 +291,12 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                         <CollapsibleSection
                             title={t('providerSelection')}
                             description={t('providerSelectionDescription')}
-                            defaultExpanded={false}
+                            defaultExpanded={true}
                         >
-                            <div className="space-y-4">
+                            <div className="space-y-3">
                                 {formSchema.providers.search.length > 0 && (
                                     <ProviderSelector
                                         label={t('searchProvider')}
-                                        description={t('searchProviderDescription')}
                                         providers={formSchema.providers.search}
                                         value={providers.search}
                                         onChange={(id) => handleProviderChange('search', id)}
@@ -306,7 +305,6 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                                 {formSchema.providers.screenshot.length > 0 && (
                                     <ProviderSelector
                                         label={t('screenshotProvider')}
-                                        description={t('screenshotProviderDescription')}
                                         providers={formSchema.providers.screenshot}
                                         value={providers.screenshot}
                                         onChange={(id) => handleProviderChange('screenshot', id)}
@@ -315,7 +313,6 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                                 {formSchema.providers.ai.length > 0 && (
                                     <ProviderSelector
                                         label={t('aiProvider')}
-                                        description={t('aiProviderDescription')}
                                         providers={formSchema.providers.ai}
                                         value={providers.ai}
                                         onChange={(id) => handleProviderChange('ai', id)}
@@ -324,7 +321,6 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                                 {formSchema.providers.contentExtractor.length > 0 && (
                                     <ProviderSelector
                                         label={t('contentExtractorProvider')}
-                                        description={t('contentExtractorProviderDescription')}
                                         providers={formSchema.providers.contentExtractor}
                                         value={providers.contentExtractor}
                                         onChange={(id) =>

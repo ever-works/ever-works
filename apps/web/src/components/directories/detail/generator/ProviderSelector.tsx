@@ -1,38 +1,24 @@
 'use client';
 
 import { cn } from '@/lib/utils/cn';
-import type { ProviderOption, PluginIcon } from '@/lib/api/types-only';
+import type { ProviderOption } from '@/lib/api/types-only';
 import { useTranslations } from 'next-intl';
+import { PluginIcon } from '@/components/plugins/PluginIcon';
 
 interface ProviderSelectorProps {
-    /** Category label (e.g., "Search Provider") */
     label: string;
-    /** Description text */
-    description?: string;
-    /** Available providers for this category */
     providers: ProviderOption[];
-    /** Currently selected provider ID (null = use default) */
     value: string | null;
-    /** Callback when selection changes */
     onChange: (providerId: string | null) => void;
-    /** Whether this selector is disabled */
     disabled?: boolean;
-    /** Show "Use Default" option */
-    showUseDefault?: boolean;
 }
 
-/**
- * Renders a provider selection dropdown for a specific capability category.
- * Used in the Generator Form to allow users to override default providers.
- */
 export function ProviderSelector({
     label,
-    description,
     providers,
     value,
     onChange,
     disabled = false,
-    showUseDefault = true,
 }: ProviderSelectorProps) {
     const t = useTranslations('dashboard.directoryDetail.generator');
 
@@ -40,121 +26,98 @@ export function ProviderSelector({
         return null;
     }
 
-    const selectedProvider = providers.find((p) => p.id === value);
-    const defaultProvider = providers.find((p) => p.isDefault);
+    const isDefault = value === null;
+    const hasMultiple = providers.length > 1;
 
     return (
-        <div className="space-y-2">
-            <label className="block text-sm font-medium text-text dark:text-text-dark">
-                {label}
-            </label>
-            {description && (
-                <p className="text-xs text-text-muted dark:text-text-muted-dark">{description}</p>
-            )}
-            <div className="relative">
-                <select
-                    value={value || ''}
-                    onChange={(e) => onChange(e.target.value || null)}
-                    disabled={disabled}
-                    className={cn(
-                        'w-full px-3 py-2 rounded-lg border text-sm appearance-none',
-                        'bg-surface dark:bg-surface-dark',
-                        'border-border dark:border-border-dark',
-                        'text-text dark:text-text-dark',
-                        disabled && 'opacity-50 cursor-not-allowed',
-                    )}
-                >
-                    {showUseDefault && (
-                        <option value="">
-                            {t('useDirectoryDefault')}
-                            {defaultProvider && ` (${defaultProvider.name})`}
-                        </option>
-                    )}
-                    {providers.map((provider) => (
-                        <option key={provider.id} value={provider.id}>
-                            {provider.name}
-                            {provider.isDefault && ` (${t('default')})`}
-                            {!provider.configured && ` - ${t('notConfigured')}`}
-                        </option>
-                    ))}
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                    <svg
-                        className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                        />
-                    </svg>
-                </div>
+        <div className="flex items-center gap-3 py-2">
+            <div className="w-32 shrink-0">
+                <span className="text-sm font-medium text-text dark:text-text-dark">{label}</span>
             </div>
-            {selectedProvider?.description && (
-                <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                    {selectedProvider.description}
-                </p>
-            )}
+
+            <div className="flex-1 flex flex-wrap gap-2">
+                {hasMultiple && (
+                    <button
+                        type="button"
+                        onClick={() => onChange(null)}
+                        disabled={disabled || isDefault}
+                        className={cn(
+                            'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border',
+                            isDefault
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border dark:border-border-dark hover:border-primary/50 text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark',
+                            disabled && 'opacity-50 cursor-not-allowed',
+                        )}
+                    >
+                        <span>{t('default')}</span>
+                        {isDefault && (
+                            <svg
+                                className="w-4 h-4 text-primary"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                            >
+                                <path
+                                    fillRule="evenodd"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    clipRule="evenodd"
+                                />
+                            </svg>
+                        )}
+                    </button>
+                )}
+
+                {/* Provider options */}
+                {providers.map((provider) => {
+                    const isActive = value === provider.id || (!hasMultiple && isDefault);
+                    return (
+                        <button
+                            type="button"
+                            key={provider.id}
+                            onClick={() => onChange(provider.id)}
+                            disabled={disabled || isActive || !provider.configured}
+                            className={cn(
+                                'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border',
+                                isActive
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-border dark:border-border-dark hover:border-primary/50 text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark',
+                                !provider.configured && 'opacity-40 cursor-not-allowed',
+                                disabled && 'opacity-50 cursor-not-allowed',
+                            )}
+                        >
+                            {provider.icon && (
+                                <PluginIcon icon={provider.icon} name={provider.name} size={20} />
+                            )}
+                            <span>
+                                {provider.name}
+                                {!provider.configured && ` (${t('notConfigured')})`}
+                            </span>
+                            {isActive && (
+                                <svg
+                                    className="w-4 h-4 text-primary"
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                >
+                                    <path
+                                        fillRule="evenodd"
+                                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                        clipRule="evenodd"
+                                    />
+                                </svg>
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
         </div>
     );
 }
 
-/**
- * Renders a provider icon.
- */
-export function ProviderIcon({ icon, className }: { icon?: PluginIcon; className?: string }) {
-    if (!icon) return null;
-
-    const baseClass = cn('w-4 h-4', className);
-
-    switch (icon.type) {
-        case 'emoji':
-            return <span className={baseClass}>{icon.value}</span>;
-        case 'lucide':
-            // For now, just render the icon name as text - could be enhanced with actual Lucide icons
-            return <span className={baseClass}>{icon.value}</span>;
-        case 'svg':
-            return (
-                <span
-                    className={baseClass}
-                    dangerouslySetInnerHTML={{ __html: icon.value }}
-                    style={{ color: icon.color }}
-                />
-            );
-        case 'url':
-        case 'base64':
-            return (
-                <img
-                    src={
-                        icon.type === 'base64' ? `data:image/png;base64,${icon.value}` : icon.value
-                    }
-                    alt=""
-                    className={baseClass}
-                    style={{ backgroundColor: icon.backgroundColor }}
-                />
-            );
-        default:
-            return null;
-    }
-}
-
 interface PipelineModeSelectorProps {
-    /** Available full pipeline providers */
     fullPipelineProviders: ProviderOption[];
-    /** Current pipeline selection (null = standard pipeline) */
     selectedPipeline: string | null;
-    /** Callback when pipeline mode changes */
     onChange: (pipelineId: string | null) => void;
 }
 
-/**
- * Renders the pipeline mode selector - allows choosing between
- * Standard Pipeline (step-by-step) or a Full Pipeline provider.
- */
 export function PipelineModeSelector({
     fullPipelineProviders,
     selectedPipeline,
@@ -175,7 +138,6 @@ export function PipelineModeSelector({
             </h4>
 
             <div className="space-y-3">
-                {/* Standard Pipeline Option */}
                 <label className="flex items-start gap-3 cursor-pointer">
                     <input
                         type="radio"
@@ -194,7 +156,6 @@ export function PipelineModeSelector({
                     </div>
                 </label>
 
-                {/* Full Pipeline Options */}
                 {fullPipelineProviders.map((provider) => (
                     <label key={provider.id} className="flex items-start gap-3 cursor-pointer">
                         <input

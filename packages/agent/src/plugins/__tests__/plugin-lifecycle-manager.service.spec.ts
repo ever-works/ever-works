@@ -453,6 +453,60 @@ describe('PluginLifecycleManagerService', () => {
         });
     });
 
+    describe('enableAutoEnablePlugins', () => {
+        it('should enable loaded plugins with autoEnable: true in manifest', async () => {
+            const plugin = createMockPlugin();
+            const manifest = { ...createMockManifest(), autoEnable: true } as PluginManifest;
+            const registered: RegisteredPlugin = {
+                plugin,
+                manifest,
+                state: 'loaded',
+                builtIn: false,
+                registeredAt: Date.now(),
+                stateHistory: [],
+            };
+
+            jest.spyOn(registry, 'getByState').mockReturnValue([registered]);
+            jest.spyOn(registry, 'get').mockReturnValue(registered);
+
+            const results = await service.enableAutoEnablePlugins();
+
+            expect(results).toHaveLength(1);
+            expect(results[0].success).toBe(true);
+            expect(results[0].newState).toBe('enabled');
+            expect(plugin.onEnable).toHaveBeenCalled();
+        });
+
+        it('should skip loaded plugins without autoEnable in manifest', async () => {
+            const plugin = createMockPlugin();
+            const registered: RegisteredPlugin = {
+                plugin,
+                manifest: createMockManifest(),
+                state: 'loaded',
+                builtIn: false,
+                registeredAt: Date.now(),
+                stateHistory: [],
+            };
+
+            jest.spyOn(registry, 'getByState').mockReturnValue([registered]);
+
+            const results = await service.enableAutoEnablePlugins();
+
+            expect(results).toHaveLength(0);
+            expect(plugin.onEnable).not.toHaveBeenCalled();
+        });
+
+        it('should not see already-enabled system plugins (they are no longer in loaded state)', async () => {
+            // After enableSystemPlugins runs, system plugins are in 'enabled' state,
+            // so getByState('loaded') won't return them
+            jest.spyOn(registry, 'getByState').mockReturnValue([]);
+
+            const results = await service.enableAutoEnablePlugins();
+
+            expect(results).toHaveLength(0);
+        });
+    });
+
     describe('isInState', () => {
         it('should check if plugin is in specific state', () => {
             const plugin = createMockPlugin();

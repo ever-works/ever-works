@@ -47,7 +47,7 @@ export class GroqPlugin extends BaseAiProvider {
 				description: 'Used for all AI tasks unless a tier-specific model is set',
 				default: 'meta-llama/llama-4-scout-17b-16e-instruct',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			simpleModel: {
 				type: 'string',
@@ -55,7 +55,7 @@ export class GroqPlugin extends BaseAiProvider {
 				description: 'Handles tags, short descriptions, and quick classifications',
 				default: 'llama-3.1-8b-instant',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			mediumModel: {
 				type: 'string',
@@ -63,7 +63,7 @@ export class GroqPlugin extends BaseAiProvider {
 				description: 'Handles listings, summaries, and content reformatting',
 				default: 'meta-llama/llama-4-scout-17b-16e-instruct',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			complexModel: {
 				type: 'string',
@@ -71,7 +71,7 @@ export class GroqPlugin extends BaseAiProvider {
 				description: 'Handles full page generation and multi-step analysis',
 				default: 'llama-3.3-70b-versatile',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			baseUrl: {
 				type: 'string',

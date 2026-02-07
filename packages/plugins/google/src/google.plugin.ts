@@ -47,7 +47,7 @@ export class GooglePlugin extends BaseAiProvider {
 				description: 'Used for all AI tasks unless a tier-specific model is set',
 				default: 'gemini-2.5-flash',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			simpleModel: {
 				type: 'string',
@@ -55,7 +55,7 @@ export class GooglePlugin extends BaseAiProvider {
 				description: 'Handles tags, short descriptions, and quick classifications',
 				default: 'gemini-2.0-flash',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			mediumModel: {
 				type: 'string',
@@ -63,7 +63,7 @@ export class GooglePlugin extends BaseAiProvider {
 				description: 'Handles listings, summaries, and content reformatting',
 				default: 'gemini-2.5-flash',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			complexModel: {
 				type: 'string',
@@ -71,7 +71,7 @@ export class GooglePlugin extends BaseAiProvider {
 				description: 'Handles full page generation and multi-step analysis',
 				default: 'gemini-2.5-pro',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			baseUrl: {
 				type: 'string',

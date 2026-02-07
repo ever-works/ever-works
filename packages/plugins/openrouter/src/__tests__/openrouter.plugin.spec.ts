@@ -50,7 +50,7 @@ describe('OpenRouterPlugin', () => {
 			expect(schema.title).toBe('Default Model');
 			expect(schema.default).toBe('openai/gpt-5-nano');
 			expect(schema['x-widget']).toBe('model-select');
-			expect(schema['x-scope']).toBe('user');
+			expect(schema['x-scope']).toBe('global');
 		});
 
 		it('should have simpleModel field', () => {

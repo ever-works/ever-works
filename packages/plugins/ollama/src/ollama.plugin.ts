@@ -48,7 +48,7 @@ export class OllamaPlugin extends BaseAiProvider {
 				description: 'Used for all AI tasks unless a tier-specific model is set',
 				default: 'llama3.3',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			simpleModel: {
 				type: 'string',
@@ -56,7 +56,7 @@ export class OllamaPlugin extends BaseAiProvider {
 				description: 'Handles tags, short descriptions, and quick classifications',
 				default: 'llama3.2',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			mediumModel: {
 				type: 'string',
@@ -64,7 +64,7 @@ export class OllamaPlugin extends BaseAiProvider {
 				description: 'Handles listings, summaries, and content reformatting',
 				default: 'llama3.3',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			complexModel: {
 				type: 'string',
@@ -72,7 +72,7 @@ export class OllamaPlugin extends BaseAiProvider {
 				description: 'Handles full page generation and multi-step analysis',
 				default: 'llama3.3',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'global'
 			},
 			baseUrl: {
 				type: 'string',
