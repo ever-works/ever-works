@@ -1742,7 +1742,7 @@ describe('PluginOperationsService', () => {
             expect(directoryPluginRepository.save).toHaveBeenCalled();
         });
 
-        it('should throw in updateDirectoryPluginSettings when neither autoEnable nor autoEnableForDirectories', async () => {
+        it('should throw in updateDirectoryPluginSettings when user has plugin disabled', async () => {
             const registered = createRegisteredPlugin();
             registered.manifest = { ...registered.manifest, autoEnable: false } as PluginManifest;
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
@@ -1750,7 +1750,7 @@ describe('PluginOperationsService', () => {
                 id: '1',
                 userId: 'user-1',
                 pluginId: 'test-plugin',
-                enabled: true,
+                enabled: false,
                 autoEnableForDirectories: false,
                 settings: {},
                 secretSettings: {},

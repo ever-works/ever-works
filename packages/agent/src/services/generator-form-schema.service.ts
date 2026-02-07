@@ -4,7 +4,6 @@ import {
     RegisteredPlugin,
 } from '@src/plugins/services/plugin-registry.service';
 import { DirectoryPluginRepository } from '@src/plugins/repositories/directory-plugin.repository';
-import { UserPluginRepository } from '@src/plugins/repositories/user-plugin.repository';
 import type {
     GeneratorFormSchema,
     ProviderOption,
@@ -39,7 +38,6 @@ export class GeneratorFormSchemaService {
     constructor(
         private readonly pluginRegistry: PluginRegistryService,
         @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
-        @Optional() private readonly userPluginRepository?: UserPluginRepository,
     ) {}
 
     /**
@@ -177,7 +175,7 @@ export class GeneratorFormSchemaService {
         for (const registered of enabledPlugins) {
             // Check if plugin is enabled for this context
             if (options?.directoryId || options?.userId) {
-                const isEnabled = await this.isPluginEnabled(
+                const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
                     registered.plugin.id,
                     options.directoryId,
                     options.userId,
@@ -191,62 +189,6 @@ export class GeneratorFormSchemaService {
         }
 
         return result;
-    }
-
-    /**
-     * Check if a plugin is enabled for a specific context.
-     *
-     * Resolution order (three-level configuration):
-     * 1. DirectoryPlugin.enabled (Level 2) - if record exists
-     * 2. UserPlugin.enabled (Level 1) - if record exists
-     * 3. autoEnable in manifest or default to enabled
-     */
-    private async isPluginEnabled(
-        pluginId: string,
-        directoryId?: string,
-        userId?: string,
-    ): Promise<boolean> {
-        // Level 2: Check DirectoryPlugin record
-        if (directoryId && this.directoryPluginRepository) {
-            try {
-                const directoryPlugin =
-                    await this.directoryPluginRepository.findByDirectoryAndPlugin(
-                        directoryId,
-                        pluginId,
-                    );
-
-                if (directoryPlugin !== null) {
-                    return directoryPlugin.enabled;
-                }
-            } catch {
-                // Continue to Level 1
-            }
-        }
-
-        // Level 1: Check UserPlugin record
-        if (userId && this.userPluginRepository) {
-            try {
-                const userPlugin = await this.userPluginRepository.findByUserAndPlugin(
-                    userId,
-                    pluginId,
-                );
-
-                if (userPlugin !== null) {
-                    return userPlugin.enabled;
-                }
-            } catch {
-                // Continue to autoEnable
-            }
-        }
-
-        // Check autoEnable in manifest
-        const registered = this.pluginRegistry.get(pluginId);
-        if (registered?.manifest?.autoEnable) {
-            return true;
-        }
-
-        // Default to enabled if no explicit setting
-        return true;
     }
 
     /**

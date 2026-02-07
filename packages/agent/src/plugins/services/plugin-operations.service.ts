@@ -29,7 +29,11 @@ import type {
 import { PluginEntity } from '../entities/plugin.entity';
 import { UserPluginEntity } from '../entities/user-plugin.entity';
 import { DirectoryPluginEntity } from '../entities/directory-plugin.entity';
-import { PluginRegistryService, type RegisteredPlugin } from './plugin-registry.service';
+import {
+    PluginRegistryService,
+    type RegisteredPlugin,
+    resolvePluginEnabled,
+} from './plugin-registry.service';
 import {
     SettingsSchemaValidatorService,
     type SettingsScope,
@@ -80,9 +84,14 @@ export class PluginOperationsService {
         // When filtering by category (settings page), only show enabled plugins
         if (category) {
             filteredPlugins = filteredPlugins.filter((registered) => {
-                const userPlugin = userPluginMap.get(registered.plugin.id);
-                const autoEnabled = registered.manifest?.autoEnable ?? false;
-                return userPlugin?.enabled ?? autoEnabled;
+                const userPlugin = userPluginMap.get(registered.plugin.id) ?? null;
+                return resolvePluginEnabled({
+                    systemPlugin: registered.manifest?.systemPlugin,
+                    autoEnable: registered.manifest?.autoEnable,
+                    userPlugin,
+                    directoryPlugin: null,
+                    hasDirectoryContext: false,
+                });
             });
         }
 
@@ -127,9 +136,14 @@ export class PluginOperationsService {
             const configMode = registered.plugin.configurationMode || 'hybrid';
             if (configMode === 'admin-only' && !hasOAuth) return false;
 
-            const userPlugin = userPluginMap.get(registered.plugin.id);
-            const autoEnabled = registered.manifest?.autoEnable ?? false;
-            const isEnabled = userPlugin?.enabled ?? autoEnabled;
+            const userPlugin = userPluginMap.get(registered.plugin.id) ?? null;
+            const isEnabled = resolvePluginEnabled({
+                systemPlugin: registered.manifest?.systemPlugin,
+                autoEnable: registered.manifest?.autoEnable,
+                userPlugin,
+                directoryPlugin: null,
+                hasDirectoryContext: false,
+            });
             if (!isEnabled) return false;
 
             // Check if plugin has user-configurable settings
@@ -631,10 +645,15 @@ export class PluginOperationsService {
             directoryPlugin.enabled = false;
             await this.directoryPluginRepository.save(directoryPlugin);
         } else {
-            // For autoEnabled or user-auto-enabled plugins, create a record with enabled=false to opt out
-            const autoEnabled = registered.manifest?.autoEnable ?? false;
-            const userAutoEnabled = userPlugin?.autoEnableForDirectories ?? false;
-            if (autoEnabled || userAutoEnabled) {
+            // For plugins that would be enabled in this directory, create a record with enabled=false to opt out
+            const wouldBeEnabled = resolvePluginEnabled({
+                systemPlugin: registered.manifest?.systemPlugin,
+                autoEnable: registered.manifest?.autoEnable,
+                userPlugin: userPlugin ?? null,
+                directoryPlugin: null,
+                hasDirectoryContext: true,
+            });
+            if (wouldBeEnabled) {
                 const pluginEntity = await this.pluginRepository.findOne({
                     where: { pluginId },
                 });
@@ -851,12 +870,18 @@ export class PluginOperationsService {
         userPlugin?: UserPluginEntity | null,
     ): UserPluginResponse {
         const baseResponse = this.toPluginResponse(registered);
-        const autoEnabled = registered.manifest?.autoEnable ?? false;
+        const enabled = resolvePluginEnabled({
+            systemPlugin: registered.manifest?.systemPlugin,
+            autoEnable: registered.manifest?.autoEnable,
+            userPlugin: userPlugin ?? null,
+            directoryPlugin: null,
+            hasDirectoryContext: false,
+        });
 
         return {
             ...baseResponse,
-            installed: !!userPlugin || autoEnabled,
-            enabled: userPlugin?.enabled ?? autoEnabled,
+            installed: !!userPlugin || enabled,
+            enabled,
             settings: userPlugin
                 ? { ...userPlugin.settings, ...userPlugin.secretSettings }
                 : undefined,
@@ -877,14 +902,16 @@ export class PluginOperationsService {
         directoryPlugin?: DirectoryPluginEntity | null,
     ): DirectoryPluginResponse {
         const userResponse = this.toUserPluginResponse(registered, userPlugin);
-        const autoEnabled = registered.manifest?.autoEnable ?? false;
 
         return {
             ...userResponse,
-            directoryEnabled:
-                directoryPlugin?.enabled ??
-                (userPlugin?.autoEnableForDirectories || undefined) ??
-                autoEnabled,
+            directoryEnabled: resolvePluginEnabled({
+                systemPlugin: registered.manifest?.systemPlugin,
+                autoEnable: registered.manifest?.autoEnable,
+                userPlugin: userPlugin ?? null,
+                directoryPlugin: directoryPlugin ?? null,
+                hasDirectoryContext: true,
+            }),
             activeCapability: directoryPlugin?.activeCapability,
             directorySettings: directoryPlugin
                 ? { ...directoryPlugin.settings, ...directoryPlugin.secretSettings }
@@ -974,9 +1001,14 @@ export class PluginOperationsService {
             return existing;
         }
 
-        const autoEnabled = manifest?.autoEnable ?? false;
-        const userAutoEnabled = userPlugin?.autoEnableForDirectories ?? false;
-        if (!autoEnabled && !userAutoEnabled) {
+        const wouldBeEnabled = resolvePluginEnabled({
+            systemPlugin: manifest?.systemPlugin,
+            autoEnable: manifest?.autoEnable,
+            userPlugin,
+            directoryPlugin: null,
+            hasDirectoryContext: true,
+        });
+        if (!wouldBeEnabled) {
             throw new BadRequestException(
                 `Plugin "${pluginId}" is not enabled for this directory. Enable it first.`,
             );

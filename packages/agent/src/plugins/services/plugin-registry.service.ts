@@ -12,6 +12,40 @@ import { PluginEvents } from '../plugins.constants';
 import { DirectoryPluginRepository } from '../repositories/directory-plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
 
+export interface PluginEnableContext {
+    systemPlugin?: boolean;
+    autoEnable?: boolean;
+    userPlugin?: { enabled: boolean; autoEnableForDirectories?: boolean } | null;
+    directoryPlugin?: { enabled: boolean } | null;
+    hasDirectoryContext: boolean;
+}
+
+/**
+ * Pure enable-resolution algorithm. Single source of truth.
+ *
+ * Priority:
+ * 1. System plugins → always enabled
+ * 2. User-level DISABLE → cascades globally
+ * 3. Directory explicit record → use its enabled value
+ * 4. User autoEnableForDirectories (directory context) → true
+ * 5. User-level enabled status
+ * 6. Fallback to manifest autoEnable (default true)
+ */
+export function resolvePluginEnabled(ctx: PluginEnableContext): boolean {
+    if (ctx.systemPlugin) return true;
+    if (ctx.userPlugin !== undefined && ctx.userPlugin !== null && !ctx.userPlugin.enabled)
+        return false;
+    if (
+        ctx.hasDirectoryContext &&
+        ctx.directoryPlugin !== undefined &&
+        ctx.directoryPlugin !== null
+    )
+        return ctx.directoryPlugin.enabled;
+    if (ctx.hasDirectoryContext && ctx.userPlugin?.autoEnableForDirectories) return true;
+    if (ctx.userPlugin !== undefined && ctx.userPlugin !== null) return ctx.userPlugin.enabled;
+    return ctx.autoEnable ?? true;
+}
+
 export interface RegisteredPlugin {
     plugin: IPlugin;
     manifest: PluginManifest;
@@ -349,14 +383,7 @@ export class PluginRegistryService {
 
     /**
      * Check if plugin is enabled for scope.
-     *
-     * Resolution priority:
-     * 1. System plugins are always enabled
-     * 2. User-level DISABLE cascades globally (highest non-system priority)
-     * 3. Directory-level explicit record → use its enabled value
-     * 4. User autoEnableForDirectories (directory context only) → true
-     * 5. User-level enabled status (non-disable, non-directory fallback)
-     * 6. Fallback to manifest autoEnable
+     * Fetches DB records then delegates to resolvePluginEnabled().
      */
     async isPluginEnabledForScope(
         pluginId: string,
@@ -365,10 +392,6 @@ export class PluginRegistryService {
     ): Promise<boolean> {
         const registered = this.plugins.get(pluginId);
 
-        // 1. System plugins are always enabled
-        if (registered?.manifest?.systemPlugin) return true;
-
-        // Fetch user plugin once for all subsequent checks
         let userPlugin = null;
         if (userId && this.userPluginRepository) {
             try {
@@ -378,29 +401,24 @@ export class PluginRegistryService {
             }
         }
 
-        // 2. User-level DISABLE cascades globally (highest priority)
-        if (userPlugin !== null && !userPlugin.enabled) return false;
-
-        // 3. Directory-level explicit record
+        let directoryPlugin = null;
         if (directoryId && this.directoryPluginRepository) {
             try {
-                const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
+                directoryPlugin = await this.directoryPluginRepository.findByDirectoryAndPlugin(
                     directoryId,
                     pluginId,
                 );
-                if (dp !== null) return dp.enabled;
             } catch {
                 // Continue
             }
         }
 
-        // 4. User autoEnableForDirectories (directory context only)
-        if (directoryId && userPlugin?.autoEnableForDirectories) return true;
-
-        // 5. User-level enabled status
-        if (userPlugin !== null) return userPlugin.enabled;
-
-        // 6. Fallback to manifest autoEnable
-        return registered?.manifest?.autoEnable ?? true;
+        return resolvePluginEnabled({
+            systemPlugin: registered?.manifest?.systemPlugin,
+            autoEnable: registered?.manifest?.autoEnable,
+            userPlugin,
+            directoryPlugin,
+            hasDirectoryContext: !!directoryId,
+        });
     }
 }

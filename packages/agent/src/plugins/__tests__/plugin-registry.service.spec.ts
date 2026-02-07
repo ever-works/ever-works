@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PluginRegistryService } from '../services/plugin-registry.service';
+import { PluginRegistryService, resolvePluginEnabled } from '../services/plugin-registry.service';
 import { DirectoryPluginRepository } from '../repositories/directory-plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
 import { PluginEvents } from '../plugins.constants';
@@ -759,6 +759,123 @@ describe('PluginRegistryService', () => {
 
             await service.isPluginEnabledForScope('test-plugin', 'dir-1', 'user-1');
             expect(userPluginRepository.findByUserAndPlugin).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('resolvePluginEnabled (pure function)', () => {
+        it('should always return true for system plugins', () => {
+            expect(
+                resolvePluginEnabled({
+                    systemPlugin: true,
+                    autoEnable: false,
+                    userPlugin: { enabled: false },
+                    directoryPlugin: { enabled: false },
+                    hasDirectoryContext: true,
+                }),
+            ).toBe(true);
+        });
+
+        it('should cascade user-level disable globally', () => {
+            expect(
+                resolvePluginEnabled({
+                    autoEnable: true,
+                    userPlugin: { enabled: false },
+                    directoryPlugin: { enabled: true },
+                    hasDirectoryContext: true,
+                }),
+            ).toBe(false);
+        });
+
+        it('should use directory explicit record when user has not disabled', () => {
+            expect(
+                resolvePluginEnabled({
+                    autoEnable: false,
+                    userPlugin: { enabled: true },
+                    directoryPlugin: { enabled: false },
+                    hasDirectoryContext: true,
+                }),
+            ).toBe(false);
+
+            expect(
+                resolvePluginEnabled({
+                    autoEnable: false,
+                    userPlugin: { enabled: true },
+                    directoryPlugin: { enabled: true },
+                    hasDirectoryContext: true,
+                }),
+            ).toBe(true);
+        });
+
+        it('should use autoEnableForDirectories when no directory record exists', () => {
+            expect(
+                resolvePluginEnabled({
+                    autoEnable: false,
+                    userPlugin: { enabled: true, autoEnableForDirectories: true },
+                    directoryPlugin: null,
+                    hasDirectoryContext: true,
+                }),
+            ).toBe(true);
+        });
+
+        it('should not apply autoEnableForDirectories without directory context', () => {
+            expect(
+                resolvePluginEnabled({
+                    autoEnable: false,
+                    userPlugin: { enabled: true, autoEnableForDirectories: true },
+                    directoryPlugin: null,
+                    hasDirectoryContext: false,
+                }),
+            ).toBe(true); // falls through to step 5 (user enabled)
+        });
+
+        it('should fall back to user enabled status without directory context', () => {
+            expect(
+                resolvePluginEnabled({
+                    autoEnable: false,
+                    userPlugin: { enabled: true },
+                    directoryPlugin: null,
+                    hasDirectoryContext: false,
+                }),
+            ).toBe(true);
+
+            expect(
+                resolvePluginEnabled({
+                    autoEnable: true,
+                    userPlugin: { enabled: false },
+                    directoryPlugin: null,
+                    hasDirectoryContext: false,
+                }),
+            ).toBe(false);
+        });
+
+        it('should fall back to autoEnable when no user/directory records', () => {
+            expect(
+                resolvePluginEnabled({
+                    autoEnable: true,
+                    userPlugin: null,
+                    directoryPlugin: null,
+                    hasDirectoryContext: false,
+                }),
+            ).toBe(true);
+
+            expect(
+                resolvePluginEnabled({
+                    autoEnable: false,
+                    userPlugin: null,
+                    directoryPlugin: null,
+                    hasDirectoryContext: false,
+                }),
+            ).toBe(false);
+        });
+
+        it('should default to true when autoEnable is undefined', () => {
+            expect(
+                resolvePluginEnabled({
+                    userPlugin: null,
+                    directoryPlugin: null,
+                    hasDirectoryContext: false,
+                }),
+            ).toBe(true);
         });
     });
 
