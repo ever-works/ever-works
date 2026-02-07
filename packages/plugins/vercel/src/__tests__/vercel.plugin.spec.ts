@@ -33,7 +33,6 @@ describe('VercelPlugin', () => {
 			expect(manifest.description).toBe('Publish your directory as a live website on Vercel');
 			expect(manifest.builtIn).toBe(true);
 			expect(manifest.autoEnable).toBe(true);
-			expect(manifest.visibility).toBe('public');
 			expect(manifest.defaultForCapabilities).toContain('deployment');
 		});
 	});

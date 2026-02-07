@@ -7,6 +7,10 @@ on:
     branches: [main, develop, stage]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-test:
     runs-on: ubicloud-standard-8
