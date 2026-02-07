@@ -1197,8 +1197,8 @@
                         "title": "Vercel 토큰 구성 방법:",
                         "step1": "Vercel 대시보드를 열려면 'Vercel 토큰 가져오기' 클릭",
                         "step2": "배포 권한이 있는 새 토큰 생성",
-                        "step3": "생성된 토큰 복사",
-                        "step4": "API 토큰 설정으로 이동하여 Vercel 섹션에 토큰 붙여넣기"
+                        "step3": "플러그인 설정 > {provider}에서 {provider} API 토큰을 구성하세요",
+                        "step4": "디렉토리를 배포하려면 여기로 돌아오세요"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1207,10 @@
                     "hint": "협업자로서 소유자가 Vercel 통합을 구성하면 배포를 트리거할 수 있습니다."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Vercel에 배포",
                         "description": "디렉토리 웹사이트 리포지토리를 Vercel에 배포하세요.",
-                        "deployButton": "지금 배포",
+                        "deployButton": "{provider}에 배포",
                         "deployingButton": "배포 중...",
                         "deployingStateButton": "배포 중 ({state})...",
                         "successMessage": "웹사이트가 성공적으로 배포되었습니다!",

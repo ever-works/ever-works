@@ -1104,8 +1104,8 @@
                         "title": "כיצד להגדיר את אסימון ה-Vercel שלך:",
                         "step1": "לחץ על 'קבל אסימון Vercel' כדי לפתוח את לוח הבקרה של Vercel",
                         "step2": "צור אסימון חדש עם הרשאות פריסה",
-                        "step3": "העתק את האסימון שנוצר",
-                        "step4": "עבור להגדרות אסימוני API והדבק את האסימון שלך בקטע Vercel"
+                        "step3": "הגדר את מפתח ה-API של {provider} בהגדרות התוסף > {provider}",
+                        "step4": "חזור לכאן כדי לפרוס את הספרייה שלך"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1114,10 +1114,10 @@
                     "hint": "כמשתף פעולה, תוכל להפעיל פריסות ברגע שבעל המדריך יקבל את שילוב ה-Vercel שלו."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "פרוס ל-Vercel",
                         "description": "פרוס את מאגר אתר האינטרנט של המדריך שלך ב-Vercel.",
-                        "deployButton": "פרוס עכשיו",
+                        "deployButton": "פרוס ל-{provider}",
                         "deployingButton": "פורס...",
                         "deployingStateButton": "פורס ({state})...",
                         "successMessage": "אתר האינטרנט שלך נפרס בהצלחה!",

@@ -39,6 +39,17 @@ export default async function DeployPage({ params }: DeployPageParams) {
         redirect(ROUTES.DASHBOARD_DIRECTORY(id));
     }
 
+    // Resolve provider info (used for both the alert and deploy button)
+    const providerId = directory.deployProvider || '';
+    let providerName: string | undefined;
+    let providerHomepage: string | undefined;
+    if (providerId) {
+        const providersRes = await deployAPI.getProviders().catch(() => null);
+        const provider = providersRes?.providers?.find((p) => p.id === providerId);
+        providerName = provider?.name;
+        providerHomepage = provider?.homepage;
+    }
+
     // Check deployment capability based on shared/owned status
     if (!deploymentCapability.canDeploy) {
         // For shared directories, show message about owner needing to configure token
@@ -46,16 +57,6 @@ export default async function DeployPage({ params }: DeployPageParams) {
             return <SharedDirectoryNoTokenAlert />;
         }
         // For owned directories, show the regular token configuration alert
-        // Fetch provider info for homepage URL and display name
-        const providerId = directory.deployProvider || '';
-        let providerName: string | undefined;
-        let providerHomepage: string | undefined;
-        if (providerId) {
-            const providersRes = await deployAPI.getProviders().catch(() => null);
-            const provider = providersRes?.providers?.find((p) => p.id === providerId);
-            providerName = provider?.name;
-            providerHomepage = provider?.homepage;
-        }
         return (
             <DeployTokenAlert
                 providerId={providerId}
@@ -77,7 +78,13 @@ export default async function DeployPage({ params }: DeployPageParams) {
         }
     }
 
-    return <DeployForm directory={directory} isDeploying={isDeploying(directory)} />;
+    return (
+        <DeployForm
+            directory={directory}
+            isDeploying={isDeploying(directory)}
+            providerName={providerName}
+        />
+    );
 }
 
 function isDeploying(directory: Directory) {

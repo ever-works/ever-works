@@ -1,35 +1,50 @@
 import { Injectable } from '@nestjs/common';
 import { BasePromptService } from '@packages/cli-shared';
+import { DeployFacadeService } from '@packages/agent/facades';
 
 export interface DeploymentConfig {
-    provider: 'vercel' | 'ignore';
+    provider: string | 'ignore';
     token?: string;
 }
 
 @Injectable()
 export class DeploymentPromptService extends BasePromptService {
+    constructor(private readonly deployFacade: DeployFacadeService) {
+        super();
+    }
+
     async promptDeploymentConfig(existingConfig?: any): Promise<DeploymentConfig> {
         this.displaySectionHeader('Deployment Provider Configuration');
         this.displayInfo('Configure your deployment provider (you can add more providers later)');
 
-        let defaultProvider: 'vercel' | 'ignore' = 'ignore';
-        if (existingConfig?.DEPLOY_TOKEN) {
-            defaultProvider = 'vercel';
+        // Build provider choices dynamically
+        const providers = this.deployFacade.getAvailableProviders();
+        const choices: { name: string; value: string }[] = providers.map((p) => ({
+            name: p.name,
+            value: p.id,
+        }));
+        choices.push({ name: 'Skip deployment configuration', value: 'ignore' });
+
+        let defaultProvider = 'ignore';
+        if (existingConfig?.DEPLOY_PROVIDER) {
+            defaultProvider = existingConfig.DEPLOY_PROVIDER;
+        } else if (existingConfig?.DEPLOY_TOKEN && providers.length > 0) {
+            defaultProvider = providers[0].id;
         }
 
         const provider = await this.promptSelect(
             'Select a deployment provider:',
-            [
-                { name: 'Vercel', value: 'vercel' as const },
-                { name: 'Skip deployment configuration', value: 'ignore' as const },
-            ],
+            choices,
             defaultProvider,
         );
 
         let token: string | undefined;
 
-        if (provider === 'vercel') {
-            this.displayInfo('You can get your token from: https://vercel.com/account/tokens');
+        if (provider !== 'ignore') {
+            const providerInfo = providers.find((p) => p.id === provider);
+            if (providerInfo?.homepage) {
+                this.displayInfo(`You can get your token from: ${providerInfo.homepage}`);
+            }
 
             while (true) {
                 try {
@@ -42,31 +57,9 @@ export class DeploymentPromptService extends BasePromptService {
                         continue;
                     }
 
-                    this.displayInfo('Testing deployment token...');
-                    const isValid = await this.testDeployToken(token);
-                    if (!isValid) {
-                        this.displayError('Token validation failed');
-                        this.displayInfo(
-                            'This could be due to network issues or API endpoint changes',
-                        );
-
-                        const action = await this.promptSelect('What would you like to do?', [
-                            {
-                                name: "Continue with this token (I know it's valid)",
-                                value: 'continue',
-                            },
-                            { name: 'Re-enter the token', value: 'retry' },
-                            { name: 'Skip deployment configuration', value: 'skip' },
-                        ]);
-
-                        if (action === 'skip') {
-                            return { provider: 'ignore', token: undefined };
-                        } else if (action === 'retry') {
-                            continue;
-                        }
-                    }
-
-                    this.displaySuccess('Deployment token validated successfully');
+                    // Accept token without provider-specific validation during setup
+                    // (no directoryId available). Validation happens in `config test` or deploy.
+                    this.displaySuccess('Deployment token saved');
                     break;
                 } catch (error) {
                     this.displayError('Failed to validate token. Please try again.');
@@ -84,29 +77,5 @@ export class DeploymentPromptService extends BasePromptService {
             provider,
             token,
         };
-    }
-
-    private async testDeployToken(token: string): Promise<boolean> {
-        try {
-            const response = await fetch('https://api.vercel.com/v2/user', {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-
-            if (response.ok) {
-                return true;
-            }
-
-            const projectsResponse = await fetch('https://api.vercel.com/v9/projects', {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-
-            return projectsResponse.ok;
-        } catch (error) {
-            return false;
-        }
     }
 }

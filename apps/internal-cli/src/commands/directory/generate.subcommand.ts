@@ -18,7 +18,7 @@ import { getStepProgress, getStepText, ItemsGeneratorStep } from '@packages/cli-
 
 @SubCommand({
     name: 'generate',
-    description: 'Generate data and create a GitHub repository for a directory',
+    description: 'Generate data and create a repository for a directory',
 })
 export class GenerateSubCommand extends CommandRunner {
     constructor(

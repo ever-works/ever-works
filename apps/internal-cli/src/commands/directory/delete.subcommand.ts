@@ -10,7 +10,7 @@ import { handleCliError } from './error';
 
 @SubCommand({
     name: 'delete',
-    description: 'Delete a directory and its GitHub repositories',
+    description: 'Delete a directory and its repositories',
 })
 export class DeleteSubCommand extends CommandRunner {
     constructor(

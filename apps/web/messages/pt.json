@@ -1197,8 +1197,8 @@
                         "title": "Como configurar seu token Vercel:",
                         "step1": "Clique em 'Obter Token Vercel' para abrir o painel Vercel",
                         "step2": "Crie um novo token com permissões de implantação",
-                        "step3": "Copie o token gerado",
-                        "step4": "Vá para Configurações de Tokens da API e cole seu token na seção Vercel"
+                        "step3": "Configure seu token de API do {provider} em Configurações do Plugin > {provider}",
+                        "step4": "Retorne aqui para publicar seu diretório"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1207,10 @@
                     "hint": "Como colaborador, você pode acionar implantações após o proprietário configurar sua integração Vercel."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Publicar no Vercel",
                         "description": "Implante o repositório do site do seu diretório no Vercel.",
-                        "deployButton": "Publicar Agora",
+                        "deployButton": "Publicar no {provider}",
                         "deployingButton": "Publicando...",
                         "deployingStateButton": "Publicando ({state})...",
                         "successMessage": "Seu site foi publicado com sucesso!",

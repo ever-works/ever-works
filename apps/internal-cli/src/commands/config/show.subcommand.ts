@@ -38,14 +38,16 @@ export class ShowSubCommand extends CommandRunner {
                 'App Type': config.APP_TYPE,
             });
 
-            this.displaySection('GitHub & Git', {
-                'GitHub Owner': config.GH_OWNER,
-                'GitHub API Key': maskSecret(config.GH_APIKEY),
+            this.displaySection('Git Provider', {
+                Provider: config.GIT_PROVIDER || 'github',
+                Owner: config.GIT_OWNER,
+                'API Token': maskSecret(config.GIT_TOKEN),
                 'Git Name': config.GIT_NAME,
                 'Git Email': config.GIT_EMAIL,
             });
 
             this.displaySection('Deployment', {
+                Provider: config.DEPLOY_PROVIDER || 'Not configured',
                 'Deploy Token': config.DEPLOY_TOKEN
                     ? maskSecret(config.DEPLOY_TOKEN)
                     : 'Not configured',

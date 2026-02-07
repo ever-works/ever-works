@@ -34,7 +34,7 @@ export function TeamSelectionDialog({
     open,
     teams,
     isSubmitting = false,
-    providerName = 'Vercel',
+    providerName,
     onConfirm,
     onCancel,
 }: TeamSelectionDialogProps) {
@@ -69,21 +69,21 @@ export function TeamSelectionDialog({
             <DialogContent>
                 <DialogClose onClose={onCancel} />
                 <DialogHeader>
-                    <DialogTitle>{t('form.deployToVercel.teamSelection.title')}</DialogTitle>
+                    <DialogTitle>{t('form.deployment.teamSelection.title')}</DialogTitle>
                     <DialogDescription>
-                        {t('form.deployToVercel.teamSelection.description')}
+                        {t('form.deployment.teamSelection.description')}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4">
                     <Select
-                        label={t('form.deployToVercel.teamSelection.label')}
+                        label={t('form.deployment.teamSelection.label')}
                         value={selectedTeamScope}
                         onChange={(event) => setSelectedTeamScope(event.target.value)}
                         variant="form"
                     >
                         <option value="" disabled>
-                            {t('form.deployToVercel.teamSelection.placeholder')}
+                            {t('form.deployment.teamSelection.placeholder')}
                         </option>
                         {options.map((team) => (
                             <option key={team.id} value={team.slug}>
@@ -95,7 +95,7 @@ export function TeamSelectionDialog({
 
                 <DialogFooter>
                     <Button type="button" variant="secondary" onClick={onCancel}>
-                        {t('form.deployToVercel.teamSelection.cancelButton')}
+                        {t('form.deployment.teamSelection.cancelButton')}
                     </Button>
                     <Button
                         type="button"
@@ -105,10 +105,10 @@ export function TeamSelectionDialog({
                         {isSubmitting ? (
                             <span className="flex items-center gap-2">
                                 <Loader2 className="animate-spin h-4 w-4" />
-                                {t('form.deployToVercel.deployingButton')}
+                                {t('form.deployment.deployingButton')}
                             </span>
                         ) : (
-                            t('form.deployToVercel.teamSelection.confirmButton')
+                            t('form.deployment.teamSelection.confirmButton')
                         )}
                     </Button>
                 </DialogFooter>

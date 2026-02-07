@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import { ConfigService } from '../../config/config.service';
-import { AiFacadeService } from '@packages/agent/facades';
+import { AiFacadeService, GitFacadeService } from '@packages/agent/facades';
 
 import { COMMAND } from '../../config';
 
@@ -17,6 +17,7 @@ export class TestSubCommand extends CommandRunner {
     constructor(
         private readonly configService: ConfigService,
         private readonly aiFacade: AiFacadeService,
+        private readonly gitFacade: GitFacadeService,
     ) {
         super();
     }
@@ -43,7 +44,7 @@ export class TestSubCommand extends CommandRunner {
                 allTestsPassed = false;
             }
 
-            // Test other services (GitHub, Deployment, etc.)
+            // Test other services (Git, Deployment, etc.)
             const serviceTestResults = await this.testOtherServices(config);
             if (!serviceTestResults) {
                 allTestsPassed = false;
@@ -99,17 +100,17 @@ export class TestSubCommand extends CommandRunner {
 
         let allPassed = true;
 
-        // Test GitHub API
-        if (config.GH_APIKEY) {
-            const githubResult = await this.testGitHubApi(config.GH_APIKEY);
-            if (!githubResult) {
+        // Test Git API
+        if (config.GIT_TOKEN) {
+            const gitResult = await this.testGitApi(config);
+            if (!gitResult) {
                 allPassed = false;
             }
         }
 
         // Test Deployment API
         if (config.DEPLOY_TOKEN) {
-            const deployResult = await this.testDeployApi(config.DEPLOY_TOKEN);
+            const deployResult = await this.testDeployApi(config.DEPLOY_TOKEN, config);
             if (!deployResult) {
                 allPassed = false;
             }
@@ -126,34 +127,28 @@ export class TestSubCommand extends CommandRunner {
         return allPassed;
     }
 
-    private async testGitHubApi(apiKey: string): Promise<boolean> {
-        const spinner = ora('Testing GitHub API...').start();
+    private async testGitApi(config: any): Promise<boolean> {
+        const providerId = config.GIT_PROVIDER || 'github';
+        const spinner = ora(`Testing Git API (${providerId})...`).start();
 
         try {
-            const response = await fetch('https://api.github.com/user', {
-                headers: {
-                    Authorization: `token ${apiKey}`,
-                    'User-Agent': 'ever-works-cli',
-                },
+            const user = await this.gitFacade.getUser({
+                providerId,
+                token: config.GIT_TOKEN,
             });
 
-            if (response.ok) {
-                const user = await response.json();
-                spinner.succeed(`GitHub API: ${chalk.green('✓ Connected')} (User: ${user.login})`);
-                return true;
-            } else {
-                spinner.fail(`GitHub API: ${chalk.red('✗ Failed')} (Status: ${response.status})`);
-                return false;
-            }
+            spinner.succeed(`Git API: ${chalk.green('✓ Connected')} (User: ${user.login})`);
+            return true;
         } catch (error) {
-            spinner.fail(`GitHub API: ${chalk.red('✗ Failed')}`);
+            spinner.fail(`Git API: ${chalk.red('✗ Failed')}`);
             console.log(chalk.red(`  Error: ${error.message}`));
             return false;
         }
     }
 
-    private async testDeployApi(token: string): Promise<boolean> {
-        const spinner = ora('Testing Deploy API...').start();
+    private async testDeployApi(token: string, config: any): Promise<boolean> {
+        const provider = config.DEPLOY_PROVIDER || 'vercel';
+        const spinner = ora(`Testing Deploy API (${provider})...`).start();
 
         try {
             const response = await fetch('https://api.vercel.com/v2/user', {

@@ -145,7 +145,7 @@ export class UnsetSubCommand extends CommandRunner {
     private groupConfigKeys(keys: string[]): Record<string, string[]> {
         const groups: Record<string, string[]> = {
             Application: [],
-            'GitHub & Git': [],
+            'Git Provider': [],
             'AI Providers': [],
             Deployment: [],
             'Search Services': [],
@@ -155,8 +155,8 @@ export class UnsetSubCommand extends CommandRunner {
         keys.forEach((key) => {
             if (key === 'APP_TYPE') {
                 groups['Application'].push(key);
-            } else if (key.startsWith('GITHUB_') || key.startsWith('GIT_')) {
-                groups['GitHub & Git'].push(key);
+            } else if (key.startsWith('GIT_')) {
+                groups['Git Provider'].push(key);
             } else if (
                 key.startsWith('AI_') ||
                 key.includes('_API_KEY') ||
@@ -166,7 +166,7 @@ export class UnsetSubCommand extends CommandRunner {
                 key.includes('_BASE_URL')
             ) {
                 groups['AI Providers'].push(key);
-            } else if (key.includes('VERCEL') || key.includes('DEPLOY')) {
+            } else if (key.includes('DEPLOY')) {
                 groups['Deployment'].push(key);
             } else if (key.includes('SEARCH') || key.includes('TAVILY')) {
                 groups['Search Services'].push(key);
@@ -211,8 +211,9 @@ export class UnsetSubCommand extends CommandRunner {
     private isCriticalKey(key: string): boolean {
         const criticalKeys = [
             'AI_DEFAULT_PROVIDER',
-            'GH_APIKEY',
-            'GH_OWNER',
+            'GIT_TOKEN',
+            'GIT_OWNER',
+            'GIT_PROVIDER',
             'GIT_NAME',
             'GIT_EMAIL',
         ];
@@ -222,8 +223,9 @@ export class UnsetSubCommand extends CommandRunner {
     private getCriticalKeyWarning(key: string): string {
         const warnings: Record<string, string> = {
             AI_DEFAULT_PROVIDER: 'Removing this will disable AI functionality',
-            GH_APIKEY: 'Removing this will disable GitHub API access',
-            GH_OWNER: 'Removing this will break repository operations',
+            GIT_TOKEN: 'Removing this will disable git provider access',
+            GIT_OWNER: 'Removing this will break repository operations',
+            GIT_PROVIDER: 'Removing this will default the git provider to github',
             GIT_NAME: 'Removing this will break Git commit operations',
             GIT_EMAIL: 'Removing this will break Git commit operations',
         };

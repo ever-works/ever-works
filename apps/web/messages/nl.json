@@ -1197,8 +1197,8 @@
                         "title": "Hoe u uw Vercel token configureert:",
                         "step1": "Klik op 'Vercel Token Ophalen' om het Vercel dashboard te openen",
                         "step2": "Maak een nieuwe token met implementatiemachtigingen",
-                        "step3": "Kopieer de gegenereerde token",
-                        "step4": "Ga naar API Tokens Instellingen en plak uw token in het Vercel gedeelte"
+                        "step3": "Configureer uw {provider} API-token in Plugin-instellingen > {provider}",
+                        "step4": "Keer hier terug om uw directory te implementeren"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1207,10 @@
                     "hint": "Als medewerker kunt u implementaties activeren zodra de eigenaar zijn Vercel-integratie heeft geconfigureerd."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Implementeren op Vercel",
                         "description": "Implementeer uw directory website repository op Vercel.",
-                        "deployButton": "Nu Implementeren",
+                        "deployButton": "Implementeren op {provider}",
                         "deployingButton": "Implementeren...",
                         "deployingStateButton": "Implementeren ({state})...",
                         "successMessage": "Uw website is succesvol geïmplementeerd!",

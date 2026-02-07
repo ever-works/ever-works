@@ -1104,8 +1104,8 @@
                         "title": "如何配置您的 Vercel 令牌：",
                         "step1": "点击 '获取 Vercel 令牌' 打开 Vercel 仪表板",
                         "step2": "创建具有部署权限的新令牌",
-                        "step3": "复制生成的令牌",
-                        "step4": "前往 API 令牌设置，并将您的令牌粘贴到 Vercel 部分"
+                        "step3": "在插件设置 > {provider} 中配置您的 {provider} API 令牌",
+                        "step4": "返回此处部署您的目录"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1114,10 +1114,10 @@
                     "hint": "作为协作者，一旦所有者配置了 Vercel 集成，您就可以触发部署。"
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "部署到 Vercel",
                         "description": "在 Vercel 上部署您的目录网站仓库。",
-                        "deployButton": "立即部署",
+                        "deployButton": "部署到 {provider}",
                         "deployingButton": "部署中...",
                         "deployingStateButton": "部署中 ({state})...",
                         "successMessage": "您的网站已成功部署！",

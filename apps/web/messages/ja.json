@@ -1197,8 +1197,8 @@
                         "title": "Vercel トークンの設定方法：",
                         "step1": "「Vercel トークンを取得」をクリックして Vercel ダッシュボードを開く",
                         "step2": "デプロイ権限を持つ新しいトークンを作成",
-                        "step3": "生成されたトークンをコピー",
-                        "step4": "API トークン設定に移動し、Vercel セクションにトークンを貼り付け"
+                        "step3": "プラグイン設定 > {provider} で {provider} APIトークンを設定してください",
+                        "step4": "ここに戻ってディレクトリをデプロイしてください"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1207,10 @@
                     "hint": "コラボレーターとして、所有者が Vercel 統合を設定した後、デプロイメントをトリガーできます。"
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Vercel にデプロイ",
                         "description": "Vercel 上にディレクトリ Web サイトリポジトリをデプロイします。",
-                        "deployButton": "今すぐデプロイ",
+                        "deployButton": "{provider}にデプロイ",
                         "deployingButton": "デプロイ中...",
                         "deployingStateButton": "デプロイ中（{state}）...",
                         "successMessage": "Webサイトが正常にデプロイされました！",

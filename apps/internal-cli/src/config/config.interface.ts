@@ -6,15 +6,17 @@ export interface EverWorksConfig {
     // App Configuration
     APP_TYPE: 'cli' | 'api' | 'test';
 
-    // GitHub Configuration
-    GH_APIKEY: string;
-    GH_OWNER: string;
+    // Git Provider
+    GIT_PROVIDER?: string; // e.g. 'github', 'gitlab'
+    GIT_TOKEN: string; // PAT for the selected provider
+    GIT_OWNER: string; // username/org
 
-    // Git Configuration
+    // Git Identity
     GIT_NAME: string;
     GIT_EMAIL: string;
 
-    // Deployment Providers
+    // Deployment
+    DEPLOY_PROVIDER?: string; // e.g. 'vercel'
     DEPLOY_TOKEN?: string;
 
     // AI Plugin Configurations

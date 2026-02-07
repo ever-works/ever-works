@@ -22,11 +22,13 @@ export function handleCliError(error: any, messageHeader: string = 'An error occ
     console.error(chalk.red(`\n✗ ${messageHeader}:`), String(message));
 
     if (error.message?.includes('Owner is required')) {
-        console.log(chalk.yellow('\n⚠ Make sure your GitHub configuration is set up correctly.'));
+        console.log(
+            chalk.yellow('\n⚠ Make sure your git provider configuration is set up correctly.'),
+        );
         console.log(
             chalk.gray('Run ') +
                 chalk.cyan(`${COMMAND} config setup`) +
-                chalk.gray(' to configure GitHub settings.'),
+                chalk.gray(' to configure git provider settings.'),
         );
     } else if (status === 404) {
         if (message?.toLowerCase().includes('directory')) {

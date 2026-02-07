@@ -8,8 +8,6 @@ import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
 import { DirectoryLifecycleService } from '@packages/agent/services';
 
-const DEFAULT_PROVIDER_ID = 'github';
-
 @SubCommand({
     name: 'create',
     description: 'Create a new directory',
@@ -38,11 +36,12 @@ export class CreateSubCommand extends CommandRunner {
 
             // Get user information
             const user = await this.userRepository.createOrGetLocalUser();
-            const options = { userId: user.id, providerId: DEFAULT_PROVIDER_ID };
-            const token = await this.gitFacade.getAccessToken(options);
+            const providerId = process.env.GIT_PROVIDER || 'github';
+            const token = process.env.GIT_TOKEN;
             if (!token) {
-                throw new Error('GitHub token is required');
+                throw new Error('Git provider token is required. Run "config setup" to configure.');
             }
+            const options = { userId: user.id, providerId, token };
 
             const ghOwner = await this.gitFacade.getUser(options);
 
@@ -80,7 +79,7 @@ export class CreateSubCommand extends CommandRunner {
                         slug: directoryData.slug,
                         name: directoryData.name,
                         description: directoryData.description,
-                        gitProvider: DEFAULT_PROVIDER_ID,
+                        gitProvider: providerId,
                         owner: directoryData.owner ?? undefined,
                         organization: !!directoryData.owner,
                     },

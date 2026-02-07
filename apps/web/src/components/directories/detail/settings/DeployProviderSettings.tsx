@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { Directory } from '@/lib/api';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import type { PluginIcon as PluginIconType } from '@ever-works/plugin';
-import { updateDeployProvider } from './actions';
+import { getDeployProviders, updateDeployProvider } from './actions';
 
 interface DeployProvider {
     id: string;
@@ -34,27 +34,16 @@ export function DeployProviderSettings({ directory }: DeployProviderSettingsProp
     const [selectedProvider, setSelectedProvider] = useState(directory.deployProvider || '');
     const router = useRouter();
 
-    // Fetch available providers
+    // Fetch available providers via server action
     useEffect(() => {
-        const fetchProviders = async () => {
-            try {
-                const response = await fetch('/api/deploy/providers');
-                const data = await response.json();
-                if (data.providers) {
-                    setProviders(data.providers);
-                    // Default to the directory's provider or the first enabled provider
-                    if (!selectedProvider && data.providers.length > 0) {
-                        const first =
-                            data.providers.find((p: DeployProvider) => p.enabled) ||
-                            data.providers[0];
-                        setSelectedProvider(first.id);
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to fetch deploy providers:', error);
+        getDeployProviders().then((result) => {
+            setProviders(result);
+            // Default to the directory's provider or the first enabled provider
+            if (!selectedProvider && result.length > 0) {
+                const first = result.find((p) => p.enabled) || result[0];
+                setSelectedProvider(first.id);
             }
-        };
-        fetchProviders();
+        });
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const currentProvider = providers.find((p) => p.id === selectedProvider) || {

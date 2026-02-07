@@ -10,7 +10,7 @@ import { handleCliError } from './error';
 
 @SubCommand({
     name: 'update',
-    description: 'Update a directory and its GitHub repository',
+    description: 'Update a directory and its repository',
 })
 export class UpdateSubCommand extends CommandRunner {
     constructor(

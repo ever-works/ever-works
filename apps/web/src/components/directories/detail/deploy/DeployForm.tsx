@@ -26,9 +26,10 @@ import { formatDistanceToNow } from 'date-fns';
 interface DeployFormProps {
     directory: Directory;
     isDeploying?: boolean;
+    providerName?: string;
 }
 
-export function DeployForm({ directory, isDeploying }: DeployFormProps) {
+export function DeployForm({ directory, isDeploying, providerName }: DeployFormProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
@@ -159,6 +160,7 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
                 open={isTeamDialogOpen}
                 teams={deployTeams}
                 isSubmitting={isPending || isDeploying}
+                providerName={providerName}
                 onConfirm={handleConfirmDeploy}
                 onCancel={() => setIsTeamDialogOpen(false)}
             />
@@ -177,17 +179,17 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
 
                     <div className="flex-1">
                         <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-2">
-                            {t('form.deployToVercel.title')}
+                            {t('form.deployment.title')}
                         </h3>
                         <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
-                            {t('form.deployToVercel.description')}
+                            {t('form.deployment.description')}
                         </p>
 
                         {directory.website && (
                             <div className="mb-4 p-4 rounded-lg bg-success/10 dark:bg-success-dark/10 border border-success/20 dark:border-success-dark/20">
                                 {directory.deploymentState === 'READY' && (
                                     <p className="text-sm text-success dark:text-success-dark mb-2">
-                                        {t('form.deployToVercel.successMessage')}
+                                        {t('form.deployment.successMessage')}
                                     </p>
                                 )}
 
@@ -212,15 +214,19 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
                                     <Loader2 className="animate-spin h-4 w-4" />
 
                                     {isDeploying
-                                        ? t('form.deployToVercel.deployingStateButton', {
+                                        ? t('form.deployment.deployingStateButton', {
                                               state: (
                                                   directory.deploymentState || 'INITIALIZING'
                                               ).toLowerCase(),
                                           })
-                                        : t('form.deployToVercel.deployButton')}
+                                        : t('form.deployment.deployButton', {
+                                              provider: providerName || 'Provider',
+                                          })}
                                 </span>
                             ) : (
-                                t('form.deployToVercel.deployButton')
+                                t('form.deployment.deployButton', {
+                                    provider: providerName || 'Provider',
+                                })
                             )}
                         </Button>
                     </div>

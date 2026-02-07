@@ -1197,8 +1197,8 @@
                         "title": "Vercel belirtecinizi nasıl yapılandırırsınız:",
                         "step1": "Vercel panosunu açmak için 'Vercel Belirteci Al' düğmesine tıklayın",
                         "step2": "Dağıtım izinleri olan yeni bir belirteç oluşturun",
-                        "step3": "Oluşturulan belirteci kopyalayın",
-                        "step4": "API Belirteçleri Ayarları'na gidin ve belirtecinizi Vercel bölümüne yapıştırın"
+                        "step3": "{provider} API tokeninizi Eklenti Ayarları > {provider} bölümünde yapılandırın",
+                        "step4": "Dizininizi yayınlamak için buraya geri dönün"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1207,10 @@
                     "hint": "Bir işbirlikçi olarak, sahip Vercel entegrasyonunu yapılandırdıktan sonra yayınlamaları tetikleyebilirsiniz."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Vercel'e Yayınla",
                         "description": "Dizin web sitesi deponuzu Vercel'de yayınlayın.",
-                        "deployButton": "Şimdi Yayınla",
+                        "deployButton": "{provider} üzerine yayınla",
                         "deployingButton": "Yayınlanıyor...",
                         "deployingStateButton": "Yayınlanıyor ({state})...",
                         "successMessage": "Web siteniz başarıyla yayınlandı!",

@@ -1197,8 +1197,8 @@
                         "title": "Cách cấu hình mã thông báo Vercel của bạn:",
                         "step1": "Nhấp 'Lấy Mã thông báo Vercel' để mở bảng điều khiển Vercel",
                         "step2": "Tạo mã thông báo mới với quyền triển khai",
-                        "step3": "Sao chép mã thông báo đã tạo",
-                        "step4": "Đi đến Cài đặt Mã thông báo API và dán mã thông báo của bạn vào phần Vercel"
+                        "step3": "Cấu hình token API {provider} của bạn trong Cài đặt Plugin > {provider}",
+                        "step4": "Quay lại đây để triển khai thư mục của bạn"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1207,10 @@
                     "hint": "Là một cộng tác viên, bạn có thể kích hoạt triển khai một khi chủ sở hữu cấu hình tích hợp Vercel của họ."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Triển khai lên Vercel",
                         "description": "Triển khai kho lưu trữ website thư mục của bạn trên Vercel.",
-                        "deployButton": "Triển khai Ngay",
+                        "deployButton": "Triển khai lên {provider}",
                         "deployingButton": "Đang triển khai...",
                         "deployingStateButton": "Đang triển khai ({state})...",
                         "successMessage": "Website của bạn đã được triển khai thành công!",

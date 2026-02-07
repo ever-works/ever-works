@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { DirectoryRepository, UserRepository } from '@packages/agent/database';
-import { VercelApiService } from '@ever-works/vercel-plugin';
+import { DeployFacadeService, GitFacadeService } from '@packages/agent/facades';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
@@ -15,13 +15,14 @@ import { handleCliError } from './error';
 })
 export class DeploySubCommand extends CommandRunner {
     private readonly logger = new Logger(DeploySubCommand.name);
-    private readonly deployApi = new VercelApiService();
 
     constructor(
         private readonly directoryRepository: DirectoryRepository,
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
         private readonly userRepository: UserRepository,
+        private readonly deployFacade: DeployFacadeService,
+        private readonly gitFacade: GitFacadeService,
     ) {
         super();
     }
@@ -50,10 +51,11 @@ export class DeploySubCommand extends CommandRunner {
                 ),
             );
 
+            const user = await this.userRepository.createOrGetLocalUser();
+            const facadeOptions = { userId: user.id, directoryId: directory.id };
+
             const deployOptions = await this.promptDeployOptions();
-            const team = await this.promptTeamSelection(
-                deployOptions.DEPLOY_TOKEN || process.env.DEPLOY_TOKEN,
-            );
+            const team = await this.promptTeamSelection(facadeOptions);
 
             console.log(chalk.cyan('\n--- Deployment Process ---'));
             console.log(chalk.gray('This will:'));
@@ -96,7 +98,7 @@ export class DeploySubCommand extends CommandRunner {
                     );
                 }
 
-                const isValid = await this.deployApi.validateToken(deployToken);
+                const isValid = await this.deployFacade.validateToken(facadeOptions);
                 if (!isValid) {
                     throw new Error('Invalid deployment token');
                 }
@@ -108,17 +110,19 @@ export class DeploySubCommand extends CommandRunner {
                 console.log(chalk.gray('1. Use the web dashboard to deploy your directory'));
                 console.log(chalk.gray('2. Push to your repository to trigger CI/CD deployment'));
 
+                const gitProvider = directory.gitProvider || 'github';
+                const cloneUrl = this.gitFacade.getCloneUrl(
+                    gitProvider,
+                    directory.getRepoOwner(),
+                    directory.getWebsiteRepo(),
+                );
+
                 console.log(chalk.cyan('\n--- Repository Information ---'));
                 console.log(
                     chalk.gray('Repository:'),
                     chalk.white(`${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`),
                 );
-                console.log(
-                    chalk.gray('Clone command:'),
-                    chalk.white(
-                        `git clone https://github.com/${directory.getRepoOwner()}/${directory.getWebsiteRepo()}.git`,
-                    ),
-                );
+                console.log(chalk.gray('Clone command:'), chalk.white(`git clone ${cloneUrl}`));
             } catch (error) {
                 spinner.stop();
                 throw error;
@@ -147,16 +151,12 @@ export class DeploySubCommand extends CommandRunner {
         };
     }
 
-    private async promptTeamSelection(
-        tokenFromInput?: string,
-    ): Promise<{ scope: string; label: string } | undefined> {
-        const token = tokenFromInput || process.env.DEPLOY_TOKEN;
-        if (!token) {
-            return undefined;
-        }
-
+    private async promptTeamSelection(facadeOptions: {
+        userId: string;
+        directoryId: string;
+    }): Promise<{ scope: string; label: string } | undefined> {
         try {
-            const teams = await this.deployApi.getTeams(token);
+            const teams = await this.deployFacade.getTeams(facadeOptions);
             if (!Array.isArray(teams) || teams.length === 0) {
                 return undefined;
             }

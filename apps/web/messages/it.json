@@ -1197,8 +1197,8 @@
                         "title": "Come configurare il tuo token Vercel:",
                         "step1": "Clicca 'Ottieni Token Vercel' per aprire il dashboard Vercel",
                         "step2": "Crea un nuovo token con permessi di deployment",
-                        "step3": "Copia il token generato",
-                        "step4": "Vai alle Impostazioni Token API e incolla il tuo token nella sezione Vercel"
+                        "step3": "Configura il tuo token API {provider} in Impostazioni Plugin > {provider}",
+                        "step4": "Torna qui per distribuire la tua directory"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1207,10 @@
                     "hint": "Come collaboratore, puoi attivare distribuzioni una volta che il proprietario configura la sua integrazione Vercel."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Distribuisci su Vercel",
                         "description": "Distribuisci il tuo repository sito web della directory su Vercel.",
-                        "deployButton": "Distribuisci Ora",
+                        "deployButton": "Distribuisci su {provider}",
                         "deployingButton": "Distribuzione in corso...",
                         "deployingStateButton": "Distribuzione in corso ({state})...",
                         "successMessage": "Il tuo sito web è stato distribuito con successo!",

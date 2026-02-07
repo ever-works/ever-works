@@ -1197,8 +1197,8 @@
                         "title": "Cara mengonfigurasi token Vercel Anda:",
                         "step1": "Klik 'Dapatkan Token Vercel' untuk membuka dasbor Vercel",
                         "step2": "Buat token baru dengan izin deployment",
-                        "step3": "Salin token yang dihasilkan",
-                        "step4": "Pergi ke Pengaturan Token API dan tempel token Anda di bagian Vercel"
+                        "step3": "Konfigurasikan token API {provider} Anda di Pengaturan Plugin > {provider}",
+                        "step4": "Kembali ke sini untuk mendeploy direktori Anda"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1207,10 @@
                     "hint": "Sebagai kolaborator, Anda dapat memicu deployment setelah pemilik mengonfigurasi integrasi Vercel mereka."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Deploy ke Vercel",
                         "description": "Deploy repositori situs web direktori Anda di Vercel.",
-                        "deployButton": "Deploy Sekarang",
+                        "deployButton": "Deploy ke {provider}",
                         "deployingButton": "Mendeploy...",
                         "deployingStateButton": "Mendeploy ({state})...",
                         "successMessage": "Situs web Anda telah berhasil dideploy!",

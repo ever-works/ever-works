@@ -1104,8 +1104,8 @@
                         "title": "Cómo configurar tu token de Vercel:",
                         "step1": "Haz clic en 'Obtener Token de Vercel' para abrir el panel de Vercel",
                         "step2": "Crea un nuevo token con permisos de despliegue",
-                        "step3": "Copia el token generado",
-                        "step4": "Ve a Configuración de Tokens API y pega tu token en la sección de Vercel"
+                        "step3": "Configure su token API de {provider} en Configuración del Plugin > {provider}",
+                        "step4": "Regrese aquí para desplegar su directorio"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1114,10 +1114,10 @@
                     "hint": "Como colaborador, podrás activar despliegues una vez que el propietario configure su integración de Vercel."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Desplegar en Vercel",
                         "description": "Despliega el repositorio del sitio web de tu directorio en Vercel.",
-                        "deployButton": "Desplegar Ahora",
+                        "deployButton": "Desplegar en {provider}",
                         "deployingButton": "Desplegando...",
                         "deployingStateButton": "Desplegando ({state})...",
                         "successMessage": "¡Tu sitio web ha sido desplegado exitosamente!",

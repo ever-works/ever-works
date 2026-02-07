@@ -1104,8 +1104,8 @@
                         "title": "Comment configurer votre jeton Vercel :",
                         "step1": "Cliquez sur 'Obtenir le jeton Vercel' pour ouvrir le tableau de bord Vercel",
                         "step2": "Créez un nouveau jeton avec les permissions de déploiement",
-                        "step3": "Copiez le jeton généré",
-                        "step4": "Allez dans les paramètres des jetons API et collez votre jeton dans la section Vercel"
+                        "step3": "Configurez votre jeton API {provider} dans Paramètres du Plugin > {provider}",
+                        "step4": "Revenez ici pour déployer votre répertoire"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1114,10 +1114,10 @@
                     "hint": "En tant que collaborateur, vous pourrez déclencher des déploiements une fois que le propriétaire aura configuré son intégration Vercel."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Déployer sur Vercel",
                         "description": "Déployez le dépôt du site Web de votre répertoire sur Vercel.",
-                        "deployButton": "Déployer maintenant",
+                        "deployButton": "Déployer sur {provider}",
                         "deployingButton": "Déploiement en cours...",
                         "deployingStateButton": "Déploiement en cours ({state})...",
                         "successMessage": "Votre site Web a été déployé avec succès !",

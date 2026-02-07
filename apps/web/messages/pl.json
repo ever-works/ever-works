@@ -1197,8 +1197,8 @@
                         "title": "Jak skonfigurować token Vercel:",
                         "step1": "Kliknij 'Pobierz token Vercel', aby otworzyć panel Vercel",
                         "step2": "Utwórz nowy token z uprawnieniami do wdrażania",
-                        "step3": "Skopiuj wygenerowany token",
-                        "step4": "Przejdź do ustawień tokenów API i wklej token w sekcji Vercel"
+                        "step3": "Skonfiguruj token API {provider} w Ustawieniach Wtyczki > {provider}",
+                        "step4": "Wróć tutaj, aby wdrożyć swój katalog"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1207,10 @@
                     "hint": "Jako współpracownik możesz uruchamiać wdrożenia, gdy właściciel skonfiguruje integrację Vercel."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Wdróż na Vercel",
                         "description": "Wdróż repozytorium strony katalogu na Vercel.",
-                        "deployButton": "Wdróż teraz",
+                        "deployButton": "Wdróż na {provider}",
                         "deployingButton": "Wdrażanie...",
                         "deployingStateButton": "Wdrażanie ({state})...",
                         "successMessage": "Twoja strona została pomyślnie wdrożona!",

@@ -34,7 +34,6 @@ import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/generators';
 
 interface DeployDto {
     DEPLOY_TOKEN?: string;
-    GITHUB_TOKEN?: string;
     teamScope?: string;
 }
 

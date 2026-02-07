@@ -96,6 +96,19 @@ export class ConfigService {
                 process.env[key] = String(value);
             }
         });
+
+        // Default git provider to 'github' if not set
+        if (!process.env.GIT_PROVIDER) {
+            process.env.GIT_PROVIDER = 'github';
+        }
+
+        // Map new keys to legacy env vars for downstream @packages/agent code
+        if (process.env.GIT_TOKEN && !process.env.GH_APIKEY) {
+            process.env.GH_APIKEY = process.env.GIT_TOKEN;
+        }
+        if (process.env.GIT_OWNER && !process.env.GH_OWNER) {
+            process.env.GH_OWNER = process.env.GIT_OWNER;
+        }
     }
 
     /**
@@ -106,8 +119,8 @@ export class ConfigService {
         const warnings: string[] = [];
 
         // Required fields
-        if (!config.GH_APIKEY) errors.push('GH_APIKEY is required');
-        if (!config.GH_OWNER) errors.push('GH_OWNER is required');
+        if (!config.GIT_TOKEN) errors.push('GIT_TOKEN is required');
+        if (!config.GIT_OWNER) errors.push('GIT_OWNER is required');
         if (!config.GIT_NAME) errors.push('GIT_NAME is required');
         if (!config.GIT_EMAIL) errors.push('GIT_EMAIL is required');
         // AI Plugin validation - at least one provider should have an API key

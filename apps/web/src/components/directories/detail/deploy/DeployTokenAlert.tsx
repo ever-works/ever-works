@@ -98,14 +98,11 @@ export function DeployTokenAlert({
                     </li>
                     <li className="flex gap-2">
                         <span className="font-medium">3.</span>
-                        <span>
-                            Configure your {displayName} API token in Plugin Settings &gt;{' '}
-                            {displayName}
-                        </span>
+                        <span>{t('noTokenAlert.howTo.step3', { provider: displayName })}</span>
                     </li>
                     <li className="flex gap-2">
                         <span className="font-medium">4.</span>
-                        <span>Return here to deploy your directory</span>
+                        <span>{t('noTokenAlert.howTo.step4')}</span>
                     </li>
                 </ol>
             </div>
