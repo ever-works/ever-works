@@ -2,14 +2,14 @@ import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
 import { INestApplicationContext } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
-import { TriggerWorkerModule } from '../../trigger/trigger-worker.module';
-import { TriggerInternalApiClient } from '../../trigger/trigger-internal-api.client';
-import { TriggerGenerationOrchestrator } from '../../trigger/trigger-generation.orchestrator';
-import { TriggerPluginHydratorService } from '../../trigger/plugins/trigger-plugin-hydrator.service';
+import { TriggerWorkerModule } from '../../trigger/worker/modules/trigger-worker.module';
+import { TriggerInternalApiClient } from '../../trigger/worker/services/trigger-internal-api.client';
+import { TriggerGenerationOrchestrator } from '../../trigger/worker/orchestrators/trigger-generation.orchestrator';
+import { TriggerPluginHydratorService } from '../../trigger/worker/services/trigger-plugin-hydrator.service';
 import { DirectoryGenerationPayload } from '@ever-works/agent/tasks';
 import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
 import { DirectoryScheduleService } from '@ever-works/agent/services';
-import { TriggerLogger } from '../../trigger/trigger-logger';
+import { TriggerLogger } from '../../trigger/worker/trigger-logger';
 
 async function createContext(
     appContext: INestApplicationContext,

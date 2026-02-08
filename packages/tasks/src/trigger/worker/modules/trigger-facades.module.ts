@@ -8,9 +8,9 @@ import {
     GitFacadeService,
 } from '@ever-works/agent/facades';
 import { OAuthTokenRepository } from '@ever-works/agent/database';
-import { TriggerInternalModule } from '../trigger-internal.module';
-import { TriggerInternalApiClient } from '../trigger-internal-api.client';
-import { createRemoteProxy } from './remote-proxy';
+import { TriggerInternalModule } from './trigger-internal.module';
+import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
+import { createRemoteProxy } from '../remote-proxy';
 
 const FACADES = [
     AiFacadeService,

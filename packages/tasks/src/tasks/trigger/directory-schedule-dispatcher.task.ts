@@ -1,9 +1,9 @@
 import { schedules } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
-import { TriggerInternalModule } from '../../trigger/trigger-internal.module';
+import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { config } from '@ever-works/agent/config';
 import { DirectoryScheduleDispatcherService } from '@ever-works/agent/services';
-import { TriggerLogger } from '../../trigger/trigger-logger';
+import { TriggerLogger } from '../../trigger/worker/trigger-logger';
 
 const interval = Math.max(1, config.subscriptions.getDispatchIntervalMinutes());
 const cronExpression = `*/${interval} * * * *`;

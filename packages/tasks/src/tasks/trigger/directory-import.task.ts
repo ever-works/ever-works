@@ -2,13 +2,13 @@ import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
 import { INestApplicationContext } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
-import { TriggerWorkerModule } from '../../trigger/trigger-worker.module';
-import { TriggerInternalApiClient } from '../../trigger/trigger-internal-api.client';
-import { TriggerImportOrchestrator } from '../../trigger/trigger-import.orchestrator';
-import { TriggerPluginHydratorService } from '../../trigger/plugins/trigger-plugin-hydrator.service';
+import { TriggerWorkerModule } from '../../trigger/worker/modules/trigger-worker.module';
+import { TriggerInternalApiClient } from '../../trigger/worker/services/trigger-internal-api.client';
+import { TriggerImportOrchestrator } from '../../trigger/worker/orchestrators/trigger-import.orchestrator';
+import { TriggerPluginHydratorService } from '../../trigger/worker/services/trigger-plugin-hydrator.service';
 import { DirectoryImportPayload } from '@ever-works/agent/tasks';
 import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
-import { TriggerLogger } from '../../trigger/trigger-logger';
+import { TriggerLogger } from '../../trigger/worker/trigger-logger';
 
 async function createContext(appContext: INestApplicationContext, payload: DirectoryImportPayload) {
     // Initialize plugin system with remote settings

@@ -22,8 +22,9 @@ export interface BranchSyncSummary {
 export class BranchSyncService {
     private readonly logger = new Logger(BranchSyncService.name);
 
-    // Control parallelism to avoid rate limiting
-    private readonly MAX_CONCURRENT_SYNCS = 3;
+    // Syncs must run sequentially: cloneOrPull uses a deterministic dir
+    // based on owner+repo (not branch), so parallel syncs corrupt each other.
+    private readonly MAX_CONCURRENT_SYNCS = 1;
 
     constructor(private readonly gitFacade: GitFacadeService) {}
 

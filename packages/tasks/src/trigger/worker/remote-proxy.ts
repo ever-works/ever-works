@@ -1,5 +1,5 @@
 import superjson from 'superjson';
-import { TriggerInternalApiClient } from '../trigger-internal-api.client';
+import { TriggerInternalApiClient } from './services/trigger-internal-api.client';
 
 /**
  * Creates a Proxy that forwards method calls to the API via the internal client.

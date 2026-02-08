@@ -3,8 +3,8 @@ import {
     DirectoryScheduleDispatcherService,
     DirectoryScheduleService,
 } from '@ever-works/agent/services';
-import { TriggerInternalApiClient } from './trigger-internal-api.client';
-import { createRemoteProxy } from './plugins/remote-proxy';
+import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
+import { createRemoteProxy } from '../remote-proxy';
 
 @Module({
     providers: [

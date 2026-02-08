@@ -20,11 +20,11 @@ import {
 } from '@ever-works/agent/plugins';
 import type { PluginsModuleOptions } from '@ever-works/agent/plugins';
 
-import { TriggerInternalModule } from '../trigger-internal.module';
-import { TriggerInternalApiClient } from '../trigger-internal-api.client';
-import { createRemoteProxy } from './remote-proxy';
-import { LocalPluginStore } from './local-plugin-store';
-import { TriggerPluginHydratorService } from './trigger-plugin-hydrator.service';
+import { TriggerInternalModule } from './trigger-internal.module';
+import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
+import { createRemoteProxy } from '../remote-proxy';
+import { LocalPluginStore } from '../services/local-plugin-store';
+import { TriggerPluginHydratorService } from '../services/trigger-plugin-hydrator.service';
 
 /**
  * Global plugin module for Trigger.dev context.

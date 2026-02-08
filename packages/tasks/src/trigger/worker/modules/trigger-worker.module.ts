@@ -1,8 +1,7 @@
-import { Global, Module, DynamicModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { DirectoryOperationsService } from '@ever-works/agent/directory-operations';
 import { DirectoryRepository } from '@ever-works/agent/database';
 import { NotificationService } from '@ever-works/agent/notifications';
-import { CACHE_MANAGER } from '@ever-works/agent/cache';
 import { DataGeneratorService } from '@ever-works/agent/generators';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
 import { WebsiteGeneratorService, BranchSyncService } from '@ever-works/agent/generators';
@@ -11,39 +10,15 @@ import {
     AwesomeReadmeParserService,
     ImportExecutorService,
 } from '@ever-works/agent/import';
-import { TriggerPluginsModule } from './plugins/trigger-plugins.module';
-import { TriggerFacadesModule } from './plugins/trigger-facades.module';
-import { TriggerPipelineModule } from './plugins/trigger-pipeline.module';
+import { TriggerPluginsModule } from './trigger-plugins.module';
+import { TriggerFacadesModule } from './trigger-facades.module';
+import { TriggerPipelineModule } from './trigger-pipeline.module';
 import { TriggerInternalModule } from './trigger-internal.module';
-import { TriggerInternalApiClient } from './trigger-internal-api.client';
-import { createRemoteProxy } from './plugins/remote-proxy';
-import { TriggerGenerationOrchestrator } from './trigger-generation.orchestrator';
-import { TriggerImportOrchestrator } from './trigger-import.orchestrator';
-
-/**
- * Global module that provides CACHE_MANAGER via remote proxy to the API.
- * Replaces TriggerCacheFactory + InternalAPIAdapter with the generic remote-call mechanism.
- */
-@Global()
-@Module({})
-class TriggerRemoteCacheModule {
-    static forRoot(): DynamicModule {
-        return {
-            module: TriggerRemoteCacheModule,
-            global: true,
-            imports: [TriggerInternalModule],
-            providers: [
-                {
-                    provide: CACHE_MANAGER,
-                    useFactory: (apiClient: TriggerInternalApiClient) =>
-                        createRemoteProxy(apiClient, 'CacheManager'),
-                    inject: [TriggerInternalApiClient],
-                },
-            ],
-            exports: [CACHE_MANAGER],
-        };
-    }
-}
+import { TriggerRemoteCacheModule } from './trigger-remote-cache.module';
+import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
+import { createRemoteProxy } from '../remote-proxy';
+import { TriggerGenerationOrchestrator } from '../orchestrators/trigger-generation.orchestrator';
+import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orchestrator';
 
 @Module({
     imports: [
