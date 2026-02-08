@@ -1,12 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import superjson from 'superjson';
 import { config } from '@ever-works/agent/config';
-import { GenerateStatusType } from '@ever-works/agent/entities';
 import { DirectoryContextResponse } from '@ever-works/agent/tasks';
-
-type DispatchSchedulesResponse = {
-    dispatched: number;
-};
 
 @Injectable()
 export class TriggerInternalApiClient {
@@ -36,58 +31,6 @@ export class TriggerInternalApiClient {
             method: 'GET',
             path: `/directories/${directoryId}/context?${searchParams.toString()}`,
         });
-    }
-
-    async dispatchSchedules(): Promise<DispatchSchedulesResponse> {
-        return this.request<DispatchSchedulesResponse>({
-            method: 'POST',
-            path: `/schedules/dispatch`,
-        });
-    }
-
-    async markScheduleCompleted(
-        scheduleId: string,
-        payload: { historyId?: string; status: GenerateStatusType },
-    ): Promise<void> {
-        await this.request<void>({
-            method: 'POST',
-            path: `/schedules/${scheduleId}/complete`,
-            body: payload,
-        });
-    }
-
-    async markScheduleFailed(scheduleId: string, reason?: string): Promise<void> {
-        await this.request<void>({
-            method: 'POST',
-            path: `/schedules/${scheduleId}/fail`,
-            body: { reason },
-        });
-    }
-
-    async setCacheEntry(key: string, value: any, ttl?: number): Promise<void> {
-        await this.request<void>({
-            method: 'POST',
-            path: `/cache`,
-            body: { key, value, ttl },
-        });
-    }
-
-    async getCacheEntry<T>(key: string): Promise<T | undefined> {
-        const response = await this.request<{ key: string; value: T | undefined }>({
-            method: 'GET',
-            path: `/cache?key=${encodeURIComponent(key)}`,
-        });
-
-        return response?.value;
-    }
-
-    async deleteCacheEntry<T>(key: string): Promise<boolean> {
-        const response = await this.request<{ deleted: boolean }>({
-            method: 'DELETE',
-            path: `/cache?key=${encodeURIComponent(key)}`,
-        });
-
-        return response.deleted;
     }
 
     /**

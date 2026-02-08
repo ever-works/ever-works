@@ -8,7 +8,7 @@ import { TriggerGenerationOrchestrator } from '../../trigger/trigger-generation.
 import { TriggerPluginHydratorService } from '../../trigger/plugins/trigger-plugin-hydrator.service';
 import { DirectoryGenerationPayload } from '@ever-works/agent/tasks';
 import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
-import { RemoteDirectoryScheduleService } from '../../trigger/remote-directory-schedule.service';
+import { DirectoryScheduleService } from '@ever-works/agent/services';
 import { TriggerLogger } from '../../trigger/trigger-logger';
 
 async function createContext(
@@ -51,7 +51,7 @@ export const directoryGenerationTask = task({
 
         try {
             const { orchestrator, directory, user } = await createContext(appContext, payload);
-            const scheduleService = appContext.get(RemoteDirectoryScheduleService);
+            const scheduleService = appContext.get(DirectoryScheduleService);
 
             await orchestrator.handleCancellation({
                 directory,
@@ -76,7 +76,7 @@ export const directoryGenerationTask = task({
 
         try {
             const { orchestrator, directory, user } = await createContext(appContext, payload);
-            const scheduleService = appContext.get(RemoteDirectoryScheduleService);
+            const scheduleService = appContext.get(DirectoryScheduleService);
 
             try {
                 await orchestrator.run({
@@ -88,7 +88,8 @@ export const directoryGenerationTask = task({
                 });
 
                 if (payload.triggerSource === 'schedule' && payload.scheduleId) {
-                    await scheduleService.markRunCompleted(payload.scheduleId, {
+                    await scheduleService.markRunCompleted({
+                        scheduleId: payload.scheduleId,
                         historyId: payload.historyId,
                         status: GenerateStatusType.GENERATED,
                     });

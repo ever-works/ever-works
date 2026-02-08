@@ -1,6 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Global, Module, DynamicModule } from '@nestjs/common';
 import { DirectoryOperationsService } from '@ever-works/agent/directory-operations';
+import { DirectoryRepository } from '@ever-works/agent/database';
 import { NotificationService } from '@ever-works/agent/notifications';
+import { CACHE_MANAGER } from '@ever-works/agent/cache';
 import { DataGeneratorService } from '@ever-works/agent/generators';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
 import { WebsiteGeneratorService, BranchSyncService } from '@ever-works/agent/generators';
@@ -17,7 +19,31 @@ import { TriggerInternalApiClient } from './trigger-internal-api.client';
 import { createRemoteProxy } from './plugins/remote-proxy';
 import { TriggerGenerationOrchestrator } from './trigger-generation.orchestrator';
 import { TriggerImportOrchestrator } from './trigger-import.orchestrator';
-import { TriggerCacheFactory } from './cache/cache.factory';
+
+/**
+ * Global module that provides CACHE_MANAGER via remote proxy to the API.
+ * Replaces TriggerCacheFactory + InternalAPIAdapter with the generic remote-call mechanism.
+ */
+@Global()
+@Module({})
+class TriggerRemoteCacheModule {
+    static forRoot(): DynamicModule {
+        return {
+            module: TriggerRemoteCacheModule,
+            global: true,
+            imports: [TriggerInternalModule],
+            providers: [
+                {
+                    provide: CACHE_MANAGER,
+                    useFactory: (apiClient: TriggerInternalApiClient) =>
+                        createRemoteProxy(apiClient, 'CacheManager'),
+                    inject: [TriggerInternalApiClient],
+                },
+            ],
+            exports: [CACHE_MANAGER],
+        };
+    }
+}
 
 @Module({
     imports: [
@@ -25,7 +51,7 @@ import { TriggerCacheFactory } from './cache/cache.factory';
         TriggerFacadesModule,
         TriggerPipelineModule,
         TriggerInternalModule,
-        TriggerCacheFactory.register({ isGlobal: true }),
+        TriggerRemoteCacheModule.forRoot(),
     ],
     providers: [
         {
@@ -38,6 +64,12 @@ import { TriggerCacheFactory } from './cache/cache.factory';
             provide: NotificationService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'NotificationService'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: DirectoryRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'DirectoryRepository'),
             inject: [TriggerInternalApiClient],
         },
         DataGeneratorService,

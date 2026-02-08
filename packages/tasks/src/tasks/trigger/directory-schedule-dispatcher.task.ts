@@ -2,7 +2,7 @@ import { schedules } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
 import { TriggerInternalModule } from '../../trigger/trigger-internal.module';
 import { config } from '@ever-works/agent/config';
-import { RemoteDirectoryScheduleService } from '../../trigger/remote-directory-schedule.service';
+import { DirectoryScheduleDispatcherService } from '@ever-works/agent/services';
 import { TriggerLogger } from '../../trigger/trigger-logger';
 
 const interval = Math.max(1, config.subscriptions.getDispatchIntervalMinutes());
@@ -17,8 +17,8 @@ export const directoryScheduleDispatcherTask = schedules.task({
         });
 
         try {
-            const dispatcher = appContext.get(RemoteDirectoryScheduleService);
-            const { dispatched } = await dispatcher.dispatchDueSchedules();
+            const dispatcher = appContext.get(DirectoryScheduleDispatcherService);
+            const dispatched = await dispatcher.dispatchDue();
 
             return {
                 dispatched,

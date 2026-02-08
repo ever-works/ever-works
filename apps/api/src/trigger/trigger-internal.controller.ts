@@ -10,7 +10,6 @@ import {
     Post,
     Query,
     Inject,
-    Delete,
 } from '@nestjs/common';
 import superjson from 'superjson';
 import { Public } from '../auth/decorators/public.decorator';
@@ -21,14 +20,11 @@ import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
 import { DirectoryOperationsService } from '@ever-works/agent/directory-operations';
 import { DirectoryContextResponse } from '@ever-works/agent/tasks';
 import { SkipThrottle } from '@nestjs/throttler';
-import { CacheDto } from './dto/cache.dto';
 import {
     DirectoryOwnershipService,
     DirectoryScheduleDispatcherService,
     DirectoryScheduleService,
 } from '@ever-works/agent/services';
-import { ScheduleRunCompleteDto, ScheduleRunFailureDto } from './dto/schedule-run.dto';
-import { GenerateStatusType } from '@ever-works/agent/entities';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { GitFacadeService } from '@ever-works/agent/facades';
 import { RemoteCallDto } from './dto/remote-call.dto';
@@ -66,6 +62,10 @@ export class TriggerInternalController implements OnModuleInit {
             DirectoryPluginRepository: this.directoryPluginRepository,
             DirectoryOperationsService: this.directoryOperationsService,
             NotificationService: this.notificationService,
+            DirectoryRepository: this.directoryRepository,
+            CacheManager: this.cacheManager,
+            DirectoryScheduleDispatcherService: this.scheduleDispatcher,
+            DirectoryScheduleService: this.directoryScheduleService,
         };
     }
 
@@ -94,102 +94,6 @@ export class TriggerInternalController implements OnModuleInit {
             user: this.stripSensitiveUserData(directory.user),
             gitToken: gitToken ?? undefined,
         };
-    }
-
-    @Post('schedules/dispatch')
-    @Public()
-    async dispatchSchedules(@Headers('x-trigger-secret') secret: string) {
-        this.ensureSecret(secret);
-
-        const dispatched = await this.scheduleDispatcher.dispatchDue();
-
-        return {
-            dispatched,
-        };
-    }
-
-    @Post('schedules/:id/complete')
-    @Public()
-    async markScheduleRunCompleted(
-        @Headers('x-trigger-secret') secret: string,
-        @Param('id') scheduleId: string,
-        @Body() body: ScheduleRunCompleteDto,
-    ) {
-        this.ensureSecret(secret);
-
-        if (!scheduleId) {
-            throw new BadRequestException('Missing schedule id');
-        }
-
-        await this.directoryScheduleService.markRunCompleted({
-            scheduleId,
-            historyId: body.historyId,
-            status: body.status ?? GenerateStatusType.GENERATED,
-        });
-
-        return { status: 'ok' };
-    }
-
-    @Post('schedules/:id/fail')
-    @Public()
-    async markScheduleRunFailed(
-        @Headers('x-trigger-secret') secret: string,
-        @Param('id') scheduleId: string,
-        @Body() body: ScheduleRunFailureDto,
-    ) {
-        this.ensureSecret(secret);
-
-        if (!scheduleId) {
-            throw new BadRequestException('Missing schedule id');
-        }
-
-        await this.directoryScheduleService.markRunFailed(scheduleId, body.reason);
-
-        return { status: 'ok' };
-    }
-
-    @Post('cache')
-    @Public()
-    async setCache(@Headers('x-trigger-secret') secret: string, @Body() body: CacheDto) {
-        this.ensureSecret(secret);
-
-        const { key, value, ttl } = body;
-
-        if (!key) {
-            throw new BadRequestException('Missing cache key');
-        }
-
-        await this.cacheManager.set(key, value, ttl);
-
-        return { status: 'ok' };
-    }
-
-    @Get('cache')
-    @Public()
-    async getCache(@Headers('x-trigger-secret') secret: string, @Query('key') key: string) {
-        this.ensureSecret(secret);
-
-        if (!key) {
-            throw new BadRequestException('Missing cache key');
-        }
-
-        const value = await this.cacheManager.get(key);
-
-        return { key, value };
-    }
-
-    @Delete('cache')
-    @Public()
-    async deleteCache(@Headers('x-trigger-secret') secret: string, @Query('key') key: string) {
-        this.ensureSecret(secret);
-
-        if (!key) {
-            throw new BadRequestException('Missing cache key');
-        }
-
-        const value = await this.cacheManager.del(key);
-
-        return { deleted: value };
     }
 
     @Post('remote/call')
