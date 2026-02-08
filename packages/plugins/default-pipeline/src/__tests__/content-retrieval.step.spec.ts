@@ -59,6 +59,8 @@ describe('ContentRetrievalStep', () => {
 			...overrides
 		}) as MutableGenerationContext;
 
+	const expectedFacadeOptions = { userId: 'test-user-id', directoryId: 'test-dir-id' };
+
 	beforeEach(() => {
 		step = new ContentRetrievalStep();
 		mockContext = createMockContext();
@@ -67,7 +69,9 @@ describe('ContentRetrievalStep', () => {
 			searchFacade: createMockSearchFacade(),
 			contentExtractorFacade: createMockContentExtractorFacade(),
 			aiFacade: {} as StepExecutionContext['aiFacade'],
-			screenshotFacade: {} as StepExecutionContext['screenshotFacade']
+			screenshotFacade: {} as StepExecutionContext['screenshotFacade'],
+			user: { id: 'test-user-id' },
+			directory: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 
@@ -131,7 +135,11 @@ describe('ContentRetrievalStep', () => {
 
 			await step.run(mockContext, mockExecContext);
 
-			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith('https://example.com');
+			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith(
+				'https://example.com',
+				undefined,
+				expectedFacadeOptions
+			);
 		});
 
 		it('should add retrieved pages to webPages array', async () => {
@@ -241,9 +249,15 @@ describe('ContentRetrievalStep', () => {
 			// All URLs go through the unified contentExtractorFacade
 			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledTimes(2);
 			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith(
-				'https://notion.so/page'
+				'https://notion.so/page',
+				undefined,
+				expectedFacadeOptions
 			);
-			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith('https://example.com');
+			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith(
+				'https://example.com',
+				undefined,
+				expectedFacadeOptions
+			);
 		});
 	});
 });

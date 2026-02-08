@@ -79,17 +79,16 @@ export class MyCapabilityProviderNotFoundError extends MyCapabilityFacadeError {
 }
 ```
 
-### Step 2: Define Facade Options Interface
+### Step 2: Use FacadeOptions
 
-Extend `BaseFacadeOptions` for your facade:
+All public methods that resolve plugins or settings must accept a **required** `FacadeOptions` parameter from `@ever-works/plugin`. This ensures `userId` is always available for user-scoped settings resolution.
 
 ```typescript
-import { BaseFacadeOptions } from './base.facade';
+import type { FacadeOptions } from '@ever-works/plugin';
 
-export interface MyCapabilityFacadeOptions extends BaseFacadeOptions {
-	// Add any capability-specific options
-	customOption?: string;
-}
+// FacadeOptions already provides userId, directoryId, and providerOverride.
+// Do NOT make it optional — without userId, settings silently degrade
+// to admin/env/defaults only.
 ```
 
 ### Step 3: Create the Facade Class
@@ -121,11 +120,17 @@ export class MyCapabilityFacadeService extends BaseFacadeService {
 
 	/**
 	 * Main capability method.
+	 * Note: facadeOptions is required (not optional) to ensure userId is always
+	 * available for proper user-scoped settings resolution.
 	 */
-	async doSomething(input: SomeInput, options?: MyCapabilityFacadeOptions): Promise<SomeResult> {
-		const plugin = await this.resolvePlugin(options?.providerOverride, options?.userId, options?.directoryId);
+	async doSomething(input: SomeInput, facadeOptions: FacadeOptions): Promise<SomeResult> {
+		const plugin = await this.resolvePlugin(
+			facadeOptions.providerOverride,
+			facadeOptions.userId,
+			facadeOptions.directoryId
+		);
 
-		const settings = await this.getResolvedSettings(plugin.id, options);
+		const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
 
 		return plugin.doSomething({
 			...input,
@@ -222,7 +227,7 @@ The `BaseFacadeService` provides these methods:
 | `getAvailableProviders()`                          | Get all available providers (id, name, enabled)    |
 | `getDefaultProvider(directoryId?, userId?)`        | Get the default provider based on activeCapability |
 | `isPluginEnabled(pluginId, directoryId?, userId?)` | Check if plugin is enabled (3-level resolution)    |
-| `getResolvedSettings(pluginId, options?)`          | Get settings with 4-level hierarchy                |
+| `getResolvedSettings(pluginId, options)`           | Get settings with 4-level hierarchy                |
 | `getProviderName(plugin)`                          | Get display name for a plugin                      |
 | `findActivePluginForDirectory(directoryId)`        | Find plugin marked as default for directory        |
 | `getEnabledPlugins(directoryId?, userId?)`         | Get all enabled plugins after enable check         |
@@ -345,6 +350,7 @@ describe('MyCapabilityFacadeService', () => {
 
 			// Act & Assert
 			const result = await service.doSomething(input, {
+				userId: 'user-123',
 				directoryId: 'dir-123'
 			});
 			expect(mockPlugin.doSomething).toHaveBeenCalled();
@@ -376,7 +382,7 @@ describe('MyCapabilityFacadeService', () => {
 1. **Always extend BaseFacadeService** - Don't duplicate enable resolution logic
 2. **Use @Optional() for repositories** - Allow facades to work without database
 3. **Override getProviderName()** - If your plugin interface has a specific name property
-4. **Include userId and directoryId** - Pass context for proper enable resolution
+4. **Make facadeOptions required (not optional)** - All public methods that resolve plugins or settings must require a `FacadeOptions` parameter with `userId: string`. Without this, settings resolution degrades silently to admin/env/defaults.
 5. **Handle errors gracefully** - Use capability-specific error classes
 6. **Test all enable levels** - Verify Level 2 > Level 1 > autoEnable precedence
 

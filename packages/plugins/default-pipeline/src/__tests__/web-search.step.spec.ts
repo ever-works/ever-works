@@ -63,13 +63,17 @@ describe('WebSearchStep', () => {
 			...overrides
 		}) as MutableGenerationContext;
 
+	const expectedFacadeOptions = { userId: 'test-user-id', directoryId: 'test-dir-id' };
+
 	beforeEach(() => {
 		step = new WebSearchStep();
 		mockContext = createMockContext();
 		mockExecContext = {
 			logger: createMockLogger(),
 			searchFacade: createMockSearchFacade(),
-			contentExtractorFacade: createMockContentExtractorFacade()
+			contentExtractorFacade: createMockContentExtractorFacade(),
+			user: { id: 'test-user-id' },
+			directory: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 
@@ -84,8 +88,8 @@ describe('WebSearchStep', () => {
 			await step.run(mockContext, mockExecContext);
 
 			expect(mockExecContext.searchFacade.search).toHaveBeenCalledTimes(2);
-			expect(mockExecContext.searchFacade.search).toHaveBeenCalledWith('test query 1', { maxResults: 10 });
-			expect(mockExecContext.searchFacade.search).toHaveBeenCalledWith('test query 2', { maxResults: 10 });
+			expect(mockExecContext.searchFacade.search).toHaveBeenCalledWith('test query 1', { maxResults: 10 }, expectedFacadeOptions);
+			expect(mockExecContext.searchFacade.search).toHaveBeenCalledWith('test query 2', { maxResults: 10 }, expectedFacadeOptions);
 		});
 
 		it('should extract content from search results', async () => {
@@ -170,7 +174,7 @@ describe('WebSearchStep', () => {
 
 			const result = await step.run(mockContext, mockExecContext);
 
-			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith('https://extracted.com');
+			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith('https://extracted.com', undefined, expectedFacadeOptions);
 			expect(result.webPages.some((p) => p.source_url === 'https://extracted.com')).toBe(true);
 		});
 
@@ -211,7 +215,7 @@ describe('WebSearchStep', () => {
 			await step.run(mockContext, mockExecContext);
 
 			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledTimes(1);
-			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith('https://valid.com');
+			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith('https://valid.com', undefined, expectedFacadeOptions);
 		});
 
 		it('should mark URLs as processed after extraction', async () => {

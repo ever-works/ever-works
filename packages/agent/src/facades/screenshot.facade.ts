@@ -56,12 +56,12 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
 
     async capture(
         options: ScreenshotCaptureOptions,
-        facadeOptions?: FacadeOptions,
+        facadeOptions: FacadeOptions,
     ): Promise<ScreenshotCaptureResult> {
         const plugin = await this.resolvePlugin(
-            facadeOptions?.providerOverride,
-            facadeOptions?.userId,
-            facadeOptions?.directoryId,
+            facadeOptions.providerOverride,
+            facadeOptions.userId,
+            facadeOptions.directoryId,
         );
 
         const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
@@ -92,7 +92,7 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
 
     async getSmartImage(
         options: SmartImageOptions,
-        facadeOptions?: FacadeOptions,
+        facadeOptions: FacadeOptions,
     ): Promise<SmartImageResult> {
         const result = await this.capture(
             {
@@ -115,12 +115,12 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
 
     async getScreenshotUrl(
         options: ScreenshotCaptureOptions,
-        facadeOptions?: FacadeOptions,
+        facadeOptions: FacadeOptions,
     ): Promise<string | null> {
         const plugin = await this.resolvePlugin(
-            facadeOptions?.providerOverride,
-            facadeOptions?.userId,
-            facadeOptions?.directoryId,
+            facadeOptions.providerOverride,
+            facadeOptions.userId,
+            facadeOptions.directoryId,
         );
 
         if (!plugin.getScreenshotUrl) {

@@ -114,7 +114,11 @@ describe('MarkdownGenerationStep', () => {
 		it('should fetch content when not in cache', async () => {
 			await step.run(mockContext, mockExecContext);
 
-			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith('https://example.com');
+			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith(
+				'https://example.com',
+				undefined,
+				{ userId: 'test-user-id', directoryId: 'test-dir-id' }
+			);
 		});
 
 		it('should skip items without source_url', async () => {

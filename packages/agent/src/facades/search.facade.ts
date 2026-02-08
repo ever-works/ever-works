@@ -54,18 +54,15 @@ export class SearchFacadeService extends BaseFacadeService implements ISearchFac
     async search(
         query: string,
         options: SearchFacadeOptions | undefined,
-        facadeOptions?: FacadeOptions,
+        facadeOptions: FacadeOptions,
     ): Promise<SearchFacadeResult[]> {
         const plugin = await this.resolveSearchPlugin(
-            facadeOptions?.providerOverride,
-            facadeOptions?.userId,
-            facadeOptions?.directoryId,
+            facadeOptions.providerOverride,
+            facadeOptions.userId,
+            facadeOptions.directoryId,
         );
 
-        const settings = await this.getResolvedSettings(plugin.id, {
-            userId: facadeOptions?.userId,
-            directoryId: facadeOptions?.directoryId,
-        });
+        const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
 
         const response = await plugin.search({
             query,

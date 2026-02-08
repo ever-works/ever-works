@@ -76,12 +76,26 @@ export class NoGitCredentialsError extends GitFacadeError {
     }
 }
 
-export interface GitFacadeOptions {
-    providerId: string;
-    userId?: string;
-    directoryId?: string;
-    token?: string;
+/** Base options shared by all Git facade calls */
+interface GitFacadeBaseOptions {
+    readonly providerId: string;
+    readonly directoryId?: string;
 }
+
+/** Token-based auth — used when caller already has a token (e.g., public repo analysis) */
+export interface GitFacadeTokenAuth extends GitFacadeBaseOptions {
+    readonly token: string;
+    readonly userId?: string;
+}
+
+/** User-based auth — facade looks up OAuth/PAT credentials for the user */
+export interface GitFacadeUserAuth extends GitFacadeBaseOptions {
+    readonly userId: string;
+    readonly token?: string;
+}
+
+/** Git facade options: must provide at least token OR userId */
+export type GitFacadeOptions = GitFacadeTokenAuth | GitFacadeUserAuth;
 
 export type { GitProviderInfo };
 

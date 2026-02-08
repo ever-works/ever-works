@@ -57,20 +57,17 @@ export class ContentExtractorFacadeService
     async extractContent(
         url: string,
         options: FacadeExtractionOptions | undefined,
-        facadeOptions?: FacadeOptions,
+        facadeOptions: FacadeOptions,
     ): Promise<FacadeExtractedContent | null> {
         try {
             const plugin = await this.resolvePlugin(
                 url,
-                facadeOptions?.providerOverride,
-                facadeOptions?.userId,
-                facadeOptions?.directoryId,
+                facadeOptions.providerOverride,
+                facadeOptions.userId,
+                facadeOptions.directoryId,
             );
 
-            const settings = await this.getResolvedSettings(plugin.id, {
-                userId: facadeOptions?.userId,
-                directoryId: facadeOptions?.directoryId,
-            });
+            const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
 
             const result = await plugin.extract({ url, settings });
             return {

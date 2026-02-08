@@ -225,7 +225,11 @@ export class StepPipelineExecutorService {
     private createBoundSearchFacade(ctx: FacadeBindingContext): ISearchFacade {
         const facade = this.searchFacade;
         return {
-            search: (query: string, options?: SearchFacadeOptions): Promise<SearchFacadeResult[]> =>
+            search: (
+                query: string,
+                options: SearchFacadeOptions | undefined,
+                _facadeOptions: FacadeOptions,
+            ): Promise<SearchFacadeResult[]> =>
                 facade.search(query, options, {
                     userId: ctx.userId,
                     directoryId: ctx.directoryId,
@@ -241,19 +245,28 @@ export class StepPipelineExecutorService {
     private createBoundScreenshotFacade(ctx: FacadeBindingContext): IScreenshotFacade {
         const facade = this.screenshotFacade;
         return {
-            capture: (options: ScreenshotCaptureOptions): Promise<ScreenshotCaptureResult> =>
+            capture: (
+                options: ScreenshotCaptureOptions,
+                _facadeOptions: FacadeOptions,
+            ): Promise<ScreenshotCaptureResult> =>
                 facade.capture(options, {
                     directoryId: ctx.directoryId,
                     userId: ctx.userId,
                     providerOverride: ctx.providerOverrides?.screenshot,
                 }),
-            getSmartImage: (options: SmartImageOptions): Promise<SmartImageResult> =>
+            getSmartImage: (
+                options: SmartImageOptions,
+                _facadeOptions: FacadeOptions,
+            ): Promise<SmartImageResult> =>
                 facade.getSmartImage(options, {
                     directoryId: ctx.directoryId,
                     userId: ctx.userId,
                     providerOverride: ctx.providerOverrides?.screenshot,
                 }),
-            getScreenshotUrl: (options: ScreenshotCaptureOptions): Promise<string | null> =>
+            getScreenshotUrl: (
+                options: ScreenshotCaptureOptions,
+                _facadeOptions: FacadeOptions,
+            ): Promise<string | null> =>
                 facade.getScreenshotUrl(options, {
                     directoryId: ctx.directoryId,
                     userId: ctx.userId,
@@ -271,7 +284,8 @@ export class StepPipelineExecutorService {
         return {
             extractContent: (
                 url: string,
-                options?: FacadeExtractionOptions,
+                options: FacadeExtractionOptions | undefined,
+                _facadeOptions: FacadeOptions,
             ): Promise<FacadeExtractedContent | null> =>
                 facade.extractContent(url, options, {
                     userId: ctx.userId,
@@ -291,14 +305,17 @@ export class StepPipelineExecutorService {
         }
         const facade = this.dataSourceFacade;
         return {
-            queryAll: (options?: DataSourceFacadeOptions): Promise<DataSourceFacadeResult> =>
+            queryAll: (options: DataSourceFacadeOptions): Promise<DataSourceFacadeResult> =>
                 facade.queryAll({
                     ...options,
                     directoryId: ctx.directoryId,
                     userId: ctx.userId,
                 }),
-            getEnabledSources: (directoryId: string): Promise<EnabledDataSource[]> =>
-                facade.getEnabledSources(directoryId, ctx.userId),
+            getEnabledSources: (
+                directoryId: string,
+                userId: string,
+            ): Promise<EnabledDataSource[]> =>
+                facade.getEnabledSources(directoryId, userId || ctx.userId),
             isConfigured: () => facade.isConfigured(),
         };
     }

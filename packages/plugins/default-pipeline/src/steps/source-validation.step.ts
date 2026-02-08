@@ -238,7 +238,7 @@ export class SourceValidationStep extends BasePipelineStep {
 			const allDocuments: Array<{ url: string }> = [];
 			for (const query of searchQueries) {
 				try {
-					const documents = await searchFacade.search(query, { maxResults: 3 });
+					const documents = await searchFacade.search(query, { maxResults: 3 }, facadeOptions);
 					if (documents?.length > 0) {
 						allDocuments.push(...documents);
 					}
@@ -327,7 +327,11 @@ export class SourceValidationStep extends BasePipelineStep {
 		try {
 			let pageContent = '';
 			try {
-				const extractedContent = await contentExtractorFacade.extractContent(candidateUrl);
+				const extractedContent = await contentExtractorFacade.extractContent(
+					candidateUrl,
+					undefined,
+					facadeOptions
+				);
 				pageContent = extractedContent?.rawContent || '';
 			} catch {
 				// Continue with empty content - AI can still analyze the URL structure

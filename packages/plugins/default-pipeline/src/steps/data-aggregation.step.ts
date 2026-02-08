@@ -67,7 +67,7 @@ export class DataAggregationStep extends BasePipelineStep {
 
 				const result = await dataSourceFacade.queryAll({
 					directoryId: directory.id,
-					userId: directory.user?.id,
+					userId: execContext.user!.id,
 					pluginConfig: pluginConfig,
 					filterContext: filterContext
 				});

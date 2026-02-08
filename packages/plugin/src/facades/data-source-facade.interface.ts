@@ -3,7 +3,7 @@ import type { DataSourceFilterContext } from '../contracts/capabilities/data-sou
 
 export interface DataSourceFacadeOptions {
 	/** User ID for settings resolution */
-	readonly userId?: string;
+	readonly userId: string;
 	/** Directory ID - required for Level 2 enable check */
 	readonly directoryId?: string;
 	/** Maximum number of items to return per source */
@@ -56,12 +56,12 @@ export interface IDataSourceFacade {
 	 * Query all enabled data sources and aggregate their items.
 	 * Checks DirectoryPlugin.enabled or autoEnable manifest flag.
 	 */
-	queryAll(options?: DataSourceFacadeOptions): Promise<DataSourceFacadeResult>;
+	queryAll(options: DataSourceFacadeOptions): Promise<DataSourceFacadeResult>;
 
 	/**
 	 * Get a list of all enabled data sources for a directory.
 	 */
-	getEnabledSources(directoryId: string): Promise<EnabledDataSource[]>;
+	getEnabledSources(directoryId: string, userId: string): Promise<EnabledDataSource[]>;
 
 	/**
 	 * Check if any data source plugin is configured and available.

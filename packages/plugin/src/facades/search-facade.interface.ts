@@ -28,7 +28,11 @@ export interface ISearchFacade {
 	 * });
 	 * ```
 	 */
-	search(query: string, options?: SearchFacadeOptions, facadeOptions?: FacadeOptions): Promise<SearchFacadeResult[]>;
+	search(
+		query: string,
+		options: SearchFacadeOptions | undefined,
+		facadeOptions: FacadeOptions
+	): Promise<SearchFacadeResult[]>;
 
 	isConfigured(): boolean;
 }

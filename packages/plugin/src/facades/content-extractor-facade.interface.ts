@@ -36,8 +36,8 @@ export interface IContentExtractorFacade {
 	 */
 	extractContent(
 		url: string,
-		options?: FacadeExtractionOptions,
-		facadeOptions?: FacadeOptions
+		options: FacadeExtractionOptions | undefined,
+		facadeOptions: FacadeOptions
 	): Promise<FacadeExtractedContent | null>;
 
 	isConfigured(): boolean;

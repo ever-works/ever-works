@@ -165,6 +165,7 @@ describe('DataSourceFacadeService', () => {
             registry.isPluginEnabledForScope.mockResolvedValue(false);
 
             const result = await service.queryAll({
+                userId: 'test-user',
                 directoryId: 'dir-123',
                 pluginConfig: {
                     apify: { datasetId: 'abc123' },
@@ -190,6 +191,7 @@ describe('DataSourceFacadeService', () => {
             registry.isPluginEnabledForScope.mockResolvedValue(true);
 
             const result = await service.queryAll({
+                userId: 'test-user',
                 directoryId: 'dir-123',
                 pluginConfig: {
                     apify: { datasetId: 'abc123' },
@@ -212,6 +214,7 @@ describe('DataSourceFacadeService', () => {
             registry.getByCapability.mockReturnValue([registered]);
 
             await service.queryAll({
+                userId: 'test-user',
                 pluginConfig: {
                     apify: { enabled: true },
                 },
@@ -244,6 +247,7 @@ describe('DataSourceFacadeService', () => {
             registry.getByCapability.mockReturnValue([registered]);
 
             const result = await service.queryAll({
+                userId: 'test-user',
                 pluginConfig: {
                     apify: { enabled: true },
                 },
@@ -274,6 +278,7 @@ describe('DataSourceFacadeService', () => {
             registry.getByCapability.mockReturnValue([apifyRegistered, customRegistered]);
 
             const result = await service.queryAll({
+                userId: 'test-user',
                 pluginConfig: {
                     apify: { enabled: true },
                     'custom-data-source': { enabled: true },
@@ -304,6 +309,7 @@ describe('DataSourceFacadeService', () => {
             registry.getByCapability.mockReturnValue([apifyRegistered, customRegistered]);
 
             const result = await service.queryAll({
+                userId: 'test-user',
                 pluginConfig: {
                     apify: { enabled: true },
                     'custom-data-source': { enabled: true },
@@ -324,6 +330,7 @@ describe('DataSourceFacadeService', () => {
             registry.getByCapability.mockReturnValue([registered]);
 
             const result = await service.queryAll({
+                userId: 'test-user',
                 pluginConfig: {
                     apify: { enabled: true },
                 },
@@ -344,6 +351,7 @@ describe('DataSourceFacadeService', () => {
             });
 
             await service.queryAll({
+                userId: 'test-user',
                 pluginConfig: {
                     apify: { enabled: true, datasetId: 'user-dataset' },
                 },
@@ -374,6 +382,7 @@ describe('DataSourceFacadeService', () => {
             registry.getByCapability.mockReturnValue([registered]);
 
             const result = await service.queryAll({
+                userId: 'test-user',
                 pluginConfig: {
                     apify: { enabled: true },
                 },
@@ -402,7 +411,7 @@ describe('DataSourceFacadeService', () => {
                 .mockResolvedValueOnce(true) // apify
                 .mockResolvedValueOnce(false); // custom
 
-            const enabledSources = await service.getEnabledSources('dir-123');
+            const enabledSources = await service.getEnabledSources('dir-123', 'test-user');
 
             expect(enabledSources).toHaveLength(1);
             expect(enabledSources[0]).toEqual({
@@ -418,7 +427,7 @@ describe('DataSourceFacadeService', () => {
             registry.getByCapability.mockReturnValue([registered]);
             registry.isPluginEnabledForScope.mockResolvedValue(false);
 
-            const enabledSources = await service.getEnabledSources('dir-123');
+            const enabledSources = await service.getEnabledSources('dir-123', 'test-user');
 
             expect(enabledSources).toHaveLength(0);
         });
@@ -428,7 +437,7 @@ describe('DataSourceFacadeService', () => {
             const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const enabledSources = await service.getEnabledSources('');
+            const enabledSources = await service.getEnabledSources('', 'test-user');
 
             expect(enabledSources).toHaveLength(0);
         });
@@ -447,6 +456,7 @@ describe('DataSourceFacadeService', () => {
             registry.isPluginEnabledForScope.mockResolvedValue(true);
 
             const result = await service.queryAll({
+                userId: 'test-user',
                 directoryId: 'dir-123',
             });
 
@@ -455,7 +465,7 @@ describe('DataSourceFacadeService', () => {
             expect(registry.isPluginEnabledForScope).toHaveBeenCalledWith(
                 'apify',
                 'dir-123',
-                undefined,
+                'test-user',
             );
         });
 
@@ -467,6 +477,7 @@ describe('DataSourceFacadeService', () => {
             registry.isPluginEnabledForScope.mockResolvedValue(false);
 
             const result = await service.queryAll({
+                userId: 'test-user',
                 directoryId: 'dir-123',
             });
 
@@ -486,6 +497,7 @@ describe('DataSourceFacadeService', () => {
             registry.isPluginEnabledForScope.mockResolvedValue(false);
 
             const result = await service.queryAll({
+                userId: 'test-user',
                 directoryId: 'dir-123',
                 pluginConfig: {
                     apify: { enabled: true },
@@ -504,6 +516,7 @@ describe('DataSourceFacadeService', () => {
             registry.isPluginEnabledForScope.mockResolvedValue(false);
 
             const result = await service.queryAll({
+                userId: 'test-user',
                 directoryId: 'dir-123',
                 pluginConfig: {
                     apify: { enabled: false },
@@ -563,6 +576,7 @@ describe('DataSourceFacadeService', () => {
                 .mockResolvedValueOnce(true); // custom enabled
 
             const result = await service.queryAll({
+                userId: 'test-user',
                 directoryId: 'dir-123',
             });
 

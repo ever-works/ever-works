@@ -92,6 +92,8 @@ A facade is a simple wrapper that hides the complexity of the plugin system from
 
 For example, the `GitFacade` provides methods like `createRepository()` and `push()`. Internally, it asks the plugin registry for the appropriate git plugin and delegates the work. The calling code doesn't know or care whether GitHub, GitLab, or some other provider is being used.
 
+Facades require `FacadeOptions` with a `userId` on all methods that resolve plugins or settings. This ensures proper user-scoped settings resolution and plugin enable/disable checks.
+
 > **Implementation Status:** The `GitFacade` design is complete (see `docs/plugin/designs/git-facade-design.md`). Implementation is pending Story 2 (Plugin Runtime), which will provide the required `PluginRegistryService` and `PluginSettingsService` dependencies.
 
 ---

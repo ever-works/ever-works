@@ -63,12 +63,16 @@ describe('ImageCaptureStep', () => {
 			...overrides
 		}) as MutableGenerationContext;
 
+	const expectedFacadeOptions = { userId: 'test-user-id', directoryId: 'test-dir-id' };
+
 	beforeEach(() => {
 		step = new ImageCaptureStep();
 		mockContext = createMockContext();
 		mockExecContext = {
 			logger: createMockLogger(),
-			screenshotFacade: createMockScreenshotFacade()
+			screenshotFacade: createMockScreenshotFacade(),
+			user: { id: 'test-user-id' },
+			directory: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 
@@ -114,11 +118,14 @@ describe('ImageCaptureStep', () => {
 		it('should capture images for items without images', async () => {
 			await step.run(mockContext, mockExecContext);
 
-			expect(mockExecContext.screenshotFacade.getSmartImage).toHaveBeenCalledWith({
-				url: 'https://example.com',
-				domainType: 'software',
-				itemName: 'Test Item'
-			});
+			expect(mockExecContext.screenshotFacade.getSmartImage).toHaveBeenCalledWith(
+				{
+					url: 'https://example.com',
+					domainType: 'software',
+					itemName: 'Test Item'
+				},
+				expectedFacadeOptions
+			);
 		});
 
 		it('should skip items that already have images', async () => {
@@ -191,7 +198,8 @@ describe('ImageCaptureStep', () => {
 			await step.run(mockContext, mockExecContext);
 
 			expect(mockExecContext.screenshotFacade.getSmartImage).toHaveBeenCalledWith(
-				expect.objectContaining({ domainType: 'ecommerce' })
+				expect.objectContaining({ domainType: 'ecommerce' }),
+				expectedFacadeOptions
 			);
 		});
 

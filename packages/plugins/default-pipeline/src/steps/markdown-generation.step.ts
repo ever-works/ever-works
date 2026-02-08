@@ -146,7 +146,12 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 
 			if (!rawContent) {
 				// Fall back to fetching if not in cache
-				const content = await this.extractContentFrom(item.source_url, logger, contentExtractorFacade);
+				const content = await this.extractContentFrom(
+					item.source_url,
+					logger,
+					contentExtractorFacade,
+					facadeOptions
+				);
 				rawContent = content?.rawContent;
 			}
 
@@ -196,10 +201,11 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 	private async extractContentFrom(
 		url: string,
 		logger: StepExecutionContext['logger'],
-		contentExtractorFacade: StepExecutionContext['contentExtractorFacade']
+		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
+		facadeOptions: FacadeOptions
 	): Promise<{ rawContent: string } | null> {
 		try {
-			const content = await contentExtractorFacade.extractContent(url);
+			const content = await contentExtractorFacade.extractContent(url, undefined, facadeOptions);
 			return content ? { rawContent: content.rawContent } : null;
 		} catch (error) {
 			logger.error(`Error extracting content from ${url}: ${this.formatError(error)}`);

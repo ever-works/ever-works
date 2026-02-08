@@ -42,6 +42,9 @@ export interface DefaultProviderInfo {
 /**
  * Abstract base class for capability facades.
  * Handles provider resolution, settings hierarchy, and enable checks.
+ *
+ * FacadeOptions (with userId) is required on all public methods that resolve
+ * plugins or settings. Without it, settings degrade to admin/env/defaults only.
  */
 export abstract class BaseFacadeService {
     protected abstract readonly CAPABILITY: string;
@@ -127,14 +130,14 @@ export abstract class BaseFacadeService {
     // Get resolved settings using 4-level hierarchy: Directory > User > Admin > Plugin defaults
     protected async getResolvedSettings(
         pluginId: string,
-        options?: FacadeOptions,
+        options: FacadeOptions,
     ): Promise<Record<string, unknown>> {
         if (!this.settingsService) {
             return {};
         }
         return this.settingsService.getSettings(pluginId, {
-            userId: options?.userId,
-            directoryId: options?.directoryId,
+            userId: options.userId,
+            directoryId: options.directoryId,
             includeSecrets: true,
         });
     }

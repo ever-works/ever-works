@@ -1,4 +1,4 @@
-import type { MutableGenerationContext, StepExecutionContext, WebPageData } from '@ever-works/plugin';
+import type { MutableGenerationContext, StepExecutionContext, WebPageData, FacadeOptions } from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
 /**
@@ -18,6 +18,11 @@ export class WebSearchStep extends BasePipelineStep {
 		const { logger, searchFacade, contentExtractorFacade } = execContext;
 		const config = request.config || {};
 
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
+
 		logger.log(`[${directory.slug}] Web Search & Content Retrieval - Starting`);
 
 		// Process extracted URLs first if any were found
@@ -28,7 +33,8 @@ export class WebSearchStep extends BasePipelineStep {
 				extractedUrls,
 				processedSourceUrls,
 				contentExtractorFacade,
-				logger
+				logger,
+				facadeOptions
 			);
 			logger.debug(`[${directory.slug}] Retrieved ${initialWebPages.length} web pages from extracted URLs`);
 		}
@@ -41,7 +47,8 @@ export class WebSearchStep extends BasePipelineStep {
 			config,
 			searchFacade,
 			contentExtractorFacade,
-			logger
+			logger,
+			facadeOptions
 		);
 
 		// Combine web pages from both sources
@@ -71,7 +78,8 @@ export class WebSearchStep extends BasePipelineStep {
 		config: Record<string, unknown>,
 		searchFacade: StepExecutionContext['searchFacade'],
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
-		logger: StepExecutionContext['logger']
+		logger: StepExecutionContext['logger'],
+		facadeOptions: FacadeOptions
 	): Promise<WebPageData[]> {
 		const allFetchedPages: WebPageData[] = [];
 		const currentRunProcessedUrls = new Set<string>();
@@ -87,9 +95,13 @@ export class WebSearchStep extends BasePipelineStep {
 		// Create an array of search promises
 		const searchPromises = queriesToProcess.map(async (query) => {
 			try {
-				const results = await searchFacade.search(query, {
-					maxResults: maxResultsPerQuery
-				});
+				const results = await searchFacade.search(
+					query,
+					{
+						maxResults: maxResultsPerQuery
+					},
+					facadeOptions
+				);
 				logger.debug(`[${slug}] Found ${results.length} results for query: "${query}"`);
 				return { query, results, success: true };
 			} catch (error) {
@@ -145,7 +157,7 @@ export class WebSearchStep extends BasePipelineStep {
 			const extractionPromises = batch.map(async ({ url, query }) => {
 				try {
 					// Use ContentExtractorFacade for all content extraction
-					const response = await contentExtractorFacade.extractContent(url);
+					const response = await contentExtractorFacade.extractContent(url, undefined, facadeOptions);
 
 					if (!response?.rawContent) {
 						logger.warn(
@@ -198,7 +210,8 @@ export class WebSearchStep extends BasePipelineStep {
 		urls: string[],
 		processedSourceUrls: Set<string>,
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
-		logger: StepExecutionContext['logger']
+		logger: StepExecutionContext['logger'],
+		facadeOptions: FacadeOptions
 	): Promise<WebPageData[]> {
 		const dedupedUrls = [...new Set(urls)];
 		const allFetchedPages: WebPageData[] = [];
@@ -219,7 +232,7 @@ export class WebSearchStep extends BasePipelineStep {
 
 			const extractionPromises = batch.map(async (url) => {
 				try {
-					const content = await contentExtractorFacade.extractContent(url);
+					const content = await contentExtractorFacade.extractContent(url, undefined, facadeOptions);
 
 					if (!content?.rawContent) {
 						logger.warn(`[${slug}] Skipping URL with missing extraction results: ${url}`);

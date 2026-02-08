@@ -36,7 +36,7 @@ export class DataSourceFacadeService implements IDataSourceFacade {
         private readonly settingsService: PluginSettingsService,
     ) {}
 
-    async queryAll(options?: DataSourceFacadeOptions): Promise<DataSourceFacadeResult> {
+    async queryAll(options: DataSourceFacadeOptions): Promise<DataSourceFacadeResult> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         const enabledPlugins = plugins.filter((p) => p.state === 'loaded');
 
@@ -52,9 +52,9 @@ export class DataSourceFacadeService implements IDataSourceFacade {
 
             const isEnabled = await this.isPluginEnabledForDirectory(
                 pluginId,
-                options?.directoryId,
-                options?.userId,
-                options?.pluginConfig,
+                options.directoryId,
+                options.userId,
+                options.pluginConfig,
             );
 
             if (!isEnabled) {
@@ -62,7 +62,7 @@ export class DataSourceFacadeService implements IDataSourceFacade {
                 continue;
             }
 
-            const pluginSettings = options?.pluginConfig?.[pluginId] as
+            const pluginSettings = options.pluginConfig?.[pluginId] as
                 | Record<string, unknown>
                 | undefined;
 
@@ -76,17 +76,17 @@ export class DataSourceFacadeService implements IDataSourceFacade {
                 }
 
                 const resolvedSettings = await this.settingsService.getSettings(pluginId, {
-                    userId: options?.userId,
-                    directoryId: options?.directoryId,
+                    userId: options.userId,
+                    directoryId: options.directoryId,
                     includeSecrets: true,
                 });
 
                 const mergedSettings = { ...resolvedSettings, ...pluginSettings };
 
                 const result = await plugin.query({
-                    limit: options?.limit,
+                    limit: options.limit,
                     settings: mergedSettings,
-                    filterContext: options?.filterContext,
+                    filterContext: options.filterContext,
                 });
 
                 for (const item of result.items) {
@@ -121,7 +121,7 @@ export class DataSourceFacadeService implements IDataSourceFacade {
         };
     }
 
-    async getEnabledSources(directoryId: string, userId?: string): Promise<EnabledDataSource[]> {
+    async getEnabledSources(directoryId: string, userId: string): Promise<EnabledDataSource[]> {
         if (!directoryId) return [];
 
         const plugins = this.registry.getByCapability(this.CAPABILITY);

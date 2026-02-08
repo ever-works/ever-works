@@ -374,6 +374,7 @@ describe('GitFacadeService', () => {
         it('should return false when no userId or providerId', async () => {
             const result = await service.hasValidCredentials({
                 providerId: '',
+                token: '',
             });
 
             expect(result).toBe(false);
@@ -449,6 +450,7 @@ describe('GitFacadeService', () => {
         it('should return null when no userId or providerId', async () => {
             const result = await service.getAccessToken({
                 providerId: '',
+                token: '',
             });
 
             expect(result).toBeNull();
@@ -498,6 +500,7 @@ describe('GitFacadeService', () => {
         it('should return null when no userId or providerId', async () => {
             const result = await service.getCommitter({
                 providerId: '',
+                token: '',
             });
 
             expect(result).toBeNull();
@@ -579,6 +582,7 @@ describe('GitFacadeService', () => {
             await expect(
                 service.getUser({
                     providerId: 'github',
+                    userId: 'test-user',
                 }),
             ).rejects.toThrow(GitFacadeError);
         });
@@ -1174,7 +1178,9 @@ describe('GitFacadeService', () => {
 
     describe('resolvePlugin', () => {
         it('should throw GitFacadeError when providerId is missing', async () => {
-            await expect(service.getUser({ providerId: '' })).rejects.toThrow(GitFacadeError);
+            await expect(service.getUser({ providerId: '', token: '' })).rejects.toThrow(
+                GitFacadeError,
+            );
         });
 
         it('should throw GitProviderNotFoundError for invalid providerId', async () => {
@@ -1350,6 +1356,7 @@ describe('GitFacadeService', () => {
             await expect(
                 service.getUser({
                     providerId: 'github',
+                    token: '',
                 }),
             ).rejects.toThrow(GitFacadeError);
         });

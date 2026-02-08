@@ -1,4 +1,4 @@
-import type { MutableGenerationContext, StepExecutionContext, WebPageData } from '@ever-works/plugin';
+import type { MutableGenerationContext, StepExecutionContext, WebPageData, FacadeOptions } from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
 /**
@@ -17,6 +17,11 @@ export class ContentRetrievalStep extends BasePipelineStep {
 		const { request, directory, extractedUrls, processedSourceUrls } = context;
 		const { logger, contentExtractorFacade } = execContext;
 		const config = request.config || {};
+
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
 
 		logger.log(`[${directory.slug}] Content Retrieval - Starting`);
 
@@ -47,7 +52,8 @@ export class ContentRetrievalStep extends BasePipelineStep {
 			urlsToProcess,
 			processedSourceUrls,
 			contentExtractorFacade,
-			logger
+			logger,
+			facadeOptions
 		);
 
 		// Update context
@@ -78,7 +84,8 @@ export class ContentRetrievalStep extends BasePipelineStep {
 		urls: string[],
 		processedSourceUrls: Set<string>,
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
-		logger: StepExecutionContext['logger']
+		logger: StepExecutionContext['logger'],
+		facadeOptions: FacadeOptions
 	): Promise<WebPageData[]> {
 		const pages: WebPageData[] = [];
 
@@ -89,7 +96,7 @@ export class ContentRetrievalStep extends BasePipelineStep {
 
 			const extractionPromises = batch.map(async (url) => {
 				try {
-					const content = await contentExtractorFacade.extractContent(url);
+					const content = await contentExtractorFacade.extractContent(url, undefined, facadeOptions);
 
 					if (!content?.rawContent) {
 						logger.warn(`[${slug}] No content extracted from URL: ${url}`);

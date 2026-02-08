@@ -1,4 +1,4 @@
-import type { MutableGenerationContext, StepExecutionContext, DomainType } from '@ever-works/plugin';
+import type { MutableGenerationContext, StepExecutionContext, DomainType, FacadeOptions } from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
 const IMAGE_CAPTURE_DELAY_MS = 500;
@@ -17,6 +17,11 @@ export class ImageCaptureStep extends BasePipelineStep {
 		const { directory, request, finalItems, domainAnalysis } = context;
 		const { logger, screenshotFacade } = execContext;
 		const config = request.config || {};
+
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
 
 		if (!config.capture_screenshots) {
 			logger.debug(`[${directory.slug}] Image capture disabled, skipping`);
@@ -49,11 +54,14 @@ export class ImageCaptureStep extends BasePipelineStep {
 
 		for (const item of itemsNeedingImages) {
 			try {
-				const result = await screenshotFacade.getSmartImage({
-					url: item.source_url!,
-					domainType,
-					itemName: item.name
-				});
+				const result = await screenshotFacade.getSmartImage(
+					{
+						url: item.source_url!,
+						domainType,
+						itemName: item.name
+					},
+					facadeOptions
+				);
 
 				if (result.primaryImage) {
 					item.images = [result.primaryImage, ...(item.images || [])];
