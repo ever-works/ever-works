@@ -213,7 +213,7 @@ export function DirectoryAICreator({
                 <CollapsibleSection
                     title={t('advancedSettings')}
                     description={t('advancedSubtitle')}
-                    defaultExpanded={false}
+                    defaultExpanded={true}
                 >
                     <div className="space-y-4">
                         <ProviderSelectionSection
