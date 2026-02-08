@@ -1475,6 +1475,8 @@
                 "title": "Import Existing",
                 "subtitle": "Import a directory from an existing GitHub repository",
                 "importNow": "Import now",
+                "aiProviderSettings": "AI Provider",
+                "aiProviderSettingsDescription": "Choose which AI provider to use for parsing the README",
                 "formTitle": "Import Directory from GitHub",
                 "formSubtitle": "Import items from an existing GitHub repository to create your directory",
                 "sync": {

@@ -1,4 +1,4 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
     IsBoolean,
     IsEnum,
@@ -10,6 +10,7 @@ import {
     IsUrl,
     MaxLength,
     Min,
+    ValidateNested,
 } from 'class-validator';
 import { sanitizeName } from '../utils/sanitize.util';
 import { ImportSourceType } from '../entities/directory.entity';
@@ -55,6 +56,12 @@ export class AnalyzeRepositoryResponseDto {
     error?: string;
 }
 
+export class ImportProvidersDto {
+    @IsOptional()
+    @IsString()
+    ai?: string;
+}
+
 export class ImportDirectoryDto {
     @IsUrl({}, { message: 'Please provide a valid repository URL' })
     @IsNotEmpty()
@@ -94,6 +101,11 @@ export class ImportDirectoryDto {
     @IsString()
     @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
     deployProvider?: string;
+
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => ImportProvidersDto)
+    providers?: ImportProvidersDto;
 }
 
 export class ImportDirectoryResponseDto {

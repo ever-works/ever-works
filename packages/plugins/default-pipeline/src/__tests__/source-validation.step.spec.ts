@@ -95,7 +95,9 @@ describe('SourceValidationStep', () => {
 			logger: createMockLogger(),
 			aiFacade: createMockAiFacade(),
 			searchFacade: createMockSearchFacade(),
-			contentExtractorFacade: createMockContentExtractorFacade()
+			contentExtractorFacade: createMockContentExtractorFacade(),
+			user: { id: 'test-user-id' },
+			directory: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 

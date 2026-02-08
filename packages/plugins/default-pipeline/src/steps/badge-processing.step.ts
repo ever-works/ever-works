@@ -4,7 +4,8 @@ import type {
 	StepExecutionContext,
 	PipelineMetrics,
 	MutableItemData,
-	ItemBadges
+	ItemBadges,
+	FacadeOptions
 } from '@ever-works/plugin';
 import { DomainType } from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';
@@ -83,8 +84,20 @@ export class BadgeProcessingStep extends BasePipelineStep {
 		const config = request.config || {};
 		const domainType: DomainType = domainAnalysis?.domain_type ?? DomainType.SOFTWARE;
 
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
+
 		if (config.badge_evaluation_enabled) {
-			const processedItems = await this.processBadges(finalItems, domainType, metrics, logger, aiFacade);
+			const processedItems = await this.processBadges(
+				finalItems,
+				domainType,
+				metrics,
+				logger,
+				aiFacade,
+				facadeOptions
+			);
 			context.finalItems = processedItems;
 		}
 
@@ -101,7 +114,8 @@ export class BadgeProcessingStep extends BasePipelineStep {
 		domainType: DomainType,
 		metrics: PipelineMetrics,
 		logger: StepExecutionContext['logger'],
-		aiFacade: StepExecutionContext['aiFacade']
+		aiFacade: StepExecutionContext['aiFacade'],
+		facadeOptions: FacadeOptions
 	): Promise<MutableItemData[]> {
 		try {
 			const eligibleItems = items.filter((item) => this.isEligibleForBadgeEvaluation(item, domainType));
@@ -110,7 +124,14 @@ export class BadgeProcessingStep extends BasePipelineStep {
 				return items;
 			}
 
-			const badgeResults = await this.evaluateItemsBadges(eligibleItems, domainType, metrics, logger, aiFacade);
+			const badgeResults = await this.evaluateItemsBadges(
+				eligibleItems,
+				domainType,
+				metrics,
+				logger,
+				aiFacade,
+				facadeOptions
+			);
 
 			return items.map((item) => {
 				const badgeResult = badgeResults.get(item.source_url || '');
@@ -130,14 +151,22 @@ export class BadgeProcessingStep extends BasePipelineStep {
 		domainType: DomainType,
 		metrics: PipelineMetrics,
 		logger: StepExecutionContext['logger'],
-		aiFacade: StepExecutionContext['aiFacade']
+		aiFacade: StepExecutionContext['aiFacade'],
+		facadeOptions: FacadeOptions
 	): Promise<Map<string, BadgeEvaluationResult>> {
 		const results = new Map<string, BadgeEvaluationResult>();
 		const chunks = this.chunkArray(items, this.CONCURRENCY_LIMIT);
 
 		for (const chunk of chunks) {
 			const promises = chunk.map(async (item) => {
-				const result = await this.evaluateItemBadges(item, domainType, metrics, logger, aiFacade);
+				const result = await this.evaluateItemBadges(
+					item,
+					domainType,
+					metrics,
+					logger,
+					aiFacade,
+					facadeOptions
+				);
 				if (result && item.source_url) {
 					results.set(item.source_url, result);
 				}
@@ -153,7 +182,8 @@ export class BadgeProcessingStep extends BasePipelineStep {
 		domainType: DomainType,
 		metrics: PipelineMetrics,
 		logger: StepExecutionContext['logger'],
-		aiFacade: StepExecutionContext['aiFacade']
+		aiFacade: StepExecutionContext['aiFacade'],
+		facadeOptions: FacadeOptions
 	): Promise<BadgeEvaluationResult | null> {
 		try {
 			if (domainType === 'software' && !this.isRepositoryUrl(item.source_url || '')) {
@@ -166,20 +196,25 @@ export class BadgeProcessingStep extends BasePipelineStep {
 
 			const schema = this.buildSchema(domainType);
 
-			const { result, usage, cost } = await aiFacade.askJson(BADGE_PROMPT, schema, {
-				temperature: 0,
-				variables: {
-					name: item.name,
-					description: item.description || '',
-					source_url: item.source_url || '',
-					domain_type: domainType,
-					badge_criteria: this.buildBadgeCriteria(domainType)
+			const { result, usage, cost } = await aiFacade.askJson(
+				BADGE_PROMPT,
+				schema,
+				{
+					temperature: 0,
+					variables: {
+						name: item.name,
+						description: item.description || '',
+						source_url: item.source_url || '',
+						domain_type: domainType,
+						badge_criteria: this.buildBadgeCriteria(domainType)
+					},
+					routing: {
+						complexity: 'medium',
+						taskId: 'badge-evaluation'
+					}
 				},
-				routing: {
-					complexity: 'medium',
-					taskId: 'badge-evaluation'
-				}
-			});
+				facadeOptions
+			);
 
 			const nowIso = new Date().toISOString();
 			const badges: ItemBadges = {};

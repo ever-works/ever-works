@@ -22,6 +22,7 @@ export interface ImportFromAwesomeReadmeOptions {
     user: User;
     sourceUrl: string;
     token?: string;
+    aiProviderOverride?: string;
 }
 
 export interface LinkExistingDataRepoOptions {
@@ -142,7 +143,7 @@ export class ImportExecutorService {
     async importFromAwesomeReadme(
         options: ImportFromAwesomeReadmeOptions,
     ): Promise<DirectoryImportResult> {
-        const { directory, user, sourceUrl, token } = options;
+        const { directory, user, sourceUrl, token, aiProviderOverride } = options;
 
         try {
             const readme = await this.sourceRepoAnalyzer.getReadmeContent(sourceUrl, token);
@@ -156,10 +157,14 @@ export class ImportExecutorService {
             }
 
             this.logger.log(`Parsing README from ${sourceUrl}`);
-            const parsedData = await this.awesomeReadmeParser.parseReadme(readme.content, {
-                userId: user.id,
-                directoryId: directory.id,
-            });
+            const parsedData = await this.awesomeReadmeParser.parseReadme(
+                readme.content,
+                {
+                    userId: user.id,
+                    directoryId: directory.id,
+                },
+                aiProviderOverride,
+            );
 
             this.logger.log(
                 `Parsed ${parsedData.items.length} items, ${parsedData.categories.length} categories`,

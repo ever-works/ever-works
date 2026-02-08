@@ -522,6 +522,7 @@ interface ImportDirectoryRequest {
     sync?: boolean;
     gitProvider?: string;
     deployProvider?: string;
+    providers?: Record<string, string>;
 }
 
 export async function importDirectory(data: ImportDirectoryRequest) {
@@ -540,6 +541,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
         createMissingRepos: z.boolean().optional(),
         sync: z.boolean().optional(),
         gitProvider: z.string().optional(),
+        providers: z.record(z.string()).optional(),
     });
 
     try {
@@ -584,6 +586,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
             createMissingRepos: validation.data.createMissingRepos,
             sync: validation.data.sync,
             gitProvider: providerId,
+            providers: validation.data.providers,
         });
 
         return {

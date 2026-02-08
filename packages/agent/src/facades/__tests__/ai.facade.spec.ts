@@ -474,7 +474,7 @@ describe('AiFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = await service.testConnection();
+            const result = await service.testConnection(defaultFacadeOptions);
 
             expect(result.success).toBe(true);
             expect(result.provider).toBe('openai-provider');
@@ -490,7 +490,7 @@ describe('AiFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = await service.testConnection();
+            const result = await service.testConnection(defaultFacadeOptions);
 
             expect(result.success).toBe(false);
             expect(result.error).toBe('Provider not available');
@@ -499,7 +499,7 @@ describe('AiFacadeService', () => {
         it('should return failure when no provider exists', async () => {
             registry.getByCapability.mockReturnValue([]);
 
-            const result = await service.testConnection();
+            const result = await service.testConnection(defaultFacadeOptions);
 
             expect(result.success).toBe(false);
             expect(result.error).toContain('No AI provider');

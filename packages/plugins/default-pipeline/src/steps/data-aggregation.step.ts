@@ -4,7 +4,8 @@ import type {
 	PipelineMetrics,
 	MutableItemData,
 	DataSourceFilterContext,
-	IAiFacade
+	IAiFacade,
+	FacadeOptions
 } from '@ever-works/plugin';
 import { z } from 'zod';
 import { BasePipelineStep } from '../base-pipeline-step.js';
@@ -35,6 +36,11 @@ export class DataAggregationStep extends BasePipelineStep {
 		} = context;
 		const { logger, dataSourceFacade } = execContext;
 
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
+
 		// Combine AI-generated items and web-extracted items
 		let allDiscoveredItems = [...initialAiItems, ...extractedWebItems];
 		logger.debug(
@@ -45,7 +51,12 @@ export class DataAggregationStep extends BasePipelineStep {
 		if (dataSourceFacade?.isConfigured()) {
 			try {
 				// Extract keywords using AI for multilingual support
-				const keywords = await this.extractKeywords(request.prompt, context.subject, execContext.aiFacade);
+				const keywords = await this.extractKeywords(
+					request.prompt,
+					context.subject,
+					execContext.aiFacade,
+					facadeOptions
+				);
 
 				// Build filter context for per-plugin relevance filtering
 				const filterContext: DataSourceFilterContext = {
@@ -186,7 +197,12 @@ export class DataAggregationStep extends BasePipelineStep {
 	 * Extracts keywords from prompt and subject for relevance filtering.
 	 * Uses AI for multilingual support when available, falls back to simple extraction.
 	 */
-	private async extractKeywords(prompt?: string, subject?: string, aiFacade?: IAiFacade): Promise<readonly string[]> {
+	private async extractKeywords(
+		prompt?: string,
+		subject?: string,
+		aiFacade?: IAiFacade,
+		facadeOptions?: FacadeOptions
+	): Promise<readonly string[]> {
 		// If no text to extract from, return empty
 		if (!prompt && !subject) {
 			return [];
@@ -209,7 +225,8 @@ Return only meaningful keywords, no common words or articles.`,
 					}),
 					{
 						routing: { complexity: 'simple', taskId: 'keyword-extraction' }
-					}
+					},
+					facadeOptions!
 				);
 
 				if (result.keywords && result.keywords.length > 0) {

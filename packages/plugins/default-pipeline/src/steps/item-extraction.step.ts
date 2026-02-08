@@ -5,7 +5,8 @@ import type {
 	StepExecutionContext,
 	PipelineMetrics,
 	WebPageData,
-	MutableItemData
+	MutableItemData,
+	FacadeOptions
 } from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { slugifyText } from '../utils/text.utils.js';
@@ -83,6 +84,11 @@ export class ItemExtractionStep extends BasePipelineStep {
 		const { request, directory, webPages, featuredItemHints, metrics, advancedPrompts } = context;
 		const { logger, aiFacade } = execContext;
 
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
+
 		logger.log(`[${directory.slug}] AI-Driven Structured Data Extraction for Items from Web - Starting`);
 
 		const extractedWebItems = await this.extractItemsFromPages(
@@ -96,7 +102,8 @@ export class ItemExtractionStep extends BasePipelineStep {
 			metrics,
 			advancedPrompts?.itemExtraction,
 			logger,
-			aiFacade
+			aiFacade,
+			facadeOptions
 		);
 
 		logger.log(`[${directory.slug}] Extracted ${extractedWebItems.length} potential items from web pages.`);
@@ -120,7 +127,8 @@ export class ItemExtractionStep extends BasePipelineStep {
 		metrics: PipelineMetrics,
 		customPrompt: string | null | undefined,
 		logger: StepExecutionContext['logger'],
-		aiFacade: StepExecutionContext['aiFacade']
+		aiFacade: StepExecutionContext['aiFacade'],
+		facadeOptions: FacadeOptions
 	): Promise<MutableItemData[]> {
 		if (!aiFacade.isConfigured()) {
 			logger.warn(`[${directorySlug}] AI provider not configured. Skipping AI-driven item extraction.`);
@@ -168,19 +176,24 @@ export class ItemExtractionStep extends BasePipelineStep {
 							try {
 								const { result, usage, cost } = await aiFacade.askJson<
 									ExtractedItems | ExtractedItemsWithTags
-								>(finalPrompt, schema, {
-									temperature: 0.1,
-									variables: {
-										topicName,
-										topicDescription,
-										page_content_snippet: chunk,
-										featured_hints_section: featuredHintsSection
+								>(
+									finalPrompt,
+									schema,
+									{
+										temperature: 0.1,
+										variables: {
+											topicName,
+											topicDescription,
+											page_content_snippet: chunk,
+											featured_hints_section: featuredHintsSection
+										},
+										routing: {
+											complexity: 'complex',
+											taskId: 'item-extraction-chunk'
+										}
 									},
-									routing: {
-										complexity: 'complex',
-										taskId: 'item-extraction-chunk'
-									}
-								});
+									facadeOptions
+								);
 
 								if (usage) {
 									this.accumulateMetrics(metrics, usage, cost);
@@ -228,19 +241,24 @@ export class ItemExtractionStep extends BasePipelineStep {
 						result: extractionResult,
 						usage,
 						cost
-					} = await aiFacade.askJson<ExtractedItems | ExtractedItemsWithTags>(finalPrompt, schema, {
-						temperature: 0.1,
-						variables: {
-							topicName,
-							topicDescription,
-							page_content_snippet: page.raw_content || '',
-							featured_hints_section: featuredHintsSection
+					} = await aiFacade.askJson<ExtractedItems | ExtractedItemsWithTags>(
+						finalPrompt,
+						schema,
+						{
+							temperature: 0.1,
+							variables: {
+								topicName,
+								topicDescription,
+								page_content_snippet: page.raw_content || '',
+								featured_hints_section: featuredHintsSection
+							},
+							routing: {
+								complexity: 'complex',
+								taskId: 'item-extraction'
+							}
 						},
-						routing: {
-							complexity: 'complex',
-							taskId: 'item-extraction'
-						}
-					});
+						facadeOptions
+					);
 
 					if (usage) {
 						this.accumulateMetrics(metrics, usage, cost);

@@ -75,7 +75,7 @@ export class TestSubCommand extends CommandRunner {
         const spinner = ora('Testing AI provider via plugin system...').start();
 
         try {
-            const result = await this.aiFacade.testConnection();
+            const result = await this.aiFacade.testConnection({ userId: 'cli' });
 
             if (result.success) {
                 spinner.succeed(

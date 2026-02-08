@@ -14,6 +14,7 @@ export type DirectoryImportPayload = {
         createMissingRepos?: boolean;
         enableSync?: boolean;
     };
+    providers?: { ai?: string };
 };
 
 export type DirectoryImportMetrics = {

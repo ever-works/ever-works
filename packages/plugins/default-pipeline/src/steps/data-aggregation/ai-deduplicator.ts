@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { MutableItemData, StepExecutionContext, PipelineMetrics } from '@ever-works/plugin';
+import type { MutableItemData, StepExecutionContext, PipelineMetrics, FacadeOptions } from '@ever-works/plugin';
 import { slugifyText } from '../../utils/text.utils.js';
 import { extractedItemsSchema } from '../../schemas/item-extraction.schemas.js';
 import { getErrorMessage, getErrorStack } from '../../utils/error.utils.js';
@@ -22,11 +22,16 @@ export class AiDeduplicator {
 	private readonly logger: StepExecutionContext['logger'];
 	private readonly aiFacade: StepExecutionContext['aiFacade'];
 	private readonly sharedUtils: SharedUtils;
+	private readonly facadeOptions: FacadeOptions;
 
 	constructor(execContext: StepExecutionContext, sharedUtils: SharedUtils) {
 		this.logger = execContext.logger;
 		this.aiFacade = execContext.aiFacade;
 		this.sharedUtils = sharedUtils;
+		this.facadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
 	}
 
 	/**
@@ -84,7 +89,8 @@ export class AiDeduplicator {
 						complexity: 'medium',
 						taskId: 'ai-deduplication'
 					}
-				}
+				},
+				this.facadeOptions
 			);
 
 			this.accumulateMetrics(metrics, usage, cost);

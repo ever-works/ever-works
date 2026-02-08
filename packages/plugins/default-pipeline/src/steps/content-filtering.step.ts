@@ -4,7 +4,8 @@ import type {
 	StepExecutionContext,
 	PipelineMetrics,
 	WebPageData,
-	RelevanceAssessment
+	RelevanceAssessment,
+	FacadeOptions
 } from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { getErrorStack } from '../utils/error.utils.js';
@@ -55,6 +56,11 @@ export class ContentFilteringStep extends BasePipelineStep {
 		const { logger, aiFacade } = execContext;
 		const config = request.config || {};
 
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
+
 		const contentFilteringEnabled = config.content_filtering_enabled !== false;
 
 		if (contentFilteringEnabled) {
@@ -69,7 +75,8 @@ export class ContentFilteringStep extends BasePipelineStep {
 				metrics,
 				advancedPrompts?.relevanceAssessment,
 				logger,
-				aiFacade
+				aiFacade,
+				facadeOptions
 			);
 
 			logger.log(`[${directory.slug}] Filtered down to ${filteredWebPages.length} relevant pages.`);
@@ -91,7 +98,8 @@ export class ContentFilteringStep extends BasePipelineStep {
 		metrics: PipelineMetrics,
 		customPrompt: string | null | undefined,
 		logger: StepExecutionContext['logger'],
-		aiFacade: StepExecutionContext['aiFacade']
+		aiFacade: StepExecutionContext['aiFacade'],
+		facadeOptions: FacadeOptions
 	): Promise<WebPageData[]> {
 		logger.log(`[${directorySlug}] Starting content filtering for ${webPages.length} pages`);
 
@@ -133,19 +141,24 @@ export class ContentFilteringStep extends BasePipelineStep {
 					result: assessmentResult,
 					usage,
 					cost
-				} = await aiFacade.askJson<RelevanceResult>(finalPrompt, relevanceSchema, {
-					temperature: 0,
-					variables: {
-						topic_name: topicName,
-						topic_description: topicDescription,
-						snippet_length: String(snippet.length),
-						snippet
+				} = await aiFacade.askJson<RelevanceResult>(
+					finalPrompt,
+					relevanceSchema,
+					{
+						temperature: 0,
+						variables: {
+							topic_name: topicName,
+							topic_description: topicDescription,
+							snippet_length: String(snippet.length),
+							snippet
+						},
+						routing: {
+							complexity: 'medium',
+							taskId: 'content-filtering'
+						}
 					},
-					routing: {
-						complexity: 'medium',
-						taskId: 'content-filtering'
-					}
-				});
+					facadeOptions
+				);
 
 				if (usage) {
 					this.accumulateMetrics(metrics, usage, cost);

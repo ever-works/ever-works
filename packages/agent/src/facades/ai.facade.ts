@@ -61,17 +61,17 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         promptTemplate: string,
         schema: z.ZodSchema<T>,
         options: AskJsonOptions | undefined,
-        facadeOptions?: FacadeOptions,
+        facadeOptions: FacadeOptions,
     ): Promise<AskJsonResponse<T>> {
         const plugin = await this.resolvePlugin(
             options?.routing?.providerOverride,
-            facadeOptions?.userId,
-            facadeOptions?.directoryId,
+            facadeOptions.userId,
+            facadeOptions.directoryId,
         );
 
         const settings = await this.getResolvedSettings(plugin.id, {
-            userId: facadeOptions?.userId,
-            directoryId: facadeOptions?.directoryId,
+            userId: facadeOptions.userId,
+            directoryId: facadeOptions.directoryId,
         });
 
         const model = this.resolveModel(plugin, settings, options?.routing);
@@ -147,17 +147,17 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
 
     async createChatCompletion(
         options: ChatCompletionOptions,
-        facadeOptions?: FacadeOptions,
+        facadeOptions: FacadeOptions,
     ): Promise<ChatCompletionResponse> {
         const plugin = await this.resolvePlugin(
-            facadeOptions?.providerOverride,
-            facadeOptions?.userId,
-            facadeOptions?.directoryId,
+            facadeOptions.providerOverride,
+            facadeOptions.userId,
+            facadeOptions.directoryId,
         );
 
         const settings = await this.getResolvedSettings(plugin.id, {
-            userId: facadeOptions?.userId,
-            directoryId: facadeOptions?.directoryId,
+            userId: facadeOptions.userId,
+            directoryId: facadeOptions.directoryId,
         });
 
         const model = this.resolveModel(plugin, settings, options as unknown as AiRoutingOptions);
@@ -172,17 +172,17 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
 
     async *createStreamingChatCompletion(
         options: ChatCompletionOptions,
-        facadeOptions?: FacadeOptions,
+        facadeOptions: FacadeOptions,
     ): AsyncGenerator<ChatCompletionChunk> {
         const plugin = await this.resolvePlugin(
-            facadeOptions?.providerOverride,
-            facadeOptions?.userId,
-            facadeOptions?.directoryId,
+            facadeOptions.providerOverride,
+            facadeOptions.userId,
+            facadeOptions.directoryId,
         );
 
         const settings = await this.getResolvedSettings(plugin.id, {
-            userId: facadeOptions?.userId,
-            directoryId: facadeOptions?.directoryId,
+            userId: facadeOptions.userId,
+            directoryId: facadeOptions.directoryId,
         });
 
         const model = this.resolveModel(plugin, settings, options as unknown as AiRoutingOptions);
@@ -204,7 +204,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         yield* plugin.createStreamingChatCompletion(mergedOptions);
     }
 
-    async testConnection(facadeOptions?: FacadeOptions): Promise<{
+    async testConnection(facadeOptions: FacadeOptions): Promise<{
         success: boolean;
         provider: string;
         model: string;
@@ -215,9 +215,9 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
 
         try {
             const plugin = await this.resolvePlugin(
-                facadeOptions?.providerOverride,
-                facadeOptions?.userId,
-                facadeOptions?.directoryId,
+                facadeOptions.providerOverride,
+                facadeOptions.userId,
+                facadeOptions.directoryId,
             );
 
             const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
@@ -286,12 +286,12 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         throw new NoAiProviderError();
     }
 
-    async getAvailableModels(facadeOptions?: FacadeOptions): Promise<readonly AiModel[]> {
+    async getAvailableModels(facadeOptions: FacadeOptions): Promise<readonly AiModel[]> {
         try {
             const plugin = await this.resolvePlugin(
-                facadeOptions?.providerOverride,
-                facadeOptions?.userId,
-                facadeOptions?.directoryId,
+                facadeOptions.providerOverride,
+                facadeOptions.userId,
+                facadeOptions.directoryId,
             );
             const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
             return await plugin.listModels(settings);

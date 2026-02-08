@@ -71,6 +71,7 @@ export class TriggerImportOrchestrator {
                     user,
                     sourceUrl: payload.sourceUrl,
                     token,
+                    aiProviderOverride: payload.providers?.ai,
                 });
             } else if (payload.sourceType === 'link_existing') {
                 if (!token) {

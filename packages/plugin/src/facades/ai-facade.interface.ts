@@ -97,15 +97,16 @@ export interface IAiFacade {
 	 *         temperature: 0.1,
 	 *         variables: { text: 'Hello world' },
 	 *         routing: { complexity: 'simple' }
-	 *     }
+	 *     },
+	 *     { userId: user.id, directoryId: directory.id }
 	 * );
 	 * ```
 	 */
 	askJson<T>(
 		promptTemplate: string,
 		schema: SchemaType<T>,
-		options?: AskJsonOptions,
-		facadeOptions?: FacadeOptions
+		options: AskJsonOptions | undefined,
+		facadeOptions: FacadeOptions
 	): Promise<AskJsonResponse<T>>;
 
 	/**
@@ -117,7 +118,7 @@ export interface IAiFacade {
 	 * Test the AI provider connection.
 	 * Returns health check result with success status and response time.
 	 */
-	testConnection(facadeOptions?: FacadeOptions): Promise<{
+	testConnection(facadeOptions: FacadeOptions): Promise<{
 		success: boolean;
 		provider: string;
 		model: string;
@@ -131,5 +132,5 @@ export interface IAiFacade {
 	 *
 	 * @returns List of available models with their capabilities
 	 */
-	getAvailableModels(facadeOptions?: FacadeOptions): Promise<readonly AiModel[]>;
+	getAvailableModels(facadeOptions: FacadeOptions): Promise<readonly AiModel[]>;
 }

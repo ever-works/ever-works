@@ -348,6 +348,7 @@ export interface ImportDirectoryDto {
     sync?: boolean;
     gitProvider: string;
     deployProvider?: string;
+    providers?: Record<string, string>;
 }
 
 export interface ImportDirectoryResponseDto {

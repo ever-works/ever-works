@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import type { MutableGenerationContext, StepExecutionContext, PipelineMetrics } from '@ever-works/plugin';
+import type {
+	MutableGenerationContext,
+	StepExecutionContext,
+	PipelineMetrics,
+	FacadeOptions
+} from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
 const PROMPT_COMPARISON_PROMPT =
@@ -57,6 +62,11 @@ export class PromptComparisonStep extends BasePipelineStep {
 		const { request, existing, directory } = context;
 		const { logger, aiFacade } = execContext;
 
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
+
 		const config = request.config || {};
 		const existingConfig = existing.existingConfig;
 		const $configMetadata = existingConfig?.metadata || {};
@@ -75,7 +85,8 @@ export class PromptComparisonStep extends BasePipelineStep {
 				request.prompt ?? '',
 				context.metrics,
 				aiFacade,
-				logger
+				logger,
+				facadeOptions
 			);
 
 			const confidence = comparisonResult.confidence;
@@ -109,7 +120,8 @@ export class PromptComparisonStep extends BasePipelineStep {
 		newPrompt: string,
 		metrics: PipelineMetrics,
 		aiFacade: StepExecutionContext['aiFacade'],
-		logger: StepExecutionContext['logger']
+		logger: StepExecutionContext['logger'],
+		facadeOptions: FacadeOptions
 	): Promise<PromptComparisonResult> {
 		if (!existingPrompt || !newPrompt) {
 			return {
@@ -139,7 +151,8 @@ export class PromptComparisonStep extends BasePipelineStep {
 						complexity: 'medium',
 						taskId: 'prompt-comparison'
 					}
-				}
+				},
+				facadeOptions
 			);
 
 			// Accumulate metrics

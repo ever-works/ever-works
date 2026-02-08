@@ -75,7 +75,9 @@ describe('MarkdownGenerationStep', () => {
 		mockExecContext = {
 			logger: createMockLogger(),
 			aiFacade: createMockAiFacade(),
-			contentExtractorFacade: createMockContentExtractorFacade()
+			contentExtractorFacade: createMockContentExtractorFacade(),
+			user: { id: 'test-user-id' },
+			directory: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 

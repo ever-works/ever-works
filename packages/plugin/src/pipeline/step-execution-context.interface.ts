@@ -37,7 +37,8 @@ export interface StepLogger {
  *         const { result } = await execContext.aiFacade.askJson(
  *             'Analyze: {text}',
  *             schema,
- *             { variables: { text: 'hello' } }
+ *             { variables: { text: 'hello' } },
+ *             { userId: execContext.user!.id, directoryId: execContext.directory.id }
  *         );
  *
  *         // Use search facade

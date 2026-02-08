@@ -67,7 +67,9 @@ describe('DomainDetectionStep', () => {
 		mockContext = createMockContext();
 		mockExecContext = {
 			logger: createMockLogger(),
-			aiFacade: createMockAiFacade()
+			aiFacade: createMockAiFacade(),
+			user: { id: 'test-user-id' },
+			directory: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 

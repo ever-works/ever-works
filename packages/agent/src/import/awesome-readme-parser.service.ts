@@ -139,7 +139,11 @@ export class AwesomeReadmeParserService {
         });
     }
 
-    async parseReadme(content: string, facadeOptions: FacadeOptions): Promise<ParsedAwesomeData> {
+    async parseReadme(
+        content: string,
+        facadeOptions: FacadeOptions,
+        aiProviderOverride?: string,
+    ): Promise<ParsedAwesomeData> {
         const parseErrors: string[] = [];
         const metrics: MetricsAccumulator = {
             total_tokens_used: 0,
@@ -147,12 +151,16 @@ export class AwesomeReadmeParserService {
         };
         const overallStartTime = Date.now();
 
+        const effectiveFacadeOptions: FacadeOptions = aiProviderOverride
+            ? { ...facadeOptions, providerOverride: aiProviderOverride }
+            : facadeOptions;
+
         this.logger.log(`[Import] Parsing README (${content.length} chars)`);
         this.logger.log(`[Import] Step 1/3: Extracting categories...`);
 
         let categories: Category[];
         try {
-            categories = await this.extractCategories(content, metrics, facadeOptions);
+            categories = await this.extractCategories(content, metrics, effectiveFacadeOptions);
             this.logger.log(`[Import] Step 1/3 complete: Found ${categories.length} categories`);
         } catch (error) {
             this.logger.error('[Import] Category extraction failed, using fallback', error);
@@ -177,7 +185,7 @@ export class AwesomeReadmeParserService {
                     section.categoryName,
                     section.categoryId,
                     metrics,
-                    facadeOptions,
+                    effectiveFacadeOptions,
                 );
                 allItems.push(...items);
                 this.logger.log(

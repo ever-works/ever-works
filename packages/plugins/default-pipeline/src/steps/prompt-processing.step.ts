@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import type { MutableGenerationContext, StepExecutionContext, PipelineMetrics } from '@ever-works/plugin';
+import type {
+	MutableGenerationContext,
+	StepExecutionContext,
+	PipelineMetrics,
+	FacadeOptions
+} from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
 const PROMPT_PROCESSING_PROMPT = `
@@ -123,6 +128,11 @@ export class PromptProcessingStep extends BasePipelineStep {
 		const { logger, aiFacade } = execContext;
 		const config = request.config || {};
 
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
+
 		logger.log(`[${directory.slug}] Prompt Processing - Starting`);
 
 		const {
@@ -132,7 +142,7 @@ export class PromptProcessingStep extends BasePipelineStep {
 			featuredItemHints,
 			subject,
 			rewrittenPrompt: prompt
-		} = await this.processPrompt(request.prompt || '', metrics, logger, aiFacade);
+		} = await this.processPrompt(request.prompt || '', metrics, logger, aiFacade, facadeOptions);
 
 		// Merge with request priority categories
 		const requestPriorityCategories = (config.priority_categories as string[]) || [];
@@ -202,7 +212,8 @@ export class PromptProcessingStep extends BasePipelineStep {
 		prompt: string,
 		metrics: PipelineMetrics,
 		logger: StepExecutionContext['logger'],
-		aiFacade: StepExecutionContext['aiFacade']
+		aiFacade: StepExecutionContext['aiFacade'],
+		facadeOptions: FacadeOptions
 	): Promise<{
 		extractedUrls: string[];
 		suggestedCategories: string[];
@@ -234,7 +245,8 @@ export class PromptProcessingStep extends BasePipelineStep {
 						complexity: 'simple',
 						taskId: 'prompt-processing'
 					}
-				}
+				},
+				facadeOptions
 			);
 
 			// Accumulate metrics

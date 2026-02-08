@@ -110,7 +110,9 @@ describe('DataAggregationStep', () => {
 		mockExecContext = {
 			logger: createMockLogger(),
 			aiFacade: createMockAiFacade(),
-			dataSourceFacade: createMockDataSourceFacade()
+			dataSourceFacade: createMockDataSourceFacade(),
+			user: { id: 'test-user-id' },
+			directory: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 

@@ -444,7 +444,12 @@ describe('StepPipelineExecutorService', () => {
                 name: 'Prompt Comparison',
                 run: jest.fn().mockImplementation(async (ctx, execContext) => {
                     // Use the AI facade to trigger the bound call
-                    await execContext.aiFacade.askJson('test prompt', {}, {});
+                    await execContext.aiFacade.askJson(
+                        'test prompt',
+                        {} as any,
+                        {},
+                        { userId: execContext.user!.id, directoryId: execContext.directory.id },
+                    );
                     ctx.shouldStop = true;
                     return ctx;
                 }),
@@ -488,7 +493,12 @@ describe('StepPipelineExecutorService', () => {
             defaultPlugin.registerStepExecutor('prompt-comparison' as any, {
                 name: 'Prompt Comparison',
                 run: jest.fn().mockImplementation(async (ctx, execContext) => {
-                    await execContext.aiFacade.askJson('test prompt', {}, {});
+                    await execContext.aiFacade.askJson(
+                        'test prompt',
+                        {} as any,
+                        {},
+                        { userId: execContext.user!.id, directoryId: execContext.directory.id },
+                    );
                     ctx.shouldStop = true;
                     return ctx;
                 }),

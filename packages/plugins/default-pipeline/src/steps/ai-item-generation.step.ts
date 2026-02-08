@@ -2,7 +2,8 @@ import type {
 	MutableGenerationContext,
 	StepExecutionContext,
 	PipelineMetrics,
-	MutableItemData
+	MutableItemData,
+	FacadeOptions
 } from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { slugifyText } from '../utils/text.utils.js';
@@ -80,6 +81,11 @@ export class AiItemGenerationStep extends BasePipelineStep {
 		const { logger, aiFacade } = execContext;
 		const config = request.config || {};
 
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
+
 		const aiFirstEnabled = config.ai_first_generation_enabled !== false;
 
 		if (aiFirstEnabled) {
@@ -94,7 +100,8 @@ export class AiItemGenerationStep extends BasePipelineStep {
 				metrics,
 				advancedPrompts?.itemGeneration,
 				logger,
-				aiFacade
+				aiFacade,
+				facadeOptions
 			);
 
 			logger.log(`[${directory.slug}] AI generated ${initialAiItems.length} initial items.`);
@@ -120,7 +127,8 @@ export class AiItemGenerationStep extends BasePipelineStep {
 		metrics: PipelineMetrics,
 		customPrompt: string | null | undefined,
 		logger: StepExecutionContext['logger'],
-		aiFacade: StepExecutionContext['aiFacade']
+		aiFacade: StepExecutionContext['aiFacade'],
+		facadeOptions: FacadeOptions
 	): Promise<MutableItemData[]> {
 		logger.debug(`[${directorySlug}] AI-First Item Generation - Starting for topic: ${topicName}`);
 		const allGeneratedItems: MutableItemData[] = [];
@@ -138,18 +146,23 @@ export class AiItemGenerationStep extends BasePipelineStep {
 				result: assessment,
 				usage,
 				cost
-			} = await aiFacade.askJson<PromptAssessment>(UNDERSTANDING_PROMPT, promptUnderstandingAssessmentSchema, {
-				temperature: 0.3,
-				variables: {
-					topicName,
-					topicDescription,
-					target_keywords_string: keywordsString
+			} = await aiFacade.askJson<PromptAssessment>(
+				UNDERSTANDING_PROMPT,
+				promptUnderstandingAssessmentSchema,
+				{
+					temperature: 0.3,
+					variables: {
+						topicName,
+						topicDescription,
+						target_keywords_string: keywordsString
+					},
+					routing: {
+						complexity: 'simple',
+						taskId: 'ai-item-generation-assessment'
+					}
 				},
-				routing: {
-					complexity: 'simple',
-					taskId: 'ai-item-generation-assessment'
-				}
-			});
+				facadeOptions
+			);
 
 			if (usage) {
 				this.accumulateMetrics(metrics, usage, cost);
@@ -183,19 +196,24 @@ export class AiItemGenerationStep extends BasePipelineStep {
 		try {
 			const finalPrompt = appendCustomPrompt(GENERATION_PROMPT, customPrompt);
 
-			const { result, usage, cost } = await aiFacade.askJson<ExtractedItems>(finalPrompt, extractedItemsSchema, {
-				temperature: 0,
-				variables: {
-					topicName,
-					topicDescription,
-					target_keywords_string: keywordsString,
-					featured_hints_section: featuredHintsSection
+			const { result, usage, cost } = await aiFacade.askJson<ExtractedItems>(
+				finalPrompt,
+				extractedItemsSchema,
+				{
+					temperature: 0,
+					variables: {
+						topicName,
+						topicDescription,
+						target_keywords_string: keywordsString,
+						featured_hints_section: featuredHintsSection
+					},
+					routing: {
+						complexity: 'complex',
+						taskId: 'ai-item-generation'
+					}
 				},
-				routing: {
-					complexity: 'complex',
-					taskId: 'ai-item-generation'
-				}
-			});
+				facadeOptions
+			);
 
 			if (usage) {
 				this.accumulateMetrics(metrics, usage, cost);

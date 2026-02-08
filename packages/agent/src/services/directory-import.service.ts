@@ -365,6 +365,7 @@ export class DirectoryImportService {
                 createMissingRepos: dto.createMissingRepos ?? false,
                 enableSync: dto.sync ?? true,
             },
+            providers: dto.providers,
         };
 
         const dispatchedId = this.importDispatcher
@@ -436,6 +437,7 @@ export class DirectoryImportService {
                     user,
                     sourceUrl: dto.sourceUrl,
                     token,
+                    aiProviderOverride: dto.providers?.ai,
                 });
             } else if (dto.sourceType === ImportSourceTypeEnum.LINK_EXISTING) {
                 if (!token) {

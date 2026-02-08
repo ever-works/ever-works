@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import type { MutableGenerationContext, StepExecutionContext, PipelineMetrics } from '@ever-works/plugin';
+import type {
+	MutableGenerationContext,
+	StepExecutionContext,
+	PipelineMetrics,
+	FacadeOptions
+} from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { getErrorStack } from '../utils/error.utils.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
@@ -37,6 +42,11 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 		const { logger, aiFacade } = execContext;
 		const config = request.config || {};
 
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
+
 		logger.log(`[${directory.slug}] AI-Powered Search Query Generation - Starting`);
 
 		const searchQueries = await this.generateSearchQueries(
@@ -47,7 +57,8 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 			metrics,
 			advancedPrompts?.searchQuery,
 			logger,
-			aiFacade
+			aiFacade,
+			facadeOptions
 		);
 
 		logger.log(`[${directory.slug}] Generated ${searchQueries.length} search queries.`);
@@ -68,7 +79,8 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 		metrics: PipelineMetrics,
 		customPrompt: string | null | undefined,
 		logger: StepExecutionContext['logger'],
-		aiFacade: StepExecutionContext['aiFacade']
+		aiFacade: StepExecutionContext['aiFacade'],
+		facadeOptions: FacadeOptions
 	): Promise<string[]> {
 		logger.debug(`[${name}] Generating search queries using LLM...`);
 
@@ -85,20 +97,25 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 		const finalPrompt = appendCustomPrompt(SEARCH_QUERY_PROMPT, customPrompt);
 
 		try {
-			const { result, usage, cost } = await aiFacade.askJson(finalPrompt, searchQuerySchema, {
-				temperature: 0.2,
-				variables: {
-					name,
-					description,
-					keywords: keywords.length ? keywords.join(', ') : 'N/A',
-					date: dateStr,
-					query_count: String(maxSearchQueries * 2)
+			const { result, usage, cost } = await aiFacade.askJson(
+				finalPrompt,
+				searchQuerySchema,
+				{
+					temperature: 0.2,
+					variables: {
+						name,
+						description,
+						keywords: keywords.length ? keywords.join(', ') : 'N/A',
+						date: dateStr,
+						query_count: String(maxSearchQueries * 2)
+					},
+					routing: {
+						complexity: 'simple',
+						taskId: 'search-query-generation'
+					}
 				},
-				routing: {
-					complexity: 'simple',
-					taskId: 'search-query-generation'
-				}
-			});
+				facadeOptions
+			);
 
 			if (usage) {
 				this.accumulateMetrics(metrics, usage, cost);

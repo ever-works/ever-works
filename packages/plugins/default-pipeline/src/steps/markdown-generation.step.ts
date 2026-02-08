@@ -3,7 +3,8 @@ import type {
 	MutableGenerationContext,
 	StepExecutionContext,
 	PipelineMetrics,
-	MutableItemData
+	MutableItemData,
+	FacadeOptions
 } from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { getErrorStack } from '../utils/error.utils.js';
@@ -48,6 +49,11 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 		const { directory, finalItems, contentCache, metrics } = context;
 		const { logger, aiFacade, contentExtractorFacade } = execContext;
 
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
+
 		if (!finalItems || finalItems.length === 0) {
 			return context;
 		}
@@ -60,7 +66,8 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 			metrics,
 			logger,
 			aiFacade,
-			contentExtractorFacade
+			contentExtractorFacade,
+			facadeOptions
 		);
 
 		context.finalItems = itemsWithMarkdown;
@@ -76,7 +83,8 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 		metrics: PipelineMetrics,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
-		contentExtractorFacade: StepExecutionContext['contentExtractorFacade']
+		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
+		facadeOptions: FacadeOptions
 	): Promise<MutableItemData[]> {
 		if (!items || items.length === 0) {
 			return [];
@@ -95,7 +103,8 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 					metrics,
 					logger,
 					aiFacade,
-					contentExtractorFacade
+					contentExtractorFacade,
+					facadeOptions
 				);
 				return {
 					...item,
@@ -123,7 +132,8 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 		metrics: PipelineMetrics,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
-		contentExtractorFacade: StepExecutionContext['contentExtractorFacade']
+		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
+		facadeOptions: FacadeOptions
 	): Promise<string> {
 		if (!item || !item.source_url) {
 			logger.warn(`Cannot generate markdown: Missing item or source URL`);
@@ -164,7 +174,8 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 						complexity: 'medium',
 						taskId: 'markdown-generation'
 					}
-				}
+				},
+				facadeOptions
 			);
 
 			this.accumulateMetrics(metrics, usage, cost);

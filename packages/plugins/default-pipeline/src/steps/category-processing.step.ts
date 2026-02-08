@@ -6,7 +6,8 @@ import type {
 	MutableItemData,
 	Category,
 	Tag,
-	Brand
+	Brand,
+	FacadeOptions
 } from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { slugifyText, unSlugifyText } from '../utils/text.utils.js';
@@ -351,6 +352,11 @@ export class CategoryProcessingStep extends BasePipelineStep {
 	): Promise<MutableItemData[]> {
 		const { logger, aiFacade } = execContext;
 
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
+
 		if (!items || items.length === 0) return [];
 
 		try {
@@ -380,31 +386,41 @@ export class CategoryProcessingStep extends BasePipelineStep {
 			const finalBasePrompt = appendCustomPrompt(CATEGORY_PROMPT, customPrompt);
 
 			const { result, usage, cost } = hasContext
-				? await aiFacade.askJson<CategorizeResult>(finalEnhancedPrompt, categorizeOutputSchema, {
-						temperature: 0.3,
-						variables: {
-							task: prompt,
-							items: JSON.stringify(items),
-							existing_categories: categoriesText,
-							existing_tags: tagsText,
-							category_metrics: JSON.stringify(initialCategoryMetrics)
+				? await aiFacade.askJson<CategorizeResult>(
+						finalEnhancedPrompt,
+						categorizeOutputSchema,
+						{
+							temperature: 0.3,
+							variables: {
+								task: prompt,
+								items: JSON.stringify(items),
+								existing_categories: categoriesText,
+								existing_tags: tagsText,
+								category_metrics: JSON.stringify(initialCategoryMetrics)
+							},
+							routing: {
+								complexity: 'medium',
+								taskId: 'category-processing'
+							}
 						},
-						routing: {
-							complexity: 'medium',
-							taskId: 'category-processing'
-						}
-					})
-				: await aiFacade.askJson<CategorizeResult>(finalBasePrompt, categorizeOutputSchema, {
-						temperature: 0.3,
-						variables: {
-							task: prompt,
-							items: JSON.stringify(items)
+						facadeOptions
+					)
+				: await aiFacade.askJson<CategorizeResult>(
+						finalBasePrompt,
+						categorizeOutputSchema,
+						{
+							temperature: 0.3,
+							variables: {
+								task: prompt,
+								items: JSON.stringify(items)
+							},
+							routing: {
+								complexity: 'medium',
+								taskId: 'category-processing'
+							}
 						},
-						routing: {
-							complexity: 'medium',
-							taskId: 'category-processing'
-						}
-					});
+						facadeOptions
+					);
 
 			this.accumulateMetrics(metrics, usage, cost);
 			return (result?.items || []) as MutableItemData[];
@@ -436,6 +452,11 @@ export class CategoryProcessingStep extends BasePipelineStep {
 	): Promise<MutableItemData[]> {
 		const { logger, aiFacade } = execContext;
 		const allCategorizedItems: MutableItemData[] = [];
+
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
 
 		// Process items in batches
 		for (let i = 0; i < items.length; i += this.BATCH_SIZE) {
@@ -481,7 +502,8 @@ export class CategoryProcessingStep extends BasePipelineStep {
 							complexity: 'medium',
 							taskId: 'category-processing-batch'
 						}
-					}
+					},
+					facadeOptions
 				);
 
 				this.accumulateMetrics(metrics, usage, cost);

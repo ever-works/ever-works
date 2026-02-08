@@ -3,7 +3,8 @@ import type {
 	MutableGenerationContext,
 	StepExecutionContext,
 	PipelineMetrics,
-	MutableItemData
+	MutableItemData,
+	FacadeOptions
 } from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
@@ -63,6 +64,11 @@ export class SourceValidationStep extends BasePipelineStep {
 		const { directory, finalItems, metrics, subject, advancedPrompts } = context;
 		const { logger, aiFacade, searchFacade, contentExtractorFacade } = execContext;
 
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
+
 		logger.log(`[${directory.slug}] Validating source URLs for ${finalItems.length} items`);
 
 		const validatedItems = await this.filterAndValidateSourceItems(
@@ -73,7 +79,8 @@ export class SourceValidationStep extends BasePipelineStep {
 			logger,
 			aiFacade,
 			searchFacade,
-			contentExtractorFacade
+			contentExtractorFacade,
+			facadeOptions
 		);
 
 		context.finalItems = validatedItems;
@@ -89,7 +96,8 @@ export class SourceValidationStep extends BasePipelineStep {
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
 		searchFacade: StepExecutionContext['searchFacade'],
-		contentExtractorFacade: StepExecutionContext['contentExtractorFacade']
+		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
+		facadeOptions: FacadeOptions
 	): Promise<MutableItemData[]> {
 		if (!items || items.length === 0) {
 			return [];
@@ -111,7 +119,8 @@ export class SourceValidationStep extends BasePipelineStep {
 						logger,
 						aiFacade,
 						searchFacade,
-						contentExtractorFacade
+						contentExtractorFacade,
+						facadeOptions
 					)
 						.then((validatedSourceUrl) => {
 							if (validatedSourceUrl) {
@@ -152,7 +161,8 @@ export class SourceValidationStep extends BasePipelineStep {
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
 		searchFacade: StepExecutionContext['searchFacade'],
-		contentExtractorFacade: StepExecutionContext['contentExtractorFacade']
+		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
+		facadeOptions: FacadeOptions
 	): Promise<string | undefined> {
 		const sourceUrl = currentItem.source_url;
 		const itemName = currentItem.name;
@@ -257,7 +267,8 @@ export class SourceValidationStep extends BasePipelineStep {
 					metrics,
 					customPrompt,
 					aiFacade,
-					contentExtractorFacade
+					contentExtractorFacade,
+					facadeOptions
 				);
 				return { url, aiValidation };
 			});
@@ -306,7 +317,8 @@ export class SourceValidationStep extends BasePipelineStep {
 		metrics: PipelineMetrics,
 		customPrompt: string | null | undefined,
 		aiFacade: StepExecutionContext['aiFacade'],
-		contentExtractorFacade: StepExecutionContext['contentExtractorFacade']
+		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
+		facadeOptions: FacadeOptions
 	): Promise<{ isOfficial: boolean; confidence: number; reasoning: string } | null> {
 		if (!aiFacade.isConfigured()) {
 			return null;
@@ -341,7 +353,8 @@ export class SourceValidationStep extends BasePipelineStep {
 						complexity: 'simple',
 						taskId: 'source-validation'
 					}
-				}
+				},
+				facadeOptions
 			);
 
 			this.accumulateMetrics(metrics, usage, cost);

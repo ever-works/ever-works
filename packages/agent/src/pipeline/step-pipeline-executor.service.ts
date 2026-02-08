@@ -51,6 +51,7 @@ import type {
     DomainAnalysis,
     WebPageData,
     AdvancedPromptsContext,
+    FacadeOptions,
 } from '@ever-works/plugin';
 import { isDefaultPipelinePlugin, isPipelineStepPlugin } from '@ever-works/plugin';
 import { AiFacadeService } from '../facades/ai.facade';
@@ -189,32 +190,26 @@ export class StepPipelineExecutorService {
      */
     private createBoundAiFacade(ctx: FacadeBindingContext): IAiFacade {
         const facade = this.aiFacade;
+        const boundFacadeOptions: FacadeOptions = {
+            directoryId: ctx.directoryId,
+            userId: ctx.userId,
+            providerOverride: ctx.providerOverrides?.ai,
+        };
         return {
             askJson: <T>(
                 promptTemplate: string,
                 schema: SchemaType<T>,
-                options?: AskJsonOptions,
+                options: AskJsonOptions | undefined,
+                _facadeOptions: FacadeOptions,
             ): Promise<AskJsonResponse<T>> =>
                 // Cast schema to any since both ZodSchema and SchemaType satisfy the contract
                 // The runtime implementation in AiFacadeService handles Zod schemas
-                facade.askJson(promptTemplate, schema as any, options, {
-                    directoryId: ctx.directoryId,
-                    userId: ctx.userId,
-                    providerOverride: ctx.providerOverrides?.ai,
-                }),
+                facade.askJson(promptTemplate, schema as any, options, boundFacadeOptions),
             isConfigured: () => facade.isConfigured(),
-            testConnection: () =>
-                facade.testConnection({
-                    directoryId: ctx.directoryId,
-                    userId: ctx.userId,
-                    providerOverride: ctx.providerOverrides?.ai,
-                }),
-            getAvailableModels: () =>
-                facade.getAvailableModels({
-                    directoryId: ctx.directoryId,
-                    userId: ctx.userId,
-                    providerOverride: ctx.providerOverrides?.ai,
-                }),
+            testConnection: (_facadeOptions: FacadeOptions) =>
+                facade.testConnection(boundFacadeOptions),
+            getAvailableModels: (_facadeOptions: FacadeOptions) =>
+                facade.getAvailableModels(boundFacadeOptions),
         };
     }
 

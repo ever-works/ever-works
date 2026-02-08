@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { MutableGenerationContext, StepExecutionContext, DomainType } from '@ever-works/plugin';
+import type { MutableGenerationContext, StepExecutionContext, DomainType, FacadeOptions } from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
 /**
@@ -40,17 +40,27 @@ export class DomainDetectionStep extends BasePipelineStep {
 		const { logger, aiFacade } = execContext;
 		const { name, prompt } = request;
 
+		const facadeOptions: FacadeOptions = {
+			userId: execContext.user!.id,
+			directoryId: execContext.directory.id
+		};
+
 		logger.log(`[${directory.slug}] Domain Detection - Starting`);
 
 		try {
-			const { result, usage, cost } = await aiFacade.askJson(DOMAIN_DETECTION_PROMPT, domainDetectionSchema, {
-				temperature: 0.1,
-				variables: { name: name || '', description: prompt ?? '' },
-				routing: {
-					complexity: 'simple',
-					taskId: 'domain-detection'
-				}
-			});
+			const { result, usage, cost } = await aiFacade.askJson(
+				DOMAIN_DETECTION_PROMPT,
+				domainDetectionSchema,
+				{
+					temperature: 0.1,
+					variables: { name: name || '', description: prompt ?? '' },
+					routing: {
+						complexity: 'simple',
+						taskId: 'domain-detection'
+					}
+				},
+				facadeOptions
+			);
 
 			context.domainAnalysis = {
 				domain_type: result.domain_type as DomainType,
