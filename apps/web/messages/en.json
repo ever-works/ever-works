@@ -1021,7 +1021,8 @@
                 "contentExtractorProviderDescription": "Provider for extracting content from web pages",
                 "useDirectoryDefault": "Use Directory Default",
                 "default": "Default",
-                "notConfigured": "Not configured"
+                "notConfigured": "Not configured",
+                "notConfiguredTooltip": "This provider requires configuration. Visit Settings → Plugins to set it up."
             },
             "progress": {
                 "title": "Generation in Progress",

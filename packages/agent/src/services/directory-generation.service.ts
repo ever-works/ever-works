@@ -56,6 +56,7 @@ import {
     NotificationOperations,
 } from '@src/notification-operations/notification-operations.interface';
 import { ScreenshotFacadeService } from '@src/facades';
+import { GeneratorFormSchemaService } from './generator-form-schema.service';
 
 export interface BulkCaptureImagesDto {
     itemSlugs?: string[];
@@ -116,6 +117,7 @@ export class DirectoryGenerationService {
         private readonly directoryImportService: DirectoryImportService,
         private readonly userRepository: UserRepository,
         private readonly screenshotFacade: ScreenshotFacadeService,
+        private readonly generatorFormSchemaService: GeneratorFormSchemaService,
         @Optional()
         @Inject(DIRECTORY_GENERATION_DISPATCHER)
         private readonly generationDispatcher?: DirectoryGenerationDispatcher,
@@ -134,6 +136,12 @@ export class DirectoryGenerationService {
         // Require editor role to generate/update items
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
         const triggerContext = this.resolveContext(context);
+
+        // Validate selected providers before starting generation
+        await this.generatorFormSchemaService.validateSelectedProviders(dto.providers, {
+            userId: user.id,
+            directoryId,
+        });
 
         const history = await this.createGenerationHistoryRecord(
             directory,
@@ -231,6 +239,12 @@ export class DirectoryGenerationService {
                 ...updateDto.providers,
             };
         }
+
+        // Validate selected providers before starting generation
+        await this.generatorFormSchemaService.validateSelectedProviders(payload.providers, {
+            userId: user.id,
+            directoryId,
+        });
 
         // Apply conservative config for scheduled runs to control resource usage
         // This ensures scheduled updates are efficient and cost-effective

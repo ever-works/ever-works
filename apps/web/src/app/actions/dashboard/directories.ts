@@ -167,6 +167,14 @@ interface AIDirectoryOptions {
     owner?: string;
     gitProvider?: string;
     deployProvider?: string;
+    providers?: {
+        search?: string;
+        screenshot?: string;
+        ai?: string;
+        contentExtractor?: string;
+        pipeline?: string;
+    };
+    pluginConfig?: Record<string, unknown>;
 }
 
 export async function createDirectoryWithAI(request: AIDirectoryOptions) {
@@ -257,8 +265,10 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
         await itemsGeneratorAPI.generate(directory.id, {
             name: validation.data.name,
             prompt: validation.data.prompt,
+            providers: request.providers || undefined,
             pluginConfig: {
                 target_keywords: directoryDetails.keywords,
+                ...(request.pluginConfig || {}),
             },
         });
 

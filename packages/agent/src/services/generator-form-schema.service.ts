@@ -1,17 +1,36 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
 import {
     PluginRegistryService,
     RegisteredPlugin,
 } from '@src/plugins/services/plugin-registry.service';
 import { DirectoryPluginRepository } from '@src/plugins/repositories/directory-plugin.repository';
+import { PluginSettingsService } from '@src/plugins/services/plugin-settings.service';
 import type {
     GeneratorFormSchema,
     ProviderOption,
     FormFieldDefinition,
     FormFieldGroup,
     ValidationResult,
+    JsonSchema,
 } from '@ever-works/plugin';
-import { isFormSchemaProvider, SELECTABLE_PROVIDER_CATEGORIES } from '@ever-works/plugin';
+import {
+    isFormSchemaProvider,
+    SELECTABLE_PROVIDER_CATEGORIES,
+    type ProviderCategoryKey,
+} from '@ever-works/plugin';
+import type { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dto';
+
+/**
+ * Maps DTO provider field names to the key in SELECTABLE_PROVIDER_CATEGORIES.
+ * The DTO uses `pipeline` while the categories use `fullPipeline`.
+ */
+const DTO_FIELD_TO_CATEGORY_KEY: Record<keyof Required<ProvidersDto>, ProviderCategoryKey> = {
+    search: 'search',
+    screenshot: 'screenshot',
+    ai: 'ai',
+    contentExtractor: 'contentExtractor',
+    pipeline: 'fullPipeline',
+};
 
 /**
  * Service for resolving dynamic generator form schema based on selected plugins.
@@ -38,6 +57,7 @@ export class GeneratorFormSchemaService {
     constructor(
         private readonly pluginRegistry: PluginRegistryService,
         @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
+        @Optional() private readonly pluginSettingsService?: PluginSettingsService,
     ) {}
 
     /**
@@ -185,7 +205,8 @@ export class GeneratorFormSchemaService {
                 }
             }
 
-            result.push(this.toProviderOption(registered, activePluginId));
+            const configured = await this.isPluginConfigured(registered, options);
+            result.push(this.toProviderOption(registered, activePluginId, configured));
         }
 
         return result;
@@ -197,6 +218,7 @@ export class GeneratorFormSchemaService {
     private toProviderOption(
         registered: RegisteredPlugin,
         activePluginId?: string | null,
+        configured: boolean = true,
     ): ProviderOption {
         const { plugin, manifest } = registered;
 
@@ -211,10 +233,131 @@ export class GeneratorFormSchemaService {
             id: plugin.id,
             name: manifest.name,
             description: manifest.description,
-            configured: true, // Plugin is enabled, so it's configured
+            configured,
             isDefault,
             icon: manifest.icon,
         };
+    }
+
+    /**
+     * Check if a plugin has all required settings configured.
+     * Returns true if no settings service is available (graceful fallback).
+     */
+    private async isPluginConfigured(
+        registered: RegisteredPlugin,
+        options?: FormSchemaOptions,
+    ): Promise<boolean> {
+        if (!this.pluginSettingsService) {
+            return true;
+        }
+
+        const schema = registered.plugin.settingsSchema;
+        if (!schema?.properties || !schema.required?.length) {
+            return true;
+        }
+
+        try {
+            const resolved = await this.pluginSettingsService.getResolvedSettings(
+                registered.plugin.id,
+                {
+                    userId: options?.userId,
+                    directoryId: options?.directoryId,
+                    includeSecrets: true,
+                },
+            );
+
+            // Check every required field has a non-empty resolved value
+            for (const requiredKey of schema.required) {
+                const propSchema = schema.properties[requiredKey] as JsonSchema | undefined;
+
+                // Skip env-only fields — they resolve from process.env, not DB
+                if (propSchema?.['x-envVar'] && !propSchema?.['x-secret']) {
+                    continue;
+                }
+
+                const setting = resolved[requiredKey];
+                if (
+                    !setting ||
+                    setting.value === undefined ||
+                    setting.value === null ||
+                    setting.value === ''
+                ) {
+                    return false;
+                }
+            }
+
+            return true;
+        } catch (error) {
+            this.logger.warn(
+                `Failed to check configured status for plugin ${registered.plugin.id}: ${error}`,
+            );
+            return true;
+        }
+    }
+
+    /**
+     * Validate that all selected providers exist, are loaded, enabled, and configured.
+     * Throws BadRequestException with detailed per-provider errors if any fail.
+     */
+    async validateSelectedProviders(
+        providers: ProvidersDto | undefined,
+        options: FormSchemaOptions,
+    ): Promise<void> {
+        if (!providers) return;
+
+        const providerErrors: Record<string, string> = {};
+
+        for (const dtoField of Object.keys(DTO_FIELD_TO_CATEGORY_KEY) as (keyof ProvidersDto)[]) {
+            const pluginId = providers[dtoField];
+            if (!pluginId) continue;
+
+            const error = await this.validateSingleProvider(pluginId, options);
+            if (error) {
+                providerErrors[dtoField] = error;
+            }
+        }
+
+        if (Object.keys(providerErrors).length > 0) {
+            throw new BadRequestException({
+                message: 'One or more selected providers are not available.',
+                providerErrors,
+            });
+        }
+    }
+
+    /**
+     * Validate a single provider: exists → loaded → enabled → configured.
+     * Returns an error message string, or null if valid.
+     */
+    private async validateSingleProvider(
+        pluginId: string,
+        options: FormSchemaOptions,
+    ): Promise<string | null> {
+        const registered = this.pluginRegistry.get(pluginId);
+        if (!registered) {
+            return `Provider "${pluginId}" is not registered.`;
+        }
+        if (registered.state !== 'loaded') {
+            return `Provider "${pluginId}" is not loaded (state: ${registered.state}).`;
+        }
+
+        if (options.directoryId || options.userId) {
+            const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
+                pluginId,
+                options.directoryId,
+                options.userId,
+            );
+            if (!isEnabled) {
+                return `Provider "${pluginId}" is not enabled for this scope.`;
+            }
+        }
+
+        const configured = await this.isPluginConfigured(registered, options);
+        if (!configured) {
+            return `Provider "${pluginId}" is not configured. Visit Settings → Plugins to set it up.`;
+        }
+
+        return null;
     }
 
     /**

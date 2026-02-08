@@ -152,4 +152,10 @@ export const itemsGeneratorAPI = {
             `/directories/${directoryId}/generator-form${queryParams}`,
         );
     },
+
+    // Get global generator form schema (no directory context)
+    getFormSchemaGlobal: async (pipelineId?: string) => {
+        const queryParams = pipelineId ? `?pipelineId=${encodeURIComponent(pipelineId)}` : '';
+        return serverFetch<GeneratorFormSchema>(`/generator-form${queryParams}`);
+    },
 };

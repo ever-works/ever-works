@@ -286,6 +286,26 @@ export class DirectoriesController {
         );
     }
 
+    @Get('generator-form')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get global generator form schema',
+        description:
+            'Get the dynamic form schema for the generator without a specific directory context',
+    })
+    @ApiQuery({ name: 'pipelineId', required: false, description: 'Selected pipeline plugin ID' })
+    @ApiResponse({ status: 200, description: 'Generator form schema' })
+    async getGlobalGeneratorFormSchema(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query('pipelineId') pipelineId?: string,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+
+        return this.generatorFormSchemaService.getFormSchema(pipelineId, {
+            userId: user.id,
+        });
+    }
+
     @Get('directories/:id/generator-form')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({

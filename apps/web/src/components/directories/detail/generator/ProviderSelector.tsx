@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils/cn';
 import type { ProviderOption } from '@/lib/api/types-only';
 import { useTranslations } from 'next-intl';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface ProviderSelectorProps {
     label: string;
@@ -36,10 +37,9 @@ export function ProviderSelector({
                 {providers.map((provider) => {
                     const isActive =
                         value === provider.id || (value === null && provider.isDefault);
-                    return (
+                    const button = (
                         <button
                             type="button"
-                            key={provider.id}
                             onClick={() => {
                                 if (value === null && provider.isDefault) return;
                                 if (value === provider.id) {
@@ -83,6 +83,14 @@ export function ProviderSelector({
                                 </svg>
                             )}
                         </button>
+                    );
+
+                    return !provider.configured ? (
+                        <Tooltip key={provider.id} content={t('notConfiguredTooltip')}>
+                            {button}
+                        </Tooltip>
+                    ) : (
+                        <span key={provider.id}>{button}</span>
                     );
                 })}
             </div>
@@ -134,33 +142,47 @@ export function PipelineModeSelector({
                     </div>
                 </label>
 
-                {fullPipelineProviders.map((provider) => (
-                    <label key={provider.id} className="flex items-start gap-3 cursor-pointer">
-                        <input
-                            type="radio"
-                            name="pipeline-mode"
-                            checked={selectedPipeline === provider.id}
-                            onChange={() => onChange(provider.id)}
-                            disabled={!provider.configured}
-                            className="mt-1"
-                        />
-                        <div className="flex-1">
-                            <span className="text-sm font-medium text-text dark:text-text-dark">
-                                {provider.name}
-                                {!provider.configured && (
-                                    <span className="ml-2 text-xs text-warning">
-                                        ({t('notConfigured')})
-                                    </span>
+                {fullPipelineProviders.map((provider) => {
+                    const radioLabel = (
+                        <label className="flex items-start gap-3 cursor-pointer">
+                            <input
+                                type="radio"
+                                name="pipeline-mode"
+                                checked={selectedPipeline === provider.id}
+                                onChange={() => onChange(provider.id)}
+                                disabled={!provider.configured}
+                                className="mt-1"
+                            />
+                            <div className="flex-1">
+                                <span className="text-sm font-medium text-text dark:text-text-dark">
+                                    {provider.name}
+                                    {!provider.configured && (
+                                        <span className="ml-2 text-xs text-warning">
+                                            ({t('notConfigured')})
+                                        </span>
+                                    )}
+                                </span>
+                                {provider.description && (
+                                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                        {provider.description}
+                                    </p>
                                 )}
-                            </span>
-                            {provider.description && (
-                                <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                                    {provider.description}
-                                </p>
-                            )}
-                        </div>
-                    </label>
-                ))}
+                            </div>
+                        </label>
+                    );
+
+                    return !provider.configured ? (
+                        <Tooltip
+                            key={provider.id}
+                            content={t('notConfiguredTooltip')}
+                            position="bottom"
+                        >
+                            {radioLabel}
+                        </Tooltip>
+                    ) : (
+                        <div key={provider.id}>{radioLabel}</div>
+                    );
+                })}
             </div>
         </div>
     );

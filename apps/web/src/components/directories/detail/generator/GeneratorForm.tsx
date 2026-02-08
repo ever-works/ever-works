@@ -7,14 +7,11 @@ import {
     DirectoryConfig,
     UpdateItemsGeneratorDto,
     GeneratorFormSchema,
-    ProviderSelectionState,
-    SelectableProviderCategory,
 } from '@/lib/api/types-only';
 import { RequiredFields } from './RequiredFields';
 import { UpdateItemsFields } from './UpdateItemsFields';
 import { CompanyFields } from './CompanyFields';
 import { DynamicPluginFields } from './DynamicPluginFields';
-import { PipelineModeSelector, ProviderSelector } from './ProviderSelector';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useRouter } from '@/i18n/navigation';
@@ -30,6 +27,8 @@ import { useTranslations } from 'next-intl';
 import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/enums';
 import { getFormSchema } from '@/app/actions/dashboard/generator-form';
 import { CollapsibleSection } from '../shared';
+import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
+import { ProviderSelectionSection } from '@/components/directories/shared/ProviderSelectionSection';
 
 interface GeneratorFormProps {
     directoryId: string;
@@ -76,14 +75,8 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const [pluginConfig, setPluginConfig] = useState<Record<string, unknown>>({});
 
     // Provider selection (null = use directory/system default)
-    // Uses ProviderSelectionState type derived from FormSchemaProviders for type safety
-    const [providers, setProviders] = useState<ProviderSelectionState>({
-        search: lastRequestData?.providers?.search || null,
-        screenshot: lastRequestData?.providers?.screenshot || null,
-        ai: lastRequestData?.providers?.ai || null,
-        contentExtractor: lastRequestData?.providers?.contentExtractor || null,
-        pipeline: lastRequestData?.providers?.pipeline || null,
-    });
+    const { providers, handleProviderChange, isFullPipeline, buildSelectedProviders } =
+        useProviderSelection(lastRequestData?.providers);
 
     // Load form schema on mount
     useEffect(() => {
@@ -121,16 +114,6 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const handlePluginConfigChange = useCallback((values: Record<string, unknown>) => {
         setPluginConfig(values);
     }, []);
-
-    const handleProviderChange = useCallback(
-        (category: SelectableProviderCategory, value: string | null) => {
-            setProviders((prev) => ({ ...prev, [category]: value }));
-        },
-        [],
-    );
-
-    // Whether using a full pipeline (hides individual provider selectors)
-    const isFullPipeline = providers.pipeline !== null;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -170,17 +153,6 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                     return;
                 }
 
-                // Build providers object (only include non-null selections)
-                const selectedProviders = {
-                    ...(providers.search && { search: providers.search }),
-                    ...(providers.screenshot && { screenshot: providers.screenshot }),
-                    ...(providers.ai && { ai: providers.ai }),
-                    ...(providers.contentExtractor && {
-                        contentExtractor: providers.contentExtractor,
-                    }),
-                    ...(providers.pipeline && { pipeline: providers.pipeline }),
-                };
-
                 const generateData: CreateItemsGeneratorDto = {
                     name: coreData.name,
                     prompt: coreData.prompt,
@@ -189,8 +161,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                     generation_method: coreData.generation_method,
                     update_with_pull_request: coreData.update_with_pull_request,
                     website_repository_creation_method: coreData.website_repository_creation_method,
-                    providers:
-                        Object.keys(selectedProviders).length > 0 ? selectedProviders : undefined,
+                    providers: buildSelectedProviders(),
                     pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
                 };
 
@@ -278,58 +249,13 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             {/* Show additional advanced options for new directories or when toggled */}
             {(!isGenerated || showAdvancedOptions) && (
                 <>
-                    {formSchema && formSchema.providers.fullPipeline.length > 1 && (
-                        <PipelineModeSelector
-                            fullPipelineProviders={formSchema.providers.fullPipeline}
-                            selectedPipeline={providers.pipeline}
-                            onChange={(pipelineId) => handleProviderChange('pipeline', pipelineId)}
+                    {formSchema && (
+                        <ProviderSelectionSection
+                            formSchema={formSchema}
+                            providers={providers}
+                            onProviderChange={handleProviderChange}
+                            isFullPipeline={isFullPipeline}
                         />
-                    )}
-
-                    {/* Provider Selection (only shown for standard pipeline) */}
-                    {formSchema && !isFullPipeline && (
-                        <CollapsibleSection
-                            title={t('providerSelection')}
-                            description={t('providerSelectionDescription')}
-                            defaultExpanded={true}
-                        >
-                            <div className="space-y-3">
-                                {formSchema.providers.search.length > 0 && (
-                                    <ProviderSelector
-                                        label={t('searchProvider')}
-                                        providers={formSchema.providers.search}
-                                        value={providers.search}
-                                        onChange={(id) => handleProviderChange('search', id)}
-                                    />
-                                )}
-                                {formSchema.providers.screenshot.length > 0 && (
-                                    <ProviderSelector
-                                        label={t('screenshotProvider')}
-                                        providers={formSchema.providers.screenshot}
-                                        value={providers.screenshot}
-                                        onChange={(id) => handleProviderChange('screenshot', id)}
-                                    />
-                                )}
-                                {formSchema.providers.ai.length > 0 && (
-                                    <ProviderSelector
-                                        label={t('aiProvider')}
-                                        providers={formSchema.providers.ai}
-                                        value={providers.ai}
-                                        onChange={(id) => handleProviderChange('ai', id)}
-                                    />
-                                )}
-                                {formSchema.providers.contentExtractor.length > 0 && (
-                                    <ProviderSelector
-                                        label={t('contentExtractorProvider')}
-                                        providers={formSchema.providers.contentExtractor}
-                                        value={providers.contentExtractor}
-                                        onChange={(id) =>
-                                            handleProviderChange('contentExtractor', id)
-                                        }
-                                    />
-                                )}
-                            </div>
-                        </CollapsibleSection>
                     )}
 
                     {/* Company Information */}

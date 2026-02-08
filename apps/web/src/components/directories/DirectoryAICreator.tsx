@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { createDirectoryWithAI } from '@/app/actions/dashboard';
+import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
 import { ROUTES } from '@/lib/constants';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
@@ -11,7 +12,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { OrganizationSelector } from './OrganizationSelector';
+import { DynamicPluginFields } from './detail/generator/DynamicPluginFields';
+import { ProviderSelectionSection } from './shared/ProviderSelectionSection';
 import { ChevronDown, Lightbulb, Check } from 'lucide-react';
+import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
+import type { GeneratorFormSchema } from '@/lib/api/types-only';
 
 interface DirectoryAICreatorProps {
     gitProvider?: string;
@@ -27,6 +32,34 @@ export function DirectoryAICreator({ gitProvider, deployProvider }: DirectoryAIC
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const t = useTranslations('dashboard.directoryCreation.ai');
+
+    // Provider/pipeline selection state
+    const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
+    const { providers, handleProviderChange, isFullPipeline, buildSelectedProviders } =
+        useProviderSelection();
+    const [pluginConfig, setPluginConfig] = useState<Record<string, unknown>>({});
+
+    // Load form schema on mount
+    useEffect(() => {
+        async function loadSchema() {
+            try {
+                const result = await getGlobalFormSchema();
+                if (result.success && result.data) {
+                    setFormSchema(result.data);
+                    if (result.data.defaultValues) {
+                        setPluginConfig({ ...result.data.defaultValues });
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load form schema:', error);
+            }
+        }
+        loadSchema();
+    }, []);
+
+    const handlePluginConfigChange = useCallback((values: Record<string, unknown>) => {
+        setPluginConfig(values);
+    }, []);
 
     const handleGenerate = async () => {
         if (!directoryName.trim()) {
@@ -47,6 +80,8 @@ export function DirectoryAICreator({ gitProvider, deployProvider }: DirectoryAIC
                 owner: organization ? owner : undefined,
                 gitProvider,
                 deployProvider,
+                providers: buildSelectedProviders(),
+                pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
             });
 
             if (result.success) {
@@ -150,6 +185,26 @@ export function DirectoryAICreator({ gitProvider, deployProvider }: DirectoryAIC
                                 }}
                                 disabled={isPending}
                             />
+
+                            {/* Provider Selection */}
+                            {formSchema && (
+                                <ProviderSelectionSection
+                                    formSchema={formSchema}
+                                    providers={providers}
+                                    onProviderChange={handleProviderChange}
+                                    isFullPipeline={isFullPipeline}
+                                />
+                            )}
+
+                            {/* Dynamic Plugin Fields */}
+                            {formSchema && formSchema.pluginFields.length > 0 && (
+                                <DynamicPluginFields
+                                    fields={formSchema.pluginFields}
+                                    groups={formSchema.pluginGroups}
+                                    values={pluginConfig}
+                                    onChange={handlePluginConfigChange}
+                                />
+                            )}
                         </div>
                     )}
 
