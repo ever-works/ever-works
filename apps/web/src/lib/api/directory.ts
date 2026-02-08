@@ -328,6 +328,13 @@ export interface AnalyzeRepositoryResponseDto {
         itemCount?: number;
         categoryCount?: number;
     };
+    relatedDataRepo?: { name: string; owner: string };
+    baseSlug?: string;
+    slugConflict?: {
+        hasConflict: boolean;
+        conflictingRepos: string[];
+        suggestedSlug: string;
+    };
     error?: string;
 }
 

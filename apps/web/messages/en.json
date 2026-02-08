@@ -1605,6 +1605,11 @@
                 "success": {
                     "started": "Import started! Redirecting to your directory...",
                     "linked": "Directory linked successfully"
+                },
+                "slugConflict": {
+                    "title": "Repository name conflict",
+                    "description": "Repositories with this name already exist in your account. You can use a different name or accept the suggestion.",
+                    "useSuggestion": "Use \"{slug}\" instead"
                 }
             }
         },

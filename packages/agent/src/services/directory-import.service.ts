@@ -82,7 +82,31 @@ export class DirectoryImportService {
     ): Promise<AnalyzeRepositoryResponseDto> {
         const providerId = dto.gitProvider || this.getProviderFromUrl(dto.sourceUrl);
         const token = await this.getProviderToken(user, providerId);
-        return this.sourceRepoAnalyzer.analyzeRepository(dto.sourceUrl, token);
+        const result = await this.sourceRepoAnalyzer.analyzeRepository(dto.sourceUrl, token);
+
+        if (!result.error && result.repo && token) {
+            const repoOwner = user.username || result.owner;
+            const baseSlug = result.baseSlug || result.repo;
+            const slug = slugifyText(
+                this.normalizeDirectoryName(baseSlug, ImportSourceTypeEnum.LINK_EXISTING),
+            );
+
+            try {
+                const conflict = await this.sourceRepoAnalyzer.checkSlugConflicts(
+                    repoOwner,
+                    slug,
+                    token,
+                    providerId,
+                );
+                if (conflict.hasConflict) {
+                    result.slugConflict = conflict;
+                }
+            } catch (err) {
+                this.logger.debug(`Slug conflict check failed: ${err.message}`);
+            }
+        }
+
+        return result;
     }
 
     async analyzeForLinking(
@@ -181,7 +205,7 @@ export class DirectoryImportService {
         }
 
         const normalizedName = this.normalizeDirectoryName(dto.name, dto.sourceType);
-        const slug = slugifyText(normalizedName);
+        let slug = slugifyText(normalizedName);
 
         const existingDir = await this.directoryRepository.findByOwnerAndSlug({
             userId: user.id,
@@ -204,6 +228,15 @@ export class DirectoryImportService {
                 };
             }
 
+            if (dto.sourceType !== ImportSourceTypeEnum.LINK_EXISTING) {
+                slug = await this.resolveSlugConflicts(
+                    slug,
+                    dto.owner || user.username,
+                    user,
+                    dto.gitProvider,
+                );
+            }
+
             const directory = await this.directoryRepository.create(
                 {
                     slug,
@@ -217,6 +250,10 @@ export class DirectoryImportService {
                 },
                 user,
             );
+
+            if (dto.sourceType === ImportSourceTypeEnum.LINK_EXISTING) {
+                return this.handleLinkExisting(directory, dto, parsed, user);
+            }
 
             const updateData: Partial<Directory> = {
                 generateStatus: {
@@ -736,6 +773,138 @@ export class DirectoryImportService {
         return parsed?.provider;
     }
 
+    private async resolveSlugConflicts(
+        slug: string,
+        repoOwner: string,
+        user: User,
+        gitProvider: string,
+    ): Promise<string> {
+        const token = await this.getProviderToken(user, gitProvider);
+        if (!token) {
+            return slug;
+        }
+
+        const providerId = gitProvider;
+        const repoNames = [slug, `${slug}-data`, `${slug}-website`];
+        let hasConflict = false;
+
+        for (const repoName of repoNames) {
+            try {
+                const exists = await this.gitFacade.repositoryExists(repoOwner, repoName, {
+                    token,
+                    providerId,
+                });
+                if (exists) {
+                    hasConflict = true;
+                    break;
+                }
+            } catch {
+                // ignore
+            }
+        }
+
+        if (!hasConflict) {
+            return slug;
+        }
+
+        // Try slug-2 through slug-10
+        for (let i = 2; i <= 10; i++) {
+            const candidate = `${slug}-${i}`;
+            const candidateRepos = [candidate, `${candidate}-data`, `${candidate}-website`];
+            let candidateConflicts = false;
+
+            for (const repo of candidateRepos) {
+                try {
+                    const exists = await this.gitFacade.repositoryExists(repoOwner, repo, {
+                        token,
+                        providerId,
+                    });
+                    if (exists) {
+                        candidateConflicts = true;
+                        break;
+                    }
+                } catch {
+                    // ignore
+                }
+            }
+
+            if (!candidateConflicts) {
+                const dbExists = await this.directoryRepository.findByOwnerAndSlug({
+                    userId: user.id,
+                    owner: repoOwner,
+                    slug: candidate,
+                });
+                if (!dbExists) {
+                    this.logger.log(
+                        `Slug conflict resolved: "${slug}" → "${candidate}" for ${repoOwner}`,
+                    );
+                    return candidate;
+                }
+            }
+        }
+
+        const fallback = `${slug}-${Date.now()}`;
+        this.logger.log(`Slug conflict fallback: "${slug}" → "${fallback}" for ${repoOwner}`);
+        return fallback;
+    }
+
+    private async handleLinkExisting(
+        directory: Directory,
+        dto: ImportDirectoryDto,
+        parsed: { owner: string; repo: string },
+        user: User,
+    ): Promise<ImportDirectoryResponseDto> {
+        const now = new Date();
+
+        await this.directoryRepository.update(directory.id, {
+            generateStatus: {
+                status: GenerateStatusType.GENERATED,
+                step: 'linked',
+            },
+            sourceRepository: {
+                url: dto.sourceUrl,
+                owner: parsed.owner,
+                repo: parsed.repo,
+                type: ImportSourceTypeEnum.LINK_EXISTING as ImportSourceType,
+                importedAt: now,
+            },
+        });
+
+        const history = await this.generationHistoryRepository.createEntry({
+            directoryId: directory.id,
+            userId: user.id,
+            status: GenerateStatusType.GENERATED,
+            generationMethod: 'import' as any,
+            parameters: {
+                sourceUrl: dto.sourceUrl,
+                sourceType: dto.sourceType,
+                sourceOwner: parsed.owner,
+                sourceRepo: parsed.repo,
+            },
+            triggeredBy: 'user',
+            scheduleId: null,
+            startedAt: now,
+        });
+
+        await this.generationHistoryRepository.updateEntry(history.id, {
+            finishedAt: now,
+            durationInSeconds: 0,
+        });
+
+        this.logger.log(`Linked directory ${directory.id} to existing repos at ${dto.sourceUrl}`);
+
+        this.eventEmitter.emit(
+            'directory.generation.completed',
+            new DirectoryGenerationCompletedEvent(directory),
+        );
+
+        return {
+            status: 'success',
+            directoryId: directory.id,
+            message: 'Directory linked to existing repositories',
+        };
+    }
+
     /**
      * Normalize directory name by stripping -data suffix for data repo imports.
      * This prevents naming conflicts where a repo like "my-dir-data" would
@@ -750,28 +919,28 @@ export class DirectoryImportService {
             return name;
         }
 
-        // Check both the original name and slugified version for -data suffix
+        // Check both the original name and slugified version for -data / -website suffix
         const slugified = slugifyText(name);
 
-        if (slugified.endsWith('-data')) {
-            // Handle different name formats:
-            // "my-dir-data" -> "my-dir"
-            // "My Dir Data" -> "My Dir"
-            // "My-Dir-Data" -> "My-Dir"
+        if (slugified.endsWith('-data') || slugified.endsWith('-website')) {
+            const suffix = slugified.endsWith('-data') ? 'data' : 'website';
+            const suffixLen = suffix.length;
             const trimmed = name.trim();
 
-            // Check for " Data" suffix (case-insensitive)
-            if (/\s+data$/i.test(trimmed)) {
-                return trimmed.replace(/\s+data$/i, '');
+            // Check for " Data" / " Website" suffix (case-insensitive)
+            const spaceSuffixRegex = new RegExp(`\\s+${suffix}$`, 'i');
+            if (spaceSuffixRegex.test(trimmed)) {
+                return trimmed.replace(spaceSuffixRegex, '');
             }
 
-            // Check for "-Data" or "-data" suffix
-            if (/-data$/i.test(trimmed)) {
-                return trimmed.replace(/-data$/i, '');
+            // Check for "-Data" / "-Website" suffix (case-insensitive)
+            const dashSuffixRegex = new RegExp(`-${suffix}$`, 'i');
+            if (dashSuffixRegex.test(trimmed)) {
+                return trimmed.replace(dashSuffixRegex, '');
             }
 
             // Fallback: strip from slugified and convert back to title case
-            const baseSlug = slugified.slice(0, -5);
+            const baseSlug = slugified.slice(0, -(suffixLen + 1)); // +1 for the dash
             return baseSlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
         }
 

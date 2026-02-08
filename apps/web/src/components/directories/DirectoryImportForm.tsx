@@ -29,7 +29,12 @@ import {
     importDirectory,
     analyzeForLinking,
 } from '@/app/actions/dashboard/directories';
-import { ImportModeSelector, LinkExistingConfirm, type ImportMode } from './import';
+import {
+    ImportModeSelector,
+    LinkExistingConfirm,
+    SlugConflictWarning,
+    type ImportMode,
+} from './import';
 import type { AnalyzeForLinkingResponseDto } from '@/lib/api/directory';
 
 interface DirectoryImportFormProps {
@@ -56,6 +61,13 @@ interface AnalysisResult {
         isMultiFile?: boolean;
         itemCount?: number;
         categoryCount?: number;
+    };
+    relatedDataRepo?: { name: string; owner: string };
+    baseSlug?: string;
+    slugConflict?: {
+        hasConflict: boolean;
+        conflictingRepos: string[];
+        suggestedSlug: string;
     };
     error?: string;
 }
@@ -102,30 +114,28 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                     toast.error(result.data.error);
                     setStep('source');
                 } else {
-                    // Pre-fill directory name from repo name
                     if (!directoryName && result.data.repo) {
-                        let repoName = result.data.repo;
-                        // Strip -data suffix for data repos to avoid naming conflicts
+                        let repoName = result.data.baseSlug || result.data.repo;
                         if (repoName.endsWith('-data')) {
                             repoName = repoName.slice(0, -5);
+                        } else if (repoName.endsWith('-website')) {
+                            repoName = repoName.slice(0, -8);
                         }
                         setDirectoryName(
                             repoName.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
                         );
                     }
 
-                    // Reset manual source type when detection succeeds
                     setManualSourceType(null);
 
-                    if (!result.data.detectedType) {
-                        // Format not auto-detected, allow manual selection
-                        // Default to awesome_readme if there's a README
+                    if (result.data.relatedDataRepo) {
+                        setStep('choose_mode');
+                    } else if (!result.data.detectedType) {
                         if (result.data.structure?.hasReadme) {
                             setManualSourceType('awesome_readme');
                         }
                         setStep('configure');
                     } else if (result.data.detectedType === 'data_repo') {
-                        // For data_repo, show mode selection
                         setStep('choose_mode');
                     } else {
                         setStep('configure');
@@ -138,12 +148,21 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
         });
     };
 
+    const buildRelatedRepoUrl = (dataRepo: { owner: string; name: string }): string => {
+        if (!analysisResult) return sourceUrl;
+        const base = analysisResult.sourceUrl.replace(/\/[^/]+\/[^/]+\/?$/, '');
+        return `${base}/${dataRepo.owner}/${dataRepo.name}`;
+    };
+
     const handleModeSelect = async (mode: ImportMode) => {
         if (mode === 'import') {
             setStep('configure');
         } else if (mode === 'link_existing' && analysisResult && gitProvider) {
             startTransition(async () => {
-                const result = await analyzeForLinking(analysisResult.sourceUrl, gitProvider);
+                const linkUrl = analysisResult.relatedDataRepo
+                    ? buildRelatedRepoUrl(analysisResult.relatedDataRepo)
+                    : analysisResult.sourceUrl;
+                const result = await analyzeForLinking(linkUrl, gitProvider);
                 if (result.success && result.data) {
                     setLinkAnalysis(result.data);
                     setShowLinkConfirm(true);
@@ -162,8 +181,11 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
         setStep('importing');
 
         startTransition(async () => {
+            const linkSourceUrl = analysisResult.relatedDataRepo
+                ? buildRelatedRepoUrl(analysisResult.relatedDataRepo)
+                : sourceUrl;
             const result = await importDirectory({
-                sourceUrl,
+                sourceUrl: linkSourceUrl,
                 sourceType: 'link_existing',
                 name: directoryName,
                 organization,
@@ -540,6 +562,15 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                 placeholder={t('namePlaceholder')}
                 variant="form"
             />
+
+            {/* Slug Conflict Warning */}
+            {analysisResult?.slugConflict?.hasConflict && (
+                <SlugConflictWarning
+                    conflictingRepos={analysisResult.slugConflict.conflictingRepos}
+                    suggestedSlug={analysisResult.slugConflict.suggestedSlug}
+                    onAcceptSuggestion={(name) => setDirectoryName(name)}
+                />
+            )}
 
             {/* Sync Toggle */}
             <div className="flex items-center justify-between p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">

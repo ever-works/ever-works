@@ -197,7 +197,7 @@ export class SourceRepoAnalyzerService {
                 provider,
             );
 
-            return {
+            const response: AnalyzeRepositoryResponseDto = {
                 sourceUrl,
                 owner,
                 repo,
@@ -206,6 +206,16 @@ export class SourceRepoAnalyzerService {
                 requiresAuth: false,
                 structure: detectionResult.structure,
             };
+
+            if (detectionResult.type !== 'data_repo') {
+                const ecosystem = await this.detectDirectoryEcosystem(owner, repo, token, provider);
+                if (ecosystem) {
+                    response.relatedDataRepo = ecosystem.dataRepo;
+                    response.baseSlug = ecosystem.baseSlug;
+                }
+            }
+
+            return response;
         } catch (error: any) {
             this.logger.error(`Failed to analyze repository: ${sourceUrl}`, error);
             return {
@@ -597,6 +607,135 @@ export class SourceRepoAnalyzerService {
                 },
                 error: error instanceof Error ? error.message : 'Failed to analyze repository',
             };
+        }
+    }
+
+    async checkSlugConflicts(
+        owner: string,
+        slug: string,
+        token: string,
+        provider?: string,
+    ): Promise<{
+        hasConflict: boolean;
+        conflictingRepos: string[];
+        suggestedSlug: string;
+    }> {
+        const repoNames = [slug, `${slug}-data`, `${slug}-website`];
+        const conflictingRepos: string[] = [];
+
+        await Promise.all(
+            repoNames.map(async (repoName) => {
+                try {
+                    const exists = await this.gitFacade.repositoryExists(owner, repoName, {
+                        token,
+                        providerId: provider,
+                    });
+                    if (exists) {
+                        conflictingRepos.push(repoName);
+                    }
+                } catch {
+                    // ignore
+                }
+            }),
+        );
+
+        if (conflictingRepos.length === 0) {
+            return { hasConflict: false, conflictingRepos: [], suggestedSlug: slug };
+        }
+
+        // Try slug-2 through slug-10
+        let suggestedSlug = slug;
+        for (let i = 2; i <= 10; i++) {
+            const candidate = `${slug}-${i}`;
+            const candidateRepos = [candidate, `${candidate}-data`, `${candidate}-website`];
+            let candidateConflicts = false;
+
+            for (const repo of candidateRepos) {
+                try {
+                    const exists = await this.gitFacade.repositoryExists(owner, repo, {
+                        token,
+                        providerId: provider,
+                    });
+                    if (exists) {
+                        candidateConflicts = true;
+                        break;
+                    }
+                } catch {
+                    // ignore
+                }
+            }
+
+            if (!candidateConflicts) {
+                suggestedSlug = candidate;
+                break;
+            }
+        }
+
+        if (suggestedSlug === slug) {
+            suggestedSlug = `${slug}-${Date.now()}`;
+        }
+
+        return { hasConflict: true, conflictingRepos, suggestedSlug };
+    }
+
+    private async detectDirectoryEcosystem(
+        owner: string,
+        repo: string,
+        token?: string,
+        provider?: string,
+    ): Promise<{ baseSlug: string; dataRepo: { name: string; owner: string } } | null> {
+        if (repo.endsWith('-data')) {
+            return null;
+        }
+
+        let candidateDataRepo: string;
+        let baseSlug: string;
+
+        if (repo.endsWith('-website')) {
+            baseSlug = repo.slice(0, -8);
+            candidateDataRepo = `${baseSlug}-data`;
+        } else {
+            baseSlug = repo;
+            candidateDataRepo = `${repo}-data`;
+        }
+
+        try {
+            const dataRepoInfo = await this.gitFacade.getRepository(owner, candidateDataRepo, {
+                token,
+                providerId: provider,
+            });
+
+            if (!dataRepoInfo) {
+                return null;
+            }
+
+            const contents = await this.gitFacade.getDirectoryContents(
+                owner,
+                candidateDataRepo,
+                '',
+                { token, providerId: provider },
+            );
+
+            if (!contents) {
+                return null;
+            }
+
+            const hasConfig =
+                contents.some((c) => c.name === 'config.yml' && c.type === 'file') ||
+                contents.some((c) => c.name === 'config.yaml' && c.type === 'file');
+            const hasDataFolder = contents.some((c) => c.name === 'data' && c.type === 'dir');
+
+            if (!hasConfig || !hasDataFolder) {
+                return null;
+            }
+
+            return {
+                baseSlug,
+                dataRepo: { name: candidateDataRepo, owner },
+            };
+        } catch (err) {
+            this.logger.debug(`No ecosystem data repo found for ${owner}/${repo}: ${err.message}`);
+            return null;
         }
     }
 

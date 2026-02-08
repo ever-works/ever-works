@@ -56,30 +56,9 @@ function getProviderIcon(providerId: string) {
     }
 }
 
-function getProviderWebUrl(providerId: string, username: string) {
-    switch (providerId.toLowerCase()) {
-        case 'github':
-            return `https://github.com/${username}`;
-        case 'gitlab':
-            return `https://gitlab.com/${username}`;
-        case 'bitbucket':
-            return `https://bitbucket.org/${username}`;
-        default:
-            return '#';
-    }
-}
-
-function getOrgWebUrl(providerId: string, orgLogin: string) {
-    switch (providerId.toLowerCase()) {
-        case 'github':
-            return `https://github.com/${orgLogin}`;
-        case 'gitlab':
-            return `https://gitlab.com/${orgLogin}`;
-        case 'bitbucket':
-            return `https://bitbucket.org/${orgLogin}`;
-        default:
-            return '#';
-    }
+function buildProviderUrl(homepage: string | undefined, path: string): string {
+    if (!homepage) return '#';
+    return `${homepage.replace(/\/$/, '')}/${path}`;
 }
 
 function getProviderBrandColors(providerId: string) {
@@ -382,7 +361,7 @@ function GitProviderCard({
                             )}
                             <div className="flex-1 min-w-0">
                                 <Link
-                                    href={getProviderWebUrl(provider.id, username)}
+                                    href={buildProviderUrl(provider.homepage, username)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="group flex items-center gap-1.5"
@@ -413,7 +392,7 @@ function GitProviderCard({
                                     {organizations.map((org) => (
                                         <Link
                                             key={org.id}
-                                            href={getOrgWebUrl(provider.id, org.login)}
+                                            href={buildProviderUrl(provider.homepage, org.login)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className={cn(
