@@ -1294,7 +1294,8 @@
                 "personalAccount": "המאגר ייווצר תחת חשבון GitHub האישי שלך",
                 "organizations": "ארגונים",
                 "personalHelp": "המאגר ייווצר תחת חשבון GitHub האישי שלך",
-                "organizationHelp": "המאגר ייווצר תחת הארגון {org}"
+                "organizationHelp": "המאגר ייווצר תחת הארגון {org}",
+                "connectRequired": "חבר ספק Git בסרגל הצד כדי לבחור היכן ייווצר המאגר שלך."
             },
             "ai": {
                 "title": "צור עם AI",

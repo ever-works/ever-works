@@ -317,7 +317,7 @@ export class GeneratorFormSchemaService {
             }
 
             const configured = await this.isPluginConfigured(registered, options);
-            result.push(this.toProviderOption(registered, activePluginId, configured));
+            result.push(this.toProviderOption(registered, activePluginId, configured, capability));
         }
 
         return result;
@@ -330,15 +330,19 @@ export class GeneratorFormSchemaService {
         registered: RegisteredPlugin,
         activePluginId?: string | null,
         configured: boolean = true,
+        capability?: string,
     ): ProviderOption {
         const { plugin, manifest } = registered;
 
         // Mark as default if:
         // 1. It's the active plugin for the directory (via activeCapability)
-        // 2. OR it's a system plugin (if no active plugin is set)
+        // 2. OR it declares this capability in defaultForCapabilities
+        // 3. OR it's a system plugin (fallback if no capability provided)
         const isDefault = activePluginId
             ? plugin.id === activePluginId
-            : manifest.systemPlugin || false;
+            : capability
+              ? manifest.defaultForCapabilities?.includes(capability) || false
+              : manifest.systemPlugin || false;
 
         return {
             id: plugin.id,

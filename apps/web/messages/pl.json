@@ -1294,7 +1294,8 @@
                 "personalAccount": "Repozytorium zostanie utworzone pod Twoim osobistym kontem",
                 "organizations": "Organizacje",
                 "personalHelp": "Repozytorium zostanie utworzone pod Twoim osobistym kontem GitHub",
-                "organizationHelp": "Repozytorium zostanie utworzone pod organizacją {org}"
+                "organizationHelp": "Repozytorium zostanie utworzone pod organizacją {org}",
+                "connectRequired": "Połącz dostawcę Git na pasku bocznym, aby wybrać, gdzie zostanie utworzone repozytorium."
             },
             "ai": {
                 "title": "Utwórz z AI",

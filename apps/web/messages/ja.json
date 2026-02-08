@@ -1294,7 +1294,8 @@
                 "personalAccount": "リポジトリは個人アカウントの下に作成されます",
                 "organizations": "組織",
                 "personalHelp": "リポジトリは個人の GitHub アカウントの下に作成されます",
-                "organizationHelp": "リポジトリは {org} 組織の下に作成されます"
+                "organizationHelp": "リポジトリは {org} 組織の下に作成されます",
+                "connectRequired": "リポジトリの作成先を選択するには、サイドバーでGitプロバイダーを接続してください。"
             },
             "ai": {
                 "title": "AI で作成",

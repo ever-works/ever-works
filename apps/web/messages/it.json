@@ -1294,7 +1294,8 @@
                 "personalAccount": "Il repository sarà creato sotto il tuo account personale",
                 "organizations": "Organizzazioni",
                 "personalHelp": "Il repository sarà creato sotto il tuo account GitHub personale",
-                "organizationHelp": "Il repository sarà creato sotto l'organizzazione {org}"
+                "organizationHelp": "Il repository sarà creato sotto l'organizzazione {org}",
+                "connectRequired": "Collega un provider Git nella barra laterale per scegliere dove verrà creato il tuo repository."
             },
             "ai": {
                 "title": "Crea con AI",

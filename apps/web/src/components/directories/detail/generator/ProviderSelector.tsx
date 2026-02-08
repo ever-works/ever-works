@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils/cn';
 import type { ProviderOption } from '@/lib/api/types-only';
 import { useTranslations } from 'next-intl';
@@ -23,6 +24,12 @@ export function ProviderSelector({
 }: ProviderSelectorProps) {
     const t = useTranslations('dashboard.directoryDetail.generator');
 
+    const effectiveDefaultId = useMemo(() => {
+        if (value !== null) return null;
+        const first = providers.find((p) => p.isDefault && p.configured);
+        return first?.id ?? providers.find((p) => p.isDefault)?.id ?? null;
+    }, [value, providers]);
+
     if (providers.length === 0) {
         return null;
     }
@@ -35,13 +42,12 @@ export function ProviderSelector({
 
             <div className="flex-1 flex flex-wrap gap-2">
                 {providers.map((provider) => {
-                    const isActive =
-                        value === provider.id || (value === null && provider.isDefault);
+                    const isActive = value === provider.id || provider.id === effectiveDefaultId;
                     const button = (
                         <button
                             type="button"
                             onClick={() => {
-                                if (value === null && provider.isDefault) return;
+                                if (provider.id === effectiveDefaultId) return;
                                 if (value === provider.id) {
                                     onChange(null);
                                 } else {
@@ -51,7 +57,7 @@ export function ProviderSelector({
                             disabled={
                                 disabled ||
                                 !provider.configured ||
-                                (value === null && provider.isDefault)
+                                provider.id === effectiveDefaultId
                             }
                             className={cn(
                                 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border',

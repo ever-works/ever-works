@@ -1294,7 +1294,8 @@
                 "personalAccount": "Kho lưu trữ sẽ được tạo dưới tài khoản cá nhân của bạn",
                 "organizations": "Tổ chức",
                 "personalHelp": "Kho lưu trữ sẽ được tạo dưới tài khoản GitHub cá nhân của bạn",
-                "organizationHelp": "Kho lưu trữ sẽ được tạo dưới tổ chức {org}"
+                "organizationHelp": "Kho lưu trữ sẽ được tạo dưới tổ chức {org}",
+                "connectRequired": "Kết nối nhà cung cấp Git ở thanh bên để chọn nơi kho lưu trữ của bạn sẽ được tạo."
             },
             "ai": {
                 "title": "Tạo với AI",

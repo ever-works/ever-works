@@ -32,8 +32,8 @@ function getProviderColors(providerId: string) {
     switch (providerId.toLowerCase()) {
         case 'github':
             return {
-                bg: 'bg-[#24292e]',
-                hover: 'hover:bg-[#24292e]/90',
+                bg: 'bg-[#24292e] dark:bg-primary',
+                hover: 'hover:bg-[#24292e]/90 dark:hover:bg-primary/90',
                 text: 'text-white',
             };
         case 'gitlab':

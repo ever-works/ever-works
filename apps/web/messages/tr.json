@@ -1294,7 +1294,8 @@
                 "personalAccount": "Depo kişisel hesabınız altında oluşturulacak",
                 "organizations": "Organizasyonlar",
                 "personalHelp": "Depo kişisel GitHub hesabınız altında oluşturulacak",
-                "organizationHelp": "Depo {org} organizasyonu altında oluşturulacak"
+                "organizationHelp": "Depo {org} organizasyonu altında oluşturulacak",
+                "connectRequired": "Deponuzun nerede oluşturulacağını seçmek için kenar çubuğundan bir Git sağlayıcısı bağlayın."
             },
             "ai": {
                 "title": "Yapay Zeka ile Oluştur",

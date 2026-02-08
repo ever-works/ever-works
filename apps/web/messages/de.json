@@ -1294,7 +1294,8 @@
                 "personalAccount": "Repository wird unter Ihrem persönlichen Konto erstellt",
                 "organizations": "Organisationen",
                 "personalHelp": "Das Repository wird unter Ihrem persönlichen GitHub-Konto erstellt",
-                "organizationHelp": "Das Repository wird unter der {org} Organisation erstellt"
+                "organizationHelp": "Das Repository wird unter der {org} Organisation erstellt",
+                "connectRequired": "Verbinden Sie einen Git-Anbieter in der Seitenleiste, um auszuwählen, wo Ihr Repository erstellt wird."
             },
             "ai": {
                 "title": "Mit KI erstellen",

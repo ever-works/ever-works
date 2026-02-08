@@ -227,7 +227,9 @@ export class PipelineBuilderService {
         }> = [];
 
         // Get all enabled plugins with pipeline-step capability
-        const pluginsWithCapability = this.registry.getByCapability(PLUGIN_CAPABILITIES.PIPELINE_STEP);
+        const pluginsWithCapability = this.registry.getByCapability(
+            PLUGIN_CAPABILITIES.PIPELINE_STEP,
+        );
 
         for (const registered of pluginsWithCapability) {
             // Only include enabled plugins at registry level

@@ -1294,7 +1294,8 @@
                 "personalAccount": "리포지토리가 개인 계정 아래 생성됩니다",
                 "organizations": "조직",
                 "personalHelp": "리포지토리가 개인 GitHub 계정 아래 생성됩니다",
-                "organizationHelp": "리포지토리가 {org} 조직 아래 생성됩니다"
+                "organizationHelp": "리포지토리가 {org} 조직 아래 생성됩니다",
+                "connectRequired": "저장소가 생성될 위치를 선택하려면 사이드바에서 Git 공급자를 연결하세요."
             },
             "ai": {
                 "title": "AI로 만들기",

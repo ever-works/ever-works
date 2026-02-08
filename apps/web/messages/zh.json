@@ -1294,7 +1294,8 @@
                 "personalAccount": "仓库将在您的个人账户下创建",
                 "organizations": "组织",
                 "personalHelp": "仓库将在您的个人 GitHub 账户下创建",
-                "organizationHelp": "仓库将在 {org} 组织下创建"
+                "organizationHelp": "仓库将在 {org} 组织下创建",
+                "connectRequired": "在侧边栏中连接 Git 提供商，以选择您的仓库创建位置。"
             },
             "ai": {
                 "title": "使用 AI 创建",

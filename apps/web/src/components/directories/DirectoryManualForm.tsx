@@ -12,22 +12,22 @@ import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { OrganizationSelector } from './OrganizationSelector';
-import { ChevronDown, Plus } from 'lucide-react';
+import { RepositoryOwnerCard } from './RepositoryOwnerCard';
+import { Plus } from 'lucide-react';
 
 interface DirectoryManualFormProps {
     user: AuthUser;
     gitProvider?: string;
+    gitConnected?: boolean;
     deployProvider?: string;
 }
 
 export function DirectoryManualForm({
     user,
     gitProvider,
+    gitConnected,
     deployProvider,
 }: DirectoryManualFormProps) {
-    const [showAdvanced, setShowAdvanced] = useState(false);
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const t = useTranslations('dashboard.directoryCreation.manual');
@@ -39,12 +39,6 @@ export function DirectoryManualForm({
         description: '',
         organization: false,
         owner: '',
-        readmeConfig: {
-            header: '',
-            overwriteDefaultHeader: false,
-            footer: '',
-            overwriteDefaultFooter: false,
-        },
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -161,127 +155,20 @@ export function DirectoryManualForm({
                     </div>
                 </div>
 
-                {/* Advanced Fields Toggle */}
-                <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                    fullWidth
-                    className={cn(
-                        'p-4 text-left justify-between',
-                        'bg-surface dark:bg-surface-dark',
-                        'border border-border dark:border-border-dark',
-                        'hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark',
-                    )}
-                >
-                    <div>
-                        <h3 className="font-medium text-text dark:text-text-dark">
-                            {t('advancedSettings')}
-                        </h3>
-                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                            {t('advancedSubtitle')}
-                        </p>
-                    </div>
-                    <ChevronDown
-                        className={cn(
-                            'w-5 h-5 text-text-secondary dark:text-text-secondary-dark transition-transform',
-                            showAdvanced && 'rotate-180',
-                        )}
-                    />
-                </Button>
-
-                {/* Advanced Fields */}
-                {showAdvanced && (
-                    <div
-                        className={cn(
-                            'p-6 rounded-lg space-y-4',
-                            'bg-card dark:bg-card-dark',
-                            'border border-card-border dark:border-card-border-dark',
-                        )}
-                    >
-                        {/* Organization Selector */}
-                        <OrganizationSelector
-                            value={formData.owner || ''}
-                            providerId={gitProvider!}
-                            onChange={(value, isOrganization) => {
-                                setFormData({
-                                    ...formData,
-                                    owner: value,
-                                    organization: isOrganization,
-                                });
-                            }}
-                            disabled={isPending}
-                        />
-
-                        {/* README Header */}
-                        <div className="space-y-3">
-                            <Textarea
-                                label={t('headerLabel')}
-                                value={formData.readmeConfig?.header || ''}
-                                onChange={(e) =>
-                                    setFormData({
-                                        ...formData,
-                                        readmeConfig: {
-                                            ...formData.readmeConfig,
-                                            header: e.target.value,
-                                        },
-                                    })
-                                }
-                                placeholder={t('headerPlaceholder')}
-                                rows={3}
-                                variant="form"
-                            />
-                            <Checkbox
-                                checked={formData.readmeConfig?.overwriteDefaultHeader || false}
-                                onChange={(e) =>
-                                    setFormData({
-                                        ...formData,
-                                        readmeConfig: {
-                                            ...formData.readmeConfig,
-                                            overwriteDefaultHeader: e.target.checked,
-                                        },
-                                    })
-                                }
-                                label={t('headerOverwrite')}
-                                variant="form"
-                            />
-                        </div>
-
-                        {/* README Footer */}
-                        <div className="space-y-3">
-                            <Textarea
-                                label={t('footerLabel')}
-                                value={formData.readmeConfig?.footer || ''}
-                                onChange={(e) =>
-                                    setFormData({
-                                        ...formData,
-                                        readmeConfig: {
-                                            ...formData.readmeConfig,
-                                            footer: e.target.value,
-                                        },
-                                    })
-                                }
-                                placeholder={t('footerPlaceholder')}
-                                rows={3}
-                                variant="form"
-                            />
-                            <Checkbox
-                                checked={formData.readmeConfig?.overwriteDefaultFooter || false}
-                                onChange={(e) =>
-                                    setFormData({
-                                        ...formData,
-                                        readmeConfig: {
-                                            ...formData.readmeConfig,
-                                            overwriteDefaultFooter: e.target.checked,
-                                        },
-                                    })
-                                }
-                                label={t('footerOverwrite')}
-                                variant="form"
-                            />
-                        </div>
-                    </div>
-                )}
+                {/* Repository Owner */}
+                <RepositoryOwnerCard
+                    gitProvider={gitProvider}
+                    gitConnected={gitConnected}
+                    owner={formData.owner || ''}
+                    onChange={(value, isOrganization) => {
+                        setFormData({
+                            ...formData,
+                            owner: value,
+                            organization: isOrganization,
+                        });
+                    }}
+                    disabled={isPending}
+                />
 
                 {/* Action Buttons */}
                 <div className="flex gap-3">

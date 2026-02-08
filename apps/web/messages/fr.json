@@ -1294,7 +1294,8 @@
                 "personalAccount": "Le dépôt sera créé sous votre compte personnel",
                 "organizations": "Organisations",
                 "personalHelp": "Le dépôt sera créé sous votre compte GitHub personnel",
-                "organizationHelp": "Le dépôt sera créé sous l'organisation {org}"
+                "organizationHelp": "Le dépôt sera créé sous l'organisation {org}",
+                "connectRequired": "Connectez un fournisseur Git dans la barre latérale pour choisir où votre dépôt sera créé."
             },
             "ai": {
                 "title": "Créer avec l'IA",

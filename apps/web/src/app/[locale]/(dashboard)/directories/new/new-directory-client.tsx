@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils/cn';
 import { DirectoryAICreator } from '@/components/directories/DirectoryAICreator';
@@ -34,6 +34,12 @@ export default function NewDirectoryClient({
         defaultDeployProviderId || deployProviders[0]?.id || null,
     );
     const t = useTranslations('dashboard.directoryCreation');
+
+    const gitConnected = useMemo(() => {
+        if (!selectedProviderId) return false;
+        const selected = providers.find((p) => p.provider.id === selectedProviderId);
+        return selected?.connectionInfo?.connected ?? false;
+    }, [selectedProviderId, providers]);
 
     if (creationMode === null) {
         return (
@@ -252,6 +258,7 @@ export default function NewDirectoryClient({
                 {creationMode === 'ai' && (
                     <DirectoryAICreator
                         gitProvider={selectedProviderId || undefined}
+                        gitConnected={gitConnected}
                         deployProvider={selectedDeployProviderId || undefined}
                     />
                 )}
@@ -259,6 +266,7 @@ export default function NewDirectoryClient({
                     <DirectoryManualForm
                         user={user}
                         gitProvider={selectedProviderId || undefined}
+                        gitConnected={gitConnected}
                         deployProvider={selectedDeployProviderId || undefined}
                     />
                 )}

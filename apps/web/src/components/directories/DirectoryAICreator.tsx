@@ -11,24 +11,29 @@ import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { OrganizationSelector } from './OrganizationSelector';
+import { RepositoryOwnerCard } from './RepositoryOwnerCard';
 import { DynamicPluginFields } from './detail/generator/DynamicPluginFields';
 import { ProviderSelectionSection } from './shared/ProviderSelectionSection';
-import { ChevronDown, Lightbulb, Check } from 'lucide-react';
+import { CollapsibleSection } from './detail/shared';
+import { Lightbulb, Check } from 'lucide-react';
 import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import type { GeneratorFormSchema } from '@/lib/api/types-only';
 
 interface DirectoryAICreatorProps {
     gitProvider?: string;
+    gitConnected?: boolean;
     deployProvider?: string;
 }
 
-export function DirectoryAICreator({ gitProvider, deployProvider }: DirectoryAICreatorProps) {
+export function DirectoryAICreator({
+    gitProvider,
+    gitConnected,
+    deployProvider,
+}: DirectoryAICreatorProps) {
     const [prompt, setPrompt] = useState('');
     const [directoryName, setDirectoryName] = useState('');
     const [organization, setOrganization] = useState(false);
     const [owner, setOwner] = useState('');
-    const [showAdvanced, setShowAdvanced] = useState(false);
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const t = useTranslations('dashboard.directoryCreation.ai');
@@ -143,71 +148,6 @@ export function DirectoryAICreator({ gitProvider, deployProvider }: DirectoryAIC
                         variant="form"
                     />
 
-                    {/* Advanced Settings Toggle */}
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => setShowAdvanced(!showAdvanced)}
-                        fullWidth
-                        className={cn(
-                            'p-4 text-left justify-between',
-                            'bg-surface dark:bg-surface-dark',
-                            'border border-border dark:border-border-dark',
-                            'hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark',
-                        )}
-                    >
-                        <div>
-                            <h3 className="font-medium text-text dark:text-text-dark">
-                                {t('advancedSettings')}
-                            </h3>
-                            <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                {t('advancedSubtitle')}
-                            </p>
-                        </div>
-                        <ChevronDown
-                            className={cn(
-                                'w-5 h-5 text-text-secondary dark:text-text-secondary-dark transition-transform',
-                                showAdvanced && 'rotate-180',
-                            )}
-                        />
-                    </Button>
-
-                    {/* Advanced Fields */}
-                    {showAdvanced && (
-                        <div className="space-y-4 p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
-                            {/* Organization Selector */}
-                            <OrganizationSelector
-                                value={owner}
-                                providerId={gitProvider!}
-                                onChange={(value, isOrganization) => {
-                                    setOwner(value);
-                                    setOrganization(isOrganization);
-                                }}
-                                disabled={isPending}
-                            />
-
-                            {/* Provider Selection */}
-                            {formSchema && (
-                                <ProviderSelectionSection
-                                    formSchema={formSchema}
-                                    providers={providers}
-                                    onProviderChange={handleProviderChange}
-                                    isFullPipeline={isFullPipeline}
-                                />
-                            )}
-
-                            {/* Dynamic Plugin Fields */}
-                            {formSchema && formSchema.pluginFields.length > 0 && (
-                                <DynamicPluginFields
-                                    fields={formSchema.pluginFields}
-                                    groups={formSchema.pluginGroups}
-                                    values={pluginConfig}
-                                    onChange={handlePluginConfigChange}
-                                />
-                            )}
-                        </div>
-                    )}
-
                     {/* Example Prompts */}
                     <ExamplePrompts
                         onSelect={(selectedPrompt, selectedName) => {
@@ -244,37 +184,75 @@ export function DirectoryAICreator({ gitProvider, deployProvider }: DirectoryAIC
                             </li>
                         </ul>
                     </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-3">
-                        <Button
-                            onClick={handleGenerate}
-                            disabled={isPending || !prompt.trim()}
-                            loading={isPending}
-                            variant="primary"
-                            size="lg"
-                            fullWidth
-                        >
-                            {isPending ? (
-                                t('generatingButton')
-                            ) : (
-                                <>
-                                    <Lightbulb className="w-5 h-5" />
-                                    {t('generateButton')}
-                                </>
-                            )}
-                        </Button>
-                        <Button
-                            onClick={() => router.back()}
-                            disabled={isPending}
-                            variant="secondary"
-                            size="lg"
-                            className="px-6"
-                        >
-                            {t('cancelButton')}
-                        </Button>
-                    </div>
                 </div>
+            </div>
+
+            <RepositoryOwnerCard
+                gitProvider={gitProvider}
+                gitConnected={gitConnected}
+                owner={owner}
+                onChange={(value, isOrganization) => {
+                    setOwner(value);
+                    setOrganization(isOrganization);
+                }}
+                disabled={isPending}
+            />
+
+            {formSchema && (
+                <CollapsibleSection
+                    title={t('advancedSettings')}
+                    description={t('advancedSubtitle')}
+                    defaultExpanded={false}
+                >
+                    <div className="space-y-4">
+                        {formSchema && (
+                            <ProviderSelectionSection
+                                formSchema={formSchema}
+                                providers={providers}
+                                onProviderChange={handleProviderChange}
+                                isFullPipeline={isFullPipeline}
+                            />
+                        )}
+                        {formSchema.pluginFields.length > 0 && (
+                            <DynamicPluginFields
+                                fields={formSchema.pluginFields}
+                                groups={formSchema.pluginGroups}
+                                values={pluginConfig}
+                                onChange={handlePluginConfigChange}
+                            />
+                        )}
+                    </div>
+                </CollapsibleSection>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+                <Button
+                    onClick={handleGenerate}
+                    disabled={isPending || !prompt.trim()}
+                    loading={isPending}
+                    variant="primary"
+                    size="lg"
+                    fullWidth
+                >
+                    {isPending ? (
+                        t('generatingButton')
+                    ) : (
+                        <>
+                            <Lightbulb className="w-5 h-5" />
+                            {t('generateButton')}
+                        </>
+                    )}
+                </Button>
+                <Button
+                    onClick={() => router.back()}
+                    disabled={isPending}
+                    variant="secondary"
+                    size="lg"
+                    className="px-6"
+                >
+                    {t('cancelButton')}
+                </Button>
             </div>
 
             <div

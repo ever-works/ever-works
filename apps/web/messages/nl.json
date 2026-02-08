@@ -1294,7 +1294,8 @@
                 "personalAccount": "Repository wordt aangemaakt onder uw persoonlijke account",
                 "organizations": "Organisaties",
                 "personalHelp": "De repository wordt aangemaakt onder uw persoonlijke GitHub-account",
-                "organizationHelp": "De repository wordt aangemaakt onder de {org} organisatie"
+                "organizationHelp": "De repository wordt aangemaakt onder de {org} organisatie",
+                "connectRequired": "Verbind een Git-provider in de zijbalk om te kiezen waar uw repository wordt aangemaakt."
             },
             "ai": {
                 "title": "Aanmaken met AI",

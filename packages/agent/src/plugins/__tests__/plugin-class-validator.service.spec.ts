@@ -465,9 +465,7 @@ describe('PluginClassValidatorService', () => {
             const result = service.validateCapabilities(plugin);
 
             expect(result.valid).toBe(false);
-            expect(result.errors?.some((e) => e.message.includes('getStepDefinitions'))).toBe(
-                true,
-            );
+            expect(result.errors?.some((e) => e.message.includes('getStepDefinitions'))).toBe(true);
         });
 
         it('should fail when default-pipeline property is missing', () => {

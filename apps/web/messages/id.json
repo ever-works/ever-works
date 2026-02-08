@@ -1294,7 +1294,8 @@
                 "personalAccount": "Repositori akan dibuat di bawah akun pribadi Anda",
                 "organizations": "Organisasi",
                 "personalHelp": "Repositori akan dibuat di bawah akun GitHub pribadi Anda",
-                "organizationHelp": "Repositori akan dibuat di bawah organisasi {org}"
+                "organizationHelp": "Repositori akan dibuat di bawah organisasi {org}",
+                "connectRequired": "Hubungkan penyedia Git di bilah sisi untuk memilih tempat repositori Anda akan dibuat."
             },
             "ai": {
                 "title": "Buat dengan AI",
