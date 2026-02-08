@@ -50,7 +50,7 @@
 		"node": ">=20",
 		"pnpm": ">=9.9.0"
 	},
-	"packageManager": "pnpm@10.28.2",
+	"packageManager": "pnpm@10.29.1",
 	"prettier": {
 		"printWidth": 120,
 		"singleQuote": true,

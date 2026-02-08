@@ -196,7 +196,7 @@ Create `packages/plugins/` with all built-in plugins as full packages.
 - [ ] **4.9** Create OpenAI plugin package (IAiProviderPlugin)
 - [ ] **4.10** Create Anthropic plugin package (IAiProviderPlugin)
 - [x] **4.11** Create Notion plugin package (IContentExtractorPlugin) _(implemented: `packages/plugins/notion-extractor/`)_
-- [x] **4.12** Create Apify plugin package (IDataSourcePlugin) _(implemented: `packages/plugins/apify-data-source/`)_
+- [x] **4.12** Create Apify plugin package (IDataSourcePlugin) _(implemented: `packages/plugins/apify/`)_
 
 **Additional plugins created (beyond original scope):**
 
@@ -519,7 +519,7 @@ Once GitFacade and DeployFacade exist:
 | Tavily            | `tavily`                  | `search`, `content-extractor`           | ✅ Complete |
 | Local Extractor   | `local-content-extractor` | `content-extractor`                     | ✅ Default  |
 | Notion Extractor  | `notion-extractor`        | `content-extractor`                     | ✅ Complete |
-| Apify Data Source | `apify-data-source`       | `data-source`, `form-schema-provider`   | ✅ Complete |
+| Apify | `apify`       | `data-source`, `form-schema-provider`   | ✅ Complete |
 
 ### Missing Plugins (Required)
 

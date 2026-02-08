@@ -28,7 +28,7 @@ interface FieldMapping {
 }
 
 /**
- * Apify Data Source Plugin
+ * Apify Plugin
  *
  * Imports items from Apify datasets into directories.
  * Implements IDataSourcePlugin and IFormSchemaProvider.
@@ -38,13 +38,13 @@ interface FieldMapping {
  * - Level 2: Enable/disable per-directory (DirectoryPlugin entity)
  * - Level 3: Dataset ID, filters (GeneratorForm via IFormSchemaProvider)
  */
-export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvider {
+export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvider {
 	// ============================================================================
 	// IPlugin Properties
 	// ============================================================================
 
-	readonly id = 'apify-data-source';
-	readonly name = 'Apify Data Source';
+	readonly id = 'apify';
+	readonly name = 'Apify';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'data-source';
 	// IMPORTANT: Include BOTH capabilities
@@ -118,7 +118,7 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 				label: 'Dataset ID',
 				description: 'The Apify dataset ID to import items from',
 				placeholder: 'e.g., 5uxB4x3zYjV5S7nFd',
-				group: 'apify-data-source'
+				group: 'apify'
 			},
 			{
 				name: 'apify_actorRunId',
@@ -126,7 +126,7 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 				label: 'Actor Run ID (alternative)',
 				description: 'Import from a specific actor run instead of a dataset',
 				placeholder: 'Leave empty to use Dataset ID',
-				group: 'apify-data-source'
+				group: 'apify'
 			},
 			{
 				name: 'apify_maxItems',
@@ -134,7 +134,7 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 				label: 'Maximum Items',
 				description: 'Limit the number of items to import (0 = no limit)',
 				defaultValue: 100,
-				group: 'apify-data-source',
+				group: 'apify',
 				validation: { min: 0, max: 10000 }
 			},
 			{
@@ -143,7 +143,7 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 				label: 'Filter by Relevance',
 				description: 'Only import items relevant to the directory prompt',
 				defaultValue: true,
-				group: 'apify-data-source'
+				group: 'apify'
 			}
 		];
 	}
@@ -151,8 +151,8 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 	getFormGroups(): FormFieldGroup[] {
 		return [
 			{
-				name: 'apify-data-source',
-				title: 'Apify Data Source',
+				name: 'apify',
+				title: 'Apify',
 				description: 'Import items from Apify datasets',
 				collapsible: true,
 				collapsed: true,
@@ -184,7 +184,7 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 	transformFormValues(values: Record<string, unknown>): Record<string, unknown> {
 		return {
 			...values,
-			'apify-data-source': {
+			'apify': {
 				datasetId: values['apify_datasetId'],
 				actorRunId: values['apify_actorRunId'],
 				maxItems: values['apify_maxItems'] ?? 100,
@@ -395,7 +395,7 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
-		context.logger.log('Apify Data Source Plugin loaded');
+		context.logger.log('Apify Plugin loaded');
 	}
 
 	async onUnload(): Promise<void> {
@@ -410,7 +410,7 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 	async healthCheck(): Promise<PluginHealthCheck> {
 		return {
 			status: 'healthy',
-			message: 'Apify Data Source plugin is ready',
+			message: 'Apify plugin is ready',
 			checkedAt: Date.now()
 		};
 	}
@@ -459,4 +459,4 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 	}
 }
 
-export default ApifyDataSourcePlugin;
+export default ApifyPlugin;

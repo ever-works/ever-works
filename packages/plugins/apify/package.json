@@ -1,7 +1,7 @@
 {
-	"name": "@ever-works/apify-data-source-plugin",
+	"name": "@ever-works/apify-plugin",
 	"version": "1.0.0",
-	"description": "Apify Data Source - Import items from Apify datasets into your directory",
+	"description": "Apify - Import items from Apify datasets into your directory",
 	"private": true,
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
@@ -34,8 +34,8 @@
 	},
 	"everworks": {
 		"plugin": {
-			"id": "apify-data-source",
-			"name": "Apify Data Source",
+			"id": "apify",
+			"name": "Apify",
 			"version": "1.0.0",
 			"category": "data-source",
 			"capabilities": [

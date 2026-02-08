@@ -172,7 +172,7 @@ export interface MutableGenerationContext {
 	 * Example:
 	 * ```typescript
 	 * {
-	 *   'apify-data-source': { enabled: true, datasetId: '5uxB4x3zYjV5S7nFd' },
+	 *   'apify': { enabled: true, datasetId: '5uxB4x3zYjV5S7nFd' },
 	 *   'notion-extractor': { enabled: false }
 	 * }
 	 * ```

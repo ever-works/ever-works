@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ApifyDataSourcePlugin } from '../apify-data-source.plugin.js';
+import { ApifyPlugin } from '../apify.plugin.js';
 import type { PluginContext } from '@ever-works/plugin';
 
-describe('ApifyDataSourcePlugin', () => {
-	let plugin: ApifyDataSourcePlugin;
+describe('ApifyPlugin', () => {
+	let plugin: ApifyPlugin;
 	let mockContext: PluginContext;
 
 	beforeEach(() => {
-		plugin = new ApifyDataSourcePlugin();
+		plugin = new ApifyPlugin();
 		mockContext = {
-			pluginId: 'apify-data-source',
+			pluginId: 'apify',
 			logger: {
 				log: vi.fn(),
 				error: vi.fn(),
@@ -38,8 +38,8 @@ describe('ApifyDataSourcePlugin', () => {
 
 	describe('Plugin Metadata', () => {
 		it('should have correct plugin metadata', () => {
-			expect(plugin.id).toBe('apify-data-source');
-			expect(plugin.name).toBe('Apify Data Source');
+			expect(plugin.id).toBe('apify');
+			expect(plugin.name).toBe('Apify');
 			expect(plugin.version).toBe('1.0.0');
 			expect(plugin.category).toBe('data-source');
 		});
@@ -96,12 +96,12 @@ describe('ApifyDataSourcePlugin', () => {
 			expect(groups.length).toBeGreaterThan(0);
 		});
 
-		it('should have apify-data-source group', () => {
+		it('should have apify group', () => {
 			const groups = plugin.getFormGroups();
-			const apifyGroup = groups.find((g) => g.name === 'apify-data-source');
+			const apifyGroup = groups.find((g) => g.name === 'apify');
 
 			expect(apifyGroup).toBeDefined();
-			expect(apifyGroup?.title).toBe('Apify Data Source');
+			expect(apifyGroup?.title).toBe('Apify');
 			expect(apifyGroup?.collapsible).toBe(true);
 		});
 	});
@@ -141,7 +141,7 @@ describe('ApifyDataSourcePlugin', () => {
 
 			const transformed = plugin.transformFormValues(values);
 
-			expect(transformed['apify-data-source']).toEqual({
+			expect(transformed['apify']).toEqual({
 				datasetId: 'dataset123',
 				actorRunId: undefined,
 				maxItems: 50,
@@ -193,7 +193,7 @@ describe('ApifyDataSourcePlugin', () => {
 	describe('Lifecycle', () => {
 		it('should log on load', async () => {
 			await plugin.onLoad(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('Apify Data Source Plugin loaded');
+			expect(mockContext.logger.log).toHaveBeenCalledWith('Apify Plugin loaded');
 		});
 	});
 
@@ -201,8 +201,8 @@ describe('ApifyDataSourcePlugin', () => {
 		it('should return correct manifest', () => {
 			const manifest = plugin.getManifest();
 
-			expect(manifest.id).toBe('apify-data-source');
-			expect(manifest.name).toBe('Apify Data Source');
+			expect(manifest.id).toBe('apify');
+			expect(manifest.name).toBe('Apify');
 			expect(manifest.systemPlugin).toBe(false);
 			expect(manifest.capabilities).toContain('data-source');
 			expect(manifest.capabilities).toContain('form-schema-provider');
