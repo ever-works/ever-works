@@ -19,7 +19,7 @@ describe('DataSourceFacadeService', () => {
 
     const createMockDataSourcePlugin = (id: string, sourceName: string): IDataSourcePlugin => ({
         id,
-        name: `${sourceName} Data Source`,
+        name: `${sourceName}`,
         version: '1.0.0',
         category: 'data-source',
         capabilities: ['data-source'],
@@ -142,7 +142,7 @@ describe('DataSourceFacadeService', () => {
             });
             expect(providers[1]).toEqual({
                 id: 'custom-data-source',
-                name: 'Custom Data Source',
+                name: 'Custom',
                 sourceName: 'Custom',
                 enabled: false,
             });
@@ -167,7 +167,7 @@ describe('DataSourceFacadeService', () => {
             const result = await service.queryAll({
                 directoryId: 'dir-123',
                 pluginConfig: {
-                    'apify': { datasetId: 'abc123' },
+                    apify: { datasetId: 'abc123' },
                 },
             });
 
@@ -192,7 +192,7 @@ describe('DataSourceFacadeService', () => {
             const result = await service.queryAll({
                 directoryId: 'dir-123',
                 pluginConfig: {
-                    'apify': { datasetId: 'abc123' },
+                    apify: { datasetId: 'abc123' },
                 },
             });
 
@@ -213,7 +213,7 @@ describe('DataSourceFacadeService', () => {
 
             await service.queryAll({
                 pluginConfig: {
-                    'apify': { enabled: true },
+                    apify: { enabled: true },
                 },
                 filterContext: {
                     prompt: 'AI tools for developers',
@@ -245,7 +245,7 @@ describe('DataSourceFacadeService', () => {
 
             const result = await service.queryAll({
                 pluginConfig: {
-                    'apify': { enabled: true },
+                    apify: { enabled: true },
                 },
             });
 
@@ -275,7 +275,7 @@ describe('DataSourceFacadeService', () => {
 
             const result = await service.queryAll({
                 pluginConfig: {
-                    'apify': { enabled: true },
+                    apify: { enabled: true },
                     'custom-data-source': { enabled: true },
                 },
             });
@@ -305,7 +305,7 @@ describe('DataSourceFacadeService', () => {
 
             const result = await service.queryAll({
                 pluginConfig: {
-                    'apify': { enabled: true },
+                    apify: { enabled: true },
                     'custom-data-source': { enabled: true },
                 },
             });
@@ -325,7 +325,7 @@ describe('DataSourceFacadeService', () => {
 
             const result = await service.queryAll({
                 pluginConfig: {
-                    'apify': { enabled: true },
+                    apify: { enabled: true },
                 },
             });
 
@@ -345,7 +345,7 @@ describe('DataSourceFacadeService', () => {
 
             await service.queryAll({
                 pluginConfig: {
-                    'apify': { enabled: true, datasetId: 'user-dataset' },
+                    apify: { enabled: true, datasetId: 'user-dataset' },
                 },
             });
 
@@ -375,7 +375,7 @@ describe('DataSourceFacadeService', () => {
 
             const result = await service.queryAll({
                 pluginConfig: {
-                    'apify': { enabled: true },
+                    apify: { enabled: true },
                 },
             });
 
@@ -488,7 +488,7 @@ describe('DataSourceFacadeService', () => {
             const result = await service.queryAll({
                 directoryId: 'dir-123',
                 pluginConfig: {
-                    'apify': { enabled: true },
+                    apify: { enabled: true },
                 },
             });
 
@@ -506,7 +506,7 @@ describe('DataSourceFacadeService', () => {
             const result = await service.queryAll({
                 directoryId: 'dir-123',
                 pluginConfig: {
-                    'apify': { enabled: false },
+                    apify: { enabled: false },
                 },
             });
 
