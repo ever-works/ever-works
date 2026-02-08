@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils/cn';
 import type { ProviderOption } from '@/lib/api/types-only';
+import { resolveEffectiveDefault } from '@ever-works/plugin';
 import { useTranslations } from 'next-intl';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -26,8 +27,7 @@ export function ProviderSelector({
 
     const effectiveDefaultId = useMemo(() => {
         if (value !== null) return null;
-        const first = providers.find((p) => p.isDefault && p.configured);
-        return first?.id ?? providers.find((p) => p.isDefault)?.id ?? null;
+        return resolveEffectiveDefault(providers)?.id ?? null;
     }, [value, providers]);
 
     if (providers.length === 0) {

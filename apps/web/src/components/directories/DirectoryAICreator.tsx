@@ -40,8 +40,13 @@ export function DirectoryAICreator({
 
     // Provider/pipeline selection state
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
-    const { providers, handleProviderChange, isFullPipeline, buildSelectedProviders } =
-        useProviderSelection();
+    const {
+        providers,
+        handleProviderChange,
+        isFullPipeline,
+        buildSelectedProviders,
+        getUnconfiguredProviders,
+    } = useProviderSelection();
     const [pluginConfig, setPluginConfig] = useState<Record<string, unknown>>({});
 
     // Load form schema on mount
@@ -77,6 +82,12 @@ export function DirectoryAICreator({
             return;
         }
 
+        const unconfigured = getUnconfiguredProviders(formSchema);
+        if (unconfigured.length > 0) {
+            toast.error(t('errors.unconfiguredProviders', { providers: unconfigured.join(', ') }));
+            return;
+        }
+
         startTransition(async () => {
             const result = await createDirectoryWithAI({
                 name: directoryName,
@@ -85,7 +96,7 @@ export function DirectoryAICreator({
                 owner: organization ? owner : undefined,
                 gitProvider,
                 deployProvider,
-                providers: buildSelectedProviders(),
+                providers: buildSelectedProviders(formSchema),
                 pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
             });
 

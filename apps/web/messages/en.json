@@ -911,6 +911,7 @@
                 "requiredInfo": "Required Information",
                 "updateConfiguration": "Update Configuration",
                 "promptRequired": "Prompt is required",
+                "unconfiguredProviders": "{providers} not configured. Visit Settings → Plugins to set up before generating.",
                 "operationStartedSuccessfully": "Operation started successfully",
                 "failedToStartOperation": "Failed to start operation",
                 "loadingFormSchema": "Loading form configuration...",
@@ -1416,6 +1417,7 @@
                 "noteText": "AI generation typically takes 2-5 minutes depending on the complexity of your request. You'll be notified when your directory is ready.",
                 "errors": {
                     "promptRequired": "Please describe what kind of directory you want to create",
+                    "unconfiguredProviders": "{providers} not configured. Visit Settings → Plugins to set up before generating.",
                     "nameRequired": "Directory name is required",
                     "slugRequired": "Directory slug is required",
                     "descriptionRequired": "Directory description is required"

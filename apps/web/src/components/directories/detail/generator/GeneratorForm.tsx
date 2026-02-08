@@ -75,8 +75,13 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const [pluginConfig, setPluginConfig] = useState<Record<string, unknown>>({});
 
     // Provider selection (null = use directory/system default)
-    const { providers, handleProviderChange, isFullPipeline, buildSelectedProviders } =
-        useProviderSelection(lastRequestData?.providers);
+    const {
+        providers,
+        handleProviderChange,
+        isFullPipeline,
+        buildSelectedProviders,
+        getUnconfiguredProviders,
+    } = useProviderSelection(lastRequestData?.providers);
 
     // Seed data from the previous generation — used once during schema init,
     // should not trigger re-fetches when the parent re-renders with a new config reference.
@@ -157,6 +162,12 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                     return;
                 }
 
+                const unconfigured = getUnconfiguredProviders(formSchema);
+                if (unconfigured.length > 0) {
+                    toast.error(t('unconfiguredProviders', { providers: unconfigured.join(', ') }));
+                    return;
+                }
+
                 const generateData: CreateItemsGeneratorDto = {
                     name: coreData.name,
                     prompt: coreData.prompt,
@@ -165,7 +176,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                     generation_method: coreData.generation_method,
                     update_with_pull_request: coreData.update_with_pull_request,
                     website_repository_creation_method: coreData.website_repository_creation_method,
-                    providers: buildSelectedProviders(),
+                    providers: buildSelectedProviders(formSchema),
                     pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
                 };
 

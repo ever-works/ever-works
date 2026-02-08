@@ -17,21 +17,9 @@ import {
     isFormSchemaProvider,
     SELECTABLE_PROVIDER_CATEGORIES,
     PLUGIN_CAPABILITIES,
-    type ProviderCategoryKey,
+    getIndividualProviderCategories,
 } from '@ever-works/plugin';
 import type { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dto';
-
-/**
- * Maps DTO provider field names to the key in SELECTABLE_PROVIDER_CATEGORIES.
- * The DTO uses `pipeline` while the categories use `fullPipeline`.
- */
-const DTO_FIELD_TO_CATEGORY_KEY: Record<keyof Required<ProvidersDto>, ProviderCategoryKey> = {
-    search: 'search',
-    screenshot: 'screenshot',
-    ai: 'ai',
-    contentExtractor: 'contentExtractor',
-    pipeline: 'fullPipeline',
-};
 
 /**
  * Service for resolving dynamic generator form schema based on selected plugins.
@@ -410,25 +398,37 @@ export class GeneratorFormSchemaService {
         }
     }
 
-    /**
-     * Validate that all selected providers exist, are loaded, enabled, and configured.
-     * Throws BadRequestException with detailed per-provider errors if any fail.
-     */
     async validateSelectedProviders(
         providers: ProvidersDto | undefined,
         options: FormSchemaOptions,
     ): Promise<void> {
-        if (!providers) return;
+        if (providers?.pipeline) {
+            const error = await this.validateSingleProvider(providers.pipeline, options);
+            if (error) {
+                throw new BadRequestException({
+                    message: 'One or more selected providers are not available.',
+                    providerErrors: { pipeline: error },
+                });
+            }
+            return;
+        }
 
         const providerErrors: Record<string, string> = {};
 
-        for (const dtoField of Object.keys(DTO_FIELD_TO_CATEGORY_KEY) as (keyof ProvidersDto)[]) {
-            const pluginId = providers[dtoField];
-            if (!pluginId) continue;
-
-            const error = await this.validateSingleProvider(pluginId, options);
-            if (error) {
-                providerErrors[dtoField] = error;
+        for (const { uiKey, capability } of getIndividualProviderCategories()) {
+            const pluginId = providers?.[uiKey as keyof ProvidersDto];
+            if (pluginId) {
+                const error = await this.validateSingleProvider(pluginId, options);
+                if (error) {
+                    providerErrors[uiKey] = error;
+                }
+            } else {
+                const defaultProvider = await this.resolveDefaultProvider(capability, options);
+                if (defaultProvider && !defaultProvider.configured) {
+                    providerErrors[uiKey] =
+                        `Default provider "${defaultProvider.name}" is not configured. ` +
+                        `Visit Settings → Plugins to set it up.`;
+                }
             }
         }
 
@@ -438,6 +438,14 @@ export class GeneratorFormSchemaService {
                 providerErrors,
             });
         }
+    }
+
+    private async resolveDefaultProvider(
+        capability: string,
+        options: FormSchemaOptions,
+    ): Promise<ProviderOption | null> {
+        const providerOptions = await this.getProvidersForCapability(capability, options);
+        return providerOptions.find((p) => p.isDefault) ?? null;
     }
 
     /**

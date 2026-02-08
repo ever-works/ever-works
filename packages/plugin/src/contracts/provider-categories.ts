@@ -124,3 +124,31 @@ export type ProviderSelectionState = {
  * Keys for provider change handlers.
  */
 export type SelectableProviderCategory = keyof ProviderSelectionState;
+
+export interface IndividualProviderCategory {
+	readonly categoryKey: Exclude<ProviderCategoryKey, 'fullPipeline'>;
+	readonly uiKey: string;
+	readonly capability: string;
+}
+
+/**
+ * Individual provider categories (excluding fullPipeline).
+ * Derives from SELECTABLE_PROVIDER_CATEGORIES so new categories are picked up automatically.
+ */
+export function getIndividualProviderCategories(): IndividualProviderCategory[] {
+	return (Object.entries(SELECTABLE_PROVIDER_CATEGORIES) as [ProviderCategoryKey, ProviderCategoryDefinition][])
+		.filter(([key]) => key !== 'fullPipeline')
+		.map(([key, def]) => ({
+			categoryKey: key as Exclude<ProviderCategoryKey, 'fullPipeline'>,
+			uiKey: def.uiKey,
+			capability: def.capability
+		}));
+}
+
+/**
+ * Resolve the effective default provider from a list of options.
+ * Priority: (1) isDefault && configured, (2) isDefault (even if unconfigured).
+ */
+export function resolveEffectiveDefault(options: ProviderOption[]): ProviderOption | null {
+	return options.find((o) => o.isDefault && o.configured) || options.find((o) => o.isDefault) || null;
+}

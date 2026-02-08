@@ -358,6 +358,142 @@ describe('GeneratorFormSchemaService', () => {
         });
     });
 
+    describe('validateSelectedProviders', () => {
+        function createProviderPlugin(
+            id: string,
+            capability: string,
+            opts?: { defaultForCapabilities?: string[]; systemPlugin?: boolean },
+        ) {
+            const plugin = createMockPlugin({ id, capabilities: [capability] });
+            return createRegistered(plugin, {
+                defaultForCapabilities: opts?.defaultForCapabilities,
+                systemPlugin: opts?.systemPlugin,
+            });
+        }
+
+        it('should pass when explicit providers are valid and configured', async () => {
+            const aiPlugin = createProviderPlugin('openrouter', 'ai-provider');
+            mockRegistry.get.mockReturnValue(aiPlugin);
+
+            await expect(
+                service.validateSelectedProviders({ ai: 'openrouter' }, { userId: 'u1' }),
+            ).resolves.toBeUndefined();
+        });
+
+        it('should reject explicit provider that is not registered', async () => {
+            mockRegistry.get.mockReturnValue(undefined);
+
+            await expect(
+                service.validateSelectedProviders({ ai: 'nonexistent' }, { userId: 'u1' }),
+            ).rejects.toThrow('not available');
+        });
+
+        it('should reject explicit provider that is not configured', async () => {
+            const aiPlugin = createMockPlugin({
+                id: 'openrouter',
+                capabilities: ['ai-provider'],
+                settingsSchema: {
+                    type: 'object',
+                    properties: { apiKey: { type: 'string' } },
+                    required: ['apiKey'],
+                } as any,
+            });
+            const aiRegistered = createRegistered(aiPlugin);
+            mockRegistry.get.mockReturnValue(aiRegistered);
+
+            const settingsService = {
+                getResolvedSettings: jest.fn().mockResolvedValue({}),
+            };
+            const svc = new GeneratorFormSchemaService(
+                mockRegistry,
+                undefined,
+                settingsService as any,
+            );
+
+            await expect(
+                svc.validateSelectedProviders({ ai: 'openrouter' }, { userId: 'u1' }),
+            ).rejects.toThrow('not available');
+        });
+
+        it('should validate pipeline provider when explicitly selected', async () => {
+            mockRegistry.get.mockReturnValue(undefined);
+
+            await expect(
+                service.validateSelectedProviders(
+                    { pipeline: 'nonexistent-pipeline' },
+                    { userId: 'u1' },
+                ),
+            ).rejects.toThrow('not available');
+        });
+
+        it('should validate default providers when no explicit selection', async () => {
+            const aiPlugin = createMockPlugin({
+                id: 'openrouter',
+                capabilities: ['ai-provider'],
+                settingsSchema: {
+                    type: 'object',
+                    properties: { apiKey: { type: 'string' } },
+                    required: ['apiKey'],
+                } as any,
+            });
+            const unconfiguredAi = createRegistered(aiPlugin, {
+                defaultForCapabilities: ['ai-provider'],
+            });
+
+            mockRegistry.getByCapability.mockImplementation((cap: string) => {
+                if (cap === 'ai-provider') return [unconfiguredAi];
+                return [];
+            });
+
+            const settingsService = {
+                getResolvedSettings: jest.fn().mockResolvedValue({}),
+            };
+
+            const svc = new GeneratorFormSchemaService(
+                mockRegistry,
+                undefined,
+                settingsService as any,
+            );
+
+            await expect(
+                svc.validateSelectedProviders(undefined, { userId: 'u1' }),
+            ).rejects.toThrow('not available');
+        });
+
+        it('should pass when default providers are configured', async () => {
+            const configuredAi = createProviderPlugin('openrouter', 'ai-provider', {
+                defaultForCapabilities: ['ai-provider'],
+            });
+
+            mockRegistry.getByCapability.mockImplementation((cap: string) => {
+                if (cap === 'ai-provider') return [configuredAi];
+                return [];
+            });
+
+            // No settings service = all plugins considered configured
+            await expect(
+                service.validateSelectedProviders(undefined, { userId: 'u1' }),
+            ).resolves.toBeUndefined();
+        });
+
+        it('should pass when no providers exist for a category', async () => {
+            mockRegistry.getByCapability.mockReturnValue([]);
+
+            await expect(
+                service.validateSelectedProviders(undefined, { userId: 'u1' }),
+            ).resolves.toBeUndefined();
+        });
+
+        it('should skip pipeline category when checking individual providers', async () => {
+            mockRegistry.getByCapability.mockReturnValue([]);
+
+            // Should not throw even with undefined providers (no pipeline validation)
+            await expect(
+                service.validateSelectedProviders({}, { userId: 'u1' }),
+            ).resolves.toBeUndefined();
+        });
+    });
+
     describe('validateFormValues', () => {
         it('should validate form-schema-provider plugin form values', async () => {
             const dsPlugin = createFormSchemaPlugin('apify', [], {
