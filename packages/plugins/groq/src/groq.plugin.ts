@@ -45,7 +45,7 @@ export class GroqPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'meta-llama/llama-4-scout-17b-16e-instruct',
+				default: 'openai/gpt-oss-120b',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -53,7 +53,7 @@ export class GroqPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Handles tags, short descriptions, and quick classifications',
-				default: 'llama-3.1-8b-instant',
+				default: 'openai/gpt-oss-120b',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -61,7 +61,7 @@ export class GroqPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Handles listings, summaries, and content reformatting',
-				default: 'meta-llama/llama-4-scout-17b-16e-instruct',
+				default: 'openai/gpt-oss-120b',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -69,7 +69,7 @@ export class GroqPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'llama-3.3-70b-versatile',
+				default: 'openai/gpt-oss-120b',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -106,7 +106,7 @@ export class GroqPlugin extends BaseAiProvider {
 		await super.onLoad(context);
 		this.aiOps = new AiOperations({
 			apiKey: '',
-			model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+			model: 'openai/gpt-oss-120b',
 			baseURL: 'https://api.groq.com/openai/v1',
 			temperature: 0.7,
 			maxTokens: 4096,
@@ -166,7 +166,7 @@ export class GroqPlugin extends BaseAiProvider {
 	}
 
 	protected getDefaultModelId(): string {
-		return 'meta-llama/llama-4-scout-17b-16e-instruct';
+		return 'openai/gpt-oss-120b';
 	}
 
 	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
