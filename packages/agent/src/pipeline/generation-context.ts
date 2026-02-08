@@ -46,6 +46,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
 
     advancedPrompts?: MutableGenerationContext['advancedPrompts'];
     shouldStop?: boolean;
+    pluginConfig?: Record<string, Record<string, unknown>>;
 
     constructor(
         directory: DirectoryReference,
@@ -55,6 +56,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
         this.directory = directory;
         this.request = request;
         this.existing = existing;
+        this.pluginConfig = request.pluginConfig;
         this.metrics = this.createInitialMetrics();
     }
 
@@ -279,6 +281,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
             subject: this.subject,
             advancedPrompts: this.advancedPrompts,
             shouldStop: this.shouldStop,
+            pluginConfig: this.pluginConfig,
         };
     }
 
@@ -316,6 +319,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
         typed.subject = ctx.subject;
         typed.advancedPrompts = ctx.advancedPrompts;
         typed.shouldStop = ctx.shouldStop;
+        typed.pluginConfig = ctx.pluginConfig;
 
         return typed;
     }
@@ -355,6 +359,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
         typed.subject = snapshot.subject;
         typed.advancedPrompts = snapshot.advancedPrompts;
         typed.shouldStop = snapshot.shouldStop;
+        typed.pluginConfig = snapshot.pluginConfig;
 
         return typed;
     }

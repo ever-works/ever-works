@@ -908,17 +908,13 @@ export class DataGeneratorService {
             user: { id: user.id }, // User context for multi-tenant plugin resolution
         };
 
-        // Convert DTO to GenerationRequest (plugin type)
-        // Core fields are explicit; all plugin-specific config goes in config
         const request: GenerationRequest = {
             name: dto.name,
             prompt: dto.prompt,
             generationMethod: dto.generation_method,
             company: dto.company,
-            // All plugin-specific configuration passes through as-is
-            // The pipeline plugin applies its own defaults via getDefaultValues()
             config: dto.pluginConfig || {},
-            // Provider overrides from the generator form (e.g., user selected "openai" for AI)
+            pluginConfig: dto._processedPluginConfig || undefined,
             providers: dto.providers
                 ? {
                       ai: dto.providers.ai,

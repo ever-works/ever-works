@@ -513,13 +513,13 @@ Once GitFacade and DeployFacade exist:
 
 ### Existing Plugins (`packages/plugins/`)
 
-| Plugin            | Package                   | Capabilities                            | Status      |
-| ----------------- | ------------------------- | --------------------------------------- | ----------- |
-| Default Pipeline  | `default-pipeline`        | `pipeline-step`, `form-schema-provider` | ✅ System   |
-| Tavily            | `tavily`                  | `search`, `content-extractor`           | ✅ Complete |
-| Local Extractor   | `local-content-extractor` | `content-extractor`                     | ✅ Default  |
-| Notion Extractor  | `notion-extractor`        | `content-extractor`                     | ✅ Complete |
-| Apify | `apify`       | `data-source`, `form-schema-provider`   | ✅ Complete |
+| Plugin           | Package                   | Capabilities                            | Status      |
+| ---------------- | ------------------------- | --------------------------------------- | ----------- |
+| Default Pipeline | `default-pipeline`        | `pipeline-step`, `form-schema-provider` | ✅ System   |
+| Tavily           | `tavily`                  | `search`, `content-extractor`           | ✅ Complete |
+| Local Extractor  | `local-content-extractor` | `content-extractor`                     | ✅ Default  |
+| Notion Extractor | `notion-extractor`        | `content-extractor`                     | ✅ Complete |
+| Apify            | `apify`                   | `data-source`, `form-schema-provider`   | ✅ Complete |
 
 ### Missing Plugins (Required)
 

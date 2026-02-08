@@ -170,6 +170,9 @@ export class CreateItemsGeneratorDto implements ICreateItemsGeneratorDto {
     @IsOptional()
     @IsObject()
     pluginConfig?: Record<string, unknown>;
+
+    /** Per-plugin config extracted by processFormConfig(). Not part of API contract. */
+    _processedPluginConfig?: Record<string, Record<string, unknown>>;
 }
 
 // ============================================================================

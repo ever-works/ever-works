@@ -184,7 +184,7 @@ export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvi
 	transformFormValues(values: Record<string, unknown>): Record<string, unknown> {
 		return {
 			...values,
-			'apify': {
+			apify: {
 				datasetId: values['apify_datasetId'],
 				actorRunId: values['apify_actorRunId'],
 				maxItems: values['apify_maxItems'] ?? 100,

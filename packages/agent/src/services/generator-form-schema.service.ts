@@ -16,6 +16,7 @@ import type {
 import {
     isFormSchemaProvider,
     SELECTABLE_PROVIDER_CATEGORIES,
+    PLUGIN_CAPABILITIES,
     type ProviderCategoryKey,
 } from '@ever-works/plugin';
 import type { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dto';
@@ -95,8 +96,18 @@ export class GeneratorFormSchemaService {
             defaultValues = provider.getDefaultValues?.();
 
             this.logger.debug(
-                `Resolved ${pluginFields.length} form fields from plugin: ${pipelinePlugin.plugin.id}`,
+                `Resolved ${pluginFields.length} form fields from pipeline: ${pipelinePlugin.plugin.id}`,
             );
+        }
+
+        // Collect form fields from enabled data source plugins
+        const dsFields = await this.getDataSourceFormFields(options);
+        pluginFields = [...pluginFields, ...dsFields.fields];
+        if (dsFields.groups.length > 0) {
+            pluginGroups = [...(pluginGroups ?? []), ...dsFields.groups];
+        }
+        if (dsFields.defaultValues && Object.keys(dsFields.defaultValues).length > 0) {
+            defaultValues = { ...defaultValues, ...dsFields.defaultValues };
         }
 
         return {
@@ -109,23 +120,118 @@ export class GeneratorFormSchemaService {
     }
 
     /**
-     * Validate form values against the selected pipeline's schema.
-     *
-     * @param pipelineId - Selected pipeline plugin ID
-     * @param values - Form values to validate
-     * @returns Validation result
+     * Validate form values against the pipeline and enabled data source plugins.
      */
     async validateFormValues(
         pipelineId: string | undefined,
         values: Record<string, unknown>,
+        options?: FormSchemaOptions,
     ): Promise<ValidationResult> {
         const pipelinePlugin = this.resolvePipelinePlugin(pipelineId);
 
-        if (!pipelinePlugin || !isFormSchemaProvider(pipelinePlugin.plugin)) {
-            return { valid: true };
+        if (pipelinePlugin && isFormSchemaProvider(pipelinePlugin.plugin)) {
+            const result = await pipelinePlugin.plugin.validateFormInput(values);
+            if (!result.valid) return result;
         }
 
-        return pipelinePlugin.plugin.validateFormInput(values);
+        // Validate data source plugin form values
+        const dsPlugins = await this.getEnabledDataSourcePlugins(options);
+        for (const registered of dsPlugins) {
+            if (!isFormSchemaProvider(registered.plugin)) continue;
+            const pluginValues = (values[registered.plugin.id] as Record<string, unknown>) ?? {};
+            const result = await registered.plugin.validateFormInput(pluginValues);
+            if (!result.valid) return result;
+        }
+
+        return { valid: true };
+    }
+
+    /**
+     * Process raw form config: call transformFormValues() on pipeline + data source plugins,
+     * and separate flat pipeline config from nested per-plugin config.
+     */
+    async processFormConfig(
+        pipelineId: string | undefined,
+        rawConfig: Record<string, unknown> | undefined,
+        options: FormSchemaOptions,
+    ): Promise<{
+        config: Record<string, unknown>;
+        pluginConfig: Record<string, Record<string, unknown>>;
+    }> {
+        let config = { ...(rawConfig ?? {}) };
+        const pluginConfig: Record<string, Record<string, unknown>> = {};
+
+        // Let the pipeline plugin transform first
+        const pipelinePlugin = this.resolvePipelinePlugin(pipelineId);
+        if (pipelinePlugin && isFormSchemaProvider(pipelinePlugin.plugin)) {
+            const transform = pipelinePlugin.plugin.transformFormValues;
+            if (transform) {
+                config = transform.call(pipelinePlugin.plugin, config);
+            }
+        }
+
+        // Let each data source plugin transform the full config, then extract its nested key
+        const dsPlugins = await this.getEnabledDataSourcePlugins(options);
+        for (const registered of dsPlugins) {
+            if (!isFormSchemaProvider(registered.plugin)) continue;
+
+            const pluginId = registered.plugin.id;
+
+            // Call transformFormValues on full config — this produces the nested key
+            if (registered.plugin.transformFormValues) {
+                const transformed = registered.plugin.transformFormValues(config);
+                const nested = transformed[pluginId];
+
+                if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+                    pluginConfig[pluginId] = nested as Record<string, unknown>;
+                }
+            } else {
+                // No transform — check if config already has a nested key for this plugin
+                const nested = config[pluginId];
+                if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+                    pluginConfig[pluginId] = nested as Record<string, unknown>;
+                }
+            }
+
+            // Remove the extracted nested key from flat config
+            delete config[pluginId];
+        }
+
+        return { config, pluginConfig };
+    }
+
+    /**
+     * Validate that all enabled data source plugins are properly configured.
+     * Throws BadRequestException if any are missing required settings.
+     */
+    async validateDataSourcePlugins(options: FormSchemaOptions): Promise<void> {
+        const dsPlugins = this.pluginRegistry.getByCapability(PLUGIN_CAPABILITIES.DATA_SOURCE);
+        const errors: string[] = [];
+
+        for (const registered of dsPlugins) {
+            if (registered.state !== 'loaded') continue;
+
+            const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
+                registered.plugin.id,
+                options.directoryId,
+                options.userId,
+            );
+            if (!isEnabled) continue;
+
+            const configured = await this.isPluginConfigured(registered, options);
+            if (!configured) {
+                errors.push(
+                    `Data source "${registered.manifest.name}" is not configured. Visit Settings → Plugins to set it up.`,
+                );
+            }
+        }
+
+        if (errors.length > 0) {
+            throw new BadRequestException({
+                message: 'One or more data source plugins are not configured.',
+                dataSourceErrors: errors,
+            });
+        }
     }
 
     /**
@@ -360,9 +466,61 @@ export class GeneratorFormSchemaService {
         return null;
     }
 
-    /**
-     * Resolve the pipeline plugin to use for form fields.
-     */
+    private async getDataSourceFormFields(options?: FormSchemaOptions): Promise<{
+        fields: FormFieldDefinition[];
+        groups: FormFieldGroup[];
+        defaultValues: Record<string, unknown>;
+    }> {
+        const fields: FormFieldDefinition[] = [];
+        const groups: FormFieldGroup[] = [];
+        let defaultValues: Record<string, unknown> = {};
+
+        const dsPlugins = await this.getEnabledDataSourcePlugins(options);
+
+        for (const registered of dsPlugins) {
+            if (!isFormSchemaProvider(registered.plugin)) continue;
+            const provider = registered.plugin;
+
+            fields.push(...provider.getFormFields());
+
+            const providerGroups = provider.getFormGroups?.();
+            if (providerGroups) groups.push(...providerGroups);
+
+            const providerDefaults = provider.getDefaultValues?.();
+            if (providerDefaults) {
+                defaultValues = { ...defaultValues, ...providerDefaults };
+            }
+
+            this.logger.debug(`Collected form fields from data source: ${provider.id}`);
+        }
+
+        return { fields, groups, defaultValues };
+    }
+
+    private async getEnabledDataSourcePlugins(
+        options?: FormSchemaOptions,
+    ): Promise<RegisteredPlugin[]> {
+        const dsPlugins = this.pluginRegistry.getByCapability(PLUGIN_CAPABILITIES.DATA_SOURCE);
+        const result: RegisteredPlugin[] = [];
+
+        for (const registered of dsPlugins) {
+            if (registered.state !== 'loaded') continue;
+
+            if (options?.directoryId || options?.userId) {
+                const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
+                    registered.plugin.id,
+                    options.directoryId,
+                    options.userId,
+                );
+                if (!isEnabled) continue;
+            }
+
+            result.push(registered);
+        }
+
+        return result;
+    }
+
     private resolvePipelinePlugin(pipelineId?: string): RegisteredPlugin | undefined {
         if (pipelineId) {
             const registered = this.pluginRegistry.get(pipelineId);

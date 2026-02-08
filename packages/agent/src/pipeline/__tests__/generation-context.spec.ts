@@ -11,9 +11,20 @@ describe('TypedGenerationContext', () => {
         description: 'A test directory',
     };
 
+    const mockPluginConfig: Record<string, Record<string, unknown>> = {
+        'apify-data-source': { datasetId: 'ds-123', enabled: true },
+        'notion-extractor': { enabled: false },
+    };
+
     const mockRequest: GenerationRequest = {
         prompt: 'Generate test items',
         config: {},
+    };
+
+    const mockRequestWithPluginConfig: GenerationRequest = {
+        prompt: 'Generate test items',
+        config: {},
+        pluginConfig: mockPluginConfig,
     };
 
     const mockExisting: ExistingItems = {
@@ -55,6 +66,19 @@ describe('TypedGenerationContext', () => {
             expect(context.metrics).toBeDefined();
             expect(context.metrics.startTime).toBeLessThanOrEqual(Date.now());
             expect(context.metrics.itemsProcessed).toBe(0);
+        });
+
+        it('should initialize pluginConfig as undefined when not in request', () => {
+            expect(context.pluginConfig).toBeUndefined();
+        });
+
+        it('should initialize pluginConfig from request', () => {
+            const ctx = new TypedGenerationContext(
+                mockDirectory,
+                mockRequestWithPluginConfig,
+                mockExisting,
+            );
+            expect(ctx.pluginConfig).toEqual(mockPluginConfig);
         });
     });
 
@@ -154,6 +178,16 @@ describe('TypedGenerationContext', () => {
             expect(snapshot.subject).toBe('Test Subject');
         });
 
+        it('should include pluginConfig in snapshot', () => {
+            const ctx = new TypedGenerationContext(
+                mockDirectory,
+                mockRequestWithPluginConfig,
+                mockExisting,
+            );
+            const snapshot = ctx.toSnapshot();
+            expect(snapshot.pluginConfig).toEqual(mockPluginConfig);
+        });
+
         it('should create copies of arrays', () => {
             context.extractedUrls = ['https://example.com'];
             const snapshot = context.toSnapshot();
@@ -197,6 +231,7 @@ describe('TypedGenerationContext', () => {
                 allPriorityCategories: [],
                 featuredItemHints: [],
                 subject: 'Test Subject',
+                pluginConfig: mockPluginConfig,
             };
 
             const typed = TypedGenerationContext.fromMutableContext(mutableContext);
@@ -205,6 +240,20 @@ describe('TypedGenerationContext', () => {
             expect(typed.processedSourceUrls.has('https://processed.com')).toBe(true);
             expect(typed.contentCache.get('url')).toBe('content');
             expect(typed.subject).toBe('Test Subject');
+            expect(typed.pluginConfig).toEqual(mockPluginConfig);
+        });
+    });
+
+    describe('fromSnapshot', () => {
+        it('should restore pluginConfig from snapshot', () => {
+            const ctx = new TypedGenerationContext(
+                mockDirectory,
+                mockRequestWithPluginConfig,
+                mockExisting,
+            );
+            const snapshot = ctx.toSnapshot();
+            const restored = TypedGenerationContext.fromSnapshot(snapshot);
+            expect(restored.pluginConfig).toEqual(mockPluginConfig);
         });
     });
 

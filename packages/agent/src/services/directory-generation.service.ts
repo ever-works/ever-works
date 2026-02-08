@@ -141,11 +141,25 @@ export class DirectoryGenerationService {
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
         const triggerContext = this.resolveContext(context);
 
+        const scopeOptions = { userId: user.id, directoryId };
+
         // Validate selected providers before starting generation
-        await this.generatorFormSchemaService.validateSelectedProviders(dto.providers, {
-            userId: user.id,
-            directoryId,
-        });
+        await this.generatorFormSchemaService.validateSelectedProviders(
+            dto.providers,
+            scopeOptions,
+        );
+
+        // Validate data source plugins are configured
+        await this.generatorFormSchemaService.validateDataSourcePlugins(scopeOptions);
+
+        // Process form config: separate pipeline config from per-plugin config
+        const processed = await this.generatorFormSchemaService.processFormConfig(
+            dto.providers?.pipeline,
+            dto.pluginConfig,
+            scopeOptions,
+        );
+        dto.pluginConfig = processed.config;
+        dto._processedPluginConfig = processed.pluginConfig;
 
         const history = await this.createGenerationHistoryRecord(
             directory,
@@ -244,14 +258,26 @@ export class DirectoryGenerationService {
             };
         }
 
-        // Validate selected providers before starting generation
-        await this.generatorFormSchemaService.validateSelectedProviders(payload.providers, {
-            userId: user.id,
-            directoryId,
-        });
+        const scopeOptions = { userId: user.id, directoryId };
 
-        // Apply conservative config for scheduled runs to control resource usage
-        // This ensures scheduled updates are efficient and cost-effective
+        // Validate selected providers before starting generation
+        await this.generatorFormSchemaService.validateSelectedProviders(
+            payload.providers,
+            scopeOptions,
+        );
+
+        // Validate data source plugins are configured
+        await this.generatorFormSchemaService.validateDataSourcePlugins(scopeOptions);
+
+        // Process form config: separate pipeline config from per-plugin config
+        const processed = await this.generatorFormSchemaService.processFormConfig(
+            payload.providers?.pipeline,
+            payload.pluginConfig,
+            scopeOptions,
+        );
+        payload.pluginConfig = processed.config;
+        payload._processedPluginConfig = processed.pluginConfig;
+
         if (context.triggeredBy === 'schedule') {
             payload.config = {
                 ...payload.config,

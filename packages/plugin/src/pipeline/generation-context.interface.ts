@@ -81,6 +81,23 @@ export interface GenerationRequest {
 	readonly config?: Record<string, unknown>;
 
 	/**
+	 * Per-plugin configuration extracted from the generator form.
+	 * Maps plugin ID → plugin-specific settings (e.g., datasetId, enabled flag).
+	 *
+	 * Populated by GeneratorFormSchemaService.processFormConfig() which calls
+	 * transformFormValues() on each data source plugin.
+	 *
+	 * Example:
+	 * ```typescript
+	 * {
+	 *   'apify-data-source': { datasetId: '5uxB4x3zYjV5S7nFd' },
+	 *   'notion-extractor': { enabled: true }
+	 * }
+	 * ```
+	 */
+	readonly pluginConfig?: Record<string, Record<string, unknown>>;
+
+	/**
 	 * Provider overrides selected by the user in the generator form.
 	 * When set, these override the default/directory-level provider for each facade.
 	 */
