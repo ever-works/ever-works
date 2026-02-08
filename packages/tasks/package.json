@@ -12,8 +12,8 @@
         "build": "tsc -p tsconfig.json",
         "dev": "tsc -p tsconfig.json --watch",
         "build:plugins": "pnpm --filter './packages/plugins/*' build",
-        "dev:trigger": "npx trigger.dev@4.3.2 dev",
-        "deploy:trigger": "npx trigger.dev@4.3.2 deploy"
+        "dev:trigger": "npx trigger.dev@4.3.3 dev",
+        "deploy:trigger": "npx trigger.dev@4.3.3 deploy"
     },
     "dependencies": {
         "@nestjs/cache-manager": "^3.1.0",
@@ -23,13 +23,13 @@
         "@nestjs/platform-express": "^11.1.11",
         "@nestjs/websockets": "^11.1.11",
         "@ever-works/agent": "workspace:*",
-        "@trigger.dev/sdk": "^4.3.2",
+        "@trigger.dev/sdk": "^4.3.3",
         "class-transformer": "^0.5.1",
         "reflect-metadata": "^0.2.2",
         "rxjs": "^7.8.2"
     },
     "devDependencies": {
-        "@trigger.dev/build": "^4.3.2",
+        "@trigger.dev/build": "^4.3.3",
         "@types/node": "^22.19.3",
         "typescript": "^5.9.3"
     }
