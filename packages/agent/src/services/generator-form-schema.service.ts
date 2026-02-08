@@ -100,8 +100,8 @@ export class GeneratorFormSchemaService {
             );
         }
 
-        // Collect form fields from enabled data source plugins
-        const dsFields = await this.getDataSourceFormFields(options);
+        // Collect form fields from enabled form-schema-provider plugins (excluding pipeline)
+        const dsFields = await this.getAdditionalFormFields(options);
         pluginFields = [...pluginFields, ...dsFields.fields];
         if (dsFields.groups.length > 0) {
             pluginGroups = [...(pluginGroups ?? []), ...dsFields.groups];
@@ -134,8 +134,8 @@ export class GeneratorFormSchemaService {
             if (!result.valid) return result;
         }
 
-        // Validate data source plugin form values
-        const dsPlugins = await this.getEnabledDataSourcePlugins(options);
+        // Validate form-schema-provider plugin form values
+        const dsPlugins = await this.getEnabledFormSchemaPlugins(options);
         for (const registered of dsPlugins) {
             if (!isFormSchemaProvider(registered.plugin)) continue;
             const pluginValues = (values[registered.plugin.id] as Record<string, unknown>) ?? {};
@@ -170,8 +170,8 @@ export class GeneratorFormSchemaService {
             }
         }
 
-        // Let each data source plugin transform the full config, then extract its nested key
-        const dsPlugins = await this.getEnabledDataSourcePlugins(options);
+        // Let each form-schema-provider plugin transform the full config, then extract its nested key
+        const dsPlugins = await this.getEnabledFormSchemaPlugins(options);
         for (const registered of dsPlugins) {
             if (!isFormSchemaProvider(registered.plugin)) continue;
 
@@ -201,15 +201,20 @@ export class GeneratorFormSchemaService {
     }
 
     /**
-     * Validate that all enabled data source plugins are properly configured.
+     * Validate that all enabled form-schema-provider plugins are properly configured.
      * Throws BadRequestException if any are missing required settings.
      */
-    async validateDataSourcePlugins(options: FormSchemaOptions): Promise<void> {
-        const dsPlugins = this.pluginRegistry.getByCapability(PLUGIN_CAPABILITIES.DATA_SOURCE);
+    async validateFormSchemaPlugins(options: FormSchemaOptions): Promise<void> {
+        const plugins = this.pluginRegistry.getByCapability(
+            PLUGIN_CAPABILITIES.FORM_SCHEMA_PROVIDER,
+        );
+        const pipelinePlugin = this.resolvePipelinePlugin();
+        const pipelineId = pipelinePlugin?.plugin.id;
         const errors: string[] = [];
 
-        for (const registered of dsPlugins) {
+        for (const registered of plugins) {
             if (registered.state !== 'loaded') continue;
+            if (registered.plugin.id === pipelineId) continue;
 
             const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
                 registered.plugin.id,
@@ -221,15 +226,15 @@ export class GeneratorFormSchemaService {
             const configured = await this.isPluginConfigured(registered, options);
             if (!configured) {
                 errors.push(
-                    `Data source "${registered.manifest.name}" is not configured. Visit Settings → Plugins to set it up.`,
+                    `Plugin "${registered.manifest.name}" is not configured. Visit Settings → Plugins to set it up.`,
                 );
             }
         }
 
         if (errors.length > 0) {
             throw new BadRequestException({
-                message: 'One or more data source plugins are not configured.',
-                dataSourceErrors: errors,
+                message: 'One or more form-schema-provider plugins are not configured.',
+                formSchemaErrors: errors,
             });
         }
     }
@@ -466,7 +471,7 @@ export class GeneratorFormSchemaService {
         return null;
     }
 
-    private async getDataSourceFormFields(options?: FormSchemaOptions): Promise<{
+    private async getAdditionalFormFields(options?: FormSchemaOptions): Promise<{
         fields: FormFieldDefinition[];
         groups: FormFieldGroup[];
         defaultValues: Record<string, unknown>;
@@ -475,9 +480,9 @@ export class GeneratorFormSchemaService {
         const groups: FormFieldGroup[] = [];
         let defaultValues: Record<string, unknown> = {};
 
-        const dsPlugins = await this.getEnabledDataSourcePlugins(options);
+        const plugins = await this.getEnabledFormSchemaPlugins(options);
 
-        for (const registered of dsPlugins) {
+        for (const registered of plugins) {
             if (!isFormSchemaProvider(registered.plugin)) continue;
             const provider = registered.plugin;
 
@@ -491,20 +496,26 @@ export class GeneratorFormSchemaService {
                 defaultValues = { ...defaultValues, ...providerDefaults };
             }
 
-            this.logger.debug(`Collected form fields from data source: ${provider.id}`);
+            this.logger.debug(`Collected form fields from plugin: ${provider.id}`);
         }
 
         return { fields, groups, defaultValues };
     }
 
-    private async getEnabledDataSourcePlugins(
+    private async getEnabledFormSchemaPlugins(
         options?: FormSchemaOptions,
     ): Promise<RegisteredPlugin[]> {
-        const dsPlugins = this.pluginRegistry.getByCapability(PLUGIN_CAPABILITIES.DATA_SOURCE);
+        const plugins = this.pluginRegistry.getByCapability(
+            PLUGIN_CAPABILITIES.FORM_SCHEMA_PROVIDER,
+        );
+        const pipelinePlugin = this.resolvePipelinePlugin();
+        const pipelineId = pipelinePlugin?.plugin.id;
         const result: RegisteredPlugin[] = [];
 
-        for (const registered of dsPlugins) {
+        for (const registered of plugins) {
             if (registered.state !== 'loaded') continue;
+            // Pipeline plugin is already handled separately by resolvePipelinePlugin
+            if (registered.plugin.id === pipelineId) continue;
 
             if (options?.directoryId || options?.userId) {
                 const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(

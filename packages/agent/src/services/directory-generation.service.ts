@@ -150,7 +150,7 @@ export class DirectoryGenerationService {
         );
 
         // Validate data source plugins are configured
-        await this.generatorFormSchemaService.validateDataSourcePlugins(scopeOptions);
+        await this.generatorFormSchemaService.validateFormSchemaPlugins(scopeOptions);
 
         // Process form config: separate pipeline config from per-plugin config
         const processed = await this.generatorFormSchemaService.processFormConfig(
@@ -267,7 +267,7 @@ export class DirectoryGenerationService {
         );
 
         // Validate data source plugins are configured
-        await this.generatorFormSchemaService.validateDataSourcePlugins(scopeOptions);
+        await this.generatorFormSchemaService.validateFormSchemaPlugins(scopeOptions);
 
         // Process form config: separate pipeline config from per-plugin config
         const processed = await this.generatorFormSchemaService.processFormConfig(
