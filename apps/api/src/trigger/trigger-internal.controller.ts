@@ -5,6 +5,7 @@ import {
     ForbiddenException,
     Get,
     Headers,
+    OnModuleInit,
     Param,
     Post,
     Query,
@@ -13,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { Public } from '../auth/decorators/public.decorator';
 import { config } from '@ever-works/agent/config';
-import { DirectoryRepository } from '@ever-works/agent/database';
+import { DirectoryRepository, OAuthTokenRepository } from '@ever-works/agent/database';
 import { Directory, User } from '@ever-works/agent/entities';
 import { DirectoryCommandDto } from './dto/directory-command.dto';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
@@ -39,6 +40,7 @@ import { GenerateStatusType } from '@ever-works/agent/entities';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { GitFacadeService } from '@ever-works/agent/facades';
 import { CreateNotificationDto } from './dto/create-notification.dto';
+import { RemoteCallDto } from './dto/remote-call.dto';
 import {
     PluginRegistryService,
     PluginRepository,
@@ -64,7 +66,9 @@ type DirectoryCommandDefinition<K extends DirectoryCommandAction> = {
 
 @SkipThrottle({ short: true, medium: true, long: true })
 @Controller('internal/trigger')
-export class TriggerInternalController {
+export class TriggerInternalController implements OnModuleInit {
+    private remoteMap: Record<string, object> = {};
+
     constructor(
         private readonly directoryRepository: DirectoryRepository,
         private readonly ownershipService: DirectoryOwnershipService,
@@ -79,7 +83,17 @@ export class TriggerInternalController {
         private readonly pluginRepository: PluginRepository,
         private readonly userPluginRepository: UserPluginRepository,
         private readonly directoryPluginRepository: DirectoryPluginRepository,
+        private readonly oauthTokenRepository: OAuthTokenRepository,
     ) {}
+
+    onModuleInit() {
+        this.remoteMap = {
+            OAuthTokenRepository: this.oauthTokenRepository,
+            PluginRepository: this.pluginRepository,
+            UserPluginRepository: this.userPluginRepository,
+            DirectoryPluginRepository: this.directoryPluginRepository,
+        };
+    }
 
     @Get('directories/:id/context')
     @Public()
@@ -298,6 +312,31 @@ export class TriggerInternalController {
             success: true,
             notificationId: notification.id,
         };
+    }
+
+    @Post('remote/call')
+    @Public()
+    async callRemote(
+        @Headers('x-trigger-secret') secret: string,
+        @Body() body: RemoteCallDto,
+    ) {
+        this.ensureSecret(secret);
+
+        const instance = this.remoteMap[body.name];
+
+        if (!instance) {
+            throw new BadRequestException(`Unknown remote target: ${body.name}`);
+        }
+
+        const fn = (instance as any)[body.method];
+
+        if (typeof fn !== 'function') {
+            throw new BadRequestException(`Unknown method: ${body.method}`);
+        }
+
+        const result = await fn.call(instance, ...body.args);
+
+        return { result };
     }
 
     private ensureSecret(secret?: string) {

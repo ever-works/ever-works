@@ -127,7 +127,10 @@ export class PipelineBuilderService {
         this.logger.debug(`Found ${plugins.length} enabled pipeline plugins`);
 
         // 4. Process each plugin's step contributions
+        //    Skip the default-pipeline plugin — its steps already form the base
+        //    pipeline loaded via DefaultPipelinePlugin.getBuiltInSteps() above.
         for (const { registered, pipelinePlugin } of plugins) {
+            if (registered.plugin.id === 'default-pipeline') continue;
             this.processPluginSteps(pipelinePlugin, registered.plugin.id, buildContext);
         }
 

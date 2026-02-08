@@ -21,6 +21,7 @@ import {
 } from '@ever-works/agent/plugins';
 import type { PluginsModuleOptions } from '@ever-works/agent/plugins';
 
+import { TriggerInternalModule } from '../trigger-internal.module';
 import { RemotePluginRepository } from './remote-plugin.repository';
 import { RemoteUserPluginRepository } from './remote-user-plugin.repository';
 import { RemoteDirectoryPluginRepository } from './remote-directory-plugin.repository';
@@ -38,14 +39,17 @@ export class TriggerPluginsModule {
     static forRoot(options: PluginsModuleOptions = {}): DynamicModule {
         return {
             module: TriggerPluginsModule,
-            imports: [EventEmitterModule.forRoot()],
+            imports: [EventEmitterModule.forRoot(), TriggerInternalModule],
             providers: [
                 // Module options
                 {
                     provide: PLUGINS_MODULE_OPTIONS,
                     useValue: {
                         platformVersion: DEFAULT_PLATFORM_VERSION,
-                        pluginPaths: ['./plugins'],
+                        pluginPaths: [
+                            './plugins', // Production: copied by includePlugins() build extension
+                            '../plugins', // Dev mode: resolves to packages/plugins/
+                        ],
                         autoLoadBuiltIn: true,
                         autoEnableOnLoad: false,
                         environment: 'production',

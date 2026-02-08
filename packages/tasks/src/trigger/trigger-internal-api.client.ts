@@ -155,6 +155,21 @@ export class TriggerInternalApiClient {
     }
 
     /**
+     * Forward a method call to a named injectable on the API side.
+     * Used by the remote proxy to invoke classes (repositories, services, etc.)
+     * from within Trigger.dev tasks that have no direct database connection.
+     */
+    async callRemote(name: string, method: string, args: unknown[]): Promise<unknown> {
+        const response = await this.request<{ result: unknown }>({
+            method: 'POST',
+            path: '/remote/call',
+            body: { name, method, args },
+        });
+
+        return response.result;
+    }
+
+    /**
      * Create a notification via the internal API
      * Use this to notify users of account-level issues from tasks
      */

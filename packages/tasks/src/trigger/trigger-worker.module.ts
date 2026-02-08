@@ -3,7 +3,7 @@ import { DIRECTORY_OPERATIONS } from '@ever-works/agent/directory-operations';
 import { NOTIFICATION_OPERATIONS } from '@ever-works/agent/notification-operations';
 import { DataGeneratorService } from '@ever-works/agent/generators';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
-import { WebsiteGeneratorService } from '@ever-works/agent/generators';
+import { WebsiteGeneratorService, BranchSyncService } from '@ever-works/agent/generators';
 import {
     SourceRepoAnalyzerService,
     AwesomeReadmeParserService,
@@ -41,6 +41,7 @@ import { TriggerCacheFactory } from './cache/cache.factory';
         DataGeneratorService,
         MarkdownGeneratorService,
         WebsiteGeneratorService,
+        BranchSyncService,
         SourceRepoAnalyzerService,
         AwesomeReadmeParserService,
         ImportExecutorService,
