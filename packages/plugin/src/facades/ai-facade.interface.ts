@@ -1,4 +1,9 @@
-import type { AiModel } from '../contracts/capabilities/ai-provider.interface.js';
+import type {
+	AiModel,
+	ChatCompletionOptions,
+	ChatCompletionResponse,
+	ChatCompletionChunk
+} from '../contracts/capabilities/ai-provider.interface.js';
 import type { FacadeOptions } from './facade-options.interface.js';
 
 /**
@@ -108,6 +113,19 @@ export interface IAiFacade {
 		options: AskJsonOptions | undefined,
 		facadeOptions: FacadeOptions
 	): Promise<AskJsonResponse<T>>;
+
+	/**
+	 * Create a chat completion (non-streaming).
+	 */
+	createChatCompletion(options: ChatCompletionOptions, facadeOptions: FacadeOptions): Promise<ChatCompletionResponse>;
+
+	/**
+	 * Create a streaming chat completion.
+	 */
+	createStreamingChatCompletion(
+		options: ChatCompletionOptions,
+		facadeOptions: FacadeOptions
+	): AsyncGenerator<ChatCompletionChunk>;
 
 	/**
 	 * Check if AI service is configured and available.

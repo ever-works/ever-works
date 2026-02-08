@@ -33,6 +33,9 @@ import type {
     AskJsonOptions,
     AskJsonResponse,
     SchemaType,
+    ChatCompletionOptions,
+    ChatCompletionResponse,
+    ChatCompletionChunk,
     SearchFacadeOptions,
     SearchFacadeResult,
     ScreenshotCaptureOptions,
@@ -44,13 +47,6 @@ import type {
     DataSourceFacadeOptions,
     DataSourceFacadeResult,
     EnabledDataSource,
-    ItemData,
-    Category,
-    Tag,
-    Brand,
-    DomainAnalysis,
-    WebPageData,
-    AdvancedPromptsContext,
     FacadeOptions,
 } from '@ever-works/plugin';
 import { isDefaultPipelinePlugin, isPipelineStepPlugin } from '@ever-works/plugin';
@@ -205,6 +201,16 @@ export class StepPipelineExecutorService {
                 // Cast schema to any since both ZodSchema and SchemaType satisfy the contract
                 // The runtime implementation in AiFacadeService handles Zod schemas
                 facade.askJson(promptTemplate, schema as any, options, boundFacadeOptions),
+            createChatCompletion: (
+                options: ChatCompletionOptions,
+                _facadeOptions: FacadeOptions,
+            ): Promise<ChatCompletionResponse> =>
+                facade.createChatCompletion(options, boundFacadeOptions),
+            createStreamingChatCompletion: (
+                options: ChatCompletionOptions,
+                _facadeOptions: FacadeOptions,
+            ): AsyncGenerator<ChatCompletionChunk> =>
+                facade.createStreamingChatCompletion(options, boundFacadeOptions),
             isConfigured: () => facade.isConfigured(),
             testConnection: (_facadeOptions: FacadeOptions) =>
                 facade.testConnection(boundFacadeOptions),

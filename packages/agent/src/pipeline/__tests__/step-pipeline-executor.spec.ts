@@ -90,6 +90,10 @@ describe('StepPipelineExecutorService', () => {
                         askJson: jest
                             .fn()
                             .mockResolvedValue({ result: {}, usage: null, cost: null }),
+                        createChatCompletion: jest.fn().mockResolvedValue({
+                            choices: [{ message: { content: '' } }],
+                        }),
+                        createStreamingChatCompletion: jest.fn(),
                         testConnection: jest.fn().mockResolvedValue(true),
                         getAvailableModels: jest.fn().mockResolvedValue([]),
                         isConfigured: jest.fn().mockReturnValue(true),
@@ -420,6 +424,10 @@ describe('StepPipelineExecutorService', () => {
         it('should pass provider overrides from request to bound AI facade', async () => {
             const aiFacadeMock = {
                 askJson: jest.fn().mockResolvedValue({ result: {}, usage: null, cost: null }),
+                createChatCompletion: jest.fn().mockResolvedValue({
+                    choices: [{ message: { content: '' } }],
+                }),
+                createStreamingChatCompletion: jest.fn(),
                 isConfigured: jest.fn().mockReturnValue(true),
                 testConnection: jest.fn().mockResolvedValue(true),
                 getAvailableModels: jest.fn().mockResolvedValue([]),
@@ -483,6 +491,10 @@ describe('StepPipelineExecutorService', () => {
         it('should not include providerOverride when request has no providers', async () => {
             const aiFacadeMock = {
                 askJson: jest.fn().mockResolvedValue({ result: {}, usage: null, cost: null }),
+                createChatCompletion: jest.fn().mockResolvedValue({
+                    choices: [{ message: { content: '' } }],
+                }),
+                createStreamingChatCompletion: jest.fn(),
                 isConfigured: jest.fn().mockReturnValue(true),
                 testConnection: jest.fn().mockResolvedValue(true),
                 getAvailableModels: jest.fn().mockResolvedValue([]),

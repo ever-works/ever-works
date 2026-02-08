@@ -22,7 +22,7 @@ export class AiConversationService {
 
     async *streamChat(
         dto: ChatRequestDto,
-        facadeOptions?: FacadeOptions,
+        facadeOptions: FacadeOptions,
     ): AsyncGenerator<StreamChunk> {
         try {
             const stream = this.aiFacade.createStreamingChatCompletion(
