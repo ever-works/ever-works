@@ -88,8 +88,16 @@ describe('WebSearchStep', () => {
 			await step.run(mockContext, mockExecContext);
 
 			expect(mockExecContext.searchFacade.search).toHaveBeenCalledTimes(2);
-			expect(mockExecContext.searchFacade.search).toHaveBeenCalledWith('test query 1', { maxResults: 10 }, expectedFacadeOptions);
-			expect(mockExecContext.searchFacade.search).toHaveBeenCalledWith('test query 2', { maxResults: 10 }, expectedFacadeOptions);
+			expect(mockExecContext.searchFacade.search).toHaveBeenCalledWith(
+				'test query 1',
+				{ maxResults: 10 },
+				expectedFacadeOptions
+			);
+			expect(mockExecContext.searchFacade.search).toHaveBeenCalledWith(
+				'test query 2',
+				{ maxResults: 10 },
+				expectedFacadeOptions
+			);
 		});
 
 		it('should extract content from search results', async () => {
@@ -174,7 +182,11 @@ describe('WebSearchStep', () => {
 
 			const result = await step.run(mockContext, mockExecContext);
 
-			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith('https://extracted.com', undefined, expectedFacadeOptions);
+			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith(
+				'https://extracted.com',
+				undefined,
+				expectedFacadeOptions
+			);
 			expect(result.webPages.some((p) => p.source_url === 'https://extracted.com')).toBe(true);
 		});
 
@@ -215,7 +227,11 @@ describe('WebSearchStep', () => {
 			await step.run(mockContext, mockExecContext);
 
 			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledTimes(1);
-			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith('https://valid.com', undefined, expectedFacadeOptions);
+			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith(
+				'https://valid.com',
+				undefined,
+				expectedFacadeOptions
+			);
 		});
 
 		it('should mark URLs as processed after extraction', async () => {

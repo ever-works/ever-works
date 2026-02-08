@@ -64,7 +64,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         facadeOptions: FacadeOptions,
     ): Promise<AskJsonResponse<T>> {
         const plugin = await this.resolvePlugin(
-            options?.routing?.providerOverride,
+            options?.routing?.providerOverride ?? facadeOptions.providerOverride,
             facadeOptions.userId,
             facadeOptions.directoryId,
         );

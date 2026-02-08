@@ -17,7 +17,7 @@ async function createContext(
 ) {
     // Initialize plugin system with remote settings
     const hydrator = appContext.get(TriggerPluginHydratorService);
-    await hydrator.initialize(payload.directoryId, payload.userId);
+    await hydrator.initialize();
 
     const apiClient = appContext.get(TriggerInternalApiClient);
     const context = await apiClient.fetchDirectoryContext(payload.directoryId, payload.userId);
@@ -45,7 +45,8 @@ export const directoryGenerationTask = task({
         }
 
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: new TriggerLogger('DirectoryGeneration:Cancel'),
+            logger: ['verbose', 'debug', 'log', 'warn', 'error', 'fatal'],
+            // logger: new TriggerLogger('DirectoryGeneration:Cancel'),
         });
 
         try {
@@ -69,7 +70,8 @@ export const directoryGenerationTask = task({
     },
     run: async (payload: DirectoryGenerationPayload) => {
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: new TriggerLogger('DirectoryGeneration'),
+            logger: ['verbose', 'debug', 'log', 'warn', 'error', 'fatal'],
+            // logger: new TriggerLogger('DirectoryGeneration'),
         });
 
         try {

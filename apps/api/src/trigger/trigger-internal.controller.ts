@@ -42,12 +42,10 @@ import { GitFacadeService } from '@ever-works/agent/facades';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { RemoteCallDto } from './dto/remote-call.dto';
 import {
-    PluginRegistryService,
     PluginRepository,
     UserPluginRepository,
     DirectoryPluginRepository,
 } from '@ever-works/agent/plugins';
-import type { PluginContextSnapshotDto, PluginSnapshotEntry } from './dto/plugin-context.dto';
 
 type CommandHandlerContext = {
     directoryId: string;
@@ -79,7 +77,6 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly directoryScheduleService: DirectoryScheduleService,
         private readonly notificationService: NotificationService,
         private readonly gitFacade: GitFacadeService,
-        private readonly pluginRegistry: PluginRegistryService,
         private readonly pluginRepository: PluginRepository,
         private readonly userPluginRepository: UserPluginRepository,
         private readonly directoryPluginRepository: DirectoryPluginRepository,
@@ -245,56 +242,6 @@ export class TriggerInternalController implements OnModuleInit {
         return { deleted: value };
     }
 
-    @Get('plugins/context')
-    @Public()
-    async getPluginContext(
-        @Headers('x-trigger-secret') secret: string,
-        @Query('userId') userId: string,
-        @Query('directoryId') directoryId: string,
-    ): Promise<PluginContextSnapshotDto> {
-        this.ensureSecret(secret);
-
-        if (!userId) {
-            throw new BadRequestException('Missing userId');
-        }
-
-        if (!directoryId) {
-            throw new BadRequestException('Missing directoryId');
-        }
-
-        const allPlugins = this.pluginRegistry.getAll();
-        const plugins: Record<string, PluginSnapshotEntry> = {};
-
-        for (const registered of allPlugins) {
-            const pluginId = registered.plugin.id;
-
-            const pluginEntity = await this.pluginRepository.findByPluginId(pluginId);
-            const userPlugin = await this.userPluginRepository.findByUserAndPlugin(
-                userId,
-                pluginId,
-            );
-            const dirPlugin = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-                directoryId,
-                pluginId,
-            );
-
-            plugins[pluginId] = {
-                adminSettings: pluginEntity?.settings ?? {},
-                adminSecretSettings: pluginEntity?.secretSettings ?? {},
-                userSettings: userPlugin?.settings ?? {},
-                userSecretSettings: userPlugin?.secretSettings ?? {},
-                userEnabled: userPlugin ? userPlugin.enabled : null,
-                directorySettings: dirPlugin?.settings ?? {},
-                directorySecretSettings: dirPlugin?.secretSettings ?? {},
-                directoryEnabled: dirPlugin ? dirPlugin.enabled : null,
-                directoryActiveCapability: dirPlugin?.activeCapability ?? null,
-                directoryPriority: dirPlugin?.priority ?? 0,
-            };
-        }
-
-        return { plugins };
-    }
-
     @Post('notifications')
     @Public()
     async createNotification(
@@ -316,10 +263,7 @@ export class TriggerInternalController implements OnModuleInit {
 
     @Post('remote/call')
     @Public()
-    async callRemote(
-        @Headers('x-trigger-secret') secret: string,
-        @Body() body: RemoteCallDto,
-    ) {
+    async callRemote(@Headers('x-trigger-secret') secret: string, @Body() body: RemoteCallDto) {
         this.ensureSecret(secret);
 
         const instance = this.remoteMap[body.name];

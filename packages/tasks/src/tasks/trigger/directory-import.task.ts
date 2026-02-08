@@ -13,7 +13,7 @@ import { TriggerLogger } from '../../trigger/trigger-logger';
 async function createContext(appContext: INestApplicationContext, payload: DirectoryImportPayload) {
     // Initialize plugin system with remote settings
     const hydrator = appContext.get(TriggerPluginHydratorService);
-    await hydrator.initialize(payload.directoryId, payload.userId);
+    await hydrator.initialize();
 
     const apiClient = appContext.get(TriggerInternalApiClient);
     const context = await apiClient.fetchDirectoryContext(payload.directoryId, payload.userId);

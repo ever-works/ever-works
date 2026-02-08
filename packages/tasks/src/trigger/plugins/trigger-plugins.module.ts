@@ -1,6 +1,5 @@
 import { Module, Global, DynamicModule } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import * as path from 'path';
 
 import {
     PLUGINS_MODULE_OPTIONS,
@@ -22,16 +21,14 @@ import {
 import type { PluginsModuleOptions } from '@ever-works/agent/plugins';
 
 import { TriggerInternalModule } from '../trigger-internal.module';
-import { RemotePluginRepository } from './remote-plugin.repository';
-import { RemoteUserPluginRepository } from './remote-user-plugin.repository';
-import { RemoteDirectoryPluginRepository } from './remote-directory-plugin.repository';
+import { TriggerInternalApiClient } from '../trigger-internal-api.client';
+import { createRemoteProxy } from './remote-proxy';
+import { LocalPluginStore } from './local-plugin-store';
 import { TriggerPluginHydratorService } from './trigger-plugin-hydrator.service';
 
 /**
  * Global plugin module for Trigger.dev context.
- *
- * Provides the same injection tokens as PluginsModule.forRoot() but without TypeORM.
- * Remote repositories serve in-memory data fetched from the API at task start.
+ * Repositories use remote proxies; PluginRepository has local writes for bootstrap.
  */
 @Global()
 @Module({})
@@ -41,7 +38,6 @@ export class TriggerPluginsModule {
             module: TriggerPluginsModule,
             imports: [EventEmitterModule.forRoot(), TriggerInternalModule],
             providers: [
-                // Module options
                 {
                     provide: PLUGINS_MODULE_OPTIONS,
                     useValue: {
@@ -59,46 +55,42 @@ export class TriggerPluginsModule {
                         ...options,
                     },
                 },
-                // Remote repositories
-                RemotePluginRepository,
                 {
                     provide: PluginRepository,
-                    useExisting: RemotePluginRepository,
+                    useFactory: (apiClient: TriggerInternalApiClient) => {
+                        const store = new LocalPluginStore();
+                        return createRemoteProxy(apiClient, 'PluginRepository', store);
+                    },
+                    inject: [TriggerInternalApiClient],
                 },
-                RemoteUserPluginRepository,
                 {
                     provide: UserPluginRepository,
-                    useExisting: RemoteUserPluginRepository,
+                    useFactory: (apiClient: TriggerInternalApiClient) =>
+                        createRemoteProxy(apiClient, 'UserPluginRepository'),
+                    inject: [TriggerInternalApiClient],
                 },
-                RemoteDirectoryPluginRepository,
                 {
                     provide: DirectoryPluginRepository,
-                    useExisting: RemoteDirectoryPluginRepository,
+                    useFactory: (apiClient: TriggerInternalApiClient) =>
+                        createRemoteProxy(apiClient, 'DirectoryPluginRepository'),
+                    inject: [TriggerInternalApiClient],
                 },
-                // Validation services
                 PluginManifestValidatorService,
                 PluginVersionCheckerService,
                 PluginClassValidatorService,
-                // Core services (unchanged - they inject repositories via class tokens)
                 PluginRegistryService,
                 PluginLoaderService,
                 PluginLifecycleManagerService,
                 PluginSettingsService,
-                // Context and capabilities
                 PluginContextFactoryService,
                 CustomCapabilityRegistryService,
-                // Bootstrap
                 PluginBootstrapService,
-                // Hydrator
                 TriggerPluginHydratorService,
             ],
             exports: [
                 PluginRepository,
                 UserPluginRepository,
                 DirectoryPluginRepository,
-                RemotePluginRepository,
-                RemoteUserPluginRepository,
-                RemoteDirectoryPluginRepository,
                 PluginRegistryService,
                 PluginLoaderService,
                 PluginLifecycleManagerService,
