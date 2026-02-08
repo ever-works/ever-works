@@ -1,18 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { config } from '@ever-works/agent/config';
 import {
-    Directory,
     GenerateStatusType,
     NotificationType,
     NotificationCategory,
 } from '@ever-works/agent/entities';
-import { DirectoryCommand, DirectoryCommandAction } from '@ever-works/agent/tasks';
-
-type DirectoryContextResponse = {
-    directory: Directory;
-    user: any;
-    gitToken?: string;
-};
+import {
+    DirectoryCommand,
+    DirectoryCommandAction,
+    DirectoryContextResponse,
+} from '@ever-works/agent/tasks';
 
 type DispatchSchedulesResponse = {
     dispatched: number;
@@ -181,28 +178,61 @@ export class TriggerInternalApiClient {
         body?: unknown;
     }): Promise<T> {
         const url = this.composeUrl(path);
+        const maxRetries = 3;
+        const baseDelayMs = 500;
 
-        const response = await fetch(url, {
-            method,
-            headers: {
-                'content-type': 'application/json',
-                'x-trigger-secret': this.secret,
-            },
-            body: body ? JSON.stringify(body) : undefined,
-        });
+        let lastError: Error | undefined;
 
-        if (!response.ok) {
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            if (attempt > 0) {
+                const delay = baseDelayMs * Math.pow(2, attempt - 1);
+                await new Promise((resolve) => setTimeout(resolve, delay));
+            }
+
+            let response: Response;
+
+            try {
+                response = await fetch(url, {
+                    method,
+                    headers: {
+                        'content-type': 'application/json',
+                        'x-trigger-secret': this.secret,
+                    },
+                    body: body ? JSON.stringify(body) : undefined,
+                });
+            } catch (networkError) {
+                lastError =
+                    networkError instanceof Error ? networkError : new Error(String(networkError));
+
+                if (attempt < maxRetries) {
+                    continue;
+                }
+
+                throw lastError;
+            }
+
+            if (response.ok) {
+                if (response.status === 204) {
+                    return undefined as T;
+                }
+
+                const text = await response.text();
+
+                return text ? (JSON.parse(text) as T) : (undefined as T);
+            }
+
             const text = await response.text();
-            throw new Error(`Trigger internal API request failed (${response.status}): ${text}`);
+            lastError = new Error(
+                `Trigger internal API request failed (${response.status}): ${text}`,
+            );
+
+            // Only retry on 5xx server errors
+            if (response.status < 500 || attempt >= maxRetries) {
+                throw lastError;
+            }
         }
 
-        if (response.status === 204) {
-            return undefined as T;
-        }
-
-        const text = await response.text();
-
-        return text ? (JSON.parse(text) as T) : (undefined as T);
+        throw lastError ?? new Error('Trigger internal API request failed after retries');
     }
 
     private composeUrl(path: string): string {

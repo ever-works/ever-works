@@ -47,6 +47,10 @@ import {
 import { DirectoryScheduleBillingMode, GenerateStatusType } from '@src/entities/types';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { normalizeGeneratorError } from './utils/error.utils';
+import {
+    classifyGenerationError,
+    notifyForClassifiedError,
+} from './utils/error-classification.utils';
 import { DirectorySchedule } from '@src/entities/directory-schedule.entity';
 import { DirectoryScheduleService } from './directory-schedule.service';
 import { UserRepository } from '@src/database/repositories/user.repository';
@@ -1068,9 +1072,6 @@ export class DirectoryGenerationService {
         };
     }
 
-    /**
-     * Detect account-level errors and notify the user
-     */
     private async handleErrorNotification(
         error: unknown,
         user: User,
@@ -1080,108 +1081,16 @@ export class DirectoryGenerationService {
             return;
         }
 
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const errorLower = errorMessage.toLowerCase();
+        const classification = classifyGenerationError(error);
 
-        // Detect AI credits/quota errors
-        if (this.isAiCreditsError(errorLower)) {
-            const provider = this.detectProvider(errorLower);
-            await this.notificationOperations.notifyAiCreditsDepleted(
-                user.id,
-                provider,
-                errorMessage,
-            );
-            return;
-        }
-
-        // Detect AI provider authentication/configuration errors
-        if (this.isAiProviderError(errorLower)) {
-            const provider = this.detectProvider(errorLower);
-            await this.notificationOperations.notifyAiProviderError(
-                user.id,
-                provider,
-                errorMessage,
-            );
-            return;
-        }
-
-        // Detect Git authentication errors
-        if (this.isGitAuthError(errorLower)) {
-            const provider = this.detectGitProvider(errorLower);
-            await this.notificationOperations.notifyGitAuthExpired(user.id, provider);
-            return;
-        }
-
-        // For other account-level errors (rate limits, configuration issues)
-        if (this.isAccountLevelError(errorLower)) {
-            await this.notificationOperations.notifyGenerationAccountError(
+        if (classification.type !== 'unknown') {
+            await notifyForClassifiedError(
+                this.notificationOperations,
                 user.id,
                 directory.id,
                 directory.name,
-                errorMessage,
+                classification,
             );
         }
-    }
-
-    private isAiCreditsError(error: string): boolean {
-        return (
-            error.includes('insufficient_quota') ||
-            error.includes('rate_limit') ||
-            error.includes('quota exceeded') ||
-            error.includes('credits') ||
-            error.includes('billing') ||
-            error.includes('exceeded your current quota')
-        );
-    }
-
-    private isAiProviderError(error: string): boolean {
-        return (
-            error.includes('invalid_api_key') ||
-            error.includes('authentication') ||
-            error.includes('unauthorized') ||
-            error.includes('api key')
-        );
-    }
-
-    private isGitAuthError(error: string): boolean {
-        return (
-            (error.includes('git') || error.includes('github') || error.includes('gitlab')) &&
-            (error.includes('authentication') ||
-                error.includes('unauthorized') ||
-                error.includes('token') ||
-                error.includes('expired') ||
-                error.includes('permission denied'))
-        );
-    }
-
-    private isAccountLevelError(error: string): boolean {
-        return (
-            error.includes('account') ||
-            error.includes('subscription') ||
-            error.includes('plan limit') ||
-            error.includes('not configured')
-        );
-    }
-
-    private detectProvider(error: string): string {
-        if (error.includes('openai')) return 'OpenAI';
-        if (error.includes('anthropic') || error.includes('claude')) return 'Anthropic';
-        if (error.includes('google') || error.includes('gemini')) return 'Google';
-        if (error.includes('groq')) return 'Groq';
-        if (error.includes('ollama')) return 'Ollama';
-        if (error.includes('openrouter')) return 'OpenRouter';
-        return 'AI Provider';
-    }
-
-    /**
-     * Detect git provider name from error message for notification purposes.
-     * This is a heuristic fallback - provider name comes from error strings.
-     */
-    private detectGitProvider(error: string): string {
-        const errorLower = error.toLowerCase();
-        if (errorLower.includes('github')) return 'GitHub';
-        if (errorLower.includes('gitlab')) return 'GitLab';
-        if (errorLower.includes('bitbucket')) return 'Bitbucket';
-        return 'Git Provider';
     }
 }

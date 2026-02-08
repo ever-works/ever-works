@@ -14,7 +14,7 @@ import {
 import { Public } from '../auth/decorators/public.decorator';
 import { config } from '@ever-works/agent/config';
 import { DirectoryRepository } from '@ever-works/agent/database';
-import { Directory } from '@ever-works/agent/entities';
+import { Directory, User } from '@ever-works/agent/entities';
 import { DirectoryCommandDto } from './dto/directory-command.dto';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
 import {
@@ -22,7 +22,11 @@ import {
     DirectoryOperations,
     GenerationHistoryUpdateInput,
 } from '@ever-works/agent/directory-operations';
-import { DirectoryCommandAction, DirectoryCommandPayloads } from '@ever-works/agent/tasks';
+import {
+    DirectoryCommandAction,
+    DirectoryCommandPayloads,
+    DirectoryContextResponse,
+} from '@ever-works/agent/tasks';
 import { SkipThrottle } from '@nestjs/throttler';
 import { CacheDto } from './dto/cache.dto';
 import {
@@ -42,12 +46,6 @@ import {
     DirectoryPluginRepository,
 } from '@ever-works/agent/plugins';
 import type { PluginContextSnapshotDto, PluginSnapshotEntry } from './dto/plugin-context.dto';
-
-type DirectoryContextResponse = {
-    directory: Directory;
-    user: any;
-    gitToken?: string;
-};
 
 type CommandHandlerContext = {
     directoryId: string;
@@ -314,11 +312,7 @@ export class TriggerInternalController {
         }
     }
 
-    private stripSensitiveUserData(user: any) {
-        if (!user) {
-            return null;
-        }
-
+    private stripSensitiveUserData(user: User): DirectoryContextResponse['user'] {
         const { password, ...rest } = user;
         return JSON.parse(JSON.stringify(rest));
     }

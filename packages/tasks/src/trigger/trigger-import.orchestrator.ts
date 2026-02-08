@@ -5,6 +5,7 @@ import type { DirectoryOperations } from '@ever-works/agent/directory-operations
 import { NOTIFICATION_OPERATIONS } from '@ever-works/agent/notification-operations';
 import type { NotificationOperations } from '@ever-works/agent/notification-operations';
 import { DirectoryImportPayload, DirectoryImportResult } from '@ever-works/agent/tasks';
+import { classifyGenerationError, notifyForClassifiedError } from '@ever-works/agent/services';
 import { ImportExecutorService } from '@ever-works/agent/import';
 
 export type TriggerImportOptions = {
@@ -226,48 +227,16 @@ export class TriggerImportOrchestrator {
             return;
         }
 
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const errorLower = errorMessage.toLowerCase();
+        const classification = classifyGenerationError(error);
 
-        if (this.isGitAuthError(errorLower)) {
-            const provider = this.detectGitProvider(errorLower);
-            await this.notificationOperations.notifyGitAuthExpired(user.id, provider);
-            return;
-        }
-
-        if (this.isAccountLevelError(errorLower)) {
-            await this.notificationOperations.notifyGenerationAccountError(
+        if (classification.type !== 'unknown') {
+            await notifyForClassifiedError(
+                this.notificationOperations,
                 user.id,
                 directory.id,
                 directory.name,
-                errorMessage,
+                classification,
             );
         }
-    }
-
-    private isGitAuthError(error: string): boolean {
-        return (
-            (error.includes('git') || error.includes('github') || error.includes('gitlab')) &&
-            (error.includes('authentication') ||
-                error.includes('unauthorized') ||
-                error.includes('token') ||
-                error.includes('expired') ||
-                error.includes('permission denied'))
-        );
-    }
-
-    private isAccountLevelError(error: string): boolean {
-        return (
-            error.includes('account') ||
-            error.includes('subscription') ||
-            error.includes('plan limit') ||
-            error.includes('not configured')
-        );
-    }
-
-    private detectGitProvider(error: string): string {
-        if (error.includes('gitlab')) return 'GitLab';
-        if (error.includes('bitbucket')) return 'Bitbucket';
-        return 'GitHub';
     }
 }
