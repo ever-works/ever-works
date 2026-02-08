@@ -7,7 +7,7 @@ import type {
     StepExecutor,
     IPipelineStepPlugin,
 } from '@ever-works/plugin';
-import { isPipelineStepPlugin } from '@ever-works/plugin';
+import { isPipelineStepPlugin, PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import {
     PluginRegistryService,
     RegisteredPlugin,
@@ -227,7 +227,7 @@ export class PipelineBuilderService {
         }> = [];
 
         // Get all enabled plugins with pipeline-step capability
-        const pluginsWithCapability = this.registry.getByCapability('pipeline-step');
+        const pluginsWithCapability = this.registry.getByCapability(PLUGIN_CAPABILITIES.PIPELINE_STEP);
 
         for (const registered of pluginsWithCapability) {
             // Only include enabled plugins at registry level

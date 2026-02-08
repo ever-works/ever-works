@@ -34,6 +34,10 @@ describe('DefaultPipelinePlugin', () => {
 			expect(plugin.capabilities).toContain('form-schema-provider');
 		});
 
+		it('should include default-pipeline capability', () => {
+			expect(plugin.capabilities).toContain('default-pipeline');
+		});
+
 		it('should be marked as system plugin', () => {
 			expect(plugin.systemPlugin).toBe(true);
 		});

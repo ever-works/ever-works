@@ -9,13 +9,14 @@ import type {
     IFullPipelinePlugin,
     IPlugin,
 } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
 import { StepPipelineExecutorService } from './step-pipeline-executor.service';
 import { FullPipelineExecutorService } from './full-pipeline-executor.service';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 
 function isFullPipelinePlugin(plugin: IPlugin): plugin is IFullPipelinePlugin {
-    return plugin.capabilities.includes('full-pipeline');
+    return plugin.capabilities.includes(PLUGIN_CAPABILITIES.FULL_PIPELINE);
 }
 
 export type PipelineExecutionMode = 'step' | 'full';
@@ -148,7 +149,7 @@ export class PipelineOrchestratorService {
 
     getAvailableFullPipelinePlugins(): IFullPipelinePlugin[] {
         return this.registry
-            .getByCapability('full-pipeline')
+            .getByCapability(PLUGIN_CAPABILITIES.FULL_PIPELINE)
             .filter((p) => p.state === 'loaded')
             .map((p) => p.plugin)
             .filter(isFullPipelinePlugin);
@@ -188,7 +189,7 @@ export class PipelineOrchestratorService {
         directoryId?: string,
         userId?: string,
     ): Promise<IFullPipelinePlugin | null> {
-        const plugins = this.registry.getByCapability('full-pipeline');
+        const plugins = this.registry.getByCapability(PLUGIN_CAPABILITIES.FULL_PIPELINE);
 
         for (const registered of plugins) {
             if (registered.state !== 'loaded') {

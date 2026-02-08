@@ -293,7 +293,7 @@ export class DefaultPipelinePlugin implements IPlugin, IDefaultPipelinePlugin<Bu
 	readonly name = 'Default Pipeline';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'pipeline';
-	readonly capabilities: readonly string[] = ['pipeline-step', 'form-schema-provider'];
+	readonly capabilities: readonly string[] = ['pipeline-step', 'form-schema-provider', 'default-pipeline'];
 	readonly settingsSchema: JsonSchema = { type: 'object', properties: {} };
 	readonly handledConfigFields = ['*'] as const;
 	readonly systemPlugin = true as const;

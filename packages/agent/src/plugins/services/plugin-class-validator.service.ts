@@ -108,6 +108,14 @@ const CAPABILITY_METHOD_REQUIREMENTS: Record<string, string[]> = {
         'hasCapability',
         'getCapabilityVersion',
     ],
+    [PLUGIN_CAPABILITIES.DEFAULT_PIPELINE]: [
+        'getStepDefinitions',
+        'isValidStepId',
+        'getStepIds',
+        'registerStepExecutor',
+        'hasExecutor',
+        'executeStep',
+    ],
 };
 
 /**
@@ -124,6 +132,7 @@ const CAPABILITY_PROPERTY_REQUIREMENTS: Record<string, string[]> = {
     [PLUGIN_CAPABILITIES.AI_PROVIDER]: ['providerType', 'providerName'],
     [PLUGIN_CAPABILITIES.FORM_FIELD]: ['fieldType'],
     [PLUGIN_CAPABILITIES.SUB_PROVIDER]: ['parentCapability', 'subProviderId'],
+    [PLUGIN_CAPABILITIES.DEFAULT_PIPELINE]: ['systemPlugin'],
 };
 
 /**

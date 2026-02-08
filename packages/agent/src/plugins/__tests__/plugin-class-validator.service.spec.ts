@@ -439,6 +439,54 @@ describe('PluginClassValidatorService', () => {
             expect(result.valid).toBe(true);
         });
 
+        it('should validate default-pipeline capability', () => {
+            const plugin = createValidPlugin({
+                capabilities: ['default-pipeline'],
+            }) as any;
+            plugin.systemPlugin = true;
+            plugin.getStepDefinitions = jest.fn();
+            plugin.isValidStepId = jest.fn();
+            plugin.getStepIds = jest.fn();
+            plugin.registerStepExecutor = jest.fn();
+            plugin.hasExecutor = jest.fn();
+            plugin.executeStep = jest.fn();
+
+            const result = service.validateCapabilities(plugin);
+
+            expect(result.valid).toBe(true);
+        });
+
+        it('should fail when default-pipeline methods are missing', () => {
+            const plugin = createValidPlugin({
+                capabilities: ['default-pipeline'],
+            }) as any;
+            plugin.systemPlugin = true;
+
+            const result = service.validateCapabilities(plugin);
+
+            expect(result.valid).toBe(false);
+            expect(result.errors?.some((e) => e.message.includes('getStepDefinitions'))).toBe(
+                true,
+            );
+        });
+
+        it('should fail when default-pipeline property is missing', () => {
+            const plugin = createValidPlugin({
+                capabilities: ['default-pipeline'],
+            }) as any;
+            plugin.getStepDefinitions = jest.fn();
+            plugin.isValidStepId = jest.fn();
+            plugin.getStepIds = jest.fn();
+            plugin.registerStepExecutor = jest.fn();
+            plugin.hasExecutor = jest.fn();
+            plugin.executeStep = jest.fn();
+
+            const result = service.validateCapabilities(plugin);
+
+            expect(result.valid).toBe(false);
+            expect(result.errors?.some((e) => e.message.includes('systemPlugin'))).toBe(true);
+        });
+
         it('should validate custom-capability capability', () => {
             const plugin = createValidPlugin({
                 capabilities: ['custom-capability'],

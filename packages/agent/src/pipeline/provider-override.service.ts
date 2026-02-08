@@ -1,12 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { ISubProviderPlugin, IPlugin } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 
 /**
  * Type guard for sub-provider plugins (inlined to avoid ESM import issues)
  */
 function isSubProviderPlugin(plugin: IPlugin): plugin is ISubProviderPlugin {
-    return plugin.capabilities.includes('sub-provider');
+    return plugin.capabilities.includes(PLUGIN_CAPABILITIES.SUB_PROVIDER);
 }
 
 /**
@@ -130,7 +131,7 @@ export class ProviderOverrideService {
      * Get enabled sub-provider plugins.
      */
     private getEnabledSubProviders(): ISubProviderPlugin[] {
-        const registered = this.registry.getByCapability('sub-provider');
+        const registered = this.registry.getByCapability(PLUGIN_CAPABILITIES.SUB_PROVIDER);
 
         return registered
             .filter((r) => r.state === 'loaded')
