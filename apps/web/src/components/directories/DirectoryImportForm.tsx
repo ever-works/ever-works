@@ -79,7 +79,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
     const [directoryName, setDirectoryName] = useState('');
     const [organization, setOrganization] = useState(false);
     const [owner, setOwner] = useState('');
-    const [sync, setSync] = useState(true);
+    const [sync, setSync] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
     const [linkAnalysis, setLinkAnalysis] = useState<AnalyzeForLinkingResponseDto | null>(null);
@@ -103,9 +103,11 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
         }
 
         setStep('analyzing');
+        setDirectoryName(''); // Reset directory name to avoid confusion with previous selections
 
         startTransition(async () => {
             const result = await analyzeRepository(sourceUrl, gitProvider);
+            console.log('Analyze Repository Result:', result);
 
             if (result.success && result.data) {
                 setAnalysisResult(result.data);
@@ -114,7 +116,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                     toast.error(result.data.error);
                     setStep('source');
                 } else {
-                    if (!directoryName && result.data.repo) {
+                    if (result.data.repo) {
                         let repoName = result.data.baseSlug || result.data.repo;
                         if (repoName.endsWith('-data')) {
                             repoName = repoName.slice(0, -5);
@@ -122,7 +124,9 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                             repoName = repoName.slice(0, -8);
                         }
                         setDirectoryName(
-                            repoName.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+                            repoName
+                                .replace(/-/g, ' ')
+                                .replace(/\b\w/g, (c: string) => c.toUpperCase()),
                         );
                     }
 
