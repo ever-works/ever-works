@@ -1,13 +1,11 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { DataGeneratorService } from '@ever-works/agent/generators';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
 import { WebsiteGeneratorService } from '@ever-works/agent/generators';
 import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
 import { CreateItemsGeneratorDto } from '@ever-works/agent/items-generator';
-import { DIRECTORY_OPERATIONS } from '@ever-works/agent/directory-operations';
-import type { DirectoryOperations } from '@ever-works/agent/directory-operations';
-import { NOTIFICATION_OPERATIONS } from '@ever-works/agent/notification-operations';
-import type { NotificationOperations } from '@ever-works/agent/notification-operations';
+import { DirectoryOperationsService } from '@ever-works/agent/directory-operations';
+import { NotificationService } from '@ever-works/agent/notifications';
 import { ItemsGeneratorMetrics } from '@ever-works/agent/items-generator';
 import { classifyGenerationError, notifyForClassifiedError } from '@ever-works/agent/services';
 
@@ -34,11 +32,9 @@ export class TriggerGenerationOrchestrator {
         private readonly dataGenerator: DataGeneratorService,
         private readonly markdownGenerator: MarkdownGeneratorService,
         private readonly websiteGenerator: WebsiteGeneratorService,
-        @Inject(DIRECTORY_OPERATIONS)
-        private readonly directoryOperations: DirectoryOperations,
+        private readonly directoryOperations: DirectoryOperationsService,
         @Optional()
-        @Inject(NOTIFICATION_OPERATIONS)
-        private readonly notificationOperations?: NotificationOperations,
+        private readonly notificationService?: NotificationService,
     ) {}
 
     async run({ directory, user, dto, historyId, historyStartedAt }: TriggerGenerationOptions) {
@@ -140,7 +136,7 @@ export class TriggerGenerationOrchestrator {
                 ]);
             }
 
-            await this.directoryOperations.emitGenerationCompleted(directory);
+            await this.directoryOperations.emitGenerationCompleted(directory.id);
         }
     }
 
@@ -189,7 +185,7 @@ export class TriggerGenerationOrchestrator {
             }),
         ]);
 
-        await this.directoryOperations.emitGenerationCompleted(directory);
+        await this.directoryOperations.emitGenerationCompleted(directory.id);
     }
 
     private async handleErrorNotification(
@@ -197,7 +193,7 @@ export class TriggerGenerationOrchestrator {
         user: User,
         directory: Directory,
     ): Promise<void> {
-        if (!this.notificationOperations) {
+        if (!this.notificationService) {
             return;
         }
 
@@ -205,7 +201,7 @@ export class TriggerGenerationOrchestrator {
 
         if (classification.type !== 'unknown') {
             await notifyForClassifiedError(
-                this.notificationOperations,
+                this.notificationService,
                 user.id,
                 directory.id,
                 directory.name,

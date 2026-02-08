@@ -1,4 +1,4 @@
-import type { NotificationOperations } from '@src/notification-operations/notification-operations.interface';
+import type { NotificationService } from '@src/notifications/notification.service';
 
 export type ErrorClassificationType =
     | 'ai_credits'
@@ -37,7 +37,7 @@ export function classifyGenerationError(error: unknown): ErrorClassification {
 }
 
 export async function notifyForClassifiedError(
-    notificationOps: NotificationOperations,
+    notificationService: NotificationService,
     userId: string,
     directoryId: string,
     directoryName: string,
@@ -45,7 +45,7 @@ export async function notifyForClassifiedError(
 ): Promise<void> {
     switch (classification.type) {
         case 'ai_credits':
-            await notificationOps.notifyAiCreditsDepleted(
+            await notificationService.notifyAiCreditsDepleted(
                 userId,
                 classification.provider,
                 classification.message,
@@ -53,7 +53,7 @@ export async function notifyForClassifiedError(
             break;
 
         case 'ai_provider':
-            await notificationOps.notifyAiProviderError(
+            await notificationService.notifyAiProviderError(
                 userId,
                 classification.provider,
                 classification.message,
@@ -61,11 +61,11 @@ export async function notifyForClassifiedError(
             break;
 
         case 'git_auth':
-            await notificationOps.notifyGitAuthExpired(userId, classification.provider);
+            await notificationService.notifyGitAuthExpired(userId, classification.provider);
             break;
 
         case 'account_level':
-            await notificationOps.notifyGenerationAccountError(
+            await notificationService.notifyGenerationAccountError(
                 userId,
                 directoryId,
                 directoryName,

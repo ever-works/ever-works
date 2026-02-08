@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { DIRECTORY_OPERATIONS } from '@ever-works/agent/directory-operations';
-import { NOTIFICATION_OPERATIONS } from '@ever-works/agent/notification-operations';
+import { DirectoryOperationsService } from '@ever-works/agent/directory-operations';
+import { NotificationService } from '@ever-works/agent/notifications';
 import { DataGeneratorService } from '@ever-works/agent/generators';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
 import { WebsiteGeneratorService, BranchSyncService } from '@ever-works/agent/generators';
@@ -13,8 +13,8 @@ import { TriggerPluginsModule } from './plugins/trigger-plugins.module';
 import { TriggerFacadesModule } from './plugins/trigger-facades.module';
 import { TriggerPipelineModule } from './plugins/trigger-pipeline.module';
 import { TriggerInternalModule } from './trigger-internal.module';
-import { RemoteDirectoryOperationsService } from './remote-directory-operations.service';
-import { RemoteNotificationOperationsService } from './remote-notification-operations.service';
+import { TriggerInternalApiClient } from './trigger-internal-api.client';
+import { createRemoteProxy } from './plugins/remote-proxy';
 import { TriggerGenerationOrchestrator } from './trigger-generation.orchestrator';
 import { TriggerImportOrchestrator } from './trigger-import.orchestrator';
 import { TriggerCacheFactory } from './cache/cache.factory';
@@ -28,15 +28,17 @@ import { TriggerCacheFactory } from './cache/cache.factory';
         TriggerCacheFactory.register({ isGlobal: true }),
     ],
     providers: [
-        RemoteDirectoryOperationsService,
         {
-            provide: DIRECTORY_OPERATIONS,
-            useExisting: RemoteDirectoryOperationsService,
+            provide: DirectoryOperationsService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'DirectoryOperationsService'),
+            inject: [TriggerInternalApiClient],
         },
-        RemoteNotificationOperationsService,
         {
-            provide: NOTIFICATION_OPERATIONS,
-            useExisting: RemoteNotificationOperationsService,
+            provide: NotificationService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'NotificationService'),
+            inject: [TriggerInternalApiClient],
         },
         DataGeneratorService,
         MarkdownGeneratorService,

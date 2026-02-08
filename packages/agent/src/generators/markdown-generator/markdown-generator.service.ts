@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'node:fs/promises';
 import { GitFacadeService } from '../../facades/git.facade';
 import type { Category, Identifiable, ItemData, Tag } from '@ever-works/contracts';
@@ -8,8 +8,7 @@ import { DataRepository, PRUpdate } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
 import { GenerationMethod } from '../../items-generator/dto';
-import { DIRECTORY_OPERATIONS } from '@src/directory-operations';
-import type { DirectoryOperations } from '@src/directory-operations';
+import { DirectoryOperationsService } from '@src/directory-operations';
 
 type InitializeOptions = {
     repository_description?: string;
@@ -24,8 +23,7 @@ export class MarkdownGeneratorService {
 
     constructor(
         private readonly gitFacade: GitFacadeService,
-        @Inject(DIRECTORY_OPERATIONS)
-        private readonly directoryOperations: DirectoryOperations,
+        private readonly directoryOperations: DirectoryOperationsService,
     ) {}
 
     async initialize(directory: Directory, user: User, options: InitializeOptions = {}) {

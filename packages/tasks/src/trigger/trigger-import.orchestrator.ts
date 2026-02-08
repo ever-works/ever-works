@@ -1,9 +1,7 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
-import { DIRECTORY_OPERATIONS } from '@ever-works/agent/directory-operations';
-import type { DirectoryOperations } from '@ever-works/agent/directory-operations';
-import { NOTIFICATION_OPERATIONS } from '@ever-works/agent/notification-operations';
-import type { NotificationOperations } from '@ever-works/agent/notification-operations';
+import { DirectoryOperationsService } from '@ever-works/agent/directory-operations';
+import { NotificationService } from '@ever-works/agent/notifications';
 import { DirectoryImportPayload, DirectoryImportResult } from '@ever-works/agent/tasks';
 import { classifyGenerationError, notifyForClassifiedError } from '@ever-works/agent/services';
 import { ImportExecutorService } from '@ever-works/agent/import';
@@ -27,11 +25,9 @@ export class TriggerImportOrchestrator {
 
     constructor(
         private readonly importExecutor: ImportExecutorService,
-        @Inject(DIRECTORY_OPERATIONS)
-        private readonly directoryOperations: DirectoryOperations,
+        private readonly directoryOperations: DirectoryOperationsService,
         @Optional()
-        @Inject(NOTIFICATION_OPERATIONS)
-        private readonly notificationOperations?: NotificationOperations,
+        private readonly notificationService?: NotificationService,
     ) {}
 
     async run({ directory, user, payload, gitToken }: TriggerImportOptions): Promise<void> {
@@ -167,7 +163,7 @@ export class TriggerImportOrchestrator {
                 ]);
             }
 
-            await this.directoryOperations.emitGenerationCompleted(directory);
+            await this.directoryOperations.emitGenerationCompleted(directory.id);
         }
     }
 
@@ -199,7 +195,7 @@ export class TriggerImportOrchestrator {
             }),
         ]);
 
-        await this.directoryOperations.emitGenerationCompleted(directory);
+        await this.directoryOperations.emitGenerationCompleted(directory.id);
     }
 
     private resolveStartTime(historyStartedAt?: string): Date {
@@ -224,7 +220,7 @@ export class TriggerImportOrchestrator {
         user: User,
         directory: Directory,
     ): Promise<void> {
-        if (!this.notificationOperations) {
+        if (!this.notificationService) {
             return;
         }
 
@@ -232,7 +228,7 @@ export class TriggerImportOrchestrator {
 
         if (classification.type !== 'unknown') {
             await notifyForClassifiedError(
-                this.notificationOperations,
+                this.notificationService,
                 user.id,
                 directory.id,
                 directory.name,

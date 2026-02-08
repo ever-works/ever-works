@@ -26,7 +26,10 @@
         "schema:log": "npm run typeorm -- schema:log -d typeorm.config.ts"
     },
     "dependencies": {
+        "@ever-works/agent": "workspace:*",
+        "@ever-works/monitoring": "workspace:*",
         "@ever-works/plugin": "workspace:*",
+        "@ever-works/trigger-tasks": "workspace:*",
         "@nestjs-modules/mailer": "^2.0.2",
         "@nestjs/axios": "^4.0.1",
         "@nestjs/common": "^11.1.11",
@@ -40,9 +43,6 @@
         "@nestjs/swagger": "^11.2.5",
         "@nestjs/throttler": "^6.5.0",
         "@nestjs/typeorm": "^11.0.0",
-        "@ever-works/agent": "workspace:*",
-        "@ever-works/monitoring": "workspace:*",
-        "@ever-works/trigger-tasks": "workspace:*",
         "@scalar/nestjs-api-reference": "^1.0.20",
         "axios": "^1.13.2",
         "bcrypt": "^6.0.0",
@@ -63,6 +63,7 @@
         "pg": "^8.16.3",
         "reflect-metadata": "^0.2.2",
         "rxjs": "^7.8.2",
+        "superjson": "^1.13.3",
         "typeorm": "^0.3.28"
     },
     "devDependencies": {

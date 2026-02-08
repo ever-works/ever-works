@@ -1,4 +1,4 @@
-import { IsString, IsArray } from 'class-validator';
+import { IsString, IsObject } from 'class-validator';
 
 export class RemoteCallDto {
     @IsString()
@@ -7,6 +7,6 @@ export class RemoteCallDto {
     @IsString()
     method: string;
 
-    @IsArray()
-    args: unknown[];
+    @IsObject()
+    args: { json: unknown; meta?: unknown };
 }

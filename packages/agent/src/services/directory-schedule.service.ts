@@ -1,6 +1,5 @@
 import {
     BadRequestException,
-    Inject,
     Injectable,
     Logger,
     NotFoundException,
@@ -31,10 +30,7 @@ import { UsageLedgerTriggerType } from '@src/entities/usage-ledger-entry.entity'
 import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
 import { PluginRegistryService } from '@src/plugins/services/plugin-registry.service';
 import { Directory } from '@src/entities/directory.entity';
-import {
-    NOTIFICATION_OPERATIONS,
-    NotificationOperations,
-} from '@src/notification-operations/notification-operations.interface';
+import { NotificationService } from '@src/notifications/notification.service';
 
 @Injectable()
 export class DirectoryScheduleService {
@@ -50,8 +46,7 @@ export class DirectoryScheduleService {
         private readonly dataGeneratorService: DataGeneratorService,
         private readonly pluginRegistry: PluginRegistryService,
         @Optional()
-        @Inject(NOTIFICATION_OPERATIONS)
-        private readonly notificationOperations?: NotificationOperations,
+        private readonly notificationService?: NotificationService,
     ) {}
 
     async getSchedule(
@@ -351,8 +346,8 @@ export class DirectoryScheduleService {
 
             // Publish notification for schedule paused due to failures
             const directory = await this.directoryRepository.findById(schedule.directoryId);
-            if (directory && this.notificationOperations) {
-                await this.notificationOperations.notifySchedulePaused(
+            if (directory && this.notificationService) {
+                await this.notificationService.notifySchedulePaused(
                     schedule.userId,
                     schedule.directoryId,
                     directory.name,
@@ -415,8 +410,8 @@ export class DirectoryScheduleService {
 
             // Publish notification for schedule paused due to plan limit
             const directory = await this.directoryRepository.findById(schedule.directoryId);
-            if (directory && this.notificationOperations) {
-                await this.notificationOperations.notifySchedulePaused(
+            if (directory && this.notificationService) {
+                await this.notificationService.notifySchedulePaused(
                     schedule.userId,
                     schedule.directoryId,
                     directory.name,

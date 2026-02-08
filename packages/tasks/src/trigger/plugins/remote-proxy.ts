@@ -1,8 +1,11 @@
+import superjson from 'superjson';
 import { TriggerInternalApiClient } from '../trigger-internal-api.client';
 
 /**
  * Creates a Proxy that forwards method calls to the API via the internal client.
  * Methods in `localMethods` run locally instead of being forwarded.
+ *
+ * Uses SuperJSON for serialization so Date, Map, Set, etc. survive the round-trip.
  */
 export function createRemoteProxy(
     apiClient: TriggerInternalApiClient,
@@ -33,8 +36,11 @@ export function createRemoteProxy(
 
             if (prop in obj) return obj[prop];
 
-            // Forward to API
-            return (...args: unknown[]) => apiClient.callRemote(providerName, prop, args);
+            // Forward to API with SuperJSON-serialized args
+            return (...args: unknown[]) => {
+                const serialized = superjson.serialize(args);
+                return apiClient.callRemote(providerName, prop, serialized);
+            };
         },
     });
 }

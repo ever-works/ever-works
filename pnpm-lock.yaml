@@ -143,6 +143,9 @@ importers:
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
+      superjson:
+        specifier: ^1.13.3
+        version: 1.13.3
       typeorm:
         specifier: ^0.3.28
         version: 0.3.28(better-sqlite3@12.5.0)(ioredis@5.8.2)(mysql2@3.16.0)(pg@8.16.3)(ts-node@10.9.2(@swc/core@1.15.8(@swc/helpers@0.5.18))(@types/node@22.19.3)(typescript@5.9.3))
@@ -1203,6 +1206,9 @@ importers:
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
+      superjson:
+        specifier: ^1.13.3
+        version: 1.13.3
     devDependencies:
       '@trigger.dev/build':
         specifier: ^4.3.3

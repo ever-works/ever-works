@@ -21,7 +21,6 @@ import { GeneratorFormSchemaService } from './generator-form-schema.service';
 import { SubscriptionsModule } from '@src/subscriptions';
 import { RepositoryManagementService } from './repository-management.service';
 import { NotificationsModule } from '@src/notifications';
-import { NotificationOperationsModule } from '@src/notification-operations';
 
 /**
  * Directory module providing directory-related services.
@@ -40,7 +39,6 @@ import { NotificationOperationsModule } from '@src/notification-operations';
         ImportModule,
         SubscriptionsModule,
         NotificationsModule,
-        NotificationOperationsModule,
     ],
     providers: [
         DirectoryOwnershipService,

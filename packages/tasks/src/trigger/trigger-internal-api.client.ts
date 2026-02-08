@@ -1,32 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import superjson from 'superjson';
 import { config } from '@ever-works/agent/config';
-import {
-    GenerateStatusType,
-    NotificationType,
-    NotificationCategory,
-} from '@ever-works/agent/entities';
-import {
-    DirectoryCommand,
-    DirectoryCommandAction,
-    DirectoryContextResponse,
-} from '@ever-works/agent/tasks';
+import { GenerateStatusType } from '@ever-works/agent/entities';
+import { DirectoryContextResponse } from '@ever-works/agent/tasks';
 
 type DispatchSchedulesResponse = {
     dispatched: number;
 };
-
-export interface CreateNotificationPayload {
-    userId: string;
-    type: NotificationType;
-    category: NotificationCategory;
-    title: string;
-    message: string;
-    actionUrl?: string;
-    actionLabel?: string;
-    metadata?: Record<string, any>;
-    isPersistent?: boolean;
-    deduplicationKey?: string;
-}
 
 @Injectable()
 export class TriggerInternalApiClient {
@@ -55,17 +35,6 @@ export class TriggerInternalApiClient {
         return this.request<DirectoryContextResponse>({
             method: 'GET',
             path: `/directories/${directoryId}/context?${searchParams.toString()}`,
-        });
-    }
-
-    async sendDirectoryCommand<A extends DirectoryCommandAction>(
-        directoryId: string,
-        command: DirectoryCommand<A>,
-    ): Promise<void> {
-        await this.request<void>({
-            method: 'POST',
-            path: `/directories/${directoryId}/commands`,
-            body: command,
         });
     }
 
@@ -121,26 +90,22 @@ export class TriggerInternalApiClient {
         return response.deleted;
     }
 
-    /** Forward a method call to a named injectable on the API side. */
-    async callRemote(name: string, method: string, args: unknown[]): Promise<unknown> {
-        const response = await this.request<{ result: unknown }>({
+    /**
+     * Forward a method call to a named injectable on the API side.
+     * Args are passed as a SuperJSON envelope; the result is SuperJSON-deserialized.
+     */
+    async callRemote(
+        name: string,
+        method: string,
+        args: { json: unknown; meta?: unknown },
+    ): Promise<unknown> {
+        const response = await this.request<{ result: { json: unknown; meta?: unknown } }>({
             method: 'POST',
             path: '/remote/call',
             body: { name, method, args },
         });
 
-        return response.result;
-    }
-
-    /** Create a notification via the internal API. */
-    async createNotification(
-        payload: CreateNotificationPayload,
-    ): Promise<{ notificationId: string }> {
-        return this.request<{ notificationId: string }>({
-            method: 'POST',
-            path: `/notifications`,
-            body: payload,
-        });
+        return response.result ? superjson.deserialize(response.result as any) : undefined;
     }
 
     private async request<T>({

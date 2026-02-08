@@ -55,10 +55,7 @@ import { DirectorySchedule } from '@src/entities/directory-schedule.entity';
 import { DirectoryScheduleService } from './directory-schedule.service';
 import { UserRepository } from '@src/database/repositories/user.repository';
 import { DirectoryImportService } from './directory-import.service';
-import {
-    NOTIFICATION_OPERATIONS,
-    NotificationOperations,
-} from '@src/notification-operations/notification-operations.interface';
+import { NotificationService } from '@src/notifications/notification.service';
 import { ScreenshotFacadeService } from '@src/facades';
 import { GeneratorFormSchemaService } from './generator-form-schema.service';
 
@@ -126,8 +123,7 @@ export class DirectoryGenerationService {
         @Inject(DIRECTORY_GENERATION_DISPATCHER)
         private readonly generationDispatcher?: DirectoryGenerationDispatcher,
         @Optional()
-        @Inject(NOTIFICATION_OPERATIONS)
-        private readonly notificationOperations?: NotificationOperations,
+        private readonly notificationService?: NotificationService,
     ) {}
 
     async generateItems(
@@ -1103,7 +1099,7 @@ export class DirectoryGenerationService {
         user: User,
         directory: Directory,
     ): Promise<void> {
-        if (!this.notificationOperations) {
+        if (!this.notificationService) {
             return;
         }
 
@@ -1111,7 +1107,7 @@ export class DirectoryGenerationService {
 
         if (classification.type !== 'unknown') {
             await notifyForClassifiedError(
-                this.notificationOperations,
+                this.notificationService,
                 user.id,
                 directory.id,
                 directory.name,

@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities/user.entity';
@@ -14,8 +14,7 @@ import {
 import { format } from 'date-fns';
 import { GenerateStatusType } from '../../entities/types';
 import { LEGAL_NOTICE, LICENSE_TEXT } from './texts';
-import { DIRECTORY_OPERATIONS } from '@src/directory-operations';
-import type { DirectoryOperations } from '@src/directory-operations';
+import { DirectoryOperationsService } from '@src/directory-operations';
 import pMap from 'p-map';
 import { config } from '../../config';
 import { PipelineOrchestratorService } from '../../pipeline';
@@ -75,8 +74,7 @@ export class DataGeneratorService {
     constructor(
         private readonly gitFacade: GitFacadeService,
         private readonly pipelineOrchestrator: PipelineOrchestratorService,
-        @Inject(DIRECTORY_OPERATIONS)
-        private readonly directoryOperations: DirectoryOperations,
+        private readonly directoryOperations: DirectoryOperationsService,
     ) {}
 
     private getDirectoryOwner(directory: Directory): User {
