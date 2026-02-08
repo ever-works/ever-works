@@ -9,6 +9,7 @@ import type {
     FormFieldGroup,
 } from '../../services/api.service';
 import type { FormFieldCondition } from '@ever-works/contracts';
+import { getIndividualProviderCategories, type IndividualCategoryKey } from '@ever-works/plugin';
 
 export interface CompanyDto {
     name: string;
@@ -94,24 +95,17 @@ export class GeneratePromptService extends BasePromptService {
         }
 
         // Standard mode: prompt for each provider category with >1 option
-        const categories: Array<{
-            key: keyof ProvidersDto;
-            label: string;
-            options: GeneratorFormSchema['providers'][keyof GeneratorFormSchema['providers']];
-        }> = [
-            { key: 'ai', label: 'AI Provider', options: schema.providers.ai },
-            { key: 'search', label: 'Search Provider', options: schema.providers.search },
-            {
-                key: 'screenshot',
-                label: 'Screenshot Provider',
-                options: schema.providers.screenshot,
-            },
-            {
-                key: 'contentExtractor',
-                label: 'Content Extractor',
-                options: schema.providers.contentExtractor,
-            },
-        ];
+        const cliLabels: Record<IndividualCategoryKey, string> = {
+            ai: 'AI Provider',
+            search: 'Search Provider',
+            screenshot: 'Screenshot Provider',
+            contentExtractor: 'Content Extractor',
+        };
+        const categories = getIndividualProviderCategories().map(({ uiKey }) => ({
+            key: uiKey as keyof ProvidersDto,
+            label: cliLabels[uiKey as IndividualCategoryKey],
+            options: schema.providers[uiKey as keyof GeneratorFormSchema['providers']],
+        }));
 
         for (const category of categories) {
             if (!category.options || category.options.length <= 1) continue;

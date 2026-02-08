@@ -8,6 +8,7 @@ import { canManageSchedule } from '@/lib/permissions';
 import { notFound } from 'next/navigation';
 import type { ProviderOption } from '@/lib/api/types-only';
 import type { ProvidersDto } from '@ever-works/contracts/api';
+import { SELECTABLE_PROVIDER_CATEGORIES, type ProviderCategoryKey } from '@ever-works/plugin';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -16,13 +17,18 @@ function resolveActiveProviders(
     overrides: ProvidersDto | null | undefined,
     allProviders: Record<string, ProviderOption[]>,
 ): ResolvedProvider[] {
-    const categories = [
-        { key: 'pipeline', label: 'Pipeline', options: allProviders.fullPipeline },
-        { key: 'ai', label: 'AI', options: allProviders.ai },
-        { key: 'search', label: 'Search', options: allProviders.search },
-        { key: 'screenshot', label: 'Screenshot', options: allProviders.screenshot },
-        { key: 'contentExtractor', label: 'Extractor', options: allProviders.contentExtractor },
-    ] as const;
+    const scheduleLabels: Record<ProviderCategoryKey, string> = {
+        fullPipeline: 'Pipeline',
+        ai: 'AI',
+        search: 'Search',
+        screenshot: 'Screenshot',
+        contentExtractor: 'Extractor',
+    };
+    const categories = Object.entries(SELECTABLE_PROVIDER_CATEGORIES).map(([key, def]) => ({
+        key: (key === 'fullPipeline' ? 'pipeline' : def.uiKey) as keyof ProvidersDto,
+        label: scheduleLabels[key as ProviderCategoryKey],
+        options: allProviders[def.uiKey],
+    }));
 
     const result: ResolvedProvider[] = [];
     for (const { key, label, options } of categories) {

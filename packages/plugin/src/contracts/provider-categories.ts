@@ -125,9 +125,15 @@ export type ProviderSelectionState = {
  */
 export type SelectableProviderCategory = keyof ProviderSelectionState;
 
+/**
+ * Keys of individual (non-pipeline) provider categories.
+ * Use in `Record<IndividualCategoryKey, T>` to force exhaustive label maps.
+ */
+export type IndividualCategoryKey = Exclude<ProviderCategoryKey, 'fullPipeline'>;
+
 export interface IndividualProviderCategory {
-	readonly categoryKey: Exclude<ProviderCategoryKey, 'fullPipeline'>;
-	readonly uiKey: string;
+	readonly categoryKey: IndividualCategoryKey;
+	readonly uiKey: IndividualCategoryKey;
 	readonly capability: string;
 }
 
@@ -139,8 +145,8 @@ export function getIndividualProviderCategories(): IndividualProviderCategory[] 
 	return (Object.entries(SELECTABLE_PROVIDER_CATEGORIES) as [ProviderCategoryKey, ProviderCategoryDefinition][])
 		.filter(([key]) => key !== 'fullPipeline')
 		.map(([key, def]) => ({
-			categoryKey: key as Exclude<ProviderCategoryKey, 'fullPipeline'>,
-			uiKey: def.uiKey,
+			categoryKey: key as IndividualCategoryKey,
+			uiKey: def.uiKey as IndividualCategoryKey,
 			capability: def.capability
 		}));
 }

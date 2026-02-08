@@ -8,6 +8,7 @@ import type {
     ProviderSelectionState,
     SelectableProviderCategory,
 } from '@/lib/api/types-only';
+import { getIndividualProviderCategories } from '@ever-works/plugin';
 
 interface ProviderSelectionSectionProps {
     formSchema: GeneratorFormSchema;
@@ -41,38 +42,25 @@ export function ProviderSelectionSection({
                     defaultExpanded={true}
                 >
                     <div className="space-y-3">
-                        {formSchema.providers.search.length > 0 && (
-                            <ProviderSelector
-                                label={t('searchProvider')}
-                                providers={formSchema.providers.search}
-                                value={providers.search}
-                                onChange={(id) => onProviderChange('search', id)}
-                            />
-                        )}
-                        {formSchema.providers.screenshot.length > 0 && (
-                            <ProviderSelector
-                                label={t('screenshotProvider')}
-                                providers={formSchema.providers.screenshot}
-                                value={providers.screenshot}
-                                onChange={(id) => onProviderChange('screenshot', id)}
-                            />
-                        )}
-                        {formSchema.providers.ai.length > 0 && (
-                            <ProviderSelector
-                                label={t('aiProvider')}
-                                providers={formSchema.providers.ai}
-                                value={providers.ai}
-                                onChange={(id) => onProviderChange('ai', id)}
-                            />
-                        )}
-                        {formSchema.providers.contentExtractor.length > 0 && (
-                            <ProviderSelector
-                                label={t('contentExtractorProvider')}
-                                providers={formSchema.providers.contentExtractor}
-                                value={providers.contentExtractor}
-                                onChange={(id) => onProviderChange('contentExtractor', id)}
-                            />
-                        )}
+                        {getIndividualProviderCategories().map(({ uiKey }) => {
+                            const options =
+                                formSchema.providers[
+                                    uiKey as keyof GeneratorFormSchema['providers']
+                                ];
+                            if (!options || options.length === 0) return null;
+                            const labelKey = `${uiKey}Provider` as Parameters<typeof t>[0];
+                            return (
+                                <ProviderSelector
+                                    key={uiKey}
+                                    label={t(labelKey)}
+                                    providers={options}
+                                    value={providers[uiKey as keyof ProviderSelectionState]}
+                                    onChange={(id) =>
+                                        onProviderChange(uiKey as SelectableProviderCategory, id)
+                                    }
+                                />
+                            );
+                        })}
                     </div>
                 </CollapsibleSection>
             )}

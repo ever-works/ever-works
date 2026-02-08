@@ -25,6 +25,7 @@ import {
     GenerateStatusType,
 } from '@src/entities/types';
 import type { ProvidersDto } from '@ever-works/contracts/api';
+import { SELECTABLE_PROVIDER_CATEGORIES } from '@ever-works/plugin';
 import { UsageLedgerService } from '@src/subscriptions/usage-ledger.service';
 import { UsageLedgerTriggerType } from '@src/entities/usage-ledger-entry.entity';
 import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
@@ -543,9 +544,11 @@ export class DirectoryScheduleService {
     }
 
     private validateProviderOverrides(overrides: ProvidersDto): void {
-        const fields = ['pipeline', 'ai', 'search', 'screenshot', 'contentExtractor'] as const;
-        for (const field of fields) {
-            const pluginId = overrides[field];
+        const dtoFields = Object.entries(SELECTABLE_PROVIDER_CATEGORIES).map(([key, def]) =>
+            key === 'fullPipeline' ? 'pipeline' : def.uiKey,
+        );
+        for (const field of dtoFields) {
+            const pluginId = overrides[field as keyof ProvidersDto];
             if (pluginId) {
                 const registered = this.pluginRegistry.get(pluginId);
                 if (!registered) {

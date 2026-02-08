@@ -15,9 +15,9 @@ import type {
 } from '@ever-works/plugin';
 import {
     isFormSchemaProvider,
-    SELECTABLE_PROVIDER_CATEGORIES,
     PLUGIN_CAPABILITIES,
     getIndividualProviderCategories,
+    getSelectableCategories,
 } from '@ever-works/plugin';
 import type { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dto';
 
@@ -234,30 +234,16 @@ export class GeneratorFormSchemaService {
     private async getAvailableProviders(
         options?: FormSchemaOptions,
     ): Promise<GeneratorFormSchema['providers']> {
-        const { search, screenshot, ai, contentExtractor, fullPipeline } =
-            SELECTABLE_PROVIDER_CATEGORIES;
+        const categories = getSelectableCategories();
+        const results = await Promise.all(
+            categories.map((cat) => this.getProvidersForCapability(cat.capability, options)),
+        );
 
-        const [
-            searchProviders,
-            screenshotProviders,
-            aiProviders,
-            contentExtractorProviders,
-            fullPipelineProviders,
-        ] = await Promise.all([
-            this.getProvidersForCapability(search.capability, options),
-            this.getProvidersForCapability(screenshot.capability, options),
-            this.getProvidersForCapability(ai.capability, options),
-            this.getProvidersForCapability(contentExtractor.capability, options),
-            this.getProvidersForCapability(fullPipeline.capability, options),
-        ]);
-
-        return {
-            search: searchProviders,
-            screenshot: screenshotProviders,
-            ai: aiProviders,
-            contentExtractor: contentExtractorProviders,
-            fullPipeline: fullPipelineProviders,
-        };
+        const providers: Record<string, ProviderOption[]> = {};
+        categories.forEach((cat, i) => {
+            providers[cat.uiKey] = results[i];
+        });
+        return providers as GeneratorFormSchema['providers'];
     }
 
     /**
