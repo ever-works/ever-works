@@ -189,7 +189,7 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                     </p>
                 )}
 
-                <div className="flex flex-wrap gap-1.5 mt-3">
+                <div className="flex flex-wrap gap-1.5 my-2">
                     <span className="text-xs px-2 py-0.5 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
                         {getCategoryLabel(plugin.category)}
                     </span>

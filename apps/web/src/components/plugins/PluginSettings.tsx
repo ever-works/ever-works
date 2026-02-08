@@ -159,7 +159,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                             </div>
 
                             {/* Capability badges */}
-                            <div className="flex flex-wrap gap-1.5 mt-3">
+                            <div className="flex flex-wrap gap-1.5 my-2">
                                 {plugin.capabilities
                                     .filter((cap) => cap !== plugin.category)
                                     .map((cap) => (
