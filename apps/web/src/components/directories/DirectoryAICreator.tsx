@@ -205,14 +205,12 @@ export function DirectoryAICreator({
                     defaultExpanded={false}
                 >
                     <div className="space-y-4">
-                        {formSchema && (
-                            <ProviderSelectionSection
-                                formSchema={formSchema}
-                                providers={providers}
-                                onProviderChange={handleProviderChange}
-                                isFullPipeline={isFullPipeline}
-                            />
-                        )}
+                        <ProviderSelectionSection
+                            formSchema={formSchema}
+                            providers={providers}
+                            onProviderChange={handleProviderChange}
+                            isFullPipeline={isFullPipeline}
+                        />
                         {formSchema.pluginFields.length > 0 && (
                             <DynamicPluginFields
                                 fields={formSchema.pluginFields}

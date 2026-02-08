@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useEffect, useCallback } from 'react';
+import { useState, useTransition, useEffect, useCallback, useRef } from 'react';
 import {
     Directory,
     CreateItemsGeneratorDto,
@@ -78,7 +78,11 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const { providers, handleProviderChange, isFullPipeline, buildSelectedProviders } =
         useProviderSelection(lastRequestData?.providers);
 
-    // Load form schema on mount
+    // Seed data from the previous generation — used once during schema init,
+    // should not trigger re-fetches when the parent re-renders with a new config reference.
+    const lastPluginConfigRef = useRef(lastRequestData?.pluginConfig);
+
+    // Load form schema when directory changes
     useEffect(() => {
         async function loadFormSchema() {
             setIsLoadingSchema(true);
@@ -92,8 +96,8 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                         Object.assign(defaults, result.data.defaultValues);
                     }
                     // Merge with last request data's plugin config if available
-                    if (lastRequestData?.pluginConfig) {
-                        Object.assign(defaults, lastRequestData.pluginConfig);
+                    if (lastPluginConfigRef.current) {
+                        Object.assign(defaults, lastPluginConfigRef.current);
                     }
                     setPluginConfig(defaults);
                 }
@@ -105,7 +109,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             }
         }
         loadFormSchema();
-    }, [directoryId, lastRequestData?.pluginConfig, t]);
+    }, [directoryId, t]);
 
     const handleCoreDataChange = useCallback((updates: Partial<typeof coreData>) => {
         setCoreData((prev) => ({ ...prev, ...updates }));
