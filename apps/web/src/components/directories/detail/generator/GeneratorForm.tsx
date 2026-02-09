@@ -43,7 +43,10 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
     const [confirmRecreate, setConfirmRecreate] = useState(false);
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
-    const [isLoadingSchema, setIsLoadingSchema] = useState(true);
+    const [isLoadingSchema, setIsLoadingSchema] = useState(false);
+    const $isLoadingSchema = useRef(isLoadingSchema);
+
+    $isLoadingSchema.current = isLoadingSchema;
 
     // Check if directory has been generated before
     const isGenerated = !!config?.metadata;
@@ -87,12 +90,19 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     // should not trigger re-fetches when the parent re-renders with a new config reference.
     const lastPluginConfigRef = useRef(lastRequestData?.pluginConfig);
 
-    // Load form schema when directory changes
+    // Load form schema when directory changes or pipeline provider changes
     useEffect(() => {
+        if ($isLoadingSchema.current) {
+            return;
+        }
+
         async function loadFormSchema() {
             setIsLoadingSchema(true);
             try {
-                const result = await getFormSchema(directoryId);
+                // Pass pipelineId if a full pipeline is selected
+                const pipelineId = providers.pipeline || undefined;
+                const result = await getFormSchema(directoryId, pipelineId);
+
                 if (result.success && result.data) {
                     setFormSchema(result.data);
                     // Initialize plugin config with default values
@@ -100,8 +110,17 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                     if (result.data.defaultValues) {
                         Object.assign(defaults, result.data.defaultValues);
                     }
-                    // Merge with last request data's plugin config if available
-                    if (lastPluginConfigRef.current) {
+
+                    // Only merge last request data if the pipeline matches what was used last time
+                    const lastPipelineId = lastRequestData?.providers?.pipeline || null;
+                    const currentPipelineId = providers.pipeline;
+
+                    // Treat null/undefined as equivalent (default pipeline)
+                    const isSamePipeline =
+                        (currentPipelineId || 'default') === (lastPipelineId || 'default');
+
+                    // Merge with last request data's plugin config if available and pipelines match
+                    if (isSamePipeline && lastPluginConfigRef.current) {
                         Object.assign(defaults, lastPluginConfigRef.current);
                     }
                     setPluginConfig(defaults);
@@ -114,7 +133,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             }
         }
         loadFormSchema();
-    }, [directoryId, t]);
+    }, [directoryId, t, providers.pipeline]);
 
     const handleCoreDataChange = useCallback((updates: Partial<typeof coreData>) => {
         setCoreData((prev) => ({ ...prev, ...updates }));
@@ -203,37 +222,6 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
         return t('updateItems');
     };
 
-    if (isLoadingSchema) {
-        return (
-            <div className="flex items-center justify-center py-12">
-                <div className="flex items-center gap-3">
-                    <svg
-                        className="animate-spin h-5 w-5 text-primary"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                    >
-                        <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                        />
-                        <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                    </svg>
-                    <span className="text-text-secondary dark:text-text-secondary-dark">
-                        {t('loadingFormSchema')}
-                    </span>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl">
             {/* Show update fields for existing directories, full fields for new/expanded */}
@@ -286,13 +274,19 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                     </CollapsibleSection>
 
                     {/* Dynamic Plugin Fields */}
-                    {formSchema && formSchema.pluginFields.length > 0 && (
-                        <DynamicPluginFields
-                            fields={formSchema.pluginFields}
-                            groups={formSchema.pluginGroups}
-                            values={pluginConfig}
-                            onChange={handlePluginConfigChange}
-                        />
+
+                    {isLoadingSchema ? (
+                        <LoadingState />
+                    ) : (
+                        formSchema &&
+                        formSchema.pluginFields.length > 0 && (
+                            <DynamicPluginFields
+                                fields={formSchema.pluginFields}
+                                groups={formSchema.pluginGroups}
+                                values={pluginConfig}
+                                onChange={handlePluginConfigChange}
+                            />
+                        )
                     )}
                 </>
             )}
@@ -358,5 +352,33 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                 </DialogContent>
             </Dialog>
         </form>
+    );
+}
+
+function LoadingState() {
+    const t = useTranslations('dashboard.directoryDetail.generator');
+    return (
+        <div className="flex items-center justify-center py-12">
+            <div className="flex items-center gap-3">
+                <svg className="animate-spin h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24">
+                    <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                    />
+                    <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                </svg>
+                <span className="text-text-secondary dark:text-text-secondary-dark">
+                    {t('loadingFormSchema')}
+                </span>
+            </div>
+        </div>
     );
 }

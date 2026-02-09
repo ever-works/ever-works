@@ -27,7 +27,7 @@ export function ProviderSelectionSection({
 
     return (
         <>
-            {formSchema.providers.fullPipeline.length > 1 && (
+            {formSchema.providers.fullPipeline.length > 0 && (
                 <PipelineModeSelector
                     fullPipelineProviders={formSchema.providers.fullPipeline}
                     selectedPipeline={providers.pipeline}

@@ -53,7 +53,8 @@ export function DirectoryAICreator({
     useEffect(() => {
         async function loadSchema() {
             try {
-                const result = await getGlobalFormSchema();
+                const pipelineId = providers.pipeline || undefined;
+                const result = await getGlobalFormSchema(pipelineId);
                 if (result.success && result.data) {
                     setFormSchema(result.data);
                     if (result.data.defaultValues) {
@@ -65,7 +66,7 @@ export function DirectoryAICreator({
             }
         }
         loadSchema();
-    }, []);
+    }, [providers.pipeline]);
 
     const handlePluginConfigChange = useCallback((values: Record<string, unknown>) => {
         setPluginConfig(values);
