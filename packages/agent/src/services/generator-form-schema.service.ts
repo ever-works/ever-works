@@ -341,7 +341,10 @@ export class GeneratorFormSchemaService {
         }
 
         const schema = registered.plugin.settingsSchema;
-        if (!schema?.properties || !schema.required?.length) {
+        if (
+            !schema?.properties ||
+            (!schema.required?.length && !schema['x-requiredGroups']?.length)
+        ) {
             return true;
         }
 
@@ -355,25 +358,8 @@ export class GeneratorFormSchemaService {
                 },
             );
 
-            // Check every required field has a non-empty resolved value
-            for (const requiredKey of schema.required) {
-                const propSchema = schema.properties[requiredKey] as JsonSchema | undefined;
-
-                // Skip env-only fields — they resolve from process.env, not DB
-                if (propSchema?.['x-envVar'] && !propSchema?.['x-secret']) {
-                    continue;
-                }
-
-                const setting = resolved[requiredKey];
-                if (
-                    !setting ||
-                    setting.value === undefined ||
-                    setting.value === null ||
-                    setting.value === ''
-                ) {
-                    return false;
-                }
-            }
+            if (!this.checkRequiredFields(schema, resolved)) return false;
+            if (!this.checkRequiredGroups(schema, resolved)) return false;
 
             return true;
         } catch (error) {
@@ -382,6 +368,49 @@ export class GeneratorFormSchemaService {
             );
             return true;
         }
+    }
+
+    private checkRequiredFields(
+        schema: JsonSchema,
+        resolved: Record<string, { value?: unknown }>,
+    ): boolean {
+        for (const key of schema.required ?? []) {
+            const propSchema = schema.properties?.[key] as JsonSchema | undefined;
+            if (propSchema?.['x-envVar'] && !propSchema?.['x-secret']) continue;
+
+            const setting = resolved[key];
+            if (
+                !setting ||
+                setting.value === undefined ||
+                setting.value === null ||
+                setting.value === ''
+            ) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private checkRequiredGroups(
+        schema: JsonSchema,
+        resolved: Record<string, { value?: unknown }>,
+    ): boolean {
+        for (const group of schema['x-requiredGroups'] ?? []) {
+            const hasAny = group.fields.some((fieldName) => {
+                const propSchema = schema.properties?.[fieldName] as JsonSchema | undefined;
+                if (propSchema?.['x-envVar'] && !propSchema?.['x-secret']) return true;
+
+                const setting = resolved[fieldName];
+                return (
+                    setting &&
+                    setting.value !== undefined &&
+                    setting.value !== null &&
+                    setting.value !== ''
+                );
+            });
+            if (!hasAny) return false;
+        }
+        return true;
     }
 
     async validateSelectedProviders(

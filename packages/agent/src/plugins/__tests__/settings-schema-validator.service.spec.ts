@@ -247,6 +247,119 @@ describe('SettingsSchemaValidatorService', () => {
         });
     });
 
+    describe('validateRequiredFields with x-requiredGroups', () => {
+        it('should pass when at least one field in the group is set', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    oauthToken: { type: 'string' },
+                    apiKey: { type: 'string' },
+                },
+                'x-requiredGroups': [
+                    { fields: ['oauthToken', 'apiKey'], message: 'Need one credential' },
+                ],
+            };
+
+            const result = service.validateRequiredFields(
+                { oauthToken: '', apiKey: 'sk-123' },
+                schema,
+                'global',
+            );
+            expect(result.valid).toBe(true);
+        });
+
+        it('should fail when no field in the group is set', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    oauthToken: { type: 'string' },
+                    apiKey: { type: 'string' },
+                },
+                'x-requiredGroups': [
+                    { fields: ['oauthToken', 'apiKey'], message: 'Need one credential' },
+                ],
+            };
+
+            const result = service.validateRequiredFields(
+                { oauthToken: '', apiKey: '' },
+                schema,
+                'global',
+            );
+            expect(result.valid).toBe(false);
+            expect(result.errors).toContain('Need one credential');
+        });
+
+        it('should use default message when no custom message provided', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    fieldA: { type: 'string' },
+                    fieldB: { type: 'string' },
+                },
+                'x-requiredGroups': [{ fields: ['fieldA', 'fieldB'] }],
+            };
+
+            const result = service.validateRequiredFields({}, schema, 'global');
+            expect(result.valid).toBe(false);
+            expect(result.errors[0]).toBe('At least one of [fieldA, fieldB] is required');
+        });
+
+        it('should validate multiple groups independently', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    oauthToken: { type: 'string' },
+                    apiKey: { type: 'string' },
+                    webhookUrl: { type: 'string' },
+                    pollingEnabled: { type: 'string' },
+                },
+                'x-requiredGroups': [
+                    { fields: ['oauthToken', 'apiKey'], message: 'Need auth' },
+                    { fields: ['webhookUrl', 'pollingEnabled'], message: 'Need delivery method' },
+                ],
+            };
+
+            const result = service.validateRequiredFields({ apiKey: 'sk-123' }, schema, 'global');
+            expect(result.valid).toBe(false);
+            expect(result.errors).toContain('Need delivery method');
+            expect(result.errors).not.toContain('Need auth');
+        });
+
+        it('should filter group fields by scope', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    oauthToken: { type: 'string', 'x-scope': 'user' },
+                    apiKey: { type: 'string', 'x-scope': 'user' },
+                },
+                'x-requiredGroups': [
+                    { fields: ['oauthToken', 'apiKey'], message: 'Need credential' },
+                ],
+            };
+
+            // At directory scope, user-scoped fields are excluded → group is skipped
+            const result = service.validateRequiredFields({}, schema, 'directory');
+            expect(result.valid).toBe(true);
+        });
+
+        it('should enforce group at matching scope', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    oauthToken: { type: 'string', 'x-scope': 'user' },
+                    apiKey: { type: 'string', 'x-scope': 'user' },
+                },
+                'x-requiredGroups': [
+                    { fields: ['oauthToken', 'apiKey'], message: 'Need credential' },
+                ],
+            };
+
+            const result = service.validateRequiredFields({}, schema, 'user');
+            expect(result.valid).toBe(false);
+            expect(result.errors).toContain('Need credential');
+        });
+    });
+
     describe('validate', () => {
         it('should validate both required fields and schema', () => {
             const schema: JsonSchema = {

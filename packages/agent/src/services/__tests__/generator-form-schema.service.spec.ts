@@ -494,6 +494,124 @@ describe('GeneratorFormSchemaService', () => {
         });
     });
 
+    describe('isPluginConfigured with x-requiredGroups', () => {
+        it('should mark plugin configured when at least one group field is set', async () => {
+            const plugin = createMockPlugin({
+                id: 'my-plugin',
+                capabilities: ['ai-provider'],
+                settingsSchema: {
+                    type: 'object',
+                    properties: {
+                        oauthToken: { type: 'string', 'x-secret': true },
+                        apiKey: { type: 'string', 'x-secret': true },
+                    },
+                    'x-requiredGroups': [
+                        { fields: ['oauthToken', 'apiKey'], message: 'Need OAuth or API key' },
+                    ],
+                } as any,
+            });
+            const registered = createRegistered(plugin, {
+                defaultForCapabilities: ['ai-provider'],
+            });
+
+            mockRegistry.get.mockReturnValue(registered);
+            mockRegistry.getByCapability.mockImplementation((cap: string) => {
+                if (cap === 'ai-provider') return [registered];
+                return [];
+            });
+
+            const settingsService = {
+                getResolvedSettings: jest.fn().mockResolvedValue({
+                    oauthToken: { value: '' },
+                    apiKey: { value: 'sk-123' },
+                }),
+            };
+            const svc = new GeneratorFormSchemaService(
+                mockRegistry,
+                undefined,
+                settingsService as any,
+            );
+
+            await expect(
+                svc.validateSelectedProviders({ ai: 'my-plugin' }, { userId: 'u1' }),
+            ).resolves.toBeUndefined();
+        });
+
+        it('should mark plugin unconfigured when no group field is set', async () => {
+            const plugin = createMockPlugin({
+                id: 'my-plugin',
+                capabilities: ['ai-provider'],
+                settingsSchema: {
+                    type: 'object',
+                    properties: {
+                        oauthToken: { type: 'string', 'x-secret': true },
+                        apiKey: { type: 'string', 'x-secret': true },
+                    },
+                    'x-requiredGroups': [
+                        { fields: ['oauthToken', 'apiKey'], message: 'Need OAuth or API key' },
+                    ],
+                } as any,
+            });
+            const registered = createRegistered(plugin);
+
+            mockRegistry.get.mockReturnValue(registered);
+
+            const settingsService = {
+                getResolvedSettings: jest.fn().mockResolvedValue({
+                    oauthToken: { value: '' },
+                    apiKey: { value: '' },
+                }),
+            };
+            const svc = new GeneratorFormSchemaService(
+                mockRegistry,
+                undefined,
+                settingsService as any,
+            );
+
+            await expect(
+                svc.validateSelectedProviders({ ai: 'my-plugin' }, { userId: 'u1' }),
+            ).rejects.toThrow('not available');
+        });
+
+        it('should require both required fields and requiredGroups to pass', async () => {
+            const plugin = createMockPlugin({
+                id: 'my-plugin',
+                capabilities: ['ai-provider'],
+                settingsSchema: {
+                    type: 'object',
+                    properties: {
+                        baseUrl: { type: 'string' },
+                        oauthToken: { type: 'string', 'x-secret': true },
+                        apiKey: { type: 'string', 'x-secret': true },
+                    },
+                    required: ['baseUrl'],
+                    'x-requiredGroups': [{ fields: ['oauthToken', 'apiKey'] }],
+                } as any,
+            });
+            const registered = createRegistered(plugin);
+
+            mockRegistry.get.mockReturnValue(registered);
+
+            const settingsService = {
+                getResolvedSettings: jest.fn().mockResolvedValue({
+                    baseUrl: { value: '' },
+                    oauthToken: { value: 'token' },
+                    apiKey: { value: '' },
+                }),
+            };
+            const svc = new GeneratorFormSchemaService(
+                mockRegistry,
+                undefined,
+                settingsService as any,
+            );
+
+            // baseUrl is required but empty → unconfigured
+            await expect(
+                svc.validateSelectedProviders({ ai: 'my-plugin' }, { userId: 'u1' }),
+            ).rejects.toThrow('not available');
+        });
+    });
+
     describe('validateFormValues', () => {
         it('should validate form-schema-provider plugin form values', async () => {
             const dsPlugin = createFormSchemaPlugin('apify', [], {

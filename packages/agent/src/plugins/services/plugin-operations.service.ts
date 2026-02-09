@@ -749,15 +749,17 @@ export class PluginOperationsService {
 
         this.validateUserLevelRequiredFields(userPlugin, schema);
 
-        // Validate combined settings+secretSettings together against schema
+        // Validate combined settings against schema.
+        // User settings serve as inherited base (mirrors resolved cascade).
         if (settings || secretSettings) {
             const allSettings = {
+                ...(userPlugin?.settings || {}),
+                ...(userPlugin?.secretSettings || {}),
                 ...directoryPlugin.settings,
                 ...directoryPlugin.secretSettings,
                 ...(settings || {}),
                 ...(secretSettings || {}),
             };
-            // Strip null values before validation — null means "cleared"
             const cleanedSettings = this.stripNullValues(allSettings);
             this.validateSettingsOrThrow(cleanedSettings, schema, 'directory');
         }
@@ -876,29 +878,63 @@ export class PluginOperationsService {
     // ============================================
 
     /**
-     * Validate that user-level required settings are configured.
-     * Called before saving directory settings — directory overrides should
-     * not be allowed when the user hasn't filled their own required fields.
+     * Validate that user-level required settings are configured before
+     * allowing directory overrides.
      *
-     * Extracted as a separate method so this check can be easily disabled later.
+     * Individual `required` fields: always enforced at user scope.
+     *
+     * `x-requiredGroups`: only enforced when every field in the group is
+     * user-scoped (directory can't satisfy any of them). If any field is
+     * global or directory-scoped, the group is skipped — directory may
+     * fill it during its own validation.
      */
     private validateUserLevelRequiredFields(
         userPlugin: UserPluginEntity | null,
         schema: JsonSchema | undefined,
     ): void {
-        if (!schema?.required || !schema.properties) return;
+        if (!schema?.properties) return;
+        if (!schema.required?.length && !schema['x-requiredGroups']?.length) return;
 
         const userSettings = {
             ...(userPlugin?.settings || {}),
             ...(userPlugin?.secretSettings || {}),
         };
-        const result = this.settingsValidator.validateRequiredFields(userSettings, schema, 'user');
+
+        const userOnlyGroups = this.filterUserOnlyGroups(schema);
+        const effectiveSchema: JsonSchema = {
+            ...schema,
+            'x-requiredGroups': userOnlyGroups.length > 0 ? userOnlyGroups : undefined,
+        };
+
+        const result = this.settingsValidator.validateRequiredFields(
+            userSettings,
+            effectiveSchema,
+            'user',
+        );
         if (!result.valid) {
             throw new BadRequestException({
                 message: 'User-level required settings must be configured first',
                 errors: result.errors,
             });
         }
+    }
+
+    /**
+     * Returns only groups where every field is user-scoped,
+     * meaning directory level cannot satisfy them.
+     */
+    private filterUserOnlyGroups(schema: JsonSchema): { fields: string[]; message?: string }[] {
+        const groups = schema['x-requiredGroups'];
+        if (!groups) return [];
+
+        return groups
+            .filter((group) =>
+                group.fields.every((field) => {
+                    const propSchema = schema.properties?.[field];
+                    return (propSchema?.['x-scope'] || 'global') === 'user';
+                }),
+            )
+            .map((g) => ({ fields: [...g.fields], message: g.message }));
     }
 
     /**

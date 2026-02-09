@@ -68,6 +68,8 @@ export interface PluginSettingsSchema {
 	properties: Record<string, PluginSettingsSchemaProperty>;
 	/** Required field names */
 	required?: string[];
+	/** Groups where at least one field must be set */
+	requiredGroups?: { fields: string[]; message?: string }[];
 }
 
 /**
@@ -113,7 +115,11 @@ export function toPluginSettingsSchema(schema: JsonSchema): PluginSettingsSchema
 		title: schema.title,
 		description: schema.description,
 		properties,
-		required: schema.required as string[] | undefined
+		required: schema.required as string[] | undefined,
+		requiredGroups: schema['x-requiredGroups']?.map((g) => ({
+			fields: [...g.fields],
+			message: g.message
+		}))
 	};
 }
 

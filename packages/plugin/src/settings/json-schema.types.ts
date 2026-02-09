@@ -141,6 +141,12 @@ export interface JsonSchema {
 	readonly 'x-adminOnly'?: boolean;
 	/** Whether field should be hidden from the settings UI entirely */
 	readonly 'x-hidden'?: boolean;
+
+	/** Groups of fields where at least one must be set. Each group is independent. */
+	readonly 'x-requiredGroups'?: readonly {
+		readonly fields: readonly string[];
+		readonly message?: string;
+	}[];
 }
 
 /**

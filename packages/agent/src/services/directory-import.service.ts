@@ -232,10 +232,9 @@ export class DirectoryImportService {
 
             // Validate AI provider is configured before creating directory
             if (dto.sourceType === ImportSourceTypeEnum.AWESOME_README) {
-                await this.generatorFormSchemaService.validateSelectedProviders(
-                    dto.providers,
-                    { userId: user.id },
-                );
+                await this.generatorFormSchemaService.validateSelectedProviders(dto.providers, {
+                    userId: user.id,
+                });
             }
 
             if (dto.sourceType !== ImportSourceTypeEnum.LINK_EXISTING) {

@@ -89,13 +89,14 @@ export class SettingsSchemaValidatorService {
         schema: JsonSchema | undefined,
         scope: SettingsScope,
     ): SettingsValidationResult {
-        if (!schema?.required || !schema.properties) {
+        if (!schema?.properties) return { valid: true, errors: [] };
+        if (!schema.required?.length && !schema['x-requiredGroups']?.length) {
             return { valid: true, errors: [] };
         }
 
         const missingFields: string[] = [];
 
-        for (const requiredField of schema.required) {
+        for (const requiredField of schema.required ?? []) {
             const propSchema = schema.properties[requiredField];
             if (!propSchema) continue;
 
@@ -115,6 +116,11 @@ export class SettingsSchemaValidatorService {
                 valid: false,
                 errors: [`Missing required fields: ${missingFields.join(', ')}`],
             };
+        }
+
+        const groupErrors = this.validateRequiredGroups(settings, schema, scope);
+        if (groupErrors.length > 0) {
+            return { valid: false, errors: groupErrors };
         }
 
         return { valid: true, errors: [] };
@@ -143,16 +149,40 @@ export class SettingsSchemaValidatorService {
         return this.validateSettings(settings, schema, scope);
     }
 
-    /**
-     * Clear the schema cache
-     */
     clearCache(): void {
         this.schemaCache.clear();
     }
 
-    /**
-     * Filter a schema to only include properties for a given scope.
-     */
+    private validateRequiredGroups(
+        settings: Record<string, unknown>,
+        schema: JsonSchema,
+        scope: SettingsScope,
+    ): string[] {
+        const errors: string[] = [];
+        for (const group of schema['x-requiredGroups'] ?? []) {
+            const scopedFields = group.fields.filter((field) => {
+                const propSchema = schema.properties?.[field];
+                if (!propSchema) return false;
+                const fieldScope = (propSchema['x-scope'] as SettingsScope) || 'global';
+                return this.isScopeApplicable(fieldScope, scope);
+            });
+
+            if (scopedFields.length === 0) continue;
+
+            const hasAny = scopedFields.some((field) => {
+                const value = settings[field];
+                return value !== undefined && value !== null && value !== '';
+            });
+
+            if (!hasAny) {
+                errors.push(
+                    group.message || `At least one of [${scopedFields.join(', ')}] is required`,
+                );
+            }
+        }
+        return errors;
+    }
+
     private filterSchemaByScope(schema: JsonSchema, scope: SettingsScope): JsonSchema {
         if (!schema.properties) {
             return schema;

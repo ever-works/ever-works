@@ -107,20 +107,52 @@ export function usePluginSettings({
         });
     }, [schema, scopes]);
 
+    const requiredGroups = useMemo(() => {
+        if (!schema?.requiredGroups || !schema.properties) return [];
+        return schema.requiredGroups
+            .map((group) => ({
+                ...group,
+                fields: group.fields.filter((field) => {
+                    const propSchema = schema.properties?.[field] as
+                        | PluginSettingsSchemaProperty
+                        | undefined;
+                    if (!propSchema) return false;
+                    const scope = propSchema.scope || 'global';
+                    return scopes.includes(scope as SettingScopeApi);
+                }),
+            }))
+            .filter((group) => group.fields.length > 0);
+    }, [schema, scopes]);
+
     const validateRequiredFields = useCallback((): string[] => {
-        const missingFields: string[] = [];
+        const errors: string[] = [];
+
         for (const field of requiredFields) {
             const value = settings[field] ?? secretSettings[field];
             if (value === undefined || value === null || value === '') {
                 const propSchema = schema?.properties?.[field] as
                     | PluginSettingsSchemaProperty
                     | undefined;
-                const label = propSchema?.title || field;
-                missingFields.push(label);
+                errors.push(propSchema?.title || field);
             }
         }
-        return missingFields;
-    }, [requiredFields, settings, secretSettings, schema]);
+
+        for (const group of requiredGroups) {
+            const hasAny = group.fields.some((field) => {
+                const value = settings[field] ?? secretSettings[field];
+                return value !== undefined && value !== null && value !== '';
+            });
+            if (!hasAny) {
+                const labels = group.fields.map((f) => {
+                    const ps = schema?.properties?.[f] as PluginSettingsSchemaProperty | undefined;
+                    return ps?.title || f;
+                });
+                errors.push(group.message || `At least one of: ${labels.join(', ')}`);
+            }
+        }
+
+        return errors;
+    }, [requiredFields, requiredGroups, settings, secretSettings, schema]);
 
     const handleFieldChange = useCallback((key: string, value: unknown, isSecret: boolean) => {
         if (isSecret) {

@@ -1796,6 +1796,316 @@ describe('PluginOperationsService', () => {
         });
     });
 
+    describe('x-requiredGroups in directory settings', () => {
+        let realService: PluginOperationsService;
+        let realRegistry: PluginRegistryService;
+        let realUserPluginRepo: Repository<UserPluginEntity>;
+        let realDirectoryPluginRepo: Repository<DirectoryPluginEntity>;
+
+        beforeEach(async () => {
+            const mod: TestingModule = await Test.createTestingModule({
+                providers: [
+                    PluginOperationsService,
+                    SettingsSchemaValidatorService,
+                    {
+                        provide: getRepositoryToken(PluginEntity),
+                        useValue: {
+                            findOne: jest.fn().mockResolvedValue(null),
+                            save: jest.fn().mockImplementation((e) => e),
+                            create: jest.fn().mockImplementation((d) => d),
+                        },
+                    },
+                    {
+                        provide: getRepositoryToken(UserPluginEntity),
+                        useValue: {
+                            findOne: jest.fn().mockResolvedValue(null),
+                            save: jest.fn().mockImplementation((e) => e),
+                            create: jest.fn().mockImplementation((d) => d),
+                        },
+                    },
+                    {
+                        provide: getRepositoryToken(DirectoryPluginEntity),
+                        useValue: {
+                            findOne: jest.fn().mockResolvedValue(null),
+                            save: jest.fn().mockImplementation((e) => e),
+                            create: jest.fn().mockImplementation((d) => d),
+                            createQueryBuilder: jest.fn().mockReturnValue({
+                                update: jest.fn().mockReturnThis(),
+                                set: jest.fn().mockReturnThis(),
+                                where: jest.fn().mockReturnThis(),
+                                andWhere: jest.fn().mockReturnThis(),
+                                execute: jest.fn().mockResolvedValue({}),
+                            }),
+                        },
+                    },
+                    {
+                        provide: PluginRegistryService,
+                        useValue: {
+                            get: jest.fn(),
+                            getAll: jest.fn().mockReturnValue([]),
+                        },
+                    },
+                    {
+                        provide: AiFacadeService,
+                        useValue: { getAvailableModels: jest.fn().mockResolvedValue([]) },
+                    },
+                ],
+            }).compile();
+
+            realService = mod.get(PluginOperationsService);
+            realRegistry = mod.get(PluginRegistryService);
+            realUserPluginRepo = mod.get(getRepositoryToken(UserPluginEntity));
+            realDirectoryPluginRepo = mod.get(getRepositoryToken(DirectoryPluginEntity));
+        });
+
+        const makeSchema = (overrides: Partial<JsonSchema> = {}): JsonSchema =>
+            ({
+                type: 'object',
+                properties: {
+                    oauthToken: { type: 'string', 'x-secret': true, 'x-scope': 'user' },
+                    apiKey: { type: 'string', 'x-secret': true },
+                },
+                ...overrides,
+            }) as unknown as JsonSchema;
+
+        const makePlugin = (schema: JsonSchema) => {
+            const plugin = createMockPlugin(schema);
+            return createRegisteredPlugin(plugin);
+        };
+
+        const setupDirectoryPlugin = (
+            userSettings: Record<string, unknown>,
+            dirSettings: Record<string, unknown>,
+        ) => {
+            jest.spyOn(realUserPluginRepo, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: userSettings,
+                metadata: {},
+            } as any);
+            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+                id: '2',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: dirSettings,
+                metadata: {},
+            } as any);
+        };
+
+        it('should allow directory save when group has mixed scopes and user set nothing', async () => {
+            const schema = makeSchema({
+                'x-requiredGroups': [{ fields: ['oauthToken', 'apiKey'], message: 'Need auth' }],
+            });
+            jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
+            setupDirectoryPlugin({}, {});
+
+            // Directory provides apiKey (global scope) — should pass
+            await expect(
+                realService.updateDirectoryPluginSettings(
+                    'dir-1',
+                    'test-plugin',
+                    'user-1',
+                    undefined,
+                    { apiKey: 'sk-123' },
+                ),
+            ).resolves.toBeDefined();
+        });
+
+        it('should block directory save when all group fields are user-scoped and user set nothing', async () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    tokenA: { type: 'string', 'x-secret': true, 'x-scope': 'user' },
+                    tokenB: { type: 'string', 'x-secret': true, 'x-scope': 'user' },
+                },
+                'x-requiredGroups': [{ fields: ['tokenA', 'tokenB'], message: 'Need a token' }],
+            } as unknown as JsonSchema;
+
+            jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
+            setupDirectoryPlugin({}, {});
+
+            await expect(
+                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                    some: 'value',
+                }),
+            ).rejects.toThrow('User-level required settings must be configured first');
+        });
+
+        it('should pass when user-only group is satisfied at user level', async () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    tokenA: { type: 'string', 'x-secret': true, 'x-scope': 'user' },
+                    tokenB: { type: 'string', 'x-secret': true, 'x-scope': 'user' },
+                },
+                'x-requiredGroups': [{ fields: ['tokenA', 'tokenB'], message: 'Need a token' }],
+            } as unknown as JsonSchema;
+
+            jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
+            setupDirectoryPlugin({ tokenA: 'my-token' }, {});
+
+            await expect(
+                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                    some: 'value',
+                }),
+            ).resolves.toBeDefined();
+        });
+
+        it('should inherit user settings for required field validation at directory level', async () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    apiKey: { type: 'string', 'x-secret': true, 'x-scope': 'user' },
+                    model: { type: 'string' },
+                },
+                required: ['apiKey', 'model'],
+            } as unknown as JsonSchema;
+
+            jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
+
+            // User has apiKey (user-scoped required); directory overrides model
+            jest.spyOn(realUserPluginRepo, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: { model: 'gpt-3.5' },
+                secretSettings: { apiKey: 'sk-user' },
+                metadata: {},
+            } as any);
+            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+                id: '2',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+
+            // Directory overrides model — apiKey+model inherited from user
+            await expect(
+                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                    model: 'gpt-4',
+                }),
+            ).resolves.toBeDefined();
+        });
+
+        it('should fail directory validation when required field is missing from both levels', async () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    apiKey: { type: 'string', 'x-secret': true, 'x-scope': 'user' },
+                    model: { type: 'string' },
+                },
+                required: ['apiKey', 'model'],
+            } as unknown as JsonSchema;
+
+            jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
+
+            // User has apiKey but not model; directory sends unrelated
+            jest.spyOn(realUserPluginRepo, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: { apiKey: 'sk-user' },
+                metadata: {},
+            } as any);
+            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+                id: '2',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+
+            // model is global-scoped required — checked at user level first
+            await expect(
+                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                    unrelated: 'value',
+                }),
+            ).rejects.toThrow('User-level required settings must be configured first');
+        });
+
+        it('should satisfy requiredGroup at directory level via inherited global-scoped value', async () => {
+            const schema = makeSchema({
+                'x-requiredGroups': [{ fields: ['oauthToken', 'apiKey'], message: 'Need auth' }],
+            });
+            jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
+
+            // User set apiKey (global scope) — it's inherited at directory level
+            jest.spyOn(realUserPluginRepo, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: { apiKey: 'sk-from-user' },
+                metadata: {},
+            } as any);
+            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+                id: '2',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+
+            // apiKey inherited from user → group satisfied at directory scope
+            await expect(
+                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                    some: 'value',
+                }),
+            ).resolves.toBeDefined();
+        });
+
+        it('should fail requiredGroup at directory level when no global-scoped field is set', async () => {
+            const schema = makeSchema({
+                'x-requiredGroups': [{ fields: ['oauthToken', 'apiKey'], message: 'Need auth' }],
+            });
+            jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
+
+            // User set only oauthToken (user-scoped) — not visible at directory scope
+            jest.spyOn(realUserPluginRepo, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: { oauthToken: 'oauth-val' },
+                metadata: {},
+            } as any);
+            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+                id: '2',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+
+            // oauthToken is user-scoped → invisible at directory scope
+            // apiKey (global) is empty → group fails
+            await expect(
+                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                    some: 'value',
+                }),
+            ).rejects.toThrow('Invalid plugin settings');
+        });
+    });
+
     describe('autoEnable behavior', () => {
         describe('toUserPluginResponse with autoEnable', () => {
             it('should show autoEnabled plugin as installed and enabled without UserPluginEntity', async () => {
