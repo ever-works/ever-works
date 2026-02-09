@@ -20,9 +20,6 @@ export {
     MissingDependencyError,
 } from './pipeline-builder.service';
 
-// Step adapter service (bridges legacy step services to plugin system)
-export { StepAdapterService, type ILegacyPipelineStep } from './step-adapter.service';
-
 // Executable pipeline runtime
 export {
     ExecutablePipelineRunner,

@@ -8,7 +8,6 @@ import { StepPipelineExecutorService } from './step-pipeline-executor.service';
 import { FullPipelineExecutorService } from './full-pipeline-executor.service';
 import { PipelineOrchestratorService } from './pipeline-orchestrator.service';
 import { ProviderOverrideService } from './provider-override.service';
-import { StepAdapterService } from './step-adapter.service';
 
 /**
  * All pipeline providers
@@ -23,7 +22,6 @@ const PROVIDERS = [
     FullPipelineExecutorService,
     PipelineOrchestratorService,
     ProviderOverrideService,
-    StepAdapterService,
 ];
 
 /**
@@ -35,7 +33,6 @@ const EXPORTS = [
     FullPipelineExecutorService,
     PipelineOrchestratorService,
     ProviderOverrideService,
-    StepAdapterService,
 ];
 
 /**

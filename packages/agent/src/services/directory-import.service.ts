@@ -44,6 +44,7 @@ import { normalizeGeneratorError } from './utils/error.utils';
 import { slugifyText } from '@src/utils/text.utils';
 import { GenerationMethod } from '@src/items-generator/dto';
 import { DirectoryGenerationHistory } from '@src/entities/directory-generation-history.entity';
+import { GeneratorFormSchemaService } from './generator-form-schema.service';
 
 type ImportTriggerContext = {
     triggeredBy: 'user' | 'schedule' | 'api';
@@ -67,6 +68,7 @@ export class DirectoryImportService {
         private readonly awesomeReadmeParser: AwesomeReadmeParserService,
         private readonly importExecutor: ImportExecutorService,
         private readonly directoryScheduleService: DirectoryScheduleService,
+        private readonly generatorFormSchemaService: GeneratorFormSchemaService,
         private readonly eventEmitter: EventEmitter2,
         @Optional()
         @Inject(DIRECTORY_IMPORT_DISPATCHER)
@@ -226,6 +228,14 @@ export class DirectoryImportService {
                     status: 'error',
                     message: 'Git provider is required',
                 };
+            }
+
+            // Validate AI provider is configured before creating directory
+            if (dto.sourceType === ImportSourceTypeEnum.AWESOME_README) {
+                await this.generatorFormSchemaService.validateSelectedProviders(
+                    dto.providers,
+                    { userId: user.id },
+                );
             }
 
             if (dto.sourceType !== ImportSourceTypeEnum.LINK_EXISTING) {

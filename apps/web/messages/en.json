@@ -1604,7 +1604,8 @@
                     "noAnalysis": "Please analyze a repository first",
                     "githubRequired": "Please connect your GitHub account first",
                     "importFailed": "Failed to import directory",
-                    "linkFailed": "Failed to link directory"
+                    "linkFailed": "Failed to link directory",
+                    "providerNotConfigured": "{provider} is not configured. Visit Settings → Plugins to set it up before importing."
                 },
                 "success": {
                     "started": "Import started! Redirecting to your directory...",

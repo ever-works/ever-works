@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -100,14 +101,28 @@ export function ImportConfigureStep({
         let providers: Record<string, string> | undefined;
         if (effectiveSourceType === 'awesome_readme') {
             if (selectedAiProvider) {
+                const selected = aiProviders.find((p) => p.id === selectedAiProvider);
+                if (selected && !selected.configured) {
+                    toast.error(t('errors.providerNotConfigured', { provider: selected.name }));
+                    return;
+                }
+
                 providers = { ai: selectedAiProvider };
             } else if (formSchema) {
                 const defaultProvider = resolveEffectiveDefault(aiProviders);
+                if (defaultProvider && !defaultProvider.configured) {
+                    toast.error(
+                        t('errors.providerNotConfigured', { provider: defaultProvider.name }),
+                    );
+                    return;
+                }
+
                 if (defaultProvider) {
                     providers = { ai: defaultProvider.id };
                 }
             }
         }
+
         onImport(providers);
     };
 
