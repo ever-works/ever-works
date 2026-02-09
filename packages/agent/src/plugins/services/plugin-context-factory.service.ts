@@ -91,7 +91,10 @@ export class PluginContextFactoryService {
                 scopeId?: string,
             ): Promise<PluginSettings> => {
                 const options = this.buildSettingsOptions(scope, scopeId, scopeOptions);
-                return this.settingsService.getSettings(pluginId, options);
+                return this.settingsService.getSettings(pluginId, {
+                    ...options,
+                    includeSecrets: true,
+                });
             },
 
             getResolvedSettings: async (
@@ -99,7 +102,10 @@ export class PluginContextFactoryService {
                 scopeId?: string,
             ): Promise<ResolvedSettings> => {
                 const options = this.buildSettingsOptions(scope, scopeId, scopeOptions);
-                return this.settingsService.getResolvedSettings(pluginId, options);
+                return this.settingsService.getResolvedSettings(pluginId, {
+                    ...options,
+                    includeSecrets: true,
+                });
             },
 
             onEvent: <T extends PluginEventName>(
