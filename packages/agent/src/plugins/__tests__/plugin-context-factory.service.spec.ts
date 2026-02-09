@@ -467,6 +467,7 @@ describe('PluginContextFactoryService', () => {
             const result = await context.getSettings();
 
             expect(settingsService.getSettings).toHaveBeenCalledWith('test-plugin', {
+                includeSecrets: true,
                 scope: undefined,
             });
             expect(result).toEqual({ enabled: true });
