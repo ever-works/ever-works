@@ -69,7 +69,7 @@ export abstract class BaseFacadeService {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.map((p) => ({
             id: p.plugin.id,
-            name: p.plugin.name,
+            name: this.getProviderName(p.plugin),
             enabled: p.state === 'loaded',
         }));
     }
@@ -255,5 +255,37 @@ export abstract class BaseFacadeService {
         });
 
         return result;
+    }
+
+    // Resolve plugin: providerOverride > directory active > defaultForCapabilities > first enabled
+    protected async resolvePlugin<T extends IPlugin>(
+        providerOverride?: string,
+        userId?: string,
+        directoryId?: string,
+    ): Promise<T> {
+        if (providerOverride) {
+            const registered = this.registry.get(providerOverride);
+            if (
+                registered &&
+                registered.manifest.capabilities.includes(this.CAPABILITY) &&
+                registered.state === 'loaded'
+            ) {
+                const isEnabled = await this.isPluginEnabled(providerOverride, directoryId, userId);
+                if (isEnabled) return registered.plugin as T;
+            }
+            throw new ProviderNotFoundError(providerOverride, this.CAPABILITY);
+        }
+
+        if (directoryId) {
+            const activePlugin = await this.findActivePluginForDirectory(directoryId);
+            if (activePlugin) return activePlugin.plugin as T;
+        }
+
+        const enabledPlugins = await this.getEnabledPlugins(directoryId, userId);
+        if (enabledPlugins.length > 0) {
+            return enabledPlugins[0].plugin as T;
+        }
+
+        throw new NoProviderError(this.CAPABILITY);
     }
 }

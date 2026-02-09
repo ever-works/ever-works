@@ -22,31 +22,16 @@ export {
 export type { FacadeOptions } from '@ever-works/plugin';
 
 // AI Facade
-export {
-    AiFacadeService,
-    AiFacadeError,
-    NoAiProviderError,
-    AiProviderNotFoundError,
-} from './ai.facade';
+export { AiFacadeService, AiFacadeError } from './ai.facade';
 
 // Search Facade
-export {
-    SearchFacadeService,
-    SearchFacadeError,
-    NoSearchProviderError,
-    SearchProviderNotFoundError,
-} from './search.facade';
+export { SearchFacadeService, SearchFacadeError } from './search.facade';
 
 // Re-export SearchFacadeOptions from plugin for convenience
 export type { SearchFacadeOptions } from '@ever-works/plugin';
 
 // Screenshot Facade
-export {
-    ScreenshotFacadeService,
-    ScreenshotFacadeError,
-    NoScreenshotProviderError,
-    ScreenshotProviderNotFoundError,
-} from './screenshot.facade';
+export { ScreenshotFacadeService, ScreenshotFacadeError } from './screenshot.facade';
 
 // Content Extractor Facade
 export {

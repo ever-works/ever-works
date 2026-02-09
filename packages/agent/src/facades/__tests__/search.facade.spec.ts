@@ -1,9 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-    SearchFacadeService,
-    NoSearchProviderError,
-    SearchProviderNotFoundError,
-} from '../search.facade';
+import { SearchFacadeService } from '../search.facade';
 import {
     PluginRegistryService,
     type RegisteredPlugin,

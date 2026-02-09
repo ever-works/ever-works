@@ -1,11 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { z } from 'zod';
-import {
-    AiFacadeService,
-    AiFacadeError,
-    NoAiProviderError,
-    AiProviderNotFoundError,
-} from '../ai.facade';
+import { AiFacadeService, AiFacadeError } from '../ai.facade';
+import { NoProviderError, ProviderNotFoundError } from '../base.facade';
 import {
     PluginRegistryService,
     type RegisteredPlugin,
@@ -238,15 +234,15 @@ describe('AiFacadeService', () => {
             expect(aiPlugin.createChatCompletion).toHaveBeenCalled();
         });
 
-        it('should throw NoAiProviderError when no provider is configured', async () => {
+        it('should throw NoProviderError when no provider is configured', async () => {
             registry.getByCapability.mockReturnValue([]);
 
             await expect(
                 service.askJson('Test prompt', testSchema, undefined, defaultFacadeOptions),
-            ).rejects.toThrow(NoAiProviderError);
+            ).rejects.toThrow(NoProviderError);
         });
 
-        it('should throw AiProviderNotFoundError for invalid provider override', async () => {
+        it('should throw ProviderNotFoundError for invalid provider override', async () => {
             registry.get.mockReturnValue(undefined);
 
             await expect(
@@ -256,7 +252,7 @@ describe('AiFacadeService', () => {
                     { routing: { providerOverride: 'non-existent' } },
                     defaultFacadeOptions,
                 ),
-            ).rejects.toThrow(AiProviderNotFoundError);
+            ).rejects.toThrow(ProviderNotFoundError);
         });
 
         it('should use provider override when specified', async () => {
@@ -597,7 +593,7 @@ describe('AiFacadeService', () => {
             const result = await service.testConnection(defaultFacadeOptions);
 
             expect(result.success).toBe(false);
-            expect(result.error).toContain('No AI provider');
+            expect(result.error).toContain('No ai-provider provider');
         });
 
         it('should resolve settings and pass to plugin.isAvailable', async () => {

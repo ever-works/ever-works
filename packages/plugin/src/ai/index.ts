@@ -8,3 +8,4 @@ export {
 	getGroqReasoningConfig,
 	extractModelName
 } from './reasoning.utils.js';
+export { jsonrepair } from 'jsonrepair';

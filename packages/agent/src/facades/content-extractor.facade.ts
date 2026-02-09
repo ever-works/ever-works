@@ -60,7 +60,7 @@ export class ContentExtractorFacadeService
         facadeOptions: FacadeOptions,
     ): Promise<FacadeExtractedContent | null> {
         try {
-            const plugin = await this.resolvePlugin(
+            const plugin = await this.resolveExtractorPlugin(
                 url,
                 facadeOptions.providerOverride,
                 facadeOptions.userId,
@@ -98,7 +98,7 @@ export class ContentExtractorFacadeService
     }
 
     // Resolution: override > directory default > non-system > system default > any enabled
-    private async resolvePlugin(
+    private async resolveExtractorPlugin(
         url: string,
         providerOverride?: string,
         userId?: string,

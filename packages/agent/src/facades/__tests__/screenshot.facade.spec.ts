@@ -1,9 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-    ScreenshotFacadeService,
-    NoScreenshotProviderError,
-    ScreenshotProviderNotFoundError,
-} from '../screenshot.facade';
+import { ScreenshotFacadeService } from '../screenshot.facade';
+import { NoProviderError, ProviderNotFoundError } from '../base.facade';
 import {
     PluginRegistryService,
     type RegisteredPlugin,
@@ -183,15 +180,15 @@ describe('ScreenshotFacadeService', () => {
             );
         });
 
-        it('should throw NoScreenshotProviderError when no provider is configured', async () => {
+        it('should throw NoProviderError when no provider is configured', async () => {
             registry.getByCapability.mockReturnValue([]);
 
             await expect(
                 service.capture({ url: 'https://example.com' }, defaultFacadeOptions),
-            ).rejects.toThrow(NoScreenshotProviderError);
+            ).rejects.toThrow(NoProviderError);
         });
 
-        it('should throw ScreenshotProviderNotFoundError for invalid provider override', async () => {
+        it('should throw ProviderNotFoundError for invalid provider override', async () => {
             registry.get.mockReturnValue(undefined);
 
             await expect(
@@ -199,7 +196,7 @@ describe('ScreenshotFacadeService', () => {
                     { url: 'https://example.com' },
                     { userId: 'test-user', providerOverride: 'non-existent' },
                 ),
-            ).rejects.toThrow(ScreenshotProviderNotFoundError);
+            ).rejects.toThrow(ProviderNotFoundError);
         });
 
         it('should use provider override when specified', async () => {
@@ -329,12 +326,12 @@ describe('ScreenshotFacadeService', () => {
             );
         });
 
-        it('should throw NoScreenshotProviderError when no provider exists', async () => {
+        it('should throw NoProviderError when no provider exists', async () => {
             registry.getByCapability.mockReturnValue([]);
 
             await expect(
                 service.getSmartImage({ url: 'https://example.com' }, defaultFacadeOptions),
-            ).rejects.toThrow(NoScreenshotProviderError);
+            ).rejects.toThrow(NoProviderError);
         });
     });
 

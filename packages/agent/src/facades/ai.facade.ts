@@ -1,5 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import type {
     AskJsonOptions,
     AskJsonResponse,
@@ -15,34 +16,16 @@ import type {
     TaskComplexity,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+import { jsonrepair } from '@ever-works/plugin/ai';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
-import {
-    BaseFacadeService,
-    FacadeError,
-    NoProviderError,
-    ProviderNotFoundError,
-} from './base.facade';
+import { BaseFacadeService, FacadeError } from './base.facade';
 
 export class AiFacadeError extends FacadeError {
     constructor(message: string, operation: string, provider?: string, cause?: Error) {
         super(message, operation, provider, cause);
         this.name = 'AiFacadeError';
-    }
-}
-
-export class NoAiProviderError extends NoProviderError {
-    constructor() {
-        super('AI');
-        this.name = 'NoAiProviderError';
-    }
-}
-
-export class AiProviderNotFoundError extends ProviderNotFoundError {
-    constructor(providerId: string) {
-        super(providerId, 'AI');
-        this.name = 'AiProviderNotFoundError';
     }
 }
 
@@ -65,7 +48,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         options: AskJsonOptions | undefined,
         facadeOptions: FacadeOptions,
     ): Promise<AskJsonResponse<T>> {
-        const plugin = await this.resolvePlugin(
+        const plugin = await this.resolvePlugin<IAiProviderPlugin>(
             options?.routing?.providerOverride ?? facadeOptions.providerOverride,
             facadeOptions.userId,
             facadeOptions.directoryId,
@@ -131,9 +114,16 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         }
 
         // Fallback for plugins without askJson
+        const jsonSchema = JSON.stringify(zodToJsonSchema(schema));
         const response = await plugin.createChatCompletion({
             model: opts.model,
-            messages: [{ role: 'user', content: prompt }],
+            messages: [
+                {
+                    role: 'system',
+                    content: `Respond with valid JSON matching this schema: ${jsonSchema}`,
+                },
+                { role: 'user', content: prompt },
+            ],
             temperature: opts.temperature,
             responseFormat: { type: 'json_object' },
             settings: opts.settings,
@@ -145,13 +135,18 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         }
 
         try {
+            const parsed = JSON.parse(jsonrepair(content));
             return {
-                result: JSON.parse(content),
+                result: schema.parse(parsed),
                 model: response.model,
                 usage: response.usage,
             };
-        } catch {
-            throw new AiFacadeError('Failed to parse AI response as JSON', 'askJson', plugin.id);
+        } catch (error) {
+            throw new AiFacadeError(
+                `Failed to parse AI response as JSON: ${error instanceof Error ? error.message : error}`,
+                'askJson',
+                plugin.id,
+            );
         }
     }
 
@@ -217,7 +212,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         options: ChatCompletionOptions,
         facadeOptions: FacadeOptions,
     ): Promise<ChatCompletionResponse> {
-        const plugin = await this.resolvePlugin(
+        const plugin = await this.resolvePlugin<IAiProviderPlugin>(
             facadeOptions.providerOverride,
             facadeOptions.userId,
             facadeOptions.directoryId,
@@ -242,7 +237,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         options: ChatCompletionOptions,
         facadeOptions: FacadeOptions,
     ): AsyncGenerator<ChatCompletionChunk> {
-        const plugin = await this.resolvePlugin(
+        const plugin = await this.resolvePlugin<IAiProviderPlugin>(
             facadeOptions.providerOverride,
             facadeOptions.userId,
             facadeOptions.directoryId,
@@ -282,7 +277,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         const startTime = Date.now();
 
         try {
-            const plugin = await this.resolvePlugin(
+            const plugin = await this.resolvePlugin<IAiProviderPlugin>(
                 facadeOptions.providerOverride,
                 facadeOptions.userId,
                 facadeOptions.directoryId,
@@ -309,54 +304,9 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         }
     }
 
-    override getAvailableProviders(): Array<{ id: string; name: string; enabled: boolean }> {
-        const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.map((p) => ({
-            id: p.plugin.id,
-            name: (p.plugin as IAiProviderPlugin).providerName,
-            enabled: p.state === 'loaded',
-        }));
-    }
-
-    // Resolve AI provider: providerOverride > directory active > defaultForCapabilities > first enabled
-    private async resolvePlugin(
-        providerOverride?: string,
-        userId?: string,
-        directoryId?: string,
-    ): Promise<IAiProviderPlugin> {
-        if (providerOverride) {
-            const registered = this.registry.get(providerOverride);
-            if (
-                registered &&
-                registered.manifest.capabilities.includes(this.CAPABILITY) &&
-                registered.state === 'loaded'
-            ) {
-                const isEnabled = await this.isPluginEnabled(providerOverride, directoryId, userId);
-                if (isEnabled) return registered.plugin as IAiProviderPlugin;
-            }
-            throw new AiProviderNotFoundError(providerOverride);
-        }
-
-        // Check for directory's explicitly configured active provider
-        if (directoryId) {
-            const activePlugin = await this.findActivePluginForDirectory(directoryId);
-            if (activePlugin) {
-                return activePlugin.plugin as IAiProviderPlugin;
-            }
-        }
-
-        // Fall back to first enabled provider (base sorts by defaultForCapabilities)
-        const enabledPlugins = await this.getEnabledPlugins(directoryId, userId);
-        if (enabledPlugins.length > 0) {
-            return enabledPlugins[0].plugin as IAiProviderPlugin;
-        }
-
-        throw new NoAiProviderError();
-    }
-
     async getAvailableModels(facadeOptions: FacadeOptions): Promise<readonly AiModel[]> {
         try {
-            const plugin = await this.resolvePlugin(
+            const plugin = await this.resolvePlugin<IAiProviderPlugin>(
                 facadeOptions.providerOverride,
                 facadeOptions.userId,
                 facadeOptions.directoryId,

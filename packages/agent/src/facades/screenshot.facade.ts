@@ -5,7 +5,6 @@ import type {
     SmartImageOptions,
     SmartImageResult,
     IScreenshotPlugin,
-    IPlugin,
     IScreenshotFacade,
     FacadeOptions,
 } from '@ever-works/plugin';
@@ -13,31 +12,12 @@ import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
-import { BaseFacadeService } from './base.facade';
+import { BaseFacadeService, FacadeError } from './base.facade';
 
-export class ScreenshotFacadeError extends Error {
-    constructor(
-        message: string,
-        public readonly operation: string,
-        public readonly provider?: string,
-        public readonly cause?: Error,
-    ) {
-        super(message);
+export class ScreenshotFacadeError extends FacadeError {
+    constructor(message: string, operation: string, provider?: string, cause?: Error) {
+        super(message, operation, provider, cause);
         this.name = 'ScreenshotFacadeError';
-    }
-}
-
-export class NoScreenshotProviderError extends ScreenshotFacadeError {
-    constructor() {
-        super('No screenshot provider configured or available', 'getPlugin');
-        this.name = 'NoScreenshotProviderError';
-    }
-}
-
-export class ScreenshotProviderNotFoundError extends ScreenshotFacadeError {
-    constructor(providerId: string) {
-        super(`Screenshot provider not found: ${providerId}`, 'getPlugin', providerId);
-        this.name = 'ScreenshotProviderNotFoundError';
     }
 }
 
@@ -58,7 +38,7 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
         options: ScreenshotCaptureOptions,
         facadeOptions: FacadeOptions,
     ): Promise<ScreenshotCaptureResult> {
-        const plugin = await this.resolvePlugin(
+        const plugin = await this.resolvePlugin<IScreenshotPlugin>(
             facadeOptions.providerOverride,
             facadeOptions.userId,
             facadeOptions.directoryId,
@@ -117,7 +97,7 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
         options: ScreenshotCaptureOptions,
         facadeOptions: FacadeOptions,
     ): Promise<string | null> {
-        const plugin = await this.resolvePlugin(
+        const plugin = await this.resolvePlugin<IScreenshotPlugin>(
             facadeOptions.providerOverride,
             facadeOptions.userId,
             facadeOptions.directoryId,
@@ -133,54 +113,5 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
 
     isAvailable(): boolean {
         return this.isConfigured();
-    }
-
-    override getAvailableProviders(): Array<{
-        id: string;
-        name: string;
-        enabled: boolean;
-    }> {
-        const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.map((p) => ({
-            id: p.plugin.id,
-            name: (p.plugin as IScreenshotPlugin).providerName,
-            enabled: p.state === 'loaded',
-        }));
-    }
-
-    protected override getProviderName(plugin: IPlugin): string {
-        return (plugin as IScreenshotPlugin).providerName || plugin.name;
-    }
-
-    // Resolution: override > directory default > first enabled
-    private async resolvePlugin(
-        providerOverride?: string,
-        userId?: string,
-        directoryId?: string,
-    ): Promise<IScreenshotPlugin> {
-        if (providerOverride) {
-            const registered = this.registry.get(providerOverride);
-            if (
-                registered &&
-                registered.manifest.capabilities.includes(this.CAPABILITY) &&
-                registered.state === 'loaded'
-            ) {
-                const isEnabled = await this.isPluginEnabled(providerOverride, directoryId, userId);
-                if (isEnabled) return registered.plugin as IScreenshotPlugin;
-            }
-            throw new ScreenshotProviderNotFoundError(providerOverride);
-        }
-
-        if (directoryId) {
-            const activePlugin = await this.findActivePluginForDirectory(directoryId);
-            if (activePlugin) return activePlugin.plugin as IScreenshotPlugin;
-        }
-
-        const enabledPlugins = await this.getEnabledPlugins(directoryId, userId);
-        if (enabledPlugins.length > 0) {
-            return enabledPlugins[0].plugin as IScreenshotPlugin;
-        }
-
-        throw new NoScreenshotProviderError();
     }
 }
