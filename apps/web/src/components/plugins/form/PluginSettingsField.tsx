@@ -1,3 +1,4 @@
+// PluginSettingsField.tsx
 'use client';
 
 import { useTranslations } from 'next-intl';
@@ -6,6 +7,9 @@ import { cn } from '@/lib/utils/cn';
 import { Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 import { PluginModelSelect } from './PluginModelSelect';
+import { PluginSettingsObjectField } from './PluginSettingsObjectField';
+import { PluginSettingsArrayField } from './PluginSettingsArrayField';
+import { isType, getPrimaryType } from './utils';
 
 interface PluginSettingsFieldProps {
     name: string;
@@ -30,18 +34,65 @@ export function PluginSettingsField({
     const label = schema.title || name;
     const description = schema.description;
     const isSecret = schema.secret;
+    const primaryType = getPrimaryType(schema.type);
 
-    // Determine input type
+    // Determine input type for string/number inputs
     const getInputType = () => {
         if (isSecret && !showSecret) return 'password';
-        if (schema.type === 'number') return 'number';
+        if (isType(schema.type, 'number') || isType(schema.type, 'integer')) return 'number';
         return 'text';
     };
 
+    // Handle null type with default
+    if (primaryType === 'null') {
+        return (
+            <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-text dark:text-text-dark">
+                    {label}
+                    {required && <span className="text-danger ml-1">*</span>}
+                </label>
+                <div className="px-3 py-2 rounded-lg border border-border dark:border-border-dark bg-surface-tertiary/50 dark:bg-surface-tertiary-dark/50 text-text-muted dark:text-text-muted-dark text-sm">
+                    {t('nullValue')}
+                </div>
+                {description && (
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {description}
+                    </p>
+                )}
+            </div>
+        );
+    }
+
     // Render based on schema type
     const renderInput = () => {
+        // Object type
+        if (isType(schema.type, 'object')) {
+            return (
+                <PluginSettingsObjectField
+                    name={name}
+                    schema={schema}
+                    value={(value as Record<string, unknown>) || {}}
+                    onChange={onChange}
+                    pluginId={pluginId}
+                />
+            );
+        }
+
+        // Array type
+        if (isType(schema.type, 'array')) {
+            return (
+                <PluginSettingsArrayField
+                    name={name}
+                    schema={schema}
+                    value={(value as unknown[]) || []}
+                    onChange={onChange}
+                    pluginId={pluginId}
+                />
+            );
+        }
+
         // Boolean - checkbox/toggle
-        if (schema.type === 'boolean') {
+        if (isType(schema.type, 'boolean')) {
             return (
                 <label className="relative inline-flex items-center cursor-pointer">
                     <input
@@ -55,7 +106,7 @@ export function PluginSettingsField({
             );
         }
 
-        // Enum - select
+        // Enum - select (works for any type)
         if (schema.enum && schema.enum.length > 0) {
             return (
                 <select
@@ -79,11 +130,12 @@ export function PluginSettingsField({
             );
         }
 
-        // Number input
-        if (schema.type === 'number') {
+        // Number/Integer input
+        if (isType(schema.type, 'number') || isType(schema.type, 'integer')) {
             return (
                 <input
                     type="number"
+                    step={isType(schema.type, 'integer') ? 1 : 'any'}
                     value={
                         value === null
                             ? ''
@@ -94,7 +146,13 @@ export function PluginSettingsField({
                                 : ''
                     }
                     onChange={(e) =>
-                        onChange(e.target.value === '' ? null : Number(e.target.value))
+                        onChange(
+                            e.target.value === ''
+                                ? null
+                                : isType(schema.type, 'integer')
+                                  ? parseInt(e.target.value, 10)
+                                  : parseFloat(e.target.value),
+                        )
                     }
                     min={schema.minimum}
                     max={schema.maximum}

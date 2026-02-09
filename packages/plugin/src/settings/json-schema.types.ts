@@ -83,7 +83,7 @@ export interface JsonSchema {
 
 	// Array constraints
 	/** Array items schema */
-	readonly items?: JsonSchema | readonly JsonSchema[];
+	readonly items?: JsonSchema;
 	/** Additional items schema (for tuple validation) */
 	readonly additionalItems?: boolean | JsonSchema;
 	/** Minimum number of items */

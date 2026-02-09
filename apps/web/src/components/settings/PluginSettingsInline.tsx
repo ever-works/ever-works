@@ -9,7 +9,7 @@ import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { Save, Check, AlertCircle } from 'lucide-react';
 import { updatePluginSettings } from '@/app/actions/plugins';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
-import { PluginSettingsField } from '@/components/plugins/PluginSettingsField';
+import { PluginSettingsField } from '@/components/plugins/form/PluginSettingsField';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';

@@ -3,7 +3,7 @@
 import { ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { PluginSettingsSchemaProperty, PluginSettingsSchema } from '@/lib/api/plugins';
-import { PluginSettingsField } from './PluginSettingsField';
+import { PluginSettingsField } from './form/PluginSettingsField';
 import { AlertCircle } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';

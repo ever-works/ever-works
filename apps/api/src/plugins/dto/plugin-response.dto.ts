@@ -65,7 +65,7 @@ export class PluginAuthorDto implements PluginAuthor {
  */
 export class PluginSettingsSchemaPropertyDto implements PluginSettingsSchemaProperty {
     @ApiProperty({ description: 'Property type' })
-    type: string;
+    type: PluginSettingsSchemaProperty['type'];
 
     @ApiPropertyOptional({ description: 'Property title' })
     title?: string;

@@ -6,7 +6,7 @@
 import type { PluginCategory, PluginAuthor, PluginIcon, PluginVisibility } from '../contracts/plugin-manifest.types.js';
 import type { PluginState } from '../contracts/lifecycle.types.js';
 import type { ConfigurationMode } from '../settings/settings.types.js';
-import type { JsonSchema } from '../settings/json-schema.types.js';
+import type { JsonSchema, JsonSchemaType } from '../settings/json-schema.types.js';
 
 /**
  * Setting scope determines where the setting value is stored and who can configure it.
@@ -20,13 +20,15 @@ export type SettingScopeApi = 'global' | 'user' | 'directory';
  */
 export interface PluginSettingsSchemaProperty {
 	/** Property type (e.g., 'string', 'number', 'boolean') */
-	type: string;
+	type: JsonSchemaType | readonly JsonSchemaType[];
 	/** Property title for display */
 	title?: string;
 	/** Property description */
 	description?: string;
 	/** Default value */
 	default?: unknown;
+	/** Example values */
+	examples?: readonly unknown[];
 	/** Whether this is a secret field: never returned in API responses, rendered as password input (from JsonSchema x-secret) */
 	secret?: boolean;
 	/** Whether this field is admin-only (from JsonSchema x-adminOnly) */
@@ -37,6 +39,8 @@ export interface PluginSettingsSchemaProperty {
 	scope?: SettingScopeApi;
 	/** Enumerated allowed values */
 	enum?: readonly unknown[];
+	/** Constant value */
+	const?: unknown;
 	/** UI widget type hint (e.g., 'model-select') */
 	widget?: string;
 	/** Whether field should be hidden from the settings UI (from JsonSchema x-hidden) */
@@ -51,6 +55,25 @@ export interface PluginSettingsSchemaProperty {
 	maxLength?: number;
 	/** Regular expression pattern for string fields */
 	pattern?: string;
+	/** String format */
+	format?: string;
+	/** Array items schema */
+	items?: PluginSettingsSchemaProperty;
+	/** Minimum number of items */
+	minItems?: number;
+	/** Maximum number of items */
+	maxItems?: number;
+	/** All items must be unique */
+	uniqueItems?: boolean;
+	/** Properties for object-type fields */
+	properties?: Record<string, PluginSettingsSchemaProperty>;
+	/** Required property names */
+	required?: readonly string[];
+	/** Groups of fields where at least one must be set. Each group is independent. */
+	requiredGroups?: readonly {
+		readonly fields: readonly string[];
+		readonly message?: string;
+	}[];
 }
 
 /**
@@ -78,22 +101,39 @@ export interface PluginSettingsSchema {
  */
 export function toPluginSettingsSchemaProperty(schema: JsonSchema): PluginSettingsSchemaProperty {
 	return {
-		type: typeof schema.type === 'string' ? schema.type : 'string',
+		type: schema.type ?? 'string',
 		title: schema.title,
 		description: schema.description,
 		default: schema.default,
+		examples: schema.examples,
 		secret: schema['x-secret'],
 		adminOnly: schema['x-adminOnly'],
 		envVar: schema['x-envVar'],
-		scope: schema['x-scope'] || 'global',
+		scope: schema['x-scope'] ?? 'global',
 		enum: schema.enum,
+		const: schema.const,
 		widget: schema['x-widget'],
 		hidden: schema['x-hidden'],
 		minimum: schema.minimum,
 		maximum: schema.maximum,
 		minLength: schema.minLength,
 		maxLength: schema.maxLength,
-		pattern: schema.pattern
+		pattern: schema.pattern,
+		format: schema.format,
+		items: schema.items ? toPluginSettingsSchemaProperty(schema.items as JsonSchema) : undefined,
+		minItems: schema.minItems,
+		maxItems: schema.maxItems,
+		uniqueItems: schema.uniqueItems,
+		properties: schema.properties
+			? Object.fromEntries(
+					Object.entries(schema.properties).map(([key, propSchema]) => [
+						key,
+						toPluginSettingsSchemaProperty(propSchema)
+					])
+				)
+			: undefined,
+		required: schema.required,
+		requiredGroups: schema['x-requiredGroups']
 	};
 }
 

@@ -1863,7 +1863,10 @@
             },
             "settingsField": {
                 "selectPlaceholder": "Select...",
-                "fieldEncrypted": "This field is encrypted"
+                "fieldEncrypted": "This field is encrypted",
+                "nullValue": "No value set",
+                "removeItem": "Remove",
+                "addItem": "Add"
             },
             "oauth": {
                 "title": "Account Connection",
