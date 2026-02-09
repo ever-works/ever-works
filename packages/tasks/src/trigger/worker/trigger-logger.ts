@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { LoggerService, LogLevel } from '@nestjs/common';
 import { logger as triggerLogger } from '@trigger.dev/sdk';
 
@@ -12,9 +13,11 @@ import { logger as triggerLogger } from '@trigger.dev/sdk';
  */
 export class TriggerLogger implements LoggerService {
     private context?: string;
+    private nestjsLogger: Logger;
 
     constructor(context?: string) {
         this.context = context;
+        this.nestjsLogger = new Logger(context);
     }
 
     setContext(context: string) {
@@ -57,6 +60,8 @@ export class TriggerLogger implements LoggerService {
         } else {
             triggerLogger.log(formattedMessage, {});
         }
+
+        this.nestjsLogger.log(message, context);
     }
 
     error(message: unknown, ...optionalParams: unknown[]): void {
@@ -68,6 +73,8 @@ export class TriggerLogger implements LoggerService {
         } else {
             triggerLogger.error(formattedMessage, {});
         }
+
+        this.nestjsLogger.error(message, context);
     }
 
     warn(message: unknown, ...optionalParams: unknown[]): void {
@@ -79,6 +86,8 @@ export class TriggerLogger implements LoggerService {
         } else {
             triggerLogger.warn(formattedMessage, {});
         }
+
+        this.nestjsLogger.warn(message, context);
     }
 
     debug?(message: unknown, ...optionalParams: unknown[]): void {
@@ -90,6 +99,8 @@ export class TriggerLogger implements LoggerService {
         } else {
             triggerLogger.debug(formattedMessage, {});
         }
+
+        this.nestjsLogger.debug?.(message, context);
     }
 
     verbose?(message: unknown, ...optionalParams: unknown[]): void {
@@ -101,6 +112,8 @@ export class TriggerLogger implements LoggerService {
         } else {
             triggerLogger.debug(formattedMessage, { level: 'verbose' });
         }
+
+        this.nestjsLogger.verbose?.(message, context);
     }
 
     fatal?(message: unknown, ...optionalParams: unknown[]): void {
@@ -112,6 +125,8 @@ export class TriggerLogger implements LoggerService {
         } else {
             triggerLogger.error(formattedMessage, { level: 'fatal' });
         }
+
+        this.nestjsLogger.error(message, context);
     }
 
     setLogLevels?(_levels: LogLevel[]): void {
@@ -120,18 +135,6 @@ export class TriggerLogger implements LoggerService {
     }
 }
 
-/**
- * Creates a TriggerLogger instance for use with NestJS application context.
- *
- * Usage in trigger.dev tasks:
- * ```typescript
- * import { TriggerLogger } from './trigger-logger';
- *
- * const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
- *     logger: new TriggerLogger(),
- * });
- * ```
- */
 export function createTriggerLogger(context?: string): TriggerLogger {
     return new TriggerLogger(context);
 }

@@ -9,7 +9,7 @@ import { TriggerPluginHydratorService } from '../../trigger/worker/services/trig
 import { DirectoryGenerationPayload } from '@ever-works/agent/tasks';
 import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
 import { DirectoryScheduleService } from '@ever-works/agent/services';
-import { TriggerLogger } from '../../trigger/worker/trigger-logger';
+import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
 async function createContext(
     appContext: INestApplicationContext,
@@ -45,8 +45,7 @@ export const directoryGenerationTask = task({
         }
 
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: ['verbose', 'debug', 'log', 'warn', 'error', 'fatal'],
-            // logger: new TriggerLogger('DirectoryGeneration:Cancel'),
+            logger: createTriggerLogger('DirectoryGeneration:Cancel'),
         });
 
         try {
@@ -70,8 +69,7 @@ export const directoryGenerationTask = task({
     },
     run: async (payload: DirectoryGenerationPayload) => {
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: ['verbose', 'debug', 'log', 'warn', 'error', 'fatal'],
-            // logger: new TriggerLogger('DirectoryGeneration'),
+            logger: createTriggerLogger('DirectoryGeneration'),
         });
 
         try {

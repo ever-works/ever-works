@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { config } from '@ever-works/agent/config';
 import { DirectoryScheduleDispatcherService } from '@ever-works/agent/services';
-import { TriggerLogger } from '../../trigger/worker/trigger-logger';
+import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
 const interval = Math.max(1, config.subscriptions.getDispatchIntervalMinutes());
 const cronExpression = `*/${interval} * * * *`;
@@ -13,7 +13,7 @@ export const directoryScheduleDispatcherTask = schedules.task({
     cron: cronExpression,
     run: async () => {
         const appContext = await NestFactory.createApplicationContext(TriggerInternalModule, {
-            logger: new TriggerLogger('ScheduleDispatcher'),
+            logger: createTriggerLogger('ScheduleDispatcher'),
         });
 
         try {

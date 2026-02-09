@@ -7,8 +7,8 @@ import { TriggerInternalApiClient } from '../../trigger/worker/services/trigger-
 import { TriggerImportOrchestrator } from '../../trigger/worker/orchestrators/trigger-import.orchestrator';
 import { TriggerPluginHydratorService } from '../../trigger/worker/services/trigger-plugin-hydrator.service';
 import { DirectoryImportPayload } from '@ever-works/agent/tasks';
-import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
-import { TriggerLogger } from '../../trigger/worker/trigger-logger';
+import { Directory, User } from '@ever-works/agent/entities';
+import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
 async function createContext(appContext: INestApplicationContext, payload: DirectoryImportPayload) {
     // Initialize plugin system with remote settings
@@ -42,7 +42,7 @@ export const directoryImportTask = task({
         }
 
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: new TriggerLogger('DirectoryImport:Cancel'),
+            logger: createTriggerLogger('DirectoryImport:Cancel'),
         });
 
         try {
@@ -59,7 +59,7 @@ export const directoryImportTask = task({
     },
     run: async (payload: DirectoryImportPayload) => {
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: new TriggerLogger('DirectoryImport'),
+            logger: createTriggerLogger('DirectoryImport'),
         });
 
         try {
