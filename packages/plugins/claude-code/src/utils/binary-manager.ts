@@ -12,12 +12,15 @@ interface Logger {
 }
 
 interface ManifestEntry {
-	readonly sha256: string;
+	readonly binary: string;
+	readonly checksum: string;
 	readonly size?: number;
 }
 
 interface Manifest {
-	readonly [platform: string]: ManifestEntry;
+	readonly platforms: {
+		readonly [platform: string]: ManifestEntry;
+	};
 }
 
 /**
@@ -97,7 +100,7 @@ export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger
 	logger?.log(`Fetching manifest for Claude Code v${version}...`);
 	const manifest = await fetchManifest(version);
 
-	const manifestEntry = manifest[platform.platformString];
+	const manifestEntry = manifest.platforms[platform.platformString];
 	if (!manifestEntry) {
 		throw new Error(
 			`No binary available for platform ${platform.platformString} in Claude Code v${version}. ` +
@@ -106,7 +109,7 @@ export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger
 	}
 
 	// Download binary
-	const binaryUrl = `${CLAUDE_CODE_DIST_URL}/${version}/claude-code-${platform.platformString}`;
+	const binaryUrl = `${CLAUDE_CODE_DIST_URL}/${version}/${platform.platformString}/${manifestEntry.binary}`;
 	logger?.log(`Downloading Claude Code CLI from ${binaryUrl}...`);
 	const binaryBuffer = await fetchBuffer(binaryUrl);
 
@@ -115,7 +118,7 @@ export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger
 	await fs.writeFile(tmpPath, binaryBuffer);
 
 	// Verify checksum
-	const checksumValid = await verifyChecksum(tmpPath, manifestEntry.sha256);
+	const checksumValid = await verifyChecksum(tmpPath, manifestEntry.checksum);
 	if (!checksumValid) {
 		await fs.unlink(tmpPath).catch(() => {});
 		throw new Error(

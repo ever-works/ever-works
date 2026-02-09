@@ -371,7 +371,8 @@ export class ClaudeCodePlugin implements IPlugin, IFullPipelinePlugin {
 			}
 
 			if (execResult.exitCode !== 0) {
-				const errorMsg = execResult.stderr.slice(0, 500) || `Exit code ${execResult.exitCode}`;
+				const errorMsg =
+					(execResult.stderr || execResult.stdout).slice(0, 500) || `Exit code ${execResult.exitCode}`;
 				logger.warn(`Claude Code exited with code ${execResult.exitCode}: ${errorMsg}`);
 				// Non-zero exit is a warning, not necessarily fatal.
 				// Claude Code may still have generated some items before exiting.

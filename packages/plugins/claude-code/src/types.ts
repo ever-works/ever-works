@@ -35,7 +35,8 @@ export const BASE_TEMP_DIR = '/tmp/claude-code-generator';
 /**
  * GCS bucket URL for Claude Code CLI distribution
  */
-export const CLAUDE_CODE_DIST_URL = 'https://storage.googleapis.com/anthropic-claude-code';
+export const CLAUDE_CODE_DIST_URL =
+	'https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases';
 
 /**
  * Default CLI version to download
