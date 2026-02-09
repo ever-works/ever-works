@@ -193,36 +193,37 @@ export async function readGeneratedMetadata(workspacePath: string): Promise<{
 }
 
 /**
- * Required global flags for headless Claude Code execution.
+ * Global flags needed for headless Claude Code execution.
  * See: https://github.com/anthropics/claude-code/issues/8938
+ *
+ * These are always the same values regardless of workspace, so
+ * concurrent writes from parallel generations are safe (idempotent).
+ *
+ * Per-project flags (hasTrustDialogAccepted) are intentionally NOT
+ * used here — they would require read-modify-write which races when
+ * a user triggers multiple generations. The `-p` flag combined with
+ * `--dangerously-skip-permissions` already bypasses the trust dialog.
  */
-const HEADLESS_GLOBAL_FLAGS: Record<string, unknown> = {
+const HEADLESS_CONFIG: Record<string, unknown> = {
 	hasCompletedOnboarding: true,
 	bypassPermissionsModeAccepted: true,
 	hasTrustDialogHooksAccepted: true,
-	autoUpdates: false,
-};
-
-/**
- * Required per-project flags for headless execution.
- * The workspace path is used as the project key.
- */
-const HEADLESS_PROJECT_FLAGS: Record<string, unknown> = {
-	allowedTools: [],
-	hasTrustDialogAccepted: true,
+	autoUpdates: false
 };
 
 /**
  * Ensure .claude.json has all flags needed for non-interactive execution.
  *
  * CLAUDE_CODE_CONFIG_DIR points to a per-user directory. Claude Code
- * reads .claude.json from there and will prompt for onboarding, trust
- * dialogs, and hooks acceptance unless the right flags are set.
+ * reads .claude.json from there and will prompt for onboarding, bypass
+ * permissions acceptance, and hooks trust unless the right flags are set.
+ *
+ * Only global (idempotent) flags are written — no per-project entries —
+ * so concurrent generations for the same user are safe.
  *
  * @param configDir  Per-user config directory (CLAUDE_CODE_CONFIG_DIR)
- * @param workspacePath  Absolute path to the workspace (cwd for the CLI)
  */
-export async function ensureOnboardingConfig(configDir: string, workspacePath: string): Promise<void> {
+export async function ensureOnboardingConfig(configDir: string): Promise<void> {
 	const configPath = path.join(configDir, '.claude.json');
 	let config: Record<string, unknown>;
 
@@ -235,34 +236,20 @@ export async function ensureOnboardingConfig(configDir: string, workspacePath: s
 		config = {};
 	}
 
-	// Check if all global flags are already set
-	const globalDirty = Object.entries(HEADLESS_GLOBAL_FLAGS).some(
-		([key, value]) => config[key] !== value,
-	);
+	// Check if all flags are already set
+	const dirty = Object.entries(HEADLESS_CONFIG).some(([key, value]) => config[key] !== value);
 
-	// Check per-project flags
-	const projects = (config.projects ?? {}) as Record<string, Record<string, unknown>>;
-	const projectConfig = projects[workspacePath] ?? {};
-	const projectDirty = Object.entries(HEADLESS_PROJECT_FLAGS).some(
-		([key, value]) => JSON.stringify(projectConfig[key]) !== JSON.stringify(value),
-	);
-
-	if (!globalDirty && !projectDirty) {
-		return; // Already fully configured
+	if (!dirty) {
+		return; // Already configured
 	}
 
-	// Apply global flags
-	Object.assign(config, HEADLESS_GLOBAL_FLAGS);
-
-	// Apply per-project flags
-	projects[workspacePath] = { ...projectConfig, ...HEADLESS_PROJECT_FLAGS };
-	config.projects = projects;
-
+	Object.assign(config, HEADLESS_CONFIG);
 	await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
 }
 
 /**
- * Clean up the workspace directory. Never throws.
+ * Clean up the workspace directory and remove its project entry
+ * from .claude.json so stale paths don't accumulate. Never throws.
  */
 export async function cleanupWorkspace(userId: string, directoryId: string): Promise<void> {
 	try {

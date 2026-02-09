@@ -116,15 +116,14 @@ export class ClaudeCodePlugin implements IPlugin, IFullPipelinePlugin {
 				description: 'Claude Code OAuth token (from `claude setup-token`)',
 				'x-secret': true,
 				'x-scope': 'user',
-				'x-envVar': 'CLAUDE_CODE_OAUTH_TOKEN'
+				'x-envVar': 'PLUGIN_CLAUDE_CODE_OAUTH_TOKEN'
 			},
 			apiKey: {
 				type: 'string',
 				title: 'API Key',
 				description: 'Anthropic API key (from console.anthropic.com)',
 				'x-secret': true,
-				'x-scope': 'user',
-				'x-envVar': 'ANTHROPIC_API_KEY'
+				'x-scope': 'user'
 			},
 			version: {
 				type: 'string',
@@ -256,7 +255,7 @@ export class ClaudeCodePlugin implements IPlugin, IFullPipelinePlugin {
 
 			const configDir = `${BASE_TEMP_DIR}/${userId}`;
 			const workspacePath = await createWorkspace(userId, directory.id);
-			await ensureOnboardingConfig(configDir, workspacePath);
+			await ensureOnboardingConfig(configDir);
 			await seedExistingItems(workspacePath, existing.items);
 			await seedMetadata(workspacePath, {
 				directory: { name: directory.name, description: directory.description },

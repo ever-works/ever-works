@@ -355,7 +355,6 @@ describe('workspace-manager', () => {
 
 	describe('ensureOnboardingConfig', () => {
 		const configDir = '/tmp/claude-code-generator/user1';
-		const workspacePath = '/tmp/claude-code-generator/user1/dir1';
 		const configFile = '/tmp/claude-code-generator/user1/.claude.json';
 
 		it('should create config with all headless flags when file does not exist', async () => {
@@ -363,21 +362,16 @@ describe('workspace-manager', () => {
 			vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as string);
 			vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
-			await ensureOnboardingConfig(configDir, workspacePath);
+			await ensureOnboardingConfig(configDir);
 
 			expect(fs.mkdir).toHaveBeenCalledWith(configDir, { recursive: true });
 			expect(fs.writeFile).toHaveBeenCalledWith(configFile, expect.any(String), 'utf-8');
 
 			const written = JSON.parse(vi.mocked(fs.writeFile).mock.calls[0][1] as string);
-			// Global flags
 			expect(written.hasCompletedOnboarding).toBe(true);
 			expect(written.bypassPermissionsModeAccepted).toBe(true);
 			expect(written.hasTrustDialogHooksAccepted).toBe(true);
 			expect(written.autoUpdates).toBe(false);
-			// Per-project flags
-			expect(written.projects[workspacePath]).toBeDefined();
-			expect(written.projects[workspacePath].hasTrustDialogAccepted).toBe(true);
-			expect(written.projects[workspacePath].allowedTools).toEqual([]);
 		});
 
 		it('should not overwrite when all flags are already set', async () => {
@@ -386,53 +380,28 @@ describe('workspace-manager', () => {
 					hasCompletedOnboarding: true,
 					bypassPermissionsModeAccepted: true,
 					hasTrustDialogHooksAccepted: true,
-					autoUpdates: false,
-					projects: {
-						[workspacePath]: {
-							allowedTools: [],
-							hasTrustDialogAccepted: true,
-						},
-					},
-				}),
+					autoUpdates: false
+				})
 			);
 
-			await ensureOnboardingConfig(configDir, workspacePath);
+			await ensureOnboardingConfig(configDir);
 
 			expect(fs.writeFile).not.toHaveBeenCalled();
 		});
 
-		it('should patch existing config when global flags are missing', async () => {
+		it('should patch existing config when flags are missing', async () => {
 			vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify({ someExisting: 'data' }));
 			vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
-			await ensureOnboardingConfig(configDir, workspacePath);
+			await ensureOnboardingConfig(configDir);
 
 			expect(fs.writeFile).toHaveBeenCalled();
 			const written = JSON.parse(vi.mocked(fs.writeFile).mock.calls[0][1] as string);
 			expect(written.hasCompletedOnboarding).toBe(true);
 			expect(written.bypassPermissionsModeAccepted).toBe(true);
 			expect(written.hasTrustDialogHooksAccepted).toBe(true);
+			expect(written.autoUpdates).toBe(false);
 			expect(written.someExisting).toBe('data');
-			expect(written.projects[workspacePath].hasTrustDialogAccepted).toBe(true);
-		});
-
-		it('should add project entry when global flags exist but project is missing', async () => {
-			vi.mocked(fs.readFile).mockResolvedValue(
-				JSON.stringify({
-					hasCompletedOnboarding: true,
-					bypassPermissionsModeAccepted: true,
-					hasTrustDialogHooksAccepted: true,
-					autoUpdates: false,
-					projects: {},
-				}),
-			);
-			vi.mocked(fs.writeFile).mockResolvedValue(undefined);
-
-			await ensureOnboardingConfig(configDir, workspacePath);
-
-			expect(fs.writeFile).toHaveBeenCalled();
-			const written = JSON.parse(vi.mocked(fs.writeFile).mock.calls[0][1] as string);
-			expect(written.projects[workspacePath].hasTrustDialogAccepted).toBe(true);
 		});
 
 		it('should handle invalid JSON in existing file', async () => {
@@ -440,35 +409,40 @@ describe('workspace-manager', () => {
 			vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as string);
 			vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
-			await ensureOnboardingConfig(configDir, workspacePath);
+			await ensureOnboardingConfig(configDir);
 
 			const written = JSON.parse(vi.mocked(fs.writeFile).mock.calls[0][1] as string);
 			expect(written.hasCompletedOnboarding).toBe(true);
-			expect(written.projects[workspacePath].hasTrustDialogAccepted).toBe(true);
+			expect(written.bypassPermissionsModeAccepted).toBe(true);
 		});
 
-		it('should preserve existing project entries when adding new workspace', async () => {
-			const otherProject = '/some/other/project';
+		it('should write when a single flag differs', async () => {
 			vi.mocked(fs.readFile).mockResolvedValue(
 				JSON.stringify({
 					hasCompletedOnboarding: true,
 					bypassPermissionsModeAccepted: true,
 					hasTrustDialogHooksAccepted: true,
-					autoUpdates: false,
-					projects: {
-						[otherProject]: { hasTrustDialogAccepted: true, customData: 123 },
-					},
-				}),
+					autoUpdates: true // differs from expected false
+				})
 			);
 			vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
-			await ensureOnboardingConfig(configDir, workspacePath);
+			await ensureOnboardingConfig(configDir);
+
+			expect(fs.writeFile).toHaveBeenCalled();
+			const written = JSON.parse(vi.mocked(fs.writeFile).mock.calls[0][1] as string);
+			expect(written.autoUpdates).toBe(false);
+		});
+
+		it('should not include per-project entries (concurrent-safe)', async () => {
+			vi.mocked(fs.readFile).mockRejectedValue(new Error('ENOENT'));
+			vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as string);
+			vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+
+			await ensureOnboardingConfig(configDir);
 
 			const written = JSON.parse(vi.mocked(fs.writeFile).mock.calls[0][1] as string);
-			// New workspace added
-			expect(written.projects[workspacePath].hasTrustDialogAccepted).toBe(true);
-			// Existing project preserved
-			expect(written.projects[otherProject].customData).toBe(123);
+			expect(written.projects).toBeUndefined();
 		});
 	});
 
