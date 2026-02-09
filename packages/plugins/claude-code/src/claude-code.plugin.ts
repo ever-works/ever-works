@@ -98,8 +98,8 @@ const STEP_DEFINITIONS: readonly PipelineStepDefinition<ClaudeCodeStepId>[] = [
  * Claude Code Generator Plugin
  *
  * Full pipeline plugin that delegates the entire generation to Claude Code.
- * Instead of orchestrating 15 separate steps, this plugin runs a single Claude Code
- * session that handles web search, content creation, and file generation autonomously.
+ * This plugin runs a single Claude Code session that handles web search,
+ * content creation, and file generation autonomously.
  */
 export class ClaudeCodePlugin implements IPlugin, IFullPipelinePlugin {
 	readonly id = 'claude-code';
@@ -220,7 +220,7 @@ export class ClaudeCodePlugin implements IPlugin, IFullPipelinePlugin {
 			readme: [
 				'# Claude Code Generator Plugin',
 				'',
-				'Full pipeline plugin that delegates the entire directory generation to Claude Code. Instead of orchestrating 15 separate pipeline steps with multiple AI API calls, this plugin runs a single Claude Code session that autonomously handles web search, content creation, and file generation.',
+				'Full pipeline plugin that delegates the entire directory generation to Claude Code. This plugin runs a single Claude Code session that autonomously handles web search, content creation, and file generation.',
 				'',
 				'## How it works',
 				'',
