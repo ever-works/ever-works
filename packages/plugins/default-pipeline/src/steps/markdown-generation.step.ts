@@ -75,7 +75,8 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 	}
 
 	/**
-	 * Generates markdown summaries for multiple items
+	 * Generates markdown summaries for multiple items.
+	 * Items without source_url get empty markdown (no hallucination).
 	 */
 	private async generateMarkdownForItems(
 		items: MutableItemData[],
@@ -90,11 +91,19 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 			return [];
 		}
 
+		// Separate items: only items with source_url can get AI-generated markdown
+		const itemsWithContent = items.filter((item) => item.source_url);
+		const itemsWithoutContent = items.filter((item) => !item.source_url);
+
+		if (itemsWithoutContent.length > 0) {
+			logger.log(`Skipping markdown generation for ${itemsWithoutContent.length} items without source URLs`);
+		}
+
 		const processedItems: MutableItemData[] = [];
 
-		// Process each batch
-		for (let i = 0; i < items.length; i += this.BATCH_SIZE) {
-			const batch = items.slice(i, i + this.BATCH_SIZE);
+		// Process items with content in batches
+		for (let i = 0; i < itemsWithContent.length; i += this.BATCH_SIZE) {
+			const batch = itemsWithContent.slice(i, i + this.BATCH_SIZE);
 
 			const markdownPromises = batch.map(async (item) => {
 				const markdown = await this.generateMarkdown(
@@ -115,9 +124,14 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 			const batchResults = await Promise.all(markdownPromises);
 			processedItems.push(...batchResults);
 
-			if (i + this.BATCH_SIZE < items.length) {
+			if (i + this.BATCH_SIZE < itemsWithContent.length) {
 				await new Promise((resolve) => setTimeout(resolve, 500));
 			}
+		}
+
+		// Items without source content get empty markdown (no hallucination)
+		for (const item of itemsWithoutContent) {
+			processedItems.push({ ...item, markdown: '' });
 		}
 
 		return processedItems;
@@ -176,7 +190,7 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 						content: rawContent.slice(0, 4000)
 					},
 					routing: {
-						complexity: 'medium',
+						complexity: 'simple',
 						taskId: 'markdown-generation'
 					}
 				},

@@ -11,6 +11,8 @@ Every item has name, description, and optionally URL of item's official website/
 - Some products have slightly different names but are the same - consider them as duplicates.
 - Transform any names that contains version numbers to the base name.
 - featured field should remain the same as in the original item
+- Prefer web-extracted items (those with source_url) over AI-generated items (those without source_url).
+- When merging duplicates: keep the item with more complete data (more fields filled, longer description, has source_url).
 </rules>
 
 Example of same items but with different names - they should be considered as duplicates:
@@ -21,7 +23,9 @@ Example of same items but with different names - they should be considered as du
 "Docker" and "Docker Desktop"
 "X by Y" and "X" (btw we prefer shorter names)
 "github.com/user/repo" and "github.com/user/repo/tree/main"
+"github.com/org/repo" and "www.github.com/org/repo"
 "example.com" and "www.example.com"
+"example.com/page/" and "example.com/page"
 </examples>
 
 Here is the list of items to deduplicate:
@@ -38,11 +42,13 @@ We don't want to show duplicates to our users, so return only new items that don
 - Compare each new item with the list of existing items to identify duplicates
 - Items are considered duplicates if they have:
   * Same or very similar names (ignoring case, version numbers, common suffixes)
-  * Same or similar source URLs (especially same domain/repository)
+  * Same or similar source URLs (especially same domain/repository, ignoring www prefix, trailing slashes, git tree/blob paths)
   * Same underlying product/tool/library even with different naming
 - When in doubt, prefer to mark as duplicate rather than include a potential duplicate
 - Return only items that are genuinely new and not already represented in the existing list
 - featured field should remain the same as in the new item
+- Prefer web-extracted items (those with source_url) over AI-generated items (those without source_url).
+- When merging duplicates: keep the item with more complete data (more fields filled, longer description, has source_url).
 </rules>
 
 Example of same items but with different names - they should be considered as duplicates:
@@ -53,7 +59,9 @@ Example of same items but with different names - they should be considered as du
 "Docker" and "Docker Desktop"
 "X by Y" and "X" (btw we prefer shorter names)
 "github.com/user/repo" and "github.com/user/repo/tree/main"
+"github.com/org/repo" and "www.github.com/org/repo"
 "example.com" and "www.example.com"
+"example.com/page/" and "example.com/page"
 </examples>
 
 Here is the list of existing items (these are the most relevant existing items based on similarity):

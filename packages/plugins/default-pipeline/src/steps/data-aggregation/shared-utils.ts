@@ -253,9 +253,43 @@ export class SharedUtils {
 			if (normalizedName) {
 				index.set(`name:${normalizedName}`, item);
 			}
+
+			// Index by normalized URL (catches www vs non-www, trailing slashes, git paths)
+			if (item.source_url) {
+				const normalizedUrl = this.normalizeUrl(item.source_url);
+				if (normalizedUrl) {
+					index.set(`nurl:${normalizedUrl}`, item);
+				}
+			}
 		}
 
 		return index;
+	}
+
+	/**
+	 * Normalizes a URL for deduplication comparison.
+	 * Strips protocol, www prefix, trailing slashes, and git tree/blob paths.
+	 */
+	normalizeUrl(url: string): string {
+		if (!url) return '';
+
+		let normalized = url
+			.toLowerCase()
+			.trim()
+			// Remove protocol
+			.replace(/^https?:\/\//, '')
+			// Remove www prefix
+			.replace(/^www\./, '')
+			// Remove trailing slashes
+			.replace(/\/+$/, '')
+			// Normalize git tree/blob paths to base repo
+			.replace(/\/(tree|blob)\/[^/]+.*$/, '')
+			// Remove hash fragments
+			.replace(/#.*$/, '')
+			// Remove common trailing index files
+			.replace(/\/index\.(html?|php|aspx?)$/, '');
+
+		return normalized;
 	}
 
 	/**
@@ -294,6 +328,14 @@ export class SharedUtils {
 		const normalizedName = this.normalizeItemName(newItem.name);
 		if (normalizedName && lookupIndex.has(`name:${normalizedName}`)) {
 			return true;
+		}
+
+		// Check by normalized URL (catches www vs non-www, trailing slashes, git paths)
+		if (newItem.source_url) {
+			const normalizedUrl = this.normalizeUrl(newItem.source_url);
+			if (normalizedUrl && lookupIndex.has(`nurl:${normalizedUrl}`)) {
+				return true;
+			}
 		}
 
 		return false;

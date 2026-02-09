@@ -7,7 +7,7 @@
 import type { ZodType } from 'zod';
 import { jsonrepair } from 'jsonrepair';
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
-import { HumanMessage, SystemMessage, AIMessage } from '@langchain/core/messages';
+import { HumanMessage, SystemMessage, AIMessage, type AIMessageChunk } from '@langchain/core/messages';
 import type {
 	ChatCompletionOptions,
 	ChatCompletionResponse,
@@ -34,6 +34,9 @@ export interface AiOperationsConfig {
 export class AiOperations {
 	constructor(private defaultConfig: AiOperationsConfig) {}
 
+	/** Per-model cache of params the provider has rejected (e.g. temperature, reasoning). */
+	private readonly rejectedParams = new Map<string, Set<string>>();
+
 	/**
 	 * Create a chat completion using LangChain's ChatOpenAI.
 	 * Plain text only — for structured JSON output, use `askJson` instead.
@@ -42,16 +45,16 @@ export class AiOperations {
 		options: ChatCompletionOptions,
 		configOverrides?: Partial<AiOperationsConfig>
 	): Promise<ChatCompletionResponse> {
-		return this.withParamRetry(async (skip) => {
-			const config = this.mergeConfig(configOverrides);
-			const model = options.model || config.model;
+		const config = this.mergeConfig(configOverrides);
+		const model = options.model || config.model;
+
+		return this.withParamRetry(model, async (skip) => {
 			const llm = this.createChatModel(config, model, options, skip);
 			const tracker = new TokenUsageTracker();
 			const messages = this.toLangChainMessages(options.messages);
 
 			const response = await llm.invoke(messages, { callbacks: [tracker] });
 			const content = typeof response.content === 'string' ? response.content : '';
-			const usage = tracker.usage.totalTokens > 0 ? tracker.usage : undefined;
 
 			return {
 				id: `chatcmpl-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -64,13 +67,7 @@ export class AiOperations {
 						finishReason: 'stop'
 					}
 				],
-				usage: usage
-					? {
-							promptTokens: usage.inputTokens,
-							completionTokens: usage.outputTokens,
-							totalTokens: usage.totalTokens
-						}
-					: undefined
+				usage: this.mapTokenUsage(tracker)
 			};
 		});
 	}
@@ -82,10 +79,10 @@ export class AiOperations {
 		configOverrides?: Partial<AiOperationsConfig>,
 		options?: { temperature?: number; maxTokens?: number }
 	): Promise<AskJsonCompletionResponse> {
-		return this.withParamRetry(async (skip) => {
-			const config = this.mergeConfig(configOverrides);
-			const model = config.model;
+		const config = this.mergeConfig(configOverrides);
+		const model = config.model;
 
+		return this.withParamRetry(model, async (skip) => {
 			const llm = this.createChatModel(
 				config,
 				model,
@@ -122,18 +119,10 @@ export class AiOperations {
 				result = schema.parse(JSON.parse(jsonrepair(content)));
 			}
 
-			const usage = tracker.usage.totalTokens > 0 ? tracker.usage : undefined;
-
 			return {
 				result,
 				model,
-				usage: usage
-					? {
-							promptTokens: usage.inputTokens,
-							completionTokens: usage.outputTokens,
-							totalTokens: usage.totalTokens
-						}
-					: undefined
+				usage: this.mapTokenUsage(tracker)
 			};
 		});
 	}
@@ -147,10 +136,19 @@ export class AiOperations {
 	): AsyncIterable<ChatCompletionChunk> {
 		const config = this.mergeConfig(configOverrides);
 		const model = options.model || config.model;
-		const llm = this.createChatModel(config, model, options);
 		const messages = this.toLangChainMessages(options.messages);
 
-		const stream = await llm.stream(messages);
+		const skip = new Set(this.rejectedParams.get(model));
+		let stream: AsyncIterable<AIMessageChunk>;
+		try {
+			stream = await this.createChatModel(config, model, options, skip).stream(messages);
+		} catch (error) {
+			const param = this.parseRejectedParam(error);
+			if (!param || skip.has(param)) throw error;
+			skip.add(param);
+			this.rejectedParams.set(model, new Set(skip));
+			stream = await this.createChatModel(config, model, options, skip).stream(messages);
+		}
 
 		for await (const chunk of stream) {
 			const content = typeof chunk.content === 'string' ? chunk.content : '';
@@ -337,17 +335,32 @@ export class AiOperations {
 	 * Generic retry: if the API rejects an unsupported parameter, rebuild
 	 * the model without it and retry once. Handles temperature, reasoning,
 	 * etc. across all providers/models in one place.
+	 *
+	 * Uses a per-model cache so the same param is never sent twice.
 	 */
-	private async withParamRetry<T>(operation: (skip?: Set<string>) => Promise<T>): Promise<T> {
+	private async withParamRetry<T>(model: string, operation: (skip: Set<string>) => Promise<T>): Promise<T> {
+		const skip = new Set(this.rejectedParams.get(model));
 		try {
-			return await operation();
+			return await operation(skip);
 		} catch (error) {
 			const param = this.parseRejectedParam(error);
-			if (param) {
-				return operation(new Set([param]));
+			if (param && !skip.has(param)) {
+				skip.add(param);
+				this.rejectedParams.set(model, new Set(skip));
+				return operation(skip);
 			}
 			throw error;
 		}
+	}
+
+	private mapTokenUsage(tracker: TokenUsageTracker) {
+		const usage = tracker.usage;
+		if (usage.totalTokens === 0) return undefined;
+		return {
+			promptTokens: usage.inputTokens,
+			completionTokens: usage.outputTokens,
+			totalTokens: usage.totalTokens
+		};
 	}
 
 	private parseRejectedParam(error: unknown): string | undefined {

@@ -126,7 +126,9 @@ describe('MarkdownGenerationStep', () => {
 
 			const result = await step.run(mockContext, mockExecContext);
 
-			expect(mockExecContext.logger.warn).toHaveBeenCalled();
+			expect(mockExecContext.logger.log).toHaveBeenCalledWith(
+				expect.stringContaining('Skipping markdown generation')
+			);
 			expect(result.finalItems[0].markdown).toBe('');
 		});
 

@@ -54,6 +54,7 @@ Exclude any invalid or irrelevant content, and align the findings with the topic
 - Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource
 - Each item can have at most ONE brand; include it when the item clearly belongs to a product line/company and set brand_logo_url when a canonical logo is available.
 - Provide multiple high-quality image URLs (screenshots, product imagery) when present on the source; prefer official domains and skip low-quality or unrelated images.
+- Only include source_url if found in or clearly derivable from the content. Do NOT invent or guess URLs.
 </extraction_criteria>
 
 <web_page_content>
