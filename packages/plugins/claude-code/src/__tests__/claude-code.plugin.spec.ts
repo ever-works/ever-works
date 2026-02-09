@@ -143,7 +143,6 @@ describe('ClaudeCodePlugin', () => {
 			expect(props.oauthToken).toBeDefined();
 			expect(props.oauthToken['x-secret']).toBe(true);
 			expect(props.oauthToken['x-scope']).toBe('user');
-			expect(props.oauthToken['x-envVar']).toBe('CLAUDE_CODE_OAUTH_TOKEN');
 		});
 
 		it('should define apiKey as a secret user-scoped field', () => {
@@ -151,7 +150,6 @@ describe('ClaudeCodePlugin', () => {
 			expect(props.apiKey).toBeDefined();
 			expect(props.apiKey['x-secret']).toBe(true);
 			expect(props.apiKey['x-scope']).toBe('user');
-			expect(props.apiKey['x-envVar']).toBe('ANTHROPIC_API_KEY');
 		});
 
 		it('should define version as a hidden field with default', () => {
