@@ -1956,6 +1956,85 @@ describe('PluginOperationsService', () => {
             ).resolves.toBeDefined();
         });
 
+        it('should pass user pre-check when global-scoped required field is not set at user level', async () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    apiKey: { type: 'string', 'x-secret': true, 'x-scope': 'user' },
+                    model: { type: 'string' },
+                },
+                required: ['apiKey', 'model'],
+            } as unknown as JsonSchema;
+
+            jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
+
+            // User has apiKey (user-scoped) but not model (global-scoped)
+            jest.spyOn(realUserPluginRepo, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: { apiKey: 'sk-user' },
+                metadata: {},
+            } as any);
+            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+                id: '2',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+
+            // Global-scoped model not enforced at user pre-check; directory provides it
+            await expect(
+                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                    model: 'gpt-4',
+                }),
+            ).resolves.toBeDefined();
+        });
+
+        it('should block at user pre-check when user-scoped required field is missing', async () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    apiKey: { type: 'string', 'x-secret': true, 'x-scope': 'user' },
+                    model: { type: 'string' },
+                },
+                required: ['apiKey', 'model'],
+            } as unknown as JsonSchema;
+
+            jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
+
+            // User has NO apiKey (user-scoped required) — should block
+            jest.spyOn(realUserPluginRepo, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: { model: 'gpt-4' },
+                secretSettings: {},
+                metadata: {},
+            } as any);
+            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+                id: '2',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+
+            await expect(
+                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                    model: 'gpt-4o',
+                }),
+            ).rejects.toThrow('User-level required settings must be configured first');
+        });
+
         it('should inherit user settings for required field validation at directory level', async () => {
             const schema: JsonSchema = {
                 type: 'object',
@@ -2028,12 +2107,13 @@ describe('PluginOperationsService', () => {
                 metadata: {},
             } as any);
 
-            // model is global-scoped required — checked at user level first
+            // model is global-scoped required — passes user pre-check (only user-scoped
+            // fields enforced), fails directory-level validation
             await expect(
                 realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
                     unrelated: 'value',
                 }),
-            ).rejects.toThrow('User-level required settings must be configured first');
+            ).rejects.toThrow('Invalid plugin settings');
         });
 
         it('should satisfy requiredGroup at directory level via inherited global-scoped value', async () => {
@@ -2070,13 +2150,13 @@ describe('PluginOperationsService', () => {
             ).resolves.toBeDefined();
         });
 
-        it('should fail requiredGroup at directory level when no global-scoped field is set', async () => {
+        it('should pass requiredGroup at directory level when user-scoped field is inherited', async () => {
             const schema = makeSchema({
                 'x-requiredGroups': [{ fields: ['oauthToken', 'apiKey'], message: 'Need auth' }],
             });
             jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
 
-            // User set only oauthToken (user-scoped) — not visible at directory scope
+            // User set oauthToken (user-scoped) — inherited in merged settings at directory scope
             jest.spyOn(realUserPluginRepo, 'findOne').mockResolvedValue({
                 id: '1',
                 userId: 'user-1',
@@ -2096,8 +2176,41 @@ describe('PluginOperationsService', () => {
                 metadata: {},
             } as any);
 
-            // oauthToken is user-scoped → invisible at directory scope
-            // apiKey (global) is empty → group fails
+            // oauthToken is user-scoped but inherited → visible at directory scope
+            // group satisfied via inherited user value
+            await expect(
+                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                    some: 'value',
+                }),
+            ).resolves.toBeDefined();
+        });
+
+        it('should fail requiredGroup at directory level when neither user nor global fields are set', async () => {
+            const schema = makeSchema({
+                'x-requiredGroups': [{ fields: ['oauthToken', 'apiKey'], message: 'Need auth' }],
+            });
+            jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
+
+            // Neither oauthToken nor apiKey set at any level
+            jest.spyOn(realUserPluginRepo, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+                id: '2',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+
             await expect(
                 realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
                     some: 'value',

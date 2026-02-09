@@ -325,7 +325,7 @@ describe('SettingsSchemaValidatorService', () => {
             expect(result.errors).not.toContain('Need auth');
         });
 
-        it('should filter group fields by scope', () => {
+        it('should include user-scoped group fields at directory scope (inherited values)', () => {
             const schema: JsonSchema = {
                 type: 'object',
                 properties: {
@@ -337,9 +337,50 @@ describe('SettingsSchemaValidatorService', () => {
                 ],
             };
 
-            // At directory scope, user-scoped fields are excluded → group is skipped
+            // At directory scope with empty settings, user-scoped fields are now
+            // included (merged settings would carry inherited user values).
+            // Empty settings → group fails.
             const result = service.validateRequiredFields({}, schema, 'directory');
+            expect(result.valid).toBe(false);
+            expect(result.errors).toContain('Need credential');
+        });
+
+        it('should pass group at directory scope when user-scoped field has inherited value', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    oauthToken: { type: 'string', 'x-scope': 'user' },
+                    apiKey: { type: 'string' },
+                },
+                'x-requiredGroups': [
+                    { fields: ['oauthToken', 'apiKey'], message: 'Need credential' },
+                ],
+            };
+
+            // At directory scope, merged settings include inherited user oauthToken
+            const result = service.validateRequiredFields(
+                { oauthToken: 'inherited-token' },
+                schema,
+                'directory',
+            );
             expect(result.valid).toBe(true);
+        });
+
+        it('should fail group at directory scope when user-scoped and global fields are both empty', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    oauthToken: { type: 'string', 'x-scope': 'user' },
+                    apiKey: { type: 'string' },
+                },
+                'x-requiredGroups': [
+                    { fields: ['oauthToken', 'apiKey'], message: 'Need credential' },
+                ],
+            };
+
+            const result = service.validateRequiredFields({}, schema, 'directory');
+            expect(result.valid).toBe(false);
+            expect(result.errors).toContain('Need credential');
         });
 
         it('should enforce group at matching scope', () => {

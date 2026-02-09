@@ -900,9 +900,18 @@ export class PluginOperationsService {
             ...(userPlugin?.secretSettings || {}),
         };
 
+        const userOnlyRequired = (schema.required ?? []).filter((field) => {
+            const propSchema = schema.properties?.[field];
+            return (propSchema?.['x-scope'] || 'global') === 'user';
+        });
+
         const userOnlyGroups = this.filterUserOnlyGroups(schema);
+
+        if (userOnlyRequired.length === 0 && userOnlyGroups.length === 0) return;
+
         const effectiveSchema: JsonSchema = {
             ...schema,
+            required: userOnlyRequired.length > 0 ? userOnlyRequired : undefined,
             'x-requiredGroups': userOnlyGroups.length > 0 ? userOnlyGroups : undefined,
         };
 

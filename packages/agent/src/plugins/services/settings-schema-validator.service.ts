@@ -164,6 +164,9 @@ export class SettingsSchemaValidatorService {
                 const propSchema = schema.properties?.[field];
                 if (!propSchema) return false;
                 const fieldScope = (propSchema['x-scope'] as SettingsScope) || 'global';
+                // At directory scope, include user-scoped fields because merged
+                // settings contain inherited user values that can satisfy the group.
+                if (scope === 'directory' && fieldScope === 'user') return true;
                 return this.isScopeApplicable(fieldScope, scope);
             });
 
