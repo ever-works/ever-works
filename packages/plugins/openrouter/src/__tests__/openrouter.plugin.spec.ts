@@ -8,6 +8,7 @@ vi.mock('@ever-works/plugin/ai', () => {
 		createChatCompletion: vi.fn().mockResolvedValue({ id: 'test', choices: [], model: 'openai/gpt-4', created: 0 }),
 		createStreamingChatCompletion: vi.fn(),
 		createEmbedding: vi.fn(),
+		askJson: vi.fn().mockResolvedValue({ result: {}, model: 'openai/gpt-4', usage: undefined }),
 		listModels: vi.fn().mockResolvedValue([]),
 		testConnection: vi.fn().mockResolvedValue({ success: true })
 	}));
@@ -278,6 +279,35 @@ describe('OpenRouterPlugin', () => {
 			expect(capabilities.supportsToolCalling).toBe(true);
 			expect(capabilities.supportsVision).toBe(false);
 			expect(capabilities.maxContextLength).toBe(128000);
+		});
+	});
+
+	describe('askJson', () => {
+		const createMockContext2 = (): PluginContext =>
+			({
+				pluginId: 'openrouter',
+				logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+				getSettings: vi.fn().mockResolvedValue({})
+			}) as unknown as PluginContext;
+
+		it('should delegate to aiOps.askJson with resolved config', async () => {
+			await plugin.onLoad(createMockContext2());
+			const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+
+			await plugin.askJson('Generate JSON', {
+				settings: { apiKey: 'sk-or-test' }
+			});
+
+			expect(aiOpsInstance.askJson).toHaveBeenCalledWith(
+				'Generate JSON',
+				expect.any(Object),
+				expect.objectContaining({ apiKey: 'sk-or-test' }),
+				expect.any(Object)
+			);
+		});
+
+		it('should throw when plugin not loaded', async () => {
+			await expect(plugin.askJson('test')).rejects.toThrow('Plugin not loaded');
 		});
 	});
 

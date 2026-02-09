@@ -113,8 +113,6 @@ export class OpenRouterPlugin extends BaseAiProvider {
 		required: ['apiKey']
 	};
 
-	private aiOps?: AiOperations;
-
 	// Lifecycle hooks
 
 	async onLoad(context: PluginContext): Promise<void> {
@@ -133,7 +131,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 	}
 
 	async onUnload(): Promise<void> {
-		this.aiOps = undefined;
+		this.aiOps = null;
 		await super.onUnload();
 	}
 

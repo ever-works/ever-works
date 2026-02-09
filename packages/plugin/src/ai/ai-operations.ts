@@ -4,6 +4,8 @@
  *
  * This follows the same pattern as GitOperations in packages/plugin/src/git/git-operations.ts.
  */
+import type { ZodType } from 'zod';
+import { jsonrepair } from 'jsonrepair';
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { HumanMessage, SystemMessage, AIMessage } from '@langchain/core/messages';
 import type {
@@ -13,7 +15,8 @@ import type {
 	ChatMessage,
 	EmbeddingOptions,
 	EmbeddingResponse,
-	AiModel
+	AiModel,
+	AskJsonCompletionResponse
 } from '../contracts/capabilities/ai-provider.interface.js';
 import { TokenUsageTracker } from './token-usage.tracker.js';
 import { getReasoningConfig } from './reasoning.utils.js';
@@ -33,43 +36,106 @@ export class AiOperations {
 
 	/**
 	 * Create a chat completion using LangChain's ChatOpenAI.
+	 * Plain text only — for structured JSON output, use `askJson` instead.
 	 */
 	async createChatCompletion(
 		options: ChatCompletionOptions,
 		configOverrides?: Partial<AiOperationsConfig>
 	): Promise<ChatCompletionResponse> {
-		const config = this.mergeConfig(configOverrides);
-		const model = options.model || config.model;
-		const llm = this.createChatModel(config, model, options);
-		const tracker = new TokenUsageTracker();
-		const messages = this.toLangChainMessages(options.messages);
+		return this.withParamRetry(async (skip) => {
+			const config = this.mergeConfig(configOverrides);
+			const model = options.model || config.model;
+			const llm = this.createChatModel(config, model, options, skip);
+			const tracker = new TokenUsageTracker();
+			const messages = this.toLangChainMessages(options.messages);
 
-		const response = await llm.invoke(messages, { callbacks: [tracker] });
+			const response = await llm.invoke(messages, { callbacks: [tracker] });
+			const content = typeof response.content === 'string' ? response.content : '';
+			const usage = tracker.usage.totalTokens > 0 ? tracker.usage : undefined;
 
-		const usage = tracker.usage.totalTokens > 0 ? tracker.usage : undefined;
-
-		return {
-			id: `chatcmpl-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-			model,
-			created: Date.now(),
-			choices: [
-				{
-					index: 0,
-					message: {
-						role: 'assistant',
-						content: typeof response.content === 'string' ? response.content : ''
-					},
-					finishReason: 'stop'
-				}
-			],
-			usage: usage
-				? {
-						promptTokens: usage.inputTokens,
-						completionTokens: usage.outputTokens,
-						totalTokens: usage.totalTokens
+			return {
+				id: `chatcmpl-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+				model,
+				created: Date.now(),
+				choices: [
+					{
+						index: 0,
+						message: { role: 'assistant', content },
+						finishReason: 'stop'
 					}
-				: undefined
-		};
+				],
+				usage: usage
+					? {
+							promptTokens: usage.inputTokens,
+							completionTokens: usage.outputTokens,
+							totalTokens: usage.totalTokens
+						}
+					: undefined
+			};
+		});
+	}
+
+	/** Structured JSON output. Falls back to raw invoke + jsonrepair on failure. */
+	async askJson(
+		prompt: string,
+		schema: ZodType,
+		configOverrides?: Partial<AiOperationsConfig>,
+		options?: { temperature?: number; maxTokens?: number }
+	): Promise<AskJsonCompletionResponse> {
+		return this.withParamRetry(async (skip) => {
+			const config = this.mergeConfig(configOverrides);
+			const model = config.model;
+
+			const llm = this.createChatModel(
+				config,
+				model,
+				{
+					messages: [],
+					temperature: options?.temperature,
+					maxTokens: options?.maxTokens
+				} as ChatCompletionOptions,
+				skip
+			);
+
+			const tracker = new TokenUsageTracker();
+			let result: unknown;
+
+			try {
+				const structured = llm.withStructuredOutput(schema);
+				result = await structured.invoke([new HumanMessage(prompt)], {
+					callbacks: [tracker]
+				});
+			} catch (structuredError) {
+				if (this.parseRejectedParam(structuredError)) {
+					throw structuredError;
+				}
+
+				console.warn(
+					`[AiOperations] Structured output failed for model "${model}", falling back to jsonrepair:`,
+					structuredError instanceof Error ? structuredError.message : structuredError
+				);
+
+				const raw = await llm.invoke([new HumanMessage(prompt)], {
+					callbacks: [tracker]
+				});
+				const content = typeof raw.content === 'string' ? raw.content : '';
+				result = schema.parse(JSON.parse(jsonrepair(content)));
+			}
+
+			const usage = tracker.usage.totalTokens > 0 ? tracker.usage : undefined;
+
+			return {
+				result,
+				model,
+				usage: usage
+					? {
+							promptTokens: usage.inputTokens,
+							completionTokens: usage.outputTokens,
+							totalTokens: usage.totalTokens
+						}
+					: undefined
+			};
+		});
 	}
 
 	/**
@@ -238,17 +304,58 @@ export class AiOperations {
 		return { ...this.defaultConfig, ...overrides };
 	}
 
-	private createChatModel(config: AiOperationsConfig, model: string, options?: ChatCompletionOptions): ChatOpenAI {
-		const reasoningConfig = getReasoningConfig(config.providerType, model);
+	private createChatModel(
+		config: AiOperationsConfig,
+		model: string,
+		options?: ChatCompletionOptions,
+		skip?: Set<string>
+	): ChatOpenAI {
+		const modelKwargs: Record<string, unknown> = {};
+
+		if (!skip?.has('reasoning')) {
+			const reasoningConfig = getReasoningConfig(config.providerType, model);
+			if (reasoningConfig) Object.assign(modelKwargs, reasoningConfig);
+		}
+
+		if (options?.responseFormat) {
+			modelKwargs.response_format = options.responseFormat;
+		}
+
+		const temperature = skip?.has('temperature') ? undefined : (options?.temperature ?? config.temperature);
 
 		return new ChatOpenAI({
 			apiKey: config.apiKey,
 			model,
-			temperature: options?.temperature ?? config.temperature,
+			temperature,
 			maxTokens: options?.maxTokens ?? config.maxTokens,
 			...(config.baseURL && { configuration: { baseURL: config.baseURL } }),
-			...(reasoningConfig && { modelKwargs: reasoningConfig })
+			...(Object.keys(modelKwargs).length > 0 && { modelKwargs })
 		});
+	}
+
+	/**
+	 * Generic retry: if the API rejects an unsupported parameter, rebuild
+	 * the model without it and retry once. Handles temperature, reasoning,
+	 * etc. across all providers/models in one place.
+	 */
+	private async withParamRetry<T>(operation: (skip?: Set<string>) => Promise<T>): Promise<T> {
+		try {
+			return await operation();
+		} catch (error) {
+			const param = this.parseRejectedParam(error);
+			if (param) {
+				return operation(new Set([param]));
+			}
+			throw error;
+		}
+	}
+
+	private parseRejectedParam(error: unknown): string | undefined {
+		if (!(error instanceof Error)) return undefined;
+		const msg = error.message.toLowerCase();
+		if (msg.includes("'temperature'") || msg.includes('"temperature"')) return 'temperature';
+		if (msg.includes("'reasoning'") || msg.includes("'reasoning_effort'")) return 'reasoning';
+		return undefined;
 	}
 
 	private toLangChainMessages(messages: readonly ChatMessage[]): Array<HumanMessage | SystemMessage | AIMessage> {

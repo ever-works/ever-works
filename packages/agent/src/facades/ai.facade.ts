@@ -11,6 +11,8 @@ import type {
     AiModel,
     IAiFacade,
     FacadeOptions,
+    AskJsonCompletionResponse,
+    TaskComplexity,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -77,29 +79,16 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         const model = this.resolveModel(plugin, settings, options?.routing);
         const prompt = this.renderTemplate(promptTemplate, options?.variables);
 
-        const completionOptions: ChatCompletionOptions = {
-            model,
-            messages: [{ role: 'user', content: prompt }],
-            temperature: options?.temperature ?? 0.7,
-            responseFormat: { type: 'json_object' },
-            jsonSchema: this.zodToJsonSchema(schema),
-            settings,
-        };
+        const call = (callModel?: string) =>
+            this.callAskJson(plugin, prompt, schema, {
+                model: callModel ?? model,
+                temperature: options?.temperature ?? 0.7,
+                settings,
+            });
 
-        const response = await plugin.createChatCompletion(completionOptions);
-        const content = response.choices[0]?.message?.content;
-        if (!content || typeof content !== 'string') {
-            throw new AiFacadeError('No content in AI response', 'askJson', plugin.id);
-        }
+        const response = await this.withEscalation(call, settings, model, options?.routing);
 
-        let parsed: unknown;
-        try {
-            parsed = JSON.parse(content);
-        } catch {
-            throw new AiFacadeError('Failed to parse AI response as JSON', 'askJson', plugin.id);
-        }
-
-        const validated = schema.safeParse(parsed);
+        const validated = schema.safeParse(response.result);
         if (!validated.success) {
             throw new AiFacadeError(
                 `AI response validation failed: ${validated.error.message}`,
@@ -123,6 +112,85 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             provider: plugin.id,
             model: response.model,
         };
+    }
+
+    /** Use plugin.askJson (efficient) or fall back to createChatCompletion + JSON parse */
+    private async callAskJson(
+        plugin: IAiProviderPlugin,
+        prompt: string,
+        schema: z.ZodSchema,
+        opts: { model?: string; temperature: number; settings: Record<string, unknown> },
+    ): Promise<AskJsonCompletionResponse> {
+        if (plugin.askJson) {
+            return plugin.askJson(prompt, {
+                model: opts.model,
+                temperature: opts.temperature,
+                schema,
+                settings: opts.settings,
+            });
+        }
+
+        // Fallback for plugins without askJson
+        const response = await plugin.createChatCompletion({
+            model: opts.model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: opts.temperature,
+            responseFormat: { type: 'json_object' },
+            settings: opts.settings,
+        });
+
+        const content = response.choices[0]?.message?.content;
+        if (!content || typeof content !== 'string') {
+            throw new AiFacadeError('No content in AI response', 'askJson', plugin.id);
+        }
+
+        try {
+            return {
+                result: JSON.parse(content),
+                model: response.model,
+                usage: response.usage,
+            };
+        } catch {
+            throw new AiFacadeError('Failed to parse AI response as JSON', 'askJson', plugin.id);
+        }
+    }
+
+    /** Retry with a higher-complexity model on failure when autoEscalate is enabled */
+    private async withEscalation(
+        call: (model?: string) => Promise<AskJsonCompletionResponse>,
+        settings: Record<string, unknown>,
+        currentModel: string | undefined,
+        routing?: AiRoutingOptions,
+    ): Promise<AskJsonCompletionResponse> {
+        try {
+            return await call();
+        } catch (error) {
+            if (routing?.autoEscalate !== false && routing?.complexity) {
+                const escalated = this.escalateModel(settings, routing.complexity);
+                if (escalated && escalated !== currentModel) {
+                    this.logger.warn(
+                        `Escalating from ${currentModel ?? 'default'} to ${escalated}`,
+                    );
+                    return call(escalated);
+                }
+            }
+            throw error;
+        }
+    }
+
+    /** Find the next higher-complexity model from settings */
+    private escalateModel(
+        settings: Record<string, unknown>,
+        currentComplexity: TaskComplexity,
+    ): string | undefined {
+        const tiers: TaskComplexity[] = ['simple', 'medium', 'complex'];
+        const currentIndex = tiers.indexOf(currentComplexity);
+
+        for (let i = currentIndex + 1; i < tiers.length; i++) {
+            const model = this.getSettingTyped<string>(settings, `${tiers[i]}Model`, 'string');
+            if (model) return model;
+        }
+        return undefined;
     }
 
     private async calculateCost(
@@ -343,14 +411,5 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             const value = variables[key];
             return value !== undefined ? value : match;
         });
-    }
-
-    private zodToJsonSchema(schema: z.ZodSchema): Record<string, unknown> {
-        try {
-            const zodToJsonSchema = require('zod-to-json-schema').zodToJsonSchema;
-            return zodToJsonSchema(schema);
-        } catch {
-            return { type: 'object' };
-        }
     }
 }

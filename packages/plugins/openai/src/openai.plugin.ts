@@ -88,12 +88,17 @@ export class OpenAiPlugin extends BaseAiProvider {
 				description: 'Limits the length of each AI-generated response',
 				default: 4096,
 				'x-hidden': true
+			},
+			baseUrl: {
+				type: 'string',
+				title: 'Base URL',
+				description: 'OpenAI API endpoint',
+				default: 'https://api.openai.com/v1',
+				'x-hidden': true
 			}
 		},
 		required: ['apiKey']
 	};
-
-	private aiOps: AiOperations | null = null;
 
 	async onLoad(context: PluginContext): Promise<void> {
 		await super.onLoad(context);
@@ -101,6 +106,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 			apiKey: '',
 			model: 'gpt-5-nano',
 			temperature: 0.7,
+			baseURL: 'https://api.openai.com/v1',
 			maxTokens: 4096,
 			providerType: 'openai'
 		});

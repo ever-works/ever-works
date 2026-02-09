@@ -34,7 +34,11 @@ describe('AiFacadeService', () => {
         maxContextLength: 128000,
     };
 
-    const createMockAiPlugin = (id: string, providerName: string): IAiProviderPlugin => ({
+    const createMockAiPlugin = (
+        id: string,
+        providerName: string,
+        opts?: { withAskJson?: boolean },
+    ): IAiProviderPlugin => ({
         id,
         name: `${providerName} Plugin`,
         version: '1.0.0',
@@ -60,6 +64,13 @@ describe('AiFacadeService', () => {
             ],
             usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
         } as ChatCompletionResponse),
+        ...(opts?.withAskJson !== false && {
+            askJson: jest.fn().mockResolvedValue({
+                result: { name: 'test' },
+                model: 'gpt-4',
+                usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+            }),
+        }),
         listModels: jest.fn().mockResolvedValue([]),
         getModel: jest.fn().mockResolvedValue(null),
         getCapabilities: jest.fn().mockReturnValue(mockCapabilities),
@@ -186,7 +197,7 @@ describe('AiFacadeService', () => {
     describe('askJson', () => {
         const testSchema = z.object({ name: z.string() });
 
-        it('should call AI provider and return parsed response', async () => {
+        it('should use plugin.askJson for efficient structured output', async () => {
             const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
             const registered = createRegisteredPlugin(aiPlugin, {
                 capabilities: ['ai-provider'],
@@ -203,6 +214,27 @@ describe('AiFacadeService', () => {
             expect(result.result).toEqual({ name: 'test' });
             expect(result.provider).toBe('openai-provider');
             expect(result.model).toBe('gpt-4');
+            expect(aiPlugin.askJson).toHaveBeenCalled();
+            expect(aiPlugin.createChatCompletion).not.toHaveBeenCalled();
+        });
+
+        it('should fall back to createChatCompletion when plugin has no askJson', async () => {
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI', {
+                withAskJson: false,
+            });
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+
+            const result = await service.askJson(
+                'Extract name: {text}',
+                testSchema,
+                { variables: { text: 'Hello John' } },
+                defaultFacadeOptions,
+            );
+
+            expect(result.result).toEqual({ name: 'test' });
             expect(aiPlugin.createChatCompletion).toHaveBeenCalled();
         });
 
@@ -248,12 +280,14 @@ describe('AiFacadeService', () => {
                 defaultFacadeOptions,
             );
 
-            expect(anthropic.createChatCompletion).toHaveBeenCalled();
-            expect(openai.createChatCompletion).not.toHaveBeenCalled();
+            expect(anthropic.askJson).toHaveBeenCalled();
+            expect(openai.askJson).not.toHaveBeenCalled();
         });
 
-        it('should throw AiFacadeError when response is not valid JSON', async () => {
-            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
+        it('should throw AiFacadeError when fallback response is not valid JSON', async () => {
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI', {
+                withAskJson: false,
+            });
             (aiPlugin.createChatCompletion as jest.Mock).mockResolvedValue({
                 choices: [{ message: { content: 'invalid json' } }],
                 model: 'gpt-4',
@@ -271,8 +305,8 @@ describe('AiFacadeService', () => {
 
         it('should throw AiFacadeError when response does not match schema', async () => {
             const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
-            (aiPlugin.createChatCompletion as jest.Mock).mockResolvedValue({
-                choices: [{ message: { content: '{"wrong": "field"}' } }],
+            (aiPlugin.askJson as jest.Mock).mockResolvedValue({
+                result: { wrong: 'field' },
                 model: 'gpt-4',
             });
 
@@ -351,6 +385,67 @@ describe('AiFacadeService', () => {
 
             expect(result.cost).toBeNull();
         });
+
+        it('should auto-escalate from simple to medium on failure', async () => {
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
+            (aiPlugin.askJson as jest.Mock)
+                .mockRejectedValueOnce(new Error('Rate limit'))
+                .mockResolvedValueOnce({
+                    result: { name: 'escalated' },
+                    model: 'gpt-4',
+                    usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+                });
+
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+            settingsService.getSettings.mockResolvedValue({
+                simpleModel: 'gpt-3.5-turbo',
+                mediumModel: 'gpt-4',
+                complexModel: 'gpt-4-turbo',
+            });
+
+            const result = await service.askJson(
+                'Test',
+                testSchema,
+                { routing: { complexity: 'simple' } },
+                defaultFacadeOptions,
+            );
+
+            expect(result.result).toEqual({ name: 'escalated' });
+            expect(aiPlugin.askJson).toHaveBeenCalledTimes(2);
+            // Second call should use the escalated model
+            expect(aiPlugin.askJson).toHaveBeenLastCalledWith(
+                expect.any(String),
+                expect.objectContaining({ model: 'gpt-4' }),
+            );
+        });
+
+        it('should not auto-escalate when autoEscalate is false', async () => {
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
+            (aiPlugin.askJson as jest.Mock).mockRejectedValue(new Error('Rate limit'));
+
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+            settingsService.getSettings.mockResolvedValue({
+                simpleModel: 'gpt-3.5-turbo',
+                mediumModel: 'gpt-4',
+            });
+
+            await expect(
+                service.askJson(
+                    'Test',
+                    testSchema,
+                    { routing: { complexity: 'simple', autoEscalate: false } },
+                    defaultFacadeOptions,
+                ),
+            ).rejects.toThrow('Rate limit');
+
+            expect(aiPlugin.askJson).toHaveBeenCalledTimes(1);
+        });
     });
 
     describe('provider resolution with active directory provider', () => {
@@ -410,8 +505,8 @@ describe('AiFacadeService', () => {
             );
 
             // Anthropic should be used because it's the active provider for the directory
-            expect(anthropicPlugin.createChatCompletion).toHaveBeenCalled();
-            expect(openaiPlugin.createChatCompletion).not.toHaveBeenCalled();
+            expect(anthropicPlugin.askJson).toHaveBeenCalled();
+            expect(openaiPlugin.askJson).not.toHaveBeenCalled();
         });
 
         it('should fall back to first enabled provider when no directory active provider', async () => {
@@ -436,7 +531,7 @@ describe('AiFacadeService', () => {
             );
 
             // First provider (OpenAI) should be used when no active provider set
-            expect(openaiPlugin.createChatCompletion).toHaveBeenCalled();
+            expect(openaiPlugin.askJson).toHaveBeenCalled();
         });
 
         it('should use provider override when specified', async () => {
@@ -461,8 +556,8 @@ describe('AiFacadeService', () => {
             );
 
             // Anthropic should be used because of provider override
-            expect(anthropicPlugin.createChatCompletion).toHaveBeenCalled();
-            expect(openaiPlugin.createChatCompletion).not.toHaveBeenCalled();
+            expect(anthropicPlugin.askJson).toHaveBeenCalled();
+            expect(openaiPlugin.askJson).not.toHaveBeenCalled();
         });
     });
 
@@ -538,7 +633,8 @@ describe('AiFacadeService', () => {
                 defaultFacadeOptions,
             );
 
-            expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
+            expect(aiPlugin.askJson).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.objectContaining({ model: 'gpt-4-turbo' }),
             );
         });
@@ -564,7 +660,8 @@ describe('AiFacadeService', () => {
                 defaultFacadeOptions,
             );
 
-            expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
+            expect(aiPlugin.askJson).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.objectContaining({ model: 'gpt-3.5-turbo' }),
             );
         });
@@ -589,7 +686,8 @@ describe('AiFacadeService', () => {
                 defaultFacadeOptions,
             );
 
-            expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
+            expect(aiPlugin.askJson).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.objectContaining({ model: 'gpt-4' }),
             );
         });
@@ -614,7 +712,8 @@ describe('AiFacadeService', () => {
                 defaultFacadeOptions,
             );
 
-            expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
+            expect(aiPlugin.askJson).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.objectContaining({ model: 'gpt-4-turbo' }),
             );
         });
@@ -632,7 +731,8 @@ describe('AiFacadeService', () => {
 
             await service.askJson('Test', testSchema, undefined, defaultFacadeOptions);
 
-            expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
+            expect(aiPlugin.askJson).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.objectContaining({ model: 'gpt-4' }),
             );
         });
@@ -653,7 +753,8 @@ describe('AiFacadeService', () => {
             );
 
             // Model should be undefined, plugin uses its default
-            expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
+            expect(aiPlugin.askJson).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.objectContaining({ model: undefined }),
             );
         });
@@ -677,7 +778,8 @@ describe('AiFacadeService', () => {
             );
 
             // modelOverride should win over complexity
-            expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
+            expect(aiPlugin.askJson).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.objectContaining({ model: 'gpt-4o' }),
             );
         });
@@ -702,7 +804,8 @@ describe('AiFacadeService', () => {
             );
 
             // Falls through to defaultModel
-            expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
+            expect(aiPlugin.askJson).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.objectContaining({ model: 'gpt-4' }),
             );
         });

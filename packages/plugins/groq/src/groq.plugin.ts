@@ -100,8 +100,6 @@ export class GroqPlugin extends BaseAiProvider {
 		required: ['apiKey']
 	};
 
-	private aiOps: AiOperations | null = null;
-
 	async onLoad(context: PluginContext): Promise<void> {
 		await super.onLoad(context);
 		this.aiOps = new AiOperations({

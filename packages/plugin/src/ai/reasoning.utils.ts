@@ -18,7 +18,7 @@ const REASONING_MODELS: ReasoningConfig[] = [
 		openrouter: { reasoning: { effort: 'none' } }
 	},
 	{
-		pattern: /gpt-5(?!\.\d)/,
+		pattern: /gpt-5(?!\.\d)(?!-[a-z])/,
 		openai: { reasoning: { effort: 'minimal' } },
 		openrouter: { reasoning: { effort: 'minimal' } }
 	},

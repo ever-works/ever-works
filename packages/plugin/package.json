@@ -77,7 +77,9 @@
 		"build": "tsup",
 		"dev": "tsup --watch",
 		"clean": "rm -rf dist",
-		"type-check": "tsc --noEmit"
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
 	},
 	"devDependencies": {
 		"@types/node": "^22.19.3",
@@ -85,7 +87,8 @@
 		"@langchain/core": "^0.3.80",
 		"isomorphic-git": "^1.36.3",
 		"tsup": "^8.0.0",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.1"
 	},
 	"peerDependencies": {
 		"isomorphic-git": "^1.27.0",
@@ -104,6 +107,8 @@
 		}
 	},
 	"dependencies": {
-		"@ever-works/contracts": "workspace:*"
+		"@ever-works/contracts": "workspace:*",
+		"jsonrepair": "^3.13.2",
+		"zod": "^3.25.0"
 	}
 }

@@ -8,6 +8,7 @@ vi.mock('@ever-works/plugin/ai', () => {
 		createChatCompletion: vi.fn().mockResolvedValue({ id: 'test', choices: [], model: 'gemini', created: 0 }),
 		createStreamingChatCompletion: vi.fn(),
 		createEmbedding: vi.fn(),
+		askJson: vi.fn().mockResolvedValue({ result: {}, model: 'gemini', usage: undefined }),
 		listModels: vi.fn().mockResolvedValue([]),
 		testConnection: vi.fn().mockResolvedValue({ success: true })
 	}));
@@ -159,6 +160,35 @@ describe('GooglePlugin', () => {
 			expect(health.status).toBe('healthy');
 			expect(health.message).toBe('Google Gemini plugin is ready');
 			expect(health.checkedAt).toBeDefined();
+		});
+	});
+
+	describe('askJson', () => {
+		const createMockContext2 = (): PluginContext =>
+			({
+				pluginId: 'google',
+				logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+				getSettings: vi.fn().mockResolvedValue({})
+			}) as unknown as PluginContext;
+
+		it('should delegate to aiOps.askJson with resolved config', async () => {
+			await plugin.onLoad(createMockContext2());
+			const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+
+			await plugin.askJson('Generate JSON', {
+				settings: { apiKey: 'google-test' }
+			});
+
+			expect(aiOpsInstance.askJson).toHaveBeenCalledWith(
+				'Generate JSON',
+				expect.any(Object),
+				expect.objectContaining({ apiKey: 'google-test' }),
+				expect.any(Object)
+			);
+		});
+
+		it('should throw when plugin not loaded', async () => {
+			await expect(plugin.askJson('test')).rejects.toThrow('Plugin not loaded');
 		});
 	});
 

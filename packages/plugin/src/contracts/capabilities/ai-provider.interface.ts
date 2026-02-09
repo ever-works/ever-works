@@ -1,3 +1,4 @@
+import type { ZodType } from 'zod';
 import type { IPlugin } from '../plugin.interface.js';
 import type { PluginSettings } from '../../settings/settings.types.js';
 
@@ -127,8 +128,6 @@ export interface ChatCompletionOptions {
 	readonly toolChoice?: 'none' | 'auto' | 'required' | { type: 'function'; function: { name: string } };
 	/** Response format */
 	readonly responseFormat?: { type: 'text' | 'json_object' };
-	/** JSON Schema for structured output */
-	readonly jsonSchema?: Record<string, unknown>;
 	/** Seed for reproducibility */
 	readonly seed?: number;
 	/** User identifier for tracking */
@@ -139,6 +138,27 @@ export interface ChatCompletionOptions {
 	 * Plugins should use these settings instead of their stored defaults.
 	 */
 	readonly settings?: PluginSettings;
+}
+
+/**
+ * Options for structured JSON output
+ */
+export interface AskJsonCompletionOptions {
+	readonly model?: string;
+	readonly temperature?: number;
+	readonly maxTokens?: number;
+	/** Zod schema for structured output — passed directly to LangChain */
+	readonly schema?: ZodType;
+	readonly settings?: PluginSettings;
+}
+
+/**
+ * Response from structured JSON output
+ */
+export interface AskJsonCompletionResponse {
+	readonly result: unknown;
+	readonly model: string;
+	readonly usage?: TokenUsage;
 }
 
 /**
@@ -235,6 +255,12 @@ export interface IAiProviderPlugin extends IPlugin {
 	 * Create a chat completion
 	 */
 	createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse>;
+
+	/**
+	 * Structured JSON output — prompt in, parsed object out.
+	 * Optional: plugins that don't implement this fall back to createChatCompletion.
+	 */
+	askJson?(prompt: string, options?: AskJsonCompletionOptions): Promise<AskJsonCompletionResponse>;
 
 	/**
 	 * Create a streaming chat completion

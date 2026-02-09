@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { BasePlugin } from './base-plugin.js';
 import type {
 	IAiProviderPlugin,
@@ -8,11 +9,13 @@ import type {
 	ChatCompletionResponse,
 	ChatCompletionChunk,
 	EmbeddingOptions,
-	EmbeddingResponse
+	EmbeddingResponse,
+	AskJsonCompletionOptions,
+	AskJsonCompletionResponse
 } from '../contracts/capabilities/ai-provider.interface.js';
 import type { PluginCategory } from '../contracts/plugin-manifest.types.js';
 import type { PluginSettings } from '../settings/settings.types.js';
-import type { AiOperationsConfig } from '../ai/ai-operations.js';
+import type { AiOperations, AiOperationsConfig } from '../ai/ai-operations.js';
 
 /**
  * Abstract base class for AI provider plugins
@@ -28,11 +31,28 @@ export abstract class BaseAiProvider extends BasePlugin implements IAiProviderPl
 	/** Provider display name - must be implemented */
 	abstract readonly providerName: string;
 
+	/** Shared AI operations instance — set by onLoad(), cleared by onUnload() */
+	protected aiOps: AiOperations | null = null;
+
 	/**
 	 * Create a chat completion
 	 * Must be implemented by subclasses
 	 */
 	abstract createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse>;
+
+	/**
+	 * Structured JSON output — delegates to AiOperations.askJson.
+	 * Subclasses inherit this automatically; no override needed.
+	 */
+	async askJson(prompt: string, options?: AskJsonCompletionOptions): Promise<AskJsonCompletionResponse> {
+		if (!this.aiOps) throw new Error('Plugin not loaded');
+		const resolvedConfig = this.resolveConfig(options?.settings);
+		if (options?.model) resolvedConfig.model = options.model;
+		return this.aiOps.askJson(prompt, options?.schema ?? z.object({}), resolvedConfig, {
+			temperature: options?.temperature,
+			maxTokens: options?.maxTokens
+		});
+	}
 
 	/**
 	 * Resolve plugin settings into AiOperations config overrides.
@@ -133,34 +153,4 @@ export abstract class BaseAiProvider extends BasePlugin implements IAiProviderPl
 	 * Get default model ID for this provider
 	 */
 	protected abstract getDefaultModelId(): string;
-
-	/**
-	 * Get model ID from options or use default
-	 */
-	protected getModelId(options: ChatCompletionOptions): string {
-		return options.model || this.getDefaultModelId();
-	}
-
-	/**
-	 * Create a unique response ID
-	 */
-	protected createResponseId(): string {
-		return `chatcmpl-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-	}
-
-	/**
-	 * Count approximate tokens in text (rough estimate)
-	 * Override for more accurate counting
-	 */
-	protected countTokens(text: string): number {
-		// Rough estimate: ~4 characters per token
-		return Math.ceil(text.length / 4);
-	}
-
-	/**
-	 * Format messages for logging (redact sensitive content)
-	 */
-	protected formatMessagesForLog(options: ChatCompletionOptions): string {
-		return `${options.messages.length} messages, model: ${options.model || 'default'}`;
-	}
 }
