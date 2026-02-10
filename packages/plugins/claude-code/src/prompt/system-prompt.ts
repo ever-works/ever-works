@@ -42,11 +42,12 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
 			'  - `_meta/categories.json` - Categories currently used by existing items\n' +
 			'  - `_meta/tags.json` - Tags currently used by existing items\n' +
 			'  - `_meta/brands.json` - Brands currently used by existing items\n\n' +
-			'These `_meta/` files are provided as **context only** so you can see what categories, ' +
-			'tags, and brands already exist. Reuse existing values when appropriate for consistency, ' +
-			'but create new ones when the existing set does not fit.\n' +
-			'After creating all items, update `_meta/categories.json`, `_meta/tags.json`, ' +
-			'and `_meta/brands.json` to reflect the full set of values used across all items.'
+			'**Important:** The `_meta/` folder is managed by the system and may be empty if no items exist yet.\n' +
+			'These files are **read-only context** - do NOT create or modify files in `_meta/`.\n\n' +
+			'When setting `category`, `tags`, and `brands` fields in your item JSON files:\n' +
+			'- If `_meta/` files exist, prefer reusing those existing values for consistency\n' +
+			'- If `_meta/` is empty OR existing values don\'t fit, create NEW category/tag/brand VALUES in your items\n' +
+			'- You define new values by simply using them in your item\'s fields (e.g., `"category": "New Category"`)\n'
 	);
 
 	// Item schema
@@ -138,8 +139,8 @@ export function buildUserPrompt(options: SystemPromptOptions): string {
 
 	parts.push(
 		'\nResearch the topic thoroughly using web search. Only create items you are confident ' +
-			'match this request. Write each item as a JSON file in the workspace, then update ' +
-			'the _meta/ files to reflect all categories, tags, and brands used.'
+			'match this request. Write each item as a JSON file in the workspace root. ' +
+			'The system will automatically update _meta/ files based on your items.'
 	);
 
 	return parts.join('\n');
