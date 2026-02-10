@@ -209,7 +209,7 @@ describe('collect-results', () => {
 
 			const result = collectMetadataFromItems(items);
 			expect(result.tags).toHaveLength(3);
-			expect(result.tags.map((t) => t.name)).toEqual(['open-source', 'cloud', 'real-time']);
+			expect(result.tags.map((t) => t.name)).toEqual(['Open Source', 'Cloud', 'Real Time']);
 		});
 
 		it('should collect brands with logo_url from items', () => {

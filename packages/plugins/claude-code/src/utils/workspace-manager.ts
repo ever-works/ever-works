@@ -25,11 +25,20 @@ export function slugify(name: string): string {
 
 export function unslugify(slug: string): string {
 	return slug
-		.replace(/-+/g, ' ')
-		.toLowerCase()
+		.replace(/[-_]+/g, ' ')
+		.trim()
 		.split(' ')
-		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-		.join(' ');
+		.map((word) => {
+			if (!word) return '';
+
+			const firstPart = word.charAt(0).toUpperCase();
+			const rest = word.slice(1);
+			const hasExistingCaps = /[A-Z]/.test(rest);
+
+			return hasExistingCaps ? firstPart + rest : firstPart + rest.toLowerCase();
+		})
+		.join(' ')
+		.replace(/\s?\/\s?/g, '/');
 }
 
 /**

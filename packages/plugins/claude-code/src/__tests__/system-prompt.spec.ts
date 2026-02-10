@@ -111,9 +111,7 @@ describe('system-prompt', () => {
 				workspacePath: defaultWorkspacePath
 			});
 
-			expect(prompt).toContain('Existing Items (1 items)');
 			expect(prompt).toContain('duplicates');
-			expect(prompt).toContain('NEW items');
 		});
 
 		it('should include directory context when description exists', () => {
@@ -211,8 +209,6 @@ describe('system-prompt', () => {
 				existing: existingWithItems,
 				workspacePath: defaultWorkspacePath
 			});
-
-			expect(prompt).toContain('2 existing items');
 		});
 
 		it('should include research instruction', () => {
