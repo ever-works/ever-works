@@ -46,7 +46,7 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
 			'These files are **read-only context** - do NOT create or modify files in `_meta/`.\n\n' +
 			'When setting `category`, `tags`, and `brands` fields in your item JSON files:\n' +
 			'- If `_meta/` files exist, prefer reusing those existing values for consistency\n' +
-			'- If `_meta/` is empty OR existing values don\'t fit, create NEW category/tag/brand VALUES in your items\n' +
+			"- If `_meta/` is empty OR existing values don't fit, create NEW category/tag/brand VALUES in your items\n" +
 			'- You define new values by simply using them in your item\'s fields (e.g., `"category": "New Category"`)\n'
 	);
 
@@ -61,8 +61,7 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
 			'3. Use web search to verify items and find accurate information.\n' +
 			'4. Do NOT include items only tangentially related to the topic — every item must clearly match the user request.\n' +
 			'5. Ignore blog posts, news articles, or marketing pages as items unless specifically requested.\n' +
-			'6. Write each item as a separate JSON file in the workspace root (not to stdout).\n' +
-			'7. File names should be URL-friendly slugs (e.g., `my-awesome-tool.json`).'
+			'6. File names should be URL-friendly slugs (e.g., `my-awesome-tool.json`).'
 	);
 
 	// Category & Tag rules
@@ -71,7 +70,6 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
 			'- Assign ONE category per item based on its primary function.\n' +
 			'- Use domain-specific categories (e.g., "Cloud Services", "CI/CD", "Data Visualization").\n' +
 			'- Avoid duplicate/overlapping categories (e.g., don\'t use both "Monitoring" and "Monitoring Tools").\n' +
-			'- Prefer reusing existing categories/tags from `_meta/` when they fit; create new ones only when needed.\n' +
 			'- Add 1-3 specific, descriptive tags per item.\n' +
 			'- Maintain category balance — avoid putting most items in a single category.'
 	);
@@ -90,12 +88,15 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
 	// Dedup instructions when existing items are present
 	if (hasExisting) {
 		sections.push(
-			`\n## Existing Items (${existingCount} items)\n` +
-				'The workspace already contains JSON files for existing items. ' +
-				'READ these files first to understand what already exists.\n' +
-				'- Do NOT create duplicates of existing items.\n' +
-				'- You may update existing item files if you find better/newer information.\n' +
-				'- Focus on creating NEW items that complement the existing collection.'
+			'\n## Avoiding Duplicates\n' +
+				'The workspace contains existing items. Before creating each item:\n' +
+				'- Test if filename exists: `test -f my-tool.json && echo "exists"`\n' +
+				'- Search for URLs: `grep -l "example.com" *.json`\n' +
+				'- Search for names/keywords: `grep -l \'"name".*"keyword"\' *.json`\n' +
+				'- Check `_meta/` files for existing categories, tags, brands\n\n' +
+				'**Do NOT** list or read all files - use targeted checks only.\n' +
+				'**Do NOT** create duplicates - focus on NEW complementary items.\n' +
+				'**May update** existing files if you find significantly better information.'
 		);
 	}
 
@@ -114,7 +115,7 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
  * This is the main instruction telling Claude Code what to generate.
  */
 export function buildUserPrompt(options: SystemPromptOptions): string {
-	const { directory, request, existing } = options;
+	const { directory, request } = options;
 	const parts: string[] = [];
 
 	if (request.prompt) {
@@ -127,14 +128,6 @@ export function buildUserPrompt(options: SystemPromptOptions): string {
 
 	if (directory.description && !request.prompt?.includes(directory.description)) {
 		parts.push(`\nDirectory description: ${directory.description}`);
-	}
-
-	if (existing.items.length > 0) {
-		parts.push(
-			`\nThere are ${existing.items.length} existing items in the workspace. ` +
-				'Read them first to avoid duplicates and to reuse existing categories/tags where appropriate, ' +
-				'then add new complementary items.'
-		);
 	}
 
 	parts.push(
