@@ -518,7 +518,7 @@ export class ClaudeCodePlugin implements IPlugin, IFullPipelinePlugin {
 			]);
 
 			for (const key in directorySettings) {
-				if (!directorySettings[key]) {
+				if (directorySettings[key]) {
 					userSettings[key] = directorySettings[key];
 				}
 			}
