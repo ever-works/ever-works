@@ -23,6 +23,15 @@ export function slugify(name: string): string {
 		.replace(/^-|-$/g, '');
 }
 
+export function unslugify(slug: string): string {
+	return slug
+		.replace(/-+/g, ' ')
+		.toLowerCase()
+		.split(' ')
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(' ');
+}
+
 /**
  * Deduplicate slugs by appending an index for collisions.
  */
@@ -181,9 +190,10 @@ export function collectMetadataFromItems(items: readonly ItemData[]): {
 		for (const cat of categories) {
 			const name = typeof cat === 'string' ? cat : '';
 			if (!name) continue;
+
 			const key = name.toLowerCase().trim();
 			if (!categoryMap.has(key)) {
-				categoryMap.set(key, { id: slugify(name) || key, name });
+				categoryMap.set(key, { id: slugify(name) || key, name: unslugify(name) });
 			}
 		}
 
@@ -194,7 +204,7 @@ export function collectMetadataFromItems(items: readonly ItemData[]): {
 				if (!name) continue;
 				const key = name.toLowerCase().trim();
 				if (!tagMap.has(key)) {
-					tagMap.set(key, { id: slugify(name) || key, name });
+					tagMap.set(key, { id: slugify(name) || key, name: unslugify(name) });
 				}
 			}
 		}
@@ -211,7 +221,7 @@ export function collectMetadataFromItems(items: readonly ItemData[]): {
 				if (!brandMap.has(key)) {
 					brandMap.set(key, {
 						id: slugify(brandName) || key,
-						name: brandName,
+						name: unslugify(brandName),
 						logo_url: brandLogo
 					});
 				}
