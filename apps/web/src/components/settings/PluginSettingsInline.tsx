@@ -54,6 +54,7 @@ export function PluginSettingsInline({
         initialSettings: plugin.settings || {},
         scopes: ['global', 'user'],
         onSave,
+        scope: 'user',
     });
 
     const headerContent = (

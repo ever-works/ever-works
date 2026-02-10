@@ -62,6 +62,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
         initialSettings: plugin.settings || {},
         scopes: ['global', 'user'],
         onSave,
+        scope: 'user',
     });
 
     const {

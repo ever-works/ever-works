@@ -752,16 +752,25 @@ export class PluginOperationsService {
         // Validate combined settings against schema.
         // User settings serve as inherited base (mirrors resolved cascade).
         if (settings || secretSettings) {
-            const allSettings = {
+            // Apply nulls to directory settings first, then strip them
+            const dirSettingsAfterUpdate = this.stripNullValues({
+                ...directoryPlugin.settings,
+                ...(settings || {}),
+            });
+            const dirSecretsAfterUpdate = this.stripNullValues({
+                ...directoryPlugin.secretSettings,
+                ...(secretSettings || {}),
+            });
+
+            // NOW merge with user settings for validation
+            const allSettingsForValidation = {
                 ...(userPlugin?.settings || {}),
                 ...(userPlugin?.secretSettings || {}),
-                ...directoryPlugin.settings,
-                ...directoryPlugin.secretSettings,
-                ...(settings || {}),
-                ...(secretSettings || {}),
+                ...dirSettingsAfterUpdate,
+                ...dirSecretsAfterUpdate,
             };
-            const cleanedSettings = this.stripNullValues(allSettings);
-            this.validateSettingsOrThrow(cleanedSettings, schema, 'directory');
+
+            this.validateSettingsOrThrow(allSettingsForValidation, schema, 'directory');
         }
 
         // Merge settings and strip null keys to clear them

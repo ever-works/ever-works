@@ -20,6 +20,9 @@ interface UsePluginSettingsOptions {
     /** Display-only fallback values shown when a field has no value in initialSettings.
      *  These are NOT saved — only used by getFieldValue for display purposes. */
     fallbackSettings?: Record<string, unknown>;
+    /** Identifies validation context: 'user' scope requires all required fields,
+     *  'directory' scope allows inheritance from fallbackSettings */
+    scope: 'user' | 'directory';
 }
 
 /** Stable empty object to avoid re-renders when initialSettings is undefined */
@@ -45,6 +48,7 @@ export function usePluginSettings({
     scopes,
     onSave,
     fallbackSettings,
+    scope,
 }: UsePluginSettingsOptions): UsePluginSettingsReturn {
     const t = useTranslations('dashboard.plugins');
     const router = useRouter();
@@ -55,6 +59,7 @@ export function usePluginSettings({
             : EMPTY_SETTINGS;
     const [settings, setSettings] = useState<Record<string, unknown>>(stableInitial);
     const [secretSettings, setSecretSettings] = useState<Record<string, unknown>>({});
+    const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
     const [hasChanges, setHasChanges] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
@@ -67,6 +72,7 @@ export function usePluginSettings({
         prevInitialRef.current = stableInitial;
         setSettings(stableInitial);
         setSecretSettings({});
+        setModifiedFields(new Set());
         setHasChanges(false);
     }
 
@@ -129,7 +135,26 @@ export function usePluginSettings({
 
         for (const field of requiredFields) {
             const value = settings[field] ?? secretSettings[field];
-            if (value === undefined || value === null || value === '') {
+
+            // Check if field is empty
+            const isEmpty = value === undefined || value === null || value === '';
+
+            if (isEmpty) {
+                // At directory scope, check if inherited value exists
+                if (scope === 'directory' && fallbackSettings) {
+                    const inheritedValue = fallbackSettings[field];
+                    const hasInheritance =
+                        inheritedValue !== undefined &&
+                        inheritedValue !== null &&
+                        inheritedValue !== '';
+
+                    if (hasInheritance) {
+                        // Field will inherit - validation passes
+                        continue;
+                    }
+                }
+
+                // No local value and no inheritance - field is required
                 const propSchema = schema?.properties?.[field] as
                     | PluginSettingsSchemaProperty
                     | undefined;
@@ -138,11 +163,23 @@ export function usePluginSettings({
         }
 
         for (const group of requiredGroups) {
-            const hasAny = group.fields.some((field) => {
+            // Check local settings
+            const hasAnyLocal = group.fields.some((field) => {
                 const value = settings[field] ?? secretSettings[field];
                 return value !== undefined && value !== null && value !== '';
             });
-            if (!hasAny) {
+
+            // At directory scope, also check inherited values
+            let hasAnyInherited = false;
+            if (scope === 'directory' && fallbackSettings) {
+                hasAnyInherited = group.fields.some((field) => {
+                    const value = fallbackSettings[field];
+                    return value !== undefined && value !== null && value !== '';
+                });
+            }
+
+            // Group satisfied if ANY field has value (local or inherited)
+            if (!hasAnyLocal && !hasAnyInherited) {
                 const labels = group.fields.map((f) => {
                     const ps = schema?.properties?.[f] as PluginSettingsSchemaProperty | undefined;
                     return ps?.title || f;
@@ -152,7 +189,7 @@ export function usePluginSettings({
         }
 
         return errors;
-    }, [requiredFields, requiredGroups, settings, secretSettings, schema]);
+    }, [requiredFields, requiredGroups, settings, secretSettings, schema, scope, fallbackSettings]);
 
     const handleFieldChange = useCallback((key: string, value: unknown, isSecret: boolean) => {
         if (isSecret) {
@@ -160,6 +197,7 @@ export function usePluginSettings({
         } else {
             setSettings((prev) => ({ ...prev, [key]: value }));
         }
+        setModifiedFields((prev) => new Set(prev).add(key));
         setHasChanges(true);
         setSaveSuccess(false);
         setValidationError(null);
@@ -227,7 +265,14 @@ export function usePluginSettings({
         const sanitize = (obj: Record<string, unknown>): Record<string, unknown> => {
             const result: Record<string, unknown> = {};
             for (const [key, value] of Object.entries(obj)) {
-                result[key] = value === undefined ? null : value;
+                if (value === undefined) {
+                    result[key] = null;
+                } else if (scope === 'directory' && value === '') {
+                    // At directory scope, empty string means "clear override, use inherited"
+                    result[key] = null;
+                } else {
+                    result[key] = value;
+                }
             }
             return result;
         };
@@ -241,6 +286,7 @@ export function usePluginSettings({
                     Object.keys(secretSettings).length > 0 ? sanitize(secretSettings) : undefined,
             });
             setHasChanges(false);
+            setModifiedFields(new Set());
             setSaveSuccess(true);
             router.refresh();
             successTimerRef.current = setTimeout(() => setSaveSuccess(false), 3000);
@@ -267,12 +313,18 @@ export function usePluginSettings({
                 value = settings[key];
             }
             // Fall back to inherited value for display when no local value is set
-            if ((value === undefined || value === null || value === '') && fallbackSettings) {
+            // BUT: if the user has explicitly modified this field, respect their input (even if empty)
+            const hasBeenModified = modifiedFields.has(key);
+            if (
+                !hasBeenModified &&
+                (value === undefined || value === null || value === '') &&
+                fallbackSettings
+            ) {
                 return fallbackSettings[key];
             }
             return value;
         },
-        [settings, secretSettings, fallbackSettings],
+        [settings, secretSettings, fallbackSettings, modifiedFields],
     );
 
     return {
