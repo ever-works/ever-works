@@ -44,7 +44,7 @@ describe('OllamaPlugin', () => {
 		it('should have no required fields', () => {
 			expect(plugin.settingsSchema).toBeDefined();
 			expect(plugin.settingsSchema.type).toBe('object');
-			expect(plugin.settingsSchema.required).toEqual([]);
+			expect(plugin.settingsSchema.required).toEqual(['baseUrl']);
 		});
 
 		it('should have apiKey with default value', () => {
