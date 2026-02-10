@@ -60,7 +60,9 @@ export function usePluginSettings({
             const secret: Record<string, unknown> = {};
 
             for (const [key, value] of Object.entries(allSettings)) {
-                const propSchema = schema?.properties?.[key] as PluginSettingsSchemaProperty | undefined;
+                const propSchema = schema?.properties?.[key] as
+                    | PluginSettingsSchemaProperty
+                    | undefined;
                 if (propSchema?.secret) {
                     secret[key] = value;
                 } else {

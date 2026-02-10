@@ -74,14 +74,25 @@ export function DirectoryPluginSettingsModal({
     };
 
     const handleReset = async () => {
-        const keysToReset: Record<string, null> = {};
+        const settingsToReset: Record<string, null> = {};
+        const secretSettingsToReset: Record<string, null> = {};
+
         if (plugin.directorySettings) {
             for (const key of Object.keys(plugin.directorySettings)) {
-                keysToReset[key] = null;
+                // Check if this field is secret based on schema
+                const propSchema = plugin.settingsSchema?.properties?.[key];
+                if (propSchema && 'secret' in propSchema && propSchema.secret) {
+                    secretSettingsToReset[key] = null;
+                } else {
+                    settingsToReset[key] = null;
+                }
             }
         }
 
-        if (Object.keys(keysToReset).length === 0) {
+        if (
+            Object.keys(settingsToReset).length === 0 &&
+            Object.keys(secretSettingsToReset).length === 0
+        ) {
             setShowResetConfirm(false);
             return;
         }
@@ -89,7 +100,11 @@ export function DirectoryPluginSettingsModal({
         setIsResetting(true);
         try {
             await updateDirectoryPluginSettings(directoryId, plugin.pluginId, {
-                settings: keysToReset,
+                settings: Object.keys(settingsToReset).length > 0 ? settingsToReset : undefined,
+                secretSettings:
+                    Object.keys(secretSettingsToReset).length > 0
+                        ? secretSettingsToReset
+                        : undefined,
             });
             router.refresh();
             setShowResetConfirm(false);
