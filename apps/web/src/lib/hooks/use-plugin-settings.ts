@@ -52,13 +52,41 @@ export function usePluginSettings({
 }: UsePluginSettingsOptions): UsePluginSettingsReturn {
     const t = useTranslations('dashboard.plugins');
     const router = useRouter();
+
+    // Helper to split settings into regular and secret based on schema
+    const splitSettingsBySecret = useCallback(
+        (allSettings: Record<string, unknown>) => {
+            const regular: Record<string, unknown> = {};
+            const secret: Record<string, unknown> = {};
+
+            for (const [key, value] of Object.entries(allSettings)) {
+                const propSchema = schema?.properties?.[key] as PluginSettingsSchemaProperty | undefined;
+                if (propSchema?.secret) {
+                    secret[key] = value;
+                } else {
+                    regular[key] = value;
+                }
+            }
+
+            return { regular, secret };
+        },
+        [schema],
+    );
+
     // Use stable empty object when initialSettings has no keys, so ref comparison works
     const stableInitial =
         initialSettings && Object.keys(initialSettings).length > 0
             ? initialSettings
             : EMPTY_SETTINGS;
-    const [settings, setSettings] = useState<Record<string, unknown>>(stableInitial);
-    const [secretSettings, setSecretSettings] = useState<Record<string, unknown>>({});
+
+    // Split initial settings into regular and secret
+    const { regular: initialRegular, secret: initialSecret } = useMemo(
+        () => splitSettingsBySecret(stableInitial),
+        [stableInitial, splitSettingsBySecret],
+    );
+
+    const [settings, setSettings] = useState<Record<string, unknown>>(initialRegular);
+    const [secretSettings, setSecretSettings] = useState<Record<string, unknown>>(initialSecret);
     const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
     const [hasChanges, setHasChanges] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -68,13 +96,16 @@ export function usePluginSettings({
     const prevInitialRef = useRef(stableInitial);
 
     // Sync settings state when server data changes (e.g. after router.refresh())
-    if (stableInitial !== prevInitialRef.current) {
-        prevInitialRef.current = stableInitial;
-        setSettings(stableInitial);
-        setSecretSettings({});
-        setModifiedFields(new Set());
-        setHasChanges(false);
-    }
+    useEffect(() => {
+        if (stableInitial !== prevInitialRef.current) {
+            prevInitialRef.current = stableInitial;
+            const { regular, secret } = splitSettingsBySecret(stableInitial);
+            setSettings(regular);
+            setSecretSettings(secret);
+            setModifiedFields(new Set());
+            setHasChanges(false);
+        }
+    }, [stableInitial, splitSettingsBySecret]);
 
     // Cleanup success timer on unmount
     useEffect(() => {
@@ -280,13 +311,59 @@ export function usePluginSettings({
         setIsSaving(true);
         setValidationError(null);
         try {
+            const sanitizedSettings =
+                Object.keys(settings).length > 0 ? sanitize(settings) : undefined;
+            const sanitizedSecretSettings =
+                Object.keys(secretSettings).length > 0 ? sanitize(secretSettings) : undefined;
+
             await onSave({
-                settings: Object.keys(settings).length > 0 ? sanitize(settings) : undefined,
-                secretSettings:
-                    Object.keys(secretSettings).length > 0 ? sanitize(secretSettings) : undefined,
+                settings: sanitizedSettings,
+                secretSettings: sanitizedSecretSettings,
             });
-            setHasChanges(false);
+
+            // Update local state to reflect what was saved
+            // Remove fields that were cleared (set to null)
+            if (sanitizedSettings) {
+                setSettings((prev) => {
+                    const updated = { ...prev };
+                    for (const [key, value] of Object.entries(sanitizedSettings)) {
+                        if (value === null) {
+                            delete updated[key];
+                        } else {
+                            updated[key] = value;
+                        }
+                    }
+                    return updated;
+                });
+            }
+            if (sanitizedSecretSettings) {
+                // Update secretSettings state
+                setSecretSettings((prev) => {
+                    const updated = { ...prev };
+                    for (const [key, value] of Object.entries(sanitizedSecretSettings)) {
+                        if (value === null) {
+                            delete updated[key];
+                        } else {
+                            updated[key] = value;
+                        }
+                    }
+                    return updated;
+                });
+                // ALSO delete from settings state in case initial value was placed there
+                setSettings((prev) => {
+                    const updated = { ...prev };
+                    for (const [key, value] of Object.entries(sanitizedSecretSettings)) {
+                        if (value === null) {
+                            delete updated[key];
+                        }
+                    }
+                    return updated;
+                });
+            }
+
+            // Clear modifiedFields so getFieldValue will use inherited values
             setModifiedFields(new Set());
+            setHasChanges(false);
             setSaveSuccess(true);
             router.refresh();
             successTimerRef.current = setTimeout(() => setSaveSuccess(false), 3000);

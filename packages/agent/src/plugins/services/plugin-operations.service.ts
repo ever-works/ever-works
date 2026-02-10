@@ -780,12 +780,23 @@ export class PluginOperationsService {
                 ...settings,
             });
         }
+
         if (secretSettings) {
+            // Update secretSettings
             directoryPlugin.secretSettings = this.stripNullValues({
                 ...directoryPlugin.secretSettings,
                 ...secretSettings,
             });
+
+            // Cleanup: also remove secret fields from settings if they exist there
+            // (handles migration case where secret fields were stored in wrong field)
+            const cleanedSettings = { ...directoryPlugin.settings };
+            for (const key of Object.keys(secretSettings)) {
+                delete cleanedSettings[key];
+            }
+            directoryPlugin.settings = cleanedSettings;
         }
+
         if (metadata) {
             directoryPlugin.metadata = { ...directoryPlugin.metadata, ...metadata };
         }
