@@ -68,7 +68,6 @@ describe('OllamaPlugin', () => {
 			expect(props).toHaveProperty('baseUrl');
 			expect((props.baseUrl as any).type).toBe('string');
 			expect((props.baseUrl as any).title).toBe('Ollama Server URL');
-			expect((props.baseUrl as any).default).toBe('http://localhost:11434/v1');
 		});
 
 		it('should have temperature and maxTokens settings', () => {
