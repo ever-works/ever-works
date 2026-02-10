@@ -21,9 +21,9 @@ vi.mock('../utils/workspace-manager', () => ({
 			tags: ['test']
 		}
 	]),
-	readGeneratedMetadata: vi.fn().mockResolvedValue({
-		categories: [{ id: '1', name: 'Testing' }],
-		tags: [{ id: '1', name: 'test' }],
+	collectMetadataFromItems: vi.fn().mockReturnValue({
+		categories: [{ id: 'testing', name: 'Testing' }],
+		tags: [{ id: 'test', name: 'test' }],
 		brands: []
 	}),
 	cleanupWorkspace: vi.fn().mockResolvedValue(undefined)

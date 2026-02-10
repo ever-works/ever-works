@@ -8,7 +8,7 @@ import {
 	seedExistingItems,
 	seedMetadata,
 	readGeneratedItems,
-	readGeneratedMetadata,
+	collectMetadataFromItems,
 	cleanupWorkspace,
 	ensureOnboardingConfig
 } from '../utils/workspace-manager';
@@ -319,33 +319,36 @@ describe('workspace-manager', () => {
 		});
 	});
 
-	describe('readGeneratedMetadata', () => {
-		it('should read categories, tags, and brands', async () => {
-			vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
-				const p = filePath as string;
-				if (p.includes('categories.json')) {
-					return JSON.stringify([{ id: '1', name: 'Cat' }]);
+	describe('collectMetadataFromItems', () => {
+		it('should collect categories, tags, and brands from items', () => {
+			const items: ItemData[] = [
+				{
+					name: 'A',
+					description: 'D',
+					source_url: 'https://a.com',
+					category: 'Monitoring',
+					tags: ['cloud'],
+					brand: 'CNCF'
+				},
+				{
+					name: 'B',
+					description: 'D',
+					source_url: 'https://b.com',
+					category: 'CI/CD',
+					tags: ['cloud', 'devops'],
+					brand: 'CNCF'
 				}
-				if (p.includes('tags.json')) {
-					return JSON.stringify([{ id: '1', name: 'Tag' }]);
-				}
-				if (p.includes('brands.json')) {
-					return JSON.stringify([{ id: '1', name: 'Brand' }]);
-				}
-				throw new Error('Not found');
-			});
+			];
 
-			const result = await readGeneratedMetadata('/workspace');
+			const result = collectMetadataFromItems(items);
 
-			expect(result.categories).toHaveLength(1);
-			expect(result.tags).toHaveLength(1);
+			expect(result.categories).toHaveLength(2);
+			expect(result.tags).toHaveLength(2);
 			expect(result.brands).toHaveLength(1);
 		});
 
-		it('should return empty arrays for missing files', async () => {
-			vi.mocked(fs.readFile).mockRejectedValue(new Error('ENOENT'));
-
-			const result = await readGeneratedMetadata('/workspace');
+		it('should return empty arrays for empty items', () => {
+			const result = collectMetadataFromItems([]);
 
 			expect(result.categories).toEqual([]);
 			expect(result.tags).toEqual([]);

@@ -16,6 +16,8 @@ export interface ExecuteOptions {
 	readonly maxTurns: number;
 	/** Maximum budget in USD (optional) */
 	readonly maxBudgetUsd?: number;
+	/** Model alias or full name (optional) */
+	readonly model?: string;
 	/** Abort signal for cancellation */
 	readonly signal?: AbortSignal;
 }
@@ -74,6 +76,10 @@ export function executeClaudeCode(options: ExecuteOptions): {
 
 		if (options.maxBudgetUsd !== undefined) {
 			args.push('--max-budget-usd', String(options.maxBudgetUsd));
+		}
+
+		if (options.model) {
+			args.push('--model', options.model);
 		}
 
 		const env: Record<string, string> = {

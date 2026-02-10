@@ -162,34 +162,68 @@ export async function readGeneratedItems(workspacePath: string, logger?: Logger)
 }
 
 /**
- * Read generated metadata files from _meta/ directory.
- * Returns empty arrays for missing files.
+ * Collect categories, tags, and brands directly from the item data.
+ * This is the source of truth — items define what categories/tags/brands exist.
+ * Each unique value gets a generated id based on its slugified name.
  */
-export async function readGeneratedMetadata(workspacePath: string): Promise<{
+export function collectMetadataFromItems(items: readonly ItemData[]): {
 	categories: Category[];
 	tags: Tag[];
 	brands: Brand[];
-}> {
-	const metaDir = path.join(workspacePath, '_meta');
-	const result = { categories: [] as Category[], tags: [] as Tag[], brands: [] as Brand[] };
+} {
+	const categoryMap = new Map<string, Category>();
+	const tagMap = new Map<string, Tag>();
+	const brandMap = new Map<string, Brand>();
 
-	for (const [key, filename] of [
-		['categories', 'categories.json'],
-		['tags', 'tags.json'],
-		['brands', 'brands.json']
-	] as const) {
-		try {
-			const content = await fs.readFile(path.join(metaDir, filename), 'utf-8');
-			const parsed = JSON.parse(content);
-			if (Array.isArray(parsed)) {
-				result[key] = parsed;
+	for (const item of items) {
+		// category can be string or string[]
+		const categories = Array.isArray(item.category) ? item.category : item.category ? [item.category] : [];
+		for (const cat of categories) {
+			const name = typeof cat === 'string' ? cat : '';
+			if (!name) continue;
+			const key = name.toLowerCase().trim();
+			if (!categoryMap.has(key)) {
+				categoryMap.set(key, { id: slugify(name) || key, name });
 			}
-		} catch {
-			// File doesn't exist or is invalid - return empty array
+		}
+
+		// tags can be string[] or Tag[]
+		if (Array.isArray(item.tags)) {
+			for (const tag of item.tags) {
+				const name = typeof tag === 'string' ? tag : tag?.name;
+				if (!name) continue;
+				const key = name.toLowerCase().trim();
+				if (!tagMap.has(key)) {
+					tagMap.set(key, { id: slugify(name) || key, name });
+				}
+			}
+		}
+
+		// brand can be string or Brand object
+		if (item.brand) {
+			const brandName = typeof item.brand === 'string' ? item.brand : item.brand.name;
+			const brandLogo =
+				typeof item.brand === 'string'
+					? (item.brand_logo_url ?? undefined)
+					: (item.brand.logo_url ?? undefined);
+			if (brandName) {
+				const key = brandName.toLowerCase().trim();
+				if (!brandMap.has(key)) {
+					brandMap.set(key, {
+						id: slugify(brandName) || key,
+						name: brandName,
+						logo_url: brandLogo
+					});
+				}
+			}
 		}
 	}
 
-	return result;
+	return {
+		categories: [...categoryMap.values()],
+		tags: [...tagMap.values()],
+		brands: [...brandMap.values()]
+	};
 }
 
 /**

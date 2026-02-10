@@ -30,7 +30,7 @@ import {
 	seedExistingItems,
 	seedMetadata,
 	readGeneratedItems,
-	readGeneratedMetadata,
+	collectMetadataFromItems,
 	cleanupWorkspace,
 	ensureOnboardingConfig
 } from './utils/workspace-manager.js';
@@ -149,6 +149,13 @@ export class ClaudeCodePlugin implements IPlugin, IFullPipelinePlugin {
 				description: 'Maximum budget in USD per generation (optional)',
 				minimum: 0,
 				'x-hidden': true
+			},
+			model: {
+				type: 'string',
+				title: 'Model',
+				'x-scope': 'global',
+				description:
+					"Model for the session. Provide an alias for the latest model (e.g. 'sonnet' or 'opus') or a model's full name (e.g. 'claude-sonnet-4-5-20250929')."
 			}
 		},
 		'x-requiredGroups': [
@@ -304,10 +311,11 @@ export class ClaudeCodePlugin implements IPlugin, IFullPipelinePlugin {
 
 		try {
 			// Resolve settings
-			const settings = await this.resolveSettings(userId);
+			const settings = await this.resolveSettings(userId, directory.id);
 			const version = (settings.version as string) || DEFAULT_CLI_VERSION;
 			const maxTurns = (settings.maxTurns as number) || DEFAULT_MAX_TURNS;
 			const maxBudgetUsd = settings.maxBudgetUsd as number | undefined;
+			const model = settings.model as string | undefined;
 
 			// ── Step 1: Setup Claude Code ──────────────────────────────
 			this.updateStepState('setup-claude-code', 'running');
@@ -341,7 +349,7 @@ export class ClaudeCodePlugin implements IPlugin, IFullPipelinePlugin {
 			this.updateStepState('generate-items', 'running');
 			this.reportProgress(onProgress, 2, 30, 'Generate Items');
 
-			const promptOptions = { directory, request, existing };
+			const promptOptions = { directory, request, existing, workspacePath };
 			const systemPrompt = buildSystemPrompt(promptOptions);
 			const userPrompt = buildUserPrompt(promptOptions);
 
@@ -358,6 +366,7 @@ export class ClaudeCodePlugin implements IPlugin, IFullPipelinePlugin {
 				},
 				maxTurns,
 				maxBudgetUsd,
+				model,
 				signal
 			});
 
@@ -385,7 +394,7 @@ export class ClaudeCodePlugin implements IPlugin, IFullPipelinePlugin {
 			this.reportProgress(onProgress, 3, 85, 'Collect Results');
 
 			const items = await readGeneratedItems(workspacePath, logger);
-			const metadata = await readGeneratedMetadata(workspacePath);
+			const metadata = collectMetadataFromItems(items);
 			this.updateStepState('collect-results', 'completed');
 
 			// ── Step 5: Cleanup ────────────────────────────────────────
@@ -498,12 +507,23 @@ export class ClaudeCodePlugin implements IPlugin, IFullPipelinePlugin {
 		});
 	}
 
-	private async resolveSettings(userId: string): Promise<PluginSettings> {
+	private async resolveSettings(userId: string, directoryId: string): Promise<PluginSettings> {
 		if (!this.context) {
 			return {};
 		}
 		try {
-			return await this.context.getSettings('user', userId);
+			const [userSettings, directorySettings] = await Promise.all([
+				this.context.getSettings('user', userId),
+				this.context.getSettings('directory', directoryId)
+			]);
+
+			for (const key in directorySettings) {
+				if (!directorySettings[key]) {
+					userSettings[key] = directorySettings[key];
+				}
+			}
+
+			return userSettings;
 		} catch {
 			return {};
 		}

@@ -22,12 +22,15 @@ describe('system-prompt', () => {
 		tags: []
 	};
 
+	const defaultWorkspacePath = '/tmp/claude-code-generator/user1/dir1';
+
 	describe('buildSystemPrompt', () => {
 		it('should include the role description', () => {
 			const prompt = buildSystemPrompt({
 				directory: baseDirectory,
 				request: baseRequest,
-				existing: emptyExisting
+				existing: emptyExisting,
+				workspacePath: defaultWorkspacePath
 			});
 
 			expect(prompt).toContain('directory content generator');
@@ -37,7 +40,8 @@ describe('system-prompt', () => {
 			const prompt = buildSystemPrompt({
 				directory: baseDirectory,
 				request: baseRequest,
-				existing: emptyExisting
+				existing: emptyExisting,
+				workspacePath: defaultWorkspacePath
 			});
 
 			expect(prompt).toContain('_meta/');
@@ -50,7 +54,8 @@ describe('system-prompt', () => {
 			const prompt = buildSystemPrompt({
 				directory: baseDirectory,
 				request: baseRequest,
-				existing: emptyExisting
+				existing: emptyExisting,
+				workspacePath: defaultWorkspacePath
 			});
 
 			expect(prompt).toContain('name');
@@ -63,19 +68,21 @@ describe('system-prompt', () => {
 			const prompt = buildSystemPrompt({
 				directory: baseDirectory,
 				request: baseRequest,
-				existing: emptyExisting
+				existing: emptyExisting,
+				workspacePath: defaultWorkspacePath
 			});
 
 			expect(prompt).toContain('REAL items');
 			expect(prompt).toContain('web search');
-			expect(prompt).toContain('valid, working URL');
+			expect(prompt).toContain('valid, canonical URL');
 		});
 
 		it('should NOT include dedup instructions when no existing items', () => {
 			const prompt = buildSystemPrompt({
 				directory: baseDirectory,
 				request: baseRequest,
-				existing: emptyExisting
+				existing: emptyExisting,
+				workspacePath: defaultWorkspacePath
 			});
 
 			expect(prompt).not.toContain('Existing Items');
@@ -100,7 +107,8 @@ describe('system-prompt', () => {
 			const prompt = buildSystemPrompt({
 				directory: baseDirectory,
 				request: baseRequest,
-				existing: existingWithItems
+				existing: existingWithItems,
+				workspacePath: defaultWorkspacePath
 			});
 
 			expect(prompt).toContain('Existing Items (1 items)');
@@ -112,7 +120,8 @@ describe('system-prompt', () => {
 			const prompt = buildSystemPrompt({
 				directory: baseDirectory,
 				request: baseRequest,
-				existing: emptyExisting
+				existing: emptyExisting,
+				workspacePath: defaultWorkspacePath
 			});
 
 			expect(prompt).toContain('Directory Context');
@@ -130,7 +139,8 @@ describe('system-prompt', () => {
 			const prompt = buildSystemPrompt({
 				directory: dirNoDesc,
 				request: baseRequest,
-				existing: emptyExisting
+				existing: emptyExisting,
+				workspacePath: defaultWorkspacePath
 			});
 
 			expect(prompt).not.toContain('Directory Context');
@@ -142,7 +152,8 @@ describe('system-prompt', () => {
 			const prompt = buildUserPrompt({
 				directory: baseDirectory,
 				request: baseRequest,
-				existing: emptyExisting
+				existing: emptyExisting,
+				workspacePath: defaultWorkspacePath
 			});
 
 			expect(prompt).toContain('Generate a list of the best AI coding assistants');
@@ -154,7 +165,8 @@ describe('system-prompt', () => {
 			const prompt = buildUserPrompt({
 				directory: baseDirectory,
 				request,
-				existing: emptyExisting
+				existing: emptyExisting,
+				workspacePath: defaultWorkspacePath
 			});
 
 			expect(prompt).toContain('Generate directory items for: AI Tools');
@@ -164,7 +176,8 @@ describe('system-prompt', () => {
 			const prompt = buildUserPrompt({
 				directory: baseDirectory,
 				request: {},
-				existing: emptyExisting
+				existing: emptyExisting,
+				workspacePath: defaultWorkspacePath
 			});
 
 			expect(prompt).toContain('Generate directory items for: AI Tools');
@@ -195,7 +208,8 @@ describe('system-prompt', () => {
 			const prompt = buildUserPrompt({
 				directory: baseDirectory,
 				request: baseRequest,
-				existing: existingWithItems
+				existing: existingWithItems,
+				workspacePath: defaultWorkspacePath
 			});
 
 			expect(prompt).toContain('2 existing items');
@@ -205,7 +219,8 @@ describe('system-prompt', () => {
 			const prompt = buildUserPrompt({
 				directory: baseDirectory,
 				request: baseRequest,
-				existing: emptyExisting
+				existing: emptyExisting,
+				workspacePath: defaultWorkspacePath
 			});
 
 			expect(prompt).toContain('Research the topic');
@@ -221,7 +236,8 @@ describe('system-prompt', () => {
 			const prompt = buildUserPrompt({
 				directory: baseDirectory,
 				request,
-				existing: emptyExisting
+				existing: emptyExisting,
+				workspacePath: defaultWorkspacePath
 			});
 
 			expect(prompt).toContain('Directory description:');
@@ -236,7 +252,8 @@ describe('system-prompt', () => {
 			const prompt = buildUserPrompt({
 				directory: baseDirectory,
 				request,
-				existing: emptyExisting
+				existing: emptyExisting,
+				workspacePath: defaultWorkspacePath
 			});
 
 			// Should not add description separately since it's already in the prompt

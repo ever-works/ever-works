@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fs from 'fs/promises';
-import { readGeneratedItems, readGeneratedMetadata } from '../utils/workspace-manager';
+import { readGeneratedItems, collectMetadataFromItems } from '../utils/workspace-manager';
 
 vi.mock('fs/promises');
 
@@ -176,36 +176,66 @@ describe('collect-results', () => {
 		});
 	});
 
-	describe('readGeneratedMetadata - edge cases', () => {
-		it('should handle non-array JSON in metadata files', async () => {
-			vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify({ invalid: true }));
+	describe('collectMetadataFromItems', () => {
+		it('should collect unique categories from items', () => {
+			const items = [
+				{ name: 'A', description: 'D', source_url: 'https://a.com', category: 'Monitoring', tags: [] },
+				{ name: 'B', description: 'D', source_url: 'https://b.com', category: 'Monitoring', tags: [] },
+				{ name: 'C', description: 'D', source_url: 'https://c.com', category: 'CI/CD', tags: [] }
+			];
 
-			const result = await readGeneratedMetadata('/workspace');
-			expect(result.categories).toEqual([]);
-			expect(result.tags).toEqual([]);
-			expect(result.brands).toEqual([]);
+			const result = collectMetadataFromItems(items);
+			expect(result.categories).toHaveLength(2);
+			expect(result.categories.map((c) => c.name)).toEqual(['Monitoring', 'CI/CD']);
 		});
 
-		it('should handle invalid JSON in metadata files', async () => {
-			vi.mocked(fs.readFile).mockResolvedValue('not json');
-
-			const result = await readGeneratedMetadata('/workspace');
-			expect(result.categories).toEqual([]);
-			expect(result.tags).toEqual([]);
-			expect(result.brands).toEqual([]);
-		});
-
-		it('should read partial metadata (only categories exist)', async () => {
-			vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
-				const p = filePath as string;
-				if (p.includes('categories.json')) {
-					return JSON.stringify([{ id: '1', name: 'Cat' }]);
+		it('should collect unique tags from items', () => {
+			const items = [
+				{
+					name: 'A',
+					description: 'D',
+					source_url: 'https://a.com',
+					category: 'C',
+					tags: ['open-source', 'cloud']
+				},
+				{
+					name: 'B',
+					description: 'D',
+					source_url: 'https://b.com',
+					category: 'C',
+					tags: ['cloud', 'real-time']
 				}
-				throw new Error('ENOENT');
-			});
+			];
 
-			const result = await readGeneratedMetadata('/workspace');
-			expect(result.categories).toHaveLength(1);
+			const result = collectMetadataFromItems(items);
+			expect(result.tags).toHaveLength(3);
+			expect(result.tags.map((t) => t.name)).toEqual(['open-source', 'cloud', 'real-time']);
+		});
+
+		it('should collect brands with logo_url from items', () => {
+			const items = [
+				{
+					name: 'A',
+					description: 'D',
+					source_url: 'https://a.com',
+					category: 'C',
+					tags: [],
+					brand: 'Google',
+					brand_logo_url: 'https://google.com/logo.svg'
+				},
+				{ name: 'B', description: 'D', source_url: 'https://b.com', category: 'C', tags: [], brand: 'Google' },
+				{ name: 'C', description: 'D', source_url: 'https://c.com', category: 'C', tags: [] }
+			];
+
+			const result = collectMetadataFromItems(items);
+			expect(result.brands).toHaveLength(1);
+			expect(result.brands[0].name).toBe('Google');
+			expect(result.brands[0].logo_url).toBe('https://google.com/logo.svg');
+		});
+
+		it('should return empty arrays for empty items', () => {
+			const result = collectMetadataFromItems([]);
+			expect(result.categories).toEqual([]);
 			expect(result.tags).toEqual([]);
 			expect(result.brands).toEqual([]);
 		});
