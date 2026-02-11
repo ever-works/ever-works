@@ -12,7 +12,6 @@
     "scripts": {
         "cli": "cd dist && node dist/cli.js",
         "build": "nest build",
-        "build:deps": "pnpm --filter '@packages/*' build",
         "build:cli": "node build.js",
         "publish:cli": "npm run build:cli && cd dist && npm publish",
         "test:cli": "cd dist && npm install && node cli.js --help"

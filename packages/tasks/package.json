@@ -12,7 +12,9 @@
         "build": "tsc -p tsconfig.json",
         "dev": "tsc -p tsconfig.json --watch",
         "build:plugins": "pnpm --filter './packages/plugins/*' build",
+        "prepare:plugins": "node scripts/prepare-plugins.js",
         "dev:trigger": "npx trigger.dev@4.3.3 dev",
+        "predeploy:trigger": "pnpm prepare:plugins",
         "deploy:trigger": "npx trigger.dev@4.3.3 deploy"
     },
     "dependencies": {

@@ -50,12 +50,18 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
         setToggleError(null);
         startTransition(async () => {
             try {
+                let result;
                 if (isEnabled) {
-                    await disableDirectoryPlugin(directoryId, plugin.pluginId);
+                    result = await disableDirectoryPlugin(directoryId, plugin.pluginId);
                 } else {
-                    await enableDirectoryPlugin(directoryId, plugin.pluginId);
+                    result = await enableDirectoryPlugin(directoryId, plugin.pluginId);
                 }
-                router.refresh();
+
+                if (result.success) {
+                    router.refresh();
+                } else {
+                    throw new Error(result.error);
+                }
             } catch (error) {
                 const message = error instanceof Error ? error.message : t('toggleError');
                 setToggleError(message);

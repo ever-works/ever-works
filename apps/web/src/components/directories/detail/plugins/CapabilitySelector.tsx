@@ -31,8 +31,12 @@ export function CapabilitySelector({
 
         startTransition(async () => {
             try {
-                await setActiveCapability(directoryId, pluginId, capability);
-                router.refresh();
+                const result = await setActiveCapability(directoryId, pluginId, capability);
+                if (!result.success) {
+                    console.error('Failed to set active capability:', result.error);
+                } else {
+                    router.refresh();
+                }
             } catch (error) {
                 console.error('Failed to set active capability:', error);
             }

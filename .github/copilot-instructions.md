@@ -337,7 +337,7 @@ pnpm type-check
 
 - **Web**: `@/*` → `src/*`
 - **API**: `@src/*` → `src/*`
-- **Packages**: `@packages/*` → `../packages/*/src`
+- **Packages**: `@ever-works/*` → `../packages/*/src`
 
 ## Testing
 

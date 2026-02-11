@@ -62,8 +62,12 @@ export function PluginModelSelect({
         setLoading(true);
         setError(null);
         fetchModels(pluginId)
-            .then((data) => {
-                setModels(Array.isArray(data) ? data : []);
+            .then((response) => {
+                if (response.success && Array.isArray(response.data)) {
+                    setModels(response.data as any);
+                } else {
+                    setError(response.error || t('loadError'));
+                }
             })
             .catch(() => {
                 setError(t('loadError'));

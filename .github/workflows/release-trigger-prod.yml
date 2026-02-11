@@ -31,7 +31,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build all packages
-        run: pnpm  build --filter './packages/**'
+        run: pnpm build --filter './packages/**'
+
+      - name: Prepare plugins for Trigger.dev
+        working-directory: packages/tasks
+        run: pnpm prepare:plugins
 
       - name: 🚀 Deploy Trigger.dev
         working-directory: packages/tasks

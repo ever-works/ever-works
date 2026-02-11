@@ -34,7 +34,10 @@ export function PluginSettingsInline({
             settings?: Record<string, unknown>;
             secretSettings?: Record<string, unknown>;
         }) => {
-            await updatePluginSettings(plugin.pluginId, data);
+            const result = await updatePluginSettings(plugin.pluginId, data);
+            if (!result.success) {
+                throw new Error(result.error);
+            }
         },
         [plugin.pluginId],
     );
