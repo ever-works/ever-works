@@ -103,13 +103,6 @@ export const config = {
         },
     },
 
-    // Deployment configuration
-    deploy: {
-        getToken() {
-            return process.env.DEPLOY_TOKEN;
-        },
-    },
-
     // Sentry configuration
     sentry: {
         getDsn() {
