@@ -155,7 +155,7 @@
         "@types/fs-extra": "^11.0.4",
         "ajv": "^8.17.1",
         "ajv-formats": "^3.0.1",
-        "axios": "^1.13.2",
+        "axios": "^1.13.5",
         "bullmq": "^5.66.4",
         "cache-manager": "^7.2.7",
         "class-transformer": "^0.5.1",
