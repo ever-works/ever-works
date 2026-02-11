@@ -25,6 +25,7 @@
 		"deploy:trigger": "turbo deploy:trigger --filter=@ever-works/trigger-tasks",
 		"build": "turbo build",
 		"build:apps": "turbo build --filter=./apps/*",
+		"build:packages": "turbo build --filter=./packages/*",
 		"build:plugins": "turbo build --filter=./packages/plugin --filter=./packages/plugins/*",
 		"build:api": "turbo build --filter=ever-works-api",
 		"build:web": "turbo build --filter=ever-works-web",
