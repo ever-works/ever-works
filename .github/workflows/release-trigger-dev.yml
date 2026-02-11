@@ -30,17 +30,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build workspace packages
-        run: pnpm --filter @ever-works/agent build
-
       - name: Build plugins
-        run: pnpm --filter './packages/plugins/*' build
+        run: pnpm  build --filter './packages/plugins/**'
 
       - name: 🚀 Verify Trigger.dev is available
         working-directory: packages/tasks
         env:
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
-        # Note: we don't use the `preview` env in Trigger.dev for now for deployments from the develop branch, 
+        # Note: we don't use the `preview` env in Trigger.dev for now for deployments from the develop branch,
         # because it requires a paid account and also because we want to use built-in scheduling in NestJs in the dev!
         # That's why we just run the login operation below.
         run: |
