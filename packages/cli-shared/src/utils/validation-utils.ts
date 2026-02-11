@@ -1,4 +1,4 @@
-export const GITHUB_USERNAME_REGEX =
+export const GIT_USERNAME_REGEX =
 	/^(?:[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}|[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*(_[a-zA-Z0-9]+))$/i;
 
 /**
@@ -25,17 +25,17 @@ export function validateEmail(email: string): { isValid: boolean; error?: string
 }
 
 /**
- * Validates GitHub username format
+ * Validates git username format
  */
-export function validateGitHubUsername(username: string): { isValid: boolean; error?: string } {
+export function validateGitUsername(username: string): { isValid: boolean; error?: string } {
 	if (username.length < 1 || username.length > 39) {
-		return { isValid: false, error: 'GitHub username must be between 1 and 39 characters' };
+		return { isValid: false, error: 'Username must be between 1 and 39 characters' };
 	}
 
-	if (!GITHUB_USERNAME_REGEX.test(username)) {
+	if (!GIT_USERNAME_REGEX.test(username)) {
 		return {
 			isValid: false,
-			error: 'GitHub username can only contain alphanumeric characters and hyphens, and cannot start or end with a hyphen'
+			error: 'Username can only contain alphanumeric characters and hyphens, and cannot start or end with a hyphen'
 		};
 	}
 

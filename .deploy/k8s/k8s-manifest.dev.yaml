@@ -55,18 +55,6 @@ spec:
             - name: JWT_SECRET
               value: "$JWT_SECRET"
 
-            # Github
-            - name: GH_APIKEY
-              value: "$GH_APIKEY"
-            - name: GH_OWNER
-              value: "$GH_OWNER"
-
-            # Git
-            - name: GIT_NAME
-              value: "$GIT_NAME"
-            - name: GIT_EMAIL
-              value: "$GIT_EMAIL"
-
             # Trigger.dev
             - name: TRIGGER_ENABLED
               value: "$TRIGGER_ENABLED"
@@ -87,7 +75,7 @@ spec:
             - name: GH_CLIENT_SECRET
               value: "$GH_CLIENT_SECRET"
             - name: GH_CALLBACK_URL
-              value: https://appdev.ever.works/api/auth/github/callback
+              value: https://appdev.ever.works/api/oauth/github/callback
 
             # Google Auth
             - name: GOOGLE_CLIENT_ID
@@ -95,33 +83,29 @@ spec:
             - name: GOOGLE_CLIENT_SECRET
               value: "$GOOGLE_CLIENT_SECRET"
             - name: GOOGLE_CALLBACK_URL
-              value: https://appdev.ever.works/api/auth/google/callback
+              value: https://appdev.ever.works/api/oauth/google/callback
 
-            # AI Configuration
-            - name: AI_DEFAULT_PROVIDER
-              value: "$AI_DEFAULT_PROVIDER"
-
-            # OpenAI
-            - name: OPENAI_MODEL
-              value: "$OPENAI_MODEL"
-            - name: OPENAI_API_KEY
-              value: "$OPENAI_API_KEY"
-
-            # OpenRouter
-            - name: OPENROUTER_MODEL
-              value: "$OPENROUTER_MODEL"
-            - name: OPENROUTER_API_KEY
-              value: "$OPENROUTER_API_KEY"
-
-            # Tavily
-            - name: TAVILY_API_KEY
-              value: "$TAVILY_API_KEY"
-
-            # SEARCH SERVICES
-            - name: EXTRACT_CONTENT_SERVICE
-              value: "$EXTRACT_CONTENT_SERVICE"
-            - name: WEB_SEARCH_SERVICE
-              value: "$WEB_SEARCH_SERVICE"
+            # Plugins
+            - name: PLUGIN_OPENROUTER_API_KEY
+              value: "$PLUGIN_OPENROUTER_API_KEY"
+            - name: PLUGIN_OPENROUTER_DEFAULT_MODEL
+              value: "$PLUGIN_OPENROUTER_DEFAULT_MODEL"
+            - name: PLUGIN_OPENROUTER_SIMPLE_MODEL
+              value: "$PLUGIN_OPENROUTER_SIMPLE_MODEL"
+            - name: PLUGIN_OPENROUTER_MEDIUM_MODEL
+              value: "$PLUGIN_OPENROUTER_MEDIUM_MODEL"
+            - name: PLUGIN_OPENROUTER_COMPLEX_MODEL
+              value: "$PLUGIN_OPENROUTER_COMPLEX_MODEL"
+            - name: PLUGIN_GITHUB_CLIENT_ID
+              value: "$PLUGIN_GITHUB_CLIENT_ID"
+            - name: PLUGIN_GITHUB_CLIENT_SECRET
+              value: "$PLUGIN_GITHUB_CLIENT_SECRET"
+            - name: PLUGIN_TAVILY_API_KEY
+              value: "$PLUGIN_TAVILY_API_KEY"
+            - name: PLUGIN_SCREENSHOTONE_ACCESS_KEY
+              value: "$PLUGIN_SCREENSHOTONE_ACCESS_KEY"
+            - name: PLUGIN_SCREENSHOTONE_SECRET_KEY
+              value: "$PLUGIN_SCREENSHOTONE_SECRET_KEY"
 
             # Database
             - name: DATABASE_TYPE

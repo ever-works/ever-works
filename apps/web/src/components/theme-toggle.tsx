@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { useTheme } from '@/lib/hooks/use-theme';
+import { useTranslations } from 'next-intl';
 
 interface ThemeToggleProps {
     className?: string;
@@ -11,6 +12,7 @@ interface ThemeToggleProps {
 
 export function ThemeToggle({ className, variant = 'fixed' }: ThemeToggleProps = {}) {
     const { isDark, mounted, toggleTheme } = useTheme();
+    const t = useTranslations('common.theme');
 
     const buttonClasses =
         variant === 'fixed'
@@ -24,7 +26,7 @@ export function ThemeToggle({ className, variant = 'fixed' }: ThemeToggleProps =
                 variant="ghost"
                 size="icon"
                 className={cn(buttonClasses, className)}
-                aria-label="Toggle theme"
+                aria-label={t('toggle')}
             >
                 <div className="w-5 h-5" />
             </Button>
@@ -37,8 +39,8 @@ export function ThemeToggle({ className, variant = 'fixed' }: ThemeToggleProps =
             variant="ghost"
             size="icon"
             className={cn(buttonClasses, className)}
-            aria-label="Toggle theme"
-            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label={t('toggle')}
+            title={isDark ? t('switchToLight') : t('switchToDark')}
         >
             {isDark ? (
                 <svg

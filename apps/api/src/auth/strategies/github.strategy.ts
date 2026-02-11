@@ -3,7 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Strategy as GithubStrategy } from 'passport-github2';
 import { AuthService } from '../services/auth.service';
 import { AuthProvider, config } from '../../config/constants';
-import { GitHubScopePresets } from '../config/github-scopes.config';
+import { GITHUB_SCOPES } from '../config/github-scopes.config';
 
 @Injectable()
 export class GithubAuthStrategy extends PassportStrategy(GithubStrategy, AuthProvider.GITHUB) {
@@ -12,7 +12,7 @@ export class GithubAuthStrategy extends PassportStrategy(GithubStrategy, AuthPro
             clientID: config.github.clientId() || 'placeholder',
             clientSecret: config.github.clientSecret() || 'placeholder',
             callbackURL: config.github.callbackUrl(),
-            scope: GitHubScopePresets.AGENT,
+            scope: GITHUB_SCOPES,
             passReqToCallback: true,
         });
     }

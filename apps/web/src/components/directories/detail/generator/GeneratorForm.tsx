@@ -1,21 +1,18 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect, useCallback, useRef } from 'react';
 import {
     Directory,
     CreateItemsGeneratorDto,
     DirectoryConfig,
     UpdateItemsGeneratorDto,
+    GeneratorFormSchema,
 } from '@/lib/api/types-only';
 import { RequiredFields } from './RequiredFields';
 import { UpdateItemsFields } from './UpdateItemsFields';
 import { CompanyFields } from './CompanyFields';
-import { CategoriesFields } from './CategoriesFields';
-import { SourceFields } from './SourceFields';
-import { DataGenerationFields } from './DataGenerationFields';
-import { ConfigFields, DEFAULT_CONFIG } from './ConfigFields';
+import { DynamicPluginFields } from './DynamicPluginFields';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { useRouter } from '@/i18n/navigation';
 import {
@@ -27,7 +24,11 @@ import {
 } from '@/components/ui/dialog';
 import { generateItems, updateItems } from '@/app/actions/dashboard/generator';
 import { useTranslations } from 'next-intl';
-import { GenerationMethod, WebsiteRepositoryCreationMethod, DataVolumeMode } from '@/lib/api/enums';
+import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/enums';
+import { getFormSchema } from '@/app/actions/dashboard/generator-form';
+import { CollapsibleSection } from '../shared';
+import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
+import { ProviderSelectionSection } from '@/components/directories/shared/ProviderSelectionSection';
 
 interface GeneratorFormProps {
     directoryId: string;
@@ -39,45 +40,114 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const router = useRouter();
     const t = useTranslations('dashboard.directoryDetail.generator');
     const [isPending, startTransition] = useTransition();
-    const [expandedSections, setExpandedSections] = useState<string[]>([]);
     const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
     const [confirmRecreate, setConfirmRecreate] = useState(false);
+    const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
+    const [isLoadingSchema, setIsLoadingSchema] = useState(false);
+    const $isLoadingSchema = useRef(isLoadingSchema);
+
+    $isLoadingSchema.current = isLoadingSchema;
 
     // Check if directory has been generated before
     const isGenerated = !!config?.metadata;
     const initialPrompt = config?.metadata?.initial_prompt || '';
     const lastRequestData = config?.metadata?.last_request_data;
 
-    const [formData, setFormData] = useState<CreateItemsGeneratorDto>({
+    // Core form data (always present)
+    const [coreData, setCoreData] = useState<{
+        name: string;
+        prompt: string;
+        company?: { name: string; website: string };
+        repository_description?: string;
+        generation_method?: GenerationMethod;
+        update_with_pull_request?: boolean;
+        website_repository_creation_method?: WebsiteRepositoryCreationMethod;
+    }>({
         name: directory.name,
         prompt: initialPrompt,
         company: lastRequestData?.company || undefined,
-        initial_categories: lastRequestData?.initial_categories || [],
-        priority_categories: lastRequestData?.priority_categories || [],
-        target_keywords: lastRequestData?.target_keywords || [],
-        source_urls: lastRequestData?.source_urls || [],
         repository_description: lastRequestData?.repository_description || '',
         generation_method: GenerationMethod.CREATE_UPDATE,
         update_with_pull_request: false,
-        badge_evaluation_enabled: lastRequestData?.badge_evaluation_enabled || false,
-        capture_screenshots: lastRequestData?.capture_screenshots || false,
         website_repository_creation_method:
             lastRequestData?.website_repository_creation_method ||
             WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
-        config: { ...DEFAULT_CONFIG, ...lastRequestData?.config },
     });
 
-    const toggleSection = (section: string) => {
-        setExpandedSections((prev) =>
-            prev.includes(section) ? prev.filter((s) => s !== section) : [...prev, section],
-        );
-    };
+    // Plugin-specific configuration (dynamic fields from pipeline plugin)
+    const [pluginConfig, setPluginConfig] = useState<Record<string, unknown>>({});
+
+    // Provider selection (null = use directory/system default)
+    const {
+        providers,
+        handleProviderChange,
+        isFullPipeline,
+        buildSelectedProviders,
+        getUnconfiguredProviders,
+    } = useProviderSelection(lastRequestData?.providers);
+
+    // Seed data from the previous generation — used once during schema init,
+    // should not trigger re-fetches when the parent re-renders with a new config reference.
+    const lastPluginConfigRef = useRef(lastRequestData?.pluginConfig);
+
+    // Load form schema when directory changes or pipeline provider changes
+    useEffect(() => {
+        if ($isLoadingSchema.current) {
+            return;
+        }
+
+        async function loadFormSchema() {
+            setIsLoadingSchema(true);
+            try {
+                // Pass pipelineId if a full pipeline is selected
+                const pipelineId = providers.pipeline || undefined;
+                const result = await getFormSchema(directoryId, pipelineId);
+
+                if (result.success && result.data) {
+                    setFormSchema(result.data);
+                    // Initialize plugin config with default values
+                    const defaults: Record<string, unknown> = {};
+                    if (result.data.defaultValues) {
+                        Object.assign(defaults, result.data.defaultValues);
+                    }
+
+                    // Only merge last request data if the pipeline matches what was used last time
+                    const lastPipelineId = lastRequestData?.providers?.pipeline || null;
+                    const currentPipelineId = providers.pipeline;
+
+                    // Treat null/undefined as equivalent (default pipeline)
+                    const isSamePipeline =
+                        (currentPipelineId || 'default') === (lastPipelineId || 'default');
+
+                    // Merge with last request data's plugin config if available and pipelines match
+                    if (isSamePipeline && lastPluginConfigRef.current) {
+                        Object.assign(defaults, lastPluginConfigRef.current);
+                    }
+                    setPluginConfig(defaults);
+                }
+            } catch (error) {
+                console.error('Failed to load form schema:', error);
+                toast.error(t('failedToLoadFormSchema'));
+            } finally {
+                setIsLoadingSchema(false);
+            }
+        }
+        loadFormSchema();
+    }, [directoryId, t, providers.pipeline]);
+
+    const handleCoreDataChange = useCallback((updates: Partial<typeof coreData>) => {
+        setCoreData((prev) => ({ ...prev, ...updates }));
+    }, []);
+
+    const handlePluginConfigChange = useCallback((values: Record<string, unknown>) => {
+        setPluginConfig(values);
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (
-            formData.generation_method === GenerationMethod.RECREATE &&
+            coreData.generation_method === GenerationMethod.RECREATE &&
             config &&
             Object.keys(config || {}).length > 0 &&
             isGenerated
@@ -96,19 +166,40 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             if (
                 isGenerated &&
                 !showAdvancedOptions &&
-                formData.generation_method !== GenerationMethod.RECREATE
+                coreData.generation_method !== GenerationMethod.RECREATE
             ) {
+                // Simple update - only send update-specific fields
                 const updateData: UpdateItemsGeneratorDto = {
-                    generation_method: formData.generation_method,
-                    update_with_pull_request: formData.update_with_pull_request,
+                    generation_method: coreData.generation_method,
+                    update_with_pull_request: coreData.update_with_pull_request,
                 };
                 result = await updateItems(directoryId, updateData);
             } else {
-                if (!formData.prompt.trim()) {
+                // Full generation - send core data + plugin config
+                if (!coreData.prompt.trim()) {
                     toast.error(t('promptRequired'));
                     return;
                 }
-                result = await generateItems(directoryId, formData);
+
+                const unconfigured = getUnconfiguredProviders(formSchema);
+                if (unconfigured.length > 0) {
+                    toast.error(t('unconfiguredProviders', { providers: unconfigured.join(', ') }));
+                    return;
+                }
+
+                const generateData: CreateItemsGeneratorDto = {
+                    name: coreData.name,
+                    prompt: coreData.prompt,
+                    company: coreData.company,
+                    repository_description: coreData.repository_description,
+                    generation_method: coreData.generation_method,
+                    update_with_pull_request: coreData.update_with_pull_request,
+                    website_repository_creation_method: coreData.website_repository_creation_method,
+                    providers: buildSelectedProviders(formSchema),
+                    pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
+                };
+
+                result = await generateItems(directoryId, generateData);
             }
 
             if (result.success) {
@@ -125,7 +216,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
         if (!isGenerated) {
             return t('startGeneration');
         }
-        if (formData.generation_method === GenerationMethod.RECREATE) {
+        if (coreData.generation_method === GenerationMethod.RECREATE) {
             return t('recreateDirectory');
         }
         return t('updateItems');
@@ -136,15 +227,12 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             {/* Show update fields for existing directories, full fields for new/expanded */}
             {isGenerated && !showAdvancedOptions ? (
                 <UpdateItemsFields
-                    generationMethod={formData.generation_method}
-                    updateWithPullRequest={formData.update_with_pull_request}
-                    onChange={(updates) => setFormData({ ...formData, ...updates })}
+                    generationMethod={coreData.generation_method}
+                    updateWithPullRequest={coreData.update_with_pull_request}
+                    onChange={handleCoreDataChange}
                 />
             ) : (
-                <RequiredFields
-                    formData={formData}
-                    onChange={(updates) => setFormData({ ...formData, ...updates })}
-                />
+                <RequiredFields formData={coreData} onChange={handleCoreDataChange} />
             )}
 
             {/* Advanced Options Toggle for existing directories */}
@@ -164,79 +252,42 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             {/* Show additional advanced options for new directories or when toggled */}
             {(!isGenerated || showAdvancedOptions) && (
                 <>
+                    {formSchema && (
+                        <ProviderSelectionSection
+                            formSchema={formSchema}
+                            providers={providers}
+                            onProviderChange={handleProviderChange}
+                            isFullPipeline={isFullPipeline}
+                        />
+                    )}
+
                     {/* Company Information */}
                     <CollapsibleSection
                         title={t('companyInformation')}
                         description={t('companyInfoDescription')}
-                        isExpanded={expandedSections.includes('company')}
-                        onToggle={() => toggleSection('company')}
+                        defaultExpanded={false}
                     >
                         <CompanyFields
-                            company={formData.company}
-                            onChange={(company) => setFormData({ ...formData, company })}
+                            company={coreData.company}
+                            onChange={(company) => handleCoreDataChange({ company })}
                         />
                     </CollapsibleSection>
 
-                    {/* Categories & Keywords */}
-                    <CollapsibleSection
-                        title={t('categoriesKeywords')}
-                        description={t('categoriesDescription')}
-                        isExpanded={expandedSections.includes('categories')}
-                        onToggle={() => toggleSection('categories')}
-                    >
-                        <CategoriesFields
-                            initialCategories={formData.initial_categories || []}
-                            priorityCategories={formData.priority_categories || []}
-                            targetKeywords={formData.target_keywords || []}
-                            onChange={(updates) => setFormData({ ...formData, ...updates })}
-                        />
-                    </CollapsibleSection>
+                    {/* Dynamic Plugin Fields */}
 
-                    {/* Source URLs */}
-                    <CollapsibleSection
-                        title={t('sourceUrls')}
-                        description={t('sourceUrlsDescription')}
-                        isExpanded={expandedSections.includes('sources')}
-                        onToggle={() => toggleSection('sources')}
-                    >
-                        <SourceFields
-                            sourceUrls={formData.source_urls || []}
-                            onChange={(source_urls) => setFormData({ ...formData, source_urls })}
-                        />
-                    </CollapsibleSection>
-
-                    {/* Data Generation Options */}
-                    <CollapsibleSection
-                        title={t('dataGeneration')}
-                        description={t('dataGenerationDescription')}
-                        isExpanded={expandedSections.includes('dataGeneration')}
-                        onToggle={() => toggleSection('dataGeneration')}
-                    >
-                        <DataGenerationFields
-                            config={formData.config}
-                            onChange={(updates) => setFormData({ ...formData, ...updates })}
-                        />
-                    </CollapsibleSection>
-
-                    {/* Advanced Configuration */}
-                    <CollapsibleSection
-                        title={t('advancedConfig')}
-                        description={t('advancedConfigDescription')}
-                        isExpanded={expandedSections.includes('config')}
-                        onToggle={() => toggleSection('config')}
-                    >
-                        <ConfigFields
-                            config={formData.config}
-                            generationMethod={formData.generation_method}
-                            updateWithPullRequest={formData.update_with_pull_request || false}
-                            badgeEvaluationEnabled={formData.badge_evaluation_enabled || false}
-                            captureScreenshots={formData.capture_screenshots || false}
-                            websiteRepositoryCreationMethod={
-                                formData.website_repository_creation_method
-                            }
-                            onChange={(updates) => setFormData({ ...formData, ...updates })}
-                        />
-                    </CollapsibleSection>
+                    {isLoadingSchema ? (
+                        <LoadingState />
+                    ) : (
+                        formSchema &&
+                        formSchema.pluginFields.length > 0 && (
+                            <DynamicPluginFields
+                                fields={formSchema.pluginFields}
+                                groups={formSchema.pluginGroups}
+                                values={pluginConfig}
+                                onChange={handlePluginConfigChange}
+                            />
+                        )
+                    )}
                 </>
             )}
 
@@ -304,58 +355,30 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     );
 }
 
-interface CollapsibleSectionProps {
-    title: string;
-    description: string;
-    isExpanded: boolean;
-    onToggle: () => void;
-    children: React.ReactNode;
-}
-
-function CollapsibleSection({
-    title,
-    description,
-    isExpanded,
-    onToggle,
-    children,
-}: CollapsibleSectionProps) {
+function LoadingState() {
+    const t = useTranslations('dashboard.directoryDetail.generator');
     return (
-        <div
-            className={cn(
-                'rounded-lg border overflow-hidden',
-                'bg-card dark:bg-card-dark',
-                'border-card-border dark:border-card-border-dark',
-            )}
-        >
-            <button
-                type="button"
-                onClick={onToggle}
-                className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-surface dark:hover:bg-surface-dark transition-colors"
-            >
-                <div>
-                    <h3 className="text-lg font-medium text-text dark:text-text-dark">{title}</h3>
-                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
-                        {description}
-                    </p>
-                </div>
-                <svg
-                    className={cn(
-                        'w-5 h-5 text-text-secondary dark:text-text-secondary-dark transition-transform',
-                        isExpanded && 'rotate-180',
-                    )}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
+        <div className="flex items-center justify-center py-12">
+            <div className="flex items-center gap-3">
+                <svg className="animate-spin h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24">
+                    <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                    />
                     <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                 </svg>
-            </button>
-            {isExpanded && <div className="px-6 pb-4 pt-2">{children}</div>}
+                <span className="text-text-secondary dark:text-text-secondary-dark">
+                    {t('loadingFormSchema')}
+                </span>
+            </div>
         </div>
     );
 }

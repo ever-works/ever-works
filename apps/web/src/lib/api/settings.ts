@@ -2,10 +2,6 @@ import 'server-only';
 import { serverMutation, serverFetch } from './server-api';
 
 // DTOs
-export interface UpdateVercelTokenDto {
-    token: string;
-}
-
 export interface NotificationPreferencesDto {
     email?: {
         updates?: boolean;
@@ -19,11 +15,6 @@ export interface NotificationPreferencesDto {
         mentions?: boolean;
         systemUpdates?: boolean;
     };
-}
-
-export interface VercelTokenStatus {
-    hasToken: boolean;
-    validUntil?: Date;
 }
 
 export interface NotificationPreferencesResponse {
@@ -42,10 +33,6 @@ export interface NotificationPreferencesResponse {
 }
 
 export const settingsAPI = {
-    getVercelTokenStatus: async () => {
-        return serverFetch<VercelTokenStatus>('/settings/vercel-token/status');
-    },
-
     // Notification Preferences
     getNotificationPreferences: async () => {
         return serverFetch<NotificationPreferencesResponse>('/settings/notifications');

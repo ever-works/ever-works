@@ -6,3 +6,4 @@ export * from './directory-generation-history.dto';
 export * from './directory-schedule.dto';
 export * from './import-directory.dto';
 export * from './taxonomy.dto';
+export * from './website-settings.dto';

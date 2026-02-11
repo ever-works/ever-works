@@ -20,7 +20,7 @@ async function buildCLI() {
 
     // First, ensure the agent package is built
     try {
-        execSync('pnpm --filter "@packages/agent" build', {
+        execSync('pnpm --filter "@ever-works/agent" build', {
             cwd: path.resolve(__dirname, '../..'),
             stdio: 'inherit',
         });
@@ -69,6 +69,9 @@ async function buildCLI() {
             // Optional NestJS modules
             '@nestjs/microservices',
             '@nestjs/websockets/socket-module',
+
+            // class-transformer optional storage (used by @nestjs/mapped-types)
+            'class-transformer/storage',
 
             // Build Dependencies
             'fs-extra',

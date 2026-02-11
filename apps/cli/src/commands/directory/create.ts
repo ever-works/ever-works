@@ -5,7 +5,7 @@ import { requireAuth } from '../auth';
 import { getApiService, CreateDirectoryDto } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
-import { RepoProvider } from '@packages/cli-shared';
+import { WEB_URL } from '../../utils/constants';
 
 export const createCommand = new Command('create')
     .description('Create a new directory')
@@ -19,27 +19,64 @@ export const createCommand = new Command('create')
             const apiService = getApiService();
             const directoryPrompt = new DirectoryPromptService();
 
-            const githubConnected = await apiService.checkConnection(RepoProvider.GITHUB);
+            // Discover git providers dynamically
+            const gitProvidersResponse = await apiService.getGitProviders();
+            const enabledProviders = gitProvidersResponse.providers.filter((p) => p.enabled);
 
-            if (!githubConnected.connected) {
+            if (enabledProviders.length === 0) {
                 console.log(
                     chalk.yellow(
-                        '\n⚠ GitHub is not connected. Please connect your GitHub account.\n',
+                        '\n⚠ No git providers are configured. Please configure a git provider in Settings > Plugins.\n',
                     ),
                 );
+                return;
             }
 
+            // Find first connected provider
+            let connectedProvider: (typeof enabledProviders)[0] | null = null;
+            for (const provider of enabledProviders) {
+                try {
+                    const connection = await apiService.checkGitProviderConnection(provider.id);
+                    if (connection.connected) {
+                        connectedProvider = provider;
+                        break;
+                    }
+                } catch {
+                    // Skip providers that fail connection check
+                }
+            }
+
+            if (!connectedProvider) {
+                console.log(
+                    chalk.yellow(
+                        '\n⚠ No git provider is connected. Please connect your account.\n',
+                    ),
+                );
+                console.log(
+                    chalk.gray('  • Go to ') +
+                        chalk.cyan(WEB_URL) +
+                        chalk.gray(' to connect your git provider account'),
+                );
+                return;
+            }
+
+            // Get organizations from the connected provider
             const orgs = await apiService
-                .getGitHubOrgs()
-                .then((orgs) => {
-                    const values: { name: string; value: string | null }[] = orgs.map((org) => ({
-                        name: org.login,
-                        value: org.login,
-                    }));
+                .getGitProviderOrganizations(connectedProvider.id)
+                .then((res) => {
+                    if (!res.success || !res.organizations?.length) {
+                        return [{ name: 'Personal Account', value: null as string | null }];
+                    }
+                    const values: { name: string; value: string | null }[] = res.organizations.map(
+                        (org) => ({
+                            name: org.login,
+                            value: org.login,
+                        }),
+                    );
                     values.unshift({ name: 'Personal Account', value: null });
                     return values;
                 })
-                .catch(() => [{ name: 'Personal Account', value: null }]);
+                .catch(() => [{ name: 'Personal Account', value: null as string | null }]);
 
             // Collect directory information
             const directoryData = await directoryPrompt.promptDirectoryCreation(undefined, orgs);

@@ -85,6 +85,10 @@ export async function serverFetch<T>(
                 errorMessage = Array.isArray(errorData.message)
                     ? errorData.message.join(', ')
                     : errorData.message;
+
+                if (Array.isArray(errorData.errors) && errorData.errors.length > 0) {
+                    errorMessage += ': ' + errorData.errors.join(', ');
+                }
             } else if (errorData.error?.message) {
                 errorMessage = errorData.error.message;
             } else if (typeof errorData.error === 'string') {

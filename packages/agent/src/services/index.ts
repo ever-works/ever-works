@@ -11,3 +11,5 @@ export * from './directory-import.service';
 export * from './directory-advanced-prompts.service';
 export * from './repository-management.service';
 export * from './directory-taxonomy.service';
+export * from './generator-form-schema.service';
+export * from './utils/error-classification.utils';

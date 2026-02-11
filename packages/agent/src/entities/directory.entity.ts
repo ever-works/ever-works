@@ -16,7 +16,7 @@ import type {
     GenerateStatus,
     DirectoryMemberRole,
 } from './types';
-import type { PRUpdate } from '@src/data-generator';
+import type { PRUpdate } from '@src/generators/data-generator';
 import { DirectoryGenerationHistory } from './directory-generation-history.entity';
 import { TimestampColumn } from './_types';
 import { DirectorySchedule } from './directory-schedule.entity';
@@ -48,7 +48,10 @@ export class Directory {
     owner?: string;
 
     @Column({ default: 'github' })
-    repoProvider: string; // 'github', 'gitlab', etc.
+    gitProvider: string; // 'github', 'gitlab', etc.
+
+    @Column({ default: 'vercel', nullable: true })
+    deployProvider?: string; // 'vercel', 'netlify', etc.
 
     @Column({ nullable: true })
     website: string;
@@ -166,13 +169,7 @@ export class Directory {
     }
 
     getRepoOwner(): string {
-        const oauthToken = (this.user?.oauthTokens || []).find(
-            (token) => token.provider === this.repoProvider,
-        );
-
-        return (
-            this.owner || oauthToken?.username || oauthToken?.metadata?.login || this.user.username
-        );
+        return this.owner || this.user?.username || '';
     }
 
     /**

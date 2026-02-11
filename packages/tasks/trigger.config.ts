@@ -1,5 +1,6 @@
 import { defineConfig } from '@trigger.dev/sdk';
 import { emitDecoratorMetadata } from '@trigger.dev/build/extensions/typescript';
+import { includePlugins } from './src/build/plugins-extension';
 
 const canRetry = process.env.TRIGGER_DEV_ENABLE_RETRIES === 'true';
 
@@ -42,6 +43,8 @@ export default defineConfig({
         extensions: [
             // Enable TypeScript decorator metadata for TypeORM
             emitDecoratorMetadata(),
+            // Copy built plugin artifacts into the container
+            includePlugins(),
         ],
     },
 });

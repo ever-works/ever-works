@@ -9,7 +9,7 @@ import { ChatInterface } from '@/components/ai/ChatInterface';
 import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ROUTES } from '@/lib/constants';
 import { Link, usePathname } from '@/i18n/navigation';
-import { Home, Folder, Settings, LogOut, Plus, X } from 'lucide-react';
+import { Home, Folder, Settings, LogOut, Plus, X, Plug } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { LogoEverWork } from '../logos';
@@ -38,6 +38,7 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
     const navigation = [
         { name: t('navigation.dashboard'), href: ROUTES.DASHBOARD, icon: Home },
         { name: t('navigation.directories'), href: ROUTES.DASHBOARD_DIRECTORIES, icon: Folder },
+        { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
         // { name: 'Analytics', href: ROUTES.DASHBOARD_ANALYTICS, icon: ChartIcon },
         { name: t('navigation.settings'), href: ROUTES.DASHBOARD_SETTINGS, icon: Settings },
     ];

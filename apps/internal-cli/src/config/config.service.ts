@@ -96,6 +96,19 @@ export class ConfigService {
                 process.env[key] = String(value);
             }
         });
+
+        // Default git provider to 'github' if not set
+        if (!process.env.GIT_PROVIDER) {
+            process.env.GIT_PROVIDER = 'github';
+        }
+
+        // Map new keys to legacy env vars for downstream @ever-works/agent code
+        if (process.env.GIT_TOKEN && !process.env.GH_APIKEY) {
+            process.env.GH_APIKEY = process.env.GIT_TOKEN;
+        }
+        if (process.env.GIT_OWNER && !process.env.GH_OWNER) {
+            process.env.GH_OWNER = process.env.GIT_OWNER;
+        }
     }
 
     /**
@@ -106,30 +119,29 @@ export class ConfigService {
         const warnings: string[] = [];
 
         // Required fields
-        if (!config.GH_APIKEY) errors.push('GH_APIKEY is required');
-        if (!config.GH_OWNER) errors.push('GH_OWNER is required');
+        if (!config.GIT_TOKEN) errors.push('GIT_TOKEN is required');
+        if (!config.GIT_OWNER) errors.push('GIT_OWNER is required');
         if (!config.GIT_NAME) errors.push('GIT_NAME is required');
         if (!config.GIT_EMAIL) errors.push('GIT_EMAIL is required');
-        if (!config.AI_DEFAULT_PROVIDER) errors.push('AI_DEFAULT_PROVIDER is required');
+        // AI Plugin validation - at least one provider should have an API key
+        const hasAiProvider =
+            config.PLUGIN_OPENROUTER_API_KEY ||
+            config.PLUGIN_OPENAI_API_KEY ||
+            config.PLUGIN_GOOGLE_API_KEY ||
+            config.PLUGIN_ANTHROPIC_API_KEY ||
+            config.PLUGIN_GROQ_API_KEY ||
+            config.PLUGIN_OLLAMA_BASE_URL;
 
-        // AI Provider validation
-        if (config.AI_DEFAULT_PROVIDER) {
-            const providerKey =
-                `${config.AI_DEFAULT_PROVIDER.toUpperCase()}_API_KEY` as keyof EverWorksConfig;
-
-            if (!config[providerKey] && config.AI_DEFAULT_PROVIDER !== 'ollama') {
-                errors.push(
-                    `API key for default provider ${config.AI_DEFAULT_PROVIDER} is required`,
-                );
-            }
+        if (!hasAiProvider) {
+            warnings.push('No AI provider plugin configured. Set at least one PLUGIN_*_API_KEY.');
         }
 
         // Warnings
         if (
-            !config.TAVILY_API_KEY &&
+            !config.PLUGIN_TAVILY_API_KEY &&
             (config.EXTRACT_CONTENT_SERVICE === 'tavily' || config.WEB_SEARCH_SERVICE === 'tavily')
         ) {
-            warnings.push('TAVILY_API_KEY is recommended when using Tavily services');
+            warnings.push('PLUGIN_TAVILY_API_KEY is recommended when using Tavily services');
         }
 
         return {

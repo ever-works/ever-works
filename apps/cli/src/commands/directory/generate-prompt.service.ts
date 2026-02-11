@@ -1,32 +1,24 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import { BasePromptService } from '@packages/cli-shared';
-import { CreateItemsGeneratorDto } from '../../services/api.service';
+import { BasePromptService } from '@ever-works/cli-shared';
+import type {
+    CreateItemsGeneratorDto,
+    GeneratorFormSchema,
+    ProvidersDto,
+    FormFieldDefinition,
+    FormFieldGroup,
+} from '../../services/api.service';
+import type { FormFieldCondition } from '@ever-works/contracts';
+import { getIndividualProviderCategories, type IndividualCategoryKey } from '@ever-works/plugin';
 
 export interface CompanyDto {
     name: string;
     website: string;
 }
 
-export interface ConfigDto {
-    max_search_queries: number;
-    max_results_per_query: number;
-    max_pages_to_process: number;
-    relevance_threshold_content: number;
-    min_content_length_for_extraction: number;
-    ai_first_generation_enabled: boolean;
-    content_filtering_enabled: boolean;
-    prompt_comparison_confidence_threshold: number;
-}
-
-export enum GenerationMethod {
-    CREATE_UPDATE = 'create-update',
-    RECREATE = 'recreate',
-}
-
-export enum WebsiteRepositoryCreationMethod {
-    DUPLICATE = 'duplicate',
-    CREATE_USING_TEMPLATE = 'create-using-template',
+export interface ProviderSelectionResult {
+    providers: Partial<ProvidersDto>;
+    pipelineId: string | null;
 }
 
 export class GeneratePromptService extends BasePromptService {
@@ -55,98 +47,173 @@ export class GeneratePromptService extends BasePromptService {
     }
 
     /**
-     * Prompts for advanced generation options
+     * Prompts for provider selection based on the generator form schema
      */
-    async promptAdvancedOptions(): Promise<Partial<CreateItemsGeneratorDto>> {
-        this.displaySectionHeader('Advanced Options');
+    async promptProviderSelection(schema: GeneratorFormSchema): Promise<ProviderSelectionResult> {
+        this.displaySectionHeader('Provider Selection');
 
-        const options: Partial<CreateItemsGeneratorDto> = {};
+        const providers: Partial<ProvidersDto> = {};
+        let pipelineId: string | null = null;
 
-        // Generation method
-        options.generation_method = await this.promptSelect(
-            'Generation method:',
-            [
-                { name: 'Create/Update (recommended)', value: GenerationMethod.CREATE_UPDATE },
-                { name: 'Recreate (replace existing)', value: GenerationMethod.RECREATE },
-            ],
-            GenerationMethod.CREATE_UPDATE,
-        );
+        // Check if full pipeline providers are available
+        const configuredPipelines =
+            schema.providers.fullPipeline?.filter((p) => p.configured) || [];
 
-        // Website repository creation method
-        options.website_repository_creation_method = await this.promptSelect(
-            'Website repository creation method:',
-            [
-                {
-                    name: 'Create using template (recommended)',
-                    value: WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
-                },
-                {
-                    name: 'Duplicate',
-                    value: WebsiteRepositoryCreationMethod.DUPLICATE,
-                },
-            ],
-            WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
-        );
-
-        // Repository description
-        options.repository_description = await this.promptOptionalText(
-            'Repository description (optional):',
-        );
-
-        // Categories
-        const wantsCategories = await this.promptConfirm(
-            'Do you want to specify initial categories?',
-            false,
-        );
-
-        if (wantsCategories) {
-            options.initial_categories = await this.promptStringArray('Enter initial categories:');
-        }
-
-        const wantsPriorityCategories = await this.promptConfirm(
-            'Do you want to specify priority categories?',
-            false,
-        );
-
-        if (wantsPriorityCategories) {
-            options.priority_categories = await this.promptStringArray(
-                'Enter priority categories:',
+        if (configuredPipelines.length > 0) {
+            const mode = await this.promptSelect(
+                'Generation mode:',
+                [
+                    {
+                        name: 'Standard (select individual providers)',
+                        value: 'standard' as const,
+                    },
+                    {
+                        name: 'Full Pipeline (use a preconfigured pipeline)',
+                        value: 'pipeline' as const,
+                    },
+                ],
+                'standard' as const,
             );
+
+            if (mode === 'pipeline') {
+                const choices = configuredPipelines.map((p) => ({
+                    name: `${p.name}${p.isDefault ? ' (default)' : ''}${p.description ? ` - ${p.description}` : ''}`,
+                    value: p.id,
+                }));
+
+                const selectedPipeline = await this.promptSelect(
+                    'Select pipeline:',
+                    choices,
+                    configuredPipelines.find((p) => p.isDefault)?.id || configuredPipelines[0].id,
+                );
+
+                providers.pipeline = selectedPipeline;
+                pipelineId = selectedPipeline;
+
+                return { providers, pipelineId };
+            }
         }
 
-        // Keywords
-        const wantsKeywords = await this.promptConfirm(
-            'Do you want to specify target keywords?',
-            false,
-        );
+        // Standard mode: prompt for each provider category with >1 option
+        const cliLabels: Record<IndividualCategoryKey, string> = {
+            ai: 'AI Provider',
+            search: 'Search Provider',
+            screenshot: 'Screenshot Provider',
+            contentExtractor: 'Content Extractor',
+        };
+        const categories = getIndividualProviderCategories().map(({ uiKey }) => ({
+            key: uiKey as keyof ProvidersDto,
+            label: cliLabels[uiKey as IndividualCategoryKey],
+            options: schema.providers[uiKey as keyof GeneratorFormSchema['providers']],
+        }));
 
-        if (wantsKeywords) {
-            options.target_keywords = await this.promptStringArray('Enter target keywords:');
+        for (const category of categories) {
+            if (!category.options || category.options.length <= 1) continue;
+
+            const configured = category.options.filter((p) => p.configured);
+            if (configured.length <= 1) continue;
+
+            const choices: Array<{ name: string; value: string }> = [
+                { name: 'Auto (default)', value: '' },
+            ];
+
+            for (const provider of category.options) {
+                if (provider.configured) {
+                    choices.push({
+                        name: `${provider.name}${provider.isDefault ? ' (default)' : ''}`,
+                        value: provider.id,
+                    });
+                } else {
+                    choices.push({
+                        name: chalk.gray(`${provider.name} (not configured)`),
+                        value: `__disabled__${provider.id}`,
+                    });
+                }
+            }
+
+            let selected = await this.promptSelect(`${category.label}:`, choices, '');
+
+            // Re-prompt if user selected a disabled provider
+            while (selected.startsWith('__disabled__')) {
+                console.log(
+                    chalk.yellow(
+                        '  This provider is not configured. Please configure it in Settings > Plugins.',
+                    ),
+                );
+                selected = await this.promptSelect(`${category.label}:`, choices, '');
+            }
+
+            if (selected) {
+                providers[category.key] = selected;
+            }
         }
 
-        // Source URLs
-        const wantsSourceUrls = await this.promptConfirm(
-            'Do you want to specify source URLs?',
-            false,
+        return { providers, pipelineId };
+    }
+
+    /**
+     * Prompts for dynamic plugin form fields
+     */
+    async promptDynamicFields(
+        fields: FormFieldDefinition[],
+        groups?: FormFieldGroup[],
+        defaults?: Record<string, unknown>,
+    ): Promise<Record<string, unknown>> {
+        if (!fields || fields.length === 0) return {};
+
+        const values: Record<string, unknown> = { ...defaults };
+
+        // Sort fields by group and order
+        const sortedGroups = [...(groups || [])].sort(
+            (a, b) => (a.order ?? 999) - (b.order ?? 999),
         );
 
-        if (wantsSourceUrls) {
-            options.source_urls = await this.promptUrlArray('Enter source URLs:');
+        // Get ungrouped fields first
+        const ungroupedFields = fields
+            .filter((f) => !f.group)
+            .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+
+        // Prompt ungrouped fields
+        for (const field of ungroupedFields) {
+            await this.promptField(field, values, defaults);
         }
 
-        // Update with pull request
-        options.update_with_pull_request = await this.promptConfirm(
-            'Update with pull request?',
-            true,
-        );
+        // Prompt grouped fields
+        for (const group of sortedGroups) {
+            const groupFields = fields
+                .filter((f) => f.group === group.name)
+                .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
 
-        // Badge evaluation
-        options.badge_evaluation_enabled = await this.promptConfirm(
-            'Enable badge evaluation?',
-            false,
-        );
+            if (groupFields.length === 0) continue;
 
-        return options;
+            if (group.collapsible) {
+                const configure = await this.promptConfirm(
+                    `Configure ${group.title}?${group.description ? ` (${group.description})` : ''}`,
+                    !(group.collapsed ?? false),
+                );
+
+                if (!configure) {
+                    // Use defaults for skipped group
+                    for (const field of groupFields) {
+                        if (field.defaultValue !== undefined) {
+                            values[field.name] = field.defaultValue;
+                        }
+                    }
+                    continue;
+                }
+            } else {
+                console.log(chalk.cyan(`\n--- ${group.title} ---`));
+                if (group.description) {
+                    console.log(chalk.gray(group.description));
+                }
+            }
+
+            for (const field of groupFields) {
+                await this.promptField(field, values, defaults);
+            }
+        }
+
+        return values;
     }
 
     /**
@@ -171,78 +238,6 @@ export class GeneratePromptService extends BasePromptService {
     }
 
     /**
-     * Prompts for configuration options
-     */
-    async promptConfigOptions(): Promise<ConfigDto> {
-        this.displayInfo('Generation Configuration');
-
-        const config: ConfigDto = {
-            max_search_queries: 10,
-            max_results_per_query: 20,
-            max_pages_to_process: 10,
-            relevance_threshold_content: 0.6,
-            min_content_length_for_extraction: 300,
-            ai_first_generation_enabled: true,
-            content_filtering_enabled: true,
-            prompt_comparison_confidence_threshold: 0.5,
-        };
-
-        config.max_search_queries = await this.promptNumberMinMax(
-            'Max search queries (1-100):',
-            config.max_search_queries,
-            1,
-            100,
-        );
-
-        config.max_results_per_query = await this.promptNumberMinMax(
-            'Max results per query (1-100):',
-            config.max_results_per_query,
-            1,
-            100,
-        );
-
-        config.max_pages_to_process = await this.promptNumberMinMax(
-            'Max pages to process (1-1000):',
-            config.max_pages_to_process,
-            1,
-            1000,
-        );
-
-        config.relevance_threshold_content = await this.promptFloat(
-            'Relevance threshold for content (0.01-1.0):',
-            config.relevance_threshold_content,
-            0.01,
-            1.0,
-        );
-
-        config.min_content_length_for_extraction = await this.promptNumberMinMax(
-            'Minimum content length for extraction:',
-            config.min_content_length_for_extraction,
-            0,
-            10000,
-        );
-
-        config.ai_first_generation_enabled = await this.promptConfirm(
-            'Enable AI-first generation?',
-            config.ai_first_generation_enabled,
-        );
-
-        config.content_filtering_enabled = await this.promptConfirm(
-            'Enable content filtering?',
-            config.content_filtering_enabled,
-        );
-
-        config.prompt_comparison_confidence_threshold = await this.promptFloat(
-            'Prompt comparison confidence threshold (0.01-1.0):',
-            config.prompt_comparison_confidence_threshold,
-            0.01,
-            1.0,
-        );
-
-        return config;
-    }
-
-    /**
      * Displays generation summary
      */
     displayGenerationSummary(dto: CreateItemsGeneratorDto): void {
@@ -257,29 +252,18 @@ export class GeneratePromptService extends BasePromptService {
             );
         }
 
-        if (dto.initial_categories?.length) {
-            console.log(
-                chalk.gray('Initial Categories:'),
-                chalk.white(dto.initial_categories.join(', ')),
-            );
+        if (dto.providers) {
+            const providerEntries = Object.entries(dto.providers).filter(([, v]) => v);
+            if (providerEntries.length > 0) {
+                console.log(chalk.gray('Providers:'));
+                for (const [key, value] of providerEntries) {
+                    console.log(chalk.gray(`  ${key}:`), chalk.white(value as string));
+                }
+            }
         }
 
-        if (dto.priority_categories?.length) {
-            console.log(
-                chalk.gray('Priority Categories:'),
-                chalk.white(dto.priority_categories.join(', ')),
-            );
-        }
-
-        if (dto.target_keywords?.length) {
-            console.log(
-                chalk.gray('Target Keywords:'),
-                chalk.white(dto.target_keywords.join(', ')),
-            );
-        }
-
-        if (dto.source_urls?.length) {
-            console.log(chalk.gray('Source URLs:'), chalk.white(`${dto.source_urls.length} URLs`));
+        if (dto.generation_method) {
+            console.log(chalk.gray('Generation Method:'), chalk.white(dto.generation_method));
         }
 
         if (dto.repository_description) {
@@ -289,87 +273,207 @@ export class GeneratePromptService extends BasePromptService {
             );
         }
 
-        if (dto.generation_method) {
-            console.log(chalk.gray('Generation Method:'), chalk.white(dto.generation_method));
-        }
-
-        if (dto.website_repository_creation_method) {
-            console.log(
-                chalk.gray('Website Creation Method:'),
-                chalk.white(dto.website_repository_creation_method),
-            );
+        if (dto.pluginConfig) {
+            const configCount = Object.keys(dto.pluginConfig).length;
+            if (configCount > 0) {
+                console.log(
+                    chalk.gray('Plugin Config:'),
+                    chalk.white(`${configCount} field(s) configured`),
+                );
+            }
         }
 
         console.log(
             chalk.gray('Update with PR:'),
             chalk.white(dto.update_with_pull_request !== false ? 'Yes' : 'No'),
         );
-
-        console.log(
-            chalk.gray('Badge Evaluation:'),
-            chalk.white(dto.badge_evaluation_enabled ? 'Yes' : 'No'),
-        );
-
-        if (dto.config) {
-            console.log(chalk.gray('Advanced Config:'), chalk.white('Configured'));
-        }
     }
 
-    // Helper methods for prompting
-    private async promptStringArray(message: string): Promise<string[]> {
-        console.log(chalk.yellow(message));
-        console.log(chalk.gray('(Enter one item per line, press Enter twice when finished)'));
+    /**
+     * Prompts for a single form field based on its type
+     */
+    private async promptField(
+        field: FormFieldDefinition,
+        values: Record<string, unknown>,
+        defaults?: Record<string, unknown>,
+    ): Promise<void> {
+        // Evaluate showIf conditions
+        if (field.showIf && !this.evaluateConditions(field.showIf, values)) {
+            if (field.defaultValue !== undefined) {
+                values[field.name] = field.defaultValue;
+            }
+            return;
+        }
 
-        const items: string[] = [];
-        let emptyLineCount = 0;
+        // Skip hidden fields, use default
+        if (field.type === 'hidden') {
+            values[field.name] = defaults?.[field.name] ?? field.defaultValue;
+            return;
+        }
 
-        while (emptyLineCount < 2) {
-            const { item } = await inquirer.prompt({
-                type: 'input',
-                name: 'item',
-                message: items.length === 0 ? '>' : '|',
-            });
+        // Skip disabled/readOnly fields
+        if (field.disabled || field.readOnly) {
+            values[field.name] = defaults?.[field.name] ?? field.defaultValue;
+            return;
+        }
 
-            if (item.trim() === '') {
-                emptyLineCount++;
-            } else {
-                emptyLineCount = 0;
-                items.push(item.trim());
+        const defaultValue = defaults?.[field.name] ?? field.defaultValue;
+        const label =
+            field.label + (field.description ? chalk.gray(` (${field.description})`) : '');
+
+        switch (field.type) {
+            case 'text':
+            case 'textarea':
+            case 'url':
+            case 'email': {
+                const validator =
+                    field.type === 'url'
+                        ? this.validateUrl.bind(this)
+                        : field.type === 'email'
+                          ? this.validateEmail.bind(this)
+                          : undefined;
+
+                if (field.validation?.required) {
+                    values[field.name] = await this.promptRequiredText(
+                        `${label}:`,
+                        defaultValue as string | undefined,
+                        validator,
+                    );
+                } else {
+                    values[field.name] = await this.promptOptionalText(
+                        `${label}:`,
+                        defaultValue as string | undefined,
+                        validator,
+                    );
+                }
+                break;
+            }
+
+            case 'number':
+            case 'range': {
+                const min = field.validation?.min;
+                const max = field.validation?.max;
+                values[field.name] = await this.promptNumberMinMax(
+                    `${label}:`,
+                    defaultValue as number | undefined,
+                    min,
+                    max,
+                );
+                break;
+            }
+
+            case 'boolean': {
+                values[field.name] = await this.promptConfirm(
+                    `${label}:`,
+                    (defaultValue as boolean) ?? false,
+                );
+                break;
+            }
+
+            case 'select': {
+                if (field.options && field.options.length > 0) {
+                    const choices = field.options.map((opt) => ({
+                        name:
+                            opt.label +
+                            (opt.description ? chalk.gray(` - ${opt.description}`) : ''),
+                        value: String(opt.value),
+                    }));
+                    values[field.name] = await this.promptSelect(
+                        `${label}:`,
+                        choices,
+                        defaultValue != null ? String(defaultValue) : undefined,
+                    );
+                }
+                break;
+            }
+
+            case 'multiselect': {
+                if (field.options && field.options.length > 0) {
+                    const choices = field.options.map((opt) => ({
+                        name: opt.label,
+                        value: String(opt.value),
+                        checked: Array.isArray(defaultValue)
+                            ? defaultValue.includes(opt.value)
+                            : false,
+                    }));
+                    values[field.name] = await this.promptMultiSelect(`${label}:`, choices);
+                }
+                break;
+            }
+
+            case 'password': {
+                values[field.name] = await this.promptPassword(`${label}:`);
+                break;
+            }
+
+            case 'tags': {
+                const { value } = await inquirer.prompt({
+                    type: 'input',
+                    name: 'value',
+                    message: `${label} (comma-separated):`,
+                    default: Array.isArray(defaultValue)
+                        ? (defaultValue as string[]).join(', ')
+                        : (defaultValue as string),
+                });
+                values[field.name] = value
+                    ? String(value)
+                          .split(',')
+                          .map((s: string) => s.trim())
+                          .filter(Boolean)
+                    : [];
+                break;
+            }
+
+            default: {
+                // Fallback: treat as text input
+                values[field.name] = await this.promptOptionalText(
+                    `${label}:`,
+                    defaultValue as string | undefined,
+                );
+                break;
             }
         }
-
-        return items;
     }
 
-    private async promptUrlArray(message: string): Promise<string[]> {
-        console.log(chalk.yellow(message));
-        console.log(chalk.gray('(Enter one URL per line, press Enter twice when finished)'));
+    /**
+     * Evaluates showIf conditions against current values
+     */
+    private evaluateConditions(
+        conditions: FormFieldCondition | readonly FormFieldCondition[],
+        values: Record<string, unknown>,
+    ): boolean {
+        const conditionArray = Array.isArray(conditions) ? conditions : [conditions];
 
-        const urls: string[] = [];
-        let emptyLineCount = 0;
+        return conditionArray.every((condition) => {
+            const fieldValue = values[condition.field];
 
-        while (emptyLineCount < 2) {
-            const { url } = await inquirer.prompt({
-                type: 'input',
-                name: 'url',
-                message: urls.length === 0 ? '>' : '|',
-                validate: (input: string) => {
-                    if (input.trim() === '') {
-                        return true; // Allow empty for finishing
+            switch (condition.operator) {
+                case 'eq':
+                    return fieldValue === condition.value;
+                case 'neq':
+                    return fieldValue !== condition.value;
+                case 'gt':
+                    return Number(fieldValue) > Number(condition.value);
+                case 'gte':
+                    return Number(fieldValue) >= Number(condition.value);
+                case 'lt':
+                    return Number(fieldValue) < Number(condition.value);
+                case 'lte':
+                    return Number(fieldValue) <= Number(condition.value);
+                case 'contains':
+                    if (Array.isArray(fieldValue)) {
+                        return fieldValue.includes(condition.value);
                     }
-                    return this.validateUrl(input.trim());
-                },
-            });
-
-            if (url.trim() === '') {
-                emptyLineCount++;
-            } else {
-                emptyLineCount = 0;
-                urls.push(url.trim());
+                    return String(fieldValue).includes(String(condition.value));
+                case 'not_contains':
+                    if (Array.isArray(fieldValue)) {
+                        return !fieldValue.includes(condition.value);
+                    }
+                    return !String(fieldValue).includes(String(condition.value));
+                default:
+                    return true;
             }
-        }
-
-        return urls;
+        });
     }
 
     // Validation methods

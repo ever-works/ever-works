@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "Notificaciones",
                 "empty": "No hay nuevas notificaciones"
+            },
+            "help": {
+                "title": "Ayuda y recursos",
+                "subtitle": "Consejos rápidos y enlaces útiles",
+                "quickTips": {
+                    "title": "Consejos rápidos",
+                    "tip1": "Usa el chat de IA para crear directorios con lenguaje natural",
+                    "tip2": "Importa listas awesome o repositorios de datos existentes",
+                    "tip3": "Personaliza la apariencia de tu directorio en la configuración"
+                },
+                "shortcuts": {
+                    "title": "Atajos de teclado",
+                    "search": "Buscar",
+                    "newDirectory": "Nuevo directorio",
+                    "help": "Ayuda",
+                    "hint": "Presiona ? en cualquier lugar para ver todos los atajos"
+                },
+                "links": {
+                    "title": "Enlaces útiles",
+                    "github": "Repositorio de GitHub",
+                    "issues": "Reportar un problema",
+                    "docs": "Documentación",
+                    "comingSoon": "Próximamente"
+                },
+                "version": "Versión {version}"
             }
         },
         "directories": {
@@ -328,13 +353,16 @@
                     "actions": {
                         "connect": "Conectar",
                         "disconnect": "Desconectar",
-                        "confirmDisconnect": "¿Estás seguro de que quieres desconectar tu cuenta de GitHub?"
+                        "confirmDisconnect": "¿Estás seguro de que quieres desconectar tu cuenta de GitHub?",
+                        "reconnect": "Reconectar"
                     },
                     "messages": {
                         "disconnected": "Cuenta de GitHub desconectada",
                         "connectError": "No se pudo conectar GitHub",
                         "disconnectError": "No se pudo desconectar GitHub"
-                    }
+                    },
+                    "organizations": "Organizaciones conectadas",
+                    "organizationsHint": "Use Reconectar para otorgar acceso a organizaciones adicionales"
                 }
             }
         },
@@ -525,7 +553,7 @@
                 "dataRepo": "Repositorio de Datos",
                 "websiteRepo": "Repositorio del Sitio Web",
                 "mainRepo": "Repositorio Principal",
-                "repoProvider": "Proveedor de Repositorio",
+                "gitProvider": "Proveedor de Git",
                 "organization": "Organización",
                 "created": "Creado",
                 "lastUpdated": "Última Actualización",
@@ -534,7 +562,11 @@
                 "custom": "Personalizado",
                 "customOverwrite": "Personalizado (Sobrescribir)",
                 "yes": "Sí",
-                "no": "No"
+                "no": "No",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Detalles de Configuración",
@@ -624,7 +656,21 @@
                         "invalidUrl": "Por favor, ingresa una URL válida que incluya http:// o https://",
                         "requiredFields": "Por favor, completa todos los campos requeridos",
                         "invalidImageUrl": "Por favor, ingresa una URL de imagen válida"
-                    }
+                    },
+                    "categories": "Categorías",
+                    "existingCategories": "Seleccionar de existentes",
+                    "addNewCategory": "O agregar nueva categoría",
+                    "categoryPlaceholder": "Buscar o crear categoría...",
+                    "addMoreCategories": "Agregar más...",
+                    "createCategory": "Crear",
+                    "noMatchingCategories": "No hay categorías coincidentes",
+                    "noCategories": "Aún no hay categorías. Escribe para crear una.",
+                    "categoriesRequired": "Selecciona al menos una categoría",
+                    "captureScreenshot": "Capturar captura de pantalla",
+                    "captureScreenshotHelp": "Captura automática desde la URL de origen",
+                    "screenshotSuccess": "Captura de pantalla exitosa",
+                    "screenshotFailed": "Error al capturar pantalla",
+                    "screenshotError": "Ocurrió un error al capturar la pantalla"
                 },
                 "updateSuccess": "Elemento eliminado exitosamente",
                 "updateFailed": "No se pudo eliminar el elemento",
@@ -639,7 +685,108 @@
                 "createPRHelp": "Si está habilitado, los cambios se proponen mediante PR en lugar de commit directo.",
                 "reasonLabel": "Motivo (opcional)",
                 "reasonPlaceholder": "¿Por qué está eliminando este elemento?",
-                "confirmDelete": "Eliminar elemento"
+                "confirmDelete": "Eliminar elemento",
+                "captureScreenshot": "Capturar captura de pantalla",
+                "screenshot": {
+                    "noSourceUrl": "No hay URL de origen disponible para este elemento",
+                    "success": "Captura de pantalla exitosa",
+                    "failed": "Error al capturar pantalla",
+                    "error": "Ocurrió un error al capturar la pantalla",
+                    "notConfigured": "El servicio de capturas no está configurado. Agregue su clave API de ScreenshotOne en Configuración.",
+                    "captureFailed": "Error al capturar imagen",
+                    "captureSuccess": "Imagen capturada exitosamente",
+                    "captureError": "Ocurrió un error al capturar la imagen",
+                    "bulkCaptureComplete": "Captura masiva completada",
+                    "bulkCaptureError": "Ocurrió un error en la captura masiva"
+                },
+                "tabs": {
+                    "browseItems": "Explorar elementos",
+                    "categories": "Categorías",
+                    "tags": "Etiquetas"
+                },
+                "taxonomy": {
+                    "categories": {
+                        "searchPlaceholder": "Buscar categorías...",
+                        "add": "Agregar categoría",
+                        "addFirst": "Agregar primera categoría",
+                        "showing": "Mostrando {current} de {total} categorías",
+                        "empty": "Aún no hay categorías",
+                        "noMatch": "No hay categorías coincidentes",
+                        "columns": {
+                            "name": "Nombre",
+                            "description": "Descripción",
+                            "items": "Elementos",
+                            "priority": "Prioridad",
+                            "actions": "Acciones"
+                        },
+                        "createSuccess": "Categoría creada exitosamente",
+                        "createFailed": "Error al crear categoría",
+                        "updateSuccess": "Categoría actualizada exitosamente",
+                        "updateFailed": "Error al actualizar categoría",
+                        "deleteSuccess": "Categoría eliminada exitosamente",
+                        "deleteFailed": "Error al eliminar categoría",
+                        "deleteConfirm": "¿Está seguro de eliminar \"{name}\"?",
+                        "deleteHasItems": "No se puede eliminar categoría con {count} elementos",
+                        "modal": {
+                            "createTitle": "Crear categoría",
+                            "editTitle": "Editar categoría",
+                            "name": "Nombre",
+                            "namePlaceholder": "ej. Herramientas de monitoreo",
+                            "description": "Descripción",
+                            "descriptionPlaceholder": "Breve descripción de esta categoría",
+                            "iconUrl": "URL del icono",
+                            "iconUrlPlaceholder": "https://example.com/icon.png",
+                            "iconUrlHelp": "URL opcional a una imagen de icono",
+                            "priority": "Prioridad",
+                            "priorityPlaceholder": "ej. 1",
+                            "priorityHelp": "Los números más bajos aparecen primero",
+                            "cancel": "Cancelar",
+                            "save": "Guardar",
+                            "create": "Crear",
+                            "saving": "Guardando...",
+                            "errors": {
+                                "nameRequired": "El nombre de la categoría es requerido",
+                                "nameExists": "Ya existe una categoría con este nombre"
+                            }
+                        }
+                    },
+                    "tags": {
+                        "searchPlaceholder": "Buscar etiquetas...",
+                        "add": "Agregar etiqueta",
+                        "addFirst": "Agregar primera etiqueta",
+                        "showing": "Mostrando {current} de {total} etiquetas",
+                        "empty": "Aún no hay etiquetas",
+                        "noMatch": "No hay etiquetas coincidentes",
+                        "columns": {
+                            "name": "Nombre",
+                            "items": "Elementos",
+                            "actions": "Acciones"
+                        },
+                        "createSuccess": "Etiqueta creada exitosamente",
+                        "createFailed": "Error al crear etiqueta",
+                        "updateSuccess": "Etiqueta actualizada exitosamente",
+                        "updateFailed": "Error al actualizar etiqueta",
+                        "deleteSuccess": "Etiqueta eliminada exitosamente",
+                        "deleteFailed": "Error al eliminar etiqueta",
+                        "deleteConfirm": "¿Está seguro de eliminar \"{name}\"?",
+                        "deleteHasItems": "No se puede eliminar etiqueta con {count} elementos",
+                        "modal": {
+                            "createTitle": "Crear etiqueta",
+                            "editTitle": "Editar etiqueta",
+                            "name": "Nombre",
+                            "namePlaceholder": "ej. open-source",
+                            "nameHelp": "Use minúsculas con guiones",
+                            "cancel": "Cancelar",
+                            "save": "Guardar",
+                            "create": "Crear",
+                            "saving": "Guardando...",
+                            "errors": {
+                                "nameRequired": "El nombre de la etiqueta es requerido",
+                                "nameExists": "Ya existe una etiqueta con este nombre"
+                            }
+                        }
+                    }
+                }
             },
             "generator": {
                 "regenerationWarning": "Advertencia de Regeneración",
@@ -710,7 +857,35 @@
                 "recreateConfirmDescription": "Recrear eliminará los elementos existentes y los regenerará desde cero. Esta acción no se puede deshacer.",
                 "confirmRecreate": "Sí, recrear",
                 "recreateInlineTitle": "Recrear eliminará los elementos existentes",
-                "recreateInlineDescription": "Este modo elimina los elementos actuales y los reconstruye desde cero. Proceda solo si desea reemplazar todo."
+                "recreateInlineDescription": "Este modo elimina los elementos actuales y los reconstruye desde cero. Proceda solo si desea reemplazar todo.",
+                "captureScreenshots": "Capturar capturas de elementos",
+                "captureScreenshotsDescription": "Captura automática de imágenes durante la generación",
+                "companyNameDescription": "Se usa para personalizar el contenido con su identidad de marca.",
+                "companyWebsiteDescription": "La IA analizará su sitio para entender mejor el contexto de marca.",
+                "initialCategoriesDescription": "Categorías iniciales para organizar elementos.",
+                "priorityCategoriesDescription": "Categorías que aparecerán primero en la salida.",
+                "targetKeywordsDescription": "Palabras clave para guiar la búsqueda y generación.",
+                "sourceUrlsFieldDescription": "URLs específicas para extraer contenido.",
+                "generationMethodDescription": "Elija entre actualizar o recrear.",
+                "websiteRepositoryCreationMethodDescription": "Cómo se crea el repositorio del sitio web.",
+                "maxSearchQueriesDescription": "Número de consultas de búsqueda a generar (1-50).",
+                "resultsPerQueryDescription": "Máximo de resultados por consulta (1-20).",
+                "maxPagesToProcessDescription": "Máximo de páginas web a procesar (1-100).",
+                "relevanceThresholdDescription": "Umbral mínimo de relevancia (0-1).",
+                "dataGeneration": "Opciones de generación de datos",
+                "dataGenerationDescription": "Configurar volumen de datos y generación de entidades",
+                "dataVolumeMode": "Modo de volumen de datos",
+                "dataVolumeModeReal": "Real",
+                "dataVolumeModeRealDescription": "Generar datos completos listos para producción",
+                "dataVolumeModeSample": "Muestra",
+                "dataVolumeModeSampleDescription": "Generar datos de muestra mínimos (~10 elementos)",
+                "entityGeneration": "Generación de entidades",
+                "generateCategories": "Generar categorías",
+                "generateCategoriesDescription": "Crear estructura de categorías para organizar elementos",
+                "generateTags": "Generar etiquetas",
+                "generateTagsDescription": "Crear etiquetas para etiquetado flexible",
+                "generateBrands": "Generar marcas",
+                "generateBrandsDescription": "Extraer y crear entidades de marca"
             },
             "progress": {
                 "title": "Generación en Progreso",
@@ -784,20 +959,163 @@
                 "saveChanges": "Guardar Cambios",
                 "updateReadme": "Actualizar README",
                 "updateSuccess": "Configuración actualizada exitosamente",
-                "updateFailed": "No se pudo actualizar la configuración"
+                "updateFailed": "No se pudo actualizar la configuración",
+                "visibilityUpdateFailed": "Error al actualizar visibilidad del repositorio",
+                "visibilityWarningTitle": "¿Hacer el repositorio privado?",
+                "visibilityWarningDescription": "Está a punto de hacer {name} privado.",
+                "visibilityWarningPermanent": "Esta acción tiene consecuencias permanentes:",
+                "visibilityWarningStars": "Todas las estrellas se perderán permanentemente",
+                "visibilityWarningWatchers": "Todos los observadores serán eliminados",
+                "visibilityWarningNotRestored": "Las estrellas y observadores NO se restaurarán",
+                "visibilityConfirmPrivate": "Sí, hacer privado",
+                "advancedPrompts": {
+                    "title": "Prompts avanzados",
+                    "subtitle": "Personalizar prompts de IA para la generación del directorio.",
+                    "save": "Guardar prompts",
+                    "saveSuccess": "Prompts avanzados guardados exitosamente",
+                    "saveFailed": "Error al guardar prompts avanzados",
+                    "prompts": {
+                        "relevanceAssessment": {
+                            "title": "Evaluación de relevancia",
+                            "description": "Instrucciones para filtrar páginas por relevancia.",
+                            "placeholder": "ej. Solo incluir páginas de código abierto..."
+                        },
+                        "itemGeneration": {
+                            "title": "Generación de elementos",
+                            "description": "Instrucciones para elementos generados por IA.",
+                            "placeholder": "ej. Enfocarse en soluciones empresariales..."
+                        },
+                        "itemExtraction": {
+                            "title": "Extracción de elementos",
+                            "description": "Instrucciones para extraer elementos del contenido.",
+                            "placeholder": "ej. Priorizar herramientas con documentación..."
+                        },
+                        "searchQuery": {
+                            "title": "Generación de consultas de búsqueda",
+                            "description": "Instrucciones para generar consultas de búsqueda.",
+                            "placeholder": "ej. Incluir consultas de repositorios GitHub..."
+                        },
+                        "categorization": {
+                            "title": "Categorización",
+                            "description": "Instrucciones para categorizar elementos.",
+                            "placeholder": "ej. Usar categorías técnicas..."
+                        },
+                        "deduplication": {
+                            "title": "Deduplicación",
+                            "description": "Instrucciones para identificar duplicados.",
+                            "placeholder": "ej. Considerar repos GitHub similares como duplicados..."
+                        },
+                        "sourceValidation": {
+                            "title": "Validación de fuentes",
+                            "description": "Instrucciones para validar URLs de fuentes.",
+                            "placeholder": "ej. Preferir sitios oficiales..."
+                        }
+                    }
+                },
+                "websiteConfig": {
+                    "title": "Configuración del sitio web",
+                    "subtitle": "Personalizar la apariencia y comportamiento del sitio",
+                    "loadFailed": "Error al cargar configuración del sitio",
+                    "saveSuccess": "Configuración del sitio guardada exitosamente",
+                    "saveFailed": "Error al guardar configuración del sitio",
+                    "save": "Guardar configuración",
+                    "sections": {
+                        "siteName": {
+                            "title": "Identidad del sitio",
+                            "label": "Nombre del sitio",
+                            "placeholder": "Mi directorio",
+                            "helper": "El nombre mostrado en el encabezado y pestaña del navegador"
+                        },
+                        "global": {
+                            "title": "Características globales",
+                            "categories": "Categorías",
+                            "categoriesHelper": "Mostrar filtrado y navegación por categorías",
+                            "tags": "Etiquetas",
+                            "tagsHelper": "Mostrar filtrado y navegación por etiquetas",
+                            "companies": "Empresas",
+                            "companiesHelper": "Mostrar información de la empresa para elementos",
+                            "surveys": "Encuestas",
+                            "surveysHelper": "Habilitar funcionalidad de encuestas"
+                        },
+                        "header": {
+                            "title": "Configuración del encabezado",
+                            "submit": "Botón de enviar",
+                            "submitHelper": "Mostrar botón de enviar elemento en el encabezado",
+                            "pricing": "Enlace de precios",
+                            "pricingHelper": "Mostrar enlace de precios en la navegación",
+                            "layoutSelector": "Selector de diseño",
+                            "layoutSelectorHelper": "Permitir a usuarios cambiar entre diseños",
+                            "languageSelector": "Selector de idioma",
+                            "languageSelectorHelper": "Permitir a usuarios cambiar el idioma",
+                            "themeSelector": "Selector de tema",
+                            "themeSelectorHelper": "Permitir a usuarios cambiar entre temas",
+                            "defaultLayout": "Diseño predeterminado",
+                            "defaultTheme": "Tema predeterminado",
+                            "themeLight": "Claro",
+                            "themeDark": "Oscuro",
+                            "themeSystem": "Sistema",
+                            "defaultPagination": "Paginación predeterminada",
+                            "paginationStandard": "Estándar",
+                            "paginationInfinite": "Desplazamiento infinito",
+                            "paginationLoadMore": "Cargar más"
+                        },
+                        "homepage": {
+                            "title": "Configuración de la página principal",
+                            "hero": "Sección hero",
+                            "heroHelper": "Mostrar sección hero con título y descripción",
+                            "search": "Barra de búsqueda",
+                            "searchHelper": "Mostrar barra de búsqueda en la página principal",
+                            "defaultView": "Vista predeterminada",
+                            "viewClassic": "Clásico",
+                            "viewGrid": "Cuadrícula",
+                            "viewList": "Lista",
+                            "defaultSort": "Orden predeterminado",
+                            "sortPopularity": "Popularidad",
+                            "sortNewest": "Más recientes",
+                            "sortAlphabetical": "Alfabético"
+                        },
+                        "footer": {
+                            "title": "Configuración del pie de página",
+                            "subscribe": "Suscripción al boletín",
+                            "subscribeHelper": "Mostrar formulario de suscripción al boletín",
+                            "version": "Mostrar versión",
+                            "versionHelper": "Mostrar información de versión en el pie de página",
+                            "themeSelector": "Selector de tema del pie de página",
+                            "themeSelectorHelper": "Mostrar interruptor de tema en el pie de página"
+                        },
+                        "customMenu": {
+                            "title": "Enlaces de menú personalizados",
+                            "description": "Agregar enlaces personalizados a la navegación",
+                            "headerLinks": "Enlaces del encabezado",
+                            "footerLinks": "Enlaces del pie de página",
+                            "addLink": "Agregar enlace",
+                            "noLinks": "No se han agregado enlaces personalizados",
+                            "labelPlaceholder": "Etiqueta del enlace",
+                            "pathPlaceholder": "/about o https://...",
+                            "targetSelf": "Misma pestaña",
+                            "targetBlank": "Nueva pestaña"
+                        }
+                    }
+                }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Token de Vercel Requerido",
-                    "description": "Para desplegar tu directorio en Vercel, necesitas configurar tu token de API de Vercel en la configuración de tu cuenta.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Ir a Configuración de Tokens API",
                     "getTokenButton": "Obtener Token de Vercel",
                     "howTo": {
                         "title": "Cómo configurar tu token de Vercel:",
                         "step1": "Haz clic en 'Obtener Token de Vercel' para abrir el panel de Vercel",
                         "step2": "Crea un nuevo token con permisos de despliegue",
-                        "step3": "Copia el token generado",
-                        "step4": "Ve a Configuración de Tokens API y pega tu token en la sección de Vercel"
+                        "step3": "Configure su token API de {provider} en Configuración del Plugin > {provider}",
+                        "step4": "Regrese aquí para desplegar su directorio"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -806,10 +1124,10 @@
                     "hint": "Como colaborador, podrás activar despliegues una vez que el propietario configure su integración de Vercel."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Desplegar en Vercel",
                         "description": "Despliega el repositorio del sitio web de tu directorio en Vercel.",
-                        "deployButton": "Desplegar Ahora",
+                        "deployButton": "Desplegar en {provider}",
                         "deployingButton": "Desplegando...",
                         "deployingStateButton": "Desplegando ({state})...",
                         "successMessage": "¡Tu sitio web ha sido desplegado exitosamente!",
@@ -853,7 +1171,21 @@
                         "lastChecked": "Última verificación",
                         "lastError": "Último error",
                         "updateSuccess": "Configuración actualizada exitosamente",
-                        "updateFailed": "Error al actualizar la configuración"
+                        "updateFailed": "Error al actualizar la configuración",
+                        "githubRequired": "Se requiere conexión con GitHub. Conecte su cuenta en Configuración."
+                    },
+                    "configDialog": {
+                        "title": "Configurar antes de desplegar",
+                        "description": "Revise y personalice la configuración antes del despliegue",
+                        "siteName": "Nombre del sitio",
+                        "siteNamePlaceholder": "Mi directorio",
+                        "siteNameHelper": "El nombre mostrado en su sitio web",
+                        "advancedSettings": "Configuración avanzada",
+                        "advancedSettingsDescription": "Configurar opciones adicionales",
+                        "loadFailed": "Error al cargar la configuración actual",
+                        "saveAndDeploy": "Guardar y desplegar",
+                        "skipAndDeploy": "Omitir y desplegar",
+                        "cancel": "Cancelar"
                     }
                 }
             },
@@ -962,7 +1294,8 @@
                 "personalAccount": "El repositorio se creará bajo tu cuenta personal",
                 "organizations": "Organizaciones",
                 "personalHelp": "El repositorio se creará bajo tu cuenta personal de GitHub",
-                "organizationHelp": "El repositorio se creará bajo la organización {org}"
+                "organizationHelp": "El repositorio se creará bajo la organización {org}",
+                "connectRequired": "Conecta un proveedor de Git en la barra lateral para elegir dónde se creará tu repositorio."
             },
             "ai": {
                 "title": "Crear con IA",
@@ -1192,7 +1525,8 @@
                 "success": {
                     "started": "¡Importación iniciada! Redirigiendo a tu directorio...",
                     "linked": "Directorio vinculado exitosamente"
-                }
+                },
+                "detectionFailed": "No pudimos detectar automáticamente el formato. Por favor, seleccione cómo importar este repositorio."
             }
         },
         "github": {
@@ -1254,6 +1588,34 @@
                 "title": "Webhooks",
                 "subtitle": "Configura webhooks para recibir actualizaciones en tiempo real",
                 "configure": "Configurar Webhooks (Próximamente)"
+            },
+            "screenshotone": {
+                "title": "Integración con ScreenshotOne",
+                "subtitle": "Capturar automáticamente capturas de pantalla usando ScreenshotOne",
+                "connected": "Conectado",
+                "notConnected": "No conectado",
+                "connectedMessage": "Su cuenta de ScreenshotOne está conectada. Las capturas se realizarán automáticamente.",
+                "disconnect": "Desconectar ScreenshotOne",
+                "disconnecting": "Eliminando...",
+                "accessKeyLabel": "Clave de acceso",
+                "placeholder": "Su clave de acceso...",
+                "secretKeyLabel": "Clave secreta (Opcional)",
+                "secretKeyPlaceholder": "Su clave secreta...",
+                "showKey": "Mostrar",
+                "hideKey": "Ocultar",
+                "accessKeyHelp": "Requerido. Se usa para autenticarse con la API de ScreenshotOne.",
+                "secretKeyHelp": "Opcional. Habilita URLs firmadas para mayor seguridad. Obtenga sus claves de",
+                "dashboard": "Panel de ScreenshotOne",
+                "save": "Guardar claves",
+                "saving": "Guardando...",
+                "messages": {
+                    "accessKeyRequired": "Ingrese una clave de acceso válida de ScreenshotOne",
+                    "saveSuccess": "Claves de ScreenshotOne guardadas exitosamente",
+                    "saveFailed": "Error al guardar claves de ScreenshotOne",
+                    "removeSuccess": "Claves de ScreenshotOne eliminadas exitosamente",
+                    "removeFailed": "Error al eliminar claves de ScreenshotOne",
+                    "unexpectedError": "Ocurrió un error inesperado"
+                }
             }
         },
         "notifications": {
@@ -1358,7 +1720,19 @@
             "newChat": "Nuevo chat",
             "loadingConversation": "Cargando conversación…",
             "inputPlaceholder": "Describe el directorio que quieres crear...",
-            "sendButton": "Enviar"
+            "sendButton": "Enviar",
+            "errors": {
+                "unableToSend": "No se pudo enviar el mensaje."
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {
@@ -1508,6 +1882,15 @@
                 "notAuthenticated": "No autenticado",
                 "deleteFailed": "No se pudo eliminar la cuenta",
                 "deleteDisabled": "La eliminación de cuenta está deshabilitada en la demo"
+            },
+            "screenshotone": {
+                "notAuthenticated": "No autenticado",
+                "accessKeyRequired": "La clave de acceso es requerida",
+                "saveFailed": "Error al guardar claves de ScreenshotOne",
+                "saveSuccess": "Claves de ScreenshotOne guardadas exitosamente",
+                "validationFailed": "Las claves de ScreenshotOne son inválidas. Verifique e intente de nuevo.",
+                "removeFailed": "Error al eliminar claves de ScreenshotOne",
+                "removeSuccess": "Claves de ScreenshotOne eliminadas exitosamente"
             }
         },
         "deploy": {
@@ -1538,6 +1921,21 @@
             "username": {
                 "minLength": "El nombre de usuario debe contener al menos {length} caracteres"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "Cerrar",
+            "dismiss": "Descartar"
+        },
+        "theme": {
+            "toggle": "Cambiar tema",
+            "switchToLight": "Cambiar a modo claro",
+            "switchToDark": "Cambiar a modo oscuro"
+        },
+        "visibility": {
+            "private": "Privado",
+            "public": "Público"
         }
     }
 }

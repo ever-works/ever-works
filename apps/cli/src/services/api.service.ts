@@ -1,5 +1,27 @@
-import { Directory } from '@packages/cli-shared';
+import { Directory } from '@ever-works/cli-shared';
 import { getHttpClient } from './http-client';
+import type { CreateItemsGeneratorDto, ProvidersDto, CompanyDto } from '@ever-works/contracts/api';
+import type {
+    GeneratorFormSchema,
+    ProviderOption,
+    GitProviderInfo,
+    GitOrganization,
+    FormFieldDefinition,
+    FormFieldGroup,
+} from '@ever-works/plugin';
+
+// Re-export types used by other CLI modules
+export type {
+    CreateItemsGeneratorDto,
+    ProvidersDto,
+    CompanyDto,
+    GeneratorFormSchema,
+    ProviderOption,
+    GitProviderInfo,
+    GitOrganization,
+    FormFieldDefinition,
+    FormFieldGroup,
+};
 
 // Types for API responses
 
@@ -17,34 +39,6 @@ export interface CreateDirectoryDto {
     owner?: string;
     readmeConfig?: MarkdownReadmeConfigDto;
     organization: boolean;
-}
-
-export interface CreateItemsGeneratorDto {
-    name: string;
-    prompt: string;
-    company?: {
-        name: string;
-        website: string;
-    };
-    initial_categories?: string[];
-    priority_categories?: string[];
-    target_keywords?: string[];
-    source_urls?: string[];
-    generation_method?: 'create-update' | 'recreate';
-    website_repository_creation_method?: 'duplicate' | 'create-using-template';
-    repository_description?: string;
-    update_with_pull_request?: boolean;
-    badge_evaluation_enabled?: boolean;
-    config?: {
-        max_search_queries?: number;
-        max_results_per_query?: number;
-        max_pages_to_process?: number;
-        relevance_threshold_content?: number;
-        min_content_length_for_extraction?: number;
-        ai_first_generation_enabled?: boolean;
-        content_filtering_enabled?: boolean;
-        prompt_comparison_confidence_threshold?: number;
-    };
 }
 
 export interface UpdateDirectoryDto {
@@ -97,9 +91,7 @@ export interface RemoveItemDto {
 }
 
 export interface DeployDto {
-    VERCEL_TOKEN?: string;
-    GITHUB_TOKEN?: string;
-    vercelTeamScope?: string;
+    teamScope?: string;
 }
 
 export interface DeleteDirectoryDto {
@@ -141,38 +133,40 @@ export interface DeployWebsiteResponse {
     deployment_url?: string;
 }
 
-export interface VercelTeam {
+export interface DeploymentTeam {
     id: string;
     slug: string;
     name: string | null;
     createdAt: number;
 }
 
-export interface VercelTeamResponse extends ApiResponse<{ teams: VercelTeam[] }> {}
+export interface DeploymentTeamResponse extends ApiResponse<{ teams: DeploymentTeam[] }> {}
 
-export interface ConnectionInfo {
-    provider: string;
+export interface GitProviderConnectionInfo extends GitProviderInfo {
     connected: boolean;
-    email?: string;
     username?: string;
-    scopes?: string[];
-    connectedAt?: Date;
-    metadata?: Record<string, any>;
+    email?: string;
+    avatarUrl?: string;
+    authMethod?: string;
 }
 
-export interface GitHubOrganization {
-    login: string;
-    id: number;
-    node_id: string;
-    url: string;
-    repos_url: string;
-    events_url: string;
-    hooks_url: string;
-    issues_url: string;
-    members_url: string;
-    public_members_url: string;
-    avatar_url: string;
-    description: string;
+export interface GitProviderListResponse {
+    configured: boolean;
+    providers: GitProviderInfo[];
+}
+
+export interface GitOrganizationsResponse {
+    success: boolean;
+    organizations: GitOrganization[];
+    error?: string;
+}
+
+export interface DeployCapabilityResponse {
+    status: 'success' | 'error';
+    canDeploy: boolean;
+    isShared: boolean;
+    ownerHasToken: boolean;
+    userHasToken: boolean;
 }
 
 /**
@@ -262,14 +256,9 @@ export class ApiService {
 
     async deployWebsite(directoryId: string, data: DeployDto = {}) {
         const response = await this.httpClient.post<ApiResponse<DeployWebsiteResponse>>(
-            `/deploy/directories/${directoryId}/vercel`,
+            `/deploy/directories/${directoryId}`,
             data,
         );
-        return response.data;
-    }
-
-    async getVercelTeams() {
-        const response = await this.httpClient.post<VercelTeamResponse>('/deploy/vercel/teams', {});
         return response.data;
     }
 
@@ -288,15 +277,57 @@ export class ApiService {
         return response.data;
     }
 
-    async checkConnection(provider: string): Promise<ConnectionInfo> {
-        const response = await this.httpClient.get<ConnectionInfo>(`/auth/connections/${provider}`);
+    // Git provider operations (plugin-based)
+
+    async getGitProviders(): Promise<GitProviderListResponse> {
+        const response = await this.httpClient.get<GitProviderListResponse>('/git-providers');
         return response.data;
     }
 
-    async getGitHubOrgs(): Promise<GitHubOrganization[]> {
-        const response = await this.httpClient.get<GitHubOrganization[]>(
-            '/auth/connections/github/orgs',
+    async checkGitProviderConnection(providerId: string): Promise<GitProviderConnectionInfo> {
+        const response = await this.httpClient.get<GitProviderConnectionInfo>(
+            `/git-providers/${providerId}/connection`,
         );
+        return response.data;
+    }
+
+    async getGitProviderOrganizations(providerId: string): Promise<GitOrganizationsResponse> {
+        const response = await this.httpClient.get<GitOrganizationsResponse>(
+            `/git-providers/${providerId}/organizations`,
+        );
+        return response.data;
+    }
+
+    // Deploy operations (directory-scoped)
+
+    async checkDeployCapability(directoryId: string): Promise<DeployCapabilityResponse> {
+        const response = await this.httpClient.post<DeployCapabilityResponse>(
+            `/deploy/directories/${directoryId}/check`,
+        );
+        return response.data;
+    }
+
+    async getDeployTeamsForDirectory(directoryId: string): Promise<DeploymentTeamResponse> {
+        const response = await this.httpClient.post<DeploymentTeamResponse>(
+            `/deploy/directories/${directoryId}/teams`,
+            {},
+        );
+        return response.data;
+    }
+
+    // Generator form schema
+
+    async getGeneratorFormSchema(
+        directoryId: string,
+        pipelineId?: string,
+    ): Promise<GeneratorFormSchema> {
+        const queryParams = new URLSearchParams();
+        if (pipelineId) queryParams.append('pipelineId', pipelineId);
+
+        const query = queryParams.toString();
+        const url = `/directories/${directoryId}/generator-form${query ? `?${query}` : ''}`;
+
+        const response = await this.httpClient.get<GeneratorFormSchema>(url);
         return response.data;
     }
 }

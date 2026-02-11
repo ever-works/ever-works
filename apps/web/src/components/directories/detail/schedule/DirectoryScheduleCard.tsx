@@ -1,13 +1,6 @@
 'use client';
 
-import {
-    useEffect,
-    useMemo,
-    useState,
-    useTransition,
-    type ComponentType,
-    type ReactNode,
-} from 'react';
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { AlertCircle, CheckCircle2, PauseCircle, PlayCircle, Repeat } from 'lucide-react';
@@ -24,6 +17,7 @@ import {
     DirectoryScheduleStatus,
 } from '@/lib/api/enums';
 import { DirectoryScheduleDto } from '@/lib/api/types-only';
+import type { ProviderOption } from '@/lib/api/types-only';
 import {
     cancelDirectorySchedule,
     runDirectorySchedule,
@@ -31,9 +25,14 @@ import {
 } from '@/app/actions/dashboard/directory-schedule';
 import { ShowDateTime } from '@/components/ui/show-datetime';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
+import { ActiveProvidersBar, FieldCard, HelperPill, type ResolvedProvider } from '../shared';
+
+export type { ResolvedProvider };
 
 type DirectoryScheduleCardProps = {
     schedule: DirectoryScheduleDto | null;
+    pipelineProviders?: ProviderOption[];
+    activeProviders?: ResolvedProvider[];
 };
 
 const cadenceOrder = [
@@ -48,7 +47,11 @@ const defaultAllowances = cadenceOrder.map((cadence) => ({
     allowed: true,
 }));
 
-export function DirectoryScheduleCard({ schedule }: DirectoryScheduleCardProps) {
+export function DirectoryScheduleCard({
+    schedule,
+    pipelineProviders = [],
+    activeProviders = [],
+}: DirectoryScheduleCardProps) {
     const { directory } = useDirectoryDetail();
     const t = useTranslations('dashboard.directoryDetail.schedule.card');
     const router = useRouter();
@@ -64,24 +67,38 @@ export function DirectoryScheduleCard({ schedule }: DirectoryScheduleCardProps) 
         );
     }
 
-    return <ScheduleForm directoryId={directory.id} schedule={schedule} />;
+    return (
+        <ScheduleForm
+            directoryId={directory.id}
+            schedule={schedule}
+            pipelineProviders={pipelineProviders}
+            activeProviders={activeProviders}
+        />
+    );
 }
 
 function ScheduleForm({
     directoryId,
     schedule,
+    pipelineProviders,
+    activeProviders,
 }: {
     directoryId: string;
     schedule: DirectoryScheduleDto;
+    pipelineProviders: ProviderOption[];
+    activeProviders: ResolvedProvider[];
 }) {
     const t = useTranslations('dashboard.directoryDetail.schedule.card');
     const router = useRouter();
+
+    const showPipelineSelector = pipelineProviders.length > 1;
 
     const allowances = useMemo(
         () => (schedule.allowedCadences?.length ? schedule.allowedCadences : defaultAllowances),
         [schedule.allowedCadences],
     );
-    const [form, setForm] = useState({
+
+    const deriveFormState = () => ({
         enable: schedule.status === DirectoryScheduleStatus.ACTIVE,
         cadence:
             schedule.cadence ??
@@ -90,25 +107,20 @@ function ScheduleForm({
         billingMode: schedule.billingMode ?? DirectoryScheduleBillingMode.SUBSCRIPTION,
         maxFailureBeforePause: schedule.maxFailureBeforePause ?? 3,
         alwaysCreatePullRequest: schedule.alwaysCreatePullRequest ?? false,
+        pipelineOverride: schedule.providerOverrides?.pipeline ?? undefined,
     });
 
+    const [form, setForm] = useState(deriveFormState);
+
     useEffect(() => {
-        setForm({
-            enable: schedule.status === DirectoryScheduleStatus.ACTIVE,
-            cadence:
-                schedule.cadence ??
-                allowances.find((item) => item.allowed)?.cadence ??
-                DirectoryScheduleCadence.MONTHLY,
-            billingMode: schedule.billingMode ?? DirectoryScheduleBillingMode.SUBSCRIPTION,
-            maxFailureBeforePause: schedule.maxFailureBeforePause ?? 3,
-            alwaysCreatePullRequest: schedule.alwaysCreatePullRequest ?? false,
-        });
+        setForm(deriveFormState());
     }, [
         schedule.status,
         schedule.cadence,
         schedule.billingMode,
         schedule.maxFailureBeforePause,
         schedule.alwaysCreatePullRequest,
+        schedule.providerOverrides,
         allowances,
     ]);
 
@@ -159,12 +171,18 @@ function ScheduleForm({
                 return;
             }
 
+            const providerOverrides =
+                form.pipelineOverride !== undefined
+                    ? { pipeline: form.pipelineOverride }
+                    : undefined;
+
             const result = await updateDirectorySchedule(directoryId, {
                 enable: form.enable,
                 cadence: form.cadence,
                 billingMode: form.billingMode,
                 maxFailureBeforePause: form.maxFailureBeforePause,
                 alwaysCreatePullRequest: form.alwaysCreatePullRequest,
+                providerOverrides,
             });
 
             if (!result.success) {
@@ -228,6 +246,8 @@ function ScheduleForm({
                     <SummaryChip key={item.label} label={item.label} value={item.value} />
                 ))}
             </div>
+
+            {activeProviders.length > 0 && <ActiveProvidersBar providers={activeProviders} />}
 
             <div className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
@@ -344,6 +364,16 @@ function ScheduleForm({
                     </FieldCard>
                 </div>
 
+                {showPipelineSelector && (
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <PipelineOverrideField
+                            providers={pipelineProviders}
+                            value={form.pipelineOverride}
+                            onChange={(value) => updateForm({ pipelineOverride: value })}
+                        />
+                    </div>
+                )}
+
                 {subscriptionsEnabled && (
                     <div className="grid gap-4 md:grid-cols-2">{updateWithPRElement}</div>
                 )}
@@ -383,6 +413,32 @@ function ScheduleForm({
     );
 }
 
+function PipelineOverrideField({
+    providers,
+    value,
+    onChange,
+}: {
+    providers: ProviderOption[];
+    value: string | undefined;
+    onChange: (value: string | undefined) => void;
+}) {
+    const t = useTranslations('dashboard.directoryDetail.schedule.card');
+
+    return (
+        <FieldCard label={t('fields.pipeline')} helper={t('fields.pipelineHelp')}>
+            <Select value={value ?? ''} onChange={(e) => onChange(e.target.value || undefined)}>
+                <option value="">{t('pipeline.inherit')}</option>
+                {providers.map((p) => (
+                    <option key={p.id} value={p.id} disabled={!p.configured}>
+                        {p.name}
+                        {!p.configured ? ` (${t('pipeline.notConfigured')})` : ''}
+                    </option>
+                ))}
+            </Select>
+        </FieldCard>
+    );
+}
+
 function SummaryChip({ label, value }: { label: string; value: ReactNode | string }) {
     return (
         <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-4 space-y-1">
@@ -391,54 +447,6 @@ function SummaryChip({ label, value }: { label: string; value: ReactNode | strin
             </p>
             <p className="text-base font-semibold text-text dark:text-text-dark">{value}</p>
         </div>
-    );
-}
-
-function FieldCard({
-    label,
-    helper,
-    children,
-}: {
-    label: string;
-    helper?: string;
-    children: ReactNode;
-}) {
-    return (
-        <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-4 space-y-3">
-            <div>
-                <p className="text-sm font-medium text-text dark:text-text-dark">{label}</p>
-                {helper && (
-                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                        {helper}
-                    </p>
-                )}
-            </div>
-            {children}
-        </div>
-    );
-}
-
-function HelperPill({
-    children,
-    tone,
-    icon: Icon,
-}: {
-    children: ReactNode;
-    tone: 'success' | 'alert';
-    icon: ComponentType<{ className?: string }>;
-}) {
-    return (
-        <span
-            className={cn(
-                'mt-2 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium',
-                tone === 'success'
-                    ? 'bg-success/10 text-success'
-                    : 'bg-destructive/10 text-destructive',
-            )}
-        >
-            <Icon className="h-4 w-4" aria-hidden />
-            {children}
-        </span>
     );
 }
 

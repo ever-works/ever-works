@@ -80,7 +80,7 @@ export class DirectoryScheduleRepository {
             },
             order: { nextRunAt: 'ASC' },
             take: limit,
-            relations: ['directory', 'user', 'user.oauthTokens'],
+            relations: ['directory', 'user'],
         });
     }
 

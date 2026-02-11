@@ -1,15 +1,24 @@
 import { IsEmail, IsNotEmpty, IsString, MinLength, Matches, IsOptional } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegisterDto {
+    @ApiProperty({ description: 'Username for the new account', example: 'johndoe', minLength: 3 })
     @IsNotEmpty()
     @IsString()
     @MinLength(3)
     username: string;
 
+    @ApiProperty({ description: 'Email address', example: 'john@example.com' })
     @IsEmail()
     @IsNotEmpty()
     email: string;
 
+    @ApiProperty({
+        description:
+            'Password (min 6 chars, must contain lowercase letter and number/special char)',
+        example: 'MySecure123!',
+        minLength: 6,
+    })
     @IsString()
     @IsNotEmpty()
     @MinLength(6)
@@ -19,32 +28,46 @@ export class RegisterDto {
     })
     password: string;
 
+    @ApiPropertyOptional({ description: 'Callback URL for email verification redirect' })
     @IsString()
     @IsOptional()
     emailVerificationCallbackUrl?: string;
 }
 
 export class LoginDto {
+    @ApiProperty({ description: 'Email address', example: 'john@example.com' })
     @IsEmail()
     @IsNotEmpty()
     email: string;
 
+    @ApiProperty({ description: 'Account password', example: 'MySecure123!' })
     @IsString()
     @IsNotEmpty()
     password: string;
 }
 
 export class RefreshTokenDto {
+    @ApiProperty({
+        description: 'Refresh token obtained from login',
+        example: 'eyJhbGciOiJIUzI1NiIs...',
+    })
     @IsString()
     @IsNotEmpty()
     refreshToken: string;
 }
 
 export class UpdatePasswordDto {
+    @ApiProperty({ description: 'Current password for verification', example: 'OldPassword123!' })
     @IsString()
     @IsNotEmpty()
     currentPassword: string;
 
+    @ApiProperty({
+        description:
+            'New password (min 8 chars, must contain lowercase letter and number/special char)',
+        example: 'NewSecure456!',
+        minLength: 8,
+    })
     @IsString()
     @IsNotEmpty()
     @MinLength(8)
@@ -56,10 +79,12 @@ export class UpdatePasswordDto {
 }
 
 export class OAuthCallbackDto {
+    @ApiProperty({ description: 'Authorization code from OAuth provider' })
     @IsString()
     @IsNotEmpty()
     code: string;
 
+    @ApiPropertyOptional({ description: 'State parameter for CSRF protection' })
     @IsString()
     @IsOptional()
     state?: string;

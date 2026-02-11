@@ -10,7 +10,7 @@ export function getCategoryName(category: ItemData['category']): string {
         return category[0] || '';
     }
 
-    return category;
+    return category as string;
 }
 
 export function getCategoryNames(category: ItemData['category']): string[] {
@@ -20,8 +20,8 @@ export function getCategoryNames(category: ItemData['category']): string[] {
 
     // Handle string array
     if (Array.isArray(category)) {
-        return category;
+        return [...category];
     }
 
-    return [category];
+    return [category as string];
 }

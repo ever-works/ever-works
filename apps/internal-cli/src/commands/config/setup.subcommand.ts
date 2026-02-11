@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { ConfigService } from '../../config/config.service';
-import { GitHubGitPromptService } from './prompts/github-git-prompt.service';
+import { GitPromptService } from './prompts/git-prompt.service';
 import { DeploymentPromptService } from './prompts/deployment-prompt.service';
 import { AiProviderPromptService } from './prompts/ai-provider-prompt.service';
 import { SearchServicePromptService } from './prompts/search-service-prompt.service';
@@ -21,7 +21,7 @@ export class SetupSubCommand extends CommandRunner {
 
     constructor(
         private readonly configService: ConfigService,
-        private readonly githubGitPrompt: GitHubGitPromptService,
+        private readonly gitPrompt: GitPromptService,
         private readonly deploymentPrompt: DeploymentPromptService,
         private readonly aiProviderPrompt: AiProviderPromptService,
         private readonly searchServicePrompt: SearchServicePromptService,
@@ -87,21 +87,22 @@ export class SetupSubCommand extends CommandRunner {
                 APP_TYPE: 'cli',
             };
 
-            // 1. GitHub & Git Configuration
-            const githubGitConfig =
-                await this.githubGitPrompt.promptGitHubGitConfig(existingConfig);
+            // 1. Git Provider Configuration
+            const gitConfig = await this.gitPrompt.promptGitConfig(existingConfig);
 
-            config.GH_APIKEY = githubGitConfig.githubApiKey;
-            config.GH_OWNER = githubGitConfig.githubOwner;
-            config.GIT_NAME = githubGitConfig.gitName;
-            config.GIT_EMAIL = githubGitConfig.gitEmail;
+            config.GIT_PROVIDER = gitConfig.provider;
+            config.GIT_TOKEN = gitConfig.gitToken;
+            config.GIT_OWNER = gitConfig.gitOwner;
+            config.GIT_NAME = gitConfig.gitName;
+            config.GIT_EMAIL = gitConfig.gitEmail;
 
             // 2. Deployment Provider Configuration
             const deploymentConfig =
                 await this.deploymentPrompt.promptDeploymentConfig(existingConfig);
 
-            if (deploymentConfig.provider === 'vercel' && deploymentConfig.vercelToken) {
-                config.VERCEL_TOKEN = deploymentConfig.vercelToken;
+            if (deploymentConfig.provider !== 'ignore' && deploymentConfig.token) {
+                config.DEPLOY_PROVIDER = deploymentConfig.provider;
+                config.DEPLOY_TOKEN = deploymentConfig.token;
             }
 
             // 3. AI Provider Configuration
@@ -137,7 +138,7 @@ export class SetupSubCommand extends CommandRunner {
             config.EXTRACT_CONTENT_SERVICE = searchConfig.extractContentService;
             config.WEB_SEARCH_SERVICE = searchConfig.webSearchService;
             if (searchConfig.tavilyApiKey) {
-                config.TAVILY_API_KEY = searchConfig.tavilyApiKey;
+                config.PLUGIN_TAVILY_API_KEY = searchConfig.tavilyApiKey;
             }
 
             // 5. Validate configuration

@@ -1,25 +1,20 @@
 {
-    "name": "@packages/agent",
+    "name": "@ever-works/agent",
     "version": "0.1.0",
     "description": "ai agent for ever works",
     "private": true,
     "license": "UNLICENSED",
+    "files": [
+        "dist"
+    ],
     "exports": {
-        "./ai": {
-            "types": "./dist/ai/index.d.ts",
-            "default": "./dist/ai/index.js"
-        },
-        "./data-generator": {
-            "types": "./dist/data-generator/index.d.ts",
-            "default": "./dist/data-generator/index.js"
+        "./generators": {
+            "types": "./dist/generators/index.d.ts",
+            "default": "./dist/generators/index.js"
         },
         "./database": {
             "types": "./dist/database/index.d.ts",
             "default": "./dist/database/index.js"
-        },
-        "./deploy": {
-            "types": "./dist/deploy/index.d.ts",
-            "default": "./dist/deploy/index.js"
         },
         "./dto": {
             "types": "./dist/dto/index.d.ts",
@@ -49,14 +44,6 @@
             "types": "./dist/events/index.d.ts",
             "default": "./dist/events/index.js"
         },
-        "./markdown-generator": {
-            "types": "./dist/markdown-generator/index.d.ts",
-            "default": "./dist/markdown-generator/index.js"
-        },
-        "./website-generator": {
-            "types": "./dist/website-generator/index.d.ts",
-            "default": "./dist/website-generator/index.js"
-        },
         "./services": {
             "types": "./dist/services/index.d.ts",
             "default": "./dist/services/index.js"
@@ -77,17 +64,21 @@
             "types": "./dist/notifications/index.d.ts",
             "default": "./dist/notifications/index.js"
         },
-        "./notification-operations": {
-            "types": "./dist/notification-operations/index.d.ts",
-            "default": "./dist/notification-operations/index.js"
-        },
         "./import": {
             "types": "./dist/import/index.d.ts",
             "default": "./dist/import/index.js"
         },
-        "./screenshot": {
-            "types": "./dist/screenshot/index.d.ts",
-            "default": "./dist/screenshot/index.js"
+        "./facades": {
+            "types": "./dist/facades/index.d.ts",
+            "default": "./dist/facades/index.js"
+        },
+        "./plugins": {
+            "types": "./dist/plugins/index.d.ts",
+            "default": "./dist/plugins/index.js"
+        },
+        "./pipeline": {
+            "types": "./dist/pipeline/index.d.ts",
+            "default": "./dist/pipeline/index.js"
         }
     },
     "scripts": {
@@ -95,7 +86,10 @@
         "build": "nest build -b swc && tsc -p tsconfig.types.json",
         "build:dev": "nest build -b swc --watch",
         "build:types": "tsc -p tsconfig.types.json",
-        "build:types:dev": "tsc -p tsconfig.types.json --watch"
+        "build:types:dev": "tsc -p tsconfig.types.json --watch",
+        "test": "jest",
+        "test:watch": "jest --watch",
+        "test:cov": "jest --coverage"
     },
     "peerDependencies": {
         "@nestjs/common": "^11.1",
@@ -129,6 +123,7 @@
         "@swc/core": "^1.15.8",
         "@types/express": "^5.0.6",
         "@types/jest": "^29.5.14",
+        "@types/lodash": "^4.17.0",
         "@types/node": "^22.19.3",
         "@types/semver": "^7.7.1",
         "@types/supertest": "^6.0.3",
@@ -149,19 +144,18 @@
         "typescript-eslint": "^8.51.0"
     },
     "dependencies": {
-        "@langchain/core": "^0.3.80",
-        "@langchain/langgraph": "^0.2.74",
-        "@langchain/openai": "^0.6.17",
+        "@ever-works/contracts": "workspace:*",
+        "@ever-works/default-pipeline-plugin": "workspace:*",
+        "@ever-works/plugin": "workspace:*",
         "@langchain/textsplitters": "^0.1.0",
-        "@mozilla/readability": "^0.6.0",
         "@nestjs/cache-manager": "^3.1.0",
         "@nestjs/config": "^4.0.2",
+        "@nestjs/swagger": "^11.2.5",
         "@nestjs/typeorm": "^11.0.0",
-        "@supabase/supabase-js": "^2.89.0",
-        "@tavily/core": "^0.3.7",
         "@types/fs-extra": "^11.0.4",
-        "@vercel/sdk": "^1.18.5",
-        "axios": "^1.13.2",
+        "ajv": "^8.17.1",
+        "ajv-formats": "^3.0.1",
+        "axios": "^1.13.5",
         "bullmq": "^5.66.4",
         "cache-manager": "^7.2.7",
         "class-transformer": "^0.5.1",
@@ -170,19 +164,13 @@
         "deepmerge": "^4.3.1",
         "import-in-the-middle": "^2.0.1",
         "isomorphic-git": "^1.36.1",
-        "libsodium-wrappers": "^0.7.16",
-        "linkedom": "^0.18.12",
-        "octokit": "^5.0.5",
+        "lodash": "^4.17.21",
         "p-map": "^7.0.4",
-        "remark-stringify": "^11.0.0",
-        "screenshotone-api-sdk": "^1.1.21",
         "semver": "^7.7.3",
-        "slugify": "^1.6.6",
-        "string-similarity-js": "^2.1.4",
-        "turndown": "^7.2.2",
+        "superjson": "^1.13.3",
         "typeorm": "^0.3.28",
-        "unified": "^11.0.5",
         "yaml": "^2.8.2",
-        "zod": "^3.25.76"
+        "zod": "^3.25.76",
+        "zod-to-json-schema": "^3.25.1"
     }
 }

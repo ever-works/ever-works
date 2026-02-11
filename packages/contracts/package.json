@@ -1,0 +1,54 @@
+{
+	"name": "@ever-works/contracts",
+	"version": "1.0.0",
+	"description": "Shared type definitions and contracts for Ever Works platform",
+	"private": false,
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		},
+		"./item": {
+			"types": "./dist/item/index.d.ts",
+			"import": "./dist/item/index.js",
+			"require": "./dist/item/index.cjs"
+		},
+		"./domain": {
+			"types": "./dist/domain/index.d.ts",
+			"import": "./dist/domain/index.js",
+			"require": "./dist/domain/index.cjs"
+		},
+		"./form": {
+			"types": "./dist/form/index.d.ts",
+			"import": "./dist/form/index.js",
+			"require": "./dist/form/index.cjs"
+		},
+		"./api": {
+			"types": "./dist/api/index.d.ts",
+			"import": "./dist/api/index.js",
+			"require": "./dist/api/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@types/node": "^22.19.3",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3"
+	},
+	"peerDependencies": {},
+	"dependencies": {}
+}

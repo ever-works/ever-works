@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { config } from '../../config/constants';
-import { GitHubScopePresets } from '../config/github-scopes.config';
+import { GITHUB_SCOPES } from '../config/github-scopes.config';
 
 @Injectable()
 export class OAuthUrlService {
@@ -29,7 +29,7 @@ export class OAuthUrlService {
         return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
     }
 
-    generateGitHubAuthUrl(callbackUrl?: string, state?: string): string {
+    generateGitHubAuthUrl(callbackUrl?: string, state?: string, forceConsent?: boolean): string {
         const clientId = config.github.clientId();
         const defaultCallbackUrl = config.github.callbackUrl();
 
@@ -44,8 +44,8 @@ export class OAuthUrlService {
         const params = new URLSearchParams({
             client_id: clientId,
             redirect_uri: callbackUrl || defaultCallbackUrl,
-            scope: GitHubScopePresets.AGENT.join(' '),
-            prompt: 'consent',
+            scope: GITHUB_SCOPES.join(' '),
+            ...(forceConsent && { prompt: 'consent' }),
             ...(state && { state }),
         });
 

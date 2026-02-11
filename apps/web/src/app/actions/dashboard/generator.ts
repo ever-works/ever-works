@@ -5,11 +5,10 @@ import {
     CreateItemsGeneratorDto,
     UpdateItemsGeneratorDto,
     directoryAPI,
-    authAPI,
-    ConnectionInfo,
+    gitProvidersAPI,
 } from '@/lib/api';
 import { getTranslations } from 'next-intl/server';
-import { checkOAuthConnection } from './oauth';
+import { checkGitProviderConnection } from './oauth';
 import {
     sanitizeName,
     sanitizeDescription,
@@ -17,37 +16,61 @@ import {
     sanitizeStringArray,
 } from '@/lib/utils/sanitize';
 
+/**
+ * Sanitize plugin-specific configuration values.
+ * Applies sanitization to common patterns (string arrays, URLs) while
+ * leaving other values unchanged.
+ */
+function sanitizePluginConfig(config: Record<string, unknown>): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(config)) {
+        if (value === undefined || value === null) {
+            continue;
+        }
+
+        // String arrays (categories, keywords, tags, etc.)
+        if (Array.isArray(value) && value.every((v) => typeof v === 'string')) {
+            // URL arrays get trimmed, other string arrays get sanitized
+            if (key.includes('url')) {
+                sanitized[key] = value.map((v: string) => v.trim()).filter(Boolean);
+            } else {
+                sanitized[key] = sanitizeStringArray(value);
+            }
+        }
+        // Pass through all other values
+        else {
+            sanitized[key] = value;
+        }
+    }
+
+    return sanitized;
+}
+
 export async function generateItems(directoryId: string, data: CreateItemsGeneratorDto) {
     const t = await getTranslations('actions.generator');
     const tDirectories = await getTranslations('actions.directories');
 
     try {
-        // Sanitize input data
+        // Sanitize core data
         const sanitizedData: CreateItemsGeneratorDto = {
-            ...data,
             name: sanitizeName(data.name, 200),
             prompt: sanitizePrompt(data.prompt, 5000),
             repository_description: data.repository_description
                 ? sanitizeDescription(data.repository_description, 500)
                 : undefined,
-            initial_categories: data.initial_categories
-                ? sanitizeStringArray(data.initial_categories)
-                : undefined,
-            priority_categories: data.priority_categories
-                ? sanitizeStringArray(data.priority_categories)
-                : undefined,
-            target_keywords: data.target_keywords
-                ? sanitizeStringArray(data.target_keywords)
-                : undefined,
-            source_urls: data.source_urls
-                ? data.source_urls.map((url) => url.trim()).filter(Boolean)
-                : undefined,
+            generation_method: data.generation_method,
+            update_with_pull_request: data.update_with_pull_request,
+            website_repository_creation_method: data.website_repository_creation_method,
             company: data.company
                 ? {
                       name: sanitizeName(data.company.name, 200),
                       website: data.company.website.trim(),
                   }
                 : undefined,
+            providers: data.providers,
+            // Pass pluginConfig through (sanitization is plugin-specific)
+            pluginConfig: data.pluginConfig ? sanitizePluginConfig(data.pluginConfig) : undefined,
         };
 
         // Validate required fields
@@ -67,25 +90,23 @@ export async function generateItems(directoryId: string, data: CreateItemsGenera
 
         const { directory } = await directoryAPI.get(directoryId);
 
-        // We need to ensure that oauth connection is valid or revoke it if not
-        await authAPI.oauth_connections.ensureConnection(directory.repoProvider);
-
-        // Check GitHub connection first
-        const oauthCheck = await checkOAuthConnection(directory.repoProvider);
-        if (!oauthCheck.connected) {
+        // Check git provider connection
+        const connectionCheck = await checkGitProviderConnection(directory.gitProvider);
+        if (!connectionCheck.connected) {
             return {
                 success: false,
-                error: tDirectories('oauthRequired', { provider: directory.repoProvider }),
-                requiresGitHub: true,
+                error: tDirectories('oauthRequired', { provider: directory.gitProvider }),
+                requiresGitProvider: true,
             };
         }
 
-        const oauthInfo = oauthCheck as ConnectionInfo;
+        // Get organizations from the git provider
+        const orgsResult = await gitProvidersAPI.getOrganizations(directory.gitProvider);
+        const orgs = orgsResult.organizations || [];
 
-        // Get organizations
-        const orgs = await authAPI.oauth_connections.getGitHubOrgs();
-
-        if (directory.owner && oauthInfo.username !== directory.owner) {
+        // connectionCheck.username is available when connected is true
+        const username = 'username' in connectionCheck ? connectionCheck.username : undefined;
+        if (directory.owner && username !== directory.owner) {
             if (!orgs.some((org) => org.login === directory.owner)) {
                 return {
                     success: false,

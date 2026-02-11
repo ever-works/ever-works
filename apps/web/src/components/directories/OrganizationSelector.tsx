@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
-import { GitHubOrganization } from '@/lib/api';
-import { getGitHubOrganizations } from '@/app/actions/dashboard/organizations';
+import { GitOrganization } from '@/lib/api';
+import { getGitProviderOrganizations } from '@/app/actions/dashboard/organizations';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { Loader2, Building2, User } from 'lucide-react';
@@ -11,37 +11,38 @@ interface OrganizationSelectorProps {
     value: string;
     onChange: (value: string, isOrganization: boolean) => void;
     disabled?: boolean;
-    authId: string | null;
+    providerId: string;
 }
 
-const LOADED_ORGS = new Map<string, GitHubOrganization[]>();
+const LOADED_ORGS = new Map<string, GitOrganization[]>();
 
 export function OrganizationSelector({
     value,
     onChange,
-    authId,
     disabled,
+    providerId,
 }: OrganizationSelectorProps) {
     const t = useTranslations('dashboard.directoryCreation');
-    const [organizations, setOrganizations] = useState<GitHubOrganization[]>(
-        authId ? LOADED_ORGS.get(authId) || [] : [],
+    const cacheKey = providerId;
+    const [organizations, setOrganizations] = useState<GitOrganization[]>(
+        LOADED_ORGS.get(cacheKey) || [],
     );
     const [isPending, startTransition] = useTransition();
 
     useEffect(() => {
         startTransition(async () => {
-            const result = await getGitHubOrganizations();
+            const result = await getGitProviderOrganizations(providerId);
             setOrganizations(result.organizations || []);
 
-            if (result.success && authId) {
-                LOADED_ORGS.set(authId, result.organizations || []);
+            if (result.success) {
+                LOADED_ORGS.set(cacheKey, result.organizations || []);
             }
 
             if (!result.success) {
                 console.error('Failed to fetch organizations:', result.error);
             }
         });
-    }, []);
+    }, [providerId]);
 
     const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const selectedValue = e.target.value;
@@ -100,7 +101,7 @@ export function OrganizationSelector({
                         {organizations.map((org) => (
                             <option key={org.login} value={org.login}>
                                 {org.login}
-                                {org.description && ` - ${org.description.substring(0, 50)}`}
+                                {org.name && ` - ${org.name.substring(0, 50)}`}
                             </option>
                         ))}
                     </optgroup>

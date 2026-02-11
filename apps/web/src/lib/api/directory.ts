@@ -2,16 +2,32 @@ import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import {
     GenerateStatusType,
-    GenerationMethod,
-    ItemsGeneratorStep,
-    RepoProvider,
     DirectoryScheduleCadence,
     DirectoryScheduleStatus,
     DirectoryScheduleBillingMode,
     DirectoryMemberRole,
 } from './enums';
+import {
+    GenerationMethod,
+    type DirectoryScheduleAllowedCadence,
+    type DirectoryScheduleDto,
+    type UpdateDirectorySchedulePayload,
+    type GenerationMetrics,
+    type DirectoryGenerationHistoryEntry,
+    type DirectoryGenerationHistoryResponse,
+} from '@ever-works/contracts/api';
 import { APIResponse, ItemData, Category, Tag } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
+
+// Re-export directory types from contracts for convenience
+export type {
+    DirectoryScheduleAllowedCadence,
+    DirectoryScheduleDto,
+    UpdateDirectorySchedulePayload,
+    GenerationMetrics,
+    DirectoryGenerationHistoryEntry,
+    DirectoryGenerationHistoryResponse,
+} from '@ever-works/contracts/api';
 
 export interface MarkdownReadmeConfig {
     header?: string;
@@ -26,7 +42,8 @@ export interface CreateDirectoryDto {
     description: string;
     owner?: string;
     organization: boolean;
-    repoProvider?: RepoProvider;
+    gitProvider?: string;
+    deployProvider?: string;
     readmeConfig?: MarkdownReadmeConfig;
 }
 
@@ -35,6 +52,7 @@ export interface UpdateDirectoryDto {
     description?: string;
     owner?: string;
     organization?: boolean;
+    deployProvider?: string;
     readmeConfig?: MarkdownReadmeConfig;
     websiteTemplateAutoUpdate?: boolean;
     websiteTemplateUseBeta?: boolean;
@@ -53,7 +71,17 @@ export interface GenerateDirectoryDetailDto {
 
 export type GenerateStatus = {
     status: GenerateStatusType;
-    step?: ItemsGeneratorStep;
+    /** Current step ID (e.g., "prompt-processing") */
+    step?: string;
+    /** Human-readable step name (from pipeline plugin) */
+    stepName?: string;
+    /** Current step index (0-based) */
+    stepIndex?: number;
+    /** Total number of steps in the pipeline */
+    totalSteps?: number;
+    /** Progress percentage (0-100) */
+    progress?: number;
+    /** Error message if status is ERROR */
     error?: string;
 };
 
@@ -89,7 +117,8 @@ export interface Directory {
     owner?: string;
     website?: string;
     organization: boolean;
-    repoProvider: RepoProvider;
+    gitProvider: string;
+    deployProvider?: string;
     readmeConfig?: MarkdownReadmeConfig;
     generateStatus?: GenerateStatus;
     createdAt: string;
@@ -116,36 +145,6 @@ export interface Directory {
     sourceRepository?: SourceRepository;
     repoVisibility?: RepoVisibility;
 }
-
-export interface DirectoryScheduleAllowedCadence {
-    cadence: DirectoryScheduleCadence;
-    reason?: string;
-    payPerUse?: boolean;
-    allowed: boolean;
-}
-
-export interface DirectoryScheduleDto {
-    status: DirectoryScheduleStatus;
-    cadence: DirectoryScheduleCadence | null;
-    billingMode: DirectoryScheduleBillingMode;
-    nextRunAt: string | null;
-    lastRunAt: string | null;
-    lastRunStatus: GenerateStatusType | null;
-    failureCount: number;
-    maxFailureBeforePause: number;
-    alwaysCreatePullRequest: boolean;
-    allowedCadences: DirectoryScheduleAllowedCadence[];
-    planCode?: string;
-    subscriptionsEnabled: boolean;
-}
-
-export type UpdateDirectorySchedulePayload = {
-    enable?: boolean;
-    cadence?: DirectoryScheduleCadence;
-    billingMode?: DirectoryScheduleBillingMode;
-    maxFailureBeforePause?: number;
-    alwaysCreatePullRequest?: boolean;
-};
 
 export interface DirectoriesResponse {
     directories: Directory[];
@@ -221,7 +220,7 @@ export interface DirectoryConfig {
         generation_method?: GenerationMethod;
         pr_update?: PRUpdate | null;
         last_request_data?: CreateItemsGeneratorDto;
-    } & (Record<string, any> & {});
+    } & Record<string, unknown>;
 }
 
 export interface DirectoryCount {
@@ -235,39 +234,70 @@ export interface DirectoryCategoriesTags {
     tags: string[];
 }
 
-export interface GenerationMetrics {
-    urls_scanned?: number;
-    pages_processed?: number;
-    items_extracted_current_run?: number;
-    new_items_added_to_store?: number;
-    total_items_in_store?: number;
-    total_tokens_used?: number;
-    total_cost?: number;
+// Website Settings Types
+export interface CustomMenuItem {
+    label: string;
+    path: string;
+    target?: '_self' | '_blank';
+    icon?: string;
 }
 
-export interface DirectoryGenerationHistoryEntry {
-    id: string;
-    status: GenerateStatusType;
-    generationMethod?: GenerationMethod | null;
-    startedAt?: string | null;
-    finishedAt?: string | null;
-    durationInSeconds?: number | null;
-    newItemsCount: number;
-    updatedItemsCount: number;
-    totalItemsCount: number;
-    metrics?: GenerationMetrics | null;
-    errorMessage?: string | null;
-    parameters?: CreateItemsGeneratorDto | null;
-    createdAt: string;
-    updatedAt: string;
-    triggerRunId?: string;
+export interface WebsiteSettingsHeader {
+    submit_enabled?: boolean;
+    pricing_enabled?: boolean;
+    layout_enabled?: boolean;
+    language_enabled?: boolean;
+    theme_enabled?: boolean;
+    layout_default?: string;
+    pagination_default?: string;
+    theme_default?: string;
 }
 
-export interface DirectoryGenerationHistoryResponse {
-    history: DirectoryGenerationHistoryEntry[];
-    total: number;
-    limit: number;
-    offset: number;
+export interface WebsiteSettingsHomepage {
+    hero_enabled?: boolean;
+    search_enabled?: boolean;
+    default_view?: string;
+    default_sort?: string;
+}
+
+export interface WebsiteSettingsFooter {
+    subscribe_enabled?: boolean;
+    version_enabled?: boolean;
+    theme_selector_enabled?: boolean;
+}
+
+export interface WebsiteSettings {
+    categories_enabled?: boolean;
+    companies_enabled?: boolean;
+    tags_enabled?: boolean;
+    surveys_enabled?: boolean;
+    header?: WebsiteSettingsHeader;
+    homepage?: WebsiteSettingsHomepage;
+    footer?: WebsiteSettingsFooter;
+}
+
+export interface WebsiteSettingsResponse {
+    company_name: string;
+    settings: WebsiteSettings;
+    custom_menu: {
+        header: CustomMenuItem[];
+        footer: CustomMenuItem[];
+    };
+}
+
+export interface UpdateWebsiteSettingsDto {
+    company_name?: string;
+    categories_enabled?: boolean;
+    companies_enabled?: boolean;
+    tags_enabled?: boolean;
+    surveys_enabled?: boolean;
+    header?: WebsiteSettingsHeader;
+    homepage?: WebsiteSettingsHomepage;
+    footer?: WebsiteSettingsFooter;
+    custom_menu?: {
+        header?: CustomMenuItem[];
+        footer?: CustomMenuItem[];
+    };
 }
 
 export interface SyncDirectoryResponse {
@@ -281,6 +311,7 @@ export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing';
 
 export interface AnalyzeRepositoryDto {
     sourceUrl: string;
+    gitProvider?: string;
 }
 
 export interface AnalyzeRepositoryResponseDto {
@@ -297,6 +328,13 @@ export interface AnalyzeRepositoryResponseDto {
         itemCount?: number;
         categoryCount?: number;
     };
+    relatedDataRepo?: { name: string; owner: string };
+    baseSlug?: string;
+    slugConflict?: {
+        hasConflict: boolean;
+        conflictingRepos: string[];
+        suggestedSlug: string;
+    };
     error?: string;
 }
 
@@ -308,6 +346,9 @@ export interface ImportDirectoryDto {
     organization?: boolean;
     createMissingRepos?: boolean;
     sync?: boolean;
+    gitProvider: string;
+    deployProvider?: string;
+    providers?: Record<string, string>;
 }
 
 export interface ImportDirectoryResponseDto {
@@ -317,7 +358,7 @@ export interface ImportDirectoryResponseDto {
     message: string;
 }
 
-export interface GitHubRepoDto {
+export interface GitRepoDto {
     id: number;
     name: string;
     full_name: string;
@@ -330,7 +371,7 @@ export interface GitHubRepoDto {
 }
 
 export interface GetUserRepositoriesResponseDto {
-    repositories: GitHubRepoDto[];
+    repositories: GitRepoDto[];
     total: number;
     page: number;
     perPage: number;
@@ -561,11 +602,21 @@ export const directoryAPI = {
         });
     },
 
-    getUserRepositories: async (options?: { page?: number; perPage?: number; search?: string }) => {
+    getUserRepositories: async (options: {
+        gitProvider: string;
+        page?: number;
+        perPage?: number;
+        search?: string;
+        owner?: string;
+        type?: 'user' | 'org';
+    }) => {
         const params = new URLSearchParams();
-        if (options?.page !== undefined) params.append('page', String(options.page));
-        if (options?.perPage !== undefined) params.append('perPage', String(options.perPage));
-        if (options?.search) params.append('search', options.search);
+        params.append('gitProvider', options.gitProvider);
+        if (options.page !== undefined) params.append('page', String(options.page));
+        if (options.perPage !== undefined) params.append('perPage', String(options.perPage));
+        if (options.search) params.append('search', options.search);
+        if (options.owner) params.append('owner', options.owner);
+        if (options.type) params.append('type', options.type);
         const query = params.toString() ? `?${params.toString()}` : '';
 
         return serverFetch<GetUserRepositoriesResponseDto>(
@@ -600,6 +651,22 @@ export const directoryAPI = {
     updateAdvancedPrompts: async (id: string, data: UpdateDirectoryAdvancedPromptsDto) => {
         return serverMutation<APIResponse<{ advancedPrompts: DirectoryAdvancedPrompts }>>({
             endpoint: `/directories/${id}/advanced-prompts`,
+            data,
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    // Website Settings
+    getWebsiteSettings: async (id: string) => {
+        return serverFetch<APIResponse<WebsiteSettingsResponse>>(
+            `/directories/${id}/website-settings`,
+        );
+    },
+
+    updateWebsiteSettings: async (id: string, data: UpdateWebsiteSettingsDto) => {
+        return serverMutation<APIResponse<{ message: string }>>({
+            endpoint: `/directories/${id}/website-settings`,
             data,
             method: 'PUT',
             wrapInData: false,

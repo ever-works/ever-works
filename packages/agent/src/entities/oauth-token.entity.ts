@@ -17,7 +17,7 @@ export class OAuthToken {
     @Column()
     userId: string;
 
-    @ManyToOne(() => User, (user) => user.oauthTokens, { onDelete: 'CASCADE', lazy: true })
+    @ManyToOne(() => User, { onDelete: 'CASCADE', lazy: true })
     user: Promise<ClassToObject<User>>;
 
     @Column()

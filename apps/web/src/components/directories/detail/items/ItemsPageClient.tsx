@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { ItemData, Category, Tag } from '@/lib/api/types-only';
 import { ItemsList } from './ItemsList';
 import { AddItemModal } from './AddItemModal';
@@ -12,6 +12,8 @@ import { getCategoryName } from '@/lib/utils/items';
 import { useDirectoryDetail, useDirectoryPermissions } from '../DirectoryDetailContext';
 import { CategoriesTab } from './CategoriesTab';
 import { TagsTab } from './TagsTab';
+import { checkScreenshotAvailability } from '@/app/actions/dashboard/items';
+import { ItemsProvider } from './ItemsContext';
 
 type TabType = 'items' | 'categories' | 'tags';
 
@@ -33,6 +35,15 @@ export function ItemsPageClient({
     const { directory } = useDirectoryDetail();
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('items');
+    const [screenshotAvailable, setScreenshotAvailable] = useState(false);
+
+    useEffect(() => {
+        if (permissions.canEdit) {
+            checkScreenshotAvailability().then((result) => {
+                setScreenshotAvailable(result.available);
+            });
+        }
+    }, [permissions.canEdit]);
 
     // Ref to imperatively add items to the list
     const addItemRef = useRef<((item: ItemData) => void) | null>(null);
@@ -56,6 +67,16 @@ export function ItemsPageClient({
         }
     }, []);
 
+    const itemsContext = useMemo(
+        () => ({
+            directoryId,
+            canEdit: permissions.canEdit,
+            directoryWebsite: directory.website,
+            screenshotAvailable,
+        }),
+        [directoryId, permissions.canEdit, directory.website, screenshotAvailable],
+    );
+
     const tabs = [
         { id: 'items' as const, label: t('tabs.browseItems'), icon: Package },
         { id: 'categories' as const, label: t('tabs.categories'), icon: FolderTree },
@@ -63,7 +84,7 @@ export function ItemsPageClient({
     ];
 
     return (
-        <>
+        <ItemsProvider value={itemsContext}>
             <div className="mb-6">
                 <div className="flex items-center justify-between">
                     <div>
@@ -112,15 +133,7 @@ export function ItemsPageClient({
             </div>
 
             {/* Tab Content */}
-            {activeTab === 'items' && (
-                <ItemsList
-                    items={items}
-                    directoryId={directoryId}
-                    canEdit={permissions.canEdit}
-                    directoryWebsite={directory.website}
-                    addItemRef={addItemRef}
-                />
-            )}
+            {activeTab === 'items' && <ItemsList items={items} addItemRef={addItemRef} />}
 
             {activeTab === 'categories' && (
                 <CategoriesTab
@@ -149,6 +162,6 @@ export function ItemsPageClient({
                     onItemAdded={handleItemAdded}
                 />
             )}
-        </>
+        </ItemsProvider>
     );
 }

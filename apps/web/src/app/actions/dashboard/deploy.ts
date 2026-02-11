@@ -1,15 +1,14 @@
 'use server';
 
-import { authAPI, directoryAPI, websiteAPI } from '@/lib/api';
+import { directoryAPI, websiteAPI, deployAPI } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
-import { checkOAuthConnection } from './oauth';
+import { checkGitProviderConnection } from './oauth';
 import { revalidatePath } from 'next/cache';
-import { deployAPI } from '@/lib/api';
 
-export async function deployToVercel(directoryId: string, vercelTeamScope?: string) {
+export async function deploy(directoryId: string, teamScope?: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
@@ -21,21 +20,18 @@ export async function deployToVercel(directoryId: string, vercelTeamScope?: stri
     try {
         const { directory } = await directoryAPI.get(directoryId);
 
-        // We need to ensure that oauth connection is valid or revoke it if not
-        await authAPI.oauth_connections.ensureConnection(directory.repoProvider);
-
-        // Check GitHub connection first
-        const oauthCheck = await checkOAuthConnection(directory.repoProvider);
-        if (!oauthCheck.connected) {
+        // Check git provider connection
+        const connectionCheck = await checkGitProviderConnection(directory.gitProvider);
+        if (!connectionCheck.connected) {
             return {
                 success: false,
-                error: tDirectories('oauthRequired', { provider: directory.repoProvider }),
-                requiresGitHub: true,
+                error: tDirectories('oauthRequired', { provider: directory.gitProvider }),
+                requiresGitProvider: true,
             };
         }
 
-        const response = await deployAPI.deployToVercel(directoryId, {
-            vercelTeamScope,
+        const response = await deployAPI.deploy(directoryId, {
+            teamScope,
         });
 
         revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
@@ -46,11 +42,11 @@ export async function deployToVercel(directoryId: string, vercelTeamScope?: stri
             error: response.status === 'error' ? response.message : null,
         };
     } catch (error) {
-        console.error('Deploy to Vercel error:', error);
+        console.error('Deploy error:', error);
         return {
             success: false,
             data: null,
-            error: error instanceof Error ? error.message : t('deployVercelFailed'),
+            error: error instanceof Error ? error.message : t('deployFailed'),
         };
     }
 }
@@ -80,24 +76,28 @@ export async function updateWebsiteRepository(directoryId: string) {
     }
 }
 
-export async function getVercelTeams() {
+export async function getDeploymentTeams(directoryId?: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const response = await deployAPI.getVercelTeams();
+        // If directoryId is provided, use the directory-specific endpoint
+        // which retrieves the token from plugin settings
+        const response = directoryId
+            ? await deployAPI.getTeamsForDirectory(directoryId)
+            : await deployAPI.getDeploymentTeams();
         return {
             success: response.status === 'success',
             teams: response.status === 'success' ? response.teams : [],
         };
     } catch (error) {
-        console.error('Get Vercel teams error:', error);
+        console.error('Get deployment teams error:', error);
         return {
             success: false,
             teams: [],
-            error: error instanceof Error ? error.message : 'Failed to get Vercel teams',
+            error: error instanceof Error ? error.message : 'Failed to get deployment teams',
         };
     }
 }
@@ -153,16 +153,14 @@ export async function updateWebsiteTemplateSettings(
     try {
         const { directory } = await directoryAPI.get(directoryId);
 
-        // When enabling auto-update, verify GitHub connection exists
+        // When enabling auto-update, verify git provider connection exists
         if (settings.websiteTemplateAutoUpdate === true) {
-            await authAPI.oauth_connections.ensureConnection(directory.repoProvider);
-
-            const oauthCheck = await checkOAuthConnection(directory.repoProvider);
-            if (!oauthCheck.connected) {
+            const connectionCheck = await checkGitProviderConnection(directory.gitProvider);
+            if (!connectionCheck.connected) {
                 return {
                     success: false,
-                    error: tDirectories('oauthRequired', { provider: directory.repoProvider }),
-                    requiresGitHub: true,
+                    error: tDirectories('oauthRequired', { provider: directory.gitProvider }),
+                    requiresGitProvider: true,
                 };
             }
         }

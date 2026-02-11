@@ -9,6 +9,7 @@
 		"OLLAMA",
 		"OPENROUTER",
 		"Tavily",
+		"unconfigured",
 		"VERCEL"
 	],
 	"biome.enabled": false,

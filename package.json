@@ -18,14 +18,20 @@
 	"private": true,
 	"scripts": {
 		"dev": "turbo dev",
+		"dev:apps": "turbo dev --filter=./apps/*",
 		"dev:api": "turbo dev --filter=ever-works-api",
 		"dev:web": "turbo dev --filter=ever-works-web",
-		"dev:trigger": "turbo dev:trigger --filter=@packages/tasks",
-		"deploy:trigger": "turbo deploy:trigger --filter=@packages/tasks",
+		"dev:trigger": "turbo dev:trigger --filter=@ever-works/trigger-tasks",
+		"deploy:trigger": "turbo deploy:trigger --filter=@ever-works/trigger-tasks",
 		"build": "turbo build",
+		"build:apps": "turbo build --filter=./apps/*",
+		"build:plugins": "turbo build --filter=./packages/plugin --filter=./packages/plugins/*",
+		"build:api": "turbo build --filter=ever-works-api",
+		"build:web": "turbo build --filter=ever-works-web",
 		"prepare:husky": "npx husky install .husky",
 		"prepare": "husky",
 		"lint": "turbo lint",
+		"test": "turbo test",
 		"type-check": "turbo type-check",
 		"clean": "turbo clean",
 		"format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\""
@@ -38,13 +44,13 @@
 		"prettier": "^3.7.4",
 		"prettier-eslint-cli": "^8.0.1",
 		"prettier-plugin-tailwindcss": "^0.5.14",
-		"turbo": "^2.7.5"
+		"turbo": "^2.8.3"
 	},
 	"engines": {
 		"node": ">=20",
 		"pnpm": ">=9.9.0"
 	},
-	"packageManager": "pnpm@10.26.2",
+	"packageManager": "pnpm@10.29.1",
 	"prettier": {
 		"printWidth": 120,
 		"singleQuote": true,

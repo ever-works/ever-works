@@ -4,8 +4,8 @@ import {
     DirectoryRepository,
     DirectoryMemberRepository,
     UserRepository,
-} from '@packages/agent/database';
-import { DirectoryMemberRole } from '@packages/agent/entities';
+} from '@ever-works/agent/database';
+import { DirectoryMemberRole } from '@ever-works/agent/entities';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
 

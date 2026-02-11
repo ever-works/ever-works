@@ -14,11 +14,10 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
     fi
 
     # Run migrations using compiled TypeORM config
-    cd /app/apps/api
     node -e "
         require('reflect-metadata');
         const { DataSource } = require('typeorm');
-        const { databaseConfig } = require('@packages/agent/database');
+        const { databaseConfig } = require('@ever-works/agent/database');
 
         const config = databaseConfig();
         const dataSource = new DataSource({
@@ -45,4 +44,4 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
 fi
 
 echo "==> Starting API server..."
-exec node /app/apps/api/dist/main
+exec node /app/dist/main

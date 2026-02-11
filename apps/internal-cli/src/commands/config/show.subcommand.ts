@@ -2,7 +2,7 @@ import { SubCommand, CommandRunner } from 'nest-commander';
 import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import { ConfigService } from '../../config/config.service';
-import { maskSecret } from '@packages/cli-shared';
+import { maskSecret } from '@ever-works/cli-shared';
 import { COMMAND } from '../../config';
 
 @SubCommand({
@@ -38,29 +38,26 @@ export class ShowSubCommand extends CommandRunner {
                 'App Type': config.APP_TYPE,
             });
 
-            this.displaySection('GitHub & Git', {
-                'GitHub Owner': config.GH_OWNER,
-                'GitHub API Key': maskSecret(config.GH_APIKEY),
+            this.displaySection('Git Provider', {
+                Provider: config.GIT_PROVIDER || 'github',
+                Owner: config.GIT_OWNER,
+                'API Token': maskSecret(config.GIT_TOKEN),
                 'Git Name': config.GIT_NAME,
                 'Git Email': config.GIT_EMAIL,
             });
 
             this.displaySection('Deployment', {
-                'Vercel Token': config.VERCEL_TOKEN
-                    ? maskSecret(config.VERCEL_TOKEN)
+                Provider: config.DEPLOY_PROVIDER || 'Not configured',
+                'Deploy Token': config.DEPLOY_TOKEN
+                    ? maskSecret(config.DEPLOY_TOKEN)
                     : 'Not configured',
             });
 
-            this.displaySection('AI Configuration', {
-                'Default Provider': config.AI_DEFAULT_PROVIDER,
-                'Fallback Providers': config.AI_FALLBACK_PROVIDERS || 'None',
-            });
-
-            // Display configured AI providers
+            // Display configured AI providers (plugins)
             const aiProviders = this.getConfiguredAiProviders(config);
             if (aiProviders.length > 0) {
                 this.displaySection(
-                    'AI Providers',
+                    'AI Providers (Plugins)',
                     aiProviders.reduce(
                         (acc, provider) => {
                             acc[provider] = 'Configured ✓';
@@ -74,8 +71,8 @@ export class ShowSubCommand extends CommandRunner {
             this.displaySection('Search Services', {
                 'Content Extraction': config.EXTRACT_CONTENT_SERVICE,
                 'Web Search': config.WEB_SEARCH_SERVICE,
-                'Tavily API Key': config.TAVILY_API_KEY
-                    ? maskSecret(config.TAVILY_API_KEY)
+                'Tavily API Key': config.PLUGIN_TAVILY_API_KEY
+                    ? maskSecret(config.PLUGIN_TAVILY_API_KEY)
                     : 'Not configured',
             });
 
@@ -104,20 +101,12 @@ export class ShowSubCommand extends CommandRunner {
 
     private getConfiguredAiProviders(config: any): string[] {
         const providers: string[] = [];
-        const providerKeys = [
-            'OPENAI',
-            'GOOGLE',
-            'ANTHROPIC',
-            'OPENROUTER',
-            'OLLAMA',
-            'GROQ',
-            'CUSTOM',
-        ];
+        const providerKeys = ['OPENROUTER', 'OPENAI', 'GOOGLE', 'ANTHROPIC', 'GROQ', 'OLLAMA'];
 
         for (const provider of providerKeys) {
             if (
-                config[`${provider}_API_KEY`] ||
-                (provider === 'OLLAMA' && config[`${provider}_BASE_URL`])
+                config[`PLUGIN_${provider}_API_KEY`] ||
+                (provider === 'OLLAMA' && config[`PLUGIN_${provider}_BASE_URL`])
             ) {
                 providers.push(provider.toLowerCase());
             }
