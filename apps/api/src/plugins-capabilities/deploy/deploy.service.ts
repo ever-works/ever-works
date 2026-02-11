@@ -215,6 +215,7 @@ export class DeployService {
 
         await Promise.all([
             this.setSecret(ctx, 'DATA_REPOSITORY', `${directory.slug}-data`),
+            this.setSecret(ctx, `${provider.toUpperCase()}_TOKEN`, deployToken),
             this.setSecret(ctx, 'DEPLOY_TOKEN', deployToken),
         ]);
     }
