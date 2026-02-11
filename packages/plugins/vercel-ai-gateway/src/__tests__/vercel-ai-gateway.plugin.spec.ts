@@ -206,7 +206,7 @@ describe('VercelAiGatewayPlugin', () => {
 			const manifest = plugin.getManifest();
 			expect(manifest.builtIn).toBe(true);
 			expect(manifest.autoEnable).toBe(false);
-			expect(manifest.systemPlugin).toBe(true);
+			expect(manifest.systemPlugin).toBe(false);
 		});
 
 		it('should have public visibility', () => {
