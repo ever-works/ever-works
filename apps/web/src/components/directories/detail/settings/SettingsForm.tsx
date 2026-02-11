@@ -11,7 +11,6 @@ import { ReadmeConfiguration } from './ReadmeConfiguration';
 import { RepoVisibilitySettings } from './RepoVisibilitySettings';
 import { AdvancedPromptsSettings } from './AdvancedPromptsSettings';
 import { WebsiteConfigSettings } from './WebsiteConfigSettings';
-
 interface SettingsFormProps {
     directory: Directory;
     user: AuthUser;

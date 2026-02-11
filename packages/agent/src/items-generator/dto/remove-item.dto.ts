@@ -1,6 +1,7 @@
 import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
+import type { RemoveItemDto as IRemoveItemDto } from '@ever-works/contracts/api';
 
-export class RemoveItemDto {
+export class RemoveItemDto implements IRemoveItemDto {
     @IsString()
     @IsNotEmpty()
     item_slug: string;

@@ -8,8 +8,6 @@ import { RefreshTokenRepository } from './repositories/refresh-token.repository'
 import { OAuthTokenRepository } from './repositories/oauth-token.repository';
 import { databaseConfig, ENTITIES } from './database.config';
 import { UserRepository } from './repositories/user.repository';
-import { UserGitHubService } from './user-github.service';
-import { ChatHistoryRepository } from './repositories/chat-history.repository';
 import { DirectoryGenerationHistoryRepository } from './repositories/directory-generation-history.repository';
 import { SubscriptionPlanRepository } from './repositories/subscription-plan.repository';
 import { UserSubscriptionRepository } from './repositories/user-subscription.repository';
@@ -36,11 +34,9 @@ import { NotificationRepository } from './repositories/notification.repository';
         DirectoryRepository,
         DirectoryAdvancedPromptsRepository,
         DirectoryMemberRepository,
-        UserGitHubService,
         RefreshTokenRepository,
         UserRepository,
         OAuthTokenRepository,
-        ChatHistoryRepository,
         DirectoryGenerationHistoryRepository,
         SubscriptionPlanRepository,
         UserSubscriptionRepository,
@@ -50,14 +46,12 @@ import { NotificationRepository } from './repositories/notification.repository';
     ],
     exports: [
         TypeOrmModule,
-        UserGitHubService,
         DirectoryRepository,
         DirectoryAdvancedPromptsRepository,
         DirectoryMemberRepository,
         UserRepository,
         RefreshTokenRepository,
         OAuthTokenRepository,
-        ChatHistoryRepository,
         DirectoryGenerationHistoryRepository,
         SubscriptionPlanRepository,
         UserSubscriptionRepository,

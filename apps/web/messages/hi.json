@@ -646,7 +646,7 @@
                 "dataRepo": "डेटा रिपॉजिटरी",
                 "websiteRepo": "वेबसाइट रिपॉजिटरी",
                 "mainRepo": "मुख्य रिपॉजिटरी",
-                "repoProvider": "रिपॉजिटरी प्रदाता",
+                "gitProvider": "Git प्रदाता",
                 "organization": "संगठन",
                 "created": "बनाई गई",
                 "lastUpdated": "अंतिम अपडेट",
@@ -655,7 +655,11 @@
                 "custom": "कस्टम",
                 "customOverwrite": "कस्टम (ओवरराइट)",
                 "yes": "हाँ",
-                "no": "नहीं"
+                "no": "नहीं",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "कॉन्फ़िगरेशन विवरण",
@@ -1188,17 +1192,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Vercel टोकन आवश्यक",
-                    "description": "अपनी निर्देशिका को Vercel पर डिप्लॉय करने के लिए, आपको अपने खाता सेटिंग्स में अपना Vercel API टोकन कॉन्फ़िगर करने की आवश्यकता है।",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "API टोकन सेटिंग्स पर जाएं",
                     "getTokenButton": "Vercel टोकन प्राप्त करें",
                     "howTo": {
                         "title": "अपना Vercel टोकन कैसे कॉन्फ़िगर करें:",
                         "step1": "Vercel डैशबोर्ड खोलने के लिए 'Vercel टोकन प्राप्त करें' पर क्लिक करें",
                         "step2": "डिप्लॉयमेंट अनुमतियों के साथ एक नया टोकन बनाएं",
-                        "step3": "जनरेट किया गया टोकन कॉपी करें",
-                        "step4": "API टोकन सेटिंग्स पर जाएं और Vercel सेक्शन में अपना टोकन पेस्ट करें"
+                        "step3": "प्लगइन सेटिंग्स > {provider} में अपना {provider} API टोकन कॉन्फ़िगर करें",
+                        "step4": "अपनी डायरेक्टरी डिप्लॉय करने के लिए यहाँ वापस आएं"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1217,10 @@
                     "hint": "एक सहयोगी के रूप में, एक बार मालिक अपना Vercel इंटीग्रेशन कॉन्फ़िगर कर लेता है, तो आप डिप्लॉयमेंट ट्रिगर कर सकते हैं।"
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Vercel पर डिप्लॉय करें",
                         "description": "अपनी निर्देशिका वेबसाइट रिपॉजिटरी को Vercel पर डिप्लॉय करें।",
-                        "deployButton": "अभी डिप्लॉय करें",
+                        "deployButton": "{provider} पर डिप्लॉय करें",
                         "deployingButton": "डिप्लॉय हो रहा है...",
                         "deployingStateButton": "डिप्लॉय हो रहा है ({state})...",
                         "successMessage": "आपकी वेबसाइट सफलतापूर्वक डिप्लॉय हो गई है!",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "रिपॉजिटरी आपके व्यक्तिगत खाते के तहत बनाई जाएगी",
                 "organizations": "संगठन",
                 "personalHelp": "रिपॉजिटरी आपके व्यक्तिगत GitHub खाते के तहत बनाई जाएगी",
-                "organizationHelp": "रिपॉजिटरी {org} संगठन के तहत बनाई जाएगी"
+                "organizationHelp": "रिपॉजिटरी {org} संगठन के तहत बनाई जाएगी",
+                "connectRequired": "अपना रिपॉजिटरी कहाँ बनाया जाएगा यह चुनने के लिए साइडबार में Git प्रदाता कनेक्ट करें।"
             },
             "ai": {
                 "title": "AI के साथ बनाएं",
@@ -1712,7 +1723,16 @@
             "sendButton": "भेजें",
             "errors": {
                 "unableToSend": "संदेश भेजने में असमर्थ।"
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

@@ -646,7 +646,7 @@
                 "dataRepo": "Veri Deposu",
                 "websiteRepo": "Web Sitesi Deposu",
                 "mainRepo": "Ana Depo",
-                "repoProvider": "Depo Sağlayıcı",
+                "gitProvider": "Git Sağlayıcı",
                 "organization": "Organizasyon",
                 "created": "Oluşturuldu",
                 "lastUpdated": "Son Güncelleme",
@@ -655,7 +655,11 @@
                 "custom": "Özel",
                 "customOverwrite": "Özel (Üzerine Yaz)",
                 "yes": "Evet",
-                "no": "Hayır"
+                "no": "Hayır",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Yapılandırma Detayları",
@@ -1188,17 +1192,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Vercel Belirteci Gerekli",
-                    "description": "Dizininizi Vercel'e yayınlamak için hesap ayarlarınızda Vercel API belirtecinizi yapılandırmanız gerekir.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "API Belirteçleri Ayarlarına Git",
                     "getTokenButton": "Vercel Belirteci Al",
                     "howTo": {
                         "title": "Vercel belirtecinizi nasıl yapılandırırsınız:",
                         "step1": "Vercel panosunu açmak için 'Vercel Belirteci Al' düğmesine tıklayın",
                         "step2": "Dağıtım izinleri olan yeni bir belirteç oluşturun",
-                        "step3": "Oluşturulan belirteci kopyalayın",
-                        "step4": "API Belirteçleri Ayarları'na gidin ve belirtecinizi Vercel bölümüne yapıştırın"
+                        "step3": "{provider} API tokeninizi Eklenti Ayarları > {provider} bölümünde yapılandırın",
+                        "step4": "Dizininizi yayınlamak için buraya geri dönün"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1217,10 @@
                     "hint": "Bir işbirlikçi olarak, sahip Vercel entegrasyonunu yapılandırdıktan sonra yayınlamaları tetikleyebilirsiniz."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Vercel'e Yayınla",
                         "description": "Dizin web sitesi deponuzu Vercel'de yayınlayın.",
-                        "deployButton": "Şimdi Yayınla",
+                        "deployButton": "{provider} üzerine yayınla",
                         "deployingButton": "Yayınlanıyor...",
                         "deployingStateButton": "Yayınlanıyor ({state})...",
                         "successMessage": "Web siteniz başarıyla yayınlandı!",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "Depo kişisel hesabınız altında oluşturulacak",
                 "organizations": "Organizasyonlar",
                 "personalHelp": "Depo kişisel GitHub hesabınız altında oluşturulacak",
-                "organizationHelp": "Depo {org} organizasyonu altında oluşturulacak"
+                "organizationHelp": "Depo {org} organizasyonu altında oluşturulacak",
+                "connectRequired": "Deponuzun nerede oluşturulacağını seçmek için kenar çubuğundan bir Git sağlayıcısı bağlayın."
             },
             "ai": {
                 "title": "Yapay Zeka ile Oluştur",
@@ -1712,7 +1723,16 @@
             "sendButton": "Gönder",
             "errors": {
                 "unableToSend": "Mesaj gönderilemedi."
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

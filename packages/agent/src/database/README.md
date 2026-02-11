@@ -10,7 +10,7 @@ Import the `DatabaseModule` in your app module:
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { DatabaseModule } from '@packages/agent';
+import { DatabaseModule } from '@ever-works/agent';
 
 @Module({
     imports: [DatabaseModule],
@@ -60,7 +60,7 @@ For more control, use the factory functions that leverage the same configuration
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { DatabaseConfigurations } from '@packages/agent';
+import { DatabaseConfigurations } from '@ever-works/agent';
 
 @Module({
     imports: [
@@ -101,7 +101,7 @@ Inject the `DirectoryRepository` in your services:
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { DirectoryRepository } from '@packages/agent';
+import { DirectoryRepository } from '@ever-works/agent';
 
 @Injectable()
 export class MyService {

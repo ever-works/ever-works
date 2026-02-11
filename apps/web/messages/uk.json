@@ -646,7 +646,7 @@
                 "dataRepo": "Репозиторій даних",
                 "websiteRepo": "Репозиторій веб-сайту",
                 "mainRepo": "Основний репозиторій",
-                "repoProvider": "Провайдер репозиторія",
+                "gitProvider": "Git-провайдер",
                 "organization": "Організація",
                 "created": "Створено",
                 "lastUpdated": "Востаннє оновлено",
@@ -655,7 +655,11 @@
                 "custom": "Власний",
                 "customOverwrite": "Власний (Перезаписати)",
                 "yes": "Так",
-                "no": "Ні"
+                "no": "Ні",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Деталі конфігурації",
@@ -1188,17 +1192,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Потрібен токен Vercel",
-                    "description": "Для розгортання вашого довідника на Vercel потрібно налаштувати ваш API-токен Vercel у налаштуваннях облікового запису.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Перейти до налаштувань API-токенів",
                     "getTokenButton": "Отримати токен Vercel",
                     "howTo": {
                         "title": "Як налаштувати токен Vercel:",
                         "step1": "Натисніть 'Отримати токен Vercel', щоб відкрити панель Vercel",
                         "step2": "Створіть новий токен з дозволами на розгортання",
-                        "step3": "Скопіюйте згенерований токен",
-                        "step4": "Перейдіть до налаштувань API-токенів та вставте ваш токен у розділ Vercel"
+                        "step3": "Налаштуйте API-токен {provider} у Налаштуваннях плагіна > {provider}",
+                        "step4": "Поверніться сюди, щоб розгорнути свій каталог"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1217,10 @@
                     "hint": "Як співробітник, ви можете запускати розгортання після того, як власник налаштує інтеграцію Vercel."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Розгорнути на Vercel",
                         "description": "Розгорніть репозиторій веб-сайту вашого довідника на Vercel.",
-                        "deployButton": "Розгорнути зараз",
+                        "deployButton": "Розгорнути на {provider}",
                         "deployingButton": "Розгортання...",
                         "deployingStateButton": "Розгортання ({state})...",
                         "successMessage": "Ваш веб-сайт успішно розгорнуто!",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "Репозиторій буде створено під вашим особистим обліковим записом",
                 "organizations": "Організації",
                 "personalHelp": "Репозиторій буде створено під вашим особистим обліковим записом GitHub",
-                "organizationHelp": "Репозиторій буде створено під організацією {org}"
+                "organizationHelp": "Репозиторій буде створено під організацією {org}",
+                "connectRequired": "Підключіть Git-провайдер на бічній панелі, щоб обрати, де буде створено репозиторій."
             },
             "ai": {
                 "title": "Створити з AI",
@@ -1712,7 +1723,16 @@
             "sendButton": "Надіслати",
             "errors": {
                 "unableToSend": "Не вдалося надіслати повідомлення."
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

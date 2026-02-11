@@ -646,7 +646,7 @@
                 "dataRepo": "Repositori Data",
                 "websiteRepo": "Repositori Situs Web",
                 "mainRepo": "Repositori Utama",
-                "repoProvider": "Penyedia Repositori",
+                "gitProvider": "Penyedia Git",
                 "organization": "Organisasi",
                 "created": "Dibuat",
                 "lastUpdated": "Terakhir Diperbarui",
@@ -655,7 +655,11 @@
                 "custom": "Kustom",
                 "customOverwrite": "Kustom (Timpa)",
                 "yes": "Ya",
-                "no": "Tidak"
+                "no": "Tidak",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Detail Konfigurasi",
@@ -1188,17 +1192,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Token Vercel Diperlukan",
-                    "description": "Untuk mendeploy direktori Anda ke Vercel, Anda perlu mengonfigurasi token API Vercel di pengaturan akun Anda.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Pergi ke Pengaturan Token API",
                     "getTokenButton": "Dapatkan Token Vercel",
                     "howTo": {
                         "title": "Cara mengonfigurasi token Vercel Anda:",
                         "step1": "Klik 'Dapatkan Token Vercel' untuk membuka dasbor Vercel",
                         "step2": "Buat token baru dengan izin deployment",
-                        "step3": "Salin token yang dihasilkan",
-                        "step4": "Pergi ke Pengaturan Token API dan tempel token Anda di bagian Vercel"
+                        "step3": "Konfigurasikan token API {provider} Anda di Pengaturan Plugin > {provider}",
+                        "step4": "Kembali ke sini untuk mendeploy direktori Anda"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1217,10 @@
                     "hint": "Sebagai kolaborator, Anda dapat memicu deployment setelah pemilik mengonfigurasi integrasi Vercel mereka."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Deploy ke Vercel",
                         "description": "Deploy repositori situs web direktori Anda di Vercel.",
-                        "deployButton": "Deploy Sekarang",
+                        "deployButton": "Deploy ke {provider}",
                         "deployingButton": "Mendeploy...",
                         "deployingStateButton": "Mendeploy ({state})...",
                         "successMessage": "Situs web Anda telah berhasil dideploy!",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "Repositori akan dibuat di bawah akun pribadi Anda",
                 "organizations": "Organisasi",
                 "personalHelp": "Repositori akan dibuat di bawah akun GitHub pribadi Anda",
-                "organizationHelp": "Repositori akan dibuat di bawah organisasi {org}"
+                "organizationHelp": "Repositori akan dibuat di bawah organisasi {org}",
+                "connectRequired": "Hubungkan penyedia Git di bilah sisi untuk memilih tempat repositori Anda akan dibuat."
             },
             "ai": {
                 "title": "Buat dengan AI",
@@ -1712,7 +1723,16 @@
             "sendButton": "Kirim",
             "errors": {
                 "unableToSend": "Tidak dapat mengirim pesan."
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

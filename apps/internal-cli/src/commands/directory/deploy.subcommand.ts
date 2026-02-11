@@ -3,8 +3,8 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { DirectoryRepository, UserRepository } from '@packages/agent/database';
-import { VercelService } from '@packages/agent/deploy';
+import { DirectoryRepository, UserRepository } from '@ever-works/agent/database';
+import { DeployFacadeService, GitFacadeService } from '@ever-works/agent/facades';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
@@ -20,8 +20,9 @@ export class DeploySubCommand extends CommandRunner {
         private readonly directoryRepository: DirectoryRepository,
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
-        private readonly vercelService: VercelService,
         private readonly userRepository: UserRepository,
+        private readonly deployFacade: DeployFacadeService,
+        private readonly gitFacade: GitFacadeService,
     ) {
         super();
     }
@@ -30,10 +31,8 @@ export class DeploySubCommand extends CommandRunner {
         try {
             console.log(chalk.cyan.bold('\n🚀 Deploy Website\n'));
 
-            // Check configuration first
             await this.configCheck.requireConfiguration();
 
-            // Select directory
             const selection = await this.directoryPrompt.promptDirectorySelection(
                 this.directoryRepository,
             );
@@ -52,16 +51,15 @@ export class DeploySubCommand extends CommandRunner {
                 ),
             );
 
-            // Prompt for deployment options
-            const deployOptions = await this.promptDeployOptions();
-            const vercelTeam = await this.promptVercelTeamSelection(
-                deployOptions.VERCEL_TOKEN || process.env.VERCEL_TOKEN,
-            );
+            const user = await this.userRepository.createOrGetLocalUser();
+            const facadeOptions = { userId: user.id, directoryId: directory.id };
 
-            // Show information about what will happen
+            const deployOptions = await this.promptDeployOptions();
+            const team = await this.promptTeamSelection(facadeOptions);
+
             console.log(chalk.cyan('\n--- Deployment Process ---'));
             console.log(chalk.gray('This will:'));
-            console.log(chalk.gray('  • Deploy the website to Vercel'));
+            console.log(chalk.gray('  • Deploy the website'));
             console.log(chalk.gray('  • Update the website repository if needed'));
             console.log(chalk.gray('  • Trigger the deployment workflow'));
 
@@ -71,8 +69,8 @@ export class DeploySubCommand extends CommandRunner {
                 chalk.white(`${directory.getRepoOwner()}/${websiteRepo}`),
             );
 
-            if (vercelTeam) {
-                console.log(chalk.gray('Vercel team:'), chalk.white(vercelTeam.label));
+            if (team) {
+                console.log(chalk.gray('Team:'), chalk.white(team.label));
             }
 
             const confirmed = await inquirer.prompt([
@@ -89,43 +87,42 @@ export class DeploySubCommand extends CommandRunner {
                 return;
             }
 
-            // Deploy website
             const spinner = ora('Deploying website...').start();
 
             try {
-                // Get user and call the service method directly
-                const user = await this.userRepository.createOrGetLocalUser();
+                const deployToken = deployOptions.DEPLOY_TOKEN || process.env.DEPLOY_TOKEN;
 
-                // Call the vercel service
-                await this.vercelService.deploy(
-                    {
-                        owner: directory.getRepoOwner(),
-                        repo: directory.getWebsiteRepo(),
-                        provider: 'vercel',
-                        data: {
-                            vercelTeamScope: vercelTeam?.scope,
-                            vercelToken: deployOptions.VERCEL_TOKEN || process.env.VERCEL_TOKEN,
-                            ghToken: deployOptions.GITHUB_TOKEN || process.env.GH_APIKEY,
-                        },
-                    },
-                    directory,
-                    user,
-                );
+                if (!deployToken) {
+                    throw new Error(
+                        'Deploy token is required. Provide it via prompt or DEPLOY_TOKEN environment variable.',
+                    );
+                }
+
+                const isValid = await this.deployFacade.validateToken(facadeOptions);
+                if (!isValid) {
+                    throw new Error('Invalid deployment token');
+                }
 
                 spinner.stop();
 
-                console.log(chalk.green('\n✓ Website deployment initiated successfully!'));
+                console.log(chalk.yellow('\n⚠ Direct CLI deployment is not available.'));
+                console.log(chalk.cyan('\n--- Alternative Deployment Options ---'));
+                console.log(chalk.gray('1. Use the web dashboard to deploy your directory'));
+                console.log(chalk.gray('2. Push to your repository to trigger CI/CD deployment'));
+
+                const gitProvider = directory.gitProvider || 'github';
+                const cloneUrl = this.gitFacade.getCloneUrl(
+                    gitProvider,
+                    directory.getRepoOwner(),
+                    directory.getWebsiteRepo(),
+                );
+
+                console.log(chalk.cyan('\n--- Repository Information ---'));
                 console.log(
                     chalk.gray('Repository:'),
                     chalk.white(`${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`),
                 );
-
-                console.log(chalk.cyan('\n--- Next Steps ---'));
-                console.log(chalk.gray('  • Check Vercel dashboard for deployment status'));
-                console.log(chalk.gray('  • Monitor GitHub Actions for workflow progress'));
-                console.log(
-                    chalk.gray('  • The website will be available once deployment completes'),
-                );
+                console.log(chalk.gray('Clone command:'), chalk.white(`git clone ${cloneUrl}`));
             } catch (error) {
                 spinner.stop();
                 throw error;
@@ -143,70 +140,55 @@ export class DeploySubCommand extends CommandRunner {
         const answers = await inquirer.prompt([
             {
                 type: 'password',
-                name: 'VERCEL_TOKEN',
-                message: 'Vercel Token (optional):',
-                mask: '*',
-            },
-            {
-                type: 'password',
-                name: 'GITHUB_TOKEN',
-                message: 'GitHub Token (optional):',
+                name: 'DEPLOY_TOKEN',
+                message: 'Deploy Token (optional):',
                 mask: '*',
             },
         ]);
 
         return {
-            VERCEL_TOKEN: answers.VERCEL_TOKEN.trim() || undefined,
-            GITHUB_TOKEN: answers.GITHUB_TOKEN.trim() || undefined,
+            DEPLOY_TOKEN: answers.DEPLOY_TOKEN.trim() || undefined,
         };
     }
 
-    private async promptVercelTeamSelection(
-        tokenFromInput?: string,
-    ): Promise<{ scope: string; label: string } | undefined> {
-        const token = tokenFromInput || process.env.VERCEL_TOKEN;
-        if (!token) {
-            return undefined;
-        }
-
+    private async promptTeamSelection(facadeOptions: {
+        userId: string;
+        directoryId: string;
+    }): Promise<{ scope: string; label: string } | undefined> {
         try {
-            const teams = await this.vercelService.getAccountTeams(token);
+            const teams = await this.deployFacade.getTeams(facadeOptions);
             if (!Array.isArray(teams) || teams.length === 0) {
                 return undefined;
             }
 
-            console.log(chalk.cyan('\n--- Vercel Team Selection ---'));
+            console.log(chalk.cyan('\n--- Team Selection ---'));
 
-            const choices = teams.map((team: any) => ({
+            const choices = teams.map((team) => ({
                 name: team.name ? `${team.name} (${team.slug})` : team.slug,
                 value: team.slug,
             }));
 
-            const { vercelTeamScope } = await inquirer.prompt([
+            const { teamScope } = await inquirer.prompt([
                 {
                     type: 'list',
-                    name: 'vercelTeamScope',
-                    message: 'Select the Vercel team to deploy to:',
+                    name: 'teamScope',
+                    message: 'Select the team to deploy to:',
                     choices,
                     loop: false,
                 },
             ]);
 
-            const selected = choices.find((choice) => choice.value === vercelTeamScope);
-            console.log(
-                chalk.green(`\n✓ Selected Vercel team: ${selected?.name || vercelTeamScope}`),
-            );
+            const selected = choices.find((choice) => choice.value === teamScope);
+            console.log(chalk.green(`\n✓ Selected team: ${selected?.name || teamScope}`));
 
             return {
-                scope: vercelTeamScope,
-                label: selected?.name || vercelTeamScope,
+                scope: teamScope,
+                label: selected?.name || teamScope,
             };
         } catch (error: any) {
-            this.logger.warn(`Unable to fetch Vercel teams: ${error?.message || error}`);
+            this.logger.warn(`Unable to fetch teams: ${error?.message || error}`);
             console.log(
-                chalk.yellow(
-                    '\n⚠ Could not retrieve Vercel teams. Continuing without team selection.',
-                ),
+                chalk.yellow('\n⚠ Could not retrieve teams. Continuing without team selection.'),
             );
             return undefined;
         }

@@ -1,7 +1,6 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import { MessageResponse } from './types';
-import { OAuthProvider } from './enums';
 
 // DTOs - Auth
 export interface RegisterDto {
@@ -28,9 +27,6 @@ export interface UpdatePasswordDto {
 export interface UpdateProfileDto {
     username?: string;
     avatar?: string;
-    vercelToken?: string;
-    screenshotoneAccessKey?: string;
-    screenshotoneSecretKey?: string;
 }
 
 // DTOs - Email Verification
@@ -61,49 +57,17 @@ export interface UserProfile {
     email: string;
     avatar?: string;
     emailVerified?: boolean;
-    vercelToken?: string;
-    screenshotoneAccessKey?: string;
-    screenshotoneSecretKey?: string;
 }
 
 export interface OAuthUrlResponse {
     url: string;
 }
 
-export interface ConnectionInfo {
-    provider: OAuthProvider;
-    connected: boolean;
-    email?: string;
-    username?: string;
-    scopes?: string[];
-    connectedAt?: Date;
-    metadata?: Record<string, any>;
-}
-
-interface OAuthConnectionResponse extends ConnectionInfo {}
-
 export interface TokenValidationResponse {
     valid: boolean;
     message: string;
     email?: string;
     expiresAt?: Date;
-}
-
-// Github
-
-export interface GitHubOrganization {
-    login: string;
-    id: number;
-    node_id: string;
-    url: string;
-    repos_url: string;
-    events_url: string;
-    hooks_url: string;
-    issues_url: string;
-    members_url: string;
-    public_members_url: string;
-    avatar_url: string;
-    description: string;
 }
 
 export const authAPI = {
@@ -186,7 +150,7 @@ export const authAPI = {
         if (callbackUrl) params.append('callbackUrl', callbackUrl);
         if (state) params.append('state', state);
         const query = params.toString() ? `?${params.toString()}` : '';
-        return serverFetch<OAuthUrlResponse>(`/auth/github/url${query}`);
+        return serverFetch<OAuthUrlResponse>(`/oauth/github/url${query}`);
     },
 
     getGoogleAuthUrl: async (callbackUrl?: string, state?: string) => {
@@ -194,21 +158,21 @@ export const authAPI = {
         if (callbackUrl) params.append('callbackUrl', callbackUrl);
         if (state) params.append('state', state);
         const query = params.toString() ? `?${params.toString()}` : '';
-        return serverFetch<OAuthUrlResponse>(`/auth/google/url${query}`);
+        return serverFetch<OAuthUrlResponse>(`/oauth/google/url${query}`);
     },
 
     connectGoogleCallback: async (code: string, state?: string) => {
         const params = new URLSearchParams({ code });
         if (state) params.append('state', state);
 
-        return serverFetch<AuthResponse>(`/auth/google/callback?${params.toString()}`);
+        return serverFetch<AuthResponse>(`/oauth/google/callback?${params.toString()}`);
     },
 
     connectGitHubCallback: async (code: string, state?: string) => {
         const params = new URLSearchParams({ code });
         if (state) params.append('state', state);
 
-        return serverFetch<AuthResponse>(`/auth/github/callback?${params.toString()}`);
+        return serverFetch<AuthResponse>(`/oauth/github/callback?${params.toString()}`);
     },
 
     // Email Verification
@@ -258,75 +222,5 @@ export const authAPI = {
         return serverFetch<TokenValidationResponse>(
             `/auth/validate-reset-token?token=${encodeURIComponent(token)}`,
         );
-    },
-
-    // OAuth Connections
-    oauth_connections: {
-        getAll: async () => {
-            return serverFetch<OAuthConnectionResponse[]>('/auth/connections');
-        },
-
-        checkConnection: async (provider: `${OAuthProvider}`) => {
-            return serverFetch<OAuthConnectionResponse>(`/auth/connections/${provider}`);
-        },
-
-        getConnectUrl: async (
-            provider: OAuthProvider,
-            callbackUrl?: string,
-            state?: string,
-            forceConsent?: boolean,
-        ): Promise<{ url: string; state: string }> => {
-            const params = new URLSearchParams();
-            if (callbackUrl) params.append('callbackUrl', callbackUrl);
-            if (state) params.append('state', state);
-            if (forceConsent) params.append('forceConsent', 'true');
-            const query = params.toString() ? `?${params.toString()}` : '';
-
-            return serverFetch<{ url: string; state: string }>(
-                `/auth/connections/${provider}/connect/url${query}`,
-            );
-        },
-
-        connectCallback: async (provider: OAuthProvider, code: string, state?: string) => {
-            const params = new URLSearchParams({ code });
-            if (state) params.append('state', state);
-            return serverFetch<OAuthConnectionResponse>(
-                `/auth/connections/${provider}/callback?${params.toString()}`,
-            );
-        },
-
-        requestAdditionalScopes: async (provider: OAuthProvider, scopes: string[]) => {
-            return serverMutation<MessageResponse>({
-                endpoint: `/auth/connections/${provider}/request-scopes`,
-                data: { scopes },
-                method: 'POST',
-                wrapInData: false,
-            });
-        },
-
-        ensureConnection: async (provider: `${OAuthProvider}`) => {
-            return serverFetch<{ connected: boolean }>(`/auth/connections/${provider}/ensure`);
-        },
-
-        disconnect: async (provider: OAuthProvider) => {
-            return serverMutation<void>({
-                endpoint: `/auth/connections/${provider}`,
-                data: {},
-                method: 'DELETE',
-                wrapInData: false,
-            });
-        },
-
-        // GitHub specific
-        getGitHubOrgs: async () => {
-            return serverFetch<GitHubOrganization[]>('/auth/connections/github/orgs');
-        },
-
-        checkGitHubScopes: async (requiredScopes: string[]) => {
-            const params = new URLSearchParams({ required: requiredScopes.join(',') });
-            return serverFetch<{ hasScopes: boolean; missingScopes?: string[] }>(
-                `/auth/connections/github/check-scopes?${params.toString()}`,
-            );
-        },
     },
 };

@@ -553,7 +553,7 @@
                 "dataRepo": "数据仓库",
                 "websiteRepo": "网站仓库",
                 "mainRepo": "主仓库",
-                "repoProvider": "仓库提供商",
+                "gitProvider": "Git提供商",
                 "organization": "组织",
                 "created": "创建时间",
                 "lastUpdated": "最后更新",
@@ -562,7 +562,11 @@
                 "custom": "自定义",
                 "customOverwrite": "自定义（覆盖）",
                 "yes": "是",
-                "no": "否"
+                "no": "否",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "配置详情",
@@ -1095,17 +1099,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "需要 Vercel 令牌",
-                    "description": "要将您的目录部署到 Vercel，您需要在账户设置中配置 Vercel API 令牌。",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "前往 API 令牌设置",
                     "getTokenButton": "获取 Vercel 令牌",
                     "howTo": {
                         "title": "如何配置您的 Vercel 令牌：",
                         "step1": "点击 '获取 Vercel 令牌' 打开 Vercel 仪表板",
                         "step2": "创建具有部署权限的新令牌",
-                        "step3": "复制生成的令牌",
-                        "step4": "前往 API 令牌设置，并将您的令牌粘贴到 Vercel 部分"
+                        "step3": "在插件设置 > {provider} 中配置您的 {provider} API 令牌",
+                        "step4": "返回此处部署您的目录"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1114,10 +1124,10 @@
                     "hint": "作为协作者，一旦所有者配置了 Vercel 集成，您就可以触发部署。"
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "部署到 Vercel",
                         "description": "在 Vercel 上部署您的目录网站仓库。",
-                        "deployButton": "立即部署",
+                        "deployButton": "部署到 {provider}",
                         "deployingButton": "部署中...",
                         "deployingStateButton": "部署中 ({state})...",
                         "successMessage": "您的网站已成功部署！",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "仓库将在您的个人账户下创建",
                 "organizations": "组织",
                 "personalHelp": "仓库将在您的个人 GitHub 账户下创建",
-                "organizationHelp": "仓库将在 {org} 组织下创建"
+                "organizationHelp": "仓库将在 {org} 组织下创建",
+                "connectRequired": "在侧边栏中连接 Git 提供商，以选择您的仓库创建位置。"
             },
             "ai": {
                 "title": "使用 AI 创建",
@@ -1712,7 +1723,16 @@
             "sendButton": "发送",
             "errors": {
                 "unableToSend": "无法发送消息。"
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

@@ -553,7 +553,7 @@
                 "dataRepo": "מאגר נתונים",
                 "websiteRepo": "מאגר אתר אינטרנט",
                 "mainRepo": "מאגר ראשי",
-                "repoProvider": "ספק מאגר",
+                "gitProvider": "ספק Git",
                 "organization": "ארגון",
                 "created": "נוצר",
                 "lastUpdated": "עודכן לאחרונה",
@@ -562,7 +562,11 @@
                 "custom": "מותאם אישית",
                 "customOverwrite": "מותאם אישית (דריסה)",
                 "yes": "כן",
-                "no": "לא"
+                "no": "לא",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "פרטי הגדרה",
@@ -1095,17 +1099,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "נדרש אסימון Vercel",
-                    "description": "כדי לפרוס את המדריך שלך ב-Vercel, עליך להגדיר את אסימון ה-API של Vercel שלך בהגדרות החשבון שלך.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "עבור להגדרות אסימוני API",
                     "getTokenButton": "קבל אסימון Vercel",
                     "howTo": {
                         "title": "כיצד להגדיר את אסימון ה-Vercel שלך:",
                         "step1": "לחץ על 'קבל אסימון Vercel' כדי לפתוח את לוח הבקרה של Vercel",
                         "step2": "צור אסימון חדש עם הרשאות פריסה",
-                        "step3": "העתק את האסימון שנוצר",
-                        "step4": "עבור להגדרות אסימוני API והדבק את האסימון שלך בקטע Vercel"
+                        "step3": "הגדר את מפתח ה-API של {provider} בהגדרות התוסף > {provider}",
+                        "step4": "חזור לכאן כדי לפרוס את הספרייה שלך"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1114,10 +1124,10 @@
                     "hint": "כמשתף פעולה, תוכל להפעיל פריסות ברגע שבעל המדריך יקבל את שילוב ה-Vercel שלו."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "פרוס ל-Vercel",
                         "description": "פרוס את מאגר אתר האינטרנט של המדריך שלך ב-Vercel.",
-                        "deployButton": "פרוס עכשיו",
+                        "deployButton": "פרוס ל-{provider}",
                         "deployingButton": "פורס...",
                         "deployingStateButton": "פורס ({state})...",
                         "successMessage": "אתר האינטרנט שלך נפרס בהצלחה!",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "המאגר ייווצר תחת חשבון GitHub האישי שלך",
                 "organizations": "ארגונים",
                 "personalHelp": "המאגר ייווצר תחת חשבון GitHub האישי שלך",
-                "organizationHelp": "המאגר ייווצר תחת הארגון {org}"
+                "organizationHelp": "המאגר ייווצר תחת הארגון {org}",
+                "connectRequired": "חבר ספק Git בסרגל הצד כדי לבחור היכן ייווצר המאגר שלך."
             },
             "ai": {
                 "title": "צור עם AI",
@@ -1712,7 +1723,16 @@
             "sendButton": "שלח",
             "errors": {
                 "unableToSend": "לא ניתן לשלוח את ההודעה."
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

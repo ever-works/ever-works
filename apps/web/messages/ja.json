@@ -646,7 +646,7 @@
                 "dataRepo": "データリポジトリ",
                 "websiteRepo": "Webサイトリポジトリ",
                 "mainRepo": "メインリポジトリ",
-                "repoProvider": "リポジトリプロバイダー",
+                "gitProvider": "Gitプロバイダー",
                 "organization": "組織",
                 "created": "作成日",
                 "lastUpdated": "最終更新日",
@@ -655,7 +655,11 @@
                 "custom": "カスタム",
                 "customOverwrite": "カスタム（上書き）",
                 "yes": "はい",
-                "no": "いいえ"
+                "no": "いいえ",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "設定詳細",
@@ -1188,17 +1192,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Vercel トークンが必要です",
-                    "description": "ディレクトリを Vercel にデプロイするには、アカウント設定で Vercel API トークンを設定する必要があります。",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "API トークン設定へ移動",
                     "getTokenButton": "Vercel トークンを取得",
                     "howTo": {
                         "title": "Vercel トークンの設定方法：",
                         "step1": "「Vercel トークンを取得」をクリックして Vercel ダッシュボードを開く",
                         "step2": "デプロイ権限を持つ新しいトークンを作成",
-                        "step3": "生成されたトークンをコピー",
-                        "step4": "API トークン設定に移動し、Vercel セクションにトークンを貼り付け"
+                        "step3": "プラグイン設定 > {provider} で {provider} APIトークンを設定してください",
+                        "step4": "ここに戻ってディレクトリをデプロイしてください"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1217,10 @@
                     "hint": "コラボレーターとして、所有者が Vercel 統合を設定した後、デプロイメントをトリガーできます。"
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Vercel にデプロイ",
                         "description": "Vercel 上にディレクトリ Web サイトリポジトリをデプロイします。",
-                        "deployButton": "今すぐデプロイ",
+                        "deployButton": "{provider}にデプロイ",
                         "deployingButton": "デプロイ中...",
                         "deployingStateButton": "デプロイ中（{state}）...",
                         "successMessage": "Webサイトが正常にデプロイされました！",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "リポジトリは個人アカウントの下に作成されます",
                 "organizations": "組織",
                 "personalHelp": "リポジトリは個人の GitHub アカウントの下に作成されます",
-                "organizationHelp": "リポジトリは {org} 組織の下に作成されます"
+                "organizationHelp": "リポジトリは {org} 組織の下に作成されます",
+                "connectRequired": "リポジトリの作成先を選択するには、サイドバーでGitプロバイダーを接続してください。"
             },
             "ai": {
                 "title": "AI で作成",
@@ -1712,7 +1723,16 @@
             "sendButton": "送信",
             "errors": {
                 "unableToSend": "メッセージを送信できませんでした。"
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

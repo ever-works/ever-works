@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
+import { FacadesModule } from '@ever-works/agent/facades';
 import { AiConversationController } from './ai-conversation.controller';
-import { AiModule } from '@packages/agent/ai';
+import { AiConversationService } from './ai-conversation.service';
 
 @Module({
-    imports: [AiModule],
+    imports: [FacadesModule],
     controllers: [AiConversationController],
+    providers: [AiConversationService],
 })
 export class AiConversationModule {}

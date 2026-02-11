@@ -74,11 +74,11 @@ export const config = {
         clientSecret: () => process.env.GOOGLE_CLIENT_SECRET,
         callbackUrl: () => {
             const webUrl = config.webAppUrl();
-            return process.env.GOOGLE_CALLBACK_URL || `${webUrl}/api/auth/google/callback`;
+            return process.env.GOOGLE_CALLBACK_URL || `${webUrl}/api/oauth/google/callback`;
         },
         connectCallbackUrl: () => {
             const webUrl = config.webAppUrl();
-            return process.env.GOOGLE_CALLBACK_URL || `${webUrl}/api/auth/google/callback`;
+            return process.env.GOOGLE_CALLBACK_URL || `${webUrl}/api/oauth/google/callback`;
         },
     },
     github: {
@@ -86,11 +86,7 @@ export const config = {
         clientSecret: () => process.env.GH_CLIENT_SECRET,
         callbackUrl: () => {
             const webUrl = config.webAppUrl();
-            return process.env.GH_CALLBACK_URL || `${webUrl}/api/auth/github/callback`;
-        },
-        connectCallbackUrl: () => {
-            const webUrl = config.webAppUrl();
-            return process.env.GH_CALLBACK_URL || `${webUrl}/api/auth/github/callback`;
+            return process.env.GH_CALLBACK_URL || `${webUrl}/api/oauth/github/callback`;
         },
     },
 

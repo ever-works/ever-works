@@ -646,7 +646,7 @@
                 "dataRepo": "Repozytorium danych",
                 "websiteRepo": "Repozytorium strony",
                 "mainRepo": "Główne repozytorium",
-                "repoProvider": "Dostawca repozytorium",
+                "gitProvider": "Dostawca Git",
                 "organization": "Organizacja",
                 "created": "Utworzono",
                 "lastUpdated": "Ostatnia aktualizacja",
@@ -655,7 +655,11 @@
                 "custom": "Niestandardowe",
                 "customOverwrite": "Niestandardowe (nadpisanie)",
                 "yes": "Tak",
-                "no": "Nie"
+                "no": "Nie",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Szczegóły konfiguracji",
@@ -1188,17 +1192,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Wymagany token Vercel",
-                    "description": "Aby wdrożyć katalog na Vercel, musisz skonfigurować swój token API Vercel w ustawieniach konta.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Przejdź do ustawień tokenów API",
                     "getTokenButton": "Pobierz token Vercel",
                     "howTo": {
                         "title": "Jak skonfigurować token Vercel:",
                         "step1": "Kliknij 'Pobierz token Vercel', aby otworzyć panel Vercel",
                         "step2": "Utwórz nowy token z uprawnieniami do wdrażania",
-                        "step3": "Skopiuj wygenerowany token",
-                        "step4": "Przejdź do ustawień tokenów API i wklej token w sekcji Vercel"
+                        "step3": "Skonfiguruj token API {provider} w Ustawieniach Wtyczki > {provider}",
+                        "step4": "Wróć tutaj, aby wdrożyć swój katalog"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1217,10 @@
                     "hint": "Jako współpracownik możesz uruchamiać wdrożenia, gdy właściciel skonfiguruje integrację Vercel."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Wdróż na Vercel",
                         "description": "Wdróż repozytorium strony katalogu na Vercel.",
-                        "deployButton": "Wdróż teraz",
+                        "deployButton": "Wdróż na {provider}",
                         "deployingButton": "Wdrażanie...",
                         "deployingStateButton": "Wdrażanie ({state})...",
                         "successMessage": "Twoja strona została pomyślnie wdrożona!",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "Repozytorium zostanie utworzone pod Twoim osobistym kontem",
                 "organizations": "Organizacje",
                 "personalHelp": "Repozytorium zostanie utworzone pod Twoim osobistym kontem GitHub",
-                "organizationHelp": "Repozytorium zostanie utworzone pod organizacją {org}"
+                "organizationHelp": "Repozytorium zostanie utworzone pod organizacją {org}",
+                "connectRequired": "Połącz dostawcę Git na pasku bocznym, aby wybrać, gdzie zostanie utworzone repozytorium."
             },
             "ai": {
                 "title": "Utwórz z AI",
@@ -1712,7 +1723,16 @@
             "sendButton": "Wyślij",
             "errors": {
                 "unableToSend": "Nie można wysłać wiadomości."
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '@src/auth';
-import { SubscriptionsModule as AgentSubscriptionsModule } from '@packages/agent/subscriptions';
+import { SubscriptionsModule as AgentSubscriptionsModule } from '@ever-works/agent/subscriptions';
 import { SubscriptionsController } from './subscriptions.controller';
 
 @Module({

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useRouter } from '@/i18n/navigation';
-import { ConnectionInfo, Directory, DirectoryConfig } from '@/lib/api/types-only';
+import { GitProviderConnectionInfo, Directory, DirectoryConfig } from '@/lib/api/types-only';
 import { DirectoryHeader } from './DirectoryHeader';
 import { DirectoryTabs } from './DirectoryTabs';
 import { GenerateStatusType } from '@/lib/api/enums';
@@ -15,7 +15,7 @@ import { syncDirectoryData } from '@/app/actions/dashboard/directories';
 interface DirectoryLayoutClientProps {
     directory: Directory;
     children: React.ReactNode;
-    oauthConnection: ConnectionInfo | null;
+    oauthConnection: GitProviderConnectionInfo | null;
     config: DirectoryConfig | null;
 }
 

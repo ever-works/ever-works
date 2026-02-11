@@ -25,15 +25,6 @@ export class DirectoryOwnershipService {
     ) {}
 
     /**
-     * Ensure a user has access to a directory (either as creator or as member).
-     * @deprecated Use ensureAccess() for more flexible permission checking.
-     */
-    async ensure(directoryId: string, userId: string): Promise<Directory> {
-        const result = await this.ensureAccess(directoryId, userId);
-        return result.directory;
-    }
-
-    /**
      * Ensure a user has access to a directory and return detailed access information.
      * Access is granted if the user is the creator OR has a membership record.
      */

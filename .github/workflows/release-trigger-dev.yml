@@ -31,7 +31,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build workspace packages
-        run: pnpm --filter @packages/agent build
+        run: pnpm --filter @ever-works/agent build
+
+      - name: Build plugins
+        run: pnpm --filter './packages/plugins/*' build
 
       - name: 🚀 Verify Trigger.dev is available
         working-directory: packages/tasks
@@ -41,4 +44,4 @@ jobs:
         # because it requires a paid account and also because we want to use built-in scheduling in NestJs in the dev!
         # That's why we just run the login operation below.
         run: |
-          npx trigger.dev@4.3.2 login
+          npx trigger.dev@4.3.3 login

@@ -646,7 +646,7 @@
                 "dataRepo": "데이터 리포지토리",
                 "websiteRepo": "웹사이트 리포지토리",
                 "mainRepo": "메인 리포지토리",
-                "repoProvider": "리포지토리 제공자",
+                "gitProvider": "Git 제공자",
                 "organization": "조직",
                 "created": "생성됨",
                 "lastUpdated": "마지막 업데이트",
@@ -655,7 +655,11 @@
                 "custom": "사용자 정의",
                 "customOverwrite": "사용자 정의 (덮어쓰기)",
                 "yes": "예",
-                "no": "아니오"
+                "no": "아니오",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "구성 세부정보",
@@ -1188,17 +1192,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Vercel 토큰 필요",
-                    "description": "디렉토리를 Vercel에 배포하려면 계정 설정에서 Vercel API 토큰을 구성해야 합니다.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "API 토큰 설정으로 이동",
                     "getTokenButton": "Vercel 토큰 가져오기",
                     "howTo": {
                         "title": "Vercel 토큰 구성 방법:",
                         "step1": "Vercel 대시보드를 열려면 'Vercel 토큰 가져오기' 클릭",
                         "step2": "배포 권한이 있는 새 토큰 생성",
-                        "step3": "생성된 토큰 복사",
-                        "step4": "API 토큰 설정으로 이동하여 Vercel 섹션에 토큰 붙여넣기"
+                        "step3": "플러그인 설정 > {provider}에서 {provider} API 토큰을 구성하세요",
+                        "step4": "디렉토리를 배포하려면 여기로 돌아오세요"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1217,10 @@
                     "hint": "협업자로서 소유자가 Vercel 통합을 구성하면 배포를 트리거할 수 있습니다."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Vercel에 배포",
                         "description": "디렉토리 웹사이트 리포지토리를 Vercel에 배포하세요.",
-                        "deployButton": "지금 배포",
+                        "deployButton": "{provider}에 배포",
                         "deployingButton": "배포 중...",
                         "deployingStateButton": "배포 중 ({state})...",
                         "successMessage": "웹사이트가 성공적으로 배포되었습니다!",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "리포지토리가 개인 계정 아래 생성됩니다",
                 "organizations": "조직",
                 "personalHelp": "리포지토리가 개인 GitHub 계정 아래 생성됩니다",
-                "organizationHelp": "리포지토리가 {org} 조직 아래 생성됩니다"
+                "organizationHelp": "리포지토리가 {org} 조직 아래 생성됩니다",
+                "connectRequired": "저장소가 생성될 위치를 선택하려면 사이드바에서 Git 공급자를 연결하세요."
             },
             "ai": {
                 "title": "AI로 만들기",
@@ -1712,7 +1723,16 @@
             "sendButton": "전송",
             "errors": {
                 "unableToSend": "메시지를 보낼 수 없습니다."
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

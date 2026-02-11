@@ -24,21 +24,18 @@ export class UserRepository {
     async findByUsername(username: string): Promise<User | null> {
         return await this.repository.findOne({
             where: { username },
-            relations: ['oauthTokens'],
         });
     }
 
     async findByEmail(email: string): Promise<User | null> {
         return await this.repository.findOne({
             where: { email },
-            relations: ['oauthTokens'],
         });
     }
 
     async findById(id: string): Promise<User | null> {
         return await this.repository.findOne({
             where: { id },
-            relations: ['oauthTokens'],
         });
     }
 
@@ -47,20 +44,13 @@ export class UserRepository {
         return await this.findById(id);
     }
 
-    async findByIdWithTokens(id: string): Promise<User | null> {
-        return await this.repository.findOne({
-            where: { id },
-            relations: ['oauthTokens'],
-        });
-    }
-
     async createOrGetLocalUser(): Promise<User> {
         const username = config.github.getOwner() || config.git.getName();
         const email = config.git.getEmail();
 
         if (!username.trim()) {
             throw new Error(
-                'GitHub username or Git name cannot both be empty. Please ensure you have configured these environment variables.',
+                'Git provider username or Git name cannot both be empty. Please ensure you have configured these environment variables.',
             );
         }
 

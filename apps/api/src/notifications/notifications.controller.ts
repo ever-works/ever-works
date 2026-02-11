@@ -11,9 +11,16 @@ import {
     DefaultValuePipe,
     ParseIntPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { NotificationService } from '@packages/agent/notifications';
-import { NotificationCategory } from '@packages/agent/entities';
+import {
+    ApiTags,
+    ApiBearerAuth,
+    ApiOperation,
+    ApiResponse,
+    ApiParam,
+    ApiQuery,
+} from '@nestjs/swagger';
+import { NotificationService } from '@ever-works/agent/notifications';
+import { NotificationCategory } from '@ever-works/agent/entities';
 import { CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 
@@ -29,11 +36,34 @@ export class NotificationsController {
      */
     @Get()
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'Get notifications', description: 'Get all notifications for the current user' })
-    @ApiQuery({ name: 'unreadOnly', required: false, type: Boolean, description: 'Filter to unread only' })
-    @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Maximum number of notifications to return' })
-    @ApiQuery({ name: 'offset', required: false, type: Number, description: 'Number of notifications to skip' })
-    @ApiQuery({ name: 'category', required: false, enum: ['ai_credits', 'subscription', 'generation', 'system', 'security'], description: 'Filter by notification category' })
+    @ApiOperation({
+        summary: 'Get notifications',
+        description: 'Get all notifications for the current user',
+    })
+    @ApiQuery({
+        name: 'unreadOnly',
+        required: false,
+        type: Boolean,
+        description: 'Filter to unread only',
+    })
+    @ApiQuery({
+        name: 'limit',
+        required: false,
+        type: Number,
+        description: 'Maximum number of notifications to return',
+    })
+    @ApiQuery({
+        name: 'offset',
+        required: false,
+        type: Number,
+        description: 'Number of notifications to skip',
+    })
+    @ApiQuery({
+        name: 'category',
+        required: false,
+        enum: ['ai_credits', 'subscription', 'generation', 'system', 'security'],
+        description: 'Filter by notification category',
+    })
     @ApiResponse({ status: 200, description: 'List of notifications' })
     async getNotifications(
         @CurrentUser() auth: AuthenticatedUser,
@@ -57,7 +87,10 @@ export class NotificationsController {
      */
     @Get('unread-count')
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'Get unread count', description: 'Get the count of unread notifications' })
+    @ApiOperation({
+        summary: 'Get unread count',
+        description: 'Get the count of unread notifications',
+    })
     @ApiResponse({ status: 200, description: 'Unread notification count' })
     async getUnreadCount(@CurrentUser() auth: AuthenticatedUser) {
         const count = await this.notificationService.getUnreadCount(auth.userId);
@@ -107,7 +140,10 @@ export class NotificationsController {
      */
     @Post(':id/dismiss')
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'Dismiss notification', description: 'Dismiss a notification (hides it from view)' })
+    @ApiOperation({
+        summary: 'Dismiss notification',
+        description: 'Dismiss a notification (hides it from view)',
+    })
     @ApiParam({ name: 'id', description: 'Notification ID' })
     @ApiResponse({ status: 200, description: 'Notification dismissed' })
     async dismiss(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {

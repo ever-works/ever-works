@@ -553,7 +553,7 @@
                 "dataRepo": "Repositorio de Datos",
                 "websiteRepo": "Repositorio del Sitio Web",
                 "mainRepo": "Repositorio Principal",
-                "repoProvider": "Proveedor de Repositorio",
+                "gitProvider": "Proveedor de Git",
                 "organization": "Organización",
                 "created": "Creado",
                 "lastUpdated": "Última Actualización",
@@ -562,7 +562,11 @@
                 "custom": "Personalizado",
                 "customOverwrite": "Personalizado (Sobrescribir)",
                 "yes": "Sí",
-                "no": "No"
+                "no": "No",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Detalles de Configuración",
@@ -1095,17 +1099,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Token de Vercel Requerido",
-                    "description": "Para desplegar tu directorio en Vercel, necesitas configurar tu token de API de Vercel en la configuración de tu cuenta.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Ir a Configuración de Tokens API",
                     "getTokenButton": "Obtener Token de Vercel",
                     "howTo": {
                         "title": "Cómo configurar tu token de Vercel:",
                         "step1": "Haz clic en 'Obtener Token de Vercel' para abrir el panel de Vercel",
                         "step2": "Crea un nuevo token con permisos de despliegue",
-                        "step3": "Copia el token generado",
-                        "step4": "Ve a Configuración de Tokens API y pega tu token en la sección de Vercel"
+                        "step3": "Configure su token API de {provider} en Configuración del Plugin > {provider}",
+                        "step4": "Regrese aquí para desplegar su directorio"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1114,10 +1124,10 @@
                     "hint": "Como colaborador, podrás activar despliegues una vez que el propietario configure su integración de Vercel."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Desplegar en Vercel",
                         "description": "Despliega el repositorio del sitio web de tu directorio en Vercel.",
-                        "deployButton": "Desplegar Ahora",
+                        "deployButton": "Desplegar en {provider}",
                         "deployingButton": "Desplegando...",
                         "deployingStateButton": "Desplegando ({state})...",
                         "successMessage": "¡Tu sitio web ha sido desplegado exitosamente!",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "El repositorio se creará bajo tu cuenta personal",
                 "organizations": "Organizaciones",
                 "personalHelp": "El repositorio se creará bajo tu cuenta personal de GitHub",
-                "organizationHelp": "El repositorio se creará bajo la organización {org}"
+                "organizationHelp": "El repositorio se creará bajo la organización {org}",
+                "connectRequired": "Conecta un proveedor de Git en la barra lateral para elegir dónde se creará tu repositorio."
             },
             "ai": {
                 "title": "Crear con IA",
@@ -1712,7 +1723,16 @@
             "sendButton": "Enviar",
             "errors": {
                 "unableToSend": "No se pudo enviar el mensaje."
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

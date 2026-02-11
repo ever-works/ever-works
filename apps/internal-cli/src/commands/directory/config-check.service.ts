@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '../../config/config.service';
-import { ConfigChecker, displayConfigurationError } from '@packages/cli-shared';
+import { ConfigChecker, displayConfigurationError } from '@ever-works/cli-shared';
 
 @Injectable()
 export class ConfigCheckService implements ConfigChecker {

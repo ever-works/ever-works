@@ -2,15 +2,15 @@ import { SubCommand, CommandRunner } from 'nest-commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { DirectoryRepository, UserRepository } from '@packages/agent/database';
-import { DirectoryLifecycleService } from '@packages/agent/services';
+import { DirectoryRepository, UserRepository } from '@ever-works/agent/database';
+import { DirectoryLifecycleService } from '@ever-works/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
 
 @SubCommand({
     name: 'delete',
-    description: 'Delete a directory and its GitHub repositories',
+    description: 'Delete a directory and its repositories',
 })
 export class DeleteSubCommand extends CommandRunner {
     constructor(

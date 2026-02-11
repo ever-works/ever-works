@@ -3,7 +3,7 @@ import { IsOptional, IsString } from 'class-validator';
 export class DeployWebsiteDto {
     @IsOptional()
     @IsString()
-    VERCEL_TOKEN?: string;
+    DEPLOY_TOKEN?: string;
 
     @IsOptional()
     @IsString()

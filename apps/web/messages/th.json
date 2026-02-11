@@ -646,7 +646,7 @@
                 "dataRepo": "รีโพสิทอรีข้อมูล",
                 "websiteRepo": "รีโพสิทอรีเว็บไซต์",
                 "mainRepo": "รีโพสิทอรีหลัก",
-                "repoProvider": "ผู้ให้บริการรีโพสิทอรี",
+                "gitProvider": "ผู้ให้บริการ Git",
                 "organization": "องค์กร",
                 "created": "สร้างเมื่อ",
                 "lastUpdated": "อัปเดตล่าสุด",
@@ -655,7 +655,11 @@
                 "custom": "กำหนดเอง",
                 "customOverwrite": "กำหนดเอง (เขียนทับ)",
                 "yes": "ใช่",
-                "no": "ไม่"
+                "no": "ไม่",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "รายละเอียดการกำหนดค่า",
@@ -1188,17 +1192,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "ต้องใช้โทเค็น Vercel",
-                    "description": "เพื่อเผยแพร่ไดเรกทอรีของคุณไปยัง Vercel คุณต้องกำหนดค่าโทเค็น API Vercel ของคุณในการตั้งค่าบัญชี",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "ไปที่การตั้งค่าโทเค็น API",
                     "getTokenButton": "รับโทเค็น Vercel",
                     "howTo": {
                         "title": "วิธีกำหนดค่าโทเค็น Vercel ของคุณ:",
                         "step1": "คลิก 'รับโทเค็น Vercel' เพื่อเปิดแดชบอร์ด Vercel",
                         "step2": "สร้างโทเค็นใหม่ด้วยสิทธิ์การเผยแพร่",
-                        "step3": "คัดลอกโทเค็นที่สร้างขึ้น",
-                        "step4": "ไปที่การตั้งค่าโทเค็น API และวางโทเค็นของคุณในส่วน Vercel"
+                        "step3": "กำหนดค่าโทเค็น API ของ {provider} ในการตั้งค่าปลั๊กอิน > {provider}",
+                        "step4": "กลับมาที่นี่เพื่อเผยแพร่ไดเรกทอรีของคุณ"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1217,10 @@
                     "hint": "ในฐานะผู้ทำงานร่วมกัน คุณสามารถเริ่มการเผยแพร่ได้เมื่อเจ้าของกำหนดค่าการรวม Vercel ของพวกเขาแล้ว"
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "เผยแพร่ไปยัง Vercel",
                         "description": "เผยแพร่รีโพสิทอรีเว็บไซต์ไดเรกทอรีของคุณบน Vercel",
-                        "deployButton": "เผยแพร่ตอนนี้",
+                        "deployButton": "เผยแพร่ไปยัง {provider}",
                         "deployingButton": "กำลังเผยแพร่...",
                         "deployingStateButton": "กำลังเผยแพร่ ({state})...",
                         "successMessage": "เผยแพร่เว็บไซต์ของคุณสำเร็จแล้ว!",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "รีโพสิทอรีจะถูกสร้างภายใต้บัญชีส่วนตัวของคุณ",
                 "organizations": "องค์กร",
                 "personalHelp": "รีโพสิทอรีจะถูกสร้างภายใต้บัญชี GitHub ส่วนตัวของคุณ",
-                "organizationHelp": "รีโพสิทอรีจะถูกสร้างภายใต้องค์กร {org}"
+                "organizationHelp": "รีโพสิทอรีจะถูกสร้างภายใต้องค์กร {org}",
+                "connectRequired": "เชื่อมต่อผู้ให้บริการ Git ในแถบด้านข้างเพื่อเลือกตำแหน่งที่จะสร้างรีโพซิทอรีของคุณ"
             },
             "ai": {
                 "title": "สร้างด้วย AI",
@@ -1712,7 +1723,16 @@
             "sendButton": "ส่ง",
             "errors": {
                 "unableToSend": "ไม่สามารถส่งข้อความได้"
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

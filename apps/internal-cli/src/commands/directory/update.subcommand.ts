@@ -2,15 +2,15 @@ import { SubCommand, CommandRunner } from 'nest-commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { DirectoryRepository, UserRepository } from '@packages/agent/database';
-import { DirectoryGenerationService } from '@packages/agent/services';
+import { DirectoryRepository, UserRepository } from '@ever-works/agent/database';
+import { DirectoryGenerationService } from '@ever-works/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
 
 @SubCommand({
     name: 'update',
-    description: 'Update a directory and its GitHub repository',
+    description: 'Update a directory and its repository',
 })
 export class UpdateSubCommand extends CommandRunner {
     constructor(

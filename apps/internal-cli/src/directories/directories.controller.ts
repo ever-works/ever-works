@@ -9,9 +9,8 @@ import {
     Post,
     Query,
 } from '@nestjs/common';
-import { UserRepository } from '@packages/agent/database';
-import { DeployVercelDto, VercelService } from '@packages/agent/deploy';
-import { CreateDirectoryDto } from '@packages/agent/dto';
+import { UserRepository } from '@ever-works/agent/database';
+import { CreateDirectoryDto } from '@ever-works/agent/dto';
 import {
     CreateItemsGeneratorDto,
     DeleteDirectoryDto,
@@ -24,14 +23,19 @@ import {
     SubmitItemDto,
     SubmitItemResponseDto,
     UpdateItemsGeneratorDto,
-} from '@packages/agent/items-generator';
+} from '@ever-works/agent/items-generator';
 import {
     DirectoryGenerationService,
     DirectoryLifecycleService,
     DirectoryOwnershipService,
     DirectoryQueryService,
-} from '@packages/agent/services';
-import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-generator';
+} from '@ever-works/agent/services';
+import { UpdateWebsiteRepositoryResponseDto } from '@ever-works/agent/generators';
+
+interface DeployDto {
+    DEPLOY_TOKEN?: string;
+    teamScope?: string;
+}
 
 @Controller('api')
 export class DirectoriesController {
@@ -40,7 +44,6 @@ export class DirectoriesController {
         private readonly directoryLifecycleService: DirectoryLifecycleService,
         private readonly directoryGenerationService: DirectoryGenerationService,
         private readonly ownershipService: DirectoryOwnershipService,
-        private readonly vercelService: VercelService,
         private readonly userRepository: UserRepository,
     ) {}
 
@@ -160,32 +163,10 @@ export class DirectoriesController {
         return this.directoryLifecycleService.deleteDirectory(id, deleteDirectoryDto, user);
     }
 
-    @Post('deploy/directories/:id/vercel')
-    async toVercel(@Body() deployVercel: DeployVercelDto, @Param('id') id: string) {
-        const { VERCEL_TOKEN: vercelToken, GITHUB_TOKEN: ghToken } = deployVercel;
-
-        const user = await this.userRepository.createOrGetLocalUser();
-
-        // Verify user has edit access to the directory
-        const { directory } = await this.ownershipService.ensureCanEdit(id, user.id);
-
-        const vercel = vercelToken || process.env.VERCEL_TOKEN;
-        if (!vercel) {
-            throw new NotFoundException('Vercel token is required');
-        }
-
-        await this.vercelService.deploy(
-            {
-                owner: directory.getRepoOwner(),
-                repo: directory.getWebsiteRepo(),
-                provider: 'vercel',
-                data: {
-                    vercelToken: vercel,
-                    ghToken: ghToken || process.env.GH_APIKEY,
-                },
-            },
-            directory,
-            user,
+    @Post('deploy/directories/:id')
+    async deploy(@Body() deployDto: DeployDto, @Param('id') id: string) {
+        throw new NotFoundException(
+            'Deploy functionality via CLI has been deprecated. Please use the web dashboard.',
         );
     }
 }

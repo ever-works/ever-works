@@ -646,7 +646,7 @@
                 "dataRepo": "Data Repository",
                 "websiteRepo": "Website Repository",
                 "mainRepo": "Hoofd Repository",
-                "repoProvider": "Repository Provider",
+                "gitProvider": "Git Provider",
                 "organization": "Organisatie",
                 "created": "Aangemaakt",
                 "lastUpdated": "Laatst Bijgewerkt",
@@ -655,7 +655,11 @@
                 "custom": "Aangepast",
                 "customOverwrite": "Aangepast (Overschrijven)",
                 "yes": "Ja",
-                "no": "Nee"
+                "no": "Nee",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Configuratiedetails",
@@ -1188,17 +1192,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Vercel Token Vereist",
-                    "description": "Om uw directory op Vercel te implementeren, moet u uw Vercel API-token configureren in uw accountinstellingen.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Ga naar API Tokens Instellingen",
                     "getTokenButton": "Vercel Token Ophalen",
                     "howTo": {
                         "title": "Hoe u uw Vercel token configureert:",
                         "step1": "Klik op 'Vercel Token Ophalen' om het Vercel dashboard te openen",
                         "step2": "Maak een nieuwe token met implementatiemachtigingen",
-                        "step3": "Kopieer de gegenereerde token",
-                        "step4": "Ga naar API Tokens Instellingen en plak uw token in het Vercel gedeelte"
+                        "step3": "Configureer uw {provider} API-token in Plugin-instellingen > {provider}",
+                        "step4": "Keer hier terug om uw directory te implementeren"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1217,10 @@
                     "hint": "Als medewerker kunt u implementaties activeren zodra de eigenaar zijn Vercel-integratie heeft geconfigureerd."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Implementeren op Vercel",
                         "description": "Implementeer uw directory website repository op Vercel.",
-                        "deployButton": "Nu Implementeren",
+                        "deployButton": "Implementeren op {provider}",
                         "deployingButton": "Implementeren...",
                         "deployingStateButton": "Implementeren ({state})...",
                         "successMessage": "Uw website is succesvol geïmplementeerd!",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "Repository wordt aangemaakt onder uw persoonlijke account",
                 "organizations": "Organisaties",
                 "personalHelp": "De repository wordt aangemaakt onder uw persoonlijke GitHub-account",
-                "organizationHelp": "De repository wordt aangemaakt onder de {org} organisatie"
+                "organizationHelp": "De repository wordt aangemaakt onder de {org} organisatie",
+                "connectRequired": "Verbind een Git-provider in de zijbalk om te kiezen waar uw repository wordt aangemaakt."
             },
             "ai": {
                 "title": "Aanmaken met AI",
@@ -1712,7 +1723,16 @@
             "sendButton": "Verzenden",
             "errors": {
                 "unableToSend": "Kan bericht niet verzenden."
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

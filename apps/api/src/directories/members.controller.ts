@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DirectoryMemberService } from '@packages/agent/services';
+import { DirectoryMemberService } from '@ever-works/agent/services';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { InviteMemberDto } from './dto/invite-member.dto';
@@ -98,7 +98,10 @@ export class MembersController {
 
     @Put(':memberId')
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'Update member role', description: 'Update the role of a directory member' })
+    @ApiOperation({
+        summary: 'Update member role',
+        description: 'Update the role of a directory member',
+    })
     @ApiResponse({ status: 200, description: 'Member role updated' })
     async updateMemberRole(
         @CurrentUser() auth: AuthenticatedUser,
@@ -140,7 +143,10 @@ export class MembersController {
 
     @Post('leave')
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'Leave directory', description: 'Leave a directory you are a member of' })
+    @ApiOperation({
+        summary: 'Leave directory',
+        description: 'Leave a directory you are a member of',
+    })
     @ApiResponse({ status: 200, description: 'Successfully left the directory' })
     async leaveDirectory(
         @CurrentUser() auth: AuthenticatedUser,

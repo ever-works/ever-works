@@ -55,14 +55,6 @@ jobs:
           ALLOWED_ORIGINS: https://appdev.ever.works,https://apidev.ever.works
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
-          # Github
-          GH_APIKEY: ${{ secrets.GH_APIKEY }}
-          GH_OWNER: ${{ secrets.GH_OWNER }}
-
-          # Git
-          GIT_NAME: ${{ secrets.GIT_NAME }}
-          GIT_EMAIL: ${{ secrets.GIT_EMAIL }}
-
           # Trigger.dev
           TRIGGER_ENABLED: ${{ secrets.TRIGGER_ENABLED }}
           TRIGGER_SECRET_KEY: ${{ secrets.TRIGGER_SECRET_KEY }}
@@ -74,30 +66,24 @@ jobs:
           # GitHub Auth
           GH_CLIENT_ID: ${{ secrets.GH_CLIENT_ID }}
           GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
-          GH_CALLBACK_URL: https://appdev.ever.works/api/auth/github/callback
+          GH_CALLBACK_URL: https://appdev.ever.works/api/oauth/github/callback
 
           # Google Auth
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_CALLBACK_URL: https://appdev.ever.works/api/auth/google/callback
+          GOOGLE_CALLBACK_URL: https://appdev.ever.works/api/oauth/google/callback
 
-          # AI Configuration
-          AI_DEFAULT_PROVIDER: ${{ secrets.AI_DEFAULT_PROVIDER }}
-
-          # OpenAI
-          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-          # OpenRouter
-          OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-
-          # Tavily
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
-
-          # SEARCH SERVICES
-          EXTRACT_CONTENT_SERVICE: ${{ secrets.EXTRACT_CONTENT_SERVICE }}
-          WEB_SEARCH_SERVICE: ${{ secrets.WEB_SEARCH_SERVICE }}
+          # Plugins
+          PLUGIN_OPENROUTER_API_KEY: ${{ secrets.PLUGIN_OPENROUTER_API_KEY }}
+          PLUGIN_OPENROUTER_DEFAULT_MODEL: ${{ secrets.PLUGIN_OPENROUTER_DEFAULT_MODEL }}
+          PLUGIN_OPENROUTER_SIMPLE_MODEL: ${{ secrets.PLUGIN_OPENROUTER_SIMPLE_MODEL }}
+          PLUGIN_OPENROUTER_MEDIUM_MODEL: ${{ secrets.PLUGIN_OPENROUTER_MEDIUM_MODEL }}
+          PLUGIN_OPENROUTER_COMPLEX_MODEL: ${{ secrets.PLUGIN_OPENROUTER_COMPLEX_MODEL }}
+          PLUGIN_GITHUB_CLIENT_ID: ${{ secrets.PLUGIN_GITHUB_CLIENT_ID }}
+          PLUGIN_GITHUB_CLIENT_SECRET: ${{ secrets.PLUGIN_GITHUB_CLIENT_SECRET }}
+          PLUGIN_TAVILY_API_KEY: ${{ secrets.PLUGIN_TAVILY_API_KEY }}
+          PLUGIN_SCREENSHOTONE_ACCESS_KEY: ${{ secrets.PLUGIN_SCREENSHOTONE_ACCESS_KEY }}
+          PLUGIN_SCREENSHOTONE_SECRET_KEY: ${{ secrets.PLUGIN_SCREENSHOTONE_SECRET_KEY }}
 
           # Database
           DATABASE_TYPE: ${{ secrets.DATABASE_TYPE }}

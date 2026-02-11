@@ -41,9 +41,7 @@ export const deleteCommand = new Command('delete')
             console.log(chalk.gray('This will delete:'));
             console.log(chalk.gray('  • The directory record from the database'));
             console.log(chalk.gray('  • Associated data and configurations'));
-            console.log(
-                chalk.gray('  • Note: GitHub repositories will NOT be deleted automatically'),
-            );
+            console.log(chalk.gray('  • Note: Git repositories will NOT be deleted automatically'));
 
             // Collect deletion options
             const deleteOptions = await inquirer.prompt([
@@ -164,9 +162,7 @@ export const deleteCommand = new Command('delete')
                     !deleteOptions.delete_website_repository;
 
                 if (anyRepoNotDeleted) {
-                    console.log(
-                        chalk.yellow('\n⚠ Note: Some GitHub repositories were not deleted.'),
-                    );
+                    console.log(chalk.yellow('\n⚠ Note: Some repositories were not deleted.'));
                     console.log(
                         chalk.gray('You may want to manually delete them if no longer needed:'),
                     );

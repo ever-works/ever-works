@@ -5,7 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
 import { ApiModule } from './api.module';
 import helmet from 'helmet';
-import { initSentry, initPostHog } from '@packages/monitoring';
+import { initSentry, initPostHog } from '@ever-works/monitoring';
 import * as path from 'path';
 import { json, urlencoded } from 'express';
 
@@ -33,7 +33,7 @@ async function bootstrap() {
                         defaultSrc: ["'self'"],
                         scriptSrc: ["'self'", "'unsafe-inline'"],
                         styleSrc: ["'self'", "'unsafe-inline'"],
-                        imgSrc: ["'self'", "data:", "https:"],
+                        imgSrc: ["'self'", 'data:', 'https:'],
                     },
                 },
             })(req, res, next);
@@ -78,7 +78,7 @@ async function bootstrap() {
         .addTag('Health', 'API health check endpoints')
         .addTag('Auth', 'Authentication and authorization endpoints')
         .addTag('Directories', 'Directory management endpoints')
-        .addTag('Deploy', 'Deployment endpoints for Vercel and other providers')
+        .addTag('Deploy', 'Deployment endpoints')
         .addTag('AI Conversation', 'AI-powered conversation and content generation')
         .addTag('Screenshot', 'Screenshot capture and smart image preview')
         .addTag('Subscriptions', 'Subscription and billing management')

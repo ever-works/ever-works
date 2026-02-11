@@ -10,7 +10,7 @@ import {
     getStepProgress,
     getStepText,
     ItemsGeneratorStep,
-} from '@packages/cli-shared';
+} from '@ever-works/cli-shared';
 
 export const statusCommand = new Command('status')
     .description('Check the status of a directory')

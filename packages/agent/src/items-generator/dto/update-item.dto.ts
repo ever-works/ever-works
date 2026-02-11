@@ -1,6 +1,7 @@
 import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import type { UpdateItemDto as IUpdateItemDto } from '@ever-works/contracts/api';
 
-export class UpdateItemDto {
+export class UpdateItemDto implements IUpdateItemDto {
     @IsString()
     item_slug: string;
 

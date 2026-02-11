@@ -8,18 +8,11 @@ export class UpdateProfileDto {
     @MinLength(3)
     username?: string;
 
-    @ApiPropertyOptional({ description: 'Avatar image URL', example: 'https://example.com/avatar.jpg' })
+    @ApiPropertyOptional({
+        description: 'Avatar image URL',
+        example: 'https://example.com/avatar.jpg',
+    })
     @IsUrl()
     @IsOptional()
     avatar?: string;
-
-    @ApiPropertyOptional({ description: 'Vercel API token for deployments' })
-    @IsString()
-    @IsOptional()
-    vercelToken?: string;
-
-    @ApiPropertyOptional({ description: 'ScreenshotOne API access key for screenshots' })
-    @IsString()
-    @IsOptional()
-    screenshotoneAccessKey?: string;
 }

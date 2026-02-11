@@ -1,5 +1,5 @@
 {
-	"name": "@packages/cli-shared",
+	"name": "@ever-works/cli-shared",
 	"version": "0.1.0",
 	"description": "Shared utilities and services for Ever Works CLI applications",
 	"author": {

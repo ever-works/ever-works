@@ -1,86 +1,42 @@
 import 'server-only';
-import { serverMutation } from './server-api';
-import { GenerationMethod, WebsiteRepositoryCreationMethod, DataVolumeMode } from './enums';
+import { serverMutation, serverFetch } from './server-api';
 import { APIResponse, ItemData } from './types';
+import type { GeneratorFormSchema } from '@ever-works/plugin';
+import type {
+    CompanyDto,
+    ProvidersDto,
+    CreateItemsGeneratorDto,
+    UpdateItemsGeneratorDto,
+    SubmitItemDto,
+    RemoveItemDto,
+    UpdateItemDto,
+    ExtractItemDetailsDto,
+} from '@ever-works/contracts/api';
 
-// DTOs
-export interface CompanyDto {
-    name: string;
-    website: string;
-}
+// Re-export types from @ever-works/plugin for use in the web app
+export type {
+    PluginIcon,
+    ProviderOption,
+    GeneratorFormSchema,
+    FormSchemaProvidersType,
+    ProviderSelectionState,
+    SelectableProviderCategory,
+    ProviderCategoryKey,
+} from '@ever-works/plugin';
 
-export interface ConfigDto {
-    max_search_queries?: number;
-    max_results_per_query?: number;
-    max_pages_to_process?: number;
-    relevance_threshold_content?: number;
-    min_content_length_for_extraction?: number;
-    ai_first_generation_enabled?: boolean;
-    content_filtering_enabled?: boolean;
-    prompt_comparison_confidence_threshold?: number;
-    data_volume_mode?: DataVolumeMode;
-    generate_categories?: boolean;
-    generate_tags?: boolean;
-    generate_brands?: boolean;
-    max_items?: number;
-}
+export type { FormFieldDefinition, FormFieldGroup } from '@ever-works/contracts';
 
-export interface CreateItemsGeneratorDto {
-    name: string;
-    prompt: string;
-    company?: CompanyDto;
-    initial_categories?: string[];
-    priority_categories?: string[];
-    target_keywords?: string[];
-    source_urls?: string[];
-    config?: ConfigDto;
-    repository_description?: string;
-    generation_method?: GenerationMethod;
-    update_with_pull_request?: boolean;
-    badge_evaluation_enabled?: boolean;
-    capture_screenshots?: boolean;
-    website_repository_creation_method?: WebsiteRepositoryCreationMethod;
-}
-
-export interface UpdateItemsGeneratorDto {
-    generation_method?: GenerationMethod;
-    update_with_pull_request?: boolean;
-}
-
-export interface SubmitItemDto {
-    name: string;
-    description: string;
-    source_url: string;
-    category: string;
-    categories?: string[];
-    tags?: string[];
-    featured?: boolean;
-    order?: number;
-    pay_and_publish_now?: boolean;
-    slug?: string;
-    brand?: string;
-    brand_logo_url?: string;
-    images?: string[];
-    create_pull_request?: boolean;
-}
-
-export interface RemoveItemDto {
-    item_slug: string;
-    reason?: string;
-    create_pull_request?: boolean;
-}
-
-export interface UpdateItemDto {
-    item_slug: string;
-    featured?: boolean;
-    order?: number;
-    create_pull_request?: boolean;
-}
-
-export interface ExtractItemDetailsDto {
-    source_url: string;
-    existing_categories?: string[];
-}
+// Re-export DTOs from centralized contracts package
+export type {
+    CompanyDto,
+    ProvidersDto,
+    CreateItemsGeneratorDto,
+    UpdateItemsGeneratorDto,
+    SubmitItemDto,
+    RemoveItemDto,
+    UpdateItemDto,
+    ExtractItemDetailsDto,
+};
 
 // Response Types
 export interface ItemsGeneratorResponse {
@@ -187,5 +143,19 @@ export const itemsGeneratorAPI = {
             method: 'POST',
             wrapInData: false,
         });
+    },
+
+    // Get generator form schema
+    getFormSchema: async (directoryId: string, pipelineId?: string) => {
+        const queryParams = pipelineId ? `?pipelineId=${encodeURIComponent(pipelineId)}` : '';
+        return serverFetch<GeneratorFormSchema>(
+            `/directories/${directoryId}/generator-form${queryParams}`,
+        );
+    },
+
+    // Get global generator form schema (no directory context)
+    getFormSchemaGlobal: async (pipelineId?: string) => {
+        const queryParams = pipelineId ? `?pipelineId=${encodeURIComponent(pipelineId)}` : '';
+        return serverFetch<GeneratorFormSchema>(`/generator-form${queryParams}`);
     },
 };

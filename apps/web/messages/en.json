@@ -276,10 +276,24 @@
             "tabs": {
                 "profile": "Profile",
                 "security": "Security",
-                "apiTokens": "API & Tokens",
-                "oauth": "Connected Accounts",
-                "notifications": "Notifications",
+                "gitProviders": "Git Providers",
                 "dangerZone": "Danger Zone"
+            },
+            "pluginCategories": {
+                "ai-provider": "AI Providers",
+                "deployment": "Deployment",
+                "search": "Search",
+                "screenshot": "Screenshots",
+                "content-extractor": "Content Extractors",
+                "data-source": "Data Sources",
+                "git-provider": "Git Providers",
+                "pipeline": "Pipeline"
+            },
+            "plugins": {
+                "configure": "Configure",
+                "noPluginsInCategory": "No plugins in this category",
+                "requiredSettingsMissing": "Required settings not configured",
+                "backToCategory": "Back to {category}"
             },
             "profile": {
                 "title": "Profile Settings",
@@ -427,6 +441,7 @@
                 "generator": "Generator",
                 "schedule": "Schedule",
                 "history": "History",
+                "plugins": "Plugins",
                 "deploy": "Deploy",
                 "members": "Members",
                 "settings": "Settings"
@@ -513,7 +528,16 @@
                         "maxFailures": "Failure limit",
                         "maxFailuresHelp": "Automatically pause once this many failures occur.",
                         "createPullRequest": "Create Pull Requests",
-                        "createPullRequestHelp": "When enabled, scheduled updates create a pull request instead of committing directly."
+                        "createPullRequestHelp": "When enabled, scheduled updates create a pull request instead of committing directly.",
+                        "pipeline": "Pipeline",
+                        "pipelineHelp": "Override which pipeline runs on schedule. Leave as default to use the same pipeline as your last manual generation."
+                    },
+                    "pipeline": {
+                        "inherit": "Use last run settings",
+                        "notConfigured": "not configured"
+                    },
+                    "providers": {
+                        "title": "Active providers for next run"
                     },
                     "billing": {
                         "subscription": "Subscription",
@@ -646,7 +670,7 @@
                 "dataRepo": "Data Repository",
                 "websiteRepo": "Website Repository",
                 "mainRepo": "Main Repository",
-                "repoProvider": "Repository Provider",
+                "gitProvider": "Git Provider",
                 "organization": "Organization",
                 "created": "Created",
                 "lastUpdated": "Last Updated",
@@ -655,7 +679,11 @@
                 "custom": "Custom",
                 "customOverwrite": "Custom (Overwrite)",
                 "yes": "Yes",
-                "no": "No"
+                "no": "No",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Configuration Details",
@@ -778,7 +806,7 @@
                     "success": "Screenshot captured successfully",
                     "failed": "Failed to capture screenshot",
                     "error": "An error occurred while capturing screenshot",
-                    "notConfigured": "Screenshot service is not configured. Please add your ScreenshotOne API key in Settings.",
+                    "notConfigured": "Screenshot service is not configured",
                     "captureFailed": "Failed to capture image",
                     "captureSuccess": "Image captured successfully",
                     "captureError": "An error occurred while capturing image",
@@ -883,8 +911,12 @@
                 "requiredInfo": "Required Information",
                 "updateConfiguration": "Update Configuration",
                 "promptRequired": "Prompt is required",
+                "unconfiguredProviders": "{providers} not configured. Visit Settings → Plugins to set up before generating.",
                 "operationStartedSuccessfully": "Operation started successfully",
                 "failedToStartOperation": "Failed to start operation",
+                "loadingFormSchema": "Loading form configuration...",
+                "failedToLoadFormSchema": "Failed to load form configuration",
+                "selectOption": "Select an option",
                 "directoryName": "Directory Name",
                 "generationPrompt": "Generation Prompt",
                 "recommended": "Recommended",
@@ -974,7 +1006,24 @@
                 "generateTags": "Generate Tags",
                 "generateTagsDescription": "Create tags for flexible item labeling",
                 "generateBrands": "Generate Brands",
-                "generateBrandsDescription": "Extract and create brand entities from items"
+                "generateBrandsDescription": "Extract and create brand entities from items",
+                "pipelineMode": "Pipeline Mode",
+                "standardPipeline": "Standard Pipeline",
+                "standardPipelineDescription": "Use the step-by-step pipeline with individual provider selection",
+                "providerSelection": "Provider Selection",
+                "providerSelectionDescription": "Choose which providers to use for each capability",
+                "searchProvider": "Search Provider",
+                "searchProviderDescription": "Provider for web search and content discovery",
+                "screenshotProvider": "Screenshot Provider",
+                "screenshotProviderDescription": "Provider for capturing screenshots of items",
+                "aiProvider": "AI Provider",
+                "aiProviderDescription": "AI model provider for content generation and extraction",
+                "contentExtractorProvider": "Content Extractor",
+                "contentExtractorProviderDescription": "Provider for extracting content from web pages",
+                "useDirectoryDefault": "Use Directory Default",
+                "default": "Default",
+                "notConfigured": "Not configured",
+                "notConfiguredTooltip": "This provider requires configuration. Visit Settings → Plugins to set it up."
             },
             "progress": {
                 "title": "Generation in Progress",
@@ -1049,6 +1098,17 @@
                 "updateReadme": "Update README",
                 "updateSuccess": "Settings updated successfully",
                 "updateFailed": "Failed to update settings",
+                "deployProvider": {
+                    "title": "Deploy Provider",
+                    "description": "Select where to deploy your directory website",
+                    "configure": "Configure",
+                    "ready": "Ready to deploy",
+                    "notConfigured": "Not configured",
+                    "deployed": "Deployed",
+                    "viewSite": "View site",
+                    "updateSuccess": "Deploy provider updated successfully",
+                    "updateFailed": "Failed to update deploy provider"
+                },
                 "visibilityUpdateFailed": "Failed to update repository visibility",
                 "visibilityWarningTitle": "Make Repository Private?",
                 "visibilityWarningDescription": "You are about to make {name} private.",
@@ -1188,35 +1248,41 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Vercel Token Required",
-                    "description": "To deploy your directory to Vercel, you need to configure your Vercel API token in your account settings.",
-                    "configureButton": "Go to API Tokens Settings",
-                    "getTokenButton": "Get Vercel Token",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
+                    "configureButton": "Configure in Plugin Settings",
+                    "getTokenButton": "Get API Token",
                     "howTo": {
-                        "title": "How to configure your Vercel token:",
-                        "step1": "Click 'Get Vercel Token' to open the Vercel dashboard",
+                        "title": "How to configure deployment:",
+                        "step1": "Click 'Get API Token' to open your provider dashboard",
                         "step2": "Create a new token with deployment permissions",
-                        "step3": "Copy the generated token",
-                        "step4": "Go to API Tokens Settings and paste your token in the Vercel section"
+                        "step3": "Configure your {provider} API token in Plugin Settings > {provider}",
+                        "step4": "Return here to deploy your directory"
                     }
                 },
                 "sharedNoTokenAlert": {
                     "title": "Deployment Not Available",
-                    "description": "The directory owner has not configured a Vercel token for deployment. Please contact the directory owner to set up deployment.",
-                    "hint": "As a collaborator, you can trigger deployments once the owner configures their Vercel integration."
+                    "description": "The directory owner has not configured deployment. Please contact the directory owner to set up deployment.",
+                    "hint": "As a collaborator, you can trigger deployments once the owner configures their deployment provider."
                 },
                 "form": {
-                    "deployToVercel": {
-                        "title": "Deploy to Vercel",
-                        "description": "Deploy your directory website repository on Vercel.",
-                        "deployButton": "Deploy Now",
+                    "deployment": {
+                        "title": "Deploy Website",
+                        "description": "Deploy your directory website repository.",
+                        "deployButton": "Deploy to {provider}",
                         "deployingButton": "Deploying...",
                         "deployingStateButton": "Deploying ({state})...",
                         "successMessage": "Your website has been successfully deployed!",
                         "teamSelection": {
-                            "title": "Select Vercel Team",
-                            "description": "Choose the Vercel team to deploy this directory to.",
+                            "title": "Select Team",
+                            "description": "Choose the team to deploy this directory to.",
                             "label": "Team",
                             "placeholder": "Select a team",
                             "confirmButton": "Deploy to team",
@@ -1233,7 +1299,7 @@
                     "messages": {
                         "deploySuccess": "Deployment started successfully",
                         "deployPending": "Deployment is queued and will start shortly",
-                        "deployFailed": "Failed to deploy to Vercel",
+                        "deployFailed": "Failed to deploy",
                         "deployError": "An error occurred during deployment",
                         "updateSuccess": "Repository updated successfully",
                         "updateFailed": "Failed to update repository",
@@ -1263,6 +1329,13 @@
                         "siteName": "Site Name",
                         "siteNamePlaceholder": "My Directory",
                         "siteNameHelper": "The name displayed on your website (default: Acme)",
+                        "tabGeneral": "Global",
+                        "tabHeader": "Header",
+                        "tabHomepage": "Homepage",
+                        "tabFooter": "Footer",
+                        "featuresLabel": "Enabled Features",
+                        "visibilityLabel": "Visibility",
+                        "defaultsLabel": "Defaults",
                         "advancedSettings": "Advanced Settings",
                         "advancedSettingsDescription": "Configure additional website options",
                         "loadFailed": "Failed to load current settings",
@@ -1277,6 +1350,18 @@
             "title": "Create New Directory",
             "subtitle": "Choose how you'd like to create your directory",
             "backToOptions": "Back to options",
+            "sidebar": {
+                "selectedProvider": "Git Provider",
+                "selectedDeployProvider": "Deploy Provider"
+            },
+            "deployProvider": {
+                "title": "Deploy Provider",
+                "description": "Select where to deploy your directory website",
+                "noProviders": "No deploy providers available",
+                "notConfigured": "Not configured",
+                "configured": "Ready to deploy",
+                "configureLink": "Configure"
+            },
             "organizationSelector": {
                 "label": "Repository Owner",
                 "loading": "Loading organizations...",
@@ -1284,7 +1369,8 @@
                 "personalAccount": "Repository will be created under your personal account",
                 "organizations": "Organizations",
                 "personalHelp": "The repository will be created under your personal GitHub account",
-                "organizationHelp": "The repository will be created under the {org} organization"
+                "organizationHelp": "The repository will be created under the {org} organization",
+                "connectRequired": "Connect a Git provider in the sidebar to choose where your repository will be created."
             },
             "ai": {
                 "title": "Create with AI",
@@ -1331,6 +1417,7 @@
                 "noteText": "AI generation typically takes 2-5 minutes depending on the complexity of your request. You'll be notified when your directory is ready.",
                 "errors": {
                     "promptRequired": "Please describe what kind of directory you want to create",
+                    "unconfiguredProviders": "{providers} not configured. Visit Settings → Plugins to set up before generating.",
                     "nameRequired": "Directory name is required",
                     "slugRequired": "Directory slug is required",
                     "descriptionRequired": "Directory description is required"
@@ -1388,6 +1475,8 @@
                 "title": "Import Existing",
                 "subtitle": "Import a directory from an existing GitHub repository",
                 "importNow": "Import now",
+                "aiProviderSettings": "AI Provider",
+                "aiProviderSettingsDescription": "Choose which AI provider to use for parsing the README",
                 "formTitle": "Import Directory from GitHub",
                 "formSubtitle": "Import items from an existing GitHub repository to create your directory",
                 "sync": {
@@ -1515,89 +1604,82 @@
                     "noAnalysis": "Please analyze a repository first",
                     "githubRequired": "Please connect your GitHub account first",
                     "importFailed": "Failed to import directory",
-                    "linkFailed": "Failed to link directory"
+                    "linkFailed": "Failed to link directory",
+                    "providerNotConfigured": "{provider} is not configured. Visit Settings → Plugins to set it up before importing."
                 },
                 "success": {
                     "started": "Import started! Redirecting to your directory...",
                     "linked": "Directory linked successfully"
+                },
+                "slugConflict": {
+                    "title": "Repository name conflict",
+                    "description": "Repositories with this name already exist in your account. You can use a different name or accept the suggestion.",
+                    "useSuggestion": "Use \"{slug}\" instead"
                 }
             }
         },
-        "github": {
+        "gitProvider": {
             "connection": {
                 "alert": {
-                    "title": "GitHub not connected",
-                    "subtitle": "Connect your GitHub account to create and manage directories",
-                    "connectButton": "Connect GitHub",
+                    "title": "{provider} not connected",
+                    "subtitle": "Connect your {provider} account to create directories",
+                    "connectButton": "Connect {provider}",
                     "connectingButton": "Connecting..."
-                },
-                "status": {
-                    "title": "GitHub Status",
-                    "connected": "Connected",
-                    "notConnected": "Not connected",
-                    "connectedDescription": "Your directories will be stored as GitHub repositories in your account.",
-                    "notConnectedDescription": "Connect your GitHub account to create and manage directories.",
-                    "connectedAccount": "Connected account:",
-                    "requiredNote": "Required to create directories",
-                    "connectButton": "Connect GitHub",
-                    "connectingButton": "Connecting...",
-                    "failedToConnect": "Failed to connect GitHub"
                 }
+            },
+            "selector": {
+                "title": "Select Git Provider",
+                "noProviders": "No git providers available",
+                "notConnected": "Not connected",
+                "connected": "Connected",
+                "connecting": "Connecting...",
+                "connect": "Connect"
+            },
+            "settings": {
+                "title": "Git Provider Connections",
+                "subtitle": "Connect your git provider accounts to import repositories, create directories, and manage your projects.",
+                "connectedCount": "{count, plural, =0 {No providers connected} =1 {1 provider connected} other {# providers connected}}",
+                "noProvidersConnected": "No providers connected",
+                "canImport": "You can import and manage repositories",
+                "connectToStart": "Connect a provider to get started",
+                "noProvidersTitle": "No Git Providers Available",
+                "noProvidersSubtitle": "No git provider plugins are currently enabled. Contact your administrator to enable git provider plugins.",
+                "reconnect": "Reconnect",
+                "reconnecting": "Reconnecting...",
+                "disconnect": "Disconnect",
+                "connect": "Connect {provider}",
+                "connecting": "Connecting...",
+                "organizations": "Organizations ({count})",
+                "organizationsNote": "Only organizations where you have granted access are shown.",
+                "connectDescription": "Connect your {provider} account to import repositories and manage your projects.",
+                "selectedProvider": "Selected Provider"
             }
         },
         "apiTokens": {
             "title": "API & Tokens",
             "subtitle": "Manage your API keys and third-party integrations",
-            "vercel": {
-                "title": "Vercel Integration",
-                "subtitle": "Connect your Vercel account to deploy directories as websites",
+            "deployment": {
+                "title": "Deployment Integration",
+                "subtitle": "Configure deployment providers in Plugin Settings",
                 "connected": "Connected",
                 "notConnected": "Not Connected",
-                "connectedMessage": "Your Vercel account is connected. You can now deploy directories to Vercel.",
-                "disconnect": "Disconnect Vercel",
+                "connectedMessage": "Your deployment provider is configured. You can now deploy directories.",
+                "disconnect": "Disconnect",
                 "disconnecting": "Removing...",
-                "apiTokenLabel": "Vercel API Token",
-                "placeholder": "vc_...",
+                "apiTokenLabel": "API Token",
+                "placeholder": "Enter your API token",
                 "showToken": "Show",
                 "hideToken": "Hide",
-                "getTokenHelp": "You can get your API token from",
-                "vercelDashboard": "Vercel Dashboard",
+                "getTokenHelp": "You can get your API token from your provider dashboard",
+                "providerDashboard": "Provider Dashboard",
                 "save": "Save Token",
                 "saving": "Saving...",
                 "messages": {
-                    "tokenRequired": "Please enter a valid Vercel token",
-                    "saveSuccess": "Vercel token saved successfully",
-                    "saveFailed": "Failed to save Vercel token",
-                    "removeSuccess": "Vercel token removed successfully",
-                    "removeFailed": "Failed to remove Vercel token",
-                    "unexpectedError": "An unexpected error occurred"
-                }
-            },
-            "screenshotone": {
-                "title": "ScreenshotOne Integration",
-                "subtitle": "Automatically capture screenshots of directory items using ScreenshotOne",
-                "connected": "Connected",
-                "notConnected": "Not Connected",
-                "connectedMessage": "Your ScreenshotOne account is connected. Screenshots will be automatically captured for directory items.",
-                "disconnect": "Disconnect ScreenshotOne",
-                "disconnecting": "Removing...",
-                "accessKeyLabel": "Access Key",
-                "placeholder": "Your access key...",
-                "secretKeyLabel": "Secret Key (Optional)",
-                "secretKeyPlaceholder": "Your secret key...",
-                "showKey": "Show",
-                "hideKey": "Hide",
-                "accessKeyHelp": "Required. Used to authenticate with the ScreenshotOne API.",
-                "secretKeyHelp": "Optional. Enables signed URLs for enhanced security. Get your keys from",
-                "dashboard": "ScreenshotOne Dashboard",
-                "save": "Save Keys",
-                "saving": "Saving...",
-                "messages": {
-                    "accessKeyRequired": "Please enter a valid ScreenshotOne access key",
-                    "saveSuccess": "ScreenshotOne keys saved successfully",
-                    "saveFailed": "Failed to save ScreenshotOne keys",
-                    "removeSuccess": "ScreenshotOne keys removed successfully",
-                    "removeFailed": "Failed to remove ScreenshotOne keys",
+                    "tokenRequired": "Please enter a valid token",
+                    "saveSuccess": "Token saved successfully",
+                    "saveFailed": "Failed to save token",
+                    "removeSuccess": "Token removed successfully",
+                    "removeFailed": "Failed to remove token",
                     "unexpectedError": "An unexpected error occurred"
                 }
             },
@@ -1670,6 +1752,7 @@
             "navigation": {
                 "dashboard": "Dashboard",
                 "directories": "Directories",
+                "plugins": "Plugins",
                 "settings": "Settings"
             },
             "signOut": "Sign Out",
@@ -1716,8 +1799,144 @@
             "inputPlaceholder": "Describe the directory you want to create...",
             "sendButton": "Send",
             "errors": {
-                "unableToSend": "Unable to send message."
+                "unableToSend": "Unable to send message"
             }
+        },
+        "plugins": {
+            "title": "Plugins",
+            "subtitle": "Manage your installed plugins and integrations",
+            "empty": "No plugins available",
+            "noDescription": "No description provided",
+            "enabled": "Enabled",
+            "disabled": "Disabled",
+            "enable": "Enable",
+            "enableDescription": "Configure how this plugin is enabled across your directories.",
+            "disable": "Disable",
+            "settings": "Settings",
+            "saveSettings": "Save Settings",
+            "settingsTitle": "Plugin Settings",
+            "settingsSaved": "Settings saved successfully",
+            "noSettings": "This plugin has no configurable settings",
+            "builtIn": "Built-in",
+            "system": "System",
+            "docs": "Docs",
+            "author": "Author",
+            "documentation": "Documentation",
+            "about": "About",
+            "backToPlugins": "Back to Plugins",
+            "filters": {
+                "all": "All",
+                "enabledOnly": "Enabled only"
+            },
+            "categories": {
+                "git": "Git",
+                "deployment": "Deployment",
+                "screenshot": "Screenshot",
+                "search": "Search",
+                "content": "Content",
+                "dataSource": "Data Source",
+                "ai": "AI",
+                "pipeline": "Pipeline"
+            },
+            "alwaysEnabled": "Always enabled",
+            "disableWarning": "Disabling this plugin will also disable it in all your directories",
+            "cannotDisableSystem": "System plugins cannot be disabled",
+            "disableFailed": "Failed to disable plugin",
+            "autoEnableForDirectories": "Also enable for all directories",
+            "autoEnableForDirectoriesDescription": "This plugin will be automatically active in all your directories. You can still disable it per directory.",
+            "confirmDisable": "Confirm Disable",
+            "cancel": "Cancel",
+            "missingRequiredFields": "Missing required fields: {fields}",
+            "saveError": "Failed to save settings. Please try again.",
+            "goToPluginSettings": "Go to plugin settings",
+            "userLevelRequiredError": "User-level required settings must be configured first",
+            "modelSelect": {
+                "placeholder": "Select a model...",
+                "loading": "Loading models...",
+                "loadError": "Failed to load models",
+                "searchPlaceholder": "Search models...",
+                "noModels": "No models found",
+                "context": "{value} ctx",
+                "customModelPlaceholder": "Enter model ID...",
+                "addCustomModel": "+ Add custom model",
+                "add": "Add"
+            },
+            "settingsField": {
+                "selectPlaceholder": "Select...",
+                "fieldEncrypted": "This field is encrypted",
+                "nullValue": "No value set",
+                "removeItem": "Remove",
+                "addItem": "Add"
+            },
+            "oauth": {
+                "title": "Account Connection",
+                "connected": "Connected",
+                "notConnected": "Not connected",
+                "connect": "Connect",
+                "disconnect": "Disconnect",
+                "reconnect": "Reconnect",
+                "connecting": "Connecting...",
+                "reconnecting": "Reconnecting...",
+                "connectDescription": "Connect your {plugin} account to enable full functionality",
+                "confirmDisconnect": "Are you sure you want to disconnect {plugin}?",
+                "disconnected": "{plugin} disconnected successfully",
+                "connectError": "Failed to connect. Please try again.",
+                "reconnectError": "Failed to reconnect. Please try again.",
+                "disconnectError": "Failed to disconnect. Please try again."
+            }
+        },
+        "directoryPlugins": {
+            "title": "Directory Plugins",
+            "subtitle": "Configure plugins for this directory",
+            "active": "Active",
+            "enable": "Enable",
+            "disable": "Disable",
+            "enableForDirectory": "Enable for this directory",
+            "disableForDirectory": "Disable for this directory",
+            "enableAtUserLevelFirst": "Enable this plugin in your settings first",
+            "disabledByUser": "Disabled at user level",
+            "systemAlwaysEnabled": "System plugin - always enabled",
+            "showSettings": "Show Settings",
+            "hideSettings": "Hide Settings",
+            "directorySettingsInfo": "Configure directory-specific settings here",
+            "save": "Save",
+            "saved": "Saved",
+            "showInstalledOnly": "Show installed only",
+            "noInstalledPlugins": "No plugins are installed. Visit Plugins settings to install plugins.",
+            "noPlugins": "No plugins available",
+            "showAllPlugins": "Show all plugins",
+            "capabilityProviders": "Capability Providers",
+            "capabilityProvidersDescription": "Select which plugin provides each capability for this directory",
+            "noProvidersAvailable": "No providers available",
+            "categories": {
+                "git": "Git",
+                "deployment": "Deployment",
+                "screenshot": "Screenshot",
+                "search": "Search",
+                "content": "Content",
+                "dataSource": "Data Source",
+                "ai": "AI",
+                "pipeline": "Pipeline"
+            },
+            "missingRequiredFields": "Missing required fields: {fields}",
+            "saveError": "Failed to save settings. Please try again.",
+            "sendButton": "Send",
+            "errors": {
+                "unableToSend": "Unable to send message."
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure",
+            "autoEnabledByUser": "Auto-enabled via user settings",
+            "toggleError": "Failed to toggle plugin",
+            "system": "System",
+            "goToPluginSettings": "Go to plugin settings"
         }
     },
     "layout": {
@@ -1825,7 +2044,8 @@
             "failedToUpdateItems": "Failed to update items",
             "markdownRegeneratedSuccessfully": "Markdown regenerated successfully",
             "failedToRegenerateMarkdown": "Failed to regenerate markdown",
-            "notAuthorizedToAccessOrganization": "You are not authorized to access this organization. Please contact the owner ({owner}) for assistance."
+            "notAuthorizedToAccessOrganization": "You are not authorized to access this organization. Please contact the owner ({owner}) for assistance.",
+            "failedToLoadFormSchema": "Failed to load form configuration"
         },
         "settings": {
             "profile": {
@@ -1843,24 +2063,15 @@
                 "updateSuccess": "Password updated successfully",
                 "notAuthenticated": "Not authenticated"
             },
-            "vercel": {
+            "deployment": {
                 "notAuthenticated": "Not authenticated",
                 "tokenRequired": "Token is required",
-                "invalidFormat": "Invalid Vercel token format",
-                "saveFailed": "Failed to save Vercel token",
-                "saveSuccess": "Vercel token saved successfully",
-                "validationFailed": "The provided Vercel token is invalid. Please double-check and try again.",
-                "removeFailed": "Failed to remove Vercel token",
-                "removeSuccess": "Vercel token removed successfully"
-            },
-            "screenshotone": {
-                "notAuthenticated": "Not authenticated",
-                "accessKeyRequired": "Access key is required",
-                "saveFailed": "Failed to save ScreenshotOne keys",
-                "saveSuccess": "ScreenshotOne keys saved successfully",
-                "validationFailed": "The provided ScreenshotOne keys are invalid. Please double-check and try again.",
-                "removeFailed": "Failed to remove ScreenshotOne keys",
-                "removeSuccess": "ScreenshotOne keys removed successfully"
+                "invalidFormat": "Invalid token format",
+                "saveFailed": "Failed to save deployment token",
+                "saveSuccess": "Deployment token saved successfully",
+                "validationFailed": "The provided token is invalid. Please double-check and try again.",
+                "removeFailed": "Failed to remove deployment token",
+                "removeSuccess": "Deployment token removed successfully"
             },
             "github": {
                 "notAuthenticated": "Not authenticated",
@@ -1879,7 +2090,7 @@
             }
         },
         "deploy": {
-            "deployVercelFailed": "Failed to deploy to Vercel",
+            "deployFailed": "Failed to deploy",
             "updateRepositoryFailed": "Failed to update repository",
             "updateSettingsFailed": "Failed to update website template settings"
         }

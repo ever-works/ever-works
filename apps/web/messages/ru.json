@@ -646,7 +646,7 @@
                 "dataRepo": "Репозиторий данных",
                 "websiteRepo": "Репозиторий сайта",
                 "mainRepo": "Основной репозиторий",
-                "repoProvider": "Провайдер репозитория",
+                "gitProvider": "Git-провайдер",
                 "organization": "Организация",
                 "created": "Создан",
                 "lastUpdated": "Последнее обновление",
@@ -655,7 +655,11 @@
                 "custom": "Пользовательский",
                 "customOverwrite": "Пользовательский (Перезаписать)",
                 "yes": "Да",
-                "no": "Нет"
+                "no": "Нет",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Детали конфигурации",
@@ -1188,17 +1192,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Требуется токен Vercel",
-                    "description": "Для развертывания вашего каталога в Vercel необходимо настроить ваш API-токен Vercel в настройках аккаунта.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Перейти в настройки API токенов",
                     "getTokenButton": "Получить токен Vercel",
                     "howTo": {
                         "title": "Как настроить ваш токен Vercel:",
                         "step1": "Нажмите «Получить токен Vercel», чтобы открыть панель Vercel",
                         "step2": "Создайте новый токен с правами на развертывание",
-                        "step3": "Скопируйте сгенерированный токен",
-                        "step4": "Перейдите в настройки API токенов и вставьте ваш токен в раздел Vercel"
+                        "step3": "Настройте API-токен {provider} в Настройках плагина > {provider}",
+                        "step4": "Вернитесь сюда, чтобы развернуть свой каталог"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1217,10 @@
                     "hint": "Как участник, вы можете запускать развертывания, как только владелец настроит интеграцию Vercel."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Развернуть в Vercel",
                         "description": "Разверните репозиторий сайта вашего каталога на Vercel.",
-                        "deployButton": "Развернуть сейчас",
+                        "deployButton": "Развернуть в {provider}",
                         "deployingButton": "Развертывание...",
                         "deployingStateButton": "Развертывание ({state})...",
                         "successMessage": "Ваш сайт успешно развернут!",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "Репозиторий будет создан под вашим личным аккаунтом",
                 "organizations": "Организации",
                 "personalHelp": "Репозиторий будет создан под вашим личным аккаунтом GitHub",
-                "organizationHelp": "Репозиторий будет создан под организацией {org}"
+                "organizationHelp": "Репозиторий будет создан под организацией {org}",
+                "connectRequired": "Подключите Git-провайдер на боковой панели, чтобы выбрать, где будет создан репозиторий."
             },
             "ai": {
                 "title": "Создать с помощью ИИ",
@@ -1712,7 +1723,16 @@
             "sendButton": "Отправить",
             "errors": {
                 "unableToSend": "Не удалось отправить сообщение."
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

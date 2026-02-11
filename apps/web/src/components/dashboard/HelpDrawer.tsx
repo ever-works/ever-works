@@ -1,13 +1,7 @@
 'use client';
 
 import { Fragment } from 'react';
-import {
-    Dialog,
-    DialogPanel,
-    DialogTitle,
-    Transition,
-    TransitionChild,
-} from '@headlessui/react';
+import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { X, ExternalLink, BookOpen, Keyboard } from 'lucide-react';
@@ -174,26 +168,30 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
                                                                 {shortcut.label}
                                                             </span>
                                                             <div className="flex items-center gap-1">
-                                                                {shortcut.keys.map((key, keyIndex) => (
-                                                                    <Fragment key={keyIndex}>
-                                                                        <kbd
-                                                                            className={cn(
-                                                                                'px-2 py-1 text-xs font-medium rounded',
-                                                                                'bg-white dark:bg-surface-dark',
-                                                                                'border border-border dark:border-border-dark',
-                                                                                'text-text-secondary dark:text-text-secondary-dark',
+                                                                {shortcut.keys.map(
+                                                                    (key, keyIndex) => (
+                                                                        <Fragment key={keyIndex}>
+                                                                            <kbd
+                                                                                className={cn(
+                                                                                    'px-2 py-1 text-xs font-medium rounded',
+                                                                                    'bg-white dark:bg-surface-dark',
+                                                                                    'border border-border dark:border-border-dark',
+                                                                                    'text-text-secondary dark:text-text-secondary-dark',
+                                                                                )}
+                                                                            >
+                                                                                {key}
+                                                                            </kbd>
+                                                                            {keyIndex <
+                                                                                shortcut.keys
+                                                                                    .length -
+                                                                                    1 && (
+                                                                                <span className="text-text-muted dark:text-text-muted-dark">
+                                                                                    +
+                                                                                </span>
                                                                             )}
-                                                                        >
-                                                                            {key}
-                                                                        </kbd>
-                                                                        {keyIndex <
-                                                                            shortcut.keys.length - 1 && (
-                                                                            <span className="text-text-muted dark:text-text-muted-dark">
-                                                                                +
-                                                                            </span>
-                                                                        )}
-                                                                    </Fragment>
-                                                                ))}
+                                                                        </Fragment>
+                                                                    ),
+                                                                )}
                                                             </div>
                                                         </div>
                                                     ))}
@@ -218,7 +216,9 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
                                                         <a
                                                             key={index}
                                                             href={link.href}
-                                                            target={link.external ? '_blank' : undefined}
+                                                            target={
+                                                                link.external ? '_blank' : undefined
+                                                            }
                                                             rel={
                                                                 link.external
                                                                     ? 'noopener noreferrer'
@@ -256,7 +256,8 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
                                             <p className="text-xs text-text-muted dark:text-text-muted-dark text-center">
                                                 {t('version', {
                                                     version:
-                                                        process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
+                                                        process.env.NEXT_PUBLIC_APP_VERSION ||
+                                                        '1.0.0',
                                                 })}
                                             </p>
                                         </div>

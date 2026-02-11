@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import type { Directory, VercelTeam } from '@/lib/api';
+import type { Directory } from '@/lib/api';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import {
-    deployToVercel,
-    getVercelTeams,
+    deploy,
+    getDeploymentTeams,
     lookupExistingDeployment,
     updateWebsiteRepository,
     updateWebsiteTemplateSettings,
@@ -18,7 +18,7 @@ import { useDirectoryDetail } from '../DirectoryDetailContext';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { pageIntervalRefresh } from '@/lib/utils';
-import { VercelTeamSelectionDialog } from './VercelTeamSelectionDialog';
+import { TeamSelectionDialog, type DeployTeam } from './TeamSelectionDialog';
 import { DeployConfigDialog, type DeployConfigData } from './DeployConfigDialog';
 import { updateWebsiteSettings } from '@/app/actions/dashboard/directories';
 import { formatDistanceToNow } from 'date-fns';
@@ -26,18 +26,18 @@ import { formatDistanceToNow } from 'date-fns';
 interface DeployFormProps {
     directory: Directory;
     isDeploying?: boolean;
+    providerName?: string;
 }
 
-export function DeployForm({ directory, isDeploying }: DeployFormProps) {
+export function DeployForm({ directory, isDeploying, providerName }: DeployFormProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
     const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
-    const [vercelTeams, setVercelTeams] = useState<VercelTeam[]>([]);
-    const [pendingTeamScope, setPendingTeamScope] = useState<string | undefined>();
+    const [deployTeams, setDeployTeams] = useState<DeployTeam[]>([]);
 
-    const hasVercelTeams = vercelTeams.length > 0;
+    const hasDeployTeams = deployTeams.length > 0;
     const setHasCheckedExisting = useRef(false);
 
     useEffect(() => {
@@ -48,10 +48,12 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
     }, [isDeploying, router]);
 
     useEffect(() => {
-        getVercelTeams().then((res) => {
-            setVercelTeams(res.teams || []);
+        // Fetch teams using the directory-specific endpoint
+        // This uses the user's plugin settings token
+        getDeploymentTeams(directory.id).then((res) => {
+            setDeployTeams(res.teams || []);
         });
-    }, []);
+    }, [directory.id]);
 
     useEffect(() => {
         if (directory.website || setHasCheckedExisting.current) {
@@ -70,7 +72,7 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
     const runDeploy = (teamScope?: string) => {
         startTransition(async () => {
             try {
-                const result = await deployToVercel(directory.id, teamScope);
+                const result = await deploy(directory.id, teamScope);
 
                 if (result.success && result.data) {
                     if (result.data.status === 'pending') {
@@ -131,7 +133,7 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
     };
 
     const proceedToDeploy = () => {
-        if (hasVercelTeams) {
+        if (hasDeployTeams) {
             setIsTeamDialogOpen(true);
         } else {
             runDeploy();
@@ -153,15 +155,16 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
                 onCancel={() => setIsConfigDialogOpen(false)}
             />
 
-            <VercelTeamSelectionDialog
+            <TeamSelectionDialog
                 open={isTeamDialogOpen}
-                teams={vercelTeams}
+                teams={deployTeams}
                 isSubmitting={isPending || isDeploying}
+                providerName={providerName}
                 onConfirm={handleConfirmDeploy}
                 onCancel={() => setIsTeamDialogOpen(false)}
             />
 
-            {/* Deploy to Vercel Section */}
+            {/* Deploy Section */}
             <div className="rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark p-6">
                 <div className="flex items-start gap-4">
                     <div
@@ -175,17 +178,17 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
 
                     <div className="flex-1">
                         <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-2">
-                            {t('form.deployToVercel.title')}
+                            {t('form.deployment.title')}
                         </h3>
                         <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
-                            {t('form.deployToVercel.description')}
+                            {t('form.deployment.description')}
                         </p>
 
                         {directory.website && (
                             <div className="mb-4 p-4 rounded-lg bg-success/10 dark:bg-success-dark/10 border border-success/20 dark:border-success-dark/20">
                                 {directory.deploymentState === 'READY' && (
                                     <p className="text-sm text-success dark:text-success-dark mb-2">
-                                        {t('form.deployToVercel.successMessage')}
+                                        {t('form.deployment.successMessage')}
                                     </p>
                                 )}
 
@@ -210,15 +213,19 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
                                     <Loader2 className="animate-spin h-4 w-4" />
 
                                     {isDeploying
-                                        ? t('form.deployToVercel.deployingStateButton', {
+                                        ? t('form.deployment.deployingStateButton', {
                                               state: (
                                                   directory.deploymentState || 'INITIALIZING'
                                               ).toLowerCase(),
                                           })
-                                        : t('form.deployToVercel.deployButton')}
+                                        : t('form.deployment.deployButton', {
+                                              provider: providerName || 'Provider',
+                                          })}
                                 </span>
                             ) : (
-                                t('form.deployToVercel.deployButton')
+                                t('form.deployment.deployButton', {
+                                    provider: providerName || 'Provider',
+                                })
                             )}
                         </Button>
                     </div>
@@ -329,9 +336,9 @@ function WebsiteTemplateSettings({ directory }: DeployFormProps) {
                 if (result.success) {
                     toast.success(t('form.websiteTemplate.updateSuccess'));
                     router.refresh();
-                } else if ('requiresGitHub' in result && result.requiresGitHub) {
+                } else if ('requiresGitProvider' in result && result.requiresGitProvider) {
                     setAutoUpdate(!checked); // Revert on failure
-                    toast.error(t('form.websiteTemplate.githubRequired'));
+                    toast.error(result.error || 'Git provider connection required');
                 } else {
                     setAutoUpdate(!checked); // Revert on failure
                     toast.error(result.error || t('form.websiteTemplate.updateFailed'));

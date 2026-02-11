@@ -10,9 +10,9 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard, AuthService, CurrentUser } from '@src/auth';
-import { SubscriptionService } from '@packages/agent/subscriptions';
+import { SubscriptionService } from '@ever-works/agent/subscriptions';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
-import { SubscriptionPlanCode } from '@packages/agent/entities';
+import { SubscriptionPlanCode } from '@ever-works/agent/entities';
 import { IsEnum } from 'class-validator';
 
 class UpdateSubscriptionPlanDto {
@@ -32,7 +32,10 @@ export class SubscriptionsController {
 
     @Get('plan')
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'Get subscription plan', description: 'Get the current subscription plan for the user' })
+    @ApiOperation({
+        summary: 'Get subscription plan',
+        description: 'Get the current subscription plan for the user',
+    })
     @ApiResponse({ status: 200, description: 'Subscription plan details' })
     async getPlan(@CurrentUser() auth: AuthenticatedUser) {
         const user = await this.authService.getUser(auth.userId);
@@ -58,7 +61,10 @@ export class SubscriptionsController {
 
     @Post('plan')
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'Update subscription plan', description: 'Update the subscription plan for the user' })
+    @ApiOperation({
+        summary: 'Update subscription plan',
+        description: 'Update the subscription plan for the user',
+    })
     @ApiResponse({ status: 200, description: 'Subscription plan updated' })
     @ApiResponse({ status: 400, description: 'Subscriptions are disabled' })
     async updatePlan(

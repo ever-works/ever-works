@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { CacheEntryRepository } from '@packages/agent/cache';
-import { DirectoryRepository } from '@packages/agent/database';
-import { Directory, GenerateStatusType } from '@packages/agent/entities';
-import { DirectoryGenerationCompletedEvent } from '@packages/agent/events';
+import { CacheEntryRepository } from '@ever-works/agent/cache';
+import { DirectoryRepository } from '@ever-works/agent/database';
+import { Directory, GenerateStatusType } from '@ever-works/agent/entities';
+import { DirectoryGenerationCompletedEvent } from '@ever-works/agent/events';
 import { config } from '@src/config/constants';
 
 @Injectable()

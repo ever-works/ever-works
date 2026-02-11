@@ -51,7 +51,7 @@ async function buildCLI() {
 
     // First, ensure the cli-shared package is built
     try {
-        execSync('pnpm --filter "@packages/cli-shared" build', {
+        execSync('pnpm --filter "@ever-works/cli-shared" build', {
             cwd: path.resolve(__dirname, '../..'),
             stdio: 'inherit',
         });

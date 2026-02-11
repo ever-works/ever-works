@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { RefreshTokenRepository } from '@packages/agent/database';
+import { RefreshTokenRepository } from '@ever-works/agent/database';
 import { authConstants, jwtConstants } from '../../config/constants';
 
 @Injectable()

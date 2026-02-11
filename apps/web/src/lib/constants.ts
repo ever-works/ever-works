@@ -73,14 +73,17 @@ export const ROUTES = {
     DASHBOARD_DIRECTORY_DEPLOY: (id: string) => `/directories/${id}/deploy`,
     DASHBOARD_DIRECTORY_MEMBERS: (id: string) => `/directories/${id}/members`,
     DASHBOARD_DIRECTORY_SETTINGS: (id: string) => `/directories/${id}/settings`,
+    DASHBOARD_DIRECTORY_PLUGINS: (id: string) => `/directories/${id}/plugins`,
+    // Plugins
+    DASHBOARD_PLUGINS: '/plugins',
+    DASHBOARD_PLUGIN_DETAIL: (pluginId: string) => `/plugins/${pluginId}`,
     // Settings
     DASHBOARD_SETTINGS: '/settings',
     DASHBOARD_SETTINGS_PROFILE: '/settings',
     DASHBOARD_SETTINGS_SECURITY: '/settings/security',
-    DASHBOARD_SETTINGS_API_TOKENS: '/settings/api-tokens',
-    DASHBOARD_SETTINGS_OAUTH: '/settings/oauth',
-    DASHBOARD_SETTINGS_NOTIFICATIONS: '/settings/notifications',
     DASHBOARD_SETTINGS_DANGER_ZONE: '/settings/danger',
+    // Dynamic plugin settings routes
+    DASHBOARD_SETTINGS_PLUGIN_CATEGORY: (category: string) => `/settings/plugins/${category}`,
     // Profile
     DASHBOARD_PROFILE: '/profile',
     DASHBOARD_ANALYTICS: '/analytics',
@@ -95,11 +98,11 @@ export const ROUTES = {
     AUTH_FORGOT_PASSWORD: '/forgot-password',
 
     // API routes
-    API_AUTH_CALLBACK: '/api/auth/:provider/callback',
     API_AUTH_VERIFY_EMAIL: '/api/auth/verify-email',
     API_AUTH_RESET_PASSWORD: '/api/auth/reset-password',
-    API_AI_CONVERSATIONS_ASK_STREAM: '/api/ai-conversations/ask/stream',
-    API_AI_CONVERSATIONS_MESSAGE_STREAM: '/api/ai-conversations/:sessionId/stream',
+    API_AI_CONVERSATIONS_CHAT_STREAM: '/api/ai-conversations/chat/stream',
+    API_OAUTH_CALLBACK: '/api/oauth/:providerId/callback',
+    API_OAUTH_PLUGINS_CALLBACK: '/api/oauth/:providerId/callback/plugins',
 } as const;
 
 export const routeWithParams = (route: string, params: Record<string, string>) => {

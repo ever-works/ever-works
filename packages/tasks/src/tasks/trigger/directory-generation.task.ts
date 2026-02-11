@@ -2,18 +2,23 @@ import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
 import { INestApplicationContext } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
-import { TriggerWorkerModule } from '../../trigger/trigger-worker.module';
-import { TriggerInternalApiClient } from '../../trigger/trigger-internal-api.client';
-import { TriggerGenerationOrchestrator } from '../../trigger/trigger-generation.orchestrator';
-import { DirectoryGenerationPayload } from '@packages/agent/tasks';
-import { Directory, User, GenerateStatusType } from '@packages/agent/entities';
-import { RemoteDirectoryScheduleService } from '../../trigger/remote-directory-schedule.service';
-import { TriggerLogger } from '../../trigger/trigger-logger';
+import { TriggerWorkerModule } from '../../trigger/worker/modules/trigger-worker.module';
+import { TriggerInternalApiClient } from '../../trigger/worker/services/trigger-internal-api.client';
+import { TriggerGenerationOrchestrator } from '../../trigger/worker/orchestrators/trigger-generation.orchestrator';
+import { TriggerPluginHydratorService } from '../../trigger/worker/services/trigger-plugin-hydrator.service';
+import { DirectoryGenerationPayload } from '@ever-works/agent/tasks';
+import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
+import { DirectoryScheduleService } from '@ever-works/agent/services';
+import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
 async function createContext(
     appContext: INestApplicationContext,
     payload: DirectoryGenerationPayload,
 ) {
+    // Initialize plugin system with remote settings
+    const hydrator = appContext.get(TriggerPluginHydratorService);
+    await hydrator.initialize();
+
     const apiClient = appContext.get(TriggerInternalApiClient);
     const context = await apiClient.fetchDirectoryContext(payload.directoryId, payload.userId);
 
@@ -40,12 +45,12 @@ export const directoryGenerationTask = task({
         }
 
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: new TriggerLogger('DirectoryGeneration:Cancel'),
+            logger: createTriggerLogger('DirectoryGeneration:Cancel'),
         });
 
         try {
             const { orchestrator, directory, user } = await createContext(appContext, payload);
-            const scheduleService = appContext.get(RemoteDirectoryScheduleService);
+            const scheduleService = appContext.get(DirectoryScheduleService);
 
             await orchestrator.handleCancellation({
                 directory,
@@ -64,12 +69,12 @@ export const directoryGenerationTask = task({
     },
     run: async (payload: DirectoryGenerationPayload) => {
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: new TriggerLogger('DirectoryGeneration'),
+            logger: createTriggerLogger('DirectoryGeneration'),
         });
 
         try {
             const { orchestrator, directory, user } = await createContext(appContext, payload);
-            const scheduleService = appContext.get(RemoteDirectoryScheduleService);
+            const scheduleService = appContext.get(DirectoryScheduleService);
 
             try {
                 await orchestrator.run({
@@ -81,7 +86,8 @@ export const directoryGenerationTask = task({
                 });
 
                 if (payload.triggerSource === 'schedule' && payload.scheduleId) {
-                    await scheduleService.markRunCompleted(payload.scheduleId, {
+                    await scheduleService.markRunCompleted({
+                        scheduleId: payload.scheduleId,
                         historyId: payload.historyId,
                         status: GenerateStatusType.GENERATED,
                     });

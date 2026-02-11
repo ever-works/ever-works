@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
-import { getApiService, VercelTeam } from '../../services/api.service';
+import { getApiService, DeploymentTeam } from '../../services/api.service';
 import { Directory, DirectoryPromptService } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 
@@ -11,7 +11,7 @@ export const deployCommand = new Command('deploy')
     .description('Deploy the website for a directory')
     .action(async () => {
         try {
-            console.log(chalk.cyan.bold('\n🚀 Deploy Website\n'));
+            console.log(chalk.cyan.bold('\nDeploy Website\n'));
 
             // Ensure user is authenticated
             await requireAuth();
@@ -36,34 +36,69 @@ export const deployCommand = new Command('deploy')
                 ),
             );
 
-            // Attempt to fetch Vercel teams (optional)
-            let vercelTeams: VercelTeam[] = [];
-            let vercelTeamScope: string | undefined;
+            // Check if deployment is possible for this directory
             try {
-                const teamResponse = await apiService.getVercelTeams();
-                if (teamResponse.status === 'success' && Array.isArray(teamResponse.teams)) {
-                    vercelTeams = teamResponse.teams;
+                const deployCheck = await apiService.checkDeployCapability(directory.id);
+
+                if (!deployCheck.canDeploy) {
+                    console.log(
+                        chalk.yellow('\n⚠ Deployment is not configured for this directory.'),
+                    );
+                    if (!deployCheck.ownerHasToken) {
+                        console.log(
+                            chalk.gray(
+                                '  The directory owner needs to configure a deployment token in Settings > Plugins.',
+                            ),
+                        );
+                    }
+                    if (deployCheck.isShared && !deployCheck.userHasToken) {
+                        console.log(
+                            chalk.gray(
+                                '  You can also configure your own deployment token in Settings > Plugins.',
+                            ),
+                        );
+                    }
+                    return;
                 }
             } catch (error: any) {
                 const message = error?.response?.data?.message || error?.message;
                 if (message) {
                     console.log(
                         chalk.yellow(
-                            `\n⚠ Could not retrieve Vercel teams (${message}). Continuing without team selection.`,
-                        ),
-                    );
-                } else {
-                    console.log(
-                        chalk.yellow(
-                            '\n⚠ Could not retrieve Vercel teams. Continuing without team selection.',
+                            `\n⚠ Could not verify deployment capability (${message}). Attempting to proceed.`,
                         ),
                     );
                 }
             }
 
-            if (vercelTeams.length > 0) {
-                console.log(chalk.cyan('\n--- Vercel Team Selection ---'));
-                const choices = vercelTeams.map((team) => ({
+            // Fetch deployment teams for this directory
+            let deploymentTeams: DeploymentTeam[] = [];
+            let teamScope: string | undefined;
+            try {
+                const teamResponse = await apiService.getDeployTeamsForDirectory(directory.id);
+                if (teamResponse.status === 'success' && Array.isArray(teamResponse.teams)) {
+                    deploymentTeams = teamResponse.teams;
+                }
+            } catch (error: any) {
+                const message = error?.response?.data?.message || error?.message;
+                if (message) {
+                    console.log(
+                        chalk.yellow(
+                            `\n⚠ Could not retrieve deployment teams (${message}). Continuing without team selection.`,
+                        ),
+                    );
+                } else {
+                    console.log(
+                        chalk.yellow(
+                            '\n⚠ Could not retrieve deployment teams. Continuing without team selection.',
+                        ),
+                    );
+                }
+            }
+
+            if (deploymentTeams.length > 0) {
+                console.log(chalk.cyan('\n--- Deployment Team Selection ---'));
+                const choices = deploymentTeams.map((team) => ({
                     name: team.name ? `${team.name} (${team.slug})` : team.slug,
                     value: team.slug,
                 }));
@@ -72,17 +107,17 @@ export const deployCommand = new Command('deploy')
                     {
                         type: 'list',
                         name: 'selectedTeamScope',
-                        message: 'Select the Vercel team to deploy to:',
+                        message: 'Select the team to deploy to:',
                         choices,
                         loop: false,
                     },
                 ]);
 
-                vercelTeamScope = selectedTeamScope;
-                const selectedChoice = choices.find((c) => c.value === vercelTeamScope);
+                teamScope = selectedTeamScope;
+                const selectedChoice = choices.find((c) => c.value === teamScope);
                 console.log(
                     chalk.green(
-                        `\n✓ Selected Vercel team: ${selectedChoice?.name || vercelTeamScope}`,
+                        `\n✓ Selected deployment team: ${selectedChoice?.name || teamScope}`,
                     ),
                 );
             }
@@ -91,7 +126,7 @@ export const deployCommand = new Command('deploy')
             console.log(chalk.cyan('\n--- Deployment Process ---'));
             console.log(chalk.gray('This will:'));
             console.log(chalk.gray('  • Trigger the deployment workflow'));
-            console.log(chalk.gray('  • Deploy the website to Vercel'));
+            console.log(chalk.gray('  • Deploy the website'));
 
             const websiteRepo = `${directory.slug}-website`;
             console.log(
@@ -119,7 +154,7 @@ export const deployCommand = new Command('deploy')
 
             try {
                 const response = await apiService.deployWebsite(directory.id, {
-                    vercelTeamScope,
+                    teamScope,
                 });
 
                 if (response.status === 'error') {
@@ -129,7 +164,7 @@ export const deployCommand = new Command('deploy')
                     if (response.message?.toLowerCase().includes('token')) {
                         console.log(
                             chalk.gray(
-                                'Hint: ensure your Vercel token is configured (`ever-works auth tokens`).',
+                                'Hint: ensure your deployment token is configured in Plugin Settings.',
                             ),
                         );
                     }
@@ -137,11 +172,10 @@ export const deployCommand = new Command('deploy')
                 }
 
                 console.log(chalk.green('\n✓ Deployment request accepted!'));
-                if (vercelTeamScope) {
+                if (teamScope) {
                     const teamLabel =
-                        vercelTeams.find((team) => team.slug === vercelTeamScope)?.name ||
-                        vercelTeamScope;
-                    console.log(chalk.gray('Vercel team:'), chalk.white(teamLabel));
+                        deploymentTeams.find((team) => team.slug === teamScope)?.name || teamScope;
+                    console.log(chalk.gray('Deployment team:'), chalk.white(teamLabel));
                 }
 
                 const watchDeployment = async () => {
@@ -209,9 +243,7 @@ export const deployCommand = new Command('deploy')
 
             if (error.response?.status === 400) {
                 console.log(
-                    chalk.yellow(
-                        '\n⚠ Deployment failed. Please verify your Vercel setup and try again.',
-                    ),
+                    chalk.yellow('\n⚠ Deployment failed. Please verify your setup and try again.'),
                 );
                 const message = error.response?.data?.message;
                 if (message) {

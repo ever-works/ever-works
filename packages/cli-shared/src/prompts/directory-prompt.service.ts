@@ -18,10 +18,6 @@ export interface MarkdownReadmeConfigDto {
 	overwriteDefaultFooter?: boolean;
 }
 
-export enum RepoProvider {
-	GITHUB = 'github'
-}
-
 export interface SlugConflictResolution {
 	action: 'use_suggested' | 'modify' | 'cancel';
 	finalSlug?: string;
@@ -118,9 +114,9 @@ export class DirectoryPromptService extends BasePromptService {
 
 		if (wantsOptionalFields) {
 			if (orgs) {
-				owner = await this.promptSelect('GitHub Owner (username/organization)?', orgs, ownerDefault);
+				owner = await this.promptSelect('Repository Owner (username/organization):', orgs, ownerDefault);
 			} else {
-				owner = await this.promptOptionalText('Owner (leave empty to use default GitHub user):');
+				owner = await this.promptOptionalText('Owner (leave empty to use default):');
 			}
 
 			const wantsReadmeConfig = await this.promptConfirm(

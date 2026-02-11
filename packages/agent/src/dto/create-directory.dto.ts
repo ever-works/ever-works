@@ -1,6 +1,5 @@
 import { Type, Transform } from 'class-transformer';
 import {
-    IsEnum,
     IsBoolean,
     IsNotEmpty,
     IsOptional,
@@ -13,10 +12,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MarkdownReadmeConfig } from '../entities/directory.entity';
 import { sanitizeName, sanitizeDescription, sanitizeText } from '../utils/sanitize.util';
 
-export enum RepoProvider {
-    GITHUB = 'github',
-}
-
 export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
     @ApiPropertyOptional({ description: 'Custom header content for the README' })
     @IsOptional()
@@ -28,7 +23,10 @@ export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
     )
     header?: string;
 
-    @ApiPropertyOptional({ description: 'Whether to replace the default header entirely', default: false })
+    @ApiPropertyOptional({
+        description: 'Whether to replace the default header entirely',
+        default: false,
+    })
     @IsOptional()
     @IsBoolean()
     overwriteDefaultHeader?: boolean;
@@ -43,7 +41,10 @@ export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
     )
     footer?: string;
 
-    @ApiPropertyOptional({ description: 'Whether to replace the default footer entirely', default: false })
+    @ApiPropertyOptional({
+        description: 'Whether to replace the default footer entirely',
+        default: false,
+    })
     @IsOptional()
     @IsBoolean()
     overwriteDefaultFooter?: boolean;
@@ -62,7 +63,11 @@ export class CreateDirectoryDto {
     @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
     slug: string;
 
-    @ApiProperty({ description: 'Display name for the directory', example: 'My Awesome Directory', maxLength: 100 })
+    @ApiProperty({
+        description: 'Display name for the directory',
+        example: 'My Awesome Directory',
+        maxLength: 100,
+    })
     @IsString()
     @IsNotEmpty()
     @MaxLength(100)
@@ -80,22 +85,40 @@ export class CreateDirectoryDto {
     @Transform(({ value }) => (typeof value === 'string' ? sanitizeDescription(value, 500) : value))
     description: string;
 
-    @ApiPropertyOptional({ description: 'GitHub username or organization for repository ownership' })
+    @ApiPropertyOptional({
+        description: 'Username or organization for repository ownership',
+    })
     @IsOptional()
     @IsString()
     @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
     owner?: string;
 
-    @ApiProperty({ description: 'Whether the owner is a GitHub organization', example: false })
+    @ApiProperty({ description: 'Whether the owner is an organization', example: false })
     @IsBoolean()
     organization: boolean;
 
-    @ApiPropertyOptional({ description: 'Repository provider', enum: RepoProvider, default: RepoProvider.GITHUB })
-    @IsEnum(RepoProvider)
+    @ApiPropertyOptional({
+        description: 'Git provider plugin ID (e.g., github, gitlab)',
+        default: 'github',
+    })
+    @IsString()
     @IsOptional()
-    repoProvider: RepoProvider = RepoProvider.GITHUB;
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+    gitProvider: string = 'github';
 
-    @ApiPropertyOptional({ description: 'Custom README configuration', type: MarkdownReadmeConfigDto })
+    @ApiPropertyOptional({
+        description: 'Deploy provider (e.g., vercel)',
+        example: 'vercel',
+    })
+    @IsString()
+    @IsOptional()
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+    deployProvider?: string;
+
+    @ApiPropertyOptional({
+        description: 'Custom README configuration',
+        type: MarkdownReadmeConfigDto,
+    })
     @IsOptional()
     @ValidateNested()
     @Type(() => MarkdownReadmeConfigDto)

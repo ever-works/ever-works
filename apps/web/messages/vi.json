@@ -646,7 +646,7 @@
                 "dataRepo": "Kho lưu trữ Dữ liệu",
                 "websiteRepo": "Kho lưu trữ Website",
                 "mainRepo": "Kho lưu trữ Chính",
-                "repoProvider": "Nhà cung cấp Kho lưu trữ",
+                "gitProvider": "Nhà cung cấp Git",
                 "organization": "Tổ chức",
                 "created": "Đã tạo",
                 "lastUpdated": "Lần cập nhật cuối",
@@ -655,7 +655,11 @@
                 "custom": "Tùy chỉnh",
                 "customOverwrite": "Tùy chỉnh (Ghi đè)",
                 "yes": "Có",
-                "no": "Không"
+                "no": "Không",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Chi tiết Cấu hình",
@@ -1188,17 +1192,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Cần Mã thông báo Vercel",
-                    "description": "Để triển khai thư mục của bạn lên Vercel, bạn cần cấu hình mã thông báo API Vercel của mình trong cài đặt tài khoản.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Đi đến Cài đặt Mã thông báo API",
                     "getTokenButton": "Lấy Mã thông báo Vercel",
                     "howTo": {
                         "title": "Cách cấu hình mã thông báo Vercel của bạn:",
                         "step1": "Nhấp 'Lấy Mã thông báo Vercel' để mở bảng điều khiển Vercel",
                         "step2": "Tạo mã thông báo mới với quyền triển khai",
-                        "step3": "Sao chép mã thông báo đã tạo",
-                        "step4": "Đi đến Cài đặt Mã thông báo API và dán mã thông báo của bạn vào phần Vercel"
+                        "step3": "Cấu hình token API {provider} của bạn trong Cài đặt Plugin > {provider}",
+                        "step4": "Quay lại đây để triển khai thư mục của bạn"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1217,10 @@
                     "hint": "Là một cộng tác viên, bạn có thể kích hoạt triển khai một khi chủ sở hữu cấu hình tích hợp Vercel của họ."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Triển khai lên Vercel",
                         "description": "Triển khai kho lưu trữ website thư mục của bạn trên Vercel.",
-                        "deployButton": "Triển khai Ngay",
+                        "deployButton": "Triển khai lên {provider}",
                         "deployingButton": "Đang triển khai...",
                         "deployingStateButton": "Đang triển khai ({state})...",
                         "successMessage": "Website của bạn đã được triển khai thành công!",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "Kho lưu trữ sẽ được tạo dưới tài khoản cá nhân của bạn",
                 "organizations": "Tổ chức",
                 "personalHelp": "Kho lưu trữ sẽ được tạo dưới tài khoản GitHub cá nhân của bạn",
-                "organizationHelp": "Kho lưu trữ sẽ được tạo dưới tổ chức {org}"
+                "organizationHelp": "Kho lưu trữ sẽ được tạo dưới tổ chức {org}",
+                "connectRequired": "Kết nối nhà cung cấp Git ở thanh bên để chọn nơi kho lưu trữ của bạn sẽ được tạo."
             },
             "ai": {
                 "title": "Tạo với AI",
@@ -1712,7 +1723,16 @@
             "sendButton": "Gửi",
             "errors": {
                 "unableToSend": "Không thể gửi tin nhắn."
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

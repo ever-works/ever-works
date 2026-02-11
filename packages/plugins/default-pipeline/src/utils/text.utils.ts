@@ -1,0 +1,22 @@
+/**
+ * Convert text to URL-friendly slug
+ */
+export function slugifyText(text: string): string {
+	return text
+		.toString()
+		.normalize('NFKD') // Normalize accented characters
+		.toLowerCase()
+		.trim()
+		.replace(/\s+/g, '-')
+		.replace(/[^\w-]+/g, '')
+		.replace(/--+/g, '-');
+}
+
+/**
+ * Convert slug back to readable text
+ */
+export function unSlugifyText(slug: string): string {
+	return slug
+		.replace(/-/g, ' ')
+		.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substring(1).toLowerCase());
+}

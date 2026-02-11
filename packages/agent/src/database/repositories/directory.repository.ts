@@ -66,14 +66,14 @@ export class DirectoryRepository {
     }): Promise<Directory | null> {
         return this.repository.findOne({
             where: owner ? { userId, owner, slug } : { userId, slug },
-            relations: ['user', 'user.oauthTokens'],
+            relations: ['user'],
         });
     }
 
     async findById(id: string): Promise<Directory | null> {
         return this.repository.findOne({
             where: { id },
-            relations: ['user', 'user.oauthTokens'],
+            relations: ['user'],
         });
     }
 
@@ -131,7 +131,7 @@ export class DirectoryRepository {
 
         const findOptions: any = {
             order: { id: 'DESC' },
-            relations: ['user', 'user.oauthTokens'],
+            relations: ['user'],
         };
 
         if (hasWhereCondition) {
@@ -255,8 +255,7 @@ export class DirectoryRepository {
 
         const queryBuilder = this.repository
             .createQueryBuilder('directory')
-            .leftJoinAndSelect('directory.user', 'user')
-            .leftJoinAndSelect('user.oauthTokens', 'oauthTokens');
+            .leftJoinAndSelect('directory.user', 'user');
 
         // User has access if they are the creator OR they have a membership
         if (memberDirectoryIds.length > 0) {
@@ -362,7 +361,7 @@ export class DirectoryRepository {
     async findByIdWithMembers(id: string): Promise<Directory | null> {
         return this.repository.findOne({
             where: { id },
-            relations: ['user', 'user.oauthTokens', 'members', 'members.user'],
+            relations: ['user', 'members', 'members.user'],
         });
     }
 
@@ -372,7 +371,7 @@ export class DirectoryRepository {
     async findWithWebsiteAutoUpdateEnabled(): Promise<Directory[]> {
         return this.repository.find({
             where: { websiteTemplateAutoUpdate: true },
-            relations: ['user', 'user.oauthTokens'],
+            relations: ['user'],
         });
     }
 }

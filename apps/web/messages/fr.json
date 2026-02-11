@@ -553,7 +553,7 @@
                 "dataRepo": "Dépôt de données",
                 "websiteRepo": "Dépôt du site Web",
                 "mainRepo": "Dépôt principal",
-                "repoProvider": "Fournisseur de dépôt",
+                "gitProvider": "Fournisseur Git",
                 "organization": "Organisation",
                 "created": "Créé",
                 "lastUpdated": "Dernière mise à jour",
@@ -562,7 +562,11 @@
                 "custom": "Personnalisé",
                 "customOverwrite": "Personnalisé (Écraser)",
                 "yes": "Oui",
-                "no": "Non"
+                "no": "Non",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Détails de configuration",
@@ -1095,17 +1099,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Jeton Vercel requis",
-                    "description": "Pour déployer votre répertoire sur Vercel, vous devez configurer votre jeton API Vercel dans les paramètres de votre compte.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Aller aux paramètres des jetons API",
                     "getTokenButton": "Obtenir le jeton Vercel",
                     "howTo": {
                         "title": "Comment configurer votre jeton Vercel :",
                         "step1": "Cliquez sur 'Obtenir le jeton Vercel' pour ouvrir le tableau de bord Vercel",
                         "step2": "Créez un nouveau jeton avec les permissions de déploiement",
-                        "step3": "Copiez le jeton généré",
-                        "step4": "Allez dans les paramètres des jetons API et collez votre jeton dans la section Vercel"
+                        "step3": "Configurez votre jeton API {provider} dans Paramètres du Plugin > {provider}",
+                        "step4": "Revenez ici pour déployer votre répertoire"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1114,10 +1124,10 @@
                     "hint": "En tant que collaborateur, vous pourrez déclencher des déploiements une fois que le propriétaire aura configuré son intégration Vercel."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Déployer sur Vercel",
                         "description": "Déployez le dépôt du site Web de votre répertoire sur Vercel.",
-                        "deployButton": "Déployer maintenant",
+                        "deployButton": "Déployer sur {provider}",
                         "deployingButton": "Déploiement en cours...",
                         "deployingStateButton": "Déploiement en cours ({state})...",
                         "successMessage": "Votre site Web a été déployé avec succès !",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "Le dépôt sera créé sous votre compte personnel",
                 "organizations": "Organisations",
                 "personalHelp": "Le dépôt sera créé sous votre compte GitHub personnel",
-                "organizationHelp": "Le dépôt sera créé sous l'organisation {org}"
+                "organizationHelp": "Le dépôt sera créé sous l'organisation {org}",
+                "connectRequired": "Connectez un fournisseur Git dans la barre latérale pour choisir où votre dépôt sera créé."
             },
             "ai": {
                 "title": "Créer avec l'IA",
@@ -1712,7 +1723,16 @@
             "sendButton": "Envoyer",
             "errors": {
                 "unableToSend": "Impossible d'envoyer le message."
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

@@ -27,7 +27,9 @@
         "typescript": "^5.9.3"
     },
     "dependencies": {
-        "@packages/cli-shared": "workspace:*",
+        "@ever-works/contracts": "workspace:*",
+        "@ever-works/plugin": "workspace:*",
+        "@ever-works/cli-shared": "workspace:*",
         "axios": "^1.13.2",
         "chalk": "^4.1.2",
         "commander": "^14.0.2",

@@ -553,7 +553,7 @@
                 "dataRepo": "Daten-Repository",
                 "websiteRepo": "Website-Repository",
                 "mainRepo": "Haupt-Repository",
-                "repoProvider": "Repository-Anbieter",
+                "gitProvider": "Git-Anbieter",
                 "organization": "Organisation",
                 "created": "Erstellt",
                 "lastUpdated": "Zuletzt aktualisiert",
@@ -562,7 +562,11 @@
                 "custom": "Benutzerdefiniert",
                 "customOverwrite": "Benutzerdefiniert (Überschreiben)",
                 "yes": "Ja",
-                "no": "Nein"
+                "no": "Nein",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Konfigurationsdetails",
@@ -1095,17 +1099,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Vercel-Token erforderlich",
-                    "description": "Um Ihr Verzeichnis auf Vercel bereitzustellen, müssen Sie Ihren Vercel-API-Token in Ihren Kontoeinstellungen konfigurieren.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Zu API-Token-Einstellungen gehen",
                     "getTokenButton": "Vercel-Token abrufen",
                     "howTo": {
                         "title": "So konfigurieren Sie Ihren Vercel-Token:",
                         "step1": "Klicken Sie auf 'Vercel-Token abrufen', um das Vercel-Dashboard zu öffnen",
                         "step2": "Erstellen Sie einen neuen Token mit Bereitstellungsberechtigungen",
-                        "step3": "Kopieren Sie den generierten Token",
-                        "step4": "Gehen Sie zu API-Token-Einstellungen und fügen Sie Ihren Token im Vercel-Bereich ein"
+                        "step3": "Konfigurieren Sie Ihren {provider} API-Token in Plugin-Einstellungen > {provider}",
+                        "step4": "Kehren Sie hierher zurück, um Ihr Verzeichnis bereitzustellen"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1114,10 +1124,10 @@
                     "hint": "Als Mitarbeiter können Sie Bereitstellungen auslösen, sobald der Besitzer seine Vercel-Integration konfiguriert hat."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Auf Vercel bereitstellen",
                         "description": "Stellen Sie Ihr Verzeichnis-Website-Repository auf Vercel bereit.",
-                        "deployButton": "Jetzt bereitstellen",
+                        "deployButton": "Auf {provider} bereitstellen",
                         "deployingButton": "Wird bereitgestellt...",
                         "deployingStateButton": "Wird bereitgestellt ({state})...",
                         "successMessage": "Ihre Website wurde erfolgreich bereitgestellt!",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "Repository wird unter Ihrem persönlichen Konto erstellt",
                 "organizations": "Organisationen",
                 "personalHelp": "Das Repository wird unter Ihrem persönlichen GitHub-Konto erstellt",
-                "organizationHelp": "Das Repository wird unter der {org} Organisation erstellt"
+                "organizationHelp": "Das Repository wird unter der {org} Organisation erstellt",
+                "connectRequired": "Verbinden Sie einen Git-Anbieter in der Seitenleiste, um auszuwählen, wo Ihr Repository erstellt wird."
             },
             "ai": {
                 "title": "Mit KI erstellen",
@@ -1712,7 +1723,16 @@
             "sendButton": "Senden",
             "errors": {
                 "unableToSend": "Nachricht konnte nicht gesendet werden."
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

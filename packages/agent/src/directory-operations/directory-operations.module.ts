@@ -1,17 +1,10 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@src/database/database.module';
-import { DatabaseDirectoryOperationsService } from './database-directory-operations.service';
-import { DIRECTORY_OPERATIONS } from './directory-operations.interface';
+import { DirectoryOperationsService } from './directory-operations.service';
 
 @Module({
     imports: [DatabaseModule],
-    providers: [
-        DatabaseDirectoryOperationsService,
-        {
-            provide: DIRECTORY_OPERATIONS,
-            useExisting: DatabaseDirectoryOperationsService,
-        },
-    ],
-    exports: [DIRECTORY_OPERATIONS, DatabaseModule],
+    providers: [DirectoryOperationsService],
+    exports: [DirectoryOperationsService, DatabaseModule],
 })
 export class DirectoryOperationsModule {}

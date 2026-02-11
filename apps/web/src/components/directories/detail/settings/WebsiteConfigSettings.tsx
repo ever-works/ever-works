@@ -9,10 +9,7 @@ import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { ChevronDownIcon, ChevronUpIcon, PlusIcon, TrashIcon, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-    getWebsiteSettings,
-    updateWebsiteSettings,
-} from '@/app/actions/dashboard/directories';
+import { getWebsiteSettings, updateWebsiteSettings } from '@/app/actions/dashboard/directories';
 
 interface WebsiteConfigSettingsProps {
     directoryId: string;
@@ -186,10 +183,7 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
         }
     };
 
-    const updateSettings = <K extends keyof WebsiteSettings>(
-        key: K,
-        value: WebsiteSettings[K],
-    ) => {
+    const updateSettings = <K extends keyof WebsiteSettings>(key: K, value: WebsiteSettings[K]) => {
         setFormData((prev) => ({
             ...prev,
             settings: { ...prev.settings, [key]: value },
@@ -333,7 +327,9 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
                                     />
                                     <Switch
                                         checked={formData.settings.tags_enabled ?? true}
-                                        onChange={(checked) => updateSettings('tags_enabled', checked)}
+                                        onChange={(checked) =>
+                                            updateSettings('tags_enabled', checked)
+                                        }
                                         label={t('sections.global.tags')}
                                     />
                                     <Switch
@@ -358,35 +354,45 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                                         <Switch
-                                            checked={formData.settings.header?.submit_enabled ?? true}
+                                            checked={
+                                                formData.settings.header?.submit_enabled ?? true
+                                            }
                                             onChange={(checked) =>
                                                 updateHeaderSettings('submit_enabled', checked)
                                             }
                                             label={t('sections.header.submit')}
                                         />
                                         <Switch
-                                            checked={formData.settings.header?.pricing_enabled ?? true}
+                                            checked={
+                                                formData.settings.header?.pricing_enabled ?? true
+                                            }
                                             onChange={(checked) =>
                                                 updateHeaderSettings('pricing_enabled', checked)
                                             }
                                             label={t('sections.header.pricing')}
                                         />
                                         <Switch
-                                            checked={formData.settings.header?.layout_enabled ?? true}
+                                            checked={
+                                                formData.settings.header?.layout_enabled ?? true
+                                            }
                                             onChange={(checked) =>
                                                 updateHeaderSettings('layout_enabled', checked)
                                             }
                                             label={t('sections.header.layoutSelector')}
                                         />
                                         <Switch
-                                            checked={formData.settings.header?.language_enabled ?? true}
+                                            checked={
+                                                formData.settings.header?.language_enabled ?? true
+                                            }
                                             onChange={(checked) =>
                                                 updateHeaderSettings('language_enabled', checked)
                                             }
                                             label={t('sections.header.languageSelector')}
                                         />
                                         <Switch
-                                            checked={formData.settings.header?.theme_enabled ?? true}
+                                            checked={
+                                                formData.settings.header?.theme_enabled ?? true
+                                            }
                                             onChange={(checked) =>
                                                 updateHeaderSettings('theme_enabled', checked)
                                             }
@@ -396,9 +402,14 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-border dark:border-border-dark">
                                         <Select
                                             label={t('sections.header.defaultLayout')}
-                                            value={formData.settings.header?.layout_default || 'home1'}
+                                            value={
+                                                formData.settings.header?.layout_default || 'home1'
+                                            }
                                             onChange={(e) =>
-                                                updateHeaderSettings('layout_default', e.target.value)
+                                                updateHeaderSettings(
+                                                    'layout_default',
+                                                    e.target.value,
+                                                )
                                             }
                                             variant="form"
                                         >
@@ -408,9 +419,14 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
                                         </Select>
                                         <Select
                                             label={t('sections.header.defaultTheme')}
-                                            value={formData.settings.header?.theme_default || 'light'}
+                                            value={
+                                                formData.settings.header?.theme_default || 'light'
+                                            }
                                             onChange={(e) =>
-                                                updateHeaderSettings('theme_default', e.target.value)
+                                                updateHeaderSettings(
+                                                    'theme_default',
+                                                    e.target.value,
+                                                )
                                             }
                                             variant="form"
                                         >
@@ -457,7 +473,9 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
                                         <Switch
-                                            checked={formData.settings.homepage?.hero_enabled ?? true}
+                                            checked={
+                                                formData.settings.homepage?.hero_enabled ?? true
+                                            }
                                             onChange={(checked) =>
                                                 updateHomepageSettings('hero_enabled', checked)
                                             }
@@ -477,10 +495,14 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
                                         <Select
                                             label={t('sections.homepage.defaultView')}
                                             value={
-                                                formData.settings.homepage?.default_view || 'classic'
+                                                formData.settings.homepage?.default_view ||
+                                                'classic'
                                             }
                                             onChange={(e) =>
-                                                updateHomepageSettings('default_view', e.target.value)
+                                                updateHomepageSettings(
+                                                    'default_view',
+                                                    e.target.value,
+                                                )
                                             }
                                             variant="form"
                                         >
@@ -501,7 +523,10 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
                                                 'popularity'
                                             }
                                             onChange={(e) =>
-                                                updateHomepageSettings('default_sort', e.target.value)
+                                                updateHomepageSettings(
+                                                    'default_sort',
+                                                    e.target.value,
+                                                )
                                             }
                                             variant="form"
                                         >
@@ -523,7 +548,9 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
                             <SettingsCard title={t('sections.footer.title')}>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                     <Switch
-                                        checked={formData.settings.footer?.subscribe_enabled ?? true}
+                                        checked={
+                                            formData.settings.footer?.subscribe_enabled ?? true
+                                        }
                                         onChange={(checked) =>
                                             updateFooterSettings('subscribe_enabled', checked)
                                         }
@@ -628,10 +655,14 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
                                                             className="w-24"
                                                         >
                                                             <option value="_self">
-                                                                {t('sections.customMenu.targetSelf')}
+                                                                {t(
+                                                                    'sections.customMenu.targetSelf',
+                                                                )}
                                                             </option>
                                                             <option value="_blank">
-                                                                {t('sections.customMenu.targetBlank')}
+                                                                {t(
+                                                                    'sections.customMenu.targetBlank',
+                                                                )}
                                                             </option>
                                                         </Select>
                                                         <Button
@@ -724,10 +755,14 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
                                                             className="w-24"
                                                         >
                                                             <option value="_self">
-                                                                {t('sections.customMenu.targetSelf')}
+                                                                {t(
+                                                                    'sections.customMenu.targetSelf',
+                                                                )}
                                                             </option>
                                                             <option value="_blank">
-                                                                {t('sections.customMenu.targetBlank')}
+                                                                {t(
+                                                                    'sections.customMenu.targetBlank',
+                                                                )}
                                                             </option>
                                                         </Select>
                                                         <Button

@@ -2,24 +2,23 @@ import { SubCommand, CommandRunner } from 'nest-commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { DirectoryRepository, UserRepository } from '@packages/agent/database';
-import { DirectoryGenerationService, DirectoryQueryService } from '@packages/agent/services';
+import { DirectoryRepository, UserRepository } from '@ever-works/agent/database';
+import { DirectoryGenerationService, DirectoryQueryService } from '@ever-works/agent/services';
 import {
     CreateItemsGeneratorDto,
     CompanyDto,
-    ConfigDto,
     GenerationMethod,
     WebsiteRepositoryCreationMethod,
-} from '@packages/agent/items-generator';
+} from '@ever-works/agent/items-generator';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
-import { Directory, GenerateStatusType, User } from '@packages/agent/entities';
-import { getStepProgress, getStepText, ItemsGeneratorStep } from '@packages/cli-shared';
+import { Directory, GenerateStatusType, User } from '@ever-works/agent/entities';
+import { getStepProgress, getStepText, ItemsGeneratorStep } from '@ever-works/cli-shared';
 
 @SubCommand({
     name: 'generate',
-    description: 'Generate data and create a GitHub repository for a directory',
+    description: 'Generate data and create a repository for a directory',
 })
 export class GenerateSubCommand extends CommandRunner {
     constructor(
@@ -47,10 +46,6 @@ export class GenerateSubCommand extends CommandRunner {
 
             // Get user information
             const user = await this.userRepository.createOrGetLocalUser();
-            const token = user.getGitToken();
-            if (!token) {
-                throw new Error('GitHub token is required');
-            }
 
             // Select directory
             const selection = await this.directoryPrompt.promptDirectorySelection(
@@ -102,7 +97,6 @@ export class GenerateSubCommand extends CommandRunner {
             const createDto: CreateItemsGeneratorDto = {
                 name: requiredData.name,
                 prompt: requiredData.prompt,
-                config: new ConfigDto(), // Default config
                 ...advancedData,
             };
 
@@ -262,8 +256,9 @@ export class GenerateSubCommand extends CommandRunner {
         console.log(chalk.cyan('\n--- Advanced Options ---'));
 
         const options: Partial<CreateItemsGeneratorDto> = {};
+        const pluginConfig: Record<string, unknown> = {};
 
-        // Company information
+        // Company information (core field)
         const wantsCompany = await this.promptConfirm(
             'Do you want to specify company information?',
             false,
@@ -273,14 +268,16 @@ export class GenerateSubCommand extends CommandRunner {
             options.company = await this.promptCompanyInfo();
         }
 
-        // Categories and keywords
+        // Categories and keywords (pipeline-specific fields -> pluginConfig)
         const wantsCategories = await this.promptConfirm(
             'Do you want to specify initial categories?',
             false,
         );
 
         if (wantsCategories) {
-            options.initial_categories = await this.promptStringArray('Enter initial categories:');
+            pluginConfig.initial_categories = await this.promptStringArray(
+                'Enter initial categories:',
+            );
         }
 
         const wantsPriorityCategories = await this.promptConfirm(
@@ -289,7 +286,7 @@ export class GenerateSubCommand extends CommandRunner {
         );
 
         if (wantsPriorityCategories) {
-            options.priority_categories = await this.promptStringArray(
+            pluginConfig.priority_categories = await this.promptStringArray(
                 'Enter priority categories:',
             );
         }
@@ -300,20 +297,20 @@ export class GenerateSubCommand extends CommandRunner {
         );
 
         if (wantsKeywords) {
-            options.target_keywords = await this.promptStringArray('Enter target keywords:');
+            pluginConfig.target_keywords = await this.promptStringArray('Enter target keywords:');
         }
 
-        // Source URLs
+        // Source URLs (pipeline-specific -> pluginConfig)
         const wantsSourceUrls = await this.promptConfirm(
             'Do you want to specify source URLs?',
             false,
         );
 
         if (wantsSourceUrls) {
-            options.source_urls = await this.promptUrlArray('Enter source URLs:');
+            pluginConfig.source_urls = await this.promptUrlArray('Enter source URLs:');
         }
 
-        // Repository description
+        // Repository description (core field)
         const wantsRepoDescription = await this.promptConfirm(
             'Do you want to specify a repository description?',
             false,
@@ -324,7 +321,7 @@ export class GenerateSubCommand extends CommandRunner {
                 await this.promptOptionalText('Repository description:');
         }
 
-        // Generation method
+        // Generation method (core field)
         const generationMethod = await this.promptSelect(
             'Select generation method:',
             [
@@ -335,7 +332,7 @@ export class GenerateSubCommand extends CommandRunner {
         );
         options.generation_method = generationMethod;
 
-        // Website repository creation method
+        // Website repository creation method (core field)
         const websiteMethod = await this.promptSelect(
             'Select website repository creation method:',
             [
@@ -352,25 +349,31 @@ export class GenerateSubCommand extends CommandRunner {
         );
         options.website_repository_creation_method = websiteMethod;
 
-        // Other boolean options
+        // Other boolean options (core field)
         options.update_with_pull_request = await this.promptConfirm(
             'Update with pull request?',
             true,
         );
 
-        options.badge_evaluation_enabled = await this.promptConfirm(
+        // Badge evaluation (pipeline-specific -> pluginConfig)
+        pluginConfig.badge_evaluation_enabled = await this.promptConfirm(
             'Enable badge evaluation?',
             false,
         );
 
-        // Configuration options
+        // Configuration options (pipeline-specific -> pluginConfig)
         const wantsConfig = await this.promptConfirm(
             'Do you want to configure advanced generation settings?',
             false,
         );
 
         if (wantsConfig) {
-            options.config = await this.promptConfigOptions();
+            pluginConfig.config = await this.promptConfigOptions();
+        }
+
+        // Only add pluginConfig if there are any values
+        if (Object.keys(pluginConfig).length > 0) {
+            options.pluginConfig = pluginConfig;
         }
 
         return options;
@@ -394,68 +397,74 @@ export class GenerateSubCommand extends CommandRunner {
         return { name, website };
     }
 
-    private async promptConfigOptions(): Promise<ConfigDto> {
+    private async promptConfigOptions(): Promise<Record<string, unknown>> {
         console.log(chalk.yellow('\nGeneration Configuration:'));
 
-        const config = new ConfigDto();
+        // Default values for config options
+        const defaults = {
+            max_search_queries: 10,
+            max_results_per_query: 10,
+            max_pages_to_process: 100,
+            relevance_threshold_content: 0.5,
+            min_content_length_for_extraction: 100,
+            ai_first_generation_enabled: false,
+            content_filtering_enabled: true,
+            prompt_comparison_confidence_threshold: 0.7,
+        };
 
-        const maxSearchQueries = await this.promptNumber(
+        const config: Record<string, unknown> = {};
+
+        config.max_search_queries = await this.promptNumber(
             'Max search queries (1-100):',
-            config.max_search_queries,
+            defaults.max_search_queries,
             1,
             100,
         );
-        config.max_search_queries = maxSearchQueries;
 
-        const maxResultsPerQuery = await this.promptNumber(
+        config.max_results_per_query = await this.promptNumber(
             'Max results per query (1-100):',
-            config.max_results_per_query,
+            defaults.max_results_per_query,
             1,
             100,
         );
-        config.max_results_per_query = maxResultsPerQuery;
 
-        const maxPagesToProcess = await this.promptNumber(
+        config.max_pages_to_process = await this.promptNumber(
             'Max pages to process (1-1000):',
-            config.max_pages_to_process,
+            defaults.max_pages_to_process,
             1,
             1000,
         );
-        config.max_pages_to_process = maxPagesToProcess;
 
-        const relevanceThreshold = await this.promptFloat(
+        config.relevance_threshold_content = await this.promptFloat(
             'Relevance threshold for content (0.01-1.0):',
-            config.relevance_threshold_content,
+            defaults.relevance_threshold_content,
             0.01,
             1.0,
         );
-        config.relevance_threshold_content = relevanceThreshold;
 
-        const minContentLength = await this.promptNumber(
+        config.min_content_length_for_extraction = await this.promptNumber(
             'Minimum content length for extraction:',
-            config.min_content_length_for_extraction,
+            defaults.min_content_length_for_extraction,
             0,
             10000,
         );
-        config.min_content_length_for_extraction = minContentLength;
 
         config.ai_first_generation_enabled = await this.promptConfirm(
             'Enable AI-first generation?',
-            config.ai_first_generation_enabled,
+            defaults.ai_first_generation_enabled,
         );
 
         config.content_filtering_enabled = await this.promptConfirm(
             'Enable content filtering?',
-            config.content_filtering_enabled,
+            defaults.content_filtering_enabled,
         );
 
-        const promptComparisonThreshold = await this.promptFloat(
+        config.prompt_comparison_confidence_threshold = await this.promptFloat(
             'Prompt comparison confidence threshold (0.01-1.0):',
-            config.prompt_comparison_confidence_threshold,
+            defaults.prompt_comparison_confidence_threshold,
             0.01,
             1.0,
         );
-        config.prompt_comparison_confidence_threshold = promptComparisonThreshold;
 
         return config;
     }
@@ -469,20 +478,27 @@ export class GenerateSubCommand extends CommandRunner {
             console.log(chalk.gray(`Company: ${dto.company.name} (${dto.company.website})`));
         }
 
-        if (dto.initial_categories?.length) {
-            console.log(chalk.gray(`Initial Categories: ${dto.initial_categories.join(', ')}`));
+        // Access pipeline-specific fields from pluginConfig
+        const config = dto.pluginConfig as Record<string, unknown> | undefined;
+
+        const initialCategories = config?.initial_categories as string[] | undefined;
+        if (initialCategories?.length) {
+            console.log(chalk.gray(`Initial Categories: ${initialCategories.join(', ')}`));
         }
 
-        if (dto.priority_categories?.length) {
-            console.log(chalk.gray(`Priority Categories: ${dto.priority_categories.join(', ')}`));
+        const priorityCategories = config?.priority_categories as string[] | undefined;
+        if (priorityCategories?.length) {
+            console.log(chalk.gray(`Priority Categories: ${priorityCategories.join(', ')}`));
         }
 
-        if (dto.target_keywords?.length) {
-            console.log(chalk.gray(`Target Keywords: ${dto.target_keywords.join(', ')}`));
+        const targetKeywords = config?.target_keywords as string[] | undefined;
+        if (targetKeywords?.length) {
+            console.log(chalk.gray(`Target Keywords: ${targetKeywords.join(', ')}`));
         }
 
-        if (dto.source_urls?.length) {
-            console.log(chalk.gray(`Source URLs: ${dto.source_urls.length} URLs`));
+        const sourceUrls = config?.source_urls as string[] | undefined;
+        if (sourceUrls?.length) {
+            console.log(chalk.gray(`Source URLs: ${sourceUrls.length} URLs`));
         }
 
         if (dto.repository_description) {
@@ -494,7 +510,9 @@ export class GenerateSubCommand extends CommandRunner {
             chalk.gray(`Website Creation Method: ${dto.website_repository_creation_method}`),
         );
         console.log(chalk.gray(`Update with PR: ${dto.update_with_pull_request ? 'Yes' : 'No'}`));
-        console.log(chalk.gray(`Badge Evaluation: ${dto.badge_evaluation_enabled ? 'Yes' : 'No'}`));
+
+        const badgeEnabled = config?.badge_evaluation_enabled as boolean | undefined;
+        console.log(chalk.gray(`Badge Evaluation: ${badgeEnabled ? 'Yes' : 'No'}`));
     }
 
     // Helper methods for prompting

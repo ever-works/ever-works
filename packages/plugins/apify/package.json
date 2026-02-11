@@ -1,0 +1,55 @@
+{
+	"name": "@ever-works/apify-plugin",
+	"version": "1.0.0",
+	"description": "Apify - Import items from Apify datasets into your directory",
+	"private": true,
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@ever-works/contracts": "workspace:*",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "apify",
+			"name": "Apify",
+			"version": "1.0.0",
+			"category": "data-source",
+			"capabilities": [
+				"data-source",
+				"form-schema-provider"
+			],
+			"description": "Import items from Apify datasets. Supports field mapping and filtering to import relevant items into your directories.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"systemPlugin": false,
+			"builtIn": false,
+			"isDefault": false
+		}
+	}
+}

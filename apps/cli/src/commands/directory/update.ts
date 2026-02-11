@@ -8,7 +8,7 @@ import { DirectoryPromptService } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 
 export const updateCommand = new Command('update')
-    .description('Update a directory and its GitHub repository')
+    .description('Update a directory and its repository')
     .action(async () => {
         try {
             console.log(chalk.cyan.bold('\nUpdate Directory\n'));

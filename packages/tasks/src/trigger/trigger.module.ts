@@ -3,7 +3,7 @@ import { TriggerService } from './trigger.service';
 import {
     DIRECTORY_GENERATION_DISPATCHER,
     DIRECTORY_IMPORT_DISPATCHER,
-} from '@packages/agent/tasks';
+} from '@ever-works/agent/tasks';
 
 @Global()
 @Module({

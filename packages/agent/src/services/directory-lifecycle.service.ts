@@ -6,9 +6,9 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
-import { DataGeneratorService } from '@src/data-generator/data-generator.service';
-import { MarkdownGeneratorService } from '@src/markdown-generator/markdown-generator.service';
-import { WebsiteGeneratorService } from '@src/website-generator/website-generator.service';
+import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
+import { MarkdownGeneratorService } from '@src/generators/markdown-generator/markdown-generator.service';
+import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
 import { CreateDirectoryDto } from '@src/dto/create-directory.dto';
 import { UpdateDirectoryDto } from '@src/dto';
 import { DeleteDirectoryDto, DeleteDirectoryResponseDto } from '@src/items-generator/dto';
@@ -16,6 +16,7 @@ import { User } from '@src/entities/user.entity';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { normalizeGeneratorError } from './utils/error.utils';
 import { GenerateStatusType } from '@src/entities/types';
+import { DeployFacadeService } from '@src/facades/deploy.facade';
 
 @Injectable()
 export class DirectoryLifecycleService {
@@ -27,11 +28,20 @@ export class DirectoryLifecycleService {
         private readonly markdownGenerator: MarkdownGeneratorService,
         private readonly websiteGenerator: WebsiteGeneratorService,
         private readonly ownershipService: DirectoryOwnershipService,
+        private readonly deployFacade: DeployFacadeService,
     ) {}
 
     async createDirectory(createDirectoryDto: CreateDirectoryDto, user: User) {
-        const { slug, name, description, owner, readmeConfig, organization, repoProvider } =
-            createDirectoryDto;
+        const {
+            slug,
+            name,
+            description,
+            owner,
+            readmeConfig,
+            organization,
+            gitProvider,
+            deployProvider,
+        } = createDirectoryDto;
 
         const directoryData: Partial<CreateDirectoryDto & { userId: string }> = {
             slug,
@@ -39,7 +49,8 @@ export class DirectoryLifecycleService {
             description,
             userId: user.id,
             owner,
-            repoProvider,
+            gitProvider,
+            deployProvider,
             readmeConfig,
             organization,
         };
@@ -89,6 +100,23 @@ export class DirectoryLifecycleService {
                         : directory.organization,
                 readmeConfig: updateDto.readmeConfig ?? directory.readmeConfig,
             };
+
+            // Handle deployProvider update with validation
+            if (updateDto.deployProvider !== undefined) {
+                if (updateDto.deployProvider) {
+                    const availableProviders = this.deployFacade.getAvailableProviders();
+                    const isSupported = availableProviders.some(
+                        (p) => p.id === updateDto.deployProvider,
+                    );
+                    if (!isSupported) {
+                        throw new BadRequestException({
+                            status: 'error',
+                            message: `Unsupported deploy provider: ${updateDto.deployProvider}`,
+                        });
+                    }
+                }
+                updateData.deployProvider = updateDto.deployProvider;
+            }
 
             // Handle website template auto-update settings
             if (updateDto.websiteTemplateAutoUpdate !== undefined) {

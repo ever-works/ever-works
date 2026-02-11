@@ -1,4 +1,4 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
     IsBoolean,
     IsEnum,
@@ -10,6 +10,7 @@ import {
     IsUrl,
     MaxLength,
     Min,
+    ValidateNested,
 } from 'class-validator';
 import { sanitizeName } from '../utils/sanitize.util';
 import { ImportSourceType } from '../entities/directory.entity';
@@ -21,9 +22,13 @@ export enum ImportSourceTypeEnum {
 }
 
 export class AnalyzeRepositoryDto {
-    @IsUrl({}, { message: 'Please provide a valid GitHub URL' })
+    @IsUrl({}, { message: 'Please provide a valid repository URL' })
     @IsNotEmpty()
     sourceUrl: string;
+
+    @IsOptional()
+    @IsString()
+    gitProvider?: string;
 }
 
 export class AnalyzeRepositoryResponseDto {
@@ -41,11 +46,24 @@ export class AnalyzeRepositoryResponseDto {
         itemCount?: number;
         categoryCount?: number;
     };
+    relatedDataRepo?: { name: string; owner: string };
+    baseSlug?: string;
+    slugConflict?: {
+        hasConflict: boolean;
+        conflictingRepos: string[];
+        suggestedSlug: string;
+    };
     error?: string;
 }
 
+export class ImportProvidersDto {
+    @IsOptional()
+    @IsString()
+    ai?: string;
+}
+
 export class ImportDirectoryDto {
-    @IsUrl({}, { message: 'Please provide a valid GitHub URL' })
+    @IsUrl({}, { message: 'Please provide a valid repository URL' })
     @IsNotEmpty()
     sourceUrl: string;
 
@@ -74,6 +92,20 @@ export class ImportDirectoryDto {
     @IsOptional()
     @IsBoolean()
     sync?: boolean;
+
+    @IsString()
+    @IsNotEmpty({ message: 'Git provider is required' })
+    gitProvider: string;
+
+    @IsOptional()
+    @IsString()
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+    deployProvider?: string;
+
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => ImportProvidersDto)
+    providers?: ImportProvidersDto;
 }
 
 export class ImportDirectoryResponseDto {
@@ -93,7 +125,10 @@ export class ImportProgressDto {
     error?: string;
 }
 
-export class GitHubRepoDto {
+/**
+ * Generic Git repository DTO for provider-agnostic repository data.
+ */
+export class GitRepoDto {
     id: number;
     name: string;
     full_name: string;
@@ -106,6 +141,10 @@ export class GitHubRepoDto {
 }
 
 export class GetUserRepositoriesDto {
+    @IsString()
+    @IsNotEmpty()
+    gitProvider: string;
+
     @IsOptional()
     @IsNumber()
     @Min(1)
@@ -130,7 +169,7 @@ export class GetUserRepositoriesDto {
 }
 
 export class GetUserRepositoriesResponseDto {
-    repositories: GitHubRepoDto[];
+    repositories: GitRepoDto[];
     total: number;
     page: number;
     perPage: number;

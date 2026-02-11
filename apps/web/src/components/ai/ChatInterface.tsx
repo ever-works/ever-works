@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils/cn';
 import { useAIStream } from '@/lib/hooks/use-ai-stream';
 import { useChatContext } from '@/components/ai/ChatProvider';
 import { ChatMessage, generateMessageId } from '@/lib/hooks/use-chat-history';
-import { ROUTES, routeWithParams } from '@/lib/constants';
+import { ROUTES } from '@/lib/constants';
 
 export function ChatInterface() {
     const t = useTranslations('dashboard.aiChat');
@@ -15,8 +15,6 @@ export function ChatInterface() {
         error: historyError,
         isLoading,
         setMessages,
-        ensureSessionId,
-        markSessionId,
         loadHistory,
         resetHistory,
     } = useChatContext();
@@ -67,14 +65,6 @@ export function ChatInterface() {
 
     const { streamMessage, isStreaming, reset } = useAIStream({
         onChunk: (chunk) => {
-            if (chunk.metadata?.sessionId) {
-                markSessionId(chunk.metadata.sessionId);
-            }
-
-            if (chunk.metadata?.error) {
-                setErrorMessage(chunk.metadata.error);
-            }
-
             updatePendingMessage((message) => ({
                 ...message,
                 content: chunk.content ? message.content + chunk.content : message.content,
@@ -101,9 +91,6 @@ export function ChatInterface() {
                 isStreaming: false,
                 error: error.message,
             }));
-            if (error.message.toLowerCase().includes('404')) {
-                markSessionId(null);
-            }
             clearPending();
         },
     });
@@ -135,17 +122,19 @@ export function ChatInterface() {
 
         pendingMessageRef.current = assistantMessage.id;
 
-        setMessages((prev) => [...prev, userMessage, assistantMessage]);
+        const updatedMessages = [...messages, userMessage, assistantMessage];
+        setMessages(updatedMessages);
         scrollToBottom('auto');
 
-        const activeSessionId = ensureSessionId();
-
-        const endpoint = routeWithParams(ROUTES.API_AI_CONVERSATIONS_MESSAGE_STREAM, {
-            sessionId: activeSessionId,
-        });
+        // Build the message history to send (exclude the empty assistant placeholder)
+        const chatHistory = updatedMessages
+            .filter((m) => m.content.trim().length > 0)
+            .map((m) => ({ role: m.role, content: m.content }));
 
         try {
-            await streamMessage(endpoint, { message: trimmed });
+            await streamMessage(ROUTES.API_AI_CONVERSATIONS_CHAT_STREAM, {
+                messages: chatHistory,
+            });
         } catch (error) {
             const message = error instanceof Error ? error.message : t('errors.unableToSend');
             setErrorMessage(message);
@@ -154,9 +143,6 @@ export function ChatInterface() {
                 isStreaming: false,
                 error: message,
             }));
-            if (message.toLowerCase().includes('404')) {
-                markSessionId(null);
-            }
             clearPending();
         }
     };

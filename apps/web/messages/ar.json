@@ -553,7 +553,7 @@
                 "dataRepo": "مستودع البيانات",
                 "websiteRepo": "مستودع الموقع",
                 "mainRepo": "المستودع الرئيسي",
-                "repoProvider": "مزود المستودع",
+                "gitProvider": "مزود Git",
                 "organization": "المنظمة",
                 "created": "تم الإنشاء",
                 "lastUpdated": "آخر تحديث",
@@ -562,7 +562,11 @@
                 "custom": "مخصص",
                 "customOverwrite": "مخصص (الكتابة فوق)",
                 "yes": "نعم",
-                "no": "لا"
+                "no": "لا",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "تفاصيل التكوين",
@@ -1095,17 +1099,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "رمز Vercel مطلوب",
-                    "description": "لنشر دليلك على Vercel، تحتاج إلى تكوين رمز Vercel API في إعدادات حسابك.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "الذهاب إلى إعدادات رموز API",
                     "getTokenButton": "الحصول على رمز Vercel",
                     "howTo": {
                         "title": "كيفية تكوين رمز Vercel الخاص بك:",
                         "step1": "انقر على 'الحصول على رمز Vercel' لفتح لوحة تحكم Vercel",
                         "step2": "إنشاء رمز جديد بأذونات النشر",
-                        "step3": "نسخ الرمز المُنشأ",
-                        "step4": "الذهاب إلى إعدادات رموز API والصق رمزك في قسم Vercel"
+                        "step3": "قم بتكوين رمز API الخاص بـ {provider} في إعدادات الإضافة > {provider}",
+                        "step4": "ارجع إلى هنا لنشر دليلك"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1114,10 +1124,10 @@
                     "hint": "كمتعاون، يمكنك تشغيل عمليات النشر بمجرد أن يقوم المالك بتكوين تكامل Vercel الخاص به."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "النشر على Vercel",
                         "description": "انشر مستودع موقع دليلك على Vercel.",
-                        "deployButton": "النشر الآن",
+                        "deployButton": "النشر إلى {provider}",
                         "deployingButton": "جارٍ النشر...",
                         "deployingStateButton": "جارٍ النشر ({state})...",
                         "successMessage": "تم نشر موقعك بنجاح!",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "سيتم إنشاء المستودع تحت حسابك الشخصي",
                 "organizations": "المنظمات",
                 "personalHelp": "سيتم إنشاء المستودع تحت حساب GitHub الشخصي الخاص بك",
-                "organizationHelp": "سيتم إنشاء المستودع تحت منظمة {org}"
+                "organizationHelp": "سيتم إنشاء المستودع تحت منظمة {org}",
+                "connectRequired": "قم بتوصيل مزود Git من الشريط الجانبي لاختيار مكان إنشاء المستودع."
             },
             "ai": {
                 "title": "إنشاء بالذكاء الاصطناعي",
@@ -1712,7 +1723,16 @@
             "sendButton": "إرسال",
             "errors": {
                 "unableToSend": "تعذر إرسال الرسالة."
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

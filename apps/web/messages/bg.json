@@ -646,7 +646,7 @@
                 "dataRepo": "Хранилище за Данни",
                 "websiteRepo": "Хранилище за Уебсайт",
                 "mainRepo": "Основно Хранилище",
-                "repoProvider": "Доставчик на Хранилища",
+                "gitProvider": "Git Доставчик",
                 "organization": "Организация",
                 "created": "Създадена",
                 "lastUpdated": "Последно Актуализирана",
@@ -655,7 +655,11 @@
                 "custom": "Персонализирано",
                 "customOverwrite": "Персонализирано (Замяна)",
                 "yes": "Да",
-                "no": "Не"
+                "no": "Не",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Детайли за Конфигурацията",
@@ -1188,17 +1192,23 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Изисква се Vercel токен",
-                    "description": "За да публикувате директорията си в Vercel, трябва да конфигурирате вашия Vercel API токен в настройките на акаунта ви.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Към Настройки за API токени",
                     "getTokenButton": "Вземи Vercel токен",
                     "howTo": {
                         "title": "Как да конфигурирате вашия Vercel токен:",
                         "step1": "Натиснете 'Вземи Vercel токен', за да отворите таблото на Vercel",
                         "step2": "Създайте нов токен с разрешения за публикуване",
-                        "step3": "Копирайте генерирания токен",
-                        "step4": "Отидете в Настройки за API токени и поставете вашия токен в секцията за Vercel"
+                        "step3": "Конфигурирайте вашия {provider} API токен в Настройки на плъгина > {provider}",
+                        "step4": "Върнете се тук, за да публикувате директорията си"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -1207,10 +1217,10 @@
                     "hint": "Като сътрудник, можете да задействате публикувания, след като собственикът конфигурира интеграцията си с Vercel."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Публикуване в Vercel",
                         "description": "Публикувайте хранилището за уебсайт на вашата директория в Vercel.",
-                        "deployButton": "Публикувай сега",
+                        "deployButton": "Публикувай в {provider}",
                         "deployingButton": "Публикуване...",
                         "deployingStateButton": "Публикуване ({state})...",
                         "successMessage": "Вашият уебсайт е публикуван успешно!",
@@ -1284,7 +1294,8 @@
                 "personalAccount": "Хранилището ще бъде създадено под вашия личен акаунт",
                 "organizations": "Организации",
                 "personalHelp": "Хранилището ще бъде създадено под вашия личен GitHub акаунт",
-                "organizationHelp": "Хранилището ще бъде създадено под организацията {org}"
+                "organizationHelp": "Хранилището ще бъде създадено под организацията {org}",
+                "connectRequired": "Свържете Git доставчик от страничната лента, за да изберете къде да бъде създадено хранилището."
             },
             "ai": {
                 "title": "Създай с AI",
@@ -1712,7 +1723,16 @@
             "sendButton": "Изпрати",
             "errors": {
                 "unableToSend": "Съобщението не може да бъде изпратено."
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

@@ -24,6 +24,11 @@ export class UpdateDirectoryDto {
     @IsOptional()
     organization?: boolean;
 
+    @IsString()
+    @IsOptional()
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+    deployProvider?: string;
+
     @IsOptional()
     @ValidateNested()
     @Type(() => MarkdownReadmeConfigDto)
