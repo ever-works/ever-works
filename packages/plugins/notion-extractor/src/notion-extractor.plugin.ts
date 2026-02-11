@@ -68,7 +68,6 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 				description:
 					'Optional - Your Notion integration API key. Required for private pages. Leave empty for public pages only.',
 				'x-secret': true,
-				'x-envVar': 'PLUGIN_NOTION_API_KEY',
 				'x-scope': 'user'
 			},
 			useSplitbeeForPublicPages: {
