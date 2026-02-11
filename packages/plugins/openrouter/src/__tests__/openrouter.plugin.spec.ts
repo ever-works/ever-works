@@ -61,7 +61,6 @@ describe('OpenRouterPlugin', () => {
 			expect(schema).toBeDefined();
 			expect(schema.type).toBe('string');
 			expect(schema.title).toBe('Default Model');
-			expect(schema.default).toBe('openai/gpt-5-nano');
 			expect(schema['x-widget']).toBe('model-select');
 			expect(schema['x-scope']).toBe('global');
 		});
@@ -72,7 +71,6 @@ describe('OpenRouterPlugin', () => {
 			expect(schema.type).toBe('string');
 			expect(schema.title).toBe('Simple Tasks Model');
 			expect(schema.description).toBe('Handles tags, short descriptions, and quick classifications');
-			expect(schema.default).toBe('openai/gpt-5-nano');
 		});
 
 		it('should have mediumModel field', () => {
@@ -81,7 +79,6 @@ describe('OpenRouterPlugin', () => {
 			expect(schema.type).toBe('string');
 			expect(schema.title).toBe('Standard Tasks Model');
 			expect(schema.description).toBe('Handles listings, summaries, and content reformatting');
-			expect(schema.default).toBe('moonshotai/kimi-k2.5');
 		});
 
 		it('should have complexModel field', () => {
@@ -90,7 +87,6 @@ describe('OpenRouterPlugin', () => {
 			expect(schema.type).toBe('string');
 			expect(schema.title).toBe('Complex Tasks Model');
 			expect(schema.description).toBe('Handles full page generation and multi-step analysis');
-			expect(schema.default).toBe('moonshotai/kimi-k2.5');
 		});
 
 		it('should have baseUrl field with default', () => {

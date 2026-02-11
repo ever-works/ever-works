@@ -53,7 +53,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'openai/gpt-5-nano',
+				default: 'openai/gpt-5.1',
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_DEFAULT_MODEL'
@@ -71,7 +71,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Handles listings, summaries, and content reformatting',
-				default: 'moonshotai/kimi-k2.5',
+				default: 'openai/gpt-4o',
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_MEDIUM_MODEL'
@@ -80,7 +80,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'moonshotai/kimi-k2.5',
+				default: 'openai/gpt-5.1',
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_COMPLEX_MODEL'

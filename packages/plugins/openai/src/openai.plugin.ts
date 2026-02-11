@@ -45,7 +45,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'gpt-5-nano',
+				default: 'gpt-5.1',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -69,7 +69,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'gpt-4o',
+				default: 'gpt-5.1',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
