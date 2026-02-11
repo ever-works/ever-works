@@ -239,7 +239,7 @@ export class VercelAiGatewayPlugin extends BaseAiProvider {
 			author: { name: 'Ever Works Team' },
 			license: 'MIT',
 			builtIn: true,
-			systemPlugin: true,
+			systemPlugin: false,
 			autoEnable: false,
 			visibility: 'public',
 			defaultForCapabilities: [],

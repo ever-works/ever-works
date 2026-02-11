@@ -52,7 +52,7 @@
 			"license": "MIT",
 			"builtIn": true,
 			"autoEnable": false,
-			"systemPlugin": true
+			"systemPlugin": false
 		}
 	}
 }
