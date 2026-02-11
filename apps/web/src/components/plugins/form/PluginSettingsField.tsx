@@ -223,7 +223,7 @@ export function PluginSettingsField({
             )}
 
             {isSecret && (
-                <p className="text-xs text-warning dark:text-warning flex items-center gap-1">
+                <p className="text-xs text-warning dark:text-warning items-center gap-1 hidden">
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                         <path
                             fillRule="evenodd"

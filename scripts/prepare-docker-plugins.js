@@ -80,14 +80,16 @@ function main() {
 		console.log(`==> Installing ${missingDeps.size} missing plugin deps via pnpm...`);
 
 		// Remove workspace marker so pnpm treats deploy dir as standalone
-		try { fs.unlinkSync('/app/pnpm-workspace.yaml'); } catch {}
+		try {
+			fs.unlinkSync('/app/pnpm-workspace.yaml');
+		} catch {}
 		// Ensure hoisting so plugins at /app/plugins/ can resolve deps
 		fs.writeFileSync(path.join(DEPLOY_DIR, '.npmrc'), 'shamefully-hoist=true\n');
 
 		try {
 			execSync(`pnpm add ${depsToInstall}`, {
 				cwd: DEPLOY_DIR,
-				stdio: 'inherit',
+				stdio: 'inherit'
 			});
 		} catch (error) {
 			console.error('==> Failed to install plugin deps:', error.message);
@@ -135,7 +137,7 @@ function collectMissingDeps(deps, missingDeps) {
 
 	for (const [name, version] of Object.entries(deps)) {
 		if (String(version).startsWith('workspace:')) continue;
-		if (name.startsWith('@ever-works/') || name.startsWith('@packages/')) continue;
+		if (name.startsWith('@ever-works/')) continue;
 		if (missingDeps.has(name)) continue;
 
 		const depPath = path.join(DEPLOY_NODE_MODULES, ...name.split('/'));

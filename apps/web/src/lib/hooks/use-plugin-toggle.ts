@@ -32,10 +32,14 @@ export function usePluginToggle({ pluginId, enabled, visibility }: UsePluginTogg
 
             startTransition(async () => {
                 try {
-                    await enablePlugin(pluginId, {
+                    const result = await enablePlugin(pluginId, {
                         autoEnableForDirectories: autoEnableForDirs,
                     });
-                    router.refresh();
+                    if (result.success) {
+                        router.refresh();
+                    } else {
+                        throw new Error(result.error);
+                    }
                 } catch (error) {
                     setOptimisticEnabled(false);
                 }
@@ -54,8 +58,12 @@ export function usePluginToggle({ pluginId, enabled, visibility }: UsePluginTogg
 
         startTransition(async () => {
             try {
-                await disablePlugin(pluginId);
-                router.refresh();
+                const result = await disablePlugin(pluginId);
+                if (result.success) {
+                    router.refresh();
+                } else {
+                    throw new Error(result.error);
+                }
             } catch (error) {
                 setOptimisticEnabled(true);
             }

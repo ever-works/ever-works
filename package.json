@@ -25,6 +25,7 @@
 		"deploy:trigger": "turbo deploy:trigger --filter=@ever-works/trigger-tasks",
 		"build": "turbo build",
 		"build:apps": "turbo build --filter=./apps/*",
+		"build:packages": "turbo build --filter=./packages/*",
 		"build:plugins": "turbo build --filter=./packages/plugin --filter=./packages/plugins/*",
 		"build:api": "turbo build --filter=ever-works-api",
 		"build:web": "turbo build --filter=ever-works-web",
@@ -44,7 +45,7 @@
 		"prettier": "^3.7.4",
 		"prettier-eslint-cli": "^8.0.1",
 		"prettier-plugin-tailwindcss": "^0.5.14",
-		"turbo": "^2.8.3"
+		"turbo": "^2.8.4"
 	},
 	"engines": {
 		"node": ">=20",

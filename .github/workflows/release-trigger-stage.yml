@@ -33,6 +33,10 @@ jobs:
       - name: Build all packages
         run: pnpm build --filter './packages/**'
 
+      - name: Prepare plugins for Trigger.dev
+        working-directory: packages/tasks
+        run: pnpm prepare:plugins
+
       - name: 🚀 Deploy Trigger.dev to Development environment
         working-directory: packages/tasks
         env:

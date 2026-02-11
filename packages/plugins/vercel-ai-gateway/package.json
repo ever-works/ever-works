@@ -1,7 +1,7 @@
 {
-	"name": "@ever-works/groq-plugin",
+	"name": "@ever-works/vercel-ai-gateway-plugin",
 	"version": "1.0.0",
-	"description": "Groq AI provider plugin for Ever Works platform",
+	"description": "Vercel AI Gateway plugin for Ever Works platform",
 	"private": false,
 	"type": "module",
 	"license": "MIT",
@@ -38,20 +38,21 @@
 	},
 	"everworks": {
 		"plugin": {
-			"id": "groq",
-			"name": "Groq",
+			"id": "vercel-ai-gateway",
+			"name": "Vercel AI Gateway",
 			"version": "1.0.0",
 			"category": "ai-provider",
 			"capabilities": [
 				"ai-provider"
 			],
-			"description": "Groq AI provider plugin for Ever Works platform",
+			"description": "Vercel AI Gateway plugin for Ever Works platform",
 			"author": {
 				"name": "Ever Works Team"
 			},
 			"license": "MIT",
 			"builtIn": true,
-			"autoEnable": false
+			"autoEnable": false,
+			"systemPlugin": false
 		}
 	}
 }
