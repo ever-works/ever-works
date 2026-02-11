@@ -30,8 +30,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build plugins
-        run: pnpm  build --filter './packages/plugins/**'
+      - name: Build all packages
+        run: pnpm build --filter './packages/**'
 
       - name: 🚀 Deploy Trigger.dev to Development environment
         working-directory: packages/tasks
