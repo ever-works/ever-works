@@ -30,11 +30,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build workspace packages
-        run: pnpm --filter @ever-works/agent build
-
       - name: Build plugins
-        run: pnpm --filter './packages/plugins/*' build
+        run: pnpm  build --filter './packages/plugins/**'
 
       - name: 🚀 Deploy Trigger.dev to Development environment
         working-directory: packages/tasks
