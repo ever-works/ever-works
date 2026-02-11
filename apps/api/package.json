@@ -44,7 +44,7 @@
         "@nestjs/throttler": "^6.5.0",
         "@nestjs/typeorm": "^11.0.0",
         "@scalar/nestjs-api-reference": "^1.0.20",
-        "axios": "^1.13.2",
+        "axios": "^1.13.5",
         "bcrypt": "^6.0.0",
         "better-sqlite3": "^12.5.0",
         "class-transformer": "^0.5.1",
