@@ -70,10 +70,6 @@ spec:
             - name: TRIGGER_INTERNAL_SECRET
               value: "$TRIGGER_INTERNAL_SECRET"
 
-            # Vercel
-            - name: VERCEL_TOKEN
-              value: "$VERCEL_TOKEN"
-
             # GitHub Auth
             - name: GH_CLIENT_ID
               value: "$GH_CLIENT_ID"

@@ -60,9 +60,6 @@ jobs:
           TRIGGER_SECRET_KEY: ${{ secrets.TRIGGER_SECRET_KEY }}
           TRIGGER_INTERNAL_SECRET: ${{ secrets.TRIGGER_INTERNAL_SECRET }}
 
-          # Vercel
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-
           # GitHub Auth
           GH_CLIENT_ID: ${{ secrets.GH_CLIENT_ID }}
           GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
