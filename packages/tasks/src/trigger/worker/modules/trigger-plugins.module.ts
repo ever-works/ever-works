@@ -34,6 +34,7 @@ import { TriggerPluginHydratorService } from '../services/trigger-plugin-hydrato
 @Module({})
 export class TriggerPluginsModule {
     static forRoot(options: PluginsModuleOptions = {}): DynamicModule {
+        const nodeEnv = process.env.NODE_ENV || 'development';
         return {
             module: TriggerPluginsModule,
             imports: [EventEmitterModule.forRoot(), TriggerInternalModule],
@@ -42,13 +43,10 @@ export class TriggerPluginsModule {
                     provide: PLUGINS_MODULE_OPTIONS,
                     useValue: {
                         platformVersion: DEFAULT_PLATFORM_VERSION,
-                        pluginPaths: [
-                            './plugins', // Production: copied by includePlugins() build extension
-                            '../plugins', // Dev mode: resolves to packages/plugins/
-                        ],
+                        pluginPaths: nodeEnv === 'development' ? ['../plugins'] : ['./plugins'], // ['./plugins'] Copied by prepare:plugins script before deployment
                         autoLoadBuiltIn: true,
                         autoEnableOnLoad: false,
-                        environment: 'production',
+                        environment: nodeEnv,
                         encryptSecrets: false,
                         maxConcurrentLoads: 5,
                         loadTimeout: 30000,

@@ -3,9 +3,9 @@
 	"version": "1.0.0",
 	"description": "OpenAI AI provider plugin for Ever Works platform",
 	"private": false,
-	"license": "MIT",
 	"type": "module",
-	"main": "./dist/index.js",
+	"license": "MIT",
+	"main": "./dist/index.cjs",
 	"module": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {

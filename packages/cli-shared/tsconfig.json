@@ -17,7 +17,7 @@
 		"resolveJsonModule": true,
 		"baseUrl": ".",
 		"paths": {
-			"@packages/*": ["../*/src"]
+			"@ever-works/*": ["../*/src"]
 		}
 	},
 	"include": ["src/**/*"],

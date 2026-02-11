@@ -44,7 +44,10 @@ export function DirectoryPluginSettingsModal({
             settings?: Record<string, unknown>;
             secretSettings?: Record<string, unknown>;
         }) => {
-            await updateDirectoryPluginSettings(directoryId, plugin.pluginId, data);
+            const result = await updateDirectoryPluginSettings(directoryId, plugin.pluginId, data);
+            if (!result.success) {
+                throw new Error(result.error);
+            }
         },
         [directoryId, plugin.pluginId],
     );
@@ -99,16 +102,20 @@ export function DirectoryPluginSettingsModal({
 
         setIsResetting(true);
         try {
-            await updateDirectoryPluginSettings(directoryId, plugin.pluginId, {
+            const result = await updateDirectoryPluginSettings(directoryId, plugin.pluginId, {
                 settings: Object.keys(settingsToReset).length > 0 ? settingsToReset : undefined,
                 secretSettings:
                     Object.keys(secretSettingsToReset).length > 0
                         ? secretSettingsToReset
                         : undefined,
             });
-            router.refresh();
-            setShowResetConfirm(false);
-            onOpenChange(false);
+            if (result.success) {
+                router.refresh();
+                setShowResetConfirm(false);
+                onOpenChange(false);
+            } else {
+                console.error('Failed to reset settings:', result.error);
+            }
         } catch (error) {
             console.error('Failed to reset settings:', error);
         } finally {

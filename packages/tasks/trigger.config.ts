@@ -1,6 +1,7 @@
 import { defineConfig } from '@trigger.dev/sdk';
 import { emitDecoratorMetadata } from '@trigger.dev/build/extensions/typescript';
-import { includePlugins } from './src/build/plugins-extension';
+import { additionalPackages, additionalFiles } from '@trigger.dev/build/extensions/core';
+import { collectPluginDependencies } from './src/build/collect-plugin-deps';
 
 const canRetry = process.env.TRIGGER_DEV_ENABLE_RETRIES === 'true';
 
@@ -43,8 +44,14 @@ export default defineConfig({
         extensions: [
             // Enable TypeScript decorator metadata for TypeORM
             emitDecoratorMetadata(),
-            // Copy built plugin artifacts into the container
-            includePlugins(),
+            // Copy built plugin artifacts into the deployment
+            additionalFiles({
+                files: ['./plugins/**'],
+            }),
+            // Install plugin dependencies without modifying package.json
+            additionalPackages({
+                packages: collectPluginDependencies(),
+            }),
         ],
     },
 });

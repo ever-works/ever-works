@@ -1,3 +1,4 @@
 tsconfig.tsbuildinfo
 # Trigger.dev
-.trigger
+.trigger/plugins/
+.trigger/dev.lock
