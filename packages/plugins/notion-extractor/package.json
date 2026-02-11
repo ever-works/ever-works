@@ -3,14 +3,15 @@
 	"version": "1.0.0",
 	"description": "Notion Page Extractor - Extract content from Notion pages using the Notion API or Splitbee",
 	"private": true,
-	"main": "./dist/index.js",
-	"module": "./dist/index.mjs",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
-			"import": "./dist/index.mjs",
-			"require": "./dist/index.js"
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
 		}
 	},
 	"scripts": {
@@ -22,12 +23,12 @@
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage"
 	},
-	"peerDependencies": {
-		"@ever-works/plugin": "workspace:*"
-	},
 	"dependencies": {
 		"@notionhq/client": "^2.3.0",
 		"axios": "^1.13.4"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
 	},
 	"devDependencies": {
 		"@ever-works/plugin": "workspace:*",

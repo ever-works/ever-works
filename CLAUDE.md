@@ -55,7 +55,7 @@ ever-works/
 
 - **Strict mode**: Varies by package (web: strict, api: relaxed)
 - **Decorators**: Enabled (NestJS dependency injection)
-- **Path aliases**: `@/*` (web), `@src/*` (api/cli), `@packages/*` (shared)
+- **Path aliases**: `@/*` (web), `@src/*` (api/cli), `@ever-works/*` (shared)
 - **Target**: ES2021 (backend), ES2017 (frontend)
 
 ### Formatting (Prettier)
@@ -125,7 +125,7 @@ pnpm deploy:trigger   # Deploy Trigger.dev jobs
 
 Turbo automatically handles build dependencies:
 
-1. Shared packages (`@packages/*`) build first
+1. Shared packages (`@ever-works/*`) build first
 2. Apps build after their dependencies
 3. Use `^build` in turbo.json for dependency ordering
 

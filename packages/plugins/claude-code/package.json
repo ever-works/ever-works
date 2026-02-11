@@ -4,7 +4,7 @@
 	"description": "Claude Code Generator Plugin - Full pipeline plugin that delegates generation to Claude Code",
 	"private": true,
 	"type": "module",
-	"main": "./dist/index.js",
+	"main": "./dist/index.cjs",
 	"module": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {

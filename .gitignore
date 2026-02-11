@@ -56,3 +56,6 @@ apps/**/.cache
 packages/**/.cache
 .cache
 .pnpm-debug.log
+
+packages/tasks/.trigger
+packages/tasks/plugins
