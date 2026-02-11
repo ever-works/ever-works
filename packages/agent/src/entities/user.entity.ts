@@ -8,11 +8,8 @@ import {
     ManyToOne,
     JoinColumn,
 } from 'typeorm';
-import { OAuthToken } from './oauth-token.entity';
 import type { ClassToObject } from './types';
-import { config } from '@src/config';
 import { Directory } from './directory.entity';
-import { RepoProvider } from '@src/dto';
 import { DirectoryGenerationHistory } from './directory-generation-history.entity';
 import { UserSubscription } from './user-subscription.entity';
 import { SubscriptionPlan } from './subscription-plan.entity';
@@ -49,16 +46,6 @@ export class User {
     @Column({ nullable: true })
     emailVerificationExpires: Date;
 
-    // Tokens and API keys
-    @Column({ nullable: true })
-    vercelToken: string;
-
-    @Column({ nullable: true })
-    screenshotoneAccessKey: string;
-
-    @Column({ nullable: true })
-    screenshotoneSecretKey: string;
-
     // User status
     @Column({ default: true })
     isActive: boolean;
@@ -82,10 +69,6 @@ export class User {
 
     @UpdateDateColumn()
     updatedAt: Date;
-
-    // Relationships
-    @OneToMany(() => OAuthToken, (token) => token.user, { eager: true })
-    oauthTokens: ClassToObject<OAuthToken>[];
 
     @OneToMany(() => Directory, (directory) => directory.user, { lazy: true })
     directories: Promise<ClassToObject<Directory>[]>;
@@ -111,35 +94,7 @@ export class User {
 
     local: boolean = false;
 
-    getGitToken(provider: RepoProvider = RepoProvider.GITHUB): string | null {
-        if (this.local) {
-            return config.github.getApiKey() || null;
-        }
-
-        // Check if oauth tokens are loaded
-        if (!this.oauthTokens) {
-            return null;
-        }
-
-        // Find GitHub token
-        const providerToken = this.oauthTokens.find((token) => token.provider === provider);
-        if (!providerToken) {
-            return null;
-        }
-
-        // Check if token is expired
-        if (providerToken.expiresAt && new Date() > providerToken.expiresAt) {
-            return null;
-        }
-
-        return providerToken.accessToken;
-    }
-
-    asCommitter(provider: RepoProvider = RepoProvider.GITHUB) {
-        const providerToken = (this.oauthTokens || []).find((token) => token.provider === provider);
-        const username = providerToken?.metadata?.login || providerToken?.username || this.username;
-        const email = providerToken?.email || this.email;
-
-        return { name: username, email };
+    asCommitter(): { name: string; email: string } {
+        return { name: this.username, email: this.email };
     }
 }

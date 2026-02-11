@@ -1,0 +1,69 @@
+{
+	"name": "@ever-works/screenshotone-plugin",
+	"version": "1.0.0",
+	"description": "ScreenshotOne screenshot plugin for Ever Works - capture website screenshots using the ScreenshotOne API",
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"screenshotone-api-sdk": "^1.1.6"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "screenshotone",
+			"name": "ScreenshotOne",
+			"version": "1.0.0",
+			"category": "screenshot",
+			"capabilities": [
+				"screenshot"
+			],
+			"description": "Capture website screenshots using the ScreenshotOne API service. Supports configurable viewport sizes, formats, and advanced options like ad blocking.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"systemPlugin": false,
+			"builtIn": false,
+			"envVars": [
+				{
+					"name": "PLUGIN_SCREENSHOTONE_ACCESS_KEY",
+					"required": false,
+					"secret": true,
+					"description": "ScreenshotOne access key (optional - can be set via admin/user settings)"
+				},
+				{
+					"name": "PLUGIN_SCREENSHOTONE_SECRET_KEY",
+					"required": false,
+					"secret": true,
+					"description": "ScreenshotOne secret key for signed URLs (optional - can be set via admin/user settings)"
+				}
+			]
+		}
+	}
+}

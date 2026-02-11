@@ -1,34 +1,21 @@
-import { IsBoolean, IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, Max, Min, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import {
     DirectoryScheduleBillingMode,
     DirectoryScheduleCadence,
     DirectoryScheduleStatus,
     GenerateStatusType,
 } from '@src/entities/types';
+import type { UpdateDirectorySchedulePayload as IUpdateDirectorySchedulePayload } from '@ever-works/contracts/api';
+import { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dto';
 
-export type DirectoryScheduleAllowedCadence = {
-    cadence: DirectoryScheduleCadence;
-    reason?: string;
-    payPerUse?: boolean;
-    allowed: boolean;
-};
+// Re-export types from contracts for convenience
+export type {
+    DirectoryScheduleAllowedCadence,
+    DirectoryScheduleDto,
+} from '@ever-works/contracts/api';
 
-export interface DirectoryScheduleDto {
-    status: DirectoryScheduleStatus;
-    cadence: DirectoryScheduleCadence | null;
-    billingMode: DirectoryScheduleBillingMode;
-    nextRunAt: string | null;
-    lastRunAt: string | null;
-    lastRunStatus: GenerateStatusType | null;
-    failureCount: number;
-    maxFailureBeforePause: number;
-    alwaysCreatePullRequest: boolean;
-    allowedCadences: DirectoryScheduleAllowedCadence[];
-    planCode?: string;
-    subscriptionsEnabled: boolean;
-}
-
-export class UpdateDirectoryScheduleDto {
+export class UpdateDirectoryScheduleDto implements IUpdateDirectorySchedulePayload {
     @IsOptional()
     @IsBoolean()
     enable?: boolean;
@@ -50,4 +37,9 @@ export class UpdateDirectoryScheduleDto {
     @IsOptional()
     @IsBoolean()
     alwaysCreatePullRequest?: boolean;
+
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => ProvidersDto)
+    providerOverrides?: ProvidersDto | null;
 }

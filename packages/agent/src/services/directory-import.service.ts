@@ -7,14 +7,13 @@ import {
     Optional,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Octokit } from 'octokit';
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
 import { DirectoryGenerationHistoryRepository } from '@src/database/repositories/directory-generation-history.repository';
-import { DataGeneratorService } from '@src/data-generator/data-generator.service';
-import { DataRepository } from '@src/data-generator/data-repository';
-import { MarkdownGeneratorService } from '@src/markdown-generator/markdown-generator.service';
-import { WebsiteGeneratorService } from '@src/website-generator/website-generator.service';
-import { GithubService } from '@src/git/github.service';
+import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
+import { DataRepository } from '@src/generators/data-generator/data-repository';
+import { MarkdownGeneratorService } from '@src/generators/markdown-generator/markdown-generator.service';
+import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
+import { GitFacadeService } from '@src/facades/git.facade';
 import { SourceRepoAnalyzerService } from '@src/import/source-repo-analyzer.service';
 import { AwesomeReadmeParserService } from '@src/import/awesome-readme-parser.service';
 import { ImportExecutorService } from '@src/import/import-executor.service';
@@ -27,7 +26,7 @@ import {
     ImportSourceTypeEnum,
     GetUserRepositoriesDto,
     GetUserRepositoriesResponseDto,
-    GitHubRepoDto,
+    GitRepoDto,
 } from '@src/dto/import-directory.dto';
 import { Directory, ImportSourceType, SourceRepository } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
@@ -42,9 +41,10 @@ import {
 import { DirectoryScheduleService } from './directory-schedule.service';
 import { DirectoryScheduleCadence, GenerateStatusType } from '@src/entities/types';
 import { normalizeGeneratorError } from './utils/error.utils';
-import { slugifyText } from '@src/items-generator/utils/text.utils';
+import { slugifyText } from '@src/utils/text.utils';
 import { GenerationMethod } from '@src/items-generator/dto';
 import { DirectoryGenerationHistory } from '@src/entities/directory-generation-history.entity';
+import { GeneratorFormSchemaService } from './generator-form-schema.service';
 
 type ImportTriggerContext = {
     triggeredBy: 'user' | 'schedule' | 'api';
@@ -63,11 +63,12 @@ export class DirectoryImportService {
         private readonly dataGenerator: DataGeneratorService,
         private readonly markdownGenerator: MarkdownGeneratorService,
         private readonly websiteGenerator: WebsiteGeneratorService,
-        private readonly githubService: GithubService,
+        private readonly gitFacade: GitFacadeService,
         private readonly sourceRepoAnalyzer: SourceRepoAnalyzerService,
         private readonly awesomeReadmeParser: AwesomeReadmeParserService,
         private readonly importExecutor: ImportExecutorService,
         private readonly directoryScheduleService: DirectoryScheduleService,
+        private readonly generatorFormSchemaService: GeneratorFormSchemaService,
         private readonly eventEmitter: EventEmitter2,
         @Optional()
         @Inject(DIRECTORY_IMPORT_DISPATCHER)
@@ -75,21 +76,47 @@ export class DirectoryImportService {
     ) {}
 
     /**
-     * Analyze a GitHub repository to detect its type and structure
+     * Analyze a repository to detect its type and structure
      */
     async analyzeRepository(
         dto: AnalyzeRepositoryDto,
         user: User,
     ): Promise<AnalyzeRepositoryResponseDto> {
-        const token = this.getGitHubToken(user);
-        return this.sourceRepoAnalyzer.analyzeRepository(dto.sourceUrl, token);
+        const providerId = dto.gitProvider || this.getProviderFromUrl(dto.sourceUrl);
+        const token = await this.getProviderToken(user, providerId);
+        const result = await this.sourceRepoAnalyzer.analyzeRepository(dto.sourceUrl, token);
+
+        if (!result.error && result.repo && token) {
+            const repoOwner = user.username || result.owner;
+            const baseSlug = result.baseSlug || result.repo;
+            const slug = slugifyText(
+                this.normalizeDirectoryName(baseSlug, ImportSourceTypeEnum.LINK_EXISTING),
+            );
+
+            try {
+                const conflict = await this.sourceRepoAnalyzer.checkSlugConflicts(
+                    repoOwner,
+                    slug,
+                    token,
+                    providerId,
+                );
+                if (conflict.hasConflict) {
+                    result.slugConflict = conflict;
+                }
+            } catch (err) {
+                this.logger.debug(`Slug conflict check failed: ${err.message}`);
+            }
+        }
+
+        return result;
     }
 
     async analyzeForLinking(
         dto: AnalyzeRepositoryDto,
         user: User,
     ): Promise<AnalyzeForLinkingResponseDto> {
-        const token = this.getGitHubToken(user);
+        const providerId = dto.gitProvider || this.getProviderFromUrl(dto.sourceUrl);
+        const token = await this.getProviderToken(user, providerId);
         if (!token) {
             return {
                 canLink: false,
@@ -99,35 +126,33 @@ export class DirectoryImportService {
                     markdown: { exists: false, name: null },
                     website: { exists: false, name: null },
                 },
-                error: 'GitHub token not available',
+                error: 'Git provider token not available',
             };
         }
         return this.sourceRepoAnalyzer.analyzeForLinking(dto.sourceUrl, token);
     }
 
     /**
-     * Get user's GitHub repositories for selection
+     * Get user's repositories for selection (uses git provider facade)
      */
     async getUserRepositories(
         dto: GetUserRepositoriesDto,
         user: User,
     ): Promise<GetUserRepositoriesResponseDto> {
-        const token = this.getGitHubToken(user);
+        const options = { userId: user.id, providerId: dto.gitProvider };
+        const hasCredentials = await this.gitFacade.hasValidCredentials(options);
 
-        if (!token) {
-            throw new BadRequestException('GitHub account not connected');
+        if (!hasCredentials) {
+            throw new BadRequestException('Git provider account not connected');
         }
 
-        const octokit = new Octokit({ auth: token });
         const page = dto.page || 1;
         const perPage = dto.perPage || 30;
 
         try {
-            const { data: repos } = await octokit.rest.repos.listForAuthenticatedUser({
-                sort: 'updated',
-                direction: 'desc',
-                per_page: perPage,
-                page,
+            const repos = await this.gitFacade.listRepositories(options, page, perPage, {
+                owner: dto.owner,
+                type: dto.type,
             });
 
             let filteredRepos = repos;
@@ -140,16 +165,16 @@ export class DirectoryImportService {
                 );
             }
 
-            const repositories: GitHubRepoDto[] = filteredRepos.map((repo) => ({
-                id: repo.id,
+            const repositories: GitRepoDto[] = filteredRepos.map((repo, index) => ({
+                id: index, // Use index as fallback since generic GitRepository doesn't have id
                 name: repo.name,
-                full_name: repo.full_name,
-                owner: repo.owner.login,
-                description: repo.description,
-                html_url: repo.html_url,
-                private: repo.private,
-                updated_at: repo.updated_at || new Date().toISOString(),
-                default_branch: repo.default_branch,
+                full_name: repo.fullName,
+                owner: repo.owner,
+                description: repo.description ?? null,
+                html_url: repo.url,
+                private: repo.isPrivate,
+                updated_at: new Date().toISOString(),
+                default_branch: repo.defaultBranch,
             }));
 
             return {
@@ -161,7 +186,7 @@ export class DirectoryImportService {
             };
         } catch (error) {
             this.logger.error('Failed to fetch user repositories', error);
-            throw new BadRequestException('Failed to fetch GitHub repositories');
+            throw new BadRequestException('Failed to fetch repositories');
         }
     }
 
@@ -173,16 +198,16 @@ export class DirectoryImportService {
         user: User,
         context: ImportTriggerContext = DEFAULT_IMPORT_CONTEXT,
     ): Promise<ImportDirectoryResponseDto> {
-        const parsed = this.sourceRepoAnalyzer.parseGitHubUrl(dto.sourceUrl);
+        const parsed = this.sourceRepoAnalyzer.parseGitUrl(dto.sourceUrl);
         if (!parsed) {
             return {
                 status: 'error',
-                message: 'Invalid GitHub URL format',
+                message: 'Invalid repository URL format',
             };
         }
 
         const normalizedName = this.normalizeDirectoryName(dto.name, dto.sourceType);
-        const slug = slugifyText(normalizedName);
+        let slug = slugifyText(normalizedName);
 
         const existingDir = await this.directoryRepository.findByOwnerAndSlug({
             userId: user.id,
@@ -198,6 +223,29 @@ export class DirectoryImportService {
         }
 
         try {
+            if (!dto.gitProvider) {
+                return {
+                    status: 'error',
+                    message: 'Git provider is required',
+                };
+            }
+
+            // Validate AI provider is configured before creating directory
+            if (dto.sourceType === ImportSourceTypeEnum.AWESOME_README) {
+                await this.generatorFormSchemaService.validateSelectedProviders(dto.providers, {
+                    userId: user.id,
+                });
+            }
+
+            if (dto.sourceType !== ImportSourceTypeEnum.LINK_EXISTING) {
+                slug = await this.resolveSlugConflicts(
+                    slug,
+                    dto.owner || user.username,
+                    user,
+                    dto.gitProvider,
+                );
+            }
+
             const directory = await this.directoryRepository.create(
                 {
                     slug,
@@ -206,10 +254,15 @@ export class DirectoryImportService {
                     userId: user.id,
                     owner: dto.owner,
                     organization: dto.organization || false,
-                    repoProvider: 'github',
+                    gitProvider: dto.gitProvider,
+                    deployProvider: dto.deployProvider,
                 },
                 user,
             );
+
+            if (dto.sourceType === ImportSourceTypeEnum.LINK_EXISTING) {
+                return this.handleLinkExisting(directory, dto, parsed, user);
+            }
 
             const updateData: Partial<Directory> = {
                 generateStatus: {
@@ -321,6 +374,7 @@ export class DirectoryImportService {
                 createMissingRepos: dto.createMissingRepos ?? false,
                 enableSync: dto.sync ?? true,
             },
+            providers: dto.providers,
         };
 
         const dispatchedId = this.importDispatcher
@@ -374,11 +428,11 @@ export class DirectoryImportService {
         let result: DirectoryImportResult | null = null;
 
         try {
-            const token = this.getGitHubToken(user);
+            const token = await this.getProviderToken(user, directory.gitProvider);
 
             if (dto.sourceType === ImportSourceTypeEnum.DATA_REPO) {
                 if (!token) {
-                    throw new Error('GitHub token not available');
+                    throw new Error('Git provider token not available');
                 }
                 result = await this.importExecutor.importFromDataRepo({
                     directory,
@@ -392,10 +446,11 @@ export class DirectoryImportService {
                     user,
                     sourceUrl: dto.sourceUrl,
                     token,
+                    aiProviderOverride: dto.providers?.ai,
                 });
             } else if (dto.sourceType === ImportSourceTypeEnum.LINK_EXISTING) {
                 if (!token) {
-                    throw new Error('GitHub token not available');
+                    throw new Error('Git provider token not available');
                 }
                 result = await this.importExecutor.linkExistingDataRepo({
                     directory,
@@ -556,24 +611,27 @@ export class DirectoryImportService {
         user: User,
         source: { owner: string; repo: string },
     ): Promise<DirectoryImportResult> {
-        const token = this.getGitHubToken(user);
+        const options = { userId: user.id, providerId: directory.gitProvider };
+        const hasCredentials = await this.gitFacade.hasValidCredentials(options);
 
-        if (!token) {
+        if (!hasCredentials) {
             return {
                 success: false,
                 directoryId: directory.id,
-                error: 'GitHub token not available',
+                error: 'Git provider token not available',
                 errorCode: DirectoryImportErrorCode.REPO_ACCESS_DENIED,
             };
         }
 
         try {
-            const sourceDir = await this.githubService.cloneOrPull({
-                owner: source.owner,
-                repo: source.repo,
-                token,
-                committer: user.asCommitter(),
-            });
+            const sourceDir = await this.gitFacade.cloneOrPull(
+                {
+                    owner: source.owner,
+                    repo: source.repo,
+                    committer: user.asCommitter(),
+                },
+                { userId: user.id, providerId: directory.gitProvider },
+            );
 
             const sourceData = await DataRepository.create(sourceDir);
             const items = await sourceData.getItems();
@@ -632,7 +690,8 @@ export class DirectoryImportService {
         user: User,
         sourceUrl: string,
     ): Promise<DirectoryImportResult> {
-        const token = this.getGitHubToken(user);
+        const providerId = this.getProviderFromUrl(sourceUrl);
+        const token = await this.getProviderToken(user, providerId);
 
         try {
             const readme = await this.sourceRepoAnalyzer.getReadmeContent(sourceUrl, token);
@@ -645,7 +704,10 @@ export class DirectoryImportService {
                 };
             }
 
-            const parsedData = await this.awesomeReadmeParser.parseReadme(readme.content);
+            const parsedData = await this.awesomeReadmeParser.parseReadme(readme.content, {
+                userId: user.id,
+                directoryId: directory.id,
+            });
 
             const syncResult = await this.dataGenerator.updateWithImportedData(
                 directory,
@@ -709,9 +771,149 @@ export class DirectoryImportService {
         }
     }
 
-    private getGitHubToken(user: User): string | undefined {
-        const oauthToken = user.oauthTokens?.find((t) => t.provider === 'github');
-        return oauthToken?.accessToken;
+    private async getProviderToken(user: User, providerId?: string): Promise<string | undefined> {
+        const token = await this.gitFacade.getAccessToken({
+            userId: user.id,
+            providerId: providerId,
+        });
+        return token ?? undefined;
+    }
+
+    private getProviderFromUrl(url: string): string | undefined {
+        const parsed = this.sourceRepoAnalyzer.parseGitUrl(url);
+        return parsed?.provider;
+    }
+
+    private async resolveSlugConflicts(
+        slug: string,
+        repoOwner: string,
+        user: User,
+        gitProvider: string,
+    ): Promise<string> {
+        const token = await this.getProviderToken(user, gitProvider);
+        if (!token) {
+            return slug;
+        }
+
+        const providerId = gitProvider;
+        const repoNames = [slug, `${slug}-data`, `${slug}-website`];
+        let hasConflict = false;
+
+        for (const repoName of repoNames) {
+            try {
+                const exists = await this.gitFacade.repositoryExists(repoOwner, repoName, {
+                    token,
+                    providerId,
+                });
+                if (exists) {
+                    hasConflict = true;
+                    break;
+                }
+            } catch {
+                // ignore
+            }
+        }
+
+        if (!hasConflict) {
+            return slug;
+        }
+
+        // Try slug-2 through slug-10
+        for (let i = 2; i <= 10; i++) {
+            const candidate = `${slug}-${i}`;
+            const candidateRepos = [candidate, `${candidate}-data`, `${candidate}-website`];
+            let candidateConflicts = false;
+
+            for (const repo of candidateRepos) {
+                try {
+                    const exists = await this.gitFacade.repositoryExists(repoOwner, repo, {
+                        token,
+                        providerId,
+                    });
+                    if (exists) {
+                        candidateConflicts = true;
+                        break;
+                    }
+                } catch {
+                    // ignore
+                }
+            }
+
+            if (!candidateConflicts) {
+                const dbExists = await this.directoryRepository.findByOwnerAndSlug({
+                    userId: user.id,
+                    owner: repoOwner,
+                    slug: candidate,
+                });
+                if (!dbExists) {
+                    this.logger.log(
+                        `Slug conflict resolved: "${slug}" → "${candidate}" for ${repoOwner}`,
+                    );
+                    return candidate;
+                }
+            }
+        }
+
+        const fallback = `${slug}-${Date.now()}`;
+        this.logger.log(`Slug conflict fallback: "${slug}" → "${fallback}" for ${repoOwner}`);
+        return fallback;
+    }
+
+    private async handleLinkExisting(
+        directory: Directory,
+        dto: ImportDirectoryDto,
+        parsed: { owner: string; repo: string },
+        user: User,
+    ): Promise<ImportDirectoryResponseDto> {
+        const now = new Date();
+
+        await this.directoryRepository.update(directory.id, {
+            generateStatus: {
+                status: GenerateStatusType.GENERATED,
+                step: 'linked',
+            },
+            sourceRepository: {
+                url: dto.sourceUrl,
+                owner: parsed.owner,
+                repo: parsed.repo,
+                type: ImportSourceTypeEnum.LINK_EXISTING as ImportSourceType,
+                importedAt: now,
+            },
+        });
+
+        const history = await this.generationHistoryRepository.createEntry({
+            directoryId: directory.id,
+            userId: user.id,
+            status: GenerateStatusType.GENERATED,
+            generationMethod: 'import' as any,
+            parameters: {
+                sourceUrl: dto.sourceUrl,
+                sourceType: dto.sourceType,
+                sourceOwner: parsed.owner,
+                sourceRepo: parsed.repo,
+            },
+            triggeredBy: 'user',
+            scheduleId: null,
+            startedAt: now,
+        });
+
+        await this.generationHistoryRepository.updateEntry(history.id, {
+            finishedAt: now,
+            durationInSeconds: 0,
+        });
+
+        this.logger.log(`Linked directory ${directory.id} to existing repos at ${dto.sourceUrl}`);
+
+        this.eventEmitter.emit(
+            'directory.generation.completed',
+            new DirectoryGenerationCompletedEvent(directory),
+        );
+
+        return {
+            status: 'success',
+            directoryId: directory.id,
+            message: 'Directory linked to existing repositories',
+        };
     }
 
     /**
@@ -728,28 +930,28 @@ export class DirectoryImportService {
             return name;
         }
 
-        // Check both the original name and slugified version for -data suffix
+        // Check both the original name and slugified version for -data / -website suffix
         const slugified = slugifyText(name);
 
-        if (slugified.endsWith('-data')) {
-            // Handle different name formats:
-            // "my-dir-data" -> "my-dir"
-            // "My Dir Data" -> "My Dir"
-            // "My-Dir-Data" -> "My-Dir"
+        if (slugified.endsWith('-data') || slugified.endsWith('-website')) {
+            const suffix = slugified.endsWith('-data') ? 'data' : 'website';
+            const suffixLen = suffix.length;
             const trimmed = name.trim();
 
-            // Check for " Data" suffix (case-insensitive)
-            if (/\s+data$/i.test(trimmed)) {
-                return trimmed.replace(/\s+data$/i, '');
+            // Check for " Data" / " Website" suffix (case-insensitive)
+            const spaceSuffixRegex = new RegExp(`\\s+${suffix}$`, 'i');
+            if (spaceSuffixRegex.test(trimmed)) {
+                return trimmed.replace(spaceSuffixRegex, '');
             }
 
-            // Check for "-Data" or "-data" suffix
-            if (/-data$/i.test(trimmed)) {
-                return trimmed.replace(/-data$/i, '');
+            // Check for "-Data" / "-Website" suffix (case-insensitive)
+            const dashSuffixRegex = new RegExp(`-${suffix}$`, 'i');
+            if (dashSuffixRegex.test(trimmed)) {
+                return trimmed.replace(dashSuffixRegex, '');
             }
 
             // Fallback: strip from slugified and convert back to title case
-            const baseSlug = slugified.slice(0, -5);
+            const baseSlug = slugified.slice(0, -(suffixLen + 1)); // +1 for the dash
             return baseSlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
         }
 

@@ -143,7 +143,10 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                                 <span className="text-xs opacity-75">
                                     •{' '}
                                     <span className="ml-1">
-                                        {getStepText(directory.generateStatus.step, tProgress)}
+                                        {getStepText(
+                                            directory.generateStatus,
+                                            tProgress('steps.processing'),
+                                        )}
                                     </span>
                                 </span>
                             )}
@@ -209,7 +212,7 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                                             d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
                                         />
                                     </svg>
-                                    <span className="capitalize">{directory.repoProvider}</span>
+                                    <span className="capitalize">{directory.gitProvider}</span>
                                 </>
                             );
 

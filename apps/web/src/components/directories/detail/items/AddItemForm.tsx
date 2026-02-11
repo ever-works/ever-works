@@ -11,6 +11,7 @@ import { Loader2, Link2, Plus, X, Camera } from 'lucide-react';
 import { extractItemDetails, captureScreenshot } from '@/app/actions/dashboard/items';
 import { toast } from 'sonner';
 import { CategoriesField } from './CategoriesField';
+import { useItemsContext } from './ItemsContext';
 
 export interface ItemFormData {
     name: string;
@@ -90,14 +91,14 @@ export const AddItemForm = memo(function AddItemForm({
                         description: result.data.description || prev.description,
                         tags:
                             result.data.tags && result.data.tags.length > 0
-                                ? result.data.tags
+                                ? ([...result.data.tags] as string[])
                                 : prev.tags,
                         categories: newCategories.length > 0 ? newCategories : prev.categories,
                         brand: result.data.brand || prev.brand,
                         brand_logo_url: result.data.brand_logo_url || prev.brand_logo_url,
                         images:
                             result.data.images && result.data.images.length > 0
-                                ? result.data.images
+                                ? [...result.data.images]
                                 : prev.images,
                     };
                 });
@@ -450,6 +451,7 @@ const ImagesField = memo(function ImagesField({
     isPending,
 }: ImagesFieldProps) {
     const t = useTranslations('dashboard.directoryDetail.items.addModal');
+    const { screenshotAvailable } = useItemsContext();
 
     const isValidHttpUrl = (value: string) => {
         try {
@@ -490,31 +492,33 @@ const ImagesField = memo(function ImagesField({
                     <Plus className="w-4 h-4" />
                 </Button>
             </div>
-            <div className="flex items-center gap-2">
-                <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={onCaptureScreenshot}
-                    disabled={
-                        isPending ||
-                        isCapturingScreenshot ||
-                        !sourceUrl ||
-                        !isValidHttpUrl(sourceUrl)
-                    }
-                    className="shrink-0"
-                >
-                    {isCapturingScreenshot ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                        <Camera className="w-4 h-4" />
-                    )}
-                    <span className="ml-2">{t('captureScreenshot')}</span>
-                </Button>
-                <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                    {t('captureScreenshotHelp')}
-                </p>
-            </div>
+            {screenshotAvailable && (
+                <div className="flex items-center gap-2">
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={onCaptureScreenshot}
+                        disabled={
+                            isPending ||
+                            isCapturingScreenshot ||
+                            !sourceUrl ||
+                            !isValidHttpUrl(sourceUrl)
+                        }
+                        className="shrink-0"
+                    >
+                        {isCapturingScreenshot ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Camera className="w-4 h-4" />
+                        )}
+                        <span className="ml-2">{t('captureScreenshot')}</span>
+                    </Button>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('captureScreenshotHelp')}
+                    </p>
+                </div>
+            )}
             {images.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
                     {images.map((url) => (

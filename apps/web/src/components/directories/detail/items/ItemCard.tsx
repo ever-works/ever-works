@@ -10,27 +10,23 @@ import { removeItem } from '@/app/actions/dashboard/items';
 import { toast } from 'sonner';
 import { getCategoryName } from '@/lib/utils/items';
 import { ItemActions } from './ItemActions';
+import { useItemsContext } from './ItemsContext';
 
 interface ItemCardProps {
     item: ItemData;
     viewMode: 'grid' | 'list';
-    directoryId: string;
-    canEdit?: boolean;
     onDelete?: () => void;
     onUpdate?: (item: Partial<ItemData>) => void;
-    directoryWebsite?: string;
 }
 
 export const ItemCard = memo(function ItemCard({
     item,
     viewMode,
-    directoryId,
-    canEdit = false,
     onDelete,
     onUpdate,
-    directoryWebsite,
 }: ItemCardProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
+    const { directoryId, canEdit, directoryWebsite } = useItemsContext();
     const [isPending, startTransition] = useTransition();
 
     const handleDelete = () => {
@@ -58,11 +54,8 @@ export const ItemCard = memo(function ItemCard({
             <ItemCardList
                 item={item}
                 onDelete={handleDelete}
-                directoryId={directoryId}
-                canEdit={canEdit}
                 onUpdate={onUpdate}
                 isPending={isPending}
-                directoryWebsite={directoryWebsite}
             />
         );
     }
@@ -71,11 +64,8 @@ export const ItemCard = memo(function ItemCard({
         <ItemCardGrid
             item={item}
             onDelete={handleDelete}
-            directoryId={directoryId}
-            canEdit={canEdit}
             onUpdate={onUpdate}
             isPending={isPending}
-            directoryWebsite={directoryWebsite}
         />
     );
 });
@@ -84,21 +74,16 @@ interface ItemCardViewProps {
     item: ItemData;
     onDelete: () => void;
     isPending: boolean;
-    canEdit?: boolean;
     onUpdate?: (item: Partial<ItemData>) => void;
-    directoryId: string;
-    directoryWebsite?: string;
 }
 
 const ItemCardList = memo(function ItemCardList({
     item,
     onDelete,
     isPending,
-    canEdit = false,
     onUpdate,
-    directoryId,
-    directoryWebsite,
 }: ItemCardViewProps) {
+    const { directoryId, canEdit, directoryWebsite } = useItemsContext();
     const isFeatured = item.featured === true;
 
     return (
@@ -168,7 +153,6 @@ const ItemCardList = memo(function ItemCardList({
                 {canEdit && (
                     <ItemActions
                         item={item}
-                        directoryId={directoryId}
                         onDelete={onDelete}
                         onUpdate={onUpdate}
                         isPending={isPending}
@@ -183,11 +167,9 @@ const ItemCardGrid = memo(function ItemCardGrid({
     item,
     onDelete,
     isPending,
-    canEdit = false,
     onUpdate,
-    directoryId,
-    directoryWebsite,
 }: ItemCardViewProps) {
+    const { directoryId, canEdit, directoryWebsite } = useItemsContext();
     const t = useTranslations('dashboard.directoryDetail.items');
     const isFeatured = item.featured === true;
 
@@ -214,7 +196,6 @@ const ItemCardGrid = memo(function ItemCardGrid({
                 {canEdit && (
                     <ItemActions
                         item={item}
-                        directoryId={directoryId}
                         onDelete={onDelete}
                         onUpdate={onUpdate}
                         isPending={isPending}

@@ -10,7 +10,7 @@ import {
     JoinColumn,
     Index,
 } from 'typeorm';
-import type { ClassToObject, DirectoryScheduleCadence } from './types';
+import type { ClassToObject, DirectoryScheduleCadence, ProvidersDto } from './types';
 import { Directory } from './directory.entity';
 import { User } from './user.entity';
 import { DirectoryScheduleBillingMode, DirectoryScheduleStatus, GenerateStatusType } from './types';
@@ -65,6 +65,9 @@ export class DirectorySchedule {
 
     @Column({ type: 'boolean', default: false })
     alwaysCreatePullRequest: boolean;
+
+    @Column({ type: 'simple-json', nullable: true })
+    providerOverrides?: ProvidersDto | null;
 
     @OneToMany(() => UsageLedgerEntry, (entry) => entry.schedule)
     ledgerEntries?: ClassToObject<UsageLedgerEntry>[] | null;

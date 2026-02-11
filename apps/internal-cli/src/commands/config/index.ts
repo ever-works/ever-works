@@ -4,7 +4,7 @@ import { ConfigCommand } from './config.command';
 import { AiProviderRegistryService } from './ai-providers/ai-provider-registry.service';
 
 // Prompt Services
-import { GitHubGitPromptService } from './prompts/github-git-prompt.service';
+import { GitPromptService } from './prompts/git-prompt.service';
 import { DeploymentPromptService } from './prompts/deployment-prompt.service';
 import { AiProviderPromptService } from './prompts/ai-provider-prompt.service';
 import { SearchServicePromptService } from './prompts/search-service-prompt.service';
@@ -15,7 +15,7 @@ export const ConfigCommands = [
 
     // Services
     AiProviderRegistryService,
-    GitHubGitPromptService,
+    GitPromptService,
     DeploymentPromptService,
     AiProviderPromptService,
     SearchServicePromptService,

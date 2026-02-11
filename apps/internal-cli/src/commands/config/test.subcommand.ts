@@ -3,8 +3,8 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import { ConfigService } from '../../config/config.service';
-import { AiService } from '@packages/agent/ai';
-import { config as agentConfig } from '@packages/agent/config';
+import { AiFacadeService, GitFacadeService } from '@ever-works/agent/facades';
+
 import { COMMAND } from '../../config';
 
 @SubCommand({
@@ -16,7 +16,8 @@ export class TestSubCommand extends CommandRunner {
 
     constructor(
         private readonly configService: ConfigService,
-        private readonly aiService: AiService,
+        private readonly aiFacade: AiFacadeService,
+        private readonly gitFacade: GitFacadeService,
     ) {
         super();
     }
@@ -43,7 +44,7 @@ export class TestSubCommand extends CommandRunner {
                 allTestsPassed = false;
             }
 
-            // Test other services (GitHub, Vercel, etc.)
+            // Test other services (Git, Deployment, etc.)
             const serviceTestResults = await this.testOtherServices(config);
             if (!serviceTestResults) {
                 allTestsPassed = false;
@@ -68,65 +69,30 @@ export class TestSubCommand extends CommandRunner {
         }
     }
 
-    private async testAiProviders(config: any): Promise<boolean> {
+    private async testAiProviders(_config: any): Promise<boolean> {
         console.log(chalk.blue.bold('Testing AI Providers\n'));
 
-        const providers = this.getConfiguredAiProviders(config);
-        if (providers.length === 0) {
-            console.log(chalk.yellow('⚠ No AI providers configured'));
+        const spinner = ora('Testing AI provider via plugin system...').start();
+
+        try {
+            const result = await this.aiFacade.testConnection({ userId: 'cli' });
+
+            if (result.success) {
+                spinner.succeed(
+                    `${result.provider}: ${chalk.green('✓ Connected')} (${result.responseTime}ms)`,
+                );
+            } else {
+                spinner.fail(`${result.provider}: ${chalk.red('✗ Failed')}`);
+                console.log(chalk.red(`  Error: ${result.error}`));
+                return false;
+            }
+
+            return true;
+        } catch (error) {
+            spinner.fail(`AI provider: ${chalk.red('✗ Failed')}`);
+            console.log(chalk.red(`  Error: ${error.message}`));
             return false;
         }
-
-        let allPassed = true;
-
-        for (const provider of providers) {
-            const spinner = ora(`Testing ${provider} provider...`).start();
-
-            const lowerProvider = provider.toLowerCase();
-            const upperProvider = provider.toUpperCase();
-
-            try {
-                const providerConfig = agentConfig.ai[lowerProvider];
-
-                const result = await this.aiService.testProvider({
-                    type: provider as any,
-
-                    apiKey: config[`${upperProvider}_API_KEY`],
-
-                    modelName:
-                        config[`${upperProvider}_MODEL`] ||
-                        providerConfig?.getModel?.() ||
-                        this.getDefaultModel(provider),
-
-                    temperature:
-                        parseFloat(config[`${upperProvider}_TEMPERATURE`] || '0.7') ||
-                        providerConfig?.getTemperature?.(),
-
-                    maxTokens:
-                        parseInt(config[`${upperProvider}_MAX_TOKENS`] || '4096') ||
-                        providerConfig?.getMaxTokens?.(),
-
-                    baseURL: config[`${upperProvider}_BASE_URL`] || providerConfig?.getBaseUrl?.(),
-                });
-
-                if (result.success) {
-                    spinner.succeed(
-                        `${provider}: ${chalk.green('✓ Connected')} (${result.responseTime}ms)`,
-                    );
-                    console.log(chalk.gray(`  Response: ${result.response}`));
-                } else {
-                    spinner.fail(`${provider}: ${chalk.red('✗ Failed')}`);
-                    console.log(chalk.red(`  Error: ${result.error}`));
-                    allPassed = false;
-                }
-            } catch (error) {
-                spinner.fail(`${provider}: ${chalk.red('✗ Failed')}`);
-                console.log(chalk.red(`  Error: ${error.message}`));
-                allPassed = false;
-            }
-        }
-
-        return allPassed;
     }
 
     private async testOtherServices(config: any): Promise<boolean> {
@@ -134,25 +100,25 @@ export class TestSubCommand extends CommandRunner {
 
         let allPassed = true;
 
-        // Test GitHub API
-        if (config.GH_APIKEY) {
-            const githubResult = await this.testGitHubApi(config.GH_APIKEY);
-            if (!githubResult) {
+        // Test Git API
+        if (config.GIT_TOKEN) {
+            const gitResult = await this.testGitApi(config);
+            if (!gitResult) {
                 allPassed = false;
             }
         }
 
-        // Test Vercel API
-        if (config.VERCEL_TOKEN) {
-            const vercelResult = await this.testVercelApi(config.VERCEL_TOKEN);
-            if (!vercelResult) {
+        // Test Deployment API
+        if (config.DEPLOY_TOKEN) {
+            const deployResult = await this.testDeployApi(config.DEPLOY_TOKEN, config);
+            if (!deployResult) {
                 allPassed = false;
             }
         }
 
         // Test Tavily API
-        if (config.TAVILY_API_KEY) {
-            const tavilyResult = await this.testTavilyApi(config.TAVILY_API_KEY);
+        if (config.PLUGIN_TAVILY_API_KEY) {
+            const tavilyResult = await this.testTavilyApi(config.PLUGIN_TAVILY_API_KEY);
             if (!tavilyResult) {
                 allPassed = false;
             }
@@ -161,34 +127,28 @@ export class TestSubCommand extends CommandRunner {
         return allPassed;
     }
 
-    private async testGitHubApi(apiKey: string): Promise<boolean> {
-        const spinner = ora('Testing GitHub API...').start();
+    private async testGitApi(config: any): Promise<boolean> {
+        const providerId = config.GIT_PROVIDER || 'github';
+        const spinner = ora(`Testing Git API (${providerId})...`).start();
 
         try {
-            const response = await fetch('https://api.github.com/user', {
-                headers: {
-                    Authorization: `token ${apiKey}`,
-                    'User-Agent': 'ever-works-cli',
-                },
+            const user = await this.gitFacade.getUser({
+                providerId,
+                token: config.GIT_TOKEN,
             });
 
-            if (response.ok) {
-                const user = await response.json();
-                spinner.succeed(`GitHub API: ${chalk.green('✓ Connected')} (User: ${user.login})`);
-                return true;
-            } else {
-                spinner.fail(`GitHub API: ${chalk.red('✗ Failed')} (Status: ${response.status})`);
-                return false;
-            }
+            spinner.succeed(`Git API: ${chalk.green('✓ Connected')} (User: ${user.login})`);
+            return true;
         } catch (error) {
-            spinner.fail(`GitHub API: ${chalk.red('✗ Failed')}`);
+            spinner.fail(`Git API: ${chalk.red('✗ Failed')}`);
             console.log(chalk.red(`  Error: ${error.message}`));
             return false;
         }
     }
 
-    private async testVercelApi(token: string): Promise<boolean> {
-        const spinner = ora('Testing Vercel API...').start();
+    private async testDeployApi(token: string, config: any): Promise<boolean> {
+        const provider = config.DEPLOY_PROVIDER || 'vercel';
+        const spinner = ora(`Testing Deploy API (${provider})...`).start();
 
         try {
             const response = await fetch('https://api.vercel.com/v2/user', {
@@ -200,15 +160,15 @@ export class TestSubCommand extends CommandRunner {
             if (response.ok) {
                 const user = await response.json();
                 spinner.succeed(
-                    `Vercel API: ${chalk.green('✓ Connected')} (User: ${user.user.username})`,
+                    `Deploy API: ${chalk.green('✓ Connected')} (User: ${user.user.username})`,
                 );
                 return true;
             } else {
-                spinner.fail(`Vercel API: ${chalk.red('✗ Failed')} (Status: ${response.status})`);
+                spinner.fail(`Deploy API: ${chalk.red('✗ Failed')} (Status: ${response.status})`);
                 return false;
             }
         } catch (error) {
-            spinner.fail(`Vercel API: ${chalk.red('✗ Failed')}`);
+            spinner.fail(`Deploy API: ${chalk.red('✗ Failed')}`);
             console.log(chalk.red(`  Error: ${error.message}`));
             return false;
         }
@@ -242,44 +202,5 @@ export class TestSubCommand extends CommandRunner {
             console.log(chalk.red(`  Error: ${error.message}`));
             return false;
         }
-    }
-
-    private getConfiguredAiProviders(config: any): string[] {
-        const providers: string[] = [];
-        const providerKeys = [
-            'openai',
-            'google',
-            'anthropic',
-            'openrouter',
-            'ollama',
-            'groq',
-            'custom',
-        ];
-
-        for (const provider of providerKeys) {
-            const upperProvider = provider.toUpperCase();
-            if (
-                config[`${upperProvider}_API_KEY`] ||
-                ((provider === 'ollama' || provider === 'custom') &&
-                    config[`${upperProvider}_BASE_URL`])
-            ) {
-                providers.push(provider);
-            }
-        }
-
-        return providers;
-    }
-
-    private getDefaultModel(provider: string): string {
-        const defaults: Record<string, string> = {
-            openai: 'gpt-4o',
-            google: 'gemini-2.5-flash',
-            anthropic: 'claude-3-5-sonnet-20241022',
-            openrouter: 'openai/gpt-4o',
-            ollama: 'llama2',
-            groq: 'openai/gpt-oss-120b',
-            custom: 'default',
-        };
-        return defaults[provider] || 'default';
     }
 }

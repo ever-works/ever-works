@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "Notifications",
                 "empty": "Aucune nouvelle notification"
+            },
+            "help": {
+                "title": "Aide et ressources",
+                "subtitle": "Conseils rapides et liens utiles",
+                "quickTips": {
+                    "title": "Conseils rapides",
+                    "tip1": "Utilisez le chat IA pour créer des répertoires en langage naturel",
+                    "tip2": "Importez des listes awesome ou des dépôts de données existants",
+                    "tip3": "Personnalisez l'apparence de votre répertoire dans les paramètres"
+                },
+                "shortcuts": {
+                    "title": "Raccourcis clavier",
+                    "search": "Rechercher",
+                    "newDirectory": "Nouveau répertoire",
+                    "help": "Aide",
+                    "hint": "Appuyez sur ? n'importe où pour voir tous les raccourcis"
+                },
+                "links": {
+                    "title": "Liens utiles",
+                    "github": "Dépôt GitHub",
+                    "issues": "Signaler un problème",
+                    "docs": "Documentation",
+                    "comingSoon": "Bientôt disponible"
+                },
+                "version": "Version {version}"
             }
         },
         "directories": {
@@ -328,13 +353,16 @@
                     "actions": {
                         "connect": "Connecter",
                         "disconnect": "Déconnecter",
-                        "confirmDisconnect": "Êtes-vous sûr de vouloir déconnecter votre compte GitHub ?"
+                        "confirmDisconnect": "Êtes-vous sûr de vouloir déconnecter votre compte GitHub ?",
+                        "reconnect": "Reconnecter"
                     },
                     "messages": {
                         "disconnected": "Compte GitHub déconnecté",
                         "connectError": "Échec de la connexion à GitHub",
                         "disconnectError": "Échec de la déconnexion de GitHub"
-                    }
+                    },
+                    "organizations": "Organisations connectées",
+                    "organizationsHint": "Utilisez Reconnecter pour accorder l'accès à des organisations supplémentaires"
                 }
             }
         },
@@ -525,7 +553,7 @@
                 "dataRepo": "Dépôt de données",
                 "websiteRepo": "Dépôt du site Web",
                 "mainRepo": "Dépôt principal",
-                "repoProvider": "Fournisseur de dépôt",
+                "gitProvider": "Fournisseur Git",
                 "organization": "Organisation",
                 "created": "Créé",
                 "lastUpdated": "Dernière mise à jour",
@@ -534,7 +562,11 @@
                 "custom": "Personnalisé",
                 "customOverwrite": "Personnalisé (Écraser)",
                 "yes": "Oui",
-                "no": "Non"
+                "no": "Non",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Détails de configuration",
@@ -624,7 +656,21 @@
                         "invalidUrl": "Veuillez entrer une URL valide incluant http:// ou https://",
                         "invalidImageUrl": "Veuillez entrer une URL d'image valide",
                         "requiredFields": "Veuillez remplir tous les champs requis"
-                    }
+                    },
+                    "categories": "Catégories",
+                    "existingCategories": "Sélectionner parmi les existantes",
+                    "addNewCategory": "Ou ajouter une nouvelle catégorie",
+                    "categoryPlaceholder": "Rechercher ou créer une catégorie...",
+                    "addMoreCategories": "Ajouter plus...",
+                    "createCategory": "Créer",
+                    "noMatchingCategories": "Aucune catégorie correspondante",
+                    "noCategories": "Aucune catégorie. Tapez pour en créer une.",
+                    "categoriesRequired": "Sélectionnez au moins une catégorie",
+                    "captureScreenshot": "Capturer une capture d'écran",
+                    "captureScreenshotHelp": "Capturer automatiquement une capture d'écran depuis l'URL source",
+                    "screenshotSuccess": "Capture d'écran réussie",
+                    "screenshotFailed": "Échec de la capture d'écran",
+                    "screenshotError": "Une erreur s'est produite lors de la capture d'écran"
                 },
                 "updateSuccess": "Élément mis à jour avec succès",
                 "updateFailed": "Échec de la mise à jour de l'élément",
@@ -639,7 +685,108 @@
                 "createPRHelp": "Si activé, les modifications sont proposées via PR au lieu d'un commit direct.",
                 "reasonLabel": "Raison (optionnel)",
                 "reasonPlaceholder": "Pourquoi supprimez-vous cet élément ?",
-                "confirmDelete": "Supprimer l'élément"
+                "confirmDelete": "Supprimer l'élément",
+                "captureScreenshot": "Capturer une capture d'écran",
+                "screenshot": {
+                    "noSourceUrl": "Aucune URL source disponible pour cet élément",
+                    "success": "Capture d'écran réussie",
+                    "failed": "Échec de la capture d'écran",
+                    "error": "Une erreur s'est produite lors de la capture d'écran",
+                    "notConfigured": "Le service de capture d'écran n'est pas configuré. Veuillez ajouter votre clé API ScreenshotOne dans les Paramètres.",
+                    "captureFailed": "Échec de la capture d'image",
+                    "captureSuccess": "Image capturée avec succès",
+                    "captureError": "Une erreur s'est produite lors de la capture d'image",
+                    "bulkCaptureComplete": "Capture d'images en masse terminée",
+                    "bulkCaptureError": "Une erreur s'est produite lors de la capture d'images en masse"
+                },
+                "tabs": {
+                    "browseItems": "Parcourir les éléments",
+                    "categories": "Catégories",
+                    "tags": "Tags"
+                },
+                "taxonomy": {
+                    "categories": {
+                        "searchPlaceholder": "Rechercher des catégories...",
+                        "add": "Ajouter une catégorie",
+                        "addFirst": "Ajouter la première catégorie",
+                        "showing": "Affichage de {current} sur {total} catégories",
+                        "empty": "Aucune catégorie",
+                        "noMatch": "Aucune catégorie ne correspond à votre recherche",
+                        "columns": {
+                            "name": "Nom",
+                            "description": "Description",
+                            "items": "Éléments",
+                            "priority": "Priorité",
+                            "actions": "Actions"
+                        },
+                        "createSuccess": "Catégorie créée avec succès",
+                        "createFailed": "Échec de la création de la catégorie",
+                        "updateSuccess": "Catégorie mise à jour avec succès",
+                        "updateFailed": "Échec de la mise à jour de la catégorie",
+                        "deleteSuccess": "Catégorie supprimée avec succès",
+                        "deleteFailed": "Échec de la suppression de la catégorie",
+                        "deleteConfirm": "Êtes-vous sûr de vouloir supprimer \"{name}\" ?",
+                        "deleteHasItems": "Impossible de supprimer la catégorie avec {count} éléments assignés",
+                        "modal": {
+                            "createTitle": "Créer une catégorie",
+                            "editTitle": "Modifier la catégorie",
+                            "name": "Nom",
+                            "namePlaceholder": "ex: Outils de surveillance",
+                            "description": "Description",
+                            "descriptionPlaceholder": "Brève description de cette catégorie",
+                            "iconUrl": "URL de l'icône",
+                            "iconUrlPlaceholder": "https://exemple.com/icone.png",
+                            "iconUrlHelp": "URL optionnelle vers une image d'icône",
+                            "priority": "Priorité",
+                            "priorityPlaceholder": "ex: 1",
+                            "priorityHelp": "Les nombres plus bas apparaissent en premier dans les listes",
+                            "cancel": "Annuler",
+                            "save": "Enregistrer",
+                            "create": "Créer",
+                            "saving": "Enregistrement...",
+                            "errors": {
+                                "nameRequired": "Le nom de la catégorie est requis",
+                                "nameExists": "Une catégorie avec ce nom existe déjà"
+                            }
+                        }
+                    },
+                    "tags": {
+                        "searchPlaceholder": "Rechercher des tags...",
+                        "add": "Ajouter un tag",
+                        "addFirst": "Ajouter le premier tag",
+                        "showing": "Affichage de {current} sur {total} tags",
+                        "empty": "Aucun tag",
+                        "noMatch": "Aucun tag ne correspond à votre recherche",
+                        "columns": {
+                            "name": "Nom",
+                            "items": "Éléments",
+                            "actions": "Actions"
+                        },
+                        "createSuccess": "Tag créé avec succès",
+                        "createFailed": "Échec de la création du tag",
+                        "updateSuccess": "Tag mis à jour avec succès",
+                        "updateFailed": "Échec de la mise à jour du tag",
+                        "deleteSuccess": "Tag supprimé avec succès",
+                        "deleteFailed": "Échec de la suppression du tag",
+                        "deleteConfirm": "Êtes-vous sûr de vouloir supprimer \"{name}\" ?",
+                        "deleteHasItems": "Impossible de supprimer le tag avec {count} éléments assignés",
+                        "modal": {
+                            "createTitle": "Créer un tag",
+                            "editTitle": "Modifier le tag",
+                            "name": "Nom",
+                            "namePlaceholder": "ex: open-source",
+                            "nameHelp": "Utilisez des minuscules avec des tirets pour les tags composés",
+                            "cancel": "Annuler",
+                            "save": "Enregistrer",
+                            "create": "Créer",
+                            "saving": "Enregistrement...",
+                            "errors": {
+                                "nameRequired": "Le nom du tag est requis",
+                                "nameExists": "Un tag avec ce nom existe déjà"
+                            }
+                        }
+                    }
+                }
             },
             "generator": {
                 "regenerationWarning": "Avertissement de régénération",
@@ -710,7 +857,35 @@
                 "recreateConfirmDescription": "Recréer supprimera les éléments existants et les régénérera à partir de zéro. Cette action ne peut pas être annulée.",
                 "confirmRecreate": "Oui, recréer",
                 "recreateInlineTitle": "Recréer supprimera les éléments existants",
-                "recreateInlineDescription": "Ce mode supprime les éléments actuels et les reconstruit à partir de zéro. Procédez uniquement si vous souhaitez tout remplacer."
+                "recreateInlineDescription": "Ce mode supprime les éléments actuels et les reconstruit à partir de zéro. Procédez uniquement si vous souhaitez tout remplacer.",
+                "captureScreenshots": "Capturer les captures d'écran des éléments",
+                "captureScreenshotsDescription": "Capturer automatiquement des captures d'écran ou des images de produits pour chaque élément pendant la génération",
+                "companyNameDescription": "Utilisé pour personnaliser le contenu généré avec l'identité de votre marque.",
+                "companyWebsiteDescription": "L'IA analysera votre site web pour mieux comprendre le contexte de votre marque.",
+                "initialCategoriesDescription": "Catégories de départ pour organiser les éléments. L'IA les utilisera comme point de départ.",
+                "priorityCategoriesDescription": "Catégories qui apparaîtront en premier dans le résultat généré. Utile pour mettre en valeur les sections importantes.",
+                "targetKeywordsDescription": "Mots-clés pour guider la recherche IA et la génération de contenu. Des mots-clés plus spécifiques donnent de meilleurs résultats.",
+                "sourceUrlsFieldDescription": "URLs spécifiques pour extraire le contenu. Si vide, le générateur recherchera automatiquement sur le web.",
+                "generationMethodDescription": "Choisissez de mettre à jour les éléments existants ou de tout recréer à partir de zéro.",
+                "websiteRepositoryCreationMethodDescription": "Comment le dépôt du site web est créé. Le modèle est recommandé pour la plupart des cas.",
+                "maxSearchQueriesDescription": "Nombre de requêtes de recherche que l'IA générera pour trouver du contenu pertinent (1-50).",
+                "resultsPerQueryDescription": "Nombre maximum de résultats à récupérer par requête de recherche (1-20).",
+                "maxPagesToProcessDescription": "Nombre maximum de pages web à traiter pour l'extraction de contenu (1-100).",
+                "relevanceThresholdDescription": "Score de pertinence minimum (0-1) pour que le contenu soit inclus. Des valeurs plus élevées signifient un filtrage plus strict.",
+                "dataGeneration": "Options de génération de données",
+                "dataGenerationDescription": "Configurer le volume de données et la génération d'entités",
+                "dataVolumeMode": "Mode de volume de données",
+                "dataVolumeModeReal": "Réel",
+                "dataVolumeModeRealDescription": "Générer des données complètes prêtes pour la production",
+                "dataVolumeModeSample": "Échantillon",
+                "dataVolumeModeSampleDescription": "Générer un échantillon minimal de données (~10 éléments)",
+                "entityGeneration": "Génération d'entités",
+                "generateCategories": "Générer les catégories",
+                "generateCategoriesDescription": "Créer une structure de catégories pour organiser les éléments",
+                "generateTags": "Générer les tags",
+                "generateTagsDescription": "Créer des tags pour un étiquetage flexible des éléments",
+                "generateBrands": "Générer les marques",
+                "generateBrandsDescription": "Extraire et créer des entités de marque à partir des éléments"
             },
             "progress": {
                 "title": "Génération en cours",
@@ -784,20 +959,163 @@
                 "saveChanges": "Enregistrer les modifications",
                 "updateReadme": "Mettre à jour le README",
                 "updateSuccess": "Paramètres mis à jour avec succès",
-                "updateFailed": "Échec de la mise à jour des paramètres"
+                "updateFailed": "Échec de la mise à jour des paramètres",
+                "visibilityUpdateFailed": "Échec de la mise à jour de la visibilité du dépôt",
+                "visibilityWarningTitle": "Rendre le dépôt privé ?",
+                "visibilityWarningDescription": "Vous êtes sur le point de rendre {name} privé.",
+                "visibilityWarningPermanent": "Cette action a des conséquences permanentes :",
+                "visibilityWarningStars": "Toutes les étoiles seront définitivement perdues",
+                "visibilityWarningWatchers": "Tous les observateurs seront supprimés",
+                "visibilityWarningNotRestored": "Les étoiles et les observateurs ne seront PAS restaurés si vous rendez le dépôt public à nouveau",
+                "visibilityConfirmPrivate": "Oui, rendre privé",
+                "advancedPrompts": {
+                    "title": "Prompts avancés",
+                    "subtitle": "Personnalisez les prompts IA pour la génération de répertoire. Laissez vide pour utiliser les valeurs par défaut.",
+                    "save": "Enregistrer les prompts",
+                    "saveSuccess": "Prompts avancés enregistrés avec succès",
+                    "saveFailed": "Échec de l'enregistrement des prompts avancés",
+                    "prompts": {
+                        "relevanceAssessment": {
+                            "title": "Évaluation de la pertinence",
+                            "description": "Instructions supplémentaires pour filtrer les pages web par pertinence par rapport au sujet de votre répertoire.",
+                            "placeholder": "ex: N'incluez que les pages qui se concentrent sur les projets open-source..."
+                        },
+                        "itemGeneration": {
+                            "title": "Génération d'éléments",
+                            "description": "Instructions supplémentaires pour les éléments initiaux générés par l'IA avant la recherche web.",
+                            "placeholder": "ex: Concentrez-vous sur les solutions de niveau entreprise avec une maintenance active..."
+                        },
+                        "itemExtraction": {
+                            "title": "Extraction d'éléments",
+                            "description": "Instructions supplémentaires pour extraire des éléments du contenu des pages web.",
+                            "placeholder": "ex: Priorisez les outils avec des liens de documentation officielle..."
+                        },
+                        "searchQuery": {
+                            "title": "Génération de requêtes de recherche",
+                            "description": "Instructions supplémentaires pour générer des requêtes de recherche pour trouver du contenu.",
+                            "placeholder": "ex: Incluez des requêtes ciblant les dépôts GitHub et la documentation officielle..."
+                        },
+                        "categorization": {
+                            "title": "Catégorisation",
+                            "description": "Instructions supplémentaires pour catégoriser et taguer les éléments extraits.",
+                            "placeholder": "ex: Utilisez des catégories techniques comme 'Outils CLI', 'Bibliothèques', 'Frameworks'..."
+                        },
+                        "deduplication": {
+                            "title": "Déduplication",
+                            "description": "Instructions supplémentaires pour identifier et supprimer les éléments en double.",
+                            "placeholder": "ex: Considérez les éléments avec des dépôts GitHub similaires comme des doublons..."
+                        },
+                        "sourceValidation": {
+                            "title": "Validation de la source",
+                            "description": "Instructions supplémentaires pour valider les URLs sources des éléments.",
+                            "placeholder": "ex: Préférez les sites web officiels des projets aux avis tiers..."
+                        }
+                    }
+                },
+                "websiteConfig": {
+                    "title": "Configuration du site web",
+                    "subtitle": "Personnalisez l'apparence et le comportement de votre site de répertoire",
+                    "loadFailed": "Échec du chargement des paramètres du site web",
+                    "saveSuccess": "Paramètres du site web enregistrés avec succès",
+                    "saveFailed": "Échec de l'enregistrement des paramètres du site web",
+                    "save": "Enregistrer les paramètres",
+                    "sections": {
+                        "siteName": {
+                            "title": "Identité du site",
+                            "label": "Nom du site",
+                            "placeholder": "Mon répertoire",
+                            "helper": "Le nom affiché dans l'en-tête de votre site web et l'onglet du navigateur"
+                        },
+                        "global": {
+                            "title": "Fonctionnalités globales",
+                            "categories": "Catégories",
+                            "categoriesHelper": "Afficher le filtrage et la navigation par catégorie",
+                            "tags": "Tags",
+                            "tagsHelper": "Afficher le filtrage et la navigation par tag",
+                            "companies": "Entreprises",
+                            "companiesHelper": "Afficher les informations sur l'entreprise pour les éléments",
+                            "surveys": "Sondages",
+                            "surveysHelper": "Activer la fonctionnalité de sondage"
+                        },
+                        "header": {
+                            "title": "Paramètres d'en-tête",
+                            "submit": "Bouton de soumission",
+                            "submitHelper": "Afficher le bouton de soumission d'élément dans l'en-tête",
+                            "pricing": "Lien de tarification",
+                            "pricingHelper": "Afficher le lien de tarification dans la navigation de l'en-tête",
+                            "layoutSelector": "Sélecteur de mise en page",
+                            "layoutSelectorHelper": "Permettre aux utilisateurs de changer de mise en page",
+                            "languageSelector": "Sélecteur de langue",
+                            "languageSelectorHelper": "Permettre aux utilisateurs de changer de langue",
+                            "themeSelector": "Sélecteur de thème",
+                            "themeSelectorHelper": "Permettre aux utilisateurs de changer de thème",
+                            "defaultLayout": "Mise en page par défaut",
+                            "defaultTheme": "Thème par défaut",
+                            "themeLight": "Clair",
+                            "themeDark": "Sombre",
+                            "themeSystem": "Système",
+                            "defaultPagination": "Pagination par défaut",
+                            "paginationStandard": "Standard",
+                            "paginationInfinite": "Défilement infini",
+                            "paginationLoadMore": "Charger plus"
+                        },
+                        "homepage": {
+                            "title": "Paramètres de la page d'accueil",
+                            "hero": "Section héro",
+                            "heroHelper": "Afficher la section héro avec le titre et la description",
+                            "search": "Barre de recherche",
+                            "searchHelper": "Afficher la barre de recherche sur la page d'accueil",
+                            "defaultView": "Vue par défaut",
+                            "viewClassic": "Classique",
+                            "viewGrid": "Grille",
+                            "viewList": "Liste",
+                            "defaultSort": "Tri par défaut",
+                            "sortPopularity": "Popularité",
+                            "sortNewest": "Plus récent",
+                            "sortAlphabetical": "Alphabétique"
+                        },
+                        "footer": {
+                            "title": "Paramètres du pied de page",
+                            "subscribe": "Inscription à la newsletter",
+                            "subscribeHelper": "Afficher le formulaire d'inscription à la newsletter",
+                            "version": "Affichage de la version",
+                            "versionHelper": "Afficher les informations de version dans le pied de page",
+                            "themeSelector": "Sélecteur de thème du pied de page",
+                            "themeSelectorHelper": "Afficher le sélecteur de thème dans le pied de page"
+                        },
+                        "customMenu": {
+                            "title": "Liens de menu personnalisés",
+                            "description": "Ajouter des liens personnalisés à la navigation de l'en-tête et du pied de page de votre site web",
+                            "headerLinks": "Liens d'en-tête",
+                            "footerLinks": "Liens du pied de page",
+                            "addLink": "Ajouter un lien",
+                            "noLinks": "Aucun lien personnalisé ajouté",
+                            "labelPlaceholder": "Libellé du lien",
+                            "pathPlaceholder": "/a-propos ou https://...",
+                            "targetSelf": "Même onglet",
+                            "targetBlank": "Nouvel onglet"
+                        }
+                    }
+                }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Jeton Vercel requis",
-                    "description": "Pour déployer votre répertoire sur Vercel, vous devez configurer votre jeton API Vercel dans les paramètres de votre compte.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Aller aux paramètres des jetons API",
                     "getTokenButton": "Obtenir le jeton Vercel",
                     "howTo": {
                         "title": "Comment configurer votre jeton Vercel :",
                         "step1": "Cliquez sur 'Obtenir le jeton Vercel' pour ouvrir le tableau de bord Vercel",
                         "step2": "Créez un nouveau jeton avec les permissions de déploiement",
-                        "step3": "Copiez le jeton généré",
-                        "step4": "Allez dans les paramètres des jetons API et collez votre jeton dans la section Vercel"
+                        "step3": "Configurez votre jeton API {provider} dans Paramètres du Plugin > {provider}",
+                        "step4": "Revenez ici pour déployer votre répertoire"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -806,10 +1124,10 @@
                     "hint": "En tant que collaborateur, vous pourrez déclencher des déploiements une fois que le propriétaire aura configuré son intégration Vercel."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "Déployer sur Vercel",
                         "description": "Déployez le dépôt du site Web de votre répertoire sur Vercel.",
-                        "deployButton": "Déployer maintenant",
+                        "deployButton": "Déployer sur {provider}",
                         "deployingButton": "Déploiement en cours...",
                         "deployingStateButton": "Déploiement en cours ({state})...",
                         "successMessage": "Votre site Web a été déployé avec succès !",
@@ -853,7 +1171,21 @@
                         "lastChecked": "Dernière vérification",
                         "lastError": "Dernière erreur",
                         "updateSuccess": "Paramètres mis à jour avec succès",
-                        "updateFailed": "Échec de la mise à jour des paramètres"
+                        "updateFailed": "Échec de la mise à jour des paramètres",
+                        "githubRequired": "Connexion GitHub requise. Veuillez connecter votre compte GitHub dans les Paramètres pour activer les mises à jour automatiques."
+                    },
+                    "configDialog": {
+                        "title": "Configurer avant le déploiement",
+                        "description": "Vérifiez et personnalisez les paramètres de votre site web avant le déploiement",
+                        "siteName": "Nom du site",
+                        "siteNamePlaceholder": "Mon répertoire",
+                        "siteNameHelper": "Le nom affiché sur votre site web (par défaut: Acme)",
+                        "advancedSettings": "Paramètres avancés",
+                        "advancedSettingsDescription": "Configurer des options supplémentaires du site web",
+                        "loadFailed": "Échec du chargement des paramètres actuels",
+                        "saveAndDeploy": "Enregistrer et déployer",
+                        "skipAndDeploy": "Ignorer et déployer",
+                        "cancel": "Annuler"
                     }
                 }
             },
@@ -962,7 +1294,8 @@
                 "personalAccount": "Le dépôt sera créé sous votre compte personnel",
                 "organizations": "Organisations",
                 "personalHelp": "Le dépôt sera créé sous votre compte GitHub personnel",
-                "organizationHelp": "Le dépôt sera créé sous l'organisation {org}"
+                "organizationHelp": "Le dépôt sera créé sous l'organisation {org}",
+                "connectRequired": "Connectez un fournisseur Git dans la barre latérale pour choisir où votre dépôt sera créé."
             },
             "ai": {
                 "title": "Créer avec l'IA",
@@ -1192,7 +1525,8 @@
                 "success": {
                     "started": "Importation démarrée ! Redirection vers votre répertoire...",
                     "linked": "Répertoire lié avec succès"
-                }
+                },
+                "detectionFailed": "Nous n'avons pas pu détecter automatiquement le format. Veuillez sélectionner comment importer ce dépôt."
             }
         },
         "github": {
@@ -1254,6 +1588,34 @@
                 "title": "Webhooks",
                 "subtitle": "Configurer les webhooks pour recevoir des mises à jour en temps réel",
                 "configure": "Configurer les webhooks (Bientôt disponible)"
+            },
+            "screenshotone": {
+                "title": "Intégration ScreenshotOne",
+                "subtitle": "Capturez automatiquement des captures d'écran des éléments du répertoire avec ScreenshotOne",
+                "connected": "Connecté",
+                "notConnected": "Non connecté",
+                "connectedMessage": "Votre compte ScreenshotOne est connecté. Les captures d'écran seront automatiquement capturées pour les éléments du répertoire.",
+                "disconnect": "Déconnecter ScreenshotOne",
+                "disconnecting": "Suppression...",
+                "accessKeyLabel": "Clé d'accès",
+                "placeholder": "Votre clé d'accès...",
+                "secretKeyLabel": "Clé secrète (optionnelle)",
+                "secretKeyPlaceholder": "Votre clé secrète...",
+                "showKey": "Afficher",
+                "hideKey": "Masquer",
+                "accessKeyHelp": "Obligatoire. Utilisée pour s'authentifier avec l'API ScreenshotOne.",
+                "secretKeyHelp": "Optionnelle. Active les URLs signées pour une sécurité renforcée. Obtenez vos clés depuis",
+                "dashboard": "Tableau de bord ScreenshotOne",
+                "save": "Enregistrer les clés",
+                "saving": "Enregistrement...",
+                "messages": {
+                    "accessKeyRequired": "Veuillez entrer une clé d'accès ScreenshotOne valide",
+                    "saveSuccess": "Clés ScreenshotOne enregistrées avec succès",
+                    "saveFailed": "Échec de l'enregistrement des clés ScreenshotOne",
+                    "removeSuccess": "Clés ScreenshotOne supprimées avec succès",
+                    "removeFailed": "Échec de la suppression des clés ScreenshotOne",
+                    "unexpectedError": "Une erreur inattendue s'est produite"
+                }
             }
         },
         "notifications": {
@@ -1358,7 +1720,19 @@
             "newChat": "Nouveau chat",
             "loadingConversation": "Chargement de la conversation…",
             "inputPlaceholder": "Décrivez le répertoire que vous souhaitez créer...",
-            "sendButton": "Envoyer"
+            "sendButton": "Envoyer",
+            "errors": {
+                "unableToSend": "Impossible d'envoyer le message."
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {
@@ -1508,6 +1882,15 @@
                 "notAuthenticated": "Non authentifié",
                 "deleteFailed": "Échec de la suppression du compte",
                 "deleteDisabled": "La suppression de compte est désactivée en démo"
+            },
+            "screenshotone": {
+                "notAuthenticated": "Non authentifié",
+                "accessKeyRequired": "La clé d'accès est requise",
+                "saveFailed": "Échec de l'enregistrement des clés ScreenshotOne",
+                "saveSuccess": "Clés ScreenshotOne enregistrées avec succès",
+                "validationFailed": "Les clés ScreenshotOne fournies sont invalides. Veuillez vérifier et réessayer.",
+                "removeFailed": "Échec de la suppression des clés ScreenshotOne",
+                "removeSuccess": "Clés ScreenshotOne supprimées avec succès"
             }
         },
         "deploy": {
@@ -1538,6 +1921,21 @@
             "username": {
                 "minLength": "Le nom d'utilisateur doit contenir au moins {length} caractères"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "Fermer",
+            "dismiss": "Ignorer"
+        },
+        "theme": {
+            "toggle": "Changer de thème",
+            "switchToLight": "Passer au mode clair",
+            "switchToDark": "Passer au mode sombre"
+        },
+        "visibility": {
+            "private": "Privé",
+            "public": "Public"
         }
     }
 }

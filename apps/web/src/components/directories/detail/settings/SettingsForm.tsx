@@ -10,7 +10,7 @@ import { SettingsProvider } from './SettingsContext';
 import { ReadmeConfiguration } from './ReadmeConfiguration';
 import { RepoVisibilitySettings } from './RepoVisibilitySettings';
 import { AdvancedPromptsSettings } from './AdvancedPromptsSettings';
-
+import { WebsiteConfigSettings } from './WebsiteConfigSettings';
 interface SettingsFormProps {
     directory: Directory;
     user: AuthUser;
@@ -37,6 +37,9 @@ export function SettingsForm({ directory, user, initialRepositories }: SettingsF
 
                 {/* Advanced Prompts Settings */}
                 <AdvancedPromptsSettings directoryId={directory.id} />
+
+                {/* Website Configuration Settings */}
+                <WebsiteConfigSettings directoryId={directory.id} />
 
                 {/* Danger Zone */}
                 <DeleteComponent directory={directory} />

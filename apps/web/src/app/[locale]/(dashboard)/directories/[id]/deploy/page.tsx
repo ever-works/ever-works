@@ -2,7 +2,8 @@ import { deployAPI, Directory, directoryAPI } from '@/lib/api';
 import { notFound, redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { DeployForm } from '@/components/directories/detail/deploy/DeployForm';
-import { VercelTokenAlert } from '@/components/directories/detail/deploy/VercelTokenAlert';
+import { DeployTokenAlert } from '@/components/directories/detail/deploy/DeployTokenAlert';
+import { DeployProviderSelector } from '@/components/directories/detail/deploy/DeployProviderSelector';
 import { SharedDirectoryNoTokenAlert } from '@/components/directories/detail/deploy/SharedDirectoryNoTokenAlert';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { canDeploy } from '@/lib/permissions';
@@ -24,19 +25,39 @@ export default async function DeployPage({ params }: DeployPageParams) {
         ]);
         directory = res.directory;
         deploymentCapability = capabilityRes;
-
-        // Server-side permission check: only editors+ can deploy
-        if (!canDeploy(directory.userRole)) {
-            notFound();
-        }
-
-        // Only allow deploy if directory is generated
-        if (directory.generateStatus?.status !== GenerateStatusType.GENERATED) {
-            redirect(ROUTES.DASHBOARD_DIRECTORY(id));
-        }
     } catch (error) {
         console.error('Failed to fetch directory or deployment capability:', error);
         notFound();
+    }
+
+    // Permission & status checks OUTSIDE try-catch so Next.js
+    // redirect/notFound errors propagate correctly
+    if (!canDeploy(directory.userRole)) {
+        notFound();
+    }
+
+    if (directory.generateStatus?.status !== GenerateStatusType.GENERATED) {
+        redirect(ROUTES.DASHBOARD_DIRECTORY(id));
+    }
+
+    // Always fetch providers for the selector
+    const providersRes = await deployAPI.getProviders().catch(() => null);
+    const providers = providersRes?.providers ?? [];
+
+    const providerId = directory.deployProvider || '';
+    const provider = providers.find((p) => p.id === providerId);
+    const providerName = provider?.name;
+    const providerHomepage = provider?.homepage;
+
+    // If no provider is selected, show just the selector
+    if (!directory.deployProvider) {
+        return (
+            <DeployProviderSelector
+                directoryId={directory.id}
+                providers={providers}
+                currentProviderId=""
+            />
+        );
     }
 
     // Check deployment capability based on shared/owned status
@@ -45,11 +66,24 @@ export default async function DeployPage({ params }: DeployPageParams) {
         if (deploymentCapability.isShared) {
             return <SharedDirectoryNoTokenAlert />;
         }
-        // For owned directories, show the regular token configuration alert
-        return <VercelTokenAlert />;
+        // For owned directories, show the provider selector + token configuration alert
+        return (
+            <div className="space-y-4">
+                <DeployProviderSelector
+                    directoryId={directory.id}
+                    providers={providers}
+                    currentProviderId={providerId}
+                />
+                <DeployTokenAlert
+                    providerId={providerId}
+                    providerName={providerName}
+                    providerHomepage={providerHomepage}
+                />
+            </div>
+        );
     }
 
-    // Hydrate existing deployment from Vercel if we don't have the URL stored yet
+    // Hydrate existing deployment if we don't have the URL stored yet
     if (!directory.website) {
         const lookup = await deployAPI.lookupExistingDeployment(id).catch(() => null);
 
@@ -61,7 +95,20 @@ export default async function DeployPage({ params }: DeployPageParams) {
         }
     }
 
-    return <DeployForm directory={directory} isDeploying={isDeploying(directory)} />;
+    return (
+        <div className="space-y-4">
+            <DeployProviderSelector
+                directoryId={directory.id}
+                providers={providers}
+                currentProviderId={providerId}
+            />
+            <DeployForm
+                directory={directory}
+                isDeploying={isDeploying(directory)}
+                providerName={providerName}
+            />
+        </div>
+    );
 }
 
 function isDeploying(directory: Directory) {

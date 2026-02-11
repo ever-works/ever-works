@@ -1,0 +1,60 @@
+{
+	"name": "@ever-works/vercel-plugin",
+	"version": "1.0.0",
+	"description": "Vercel deployment plugin for Ever Works - deploy directories to Vercel",
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@vercel/sdk": "^1.19.0"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "vercel",
+			"name": "Vercel",
+			"version": "1.0.0",
+			"category": "deployment",
+			"capabilities": [
+				"deployment"
+			],
+			"description": "Deploy directories to Vercel",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"autoEnable": true,
+			"systemPlugin": true,
+			"builtIn": true,
+			"visibility": "user-only",
+			"defaultForCapabilities": [
+				"deployment"
+			]
+		}
+	}
+}

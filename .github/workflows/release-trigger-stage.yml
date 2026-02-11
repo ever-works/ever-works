@@ -30,11 +30,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build workspace packages
-        run: pnpm --filter @packages/agent build
+      - name: Build plugins
+        run: pnpm  build --filter './packages/plugins/**'
 
       - name: 🚀 Deploy Trigger.dev to Development environment
         working-directory: packages/tasks
         env:
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
-        run: npx trigger.dev@4.3.2 deploy --env staging
+        run: npx trigger.dev@4.3.3 deploy --env staging

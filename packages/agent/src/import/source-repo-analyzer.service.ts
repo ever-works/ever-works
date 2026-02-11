@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Octokit, RequestError } from 'octokit';
+import { GitFacadeService } from '@src/facades/git.facade';
 import { ImportSourceType } from '@src/entities/directory.entity';
 import {
     AnalyzeRepositoryResponseDto,
@@ -7,9 +7,10 @@ import {
     RelatedRepoStatus,
 } from '@src/dto/import-directory.dto';
 
-interface ParsedGitHubUrl {
+interface ParsedRepoUrl {
     owner: string;
     repo: string;
+    provider?: string;
 }
 
 interface RepoContent {
@@ -18,33 +19,48 @@ interface RepoContent {
     path: string;
 }
 
+// Supported git provider URL patterns
+const GIT_PROVIDER_PATTERNS: Array<{
+    pattern: RegExp;
+    provider: string;
+}> = [
+    // GitHub
+    { pattern: /^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/]+)$/, provider: 'github' },
+    { pattern: /^github\.com\/([^/]+)\/([^/]+)$/, provider: 'github' },
+    // GitLab (can add more patterns as needed)
+    { pattern: /^https?:\/\/(?:www\.)?gitlab\.com\/([^/]+)\/([^/]+)$/, provider: 'gitlab' },
+    // Bitbucket (can add more patterns as needed)
+    { pattern: /^https?:\/\/(?:www\.)?bitbucket\.org\/([^/]+)\/([^/]+)$/, provider: 'bitbucket' },
+];
+
 @Injectable()
 export class SourceRepoAnalyzerService {
     private readonly logger = new Logger(SourceRepoAnalyzerService.name);
 
-    parseGitHubUrl(url: string): ParsedGitHubUrl | null {
+    constructor(private readonly gitFacade: GitFacadeService) {}
+
+    /**
+     * Parse a git repository URL into owner and repo components.
+     * Supports multiple git providers (GitHub, GitLab, Bitbucket).
+     */
+    parseGitUrl(url: string): ParsedRepoUrl | null {
         try {
             const cleanUrl = url.replace(/\.git$/, '').replace(/\/$/, '');
 
-            const patterns = [
-                /^https?:\/\/github\.com\/([^/]+)\/([^/]+)$/,
-                /^github\.com\/([^/]+)\/([^/]+)$/,
-                /^https?:\/\/www\.github\.com\/([^/]+)\/([^/]+)$/,
-            ];
-
-            for (const pattern of patterns) {
+            for (const { pattern, provider } of GIT_PROVIDER_PATTERNS) {
                 const match = cleanUrl.match(pattern);
                 if (match) {
                     return {
                         owner: match[1],
                         repo: match[2],
+                        provider,
                     };
                 }
             }
 
             return null;
         } catch (error) {
-            this.logger.error(`Failed to parse GitHub URL: ${url}`, error);
+            this.logger.error(`Failed to parse repository URL: ${url}`, error);
             return null;
         }
     }
@@ -53,7 +69,7 @@ export class SourceRepoAnalyzerService {
         sourceUrl: string,
         token?: string,
     ): Promise<AnalyzeRepositoryResponseDto> {
-        const parsed = this.parseGitHubUrl(sourceUrl);
+        const parsed = this.parseGitUrl(sourceUrl);
 
         if (!parsed) {
             return {
@@ -63,44 +79,36 @@ export class SourceRepoAnalyzerService {
                 detectedType: null,
                 isPublic: false,
                 requiresAuth: false,
-                error: 'Invalid GitHub URL format. Expected: https://github.com/owner/repo',
+                error: 'Invalid repository URL format. Expected format: https://<provider>.com/owner/repo',
             };
         }
 
-        const { owner, repo } = parsed;
+        const { owner, repo, provider } = parsed;
 
         try {
-            const octokit = new Octokit({ auth: token });
+            // Check if git provider is configured
+            if (!this.gitFacade.isConfigured()) {
+                return {
+                    sourceUrl,
+                    owner,
+                    repo,
+                    detectedType: null,
+                    isPublic: false,
+                    requiresAuth: true,
+                    error: 'No git provider configured. Please connect your git provider account.',
+                };
+            }
 
-            let repoInfo: { private: boolean };
+            // Get repository info via facade
+            let repoInfo;
             try {
-                const response = await octokit.rest.repos.get({ owner, repo });
-                repoInfo = response.data;
-            } catch (err) {
-                if (err instanceof RequestError) {
-                    if (err.status === 404) {
-                        if (!token) {
-                            return {
-                                sourceUrl,
-                                owner,
-                                repo,
-                                detectedType: null,
-                                isPublic: false,
-                                requiresAuth: true,
-                                error: 'Repository not found. It may be private - please connect your GitHub account.',
-                            };
-                        }
-                        return {
-                            sourceUrl,
-                            owner,
-                            repo,
-                            detectedType: null,
-                            isPublic: false,
-                            requiresAuth: false,
-                            error: 'Repository not found.',
-                        };
-                    }
-                    if (err.status === 403) {
+                repoInfo = await this.gitFacade.getRepository(owner, repo, {
+                    token,
+                    providerId: provider,
+                });
+            } catch (err: any) {
+                if (err.status === 404 || err.message?.includes('not found')) {
+                    if (!token) {
                         return {
                             sourceUrl,
                             owner,
@@ -108,36 +116,54 @@ export class SourceRepoAnalyzerService {
                             detectedType: null,
                             isPublic: false,
                             requiresAuth: true,
-                            error: 'Access denied. Please connect your GitHub account with appropriate permissions.',
+                            error: 'Repository not found. It may be private - please connect your git provider account.',
                         };
                     }
-                }
-                throw err;
-            }
-
-            const isPublic = !repoInfo.private;
-
-            let contents: RepoContent[];
-            try {
-                const response = await octokit.rest.repos.getContent({
-                    owner,
-                    repo,
-                    path: '',
-                });
-
-                if (!Array.isArray(response.data)) {
                     return {
                         sourceUrl,
                         owner,
                         repo,
                         detectedType: null,
-                        isPublic,
+                        isPublic: false,
                         requiresAuth: false,
-                        error: 'Unexpected repository structure.',
+                        error: 'Repository not found.',
                     };
                 }
+                if (err.status === 403) {
+                    return {
+                        sourceUrl,
+                        owner,
+                        repo,
+                        detectedType: null,
+                        isPublic: false,
+                        requiresAuth: true,
+                        error: 'Access denied. Please connect your git provider account with appropriate permissions.',
+                    };
+                }
+                throw err;
+            }
 
-                contents = response.data as RepoContent[];
+            if (!repoInfo) {
+                return {
+                    sourceUrl,
+                    owner,
+                    repo,
+                    detectedType: null,
+                    isPublic: false,
+                    requiresAuth: !token,
+                    error: 'Repository not found.',
+                };
+            }
+
+            const isPublic = !repoInfo.isPrivate;
+
+            // Get root directory contents
+            let contents: RepoContent[] | null;
+            try {
+                contents = await this.gitFacade.getDirectoryContents(owner, repo, '', {
+                    token,
+                    providerId: provider,
+                });
             } catch (err) {
                 this.logger.error(`Failed to get repo contents: ${owner}/${repo}`, err);
                 return {
@@ -151,9 +177,27 @@ export class SourceRepoAnalyzerService {
                 };
             }
 
-            const detectionResult = await this.detectRepositoryType(octokit, owner, repo, contents);
+            if (!contents) {
+                return {
+                    sourceUrl,
+                    owner,
+                    repo,
+                    detectedType: null,
+                    isPublic,
+                    requiresAuth: false,
+                    error: 'Unexpected repository structure.',
+                };
+            }
 
-            return {
+            const detectionResult = await this.detectRepositoryType(
+                owner,
+                repo,
+                contents,
+                token,
+                provider,
+            );
+
+            const response: AnalyzeRepositoryResponseDto = {
                 sourceUrl,
                 owner,
                 repo,
@@ -162,7 +206,17 @@ export class SourceRepoAnalyzerService {
                 requiresAuth: false,
                 structure: detectionResult.structure,
             };
-        } catch (error) {
+
+            if (detectionResult.type !== 'data_repo') {
+                const ecosystem = await this.detectDirectoryEcosystem(owner, repo, token, provider);
+                if (ecosystem) {
+                    response.relatedDataRepo = ecosystem.dataRepo;
+                    response.baseSlug = ecosystem.baseSlug;
+                }
+            }
+
+            return response;
+        } catch (error: any) {
             this.logger.error(`Failed to analyze repository: ${sourceUrl}`, error);
             return {
                 sourceUrl,
@@ -177,10 +231,11 @@ export class SourceRepoAnalyzerService {
     }
 
     private async detectRepositoryType(
-        octokit: Octokit,
         owner: string,
         repo: string,
         contents: RepoContent[],
+        token?: string,
+        provider?: string,
     ): Promise<{
         type: ImportSourceType | null;
         structure: {
@@ -212,14 +267,15 @@ export class SourceRepoAnalyzerService {
 
         if (hasConfig && hasDataFolder) {
             try {
-                const dataContents = await octokit.rest.repos.getContent({
+                const dataContents = await this.gitFacade.getDirectoryContents(
                     owner,
                     repo,
-                    path: 'data',
-                });
+                    'data',
+                    { token, providerId: provider },
+                );
 
-                if (Array.isArray(dataContents.data)) {
-                    const itemDirs = dataContents.data.filter((c) => c.type === 'dir');
+                if (dataContents) {
+                    const itemDirs = dataContents.filter((c) => c.type === 'dir');
                     structure.itemCount = itemDirs.length;
                 }
 
@@ -231,11 +287,12 @@ export class SourceRepoAnalyzerService {
 
                 if (hasCategoriesFile) {
                     try {
-                        const categoriesContent = await this.getFileContent(
-                            octokit,
+                        const categoriesContent = await this.getFileContentInternal(
                             owner,
                             repo,
                             'categories.yml',
+                            token,
+                            provider,
                         );
                         if (categoriesContent) {
                             const categoryMatches = categoriesContent.match(/^-\s+(id|name):/gm);
@@ -245,11 +302,12 @@ export class SourceRepoAnalyzerService {
                         }
                     } catch {
                         try {
-                            const categoriesContent = await this.getFileContent(
-                                octokit,
+                            const categoriesContent = await this.getFileContentInternal(
                                 owner,
                                 repo,
                                 'categories.yaml',
+                                token,
+                                provider,
                             );
                             if (categoriesContent) {
                                 const categoryMatches =
@@ -270,7 +328,13 @@ export class SourceRepoAnalyzerService {
 
         if (hasReadme) {
             try {
-                const readmeContent = await this.getFileContent(octokit, owner, repo, 'README.md');
+                const readmeContent = await this.getFileContentInternal(
+                    owner,
+                    repo,
+                    'README.md',
+                    token,
+                    provider,
+                );
 
                 if (readmeContent && this.isAwesomeListReadme(readmeContent)) {
                     // Check if this is a multi-file structure (links to subdirectories)
@@ -369,76 +433,54 @@ export class SourceRepoAnalyzerService {
         return isStandardAwesomeList || isMultiFileStructure;
     }
 
-    async getFileContent(
-        octokit: Octokit,
+    private async getFileContentInternal(
         owner: string,
         repo: string,
         path: string,
+        token?: string,
+        provider?: string,
     ): Promise<string | null> {
-        try {
-            const response = await octokit.rest.repos.getContent({
-                owner,
-                repo,
-                path,
-            });
-
-            if ('content' in response.data && response.data.type === 'file') {
-                return Buffer.from(response.data.content, 'base64').toString('utf-8');
-            }
-
-            return null;
-        } catch (err) {
-            if (err instanceof RequestError && err.status === 404) {
-                return null;
-            }
-            throw err;
-        }
+        const result = await this.gitFacade.getFileContent(owner, repo, path, {
+            token,
+            providerId: provider,
+        });
+        return result?.content ?? null;
     }
 
     async getReadmeContent(
         sourceUrl: string,
         token?: string,
     ): Promise<{ content: string; path: string } | null> {
-        const parsed = this.parseGitHubUrl(sourceUrl);
+        const parsed = this.parseGitUrl(sourceUrl);
         if (!parsed) {
             return null;
         }
 
-        const octokit = new Octokit({ auth: token });
+        const { owner, repo, provider } = parsed;
 
-        // Try GitHub's dedicated readme API first (more reliable)
-        try {
-            const response = await octokit.rest.repos.getReadme({
-                owner: parsed.owner,
-                repo: parsed.repo,
-            });
-
-            if (response.data.content && response.data.encoding === 'base64') {
-                const content = Buffer.from(response.data.content, 'base64').toString('utf-8');
-                return { content, path: response.data.name };
-            }
-        } catch (err) {
-            this.logger.warn(
-                `Failed to get README via API for ${parsed.owner}/${parsed.repo}: ${err.message}`,
-            );
+        // Try using the facade's getReadme method first
+        const result = await this.gitFacade.getReadme(owner, repo, {
+            token,
+            providerId: provider,
+        });
+        if (result) {
+            return result;
         }
 
-        // Fallback: try common README filenames via API
+        // Fallback: fetch from raw URL directly
+        const branches = ['main', 'master'];
         const readmeFiles = ['README.md', 'readme.md', 'Readme.md', 'README.MD'];
 
-        for (const filename of readmeFiles) {
-            const content = await this.getFileContent(octokit, parsed.owner, parsed.repo, filename);
-            if (content) {
-                return { content, path: filename };
-            }
-        }
-
-        // Final fallback: fetch from raw.githubusercontent.com directly
-        const branches = ['main', 'master'];
         for (const branch of branches) {
             for (const filename of readmeFiles) {
                 try {
-                    const rawUrl = `https://raw.githubusercontent.com/${parsed.owner}/${parsed.repo}/${branch}/${filename}`;
+                    const rawUrl = this.gitFacade.getRawFileUrl(
+                        provider || 'github', // getRawFileUrl requires providerId
+                        owner,
+                        repo,
+                        branch,
+                        filename,
+                    );
                     const response = await fetch(rawUrl);
                     if (response.ok) {
                         const content = await response.text();
@@ -457,7 +499,7 @@ export class SourceRepoAnalyzerService {
         sourceUrl: string,
         token: string,
     ): Promise<AnalyzeForLinkingResponseDto> {
-        const parsed = this.parseGitHubUrl(sourceUrl);
+        const parsed = this.parseGitUrl(sourceUrl);
 
         if (!parsed) {
             return {
@@ -468,16 +510,36 @@ export class SourceRepoAnalyzerService {
                     markdown: { exists: false, name: null },
                     website: { exists: false, name: null },
                 },
-                error: 'Invalid GitHub URL format',
+                error: 'Invalid repository URL format',
             };
         }
 
-        const { owner, repo } = parsed;
-        const octokit = new Octokit({ auth: token });
+        const { owner, repo, provider } = parsed;
 
         try {
-            const repoInfo = await octokit.rest.repos.get({ owner, repo });
-            const hasWriteAccess = repoInfo.data.permissions?.push || false;
+            const repoInfo = await this.gitFacade.getRepository(owner, repo, {
+                token,
+                providerId: provider,
+            });
+
+            if (!repoInfo) {
+                return {
+                    canLink: false,
+                    hasWriteAccess: false,
+                    relatedRepos: {
+                        data: { exists: true, name: repo },
+                        markdown: { exists: false, name: null },
+                        website: { exists: false, name: null },
+                    },
+                    error: 'Repository not found',
+                };
+            }
+
+            // Check write access by trying to get repository with user context
+            const hasWriteAccess = await this.gitFacade.hasRepositoryAccess(owner, repo, {
+                token,
+                providerId: provider,
+            });
 
             if (!hasWriteAccess) {
                 return {
@@ -494,23 +556,26 @@ export class SourceRepoAnalyzerService {
 
             let itemCount: number | undefined;
             let categoryCount: number | undefined;
+
             try {
-                const dataContents = await octokit.rest.repos.getContent({
+                const dataContents = await this.gitFacade.getDirectoryContents(
                     owner,
                     repo,
-                    path: 'data',
-                });
-                if (Array.isArray(dataContents.data)) {
-                    itemCount = dataContents.data.filter((c) => c.type === 'dir').length;
+                    'data',
+                    { token, providerId: provider },
+                );
+                if (dataContents) {
+                    itemCount = dataContents.filter((c) => c.type === 'dir').length;
                 }
             } catch {}
 
             try {
-                const categoriesContent = await this.getFileContent(
-                    octokit,
+                const categoriesContent = await this.getFileContentInternal(
                     owner,
                     repo,
                     'categories.yml',
+                    token,
+                    provider,
                 );
                 if (categoriesContent) {
                     const categoryMatches = categoriesContent.match(/^-\s+(id|name):/gm);
@@ -518,7 +583,7 @@ export class SourceRepoAnalyzerService {
                 }
             } catch {}
 
-            const relatedRepos = await this.detectRelatedRepos(octokit, owner, repo);
+            const relatedRepos = await this.detectRelatedRepos(owner, repo, token, provider);
 
             return {
                 canLink: true,
@@ -530,7 +595,7 @@ export class SourceRepoAnalyzerService {
                 itemCount,
                 categoryCount,
             };
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error(`Failed to analyze for linking: ${sourceUrl}`, error);
             return {
                 canLink: false,
@@ -545,10 +610,140 @@ export class SourceRepoAnalyzerService {
         }
     }
 
+    async checkSlugConflicts(
+        owner: string,
+        slug: string,
+        token: string,
+        provider?: string,
+    ): Promise<{
+        hasConflict: boolean;
+        conflictingRepos: string[];
+        suggestedSlug: string;
+    }> {
+        const repoNames = [slug, `${slug}-data`, `${slug}-website`];
+        const conflictingRepos: string[] = [];
+
+        await Promise.all(
+            repoNames.map(async (repoName) => {
+                try {
+                    const exists = await this.gitFacade.repositoryExists(owner, repoName, {
+                        token,
+                        providerId: provider,
+                    });
+                    if (exists) {
+                        conflictingRepos.push(repoName);
+                    }
+                } catch {
+                    // ignore
+                }
+            }),
+        );
+
+        if (conflictingRepos.length === 0) {
+            return { hasConflict: false, conflictingRepos: [], suggestedSlug: slug };
+        }
+
+        // Try slug-2 through slug-10
+        let suggestedSlug = slug;
+        for (let i = 2; i <= 10; i++) {
+            const candidate = `${slug}-${i}`;
+            const candidateRepos = [candidate, `${candidate}-data`, `${candidate}-website`];
+            let candidateConflicts = false;
+
+            for (const repo of candidateRepos) {
+                try {
+                    const exists = await this.gitFacade.repositoryExists(owner, repo, {
+                        token,
+                        providerId: provider,
+                    });
+                    if (exists) {
+                        candidateConflicts = true;
+                        break;
+                    }
+                } catch {
+                    // ignore
+                }
+            }
+
+            if (!candidateConflicts) {
+                suggestedSlug = candidate;
+                break;
+            }
+        }
+
+        if (suggestedSlug === slug) {
+            suggestedSlug = `${slug}-${Date.now()}`;
+        }
+
+        return { hasConflict: true, conflictingRepos, suggestedSlug };
+    }
+
+    private async detectDirectoryEcosystem(
+        owner: string,
+        repo: string,
+        token?: string,
+        provider?: string,
+    ): Promise<{ baseSlug: string; dataRepo: { name: string; owner: string } } | null> {
+        if (repo.endsWith('-data')) {
+            return null;
+        }
+
+        let candidateDataRepo: string;
+        let baseSlug: string;
+
+        if (repo.endsWith('-website')) {
+            baseSlug = repo.slice(0, -8);
+            candidateDataRepo = `${baseSlug}-data`;
+        } else {
+            baseSlug = repo;
+            candidateDataRepo = `${repo}-data`;
+        }
+
+        try {
+            const dataRepoInfo = await this.gitFacade.getRepository(owner, candidateDataRepo, {
+                token,
+                providerId: provider,
+            });
+
+            if (!dataRepoInfo) {
+                return null;
+            }
+
+            const contents = await this.gitFacade.getDirectoryContents(
+                owner,
+                candidateDataRepo,
+                '',
+                { token, providerId: provider },
+            );
+
+            if (!contents) {
+                return null;
+            }
+
+            const hasConfig =
+                contents.some((c) => c.name === 'config.yml' && c.type === 'file') ||
+                contents.some((c) => c.name === 'config.yaml' && c.type === 'file');
+            const hasDataFolder = contents.some((c) => c.name === 'data' && c.type === 'dir');
+
+            if (!hasConfig || !hasDataFolder) {
+                return null;
+            }
+
+            return {
+                baseSlug,
+                dataRepo: { name: candidateDataRepo, owner },
+            };
+        } catch (err) {
+            this.logger.debug(`No ecosystem data repo found for ${owner}/${repo}: ${err.message}`);
+            return null;
+        }
+    }
+
     private async detectRelatedRepos(
-        octokit: Octokit,
         owner: string,
         dataRepoName: string,
+        token: string,
+        provider?: string,
     ): Promise<{
         markdown: RelatedRepoStatus;
         website: RelatedRepoStatus;
@@ -562,26 +757,37 @@ export class SourceRepoAnalyzerService {
             potentialMarkdownRepos.push(dataRepoName);
         }
 
-        const markdown = await this.findExistingRepo(octokit, owner, potentialMarkdownRepos);
-        const website = await this.findExistingRepo(octokit, owner, potentialWebsiteRepos);
+        const markdown = await this.findExistingRepo(
+            owner,
+            potentialMarkdownRepos,
+            token,
+            provider,
+        );
+        const website = await this.findExistingRepo(owner, potentialWebsiteRepos, token, provider);
 
         return { markdown, website };
     }
 
     private async findExistingRepo(
-        octokit: Octokit,
         owner: string,
         potentialNames: string[],
+        token: string,
+        provider?: string,
     ): Promise<RelatedRepoStatus> {
         for (const name of potentialNames) {
             try {
-                const response = await octokit.rest.repos.get({ owner, repo: name });
-                const hasWriteAccess = response.data.permissions?.push || false;
-                return { exists: true, name, hasWriteAccess };
-            } catch (err) {
-                if (err instanceof RequestError && err.status === 404) {
-                    continue;
+                const repo = await this.gitFacade.getRepository(owner, name, {
+                    token,
+                    providerId: provider,
+                });
+                if (repo) {
+                    const hasWriteAccess = await this.gitFacade.hasRepositoryAccess(owner, name, {
+                        token,
+                        providerId: provider,
+                    });
+                    return { exists: true, name, hasWriteAccess };
                 }
+            } catch {
                 continue;
             }
         }

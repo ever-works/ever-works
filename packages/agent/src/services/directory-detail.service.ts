@@ -1,10 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
-import { AiService, BaseChatModel } from '../ai';
+import { AiFacadeService } from '../facades/ai.facade';
 import { User } from '../entities';
 import { DirectoryRepository } from '../database';
-import { slugifyText } from '../items-generator';
+import { slugifyText } from '../utils/text.utils';
 import { sanitizeDescription, sanitizeStringArray } from '../utils/sanitize.util';
 
 // Prompt for extracting directory details
@@ -49,14 +48,11 @@ export interface DirectoryDetails {
 @Injectable()
 export class DirectoryDetailService {
     private readonly logger = new Logger(DirectoryDetailService.name);
-    private llm: BaseChatModel;
 
     constructor(
-        private readonly aiService: AiService,
+        private readonly aiFacade: AiFacadeService,
         private readonly directoryRepository: DirectoryRepository,
-    ) {
-        this.llm = this.aiService.createLlmWithTemperature(0.0);
-    }
+    ) {}
 
     /**
      * Extracts directory details from name and prompt using AI
@@ -73,14 +69,17 @@ export class DirectoryDetailService {
         this.logger.log(`Extracting details for directory: ${name}`);
 
         try {
-            // Generate AI-extracted details
-            const promptTemplate = HumanMessagePromptTemplate.fromTemplate(DIRECTORY_DETAIL_PROMPT);
-            const result = await promptTemplate
-                .pipe(this.llm.withStructuredOutput(directoryDetailSchema))
-                .invoke({
-                    name,
-                    prompt,
-                });
+            // Generate AI-extracted details via facade
+            const { result } = await this.aiFacade.askJson(
+                DIRECTORY_DETAIL_PROMPT,
+                directoryDetailSchema,
+                {
+                    temperature: 0,
+                    variables: { name, prompt },
+                    routing: { complexity: 'simple' },
+                },
+                { userId: user.id },
+            );
 
             // Generate unique slug
             const baseSlug = slugifyText(name);

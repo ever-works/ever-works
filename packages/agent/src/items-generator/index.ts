@@ -1,12 +1,7 @@
 export * from './dto';
-export * from './interfaces/items-generator.interfaces';
 export * from './item-submission.service';
 export * from './items-generator.module';
-export * from './items-generator.service';
 export * from './schemas/item-extraction.schemas';
-export * from './shared';
-export * from './steps';
-export * from './utils/text.utils';
-export * from './utils/metrics.util';
-export * from './utils/error.util';
-export * from './constants/steps';
+
+// Re-export DomainType from contracts for backwards compatibility with CJS consumers
+export { DomainType } from '@ever-works/contracts';

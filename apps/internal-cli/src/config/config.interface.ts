@@ -6,57 +6,42 @@ export interface EverWorksConfig {
     // App Configuration
     APP_TYPE: 'cli' | 'api' | 'test';
 
-    // GitHub Configuration
-    GH_APIKEY: string;
-    GH_OWNER: string;
+    // Git Provider
+    GIT_PROVIDER?: string; // e.g. 'github', 'gitlab'
+    GIT_TOKEN: string; // PAT for the selected provider
+    GIT_OWNER: string; // username/org
 
-    // Git Configuration
+    // Git Identity
     GIT_NAME: string;
     GIT_EMAIL: string;
 
-    // Deployment Providers
-    VERCEL_TOKEN?: string;
+    // Deployment
+    DEPLOY_PROVIDER?: string; // e.g. 'vercel'
+    DEPLOY_TOKEN?: string;
 
-    // AI Configuration
-    AI_DEFAULT_PROVIDER: string;
-    AI_FALLBACK_PROVIDERS: string; // Comma-separated list
+    // AI Plugin Configurations
+    PLUGIN_OPENROUTER_API_KEY?: string;
+    PLUGIN_OPENROUTER_DEFAULT_MODEL?: string;
 
-    // AI Provider Configurations
-    OPENAI_API_KEY?: string;
-    OPENAI_MODEL?: string;
-    OPENAI_TEMPERATURE?: string;
-    OPENAI_MAX_TOKENS?: string;
+    PLUGIN_OPENAI_API_KEY?: string;
+    PLUGIN_OPENAI_DEFAULT_MODEL?: string;
 
-    GOOGLE_API_KEY?: string;
-    GOOGLE_MODEL?: string;
-    GOOGLE_TEMPERATURE?: string;
-    GOOGLE_MAX_TOKENS?: string;
+    PLUGIN_GOOGLE_API_KEY?: string;
+    PLUGIN_GOOGLE_DEFAULT_MODEL?: string;
 
-    ANTHROPIC_API_KEY?: string;
-    ANTHROPIC_MODEL?: string;
-    ANTHROPIC_TEMPERATURE?: string;
-    ANTHROPIC_MAX_TOKENS?: string;
+    PLUGIN_ANTHROPIC_API_KEY?: string;
+    PLUGIN_ANTHROPIC_DEFAULT_MODEL?: string;
 
-    OPENROUTER_API_KEY?: string;
-    OPENROUTER_MODEL?: string;
-    OPENROUTER_TEMPERATURE?: string;
-    OPENROUTER_MAX_TOKENS?: string;
+    PLUGIN_GROQ_API_KEY?: string;
+    PLUGIN_GROQ_DEFAULT_MODEL?: string;
 
-    OLLAMA_API_KEY?: string;
-    OLLAMA_MODEL?: string;
-    OLLAMA_TEMPERATURE?: string;
-    OLLAMA_MAX_TOKENS?: string;
-    OLLAMA_BASE_URL?: string;
-
-    GROQ_API_KEY?: string;
-    GROQ_MODEL?: string;
-    GROQ_TEMPERATURE?: string;
-    GROQ_MAX_TOKENS?: string;
+    PLUGIN_OLLAMA_BASE_URL?: string;
+    PLUGIN_OLLAMA_DEFAULT_MODEL?: string;
 
     // Search Services
     EXTRACT_CONTENT_SERVICE: 'tavily' | 'local';
     WEB_SEARCH_SERVICE: 'tavily';
-    TAVILY_API_KEY?: string;
+    PLUGIN_TAVILY_API_KEY?: string;
 
     // Database Configuration (for future use)
     DATABASE_TYPE?: 'sqlite' | 'postgres' | 'mysql' | 'mariadb';

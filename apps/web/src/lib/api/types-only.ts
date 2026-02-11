@@ -13,7 +13,6 @@ export type {
     ResetPasswordDto,
     AuthResponse,
     OAuthUrlResponse,
-    ConnectionInfo,
     TokenValidationResponse,
 } from './auth';
 
@@ -40,12 +39,13 @@ export type {
     SyncDirectoryResponse,
     RepositoryStatus,
     RepositoryType,
+    // GenerateStatus now has dynamic step support
 } from './directory';
 
 export type {
     // From items-generator.ts
     CompanyDto,
-    ConfigDto,
+    ProvidersDto,
     CreateItemsGeneratorDto,
     UpdateItemsGeneratorDto,
     SubmitItemDto,
@@ -55,6 +55,16 @@ export type {
     ItemsGeneratorResponse,
     ExtractItemDetailsResponse,
     RegenerateMarkdownResponse,
+    // Generator form schema types (re-exported from @ever-works/plugin)
+    PluginIcon,
+    ProviderOption,
+    FormFieldDefinition,
+    FormFieldGroup,
+    GeneratorFormSchema,
+    FormSchemaProvidersType,
+    ProviderCategoryKey,
+    ProviderSelectionState,
+    SelectableProviderCategory,
 } from './items-generator';
 
 export type {
@@ -64,20 +74,15 @@ export type {
 
 export type {
     // From settings.ts
-    UpdateVercelTokenDto,
     NotificationPreferencesDto,
-    VercelTokenStatus,
     NotificationPreferencesResponse,
 } from './settings';
 
 export type {
     // From ai-conversation.ts
-    StartConversationDto,
-    SendMessageDto,
-    ConversationStartResponse,
-    ConversationHistoryResponse,
-    ConversationSummary,
-    ConversationMessage,
+    ChatMessage as ConversationMessage,
+    ChatMessageRole,
+    ChatStreamRequestDto,
     StreamChunk,
 } from './ai-conversation';
 
@@ -92,3 +97,12 @@ export type {
     Brand,
     ItemData,
 } from './types';
+
+export type {
+    // From git-providers.ts (API response types)
+    GitProviderInfo,
+    GitProviderConnectionInfo,
+} from './plugins-capabilities/git-providers';
+
+// Re-export plugin types for client components
+export type { GitUser, GitOrganization, GitRepositoryWithPermissions } from '@ever-works/plugin';

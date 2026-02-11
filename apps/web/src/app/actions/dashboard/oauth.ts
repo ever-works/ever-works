@@ -1,16 +1,19 @@
 'use server';
 
-import { authAPI } from '@/lib/api';
-import { OAuthProcessType, OAuthProvider } from '@/lib/api/enums';
+import { oauthAPI, gitProvidersAPI } from '@/lib/api';
 import { setOAuthStateCookie } from '@/lib/auth';
 import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
 import { generateHexToken } from '@/lib/utils/random';
 
-export async function checkGitHubConnection() {
+export async function checkGitProviderConnection(providerId: string) {
     try {
-        return await authAPI.oauth_connections.checkConnection(OAuthProvider.GITHUB);
+        if (!providerId) {
+            return { success: false, connected: false, error: 'Git provider ID is required' };
+        }
+        const result = await gitProvidersAPI.checkConnection(providerId);
+        return { success: true, ...result };
     } catch (error) {
-        console.error('Failed to check GitHub connection:', error);
+        console.error(`Failed to check git provider connection:`, error);
         return {
             success: false,
             connected: false,
@@ -19,69 +22,89 @@ export async function checkGitHubConnection() {
     }
 }
 
-export async function checkOAuthConnection(provider: `${OAuthProvider}`) {
+export async function getGitProviderOrganizations(providerId: string) {
     try {
-        return await authAPI.oauth_connections.checkConnection(provider as OAuthProvider);
+        if (!providerId) {
+            return { success: false, organizations: [], error: 'Git provider ID is required' };
+        }
+        return await gitProvidersAPI.getOrganizations(providerId);
     } catch (error) {
-        console.error(`Failed to check ${provider} connection:`, error);
-
+        console.error('Failed to fetch organizations:', error);
         return {
             success: false,
-            connected: false,
-            error:
-                error instanceof Error ? error.message : `Failed to check ${provider} connection`,
+            organizations: [],
+            error: error instanceof Error ? error.message : 'Failed to fetch organizations',
         };
     }
 }
 
-export async function connectGitHub(returnPath?: string) {
+/**
+ * Connect to an OAuth provider (used for git providers and any OAuth-capable plugin)
+ */
+export async function connectOAuthProvider(
+    providerId: string,
+    returnPath?: string,
+    forceConsent?: boolean,
+) {
     try {
-        // Generate state for OAuth
+        if (!providerId) {
+            return { success: false, error: 'Provider ID is required' };
+        }
+
         const state = generateHexToken(16);
         await setOAuthStateCookie(state);
 
-        const params = new URLSearchParams({ process: OAuthProcessType.CONNECT });
+        const params = new URLSearchParams();
         if (returnPath) {
             params.append('returnPath', returnPath);
         }
 
-        // Set callback URL with return path
-        const callbackPath = routeWithParams(ROUTES.API_AUTH_CALLBACK, {
-            provider: OAuthProvider.GITHUB,
-        });
+        const queryString = params.toString();
+        const callbackPath = routeWithParams(ROUTES.API_OAUTH_PLUGINS_CALLBACK, { providerId });
+        const callbackUrl = withAppUrl(callbackPath) + (queryString ? `?${queryString}` : '');
 
-        const response = await authAPI.oauth_connections.getConnectUrl(
-            OAuthProvider.GITHUB,
-            withAppUrl(callbackPath) + `?${params.toString()}`,
-            state,
-        );
+        const response = await oauthAPI.getConnectUrl(providerId, callbackUrl, state, forceConsent);
 
-        return {
-            success: true,
-            url: response.url,
-            state: response.state,
-        };
+        return { success: true, url: response.url, state: response.state };
     } catch (error) {
-        console.error('Failed to get GitHub connect URL:', error);
+        console.error('Failed to get OAuth connect URL:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to connect GitHub',
+            error: error instanceof Error ? error.message : 'Failed to connect provider',
         };
     }
 }
 
-export async function disconnectGitHub() {
+/**
+ * @deprecated Use connectOAuthProvider instead
+ */
+export async function connectGitProvider(
+    providerId: string,
+    returnPath?: string,
+    forceConsent?: boolean,
+) {
+    return connectOAuthProvider(providerId, returnPath, forceConsent);
+}
+
+export async function disconnectOAuthProvider(providerId: string) {
     try {
-        await authAPI.oauth_connections.disconnect(OAuthProvider.GITHUB);
-        return {
-            success: true,
-            message: 'GitHub account disconnected successfully',
-        };
+        if (!providerId) {
+            return { success: false, error: 'Provider ID is required' };
+        }
+        await oauthAPI.disconnect(providerId);
+        return { success: true, message: 'Provider disconnected successfully' };
     } catch (error) {
-        console.error('Failed to disconnect GitHub:', error);
+        console.error('Failed to disconnect OAuth provider:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to disconnect GitHub',
+            error: error instanceof Error ? error.message : 'Failed to disconnect provider',
         };
     }
+}
+
+/**
+ * @deprecated Use disconnectOAuthProvider instead
+ */
+export async function disconnectGitProvider(providerId: string) {
+    return disconnectOAuthProvider(providerId);
 }

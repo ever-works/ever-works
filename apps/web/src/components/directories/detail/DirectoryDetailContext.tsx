@@ -1,13 +1,12 @@
 'use client';
 
-import { RepoProvider } from '@/lib/api/enums';
-import { ConnectionInfo, Directory, DirectoryConfig } from '@/lib/api/types-only';
+import { GitProviderConnectionInfo, Directory, DirectoryConfig } from '@/lib/api/types-only';
 import { DirectoryPermissions, getPermissions } from '@/lib/permissions';
 import { createContext, PropsWithChildren, useContext, useMemo } from 'react';
 
 type DirectoryDetailContextType = {
     directory: Directory;
-    oauthConnection: ConnectionInfo | null;
+    oauthConnection: GitProviderConnectionInfo | null;
     config: DirectoryConfig | null;
     repoLinks: {
         main: string | null;
@@ -28,7 +27,7 @@ export const DirectoryDetailProvider = ({
     children,
 }: PropsWithChildren<{
     directory: Directory;
-    oauthConnection: ConnectionInfo | null;
+    oauthConnection: GitProviderConnectionInfo | null;
     config: DirectoryConfig | null;
 }>) => {
     const value = useMemo(() => {
@@ -55,38 +54,34 @@ export const useDirectoryDetail = () => {
     return context;
 };
 
-/**
- * Hook to get just the permissions from the context.
- */
 export const useDirectoryPermissions = () => {
     const { permissions } = useDirectoryDetail();
     return permissions;
 };
 
-function repoLink(directory: Directory, oauthConnection: ConnectionInfo | null) {
-    if (!oauthConnection?.connected) {
+function repoLink(directory: Directory, oauthConnection: GitProviderConnectionInfo | null) {
+    if (!oauthConnection) {
         return null;
     }
 
-    let providerUrl: string | null = null;
-
-    switch (directory.repoProvider) {
-        case RepoProvider.GITHUB:
-            providerUrl = 'https://github.com';
-            break;
-
-        default:
-            return null;
+    // Use homepage from the provider info (populated from plugin manifest)
+    const providerUrl = oauthConnection.homepage;
+    if (!providerUrl) {
+        return null;
     }
 
-    const username = directory.owner || oauthConnection.username || oauthConnection.metadata?.login;
+    // Prefer git provider username over platform owner
+    const username = oauthConnection.username || directory.owner;
     if (!username) {
         return null;
     }
 
+    // Strip trailing slash from homepage URL
+    const baseUrl = providerUrl.replace(/\/$/, '');
+
     return {
-        main: `${providerUrl}/${username}/${directory.slug}`,
-        dataRepo: `${providerUrl}/${username}/${directory.slug}-data`,
-        websiteRepo: `${providerUrl}/${username}/${directory.slug}-website`,
+        main: `${baseUrl}/${username}/${directory.slug}`,
+        dataRepo: `${baseUrl}/${username}/${directory.slug}-data`,
+        websiteRepo: `${baseUrl}/${username}/${directory.slug}-website`,
     };
 }

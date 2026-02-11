@@ -1,0 +1,79 @@
+{
+	"name": "@ever-works/github-plugin",
+	"version": "1.0.0",
+	"description": "GitHub git provider plugin for Ever Works - repository management, git operations, and GitHub Actions",
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"octokit": "^4.0.0",
+		"libsodium-wrappers": "^0.7.15"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"isomorphic-git": "^1.27.0"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/libsodium-wrappers": "^0.7.14",
+		"@types/node": "^22.0.0",
+		"isomorphic-git": "^1.27.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "github",
+			"name": "GitHub",
+			"version": "1.0.0",
+			"category": "git-provider",
+			"capabilities": [
+				"git-provider",
+				"oauth"
+			],
+			"description": "GitHub integration for repository management, git operations, and GitHub Actions",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"autoEnable": true,
+			"systemPlugin": true,
+			"builtIn": true,
+			"visibility": "user-only",
+			"defaultForCapabilities": [
+				"git-provider"
+			],
+			"envVars": [
+				{
+					"name": "PLUGIN_GITHUB_CLIENT_ID",
+					"required": false,
+					"secret": false,
+					"description": "GitHub OAuth App Client ID (for plugin use, separate from auth GH_CLIENT_ID)"
+				},
+				{
+					"name": "PLUGIN_GITHUB_CLIENT_SECRET",
+					"required": false,
+					"secret": true,
+					"description": "GitHub OAuth App Client Secret (for plugin use, separate from auth GH_CLIENT_SECRET)"
+				}
+			]
+		}
+	}
+}

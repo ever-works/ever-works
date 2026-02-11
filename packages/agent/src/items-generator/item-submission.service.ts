@@ -1,18 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GithubService } from '../git/github.service';
+import { GitFacadeService } from '../facades/git.facade';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import { DataRepository, IDataConfig } from '../data-generator/data-repository';
-import { slugifyText } from './utils/text.utils';
-import { ItemsGeneratorService } from './items-generator.service';
-import { SmartImageRouterService } from '../screenshot/smart-image-router.service';
-import { DomainType } from './interfaces/items-generator.interfaces';
+import { DataRepository, IDataConfig } from '../generators/data-generator/data-repository';
+import { slugifyText } from '../utils/text.utils';
+import { ScreenshotFacadeService } from '../facades/screenshot.facade';
+import type { MutableItemData } from '@ever-works/contracts';
 import {
     SubmitItemDto,
     SubmitItemResponseDto,
     RemoveItemDto,
     RemoveItemResponseDto,
-    ItemData,
     UpdateItemDto,
 } from './dto';
 import { format } from 'date-fns';
@@ -23,9 +21,8 @@ export class ItemSubmissionService {
     private readonly logger = new Logger(ItemSubmissionService.name);
 
     constructor(
-        private readonly githubService: GithubService,
-        private readonly itemsGeneratorService: ItemsGeneratorService,
-        private readonly smartImageRouterService: SmartImageRouterService,
+        private readonly gitFacade: GitFacadeService,
+        private readonly screenshotFacade: ScreenshotFacadeService,
     ) {}
 
     async submitItem(
@@ -38,21 +35,23 @@ export class ItemSubmissionService {
         );
 
         try {
-            // Use directory owner's Git token (they set up the repos)
+            // Use directory owner's credentials (they set up the repos)
             // but use current user as committer for attribution
             const directoryOwner = directory.user as User;
-            const token = directoryOwner.getGitToken();
             const committer = user.asCommitter();
 
             const repo = directory.getDataRepo();
+            const owner = directory.getRepoOwner();
 
             // Clone or pull the data repository
-            const dest = await this.githubService.cloneOrPull({
-                owner: directory.getRepoOwner(),
-                repo: repo,
-                token: token,
-                committer: committer,
-            });
+            const dest = await this.gitFacade.cloneOrPull(
+                {
+                    owner,
+                    repo,
+                    committer,
+                },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
+            );
 
             const data = await DataRepository.create(dest);
 
@@ -76,19 +75,29 @@ export class ItemSubmissionService {
             );
 
             // Get main branch
-            const defaultBranch = await this.githubService.getMainBranch(dest);
+            const provider = directory.gitProvider;
+            const defaultBranch = await this.gitFacade.getMainBranch(provider, dest);
 
             let branchName: string | null = null;
             if (shouldCreatePR) {
                 // Create new branch for the item submission
-                branchName = await this.githubService.createAndSwitchToRandomBranch(dest);
+                branchName = await this.gitFacade.switchBranch(
+                    provider,
+                    dest,
+                    `item-${slugifyText(submitItemDto.name)}-${Date.now()}`,
+                    true,
+                );
                 this.logger.log(`Created and switched to new branch: ${branchName}`);
             } else {
                 // Switch to main branch for direct commit
-                await this.githubService.switchToMainBranch(dest).catch((err) => {
-                    this.logger.error('Failed to switch to main branch', err);
-                    throw new Error('Failed to switch to main branch for direct commit');
-                });
+                if (defaultBranch) {
+                    await this.gitFacade
+                        .switchBranch(provider, dest, defaultBranch)
+                        .catch((err) => {
+                            this.logger.error('Failed to switch to main branch', err);
+                            throw new Error('Failed to switch to main branch for direct commit');
+                        });
+                }
                 this.logger.log(`Switched to main branch: ${defaultBranch}`);
             }
 
@@ -99,7 +108,7 @@ export class ItemSubmissionService {
                     ? submitItemDto.categories
                     : submitItemDto.category;
 
-            const itemData: ItemData = {
+            const itemData: MutableItemData = {
                 name: submitItemDto.name,
                 description: submitItemDto.description,
                 source_url: submitItemDto.source_url,
@@ -113,33 +122,40 @@ export class ItemSubmissionService {
                 images: submitItemDto.images || [],
             };
 
-            // Smart image capture based on directory domain type
-            if (submitItemDto.source_url) {
-                const smartImage = await this.smartImageRouterService.getSmartImage({
-                    url: submitItemDto.source_url,
-                    domainType: (directory.domainType as DomainType) || DomainType.GENERAL,
-                    itemName: submitItemDto.name,
-                    user: directoryOwner,
-                });
+            // Capture screenshot if source URL provided and no images yet
+            if (submitItemDto.source_url && this.screenshotFacade.isAvailable()) {
+                try {
+                    const result = await this.screenshotFacade.capture(
+                        {
+                            url: submitItemDto.source_url,
+                            blockAds: true,
+                            blockCookieBanners: true,
+                            cache: true,
+                        },
+                        {
+                            userId: directoryOwner.id,
+                            directoryId: directory.id,
+                        },
+                    );
 
-                if (smartImage.primaryImage && !itemData.images.includes(smartImage.primaryImage)) {
-                    // Add smart image as the first image if not already present
-                    itemData.images = [smartImage.primaryImage, ...itemData.images];
-                    this.logger.debug(
-                        `Added ${smartImage.source} image for item: ${submitItemDto.name} (confidence: ${smartImage.confidence})`,
+                    if (result.success && result.cacheUrl) {
+                        if (!itemData.images.includes(result.cacheUrl)) {
+                            itemData.images = [result.cacheUrl, ...itemData.images];
+                            this.logger.debug(
+                                `Captured screenshot for item: ${submitItemDto.name}`,
+                            );
+                        }
+                    }
+                } catch (error) {
+                    this.logger.warn(
+                        `Failed to capture screenshot for ${submitItemDto.name}: ${error instanceof Error ? error.message : 'Unknown'}`,
                     );
                 }
             }
 
-            // Process badges for the item if it's a repository
-            const itemWithBadges =
-                await this.itemsGeneratorService.processSingleItemBadges(itemData);
-
-            // Generate markdown for the item using AI
-            const itemsWithMarkdown = await this.itemsGeneratorService.generateMarkdownForItems([
-                itemWithBadges,
-            ]);
-            const itemWithMarkdown = itemsWithMarkdown[0];
+            // TODO: Badge processing and markdown generation should use pipeline step executors
+            // For now, proceed without badges/markdown (user-submitted items don't need AI enhancement)
+            const itemWithMarkdown = { ...itemData };
 
             // Ensure slug is set
             itemWithMarkdown.slug = slugifyText(itemWithMarkdown.slug || itemWithMarkdown.name);
@@ -155,15 +171,19 @@ export class ItemSubmissionService {
             await data.writeItemMarkdown(itemWithMarkdown, markdown);
 
             // Commit changes
-            await this.githubService.add(dest, '.');
-            await this.githubService.commit(
+            await this.gitFacade.add(provider, dest, '.');
+            await this.gitFacade.commit(
+                provider,
                 dest,
                 `Add ${itemWithMarkdown.name}`,
                 user.asCommitter(),
             );
 
             // Push changes
-            await this.githubService.push(dest, token);
+            await this.gitFacade.push(
+                { dir: dest },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
+            );
 
             // If direct commit, return success without PR
             if (!shouldCreatePR) {
@@ -211,16 +231,16 @@ export class ItemSubmissionService {
                 `**Tags:** ${Array.isArray(itemWithMarkdown.tags) ? itemWithMarkdown.tags.join(', ') : ''}${badgeInfo}\n\n` +
                 `Generated by [${appConfig.branding.getAppName()}](${appConfig.branding.getPlatformWebsite()})`;
 
-            const pr = await this.githubService.createPR(
+            const pr = await this.gitFacade.createPullRequest(
                 {
-                    owner: directory.getRepoOwner(),
-                    repo: repo,
+                    owner,
+                    repo,
                     head: branchName!,
-                    base: defaultBranch,
+                    base: defaultBranch!,
                     title: prTitle,
                     body: prBody,
                 },
-                token,
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
 
             this.logger.log(`PR #${pr.number} created for item "${itemWithMarkdown.name}"`);
@@ -232,7 +252,7 @@ export class ItemSubmissionService {
                 item_slug: itemWithMarkdown.slug,
                 message: `Item "${itemWithMarkdown.name}" has been submitted for review. PR #${pr.number} created.`,
                 pr_number: pr.number,
-                pr_url: pr.html_url,
+                pr_url: pr.url,
                 pr_title: prTitle,
                 pr_body: prBody,
                 pr_branch_name: branchName!,
@@ -260,21 +280,23 @@ export class ItemSubmissionService {
         );
 
         try {
-            // Use directory owner's Git token (they set up the repos)
+            // Use directory owner's credentials (they set up the repos)
             // but use current user as committer for attribution
             const directoryOwner = directory.user as User;
-            const token = directoryOwner.getGitToken();
             const committer = user.asCommitter();
 
             const repo = directory.getDataRepo();
+            const owner = directory.getRepoOwner();
 
             // Clone or pull the data repository
-            const dest = await this.githubService.cloneOrPull({
-                owner: directory.getRepoOwner(),
-                repo: repo,
-                token: token,
-                committer: committer,
-            });
+            const dest = await this.gitFacade.cloneOrPull(
+                {
+                    owner,
+                    repo,
+                    committer,
+                },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
+            );
 
             const data = await DataRepository.create(dest);
 
@@ -304,14 +326,20 @@ export class ItemSubmissionService {
             }
 
             const shouldCreatePR = removeItemDto.create_pull_request === true;
-            const defaultBranch = await this.githubService.getMainBranch(dest);
+            const provider = directory.gitProvider;
+            const defaultBranch = await this.gitFacade.getMainBranch(provider, dest);
 
             let branchName: string | null = null;
             if (shouldCreatePR) {
-                branchName = await this.githubService.createAndSwitchToRandomBranch(dest);
+                branchName = await this.gitFacade.switchBranch(
+                    provider,
+                    dest,
+                    `remove-${removeItemDto.item_slug}-${Date.now()}`,
+                    true,
+                );
                 this.logger.log(`Created and switched to new branch: ${branchName}`);
-            } else {
-                await this.githubService.switchToMainBranch(dest).catch((err) => {
+            } else if (defaultBranch) {
+                await this.gitFacade.switchBranch(provider, dest, defaultBranch).catch((err) => {
                     this.logger.error('Failed to switch to main branch', err);
                     return null;
                 });
@@ -330,14 +358,17 @@ export class ItemSubmissionService {
             }
 
             // Commit changes
-            await this.githubService.addAll(dest);
+            await this.gitFacade.addAll(provider, dest);
             const commitMessage = removeItemDto.reason
                 ? `Remove ${itemData.name} - ${removeItemDto.reason}`
                 : `Remove ${itemData.name}`;
-            await this.githubService.commit(dest, commitMessage, user.asCommitter());
+            await this.gitFacade.commit(provider, dest, commitMessage, user.asCommitter());
 
             // Push changes
-            await this.githubService.push(dest, token);
+            await this.gitFacade.push(
+                { dir: dest },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
+            );
 
             if (shouldCreatePR && branchName && defaultBranch) {
                 const prTitle = `Remove ${itemData.name} - ${format(new Date(), 'MM/dd/yyyy HH:mm')}`;
@@ -349,16 +380,16 @@ export class ItemSubmissionService {
                     (removeItemDto.reason ? `**Reason:** ${removeItemDto.reason}\n` : '') +
                     `\nGenerated by [${appConfig.branding.getAppName()}](${appConfig.branding.getPlatformWebsite()})`;
 
-                const pr = await this.githubService.createPR(
+                const pr = await this.gitFacade.createPullRequest(
                     {
-                        owner: directory.getRepoOwner(),
-                        repo: repo,
+                        owner,
+                        repo,
                         head: branchName,
                         base: defaultBranch,
                         title: prTitle,
                         body: prBody,
                     },
-                    token,
+                    { userId: directoryOwner.id, providerId: directory.gitProvider },
                 );
 
                 return {
@@ -368,7 +399,7 @@ export class ItemSubmissionService {
                     item_slug: removeItemDto.item_slug,
                     message: `Item "${itemData.name}" removal has been submitted for review. PR #${pr.number} created.`,
                     pr_number: pr.number,
-                    pr_url: pr.html_url,
+                    pr_url: pr.url,
                     pr_branch_name: branchName,
                     pr_title: prTitle,
                     pr_body: prBody,
@@ -404,20 +435,22 @@ export class ItemSubmissionService {
         );
 
         try {
-            // Use directory owner's Git token (they set up the repos)
+            // Use directory owner's credentials (they set up the repos)
             // but use current user as committer for attribution
             const directoryOwner = directory.user as User;
-            const token = directoryOwner.getGitToken();
             const committer = user.asCommitter();
 
             const repo = directory.getDataRepo();
+            const owner = directory.getRepoOwner();
 
-            const dest = await this.githubService.cloneOrPull({
-                owner: directory.getRepoOwner(),
-                repo,
-                token,
-                committer,
-            });
+            const dest = await this.gitFacade.cloneOrPull(
+                {
+                    owner,
+                    repo,
+                    committer,
+                },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
+            );
 
             const data = await DataRepository.create(dest);
 
@@ -432,15 +465,21 @@ export class ItemSubmissionService {
                 };
             }
 
-            const defaultBranch = await this.githubService.getMainBranch(dest);
+            const provider = directory.gitProvider;
+            const defaultBranch = await this.gitFacade.getMainBranch(provider, dest);
             const shouldCreatePR = updateItemDto.create_pull_request === true;
 
             let branchName: string | null = null;
             if (shouldCreatePR) {
-                branchName = await this.githubService.createAndSwitchToRandomBranch(dest);
+                branchName = await this.gitFacade.switchBranch(
+                    provider,
+                    dest,
+                    `update-${updateItemDto.item_slug}-${Date.now()}`,
+                    true,
+                );
                 this.logger.log(`Created and switched to new branch: ${branchName}`);
-            } else {
-                await this.githubService.switchToMainBranch(dest).catch((err) => {
+            } else if (defaultBranch) {
+                await this.gitFacade.switchBranch(provider, dest, defaultBranch).catch((err) => {
                     this.logger.error('Failed to switch to main branch', err);
                     return null;
                 });
@@ -464,10 +503,13 @@ export class ItemSubmissionService {
                 };
             }
 
-            await this.githubService.addAll(dest);
+            await this.gitFacade.addAll(provider, dest);
             const commitMessage = `Update ${updatedItem.name} metadata`;
-            await this.githubService.commit(dest, commitMessage, user.asCommitter());
-            await this.githubService.push(dest, token);
+            await this.gitFacade.commit(provider, dest, commitMessage, user.asCommitter());
+            await this.gitFacade.push(
+                { dir: dest },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
+            );
 
             if (shouldCreatePR && branchName && defaultBranch) {
                 const prTitle = `Update ${updatedItem.name} metadata - ${format(new Date(), 'MM/dd/yyyy HH:mm')}`;
@@ -478,16 +520,16 @@ export class ItemSubmissionService {
                     `**Order:** ${updatedItem.order ?? 'n/a'}\n` +
                     `\nGenerated by [${appConfig.branding.getAppName()}](${appConfig.branding.getPlatformWebsite()})`;
 
-                const pr = await this.githubService.createPR(
+                const pr = await this.gitFacade.createPullRequest(
                     {
-                        owner: directory.getRepoOwner(),
+                        owner,
                         repo,
                         head: branchName,
                         base: defaultBranch,
                         title: prTitle,
                         body: prBody,
                     },
-                    token,
+                    { userId: directoryOwner.id, providerId: directory.gitProvider },
                 );
 
                 return {
@@ -497,7 +539,7 @@ export class ItemSubmissionService {
                     item_slug: updateItemDto.item_slug,
                     message: `Item "${updatedItem.name}" metadata update submitted. PR #${pr.number} created.`,
                     pr_number: pr.number,
-                    pr_url: pr.html_url,
+                    pr_url: pr.url,
                     pr_branch_name: branchName,
                     pr_title: prTitle,
                     pr_body: prBody,

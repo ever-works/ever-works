@@ -1,4 +1,4 @@
-import { User, Directory } from '@packages/agent/entities';
+import { User, Directory } from '@ever-works/agent/entities';
 
 export abstract class BaseUserEvent {
     public abstract user: User;

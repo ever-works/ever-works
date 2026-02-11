@@ -1,0 +1,62 @@
+{
+	"name": "@ever-works/brave-plugin",
+	"version": "1.0.0",
+	"description": "Brave Plugin - Privacy-focused web search using Brave Search API",
+	"private": true,
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "brave",
+			"name": "Brave Search",
+			"version": "1.0.0",
+			"category": "search",
+			"capabilities": [
+				"search"
+			],
+			"description": "Privacy-focused web search using the Brave Search API. Independent search index with no tracking.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"autoEnable": false,
+			"systemPlugin": false,
+			"builtIn": true,
+			"envVars": [
+				{
+					"name": "PLUGIN_BRAVE_API_KEY",
+					"required": false,
+					"secret": true,
+					"description": "Brave Search API key (optional - can be set via admin/user settings)"
+				}
+			]
+		}
+	}
+}

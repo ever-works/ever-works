@@ -1,5 +1,22 @@
 import { Injectable } from '@nestjs/common';
-import { AiProviderInfo } from '@packages/agent/ai';
+
+interface AiProviderDefaults {
+    model: string;
+    temperature: number;
+    maxTokens: number;
+    baseUrl?: string;
+}
+
+interface AiProviderInfo {
+    name: string;
+    displayName: string;
+    description: string;
+    defaults: AiProviderDefaults;
+    requiresApiKey: boolean;
+    models: string[];
+    websiteUrl: string;
+    docsUrl: string;
+}
 
 @Injectable()
 export class AiProviderRegistryService {
@@ -95,7 +112,7 @@ export class AiProviderRegistryService {
                 'openai/gpt-5-nano',
                 'openai/gpt-4o',
                 'anthropic/claude-opus-4.5',
-                'anthropic/claude-sonnet-4.5',
+                'moonshotai/kimi-k2.5',
                 'google/gemini-3-flash',
                 'google/gemini-2.0-flash-001',
                 'meta-llama/llama-3.3-70b-instruct',

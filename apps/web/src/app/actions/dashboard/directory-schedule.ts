@@ -8,12 +8,23 @@ import { revalidatePath } from 'next/cache';
 import { ROUTES } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
 
+const providerOverridesSchema = z
+    .object({
+        pipeline: z.string().optional(),
+        ai: z.string().optional(),
+        search: z.string().optional(),
+        screenshot: z.string().optional(),
+        contentExtractor: z.string().optional(),
+    })
+    .nullish();
+
 const updateScheduleSchema = z.object({
     enable: z.boolean(),
     cadence: z.nativeEnum(DirectoryScheduleCadence),
     billingMode: z.nativeEnum(DirectoryScheduleBillingMode),
     maxFailureBeforePause: z.number().int().min(1).max(10),
     alwaysCreatePullRequest: z.boolean().optional(),
+    providerOverrides: providerOverridesSchema,
 });
 
 export async function updateDirectorySchedule(

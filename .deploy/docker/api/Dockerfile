@@ -1,85 +1,59 @@
-# NodeJS Base
 FROM node:22-alpine AS base
-# Update npm and configure pnpm and turbo
 RUN npm install -g npm@latest && \
     npm install -g pnpm@10 && \
     npm install -g turbo@latest
 
-#--
-FROM base AS builder
-
-USER node
-
+#-- Pruner
+FROM base AS pruner
 WORKDIR /app
-
 COPY . .
-
 RUN turbo prune --scope=ever-works-api --docker
 
-#--
-# Add lockfile and package.json's of isolated subworkspace
+# Collect ALL package.json files (turbo prune misses plugins since they're not API deps)
+RUN mkdir -p /app/pkg-jsons && \
+    find . -name "package.json" \
+      -not -path "*/node_modules/*" \
+      -not -path "*/.git/*" \
+      -not -path "./out/*" \
+      -not -path "./pkg-jsons/*" \
+      -exec sh -c 'for f; do d=$(dirname "$f"); mkdir -p "/app/pkg-jsons/$d"; cp "$f" "/app/pkg-jsons/$d/"; done' _ {} + && \
+    cp pnpm-workspace.yaml pnpm-lock.yaml /app/pkg-jsons/
+
+#-- Installer
 FROM base AS installer
-
-USER root
-
 WORKDIR /app
 
-# First install the dependencies (as they change less often)
-COPY --from=builder /app/out/json/ .
-COPY --from=builder /app/.gitignore .gitignore
+COPY --from=pruner /app/pkg-jsons/ .
+RUN echo "shamefully-hoist=true" > .npmrc
+RUN pnpm install --frozen-lockfile
 
-# Install deps
-RUN cd apps/api && pnpm install --frozen-lockfile
+COPY --from=pruner /app/out/full/ .
+COPY packages/plugins/ packages/plugins/
+COPY scripts/prepare-docker-plugins.js scripts/prepare-docker-plugins.js
 
-# Build the project
-COPY --from=builder /app/out/full/ .
-
-# Build the apps
 RUN pnpm build --filter=ever-works-api...
+RUN pnpm build --filter="./packages/plugins/*"
+RUN pnpm deploy --filter=ever-works-api --prod --legacy /app/deploy
+RUN node scripts/prepare-docker-plugins.js
 
-# Prune dev deps and husky
-RUN sed -i '/"prepare.*husky/d' package.json
-RUN rm -rf ./**/node_modules
-RUN rm -rf /app/packages/agent/src /app/packages/monitoring/src /app/packages/tasks/src
-
-#--
-# Build
+#-- Production
 FROM node:22-alpine
 
-# Install PNPM
-RUN npm install -g pnpm@10
-RUN npm install -g npm@latest
-
-# Create app directory with proper ownership
-RUN mkdir -p /app && chown node:node /app
-
 USER node
-
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV APP_TYPE=api
-
-COPY --from=installer --chown=node:node /app/package.json ./
-COPY --from=installer --chown=node:node /app/pnpm-lock.yaml ./
-COPY --from=installer --chown=node:node /app/pnpm-workspace.yaml ./
-COPY --from=installer --chown=node:node /app/apps /app/apps
-COPY --from=installer --chown=node:node /app/packages /app/packages
-
-# Copy entrypoint script
-COPY --chown=node:node .deploy/docker/api/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
-
-RUN pnpm install --prod
-RUN pnpm store prune
-
-WORKDIR /app/apps/api
-
 ENV PORT=3100
 ENV RUN_MIGRATIONS=false
 
+COPY --from=installer --chown=node:node /app/deploy/dist ./dist
+COPY --from=installer --chown=node:node /app/deploy/node_modules ./node_modules
+COPY --from=installer --chown=node:node /app/deploy/package.json ./
+COPY --from=installer --chown=node:node /app/deploy/plugins ./plugins
+COPY --chown=node:node .deploy/docker/api/entrypoint.sh ./entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 VOLUME [ "/tmp/ever-works-repos" ]
-
 EXPOSE 3100
-
 ENTRYPOINT ["/app/entrypoint.sh"]

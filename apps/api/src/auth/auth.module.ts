@@ -7,21 +7,17 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuthService } from './services/auth.service';
 import { AuthController } from './controllers/auth.controller';
-import { OAuthConnectionsController } from './controllers/oauth-connections.controller';
+import { OAuthController } from './controllers/oauth.controller';
 import { GithubAuthStrategy } from './strategies/github.strategy';
 import { GoogleAuthStrategy } from './strategies/google.strategy';
-import { GithubConnectStrategy } from './strategies/github-connect.strategy';
 import { TokenCleanupService } from './tasks/token-cleanup.service';
-import { OAuthTokenService } from './services/oauth-token.service';
-import { OAuthConnectionService } from './services/oauth-connection.service';
-import { GitHubTokenService } from './services/github-token.service';
 import { OAuthUrlService } from './services/oauth-url.service';
 import {
     DatabaseModule,
     UserRepository,
     RefreshTokenRepository,
     OAuthTokenRepository,
-} from '@packages/agent/database';
+} from '@ever-works/agent/database';
 import { jwtConstants } from '../config/constants';
 
 @Module({
@@ -43,17 +39,13 @@ import { jwtConstants } from '../config/constants';
         JwtStrategy,
         GithubAuthStrategy,
         GoogleAuthStrategy,
-        GithubConnectStrategy,
         UserRepository,
         RefreshTokenRepository,
         OAuthTokenRepository,
         TokenCleanupService,
-        OAuthTokenService,
-        OAuthConnectionService,
-        GitHubTokenService,
         OAuthUrlService,
     ],
-    controllers: [AuthController, OAuthConnectionsController],
-    exports: [AuthService, OAuthTokenService, OAuthConnectionService, GitHubTokenService],
+    controllers: [OAuthController, AuthController],
+    exports: [AuthService],
 })
 export class AuthModule {}

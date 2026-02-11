@@ -14,6 +14,14 @@ import {
     UseGuards,
 } from '@nestjs/common';
 import {
+    ApiTags,
+    ApiBearerAuth,
+    ApiOperation,
+    ApiResponse,
+    ApiParam,
+    ApiQuery,
+} from '@nestjs/swagger';
+import {
     CreateDirectoryDto,
     UpdateDirectoryDto,
     UpdateDirectoryAdvancedPromptsDto,
@@ -21,7 +29,8 @@ import {
     UpdateCategoryDto,
     CreateTagDto,
     UpdateTagDto,
-} from '@packages/agent/dto';
+    UpdateWebsiteSettingsDto,
+} from '@ever-works/agent/dto';
 import {
     CreateItemsGeneratorDto,
     DeleteDirectoryDto,
@@ -35,8 +44,8 @@ import {
     SubmitItemResponseDto,
     UpdateItemsGeneratorDto,
     UpdateItemDto,
-} from '@packages/agent/items-generator';
-import { BulkCaptureImagesDto, BulkCaptureImagesResponseDto } from '@packages/agent/services';
+} from '@ever-works/agent/items-generator';
+import { BulkCaptureImagesDto, BulkCaptureImagesResponseDto } from '@ever-works/agent/services';
 import {
     DirectoryDetailService,
     DirectoryGenerationService,
@@ -50,7 +59,8 @@ import {
     DirectoryOwnershipService,
     DirectoryAdvancedPromptsService,
     DirectoryTaxonomyService,
-} from '@packages/agent/services';
+    GeneratorFormSchemaService,
+} from '@ever-works/agent/services';
 import {
     AnalyzeRepositoryDto,
     AnalyzeRepositoryResponseDto,
@@ -59,17 +69,19 @@ import {
     ImportDirectoryResponseDto,
     GetUserRepositoriesDto,
     GetUserRepositoriesResponseDto,
-} from '@packages/agent/dto';
-import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-generator';
+} from '@ever-works/agent/dto';
+import { UpdateWebsiteRepositoryResponseDto } from '@ever-works/agent/generators';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { GenerateDirectoryDetailDto } from './dto/generate-detail.dto';
-import { CACHE_MANAGER, Cache } from '@packages/agent/cache';
-import { UpdateDirectoryScheduleDto } from '@packages/agent/dto';
-import { DirectoryScheduleStatus } from '@packages/agent/entities';
+import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
+import { UpdateDirectoryScheduleDto } from '@ever-works/agent/dto';
+import { DirectoryScheduleStatus } from '@ever-works/agent/entities';
 
 let CACHE_TTL = 1000 * 60 * 10; // 10 minutes
 
+@ApiTags('Directories')
+@ApiBearerAuth('JWT-auth')
 @Controller('api')
 @UseGuards(JwtAuthGuard)
 export class DirectoriesController {
@@ -86,10 +98,19 @@ export class DirectoriesController {
         private readonly directoryOwnershipService: DirectoryOwnershipService,
         private readonly directoryAdvancedPromptsService: DirectoryAdvancedPromptsService,
         private readonly directoryTaxonomyService: DirectoryTaxonomyService,
+        private readonly generatorFormSchemaService: GeneratorFormSchemaService,
     ) {}
 
     @Get('directories')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'List directories',
+        description: 'Get all directories accessible to the authenticated user',
+    })
+    @ApiQuery({ name: 'limit', required: false, description: 'Maximum number of results' })
+    @ApiQuery({ name: 'offset', required: false, description: 'Number of results to skip' })
+    @ApiQuery({ name: 'search', required: false, description: 'Search term to filter directories' })
+    @ApiResponse({ status: 200, description: 'List of directories' })
     async getDirectories(
         @CurrentUser() auth: AuthenticatedUser,
         @Query('limit') limit?: string,
@@ -113,6 +134,9 @@ export class DirectoriesController {
 
     @Post('directories')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Create directory', description: 'Create a new directory' })
+    @ApiResponse({ status: 200, description: 'Directory created successfully' })
+    @ApiResponse({ status: 400, description: 'Invalid input data' })
     async createDirectory(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() createDirectoryDto: CreateDirectoryDto,
@@ -123,6 +147,10 @@ export class DirectoriesController {
 
     @Get('directories/:id')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Get directory', description: 'Get a specific directory by ID' })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Directory details' })
+    @ApiResponse({ status: 404, description: 'Directory not found' })
     async getDirectory(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const user = await this.authService.getUser(auth.userId);
         return this.directoryQueryService.getDirectory(id, user);
@@ -167,6 +195,24 @@ export class DirectoriesController {
             },
             CACHE_TTL,
         );
+    }
+
+    @Get('directories/:id/website-settings')
+    @HttpCode(HttpStatus.OK)
+    async getWebsiteSettings(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const user = await this.authService.getUser(auth.userId);
+        return this.directoryQueryService.getWebsiteSettings(id, user);
+    }
+
+    @Put('directories/:id/website-settings')
+    @HttpCode(HttpStatus.OK)
+    async updateWebsiteSettings(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: UpdateWebsiteSettingsDto,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+        return this.directoryQueryService.updateWebsiteSettings(id, user, dto);
     }
 
     @Get('directories/:id/count')
@@ -240,8 +286,58 @@ export class DirectoriesController {
         );
     }
 
+    @Get('generator-form')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get global generator form schema',
+        description:
+            'Get the dynamic form schema for the generator without a specific directory context',
+    })
+    @ApiQuery({ name: 'pipelineId', required: false, description: 'Selected pipeline plugin ID' })
+    @ApiResponse({ status: 200, description: 'Generator form schema' })
+    async getGlobalGeneratorFormSchema(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query('pipelineId') pipelineId?: string,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+
+        return this.generatorFormSchemaService.getFormSchema(pipelineId, {
+            userId: user.id,
+        });
+    }
+
+    @Get('directories/:id/generator-form')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get generator form schema',
+        description:
+            'Get the dynamic form schema for the generator based on the selected pipeline plugin',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiQuery({ name: 'pipelineId', required: false, description: 'Selected pipeline plugin ID' })
+    @ApiResponse({ status: 200, description: 'Generator form schema' })
+    async getGeneratorFormSchema(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Query('pipelineId') pipelineId?: string,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+        await this.directoryOwnershipService.ensureAccess(id, user.id);
+
+        return this.generatorFormSchemaService.getFormSchema(pipelineId, {
+            directoryId: id,
+            userId: user.id,
+        });
+    }
+
     @Post('directories/:id/generate')
     @HttpCode(HttpStatus.ACCEPTED)
+    @ApiOperation({
+        summary: 'Generate items',
+        description: 'Start AI-powered item generation for a directory',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 202, description: 'Generation started' })
     async generateItems(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
@@ -551,16 +647,22 @@ export class DirectoriesController {
     @HttpCode(HttpStatus.OK)
     async getUserRepositories(
         @CurrentUser() auth: AuthenticatedUser,
+        @Query('gitProvider') gitProvider: string,
         @Query('page') page?: string,
         @Query('perPage') perPage?: string,
         @Query('search') search?: string,
+        @Query('owner') owner?: string,
+        @Query('type') type?: 'user' | 'org',
     ): Promise<GetUserRepositoriesResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
         const dto: GetUserRepositoriesDto = {
+            gitProvider,
             page: page ? parseInt(page, 10) : undefined,
             perPage: perPage ? parseInt(perPage, 10) : undefined,
             search: search || undefined,
+            owner: owner || undefined,
+            type: type || undefined,
         };
 
         return this.directoryImportService.getUserRepositories(dto, user);

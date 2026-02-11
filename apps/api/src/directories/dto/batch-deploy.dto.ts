@@ -1,33 +1,34 @@
 import { IsArray, IsOptional, IsString, ValidateNested, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class BatchDeployItemDto {
+    @ApiProperty({ description: 'Directory ID to deploy' })
     @IsString()
     directoryId: string;
 
+    @ApiPropertyOptional({ description: 'Team scope for this directory (overrides default)' })
     @IsOptional()
     @IsString()
-    vercelTeamScope?: string;
+    teamScope?: string;
 }
 
-export class BatchDeployVercelDto {
+export class BatchDeployDto {
+    @ApiProperty({
+        description: 'List of directories to deploy',
+        type: [BatchDeployItemDto],
+        minItems: 1,
+    })
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => BatchDeployItemDto)
     @ArrayMinSize(1)
     directories: BatchDeployItemDto[];
 
+    @ApiPropertyOptional({ description: 'Default team scope for all directories' })
     @IsOptional()
     @IsString()
-    VERCEL_TOKEN?: string;
-
-    @IsOptional()
-    @IsString()
-    GITHUB_TOKEN?: string;
-
-    @IsOptional()
-    @IsString()
-    vercelTeamScope?: string; // Default team scope for all
+    teamScope?: string;
 }
 
 export interface BatchDeployResult {

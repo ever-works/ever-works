@@ -15,7 +15,7 @@ import {
     DialogFooter,
     DialogClose,
 } from '@/components/ui/dialog';
-import { Lock, Unlock, Github, AlertTriangle } from 'lucide-react';
+import { Lock, Unlock, AlertTriangle, GitBranch } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 
@@ -104,7 +104,7 @@ export function RepoVisibilitySettings({ initialRepositories }: RepoVisibilitySe
                                 )}
                             </div>
                             <div className="text-sm text-muted-foreground flex items-center gap-1">
-                                <Github className="h-3 w-3" />
+                                <GitBranch className="h-3 w-3" />
                                 {repo.name}
                             </div>
                         </div>

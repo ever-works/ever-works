@@ -8,10 +8,13 @@ import {
     Optional,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DataGeneratorService, GenerationStats } from '@src/data-generator/data-generator.service';
-import { MarkdownGeneratorService } from '@src/markdown-generator/markdown-generator.service';
-import { WebsiteGeneratorService } from '@src/website-generator/website-generator.service';
-import { WebsiteUpdateService } from '@src/website-generator/website-update.service';
+import {
+    DataGeneratorService,
+    GenerationStats,
+} from '@src/generators/data-generator/data-generator.service';
+import { MarkdownGeneratorService } from '@src/generators/markdown-generator/markdown-generator.service';
+import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
+import { WebsiteUpdateService } from '@src/generators/website-generator/website-update.service';
 import {
     CreateItemsGeneratorDto,
     GenerationMethod,
@@ -27,14 +30,13 @@ import {
 } from '@src/items-generator/dto';
 import { ItemsGeneratorResponseDto } from '@src/items-generator/dto/items-generator-response.dto';
 import { ItemSubmissionService } from '@src/items-generator/item-submission.service';
-import { ItemsGeneratorService } from '@src/items-generator/items-generator.service';
 import { Directory } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
 import { DirectoryGenerationHistoryRepository } from '@src/database/repositories/directory-generation-history.repository';
 import { DirectoryGenerationHistory } from '@src/entities/directory-generation-history.entity';
 import { DirectoryGenerationCompletedEvent } from '@src/events';
-import { UpdateWebsiteRepositoryResponseDto } from '@src/website-generator/dto/update-website-repository.dto';
+import { UpdateWebsiteRepositoryResponseDto } from '@src/generators/website-generator/dto/update-website-repository.dto';
 import {
     DIRECTORY_GENERATION_MODE,
     DirectoryGenerationMode,
@@ -45,19 +47,17 @@ import {
 import { DirectoryScheduleBillingMode, GenerateStatusType } from '@src/entities/types';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { normalizeGeneratorError } from './utils/error.utils';
+import {
+    classifyGenerationError,
+    notifyForClassifiedError,
+} from './utils/error-classification.utils';
 import { DirectorySchedule } from '@src/entities/directory-schedule.entity';
 import { DirectoryScheduleService } from './directory-schedule.service';
 import { UserRepository } from '@src/database/repositories/user.repository';
 import { DirectoryImportService } from './directory-import.service';
-import {
-    NOTIFICATION_OPERATIONS,
-    NotificationOperations,
-} from '@src/notification-operations/notification-operations.interface';
-import {
-    SmartImageRouterService,
-    BulkImageRequest,
-} from '@src/screenshot/smart-image-router.service';
-import { DomainType } from '@src/items-generator/interfaces/items-generator.interfaces';
+import { NotificationService } from '@src/notifications/notification.service';
+import { ScreenshotFacadeService } from '@src/facades';
+import { GeneratorFormSchemaService } from './generator-form-schema.service';
 
 export interface BulkCaptureImagesDto {
     itemSlugs?: string[];
@@ -110,7 +110,6 @@ export class DirectoryGenerationService {
         private readonly websiteGenerator: WebsiteGeneratorService,
         private readonly websiteUpdateService: WebsiteUpdateService,
         private readonly itemSubmissionService: ItemSubmissionService,
-        private readonly itemsGeneratorService: ItemsGeneratorService,
         private readonly directoryRepository: DirectoryRepository,
         private readonly eventEmitter: EventEmitter2,
         private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
@@ -118,13 +117,13 @@ export class DirectoryGenerationService {
         private readonly directoryScheduleService: DirectoryScheduleService,
         private readonly directoryImportService: DirectoryImportService,
         private readonly userRepository: UserRepository,
-        private readonly smartImageRouterService: SmartImageRouterService,
+        private readonly screenshotFacade: ScreenshotFacadeService,
+        private readonly generatorFormSchemaService: GeneratorFormSchemaService,
         @Optional()
         @Inject(DIRECTORY_GENERATION_DISPATCHER)
         private readonly generationDispatcher?: DirectoryGenerationDispatcher,
         @Optional()
-        @Inject(NOTIFICATION_OPERATIONS)
-        private readonly notificationOperations?: NotificationOperations,
+        private readonly notificationService?: NotificationService,
     ) {}
 
     async generateItems(
@@ -137,6 +136,26 @@ export class DirectoryGenerationService {
         // Require editor role to generate/update items
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
         const triggerContext = this.resolveContext(context);
+
+        const scopeOptions = { userId: user.id, directoryId };
+
+        // Validate selected providers before starting generation
+        await this.generatorFormSchemaService.validateSelectedProviders(
+            dto.providers,
+            scopeOptions,
+        );
+
+        // Validate data source plugins are configured
+        await this.generatorFormSchemaService.validateFormSchemaPlugins(scopeOptions);
+
+        // Process form config: separate pipeline config from per-plugin config
+        const processed = await this.generatorFormSchemaService.processFormConfig(
+            dto.providers?.pipeline,
+            dto.pluginConfig,
+            scopeOptions,
+        );
+        dto.pluginConfig = processed.config;
+        dto._processedPluginConfig = processed.pluginConfig;
 
         const history = await this.createGenerationHistoryRecord(
             directory,
@@ -227,8 +246,34 @@ export class DirectoryGenerationService {
             ...updateDto,
         };
 
-        // Apply conservative config for scheduled runs to control resource usage
-        // This ensures scheduled updates are efficient and cost-effective
+        // Deep-merge providers: overrides win per-field, but unset fields inherit from last run
+        if (lastRequestData.providers && updateDto.providers) {
+            payload.providers = {
+                ...lastRequestData.providers,
+                ...updateDto.providers,
+            };
+        }
+
+        const scopeOptions = { userId: user.id, directoryId };
+
+        // Validate selected providers before starting generation
+        await this.generatorFormSchemaService.validateSelectedProviders(
+            payload.providers,
+            scopeOptions,
+        );
+
+        // Validate data source plugins are configured
+        await this.generatorFormSchemaService.validateFormSchemaPlugins(scopeOptions);
+
+        // Process form config: separate pipeline config from per-plugin config
+        const processed = await this.generatorFormSchemaService.processFormConfig(
+            payload.providers?.pipeline,
+            payload.pluginConfig,
+            scopeOptions,
+        );
+        payload.pluginConfig = processed.config;
+        payload._processedPluginConfig = processed.pluginConfig;
+
         if (context.triggeredBy === 'schedule') {
             payload.config = {
                 ...payload.config,
@@ -390,39 +435,13 @@ export class DirectoryGenerationService {
     }
 
     async extractItemDetails(dto: ExtractItemDetailsDto): Promise<ExtractItemDetailsResponseDto> {
-        try {
-            const item = await this.itemsGeneratorService.extractItemDetailsFromUrl(
-                dto.source_url,
-                dto.existing_categories || [],
-            );
-
-            if (!item) {
-                throw new BadRequestException({
-                    status: 'error',
-                    source_url: dto.source_url,
-                    message: 'No item data could be extracted from the URL content',
-                });
-            }
-
-            return {
-                status: 'success',
-                item,
-                source_url: dto.source_url,
-                message: `Successfully extracted item details: "${item.name}"`,
-            };
-        } catch (error) {
-            if (error instanceof HttpException) {
-                throw error;
-            }
-
-            this.logger.error('Error extracting item details:', error);
-
-            throw new BadRequestException({
-                status: 'error',
-                source_url: dto.source_url,
-                message: normalizeGeneratorError(error),
-            });
-        }
+        // TODO: Implement using pipeline step executor for item extraction
+        // This method needs refactoring to use the plugin-based pipeline system
+        throw new BadRequestException({
+            status: 'error',
+            source_url: dto.source_url,
+            message: 'Item extraction is not yet implemented in the pipeline system',
+        });
     }
 
     async bulkCaptureImages(
@@ -479,22 +498,52 @@ export class DirectoryGenerationService {
                 };
             }
 
-            // Get domain type for routing
-            const domainType = (directory.domainType as DomainType) || DomainType.GENERAL;
+            // Check if screenshot facade is available
+            if (!this.screenshotFacade.isAvailable()) {
+                return {
+                    status: 'error',
+                    results: [],
+                    totalProcessed: 0,
+                    successCount: 0,
+                    errorCount: 0,
+                    message: 'Screenshot service is not available',
+                };
+            }
 
-            // Build bulk request
-            const bulkRequests: BulkImageRequest[] = itemsToProcess.map((item) => ({
-                url: item.source_url,
-                itemName: item.name,
-                itemSlug: item.slug,
-            }));
+            // Process items sequentially using facade
+            const bulkResults: BulkCaptureResultDto[] = [];
 
-            // Process bulk capture
-            const bulkResults = await this.smartImageRouterService.bulkGetSmartImages(
-                bulkRequests,
-                domainType,
-                user,
-            );
+            for (const item of itemsToProcess) {
+                try {
+                    const result = await this.screenshotFacade.capture(
+                        {
+                            url: item.source_url,
+                            blockAds: true,
+                            blockCookieBanners: true,
+                            cache: true,
+                        },
+                        {
+                            userId: user.id,
+                            directoryId: directory.id,
+                        },
+                    );
+
+                    bulkResults.push({
+                        itemSlug: item.slug,
+                        itemName: item.name,
+                        primaryImage: result.cacheUrl || result.imageUrl,
+                        source: 'screenshot',
+                    });
+                } catch (error) {
+                    bulkResults.push({
+                        itemSlug: item.slug,
+                        itemName: item.name,
+                        primaryImage: null,
+                        source: 'screenshot',
+                        error: error instanceof Error ? error.message : 'Unknown error',
+                    });
+                }
+            }
 
             // Calculate stats
             const successCount = bulkResults.filter((r) => r.primaryImage !== null).length;
@@ -686,12 +735,17 @@ export class DirectoryGenerationService {
             return this.runScheduledSync(directory, user, schedule);
         }
 
-        // Regular scheduled update (AI-powered generation)
+        const updateDto: UpdateItemsGeneratorDto = {
+            update_with_pull_request: schedule.alwaysCreatePullRequest ?? false,
+        };
+
+        if (schedule.providerOverrides) {
+            updateDto.providers = schedule.providerOverrides;
+        }
+
         return this.updateItemsGenerator({
             directoryId: schedule.directoryId,
-            updateDto: {
-                update_with_pull_request: schedule.alwaysCreatePullRequest ?? false,
-            },
+            updateDto,
             user,
             awaitCompletion: false,
             context: {
@@ -1040,114 +1094,25 @@ export class DirectoryGenerationService {
         };
     }
 
-    /**
-     * Detect account-level errors and notify the user
-     */
     private async handleErrorNotification(
         error: unknown,
         user: User,
         directory: Directory,
     ): Promise<void> {
-        if (!this.notificationOperations) {
+        if (!this.notificationService) {
             return;
         }
 
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const errorLower = errorMessage.toLowerCase();
+        const classification = classifyGenerationError(error);
 
-        // Detect AI credits/quota errors
-        if (this.isAiCreditsError(errorLower)) {
-            const provider = this.detectProvider(errorLower);
-            await this.notificationOperations.notifyAiCreditsDepleted(
-                user.id,
-                provider,
-                errorMessage,
-            );
-            return;
-        }
-
-        // Detect AI provider authentication/configuration errors
-        if (this.isAiProviderError(errorLower)) {
-            const provider = this.detectProvider(errorLower);
-            await this.notificationOperations.notifyAiProviderError(
-                user.id,
-                provider,
-                errorMessage,
-            );
-            return;
-        }
-
-        // Detect Git authentication errors
-        if (this.isGitAuthError(errorLower)) {
-            const provider = this.detectGitProvider(errorLower);
-            await this.notificationOperations.notifyGitAuthExpired(user.id, provider);
-            return;
-        }
-
-        // For other account-level errors (rate limits, configuration issues)
-        if (this.isAccountLevelError(errorLower)) {
-            await this.notificationOperations.notifyGenerationAccountError(
+        if (classification.type !== 'unknown') {
+            await notifyForClassifiedError(
+                this.notificationService,
                 user.id,
                 directory.id,
                 directory.name,
-                errorMessage,
+                classification,
             );
         }
-    }
-
-    private isAiCreditsError(error: string): boolean {
-        return (
-            error.includes('insufficient_quota') ||
-            error.includes('rate_limit') ||
-            error.includes('quota exceeded') ||
-            error.includes('credits') ||
-            error.includes('billing') ||
-            error.includes('exceeded your current quota')
-        );
-    }
-
-    private isAiProviderError(error: string): boolean {
-        return (
-            error.includes('invalid_api_key') ||
-            error.includes('authentication') ||
-            error.includes('unauthorized') ||
-            error.includes('api key')
-        );
-    }
-
-    private isGitAuthError(error: string): boolean {
-        return (
-            (error.includes('git') || error.includes('github') || error.includes('gitlab')) &&
-            (error.includes('authentication') ||
-                error.includes('unauthorized') ||
-                error.includes('token') ||
-                error.includes('expired') ||
-                error.includes('permission denied'))
-        );
-    }
-
-    private isAccountLevelError(error: string): boolean {
-        return (
-            error.includes('account') ||
-            error.includes('subscription') ||
-            error.includes('plan limit') ||
-            error.includes('not configured')
-        );
-    }
-
-    private detectProvider(error: string): string {
-        if (error.includes('openai')) return 'OpenAI';
-        if (error.includes('anthropic') || error.includes('claude')) return 'Anthropic';
-        if (error.includes('google') || error.includes('gemini')) return 'Google';
-        if (error.includes('groq')) return 'Groq';
-        if (error.includes('ollama')) return 'Ollama';
-        if (error.includes('openrouter')) return 'OpenRouter';
-        return 'AI Provider';
-    }
-
-    private detectGitProvider(error: string): string {
-        if (error.includes('gitlab')) return 'GitLab';
-        if (error.includes('bitbucket')) return 'Bitbucket';
-        return 'GitHub';
     }
 }

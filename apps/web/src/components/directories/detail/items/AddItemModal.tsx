@@ -15,9 +15,6 @@ interface AddItemModalProps {
     categories: string[];
     isOpen: boolean;
     onClose: () => void;
-    /** @deprecated Use onItemAdded instead for immediate list updates */
-    onSuccess?: () => void;
-    /** Callback when an item is successfully added, with the item data for immediate list update */
     onItemAdded?: (item: ItemData) => void;
 }
 
@@ -26,7 +23,6 @@ export const AddItemModal = memo(function AddItemModal({
     categories,
     isOpen,
     onClose,
-    onSuccess,
     onItemAdded,
 }: AddItemModalProps) {
     const t = useTranslations('dashboard.directoryDetail.items.addModal');
@@ -93,8 +89,6 @@ export const AddItemModal = memo(function AddItemModal({
                             onItemAdded(result.item);
                         }
 
-                        // Call legacy onSuccess for backward compatibility
-                        onSuccess?.();
                         onClose();
 
                         // Reset form
@@ -119,7 +113,7 @@ export const AddItemModal = memo(function AddItemModal({
                 }
             });
         },
-        [formData, directoryId, categories, onSuccess, onClose, onItemAdded, t, updateWithPR],
+        [formData, directoryId, categories, onClose, onItemAdded, t, updateWithPR],
     );
 
     return (

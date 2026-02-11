@@ -161,7 +161,7 @@ Turbo automatically handles build dependencies:
 
 - Entities in feature modules
 - Migrations: Manual or auto-sync (dev only)
-- Configuration in `@packages/agent/database`
+- Configuration in `@ever-works/agent/database`
 
 ## AI Integration
 
@@ -173,7 +173,7 @@ Turbo automatically handles build dependencies:
 
 ### LangChain
 
-- Agents in `@packages/agent`
+- Agents in `@ever-works/agent`
 - Streaming support for chat
 - Context management with LangGraph
 

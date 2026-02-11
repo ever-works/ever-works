@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { configure } from '@trigger.dev/sdk';
-import { config } from '@packages/agent/config';
+import { config } from '@ever-works/agent/config';
 import {
     DirectoryGenerationPayload,
     DirectoryGenerationDispatcher,
     DirectoryImportPayload,
     DirectoryImportDispatcher,
-} from '@packages/agent/tasks';
+} from '@ever-works/agent/tasks';
 import { directoryGenerationTask } from '../tasks/trigger/directory-generation.task';
 import { directoryImportTask } from '../tasks/trigger/directory-import.task';
 

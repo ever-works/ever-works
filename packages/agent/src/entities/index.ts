@@ -4,8 +4,6 @@ export * from './directory-member.entity';
 export * from './user.entity';
 export * from './refresh-token.entity';
 export * from './oauth-token.entity';
-export * from './chat-history.entity';
-export * from './chat-message.entity';
 export * from './directory-generation-history.entity';
 export * from './subscription-plan.entity';
 export * from './user-subscription.entity';

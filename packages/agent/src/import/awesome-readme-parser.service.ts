@@ -1,10 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { AiService, TaskComplexity } from '@src/ai';
-import { Category, ItemData, Tag } from '@src/items-generator/dto';
-import { slugifyText } from '@src/items-generator/utils/text.utils';
-import { accumulateMetrics, MetricsAccumulator } from '@src/items-generator/utils/metrics.util';
+import { AiFacadeService } from '../facades/ai.facade';
+import type { FacadeOptions } from '@ever-works/plugin';
+import type { Category, ItemData, Tag } from '@ever-works/contracts';
+import { slugifyText } from '@src/utils/text.utils';
+import { accumulateMetrics, MetricsAccumulator } from '@src/utils/metrics.util';
 
 const categorySchema = z.object({
     id: z.string().describe('URL-friendly ID for the category, lowercase with hyphens'),
@@ -46,7 +47,7 @@ export interface ParsedAwesomeData {
 }
 
 const CATEGORY_EXTRACTION_PROMPT =
-    `You are a structured data extractor. Your task is to analyze a GitHub Awesome List README and extract the category/section structure.
+    `You are a structured data extractor. Your task is to analyze an Awesome List README and extract the category/section structure.
 
 <readme_content>
 {content}
@@ -124,7 +125,7 @@ export class AwesomeReadmeParserService {
     private textSplitter: RecursiveCharacterTextSplitter;
     private categoryTextSplitter: RecursiveCharacterTextSplitter;
 
-    constructor(private readonly aiService: AiService) {
+    constructor(private readonly aiFacade: AiFacadeService) {
         this.textSplitter = new RecursiveCharacterTextSplitter({
             chunkSize: this.MAX_CHUNK_SIZE,
             chunkOverlap: this.CHUNK_OVERLAP,
@@ -138,7 +139,11 @@ export class AwesomeReadmeParserService {
         });
     }
 
-    async parseReadme(content: string): Promise<ParsedAwesomeData> {
+    async parseReadme(
+        content: string,
+        facadeOptions: FacadeOptions,
+        aiProviderOverride?: string,
+    ): Promise<ParsedAwesomeData> {
         const parseErrors: string[] = [];
         const metrics: MetricsAccumulator = {
             total_tokens_used: 0,
@@ -146,12 +151,16 @@ export class AwesomeReadmeParserService {
         };
         const overallStartTime = Date.now();
 
+        const effectiveFacadeOptions: FacadeOptions = aiProviderOverride
+            ? { ...facadeOptions, providerOverride: aiProviderOverride }
+            : facadeOptions;
+
         this.logger.log(`[Import] Parsing README (${content.length} chars)`);
         this.logger.log(`[Import] Step 1/3: Extracting categories...`);
 
         let categories: Category[];
         try {
-            categories = await this.extractCategories(content, metrics);
+            categories = await this.extractCategories(content, metrics, effectiveFacadeOptions);
             this.logger.log(`[Import] Step 1/3 complete: Found ${categories.length} categories`);
         } catch (error) {
             this.logger.error('[Import] Category extraction failed, using fallback', error);
@@ -176,6 +185,7 @@ export class AwesomeReadmeParserService {
                     section.categoryName,
                     section.categoryId,
                     metrics,
+                    effectiveFacadeOptions,
                 );
                 allItems.push(...items);
                 this.logger.log(
@@ -228,10 +238,15 @@ export class AwesomeReadmeParserService {
     private async extractCategories(
         content: string,
         metrics: MetricsAccumulator,
+        facadeOptions: FacadeOptions,
     ): Promise<Category[]> {
         if (content.length <= this.CATEGORY_CHUNK_SIZE) {
             this.logger.log(`[Import] Content fits in single chunk, extracting categories...`);
-            const categories = await this.extractCategoriesFromChunk(content, metrics);
+            const categories = await this.extractCategoriesFromChunk(
+                content,
+                metrics,
+                facadeOptions,
+            );
             this.logger.log(`[Import] Extracted ${categories.length} categories from single chunk`);
             return categories;
         }
@@ -249,7 +264,11 @@ export class AwesomeReadmeParserService {
                 `[Import] Processing category chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)...`,
             );
             try {
-                const chunkCategories = await this.extractCategoriesFromChunk(chunks[i], metrics);
+                const chunkCategories = await this.extractCategoriesFromChunk(
+                    chunks[i],
+                    metrics,
+                    facadeOptions,
+                );
                 let newCount = 0;
                 for (const cat of chunkCategories) {
                     if (!seenIds.has(cat.id)) {
@@ -279,21 +298,23 @@ export class AwesomeReadmeParserService {
     private async extractCategoriesFromChunk(
         content: string,
         metrics: MetricsAccumulator,
+        facadeOptions: FacadeOptions,
     ): Promise<Category[]> {
         this.logger.log(`[Import] AI call: extracting categories from chunk...`);
         const startTime = Date.now();
 
-        const { result, usage, cost } = await this.aiService.askJson(
+        const { result, usage, cost } = await this.aiFacade.askJson(
             CATEGORY_EXTRACTION_PROMPT,
             extractedCategoriesSchema,
             {
                 variables: { content },
                 temperature: 0.1,
                 routing: {
-                    complexity: TaskComplexity.MEDIUM,
+                    complexity: 'medium',
                     taskId: 'awesome-category-extraction',
                 },
             },
+            facadeOptions,
         );
 
         const duration = Date.now() - startTime;
@@ -398,6 +419,7 @@ export class AwesomeReadmeParserService {
         categoryName: string,
         categoryId: string,
         metrics: MetricsAccumulator,
+        facadeOptions: FacadeOptions,
     ): Promise<ItemData[]> {
         const extractedItems: ItemData[] = [];
 
@@ -413,17 +435,18 @@ export class AwesomeReadmeParserService {
                 );
                 const startTime = Date.now();
                 try {
-                    const { result, usage, cost } = await this.aiService.askJson(
+                    const { result, usage, cost } = await this.aiFacade.askJson(
                         ITEM_EXTRACTION_PROMPT,
                         extractedItemsSchema,
                         {
                             variables: { categoryName, categoryId, sectionContent: chunks[i] },
                             temperature: 0.1,
                             routing: {
-                                complexity: TaskComplexity.MEDIUM,
+                                complexity: 'medium',
                                 taskId: 'awesome-item-extraction-chunk',
                             },
                         },
+                        facadeOptions,
                     );
 
                     const duration = Date.now() - startTime;
@@ -452,17 +475,18 @@ export class AwesomeReadmeParserService {
             this.logger.log(`[Import] AI call: extracting items from "${categoryName}"...`);
             const startTime = Date.now();
 
-            const { result, usage, cost } = await this.aiService.askJson(
+            const { result, usage, cost } = await this.aiFacade.askJson(
                 ITEM_EXTRACTION_PROMPT,
                 extractedItemsSchema,
                 {
                     variables: { categoryName, categoryId, sectionContent },
                     temperature: 0.1,
                     routing: {
-                        complexity: TaskComplexity.MEDIUM,
+                        complexity: 'medium',
                         taskId: 'awesome-item-extraction',
                     },
                 },
+                facadeOptions,
             );
 
             const duration = Date.now() - startTime;
@@ -524,7 +548,11 @@ export class AwesomeReadmeParserService {
                 if (item.tags && Array.isArray(item.tags)) {
                     const existingTags = (existing.tags || []) as string[];
                     const newTags = item.tags as string[];
-                    existing.tags = [...new Set([...existingTags, ...newTags])];
+                    const mergedItem: ItemData = {
+                        ...existing,
+                        tags: [...new Set([...existingTags, ...newTags])],
+                    };
+                    seen.set(key, mergedItem);
                 }
             }
         }

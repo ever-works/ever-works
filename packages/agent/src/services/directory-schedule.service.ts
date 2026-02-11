@@ -1,6 +1,5 @@
 import {
     BadRequestException,
-    Inject,
     Injectable,
     Logger,
     NotFoundException,
@@ -24,14 +23,14 @@ import {
     DirectoryScheduleStatus,
     GenerateStatusType,
 } from '@src/entities/types';
+import type { ProvidersDto } from '@ever-works/contracts/api';
+import { SELECTABLE_PROVIDER_CATEGORIES } from '@ever-works/plugin';
 import { UsageLedgerService } from '@src/subscriptions/usage-ledger.service';
 import { UsageLedgerTriggerType } from '@src/entities/usage-ledger-entry.entity';
-import { DataGeneratorService } from '@src/data-generator/data-generator.service';
+import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
+import { PluginRegistryService } from '@src/plugins/services/plugin-registry.service';
 import { Directory } from '@src/entities/directory.entity';
-import {
-    NOTIFICATION_OPERATIONS,
-    NotificationOperations,
-} from '@src/notification-operations/notification-operations.interface';
+import { NotificationService } from '@src/notifications/notification.service';
 
 @Injectable()
 export class DirectoryScheduleService {
@@ -45,9 +44,9 @@ export class DirectoryScheduleService {
         private readonly subscriptionService: SubscriptionService,
         private readonly usageLedgerService: UsageLedgerService,
         private readonly dataGeneratorService: DataGeneratorService,
+        private readonly pluginRegistry: PluginRegistryService,
         @Optional()
-        @Inject(NOTIFICATION_OPERATIONS)
-        private readonly notificationOperations?: NotificationOperations,
+        private readonly notificationService?: NotificationService,
     ) {}
 
     async getSchedule(
@@ -133,6 +132,15 @@ export class DirectoryScheduleService {
         const alwaysCreatePullRequest =
             dto.alwaysCreatePullRequest ?? existing?.alwaysCreatePullRequest ?? false;
 
+        const providerOverrides =
+            dto.providerOverrides !== undefined
+                ? dto.providerOverrides
+                : (existing?.providerOverrides ?? null);
+
+        if (providerOverrides) {
+            this.validateProviderOverrides(providerOverrides);
+        }
+
         const creatingOrActivating =
             enable && (!existing || existing.status !== DirectoryScheduleStatus.ACTIVE);
 
@@ -165,6 +173,7 @@ export class DirectoryScheduleService {
             status,
             maxFailureBeforePause,
             alwaysCreatePullRequest,
+            providerOverrides,
             nextRunAt,
         });
 
@@ -190,6 +199,7 @@ export class DirectoryScheduleService {
             nextRunAt: null,
             billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
             alwaysCreatePullRequest: false,
+            providerOverrides: null,
         });
 
         await this.syncDirectory(directory.id, updated);
@@ -336,8 +346,8 @@ export class DirectoryScheduleService {
 
             // Publish notification for schedule paused due to failures
             const directory = await this.directoryRepository.findById(schedule.directoryId);
-            if (directory && this.notificationOperations) {
-                await this.notificationOperations.notifySchedulePaused(
+            if (directory && this.notificationService) {
+                await this.notificationService.notifySchedulePaused(
                     schedule.userId,
                     schedule.directoryId,
                     directory.name,
@@ -400,8 +410,8 @@ export class DirectoryScheduleService {
 
             // Publish notification for schedule paused due to plan limit
             const directory = await this.directoryRepository.findById(schedule.directoryId);
-            if (directory && this.notificationOperations) {
-                await this.notificationOperations.notifySchedulePaused(
+            if (directory && this.notificationService) {
+                await this.notificationService.notifySchedulePaused(
                     schedule.userId,
                     schedule.directoryId,
                     directory.name,
@@ -483,6 +493,7 @@ export class DirectoryScheduleService {
             allowedCadences: allowances,
             planCode: subscriptionsEnabled ? planCode : undefined,
             subscriptionsEnabled,
+            providerOverrides: schedule?.providerOverrides ?? null,
         };
     }
 
@@ -524,6 +535,28 @@ export class DirectoryScheduleService {
                 status: 'error',
                 message: 'Complete an initial directory setup before enabling scheduled updates.',
             });
+        }
+    }
+
+    private validateProviderOverrides(overrides: ProvidersDto): void {
+        const dtoFields = Object.entries(SELECTABLE_PROVIDER_CATEGORIES).map(([key, def]) =>
+            key === 'fullPipeline' ? 'pipeline' : def.uiKey,
+        );
+        for (const field of dtoFields) {
+            const pluginId = overrides[field as keyof ProvidersDto];
+            if (pluginId) {
+                const registered = this.pluginRegistry.get(pluginId);
+                if (!registered) {
+                    throw new BadRequestException(
+                        `Provider plugin "${pluginId}" for ${field} is not installed`,
+                    );
+                }
+                if (registered.state !== 'loaded') {
+                    throw new BadRequestException(
+                        `Provider plugin "${pluginId}" for ${field} is not enabled`,
+                    );
+                }
+            }
         }
     }
 

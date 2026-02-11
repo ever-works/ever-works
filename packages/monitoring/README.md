@@ -1,4 +1,4 @@
-# @packages/monitoring
+# @ever-works/monitoring
 
 A comprehensive monitoring package for NestJS applications that provides seamless integration with **Sentry** for error tracking and **PostHog** for analytics and user behavior tracking.
 
@@ -17,13 +17,13 @@ A comprehensive monitoring package for NestJS applications that provides seamles
 
 ```bash
 # Using pnpm (recommended)
-pnpm add @packages/monitoring
+pnpm add @ever-works/monitoring
 
 # Using npm
-npm install @packages/monitoring
+npm install @ever-works/monitoring
 
 # Using yarn
-yarn add @packages/monitoring
+yarn add @ever-works/monitoring
 ```
 
 ## 🚀 Quick Start
@@ -46,7 +46,7 @@ POSTHOG_HOST=https://app.posthog.com
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { MonitoringModule } from '@packages/monitoring';
+import { MonitoringModule } from '@ever-works/monitoring';
 
 @Module({
     imports: [
@@ -71,7 +71,7 @@ export class AppModule {}
 ```typescript
 import { Module } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { MonitoringModule, SentryInterceptor, PostHogInterceptor } from '@packages/monitoring';
+import { MonitoringModule, SentryInterceptor, PostHogInterceptor } from '@ever-works/monitoring';
 
 @Module({
     imports: [MonitoringModule.forRoot()],
@@ -94,7 +94,7 @@ export class AppModule {}
 ### Full Configuration Options
 
 ```typescript
-import { MonitoringModule } from '@packages/monitoring';
+import { MonitoringModule } from '@ever-works/monitoring';
 
 @Module({
     imports: [
@@ -127,7 +127,7 @@ export class AppModule {}
 #### Sentry Only
 
 ```typescript
-import { SentryModule } from '@packages/monitoring/sentry';
+import { SentryModule } from '@ever-works/monitoring/sentry';
 
 @Module({
     imports: [
@@ -144,7 +144,7 @@ export class AppModule {}
 #### PostHog Only
 
 ```typescript
-import { PostHogModule } from '@packages/monitoring/posthog';
+import { PostHogModule } from '@ever-works/monitoring/posthog';
 
 @Module({
     imports: [
@@ -165,7 +165,7 @@ The `AnalyticsService` provides a clean API for tracking custom events:
 
 ```typescript
 import { Controller, Get } from '@nestjs/common';
-import { AnalyticsService } from '@packages/monitoring';
+import { AnalyticsService } from '@ever-works/monitoring';
 
 @Controller('api')
 export class ApiController {
@@ -207,7 +207,7 @@ Sentry Logs allow you to send structured logs to Sentry, providing valuable cont
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { SentryService } from '@packages/monitoring';
+import { SentryService } from '@ever-works/monitoring';
 
 @Injectable()
 export class UserService {
@@ -254,7 +254,7 @@ export class UserService {
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { SentryService } from '@packages/monitoring';
+import { SentryService } from '@ever-works/monitoring';
 
 @Injectable()
 export class UserService {
@@ -286,7 +286,7 @@ export class UserService {
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { PostHogService } from '@packages/monitoring/posthog';
+import { PostHogService } from '@ever-works/monitoring/posthog';
 
 @Injectable()
 export class EventService {
@@ -313,7 +313,7 @@ Automatically captures and reports errors:
 
 ```typescript
 import { Controller, Get, UseInterceptors } from '@nestjs/common';
-import { SentryInterceptor } from '@packages/monitoring/interceptors';
+import { SentryInterceptor } from '@ever-works/monitoring/interceptors';
 
 @Controller('api')
 @UseInterceptors(SentryInterceptor)
@@ -332,7 +332,7 @@ Automatically tracks API requests:
 
 ```typescript
 import { Controller, Get, UseInterceptors } from '@nestjs/common';
-import { PostHogInterceptor } from '@packages/monitoring/interceptors';
+import { PostHogInterceptor } from '@ever-works/monitoring/interceptors';
 
 @Controller('api')
 @UseInterceptors(PostHogInterceptor)
@@ -360,7 +360,7 @@ import {
     AuthEvent,
     BusinessEvent,
     MonitoringModuleOptions,
-} from '@packages/monitoring/types';
+} from '@ever-works/monitoring/types';
 
 // Example usage with types
 const config: MonitoringConfig = {

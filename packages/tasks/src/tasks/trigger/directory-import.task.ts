@@ -2,14 +2,19 @@ import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
 import { INestApplicationContext } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
-import { TriggerWorkerModule } from '../../trigger/trigger-worker.module';
-import { TriggerInternalApiClient } from '../../trigger/trigger-internal-api.client';
-import { TriggerImportOrchestrator } from '../../trigger/trigger-import.orchestrator';
-import { DirectoryImportPayload } from '@packages/agent/tasks';
-import { Directory, User, GenerateStatusType } from '@packages/agent/entities';
-import { TriggerLogger } from '../../trigger/trigger-logger';
+import { TriggerWorkerModule } from '../../trigger/worker/modules/trigger-worker.module';
+import { TriggerInternalApiClient } from '../../trigger/worker/services/trigger-internal-api.client';
+import { TriggerImportOrchestrator } from '../../trigger/worker/orchestrators/trigger-import.orchestrator';
+import { TriggerPluginHydratorService } from '../../trigger/worker/services/trigger-plugin-hydrator.service';
+import { DirectoryImportPayload } from '@ever-works/agent/tasks';
+import { Directory, User } from '@ever-works/agent/entities';
+import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
 async function createContext(appContext: INestApplicationContext, payload: DirectoryImportPayload) {
+    // Initialize plugin system with remote settings
+    const hydrator = appContext.get(TriggerPluginHydratorService);
+    await hydrator.initialize();
+
     const apiClient = appContext.get(TriggerInternalApiClient);
     const context = await apiClient.fetchDirectoryContext(payload.directoryId, payload.userId);
 
@@ -24,6 +29,7 @@ async function createContext(appContext: INestApplicationContext, payload: Direc
         user,
         directory,
         orchestrator,
+        gitToken: context.gitToken,
     };
 }
 
@@ -36,7 +42,7 @@ export const directoryImportTask = task({
         }
 
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: new TriggerLogger('DirectoryImport:Cancel'),
+            logger: createTriggerLogger('DirectoryImport:Cancel'),
         });
 
         try {
@@ -53,16 +59,20 @@ export const directoryImportTask = task({
     },
     run: async (payload: DirectoryImportPayload) => {
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: new TriggerLogger('DirectoryImport'),
+            logger: createTriggerLogger('DirectoryImport'),
         });
 
         try {
-            const { orchestrator, directory, user } = await createContext(appContext, payload);
+            const { orchestrator, directory, user, gitToken } = await createContext(
+                appContext,
+                payload,
+            );
 
             await orchestrator.run({
                 directory,
                 user,
                 payload,
+                gitToken,
             });
 
             return {

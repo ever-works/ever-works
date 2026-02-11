@@ -1,31 +1,49 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils/cn';
 import { DirectoryAICreator } from '@/components/directories/DirectoryAICreator';
 import { DirectoryManualForm } from '@/components/directories/DirectoryManualForm';
 import { DirectoryImportForm } from '@/components/directories/DirectoryImportForm';
-import { GitHubConnectionAlert } from './github-connection-alert';
-import { GitHubStatusSidebar } from './github-status-sidebar';
+import { GitProviderSelector } from './git-provider-selector';
+import { DeployProviderSelector, type DeployProvider } from './deploy-provider-selector';
 import { useTranslations } from 'next-intl';
-import { ConnectionInfo } from '@/lib/api';
+import type { ProviderWithConnection } from './page';
 
 interface NewDirectoryClientProps {
     user: AuthUser;
-    githubConnection: ConnectionInfo | null;
+    providers: ProviderWithConnection[];
+    defaultProviderId: string | null;
+    deployProviders: DeployProvider[];
+    defaultDeployProviderId: string | null;
 }
 
-export default function NewDirectoryClient({ user, githubConnection }: NewDirectoryClientProps) {
+export default function NewDirectoryClient({
+    user,
+    providers,
+    defaultProviderId,
+    deployProviders,
+    defaultDeployProviderId,
+}: NewDirectoryClientProps) {
     const [creationMode, setCreationMode] = useState<'ai' | 'manual' | 'import' | null>(null);
+    const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
+        defaultProviderId || providers[0]?.provider.id || null,
+    );
+    const [selectedDeployProviderId, setSelectedDeployProviderId] = useState<string | null>(
+        defaultDeployProviderId || deployProviders[0]?.id || null,
+    );
     const t = useTranslations('dashboard.directoryCreation');
+
+    const gitConnected = useMemo(() => {
+        if (!selectedProviderId) return false;
+        const selected = providers.find((p) => p.provider.id === selectedProviderId);
+        return selected?.connectionInfo?.connected ?? false;
+    }, [selectedProviderId, providers]);
 
     if (creationMode === null) {
         return (
             <div className="w-full">
-                {/* GitHub Connection Alert */}
-                <GitHubConnectionAlert githubConnected={!!githubConnection?.connected} />
-
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-text dark:text-text-dark">
                         {t('title')}
@@ -237,13 +255,65 @@ export default function NewDirectoryClient({ user, githubConnection }: NewDirect
                     </button>
                 </div>
 
-                {creationMode === 'ai' && <DirectoryAICreator user={user} />}
-                {creationMode === 'manual' && <DirectoryManualForm user={user} />}
-                {creationMode === 'import' && <DirectoryImportForm user={user} />}
+                {creationMode === 'ai' && (
+                    <DirectoryAICreator
+                        gitProvider={selectedProviderId || undefined}
+                        gitConnected={gitConnected}
+                        deployProvider={selectedDeployProviderId || undefined}
+                    />
+                )}
+                {creationMode === 'manual' && (
+                    <DirectoryManualForm
+                        user={user}
+                        gitProvider={selectedProviderId || undefined}
+                        gitConnected={gitConnected}
+                        deployProvider={selectedDeployProviderId || undefined}
+                    />
+                )}
+                {creationMode === 'import' && (
+                    <DirectoryImportForm
+                        user={user}
+                        gitProvider={selectedProviderId || undefined}
+                        deployProvider={selectedDeployProviderId || undefined}
+                    />
+                )}
             </div>
 
-            {/* GitHub Status Sidebar */}
-            <GitHubStatusSidebar user={user} githubConnection={githubConnection} />
+            {/* Git Provider Selector Sidebar */}
+            <aside className="w-80 shrink-0">
+                <div
+                    className={cn(
+                        'sticky top-8 p-6 rounded-lg space-y-6',
+                        'bg-card dark:bg-card-dark',
+                        'border border-card-border dark:border-card-border-dark',
+                    )}
+                >
+                    <div>
+                        <h3 className="font-medium text-text dark:text-text-dark mb-4">
+                            {t('sidebar.selectedProvider')}
+                        </h3>
+                        <GitProviderSelector
+                            providers={providers}
+                            selectedProviderId={selectedProviderId}
+                            onSelect={setSelectedProviderId}
+                            compact
+                        />
+                    </div>
+                    {deployProviders.length > 0 && (
+                        <div>
+                            <h3 className="font-medium text-text dark:text-text-dark mb-4">
+                                {t('sidebar.selectedDeployProvider')}
+                            </h3>
+                            <DeployProviderSelector
+                                providers={deployProviders}
+                                selectedProviderId={selectedDeployProviderId}
+                                onSelect={setSelectedDeployProviderId}
+                                compact
+                            />
+                        </div>
+                    )}
+                </div>
+            </aside>
         </div>
     );
 }

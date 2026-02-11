@@ -9,18 +9,18 @@ import {
     UserRepository,
     RefreshTokenRepository,
     OAuthTokenRepository,
-} from '@packages/agent/database';
+} from '@ever-works/agent/database';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto, UpdatePasswordDto } from '../dto/auth.dto';
 import { randomBytes, randomUUID } from 'crypto';
 import { jwtConstants, authConstants, AuthProvider, config } from '../../config/constants';
-import { User } from '@packages/agent/entities';
+import { User } from '@ever-works/agent/entities';
 import { JwtPayload, TokenResponse } from '../types/jwt.types';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserCreatedEvent, UserForgotPasswordEvent } from '../../events';
 import { ForgotPasswordDto } from '../dto/email-verification.dto';
-import { GitHubScopePresets } from '../config/github-scopes.config';
+import { GITHUB_SCOPES } from '../config/github-scopes.config';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 
 @Injectable()
@@ -195,7 +195,7 @@ export class AuthService {
             accessToken: accessToken,
             refreshToken: refreshToken,
             tokenType: 'Bearer',
-            scope: profile._json?.scope || GitHubScopePresets.AGENT.join(' '),
+            scope: profile._json?.scope || GITHUB_SCOPES.join(' '),
             metadata: {
                 login: profile._json?.login || profile.username,
                 nodeId: profile._json?.node_id,
@@ -430,16 +430,15 @@ export class AuthService {
             emailVerificationExpires,
             passwordResetToken,
             passwordResetExpires,
-            oauthTokens,
             ...userProfile
         } = user;
 
-        // Add connected providers info
-        const connectedProviders =
-            oauthTokens?.map((token) => ({
-                provider: token.provider,
-                createdAt: token.createdAt,
-            })) || [];
+        // Get connected providers from OAuth tokens
+        const oauthTokens = await this.oauthTokenRepository.findByUserId(userId);
+        const connectedProviders = oauthTokens.map((token) => ({
+            provider: token.provider,
+            createdAt: token.createdAt,
+        }));
 
         return {
             ...userProfile,
@@ -461,10 +460,6 @@ export class AuthService {
         await this.userRepository.update(userId, {
             ...(isNotNull(updateData.username) && { username: updateData.username }),
             ...(isNotNull(updateData.avatar) && { avatar: updateData.avatar }),
-            ...(isNotNull(updateData.vercelToken) && { vercelToken: updateData.vercelToken }),
-            ...(isNotNull(updateData.screenshotoneAccessKey) && {
-                screenshotoneAccessKey: updateData.screenshotoneAccessKey,
-            }),
         });
 
         // Return updated profile

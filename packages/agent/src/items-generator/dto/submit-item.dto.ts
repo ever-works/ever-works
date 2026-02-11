@@ -10,8 +10,9 @@ import {
     ValidateIf,
     ArrayMinSize,
 } from 'class-validator';
+import type { SubmitItemDto as ISubmitItemDto } from '@ever-works/contracts/api';
 
-export class SubmitItemDto {
+export class SubmitItemDto implements ISubmitItemDto {
     @IsString()
     @IsNotEmpty()
     name: string;

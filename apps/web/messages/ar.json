@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "الإشعارات",
                 "empty": "لا توجد إشعارات جديدة"
+            },
+            "help": {
+                "title": "المساعدة والموارد",
+                "subtitle": "نصائح سريعة وروابط مفيدة",
+                "quickTips": {
+                    "title": "نصائح سريعة",
+                    "tip1": "استخدم الدردشة الذكية لإنشاء الدلائل باللغة الطبيعية",
+                    "tip2": "استورد القوائم الرائعة أو مستودعات البيانات الموجودة",
+                    "tip3": "خصص مظهر دليلك في الإعدادات"
+                },
+                "shortcuts": {
+                    "title": "اختصارات لوحة المفاتيح",
+                    "search": "بحث",
+                    "newDirectory": "دليل جديد",
+                    "help": "مساعدة",
+                    "hint": "اضغط ? في أي مكان لرؤية جميع الاختصارات"
+                },
+                "links": {
+                    "title": "روابط مفيدة",
+                    "github": "مستودع GitHub",
+                    "issues": "الإبلاغ عن مشكلة",
+                    "docs": "التوثيق",
+                    "comingSoon": "قريباً"
+                },
+                "version": "الإصدار {version}"
             }
         },
         "directories": {
@@ -328,13 +353,16 @@
                     "actions": {
                         "connect": "اتصال",
                         "disconnect": "قطع الاتصال",
-                        "confirmDisconnect": "هل أنت متأكد أنك تريد قطع اتصال حساب GitHub الخاص بك؟"
+                        "confirmDisconnect": "هل أنت متأكد أنك تريد قطع اتصال حساب GitHub الخاص بك؟",
+                        "reconnect": "إعادة الاتصال"
                     },
                     "messages": {
                         "disconnected": "تم قطع اتصال حساب GitHub",
                         "connectError": "فشل الاتصال بـ GitHub",
                         "disconnectError": "فشل قطع الاتصال بـ GitHub"
-                    }
+                    },
+                    "organizations": "المنظمات المتصلة",
+                    "organizationsHint": "استخدم إعادة الاتصال لمنح الوصول إلى منظمات إضافية"
                 }
             }
         },
@@ -525,7 +553,7 @@
                 "dataRepo": "مستودع البيانات",
                 "websiteRepo": "مستودع الموقع",
                 "mainRepo": "المستودع الرئيسي",
-                "repoProvider": "مزود المستودع",
+                "gitProvider": "مزود Git",
                 "organization": "المنظمة",
                 "created": "تم الإنشاء",
                 "lastUpdated": "آخر تحديث",
@@ -534,7 +562,11 @@
                 "custom": "مخصص",
                 "customOverwrite": "مخصص (الكتابة فوق)",
                 "yes": "نعم",
-                "no": "لا"
+                "no": "لا",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "تفاصيل التكوين",
@@ -624,7 +656,21 @@
                         "invalidUrl": "يرجى إدخال رابط صالح يتضمن http:// أو https://",
                         "requiredFields": "يرجى ملء جميع الحقول المطلوبة",
                         "invalidImageUrl": "يرجى إدخال رابط صورة صالح"
-                    }
+                    },
+                    "categories": "الفئات",
+                    "existingCategories": "اختر من الموجود",
+                    "addNewCategory": "أو أضف فئة جديدة",
+                    "categoryPlaceholder": "ابحث أو أنشئ فئة...",
+                    "addMoreCategories": "أضف المزيد...",
+                    "createCategory": "إنشاء",
+                    "noMatchingCategories": "لا توجد فئات مطابقة",
+                    "noCategories": "لا توجد فئات بعد. اكتب لإنشاء واحدة.",
+                    "categoriesRequired": "اختر فئة واحدة على الأقل",
+                    "captureScreenshot": "التقاط صورة الشاشة",
+                    "captureScreenshotHelp": "التقاط تلقائي لصورة الشاشة من رابط المصدر",
+                    "screenshotSuccess": "تم التقاط صورة الشاشة بنجاح",
+                    "screenshotFailed": "فشل التقاط صورة الشاشة",
+                    "screenshotError": "حدث خطأ أثناء التقاط صورة الشاشة"
                 },
                 "updateSuccess": "تم حذف العنصر بنجاح",
                 "updateFailed": "فشل حذف العنصر",
@@ -639,7 +685,108 @@
                 "createPRHelp": "إذا تم التفعيل، يتم اقتراح التغييرات عبر طلب سحب بدلاً من الالتزام المباشر.",
                 "reasonLabel": "السبب (اختياري)",
                 "reasonPlaceholder": "لماذا تزيل هذا العنصر؟",
-                "confirmDelete": "حذف العنصر"
+                "confirmDelete": "حذف العنصر",
+                "captureScreenshot": "التقاط صورة الشاشة",
+                "screenshot": {
+                    "noSourceUrl": "لا يوجد رابط مصدر لهذا العنصر",
+                    "success": "تم التقاط صورة الشاشة بنجاح",
+                    "failed": "فشل التقاط صورة الشاشة",
+                    "error": "حدث خطأ أثناء التقاط صورة الشاشة",
+                    "notConfigured": "خدمة صورة الشاشة غير مهيأة. أضف مفتاح API الخاص بـ ScreenshotOne في الإعدادات.",
+                    "captureFailed": "فشل التقاط الصورة",
+                    "captureSuccess": "تم التقاط الصورة بنجاح",
+                    "captureError": "حدث خطأ أثناء التقاط الصورة",
+                    "bulkCaptureComplete": "اكتمل التقاط الصور المجمع",
+                    "bulkCaptureError": "حدث خطأ أثناء التقاط الصور المجمع"
+                },
+                "tabs": {
+                    "browseItems": "تصفح العناصر",
+                    "categories": "الفئات",
+                    "tags": "الوسوم"
+                },
+                "taxonomy": {
+                    "categories": {
+                        "searchPlaceholder": "بحث في الفئات...",
+                        "add": "إضافة فئة",
+                        "addFirst": "إضافة الفئة الأولى",
+                        "showing": "عرض {current} من {total} فئة",
+                        "empty": "لا توجد فئات بعد",
+                        "noMatch": "لا توجد فئات مطابقة",
+                        "columns": {
+                            "name": "الاسم",
+                            "description": "الوصف",
+                            "items": "العناصر",
+                            "priority": "الأولوية",
+                            "actions": "الإجراءات"
+                        },
+                        "createSuccess": "تم إنشاء الفئة بنجاح",
+                        "createFailed": "فشل إنشاء الفئة",
+                        "updateSuccess": "تم تحديث الفئة بنجاح",
+                        "updateFailed": "فشل تحديث الفئة",
+                        "deleteSuccess": "تم حذف الفئة بنجاح",
+                        "deleteFailed": "فشل حذف الفئة",
+                        "deleteConfirm": "هل أنت متأكد من حذف \"{name}\"؟",
+                        "deleteHasItems": "لا يمكن حذف فئة تحتوي على {count} عنصر",
+                        "modal": {
+                            "createTitle": "إنشاء فئة",
+                            "editTitle": "تعديل الفئة",
+                            "name": "الاسم",
+                            "namePlaceholder": "مثال: أدوات المراقبة",
+                            "description": "الوصف",
+                            "descriptionPlaceholder": "وصف مختصر لهذه الفئة",
+                            "iconUrl": "رابط الأيقونة",
+                            "iconUrlPlaceholder": "https://example.com/icon.png",
+                            "iconUrlHelp": "رابط اختياري لصورة الأيقونة",
+                            "priority": "الأولوية",
+                            "priorityPlaceholder": "مثال: 1",
+                            "priorityHelp": "الأرقام الأقل تظهر أولاً",
+                            "cancel": "إلغاء",
+                            "save": "حفظ",
+                            "create": "إنشاء",
+                            "saving": "جاري الحفظ...",
+                            "errors": {
+                                "nameRequired": "اسم الفئة مطلوب",
+                                "nameExists": "توجد فئة بهذا الاسم"
+                            }
+                        }
+                    },
+                    "tags": {
+                        "searchPlaceholder": "بحث في الوسوم...",
+                        "add": "إضافة وسم",
+                        "addFirst": "إضافة الوسم الأول",
+                        "showing": "عرض {current} من {total} وسم",
+                        "empty": "لا توجد وسوم بعد",
+                        "noMatch": "لا توجد وسوم مطابقة",
+                        "columns": {
+                            "name": "الاسم",
+                            "items": "العناصر",
+                            "actions": "الإجراءات"
+                        },
+                        "createSuccess": "تم إنشاء الوسم بنجاح",
+                        "createFailed": "فشل إنشاء الوسم",
+                        "updateSuccess": "تم تحديث الوسم بنجاح",
+                        "updateFailed": "فشل تحديث الوسم",
+                        "deleteSuccess": "تم حذف الوسم بنجاح",
+                        "deleteFailed": "فشل حذف الوسم",
+                        "deleteConfirm": "هل أنت متأكد من حذف \"{name}\"؟",
+                        "deleteHasItems": "لا يمكن حذف وسم يحتوي على {count} عنصر",
+                        "modal": {
+                            "createTitle": "إنشاء وسم",
+                            "editTitle": "تعديل الوسم",
+                            "name": "الاسم",
+                            "namePlaceholder": "مثال: مفتوح-المصدر",
+                            "nameHelp": "استخدم الأحرف الصغيرة مع الشرطات",
+                            "cancel": "إلغاء",
+                            "save": "حفظ",
+                            "create": "إنشاء",
+                            "saving": "جاري الحفظ...",
+                            "errors": {
+                                "nameRequired": "اسم الوسم مطلوب",
+                                "nameExists": "يوجد وسم بهذا الاسم"
+                            }
+                        }
+                    }
+                }
             },
             "generator": {
                 "regenerationWarning": "تحذير إعادة الإنشاء",
@@ -710,7 +857,35 @@
                 "recreateConfirmDescription": "إعادة الإنشاء ستحذف العناصر الموجودة وتعيد إنشاءها من الصفر. لا يمكن التراجع عن هذا الإجراء.",
                 "confirmRecreate": "نعم، أعد الإنشاء",
                 "recreateInlineTitle": "إعادة الإنشاء ستزيل العناصر الموجودة",
-                "recreateInlineDescription": "هذا الوضع يحذف العناصر الحالية ويعيد بناءها من الصفر. تابع فقط إذا كنت تريد استبدال كل شيء."
+                "recreateInlineDescription": "هذا الوضع يحذف العناصر الحالية ويعيد بناءها من الصفر. تابع فقط إذا كنت تريد استبدال كل شيء.",
+                "captureScreenshots": "التقاط صور العناصر",
+                "captureScreenshotsDescription": "التقاط تلقائي للصور لكل عنصر أثناء التوليد",
+                "companyNameDescription": "يستخدم لتخصيص المحتوى بهوية علامتك التجارية.",
+                "companyWebsiteDescription": "سيحلل الذكاء الاصطناعي موقعك لفهم سياق علامتك.",
+                "initialCategoriesDescription": "فئات بذرية لتنظيم العناصر.",
+                "priorityCategoriesDescription": "الفئات التي ستظهر أولاً في المخرجات.",
+                "targetKeywordsDescription": "الكلمات المفتاحية لتوجيه البحث وتوليد المحتوى.",
+                "sourceUrlsFieldDescription": "روابط محددة لاستخراج المحتوى منها.",
+                "generationMethodDescription": "اختر تحديث العناصر الموجودة أو إعادة الإنشاء.",
+                "websiteRepositoryCreationMethodDescription": "كيفية إنشاء مستودع الموقع.",
+                "maxSearchQueriesDescription": "عدد استعلامات البحث (1-50).",
+                "resultsPerQueryDescription": "الحد الأقصى للنتائج لكل استعلام (1-20).",
+                "maxPagesToProcessDescription": "الحد الأقصى لصفحات الويب للمعالجة (1-100).",
+                "relevanceThresholdDescription": "الحد الأدنى لدرجة الصلة (0-1).",
+                "dataGeneration": "خيارات توليد البيانات",
+                "dataGenerationDescription": "تكوين حجم البيانات وتوليد الكيانات",
+                "dataVolumeMode": "وضع حجم البيانات",
+                "dataVolumeModeReal": "حقيقي",
+                "dataVolumeModeRealDescription": "توليد بيانات كاملة جاهزة للإنتاج",
+                "dataVolumeModeSample": "عينة",
+                "dataVolumeModeSampleDescription": "توليد بيانات عينة (~10 عناصر)",
+                "entityGeneration": "توليد الكيانات",
+                "generateCategories": "توليد الفئات",
+                "generateCategoriesDescription": "إنشاء هيكل الفئات لتنظيم العناصر",
+                "generateTags": "توليد الوسوم",
+                "generateTagsDescription": "إنشاء وسوم لتصنيف العناصر",
+                "generateBrands": "توليد العلامات التجارية",
+                "generateBrandsDescription": "استخراج وإنشاء كيانات العلامات التجارية"
             },
             "progress": {
                 "title": "الإنشاء قيد التنفيذ",
@@ -784,20 +959,163 @@
                 "saveChanges": "حفظ التغييرات",
                 "updateReadme": "تحديث README",
                 "updateSuccess": "تم تحديث الإعدادات بنجاح",
-                "updateFailed": "فشل تحديث الإعدادات"
+                "updateFailed": "فشل تحديث الإعدادات",
+                "visibilityUpdateFailed": "فشل تحديث رؤية المستودع",
+                "visibilityWarningTitle": "جعل المستودع خاصاً؟",
+                "visibilityWarningDescription": "أنت على وشك جعل {name} خاصاً.",
+                "visibilityWarningPermanent": "هذا الإجراء له عواقب دائمة:",
+                "visibilityWarningStars": "ستفقد جميع النجوم بشكل دائم",
+                "visibilityWarningWatchers": "ستتم إزالة جميع المتابعين",
+                "visibilityWarningNotRestored": "لن يتم استعادة النجوم والمتابعين",
+                "visibilityConfirmPrivate": "نعم، اجعله خاصاً",
+                "advancedPrompts": {
+                    "title": "التعليمات المتقدمة",
+                    "subtitle": "تخصيص تعليمات الذكاء الاصطناعي لتوليد الدليل.",
+                    "save": "حفظ التعليمات",
+                    "saveSuccess": "تم حفظ التعليمات المتقدمة بنجاح",
+                    "saveFailed": "فشل حفظ التعليمات المتقدمة",
+                    "prompts": {
+                        "relevanceAssessment": {
+                            "title": "تقييم الصلة",
+                            "description": "تعليمات لتصفية صفحات الويب حسب الصلة.",
+                            "placeholder": "مثال: تضمين الصفحات المفتوحة المصدر فقط..."
+                        },
+                        "itemGeneration": {
+                            "title": "توليد العناصر",
+                            "description": "تعليمات للعناصر المولدة بالذكاء الاصطناعي.",
+                            "placeholder": "مثال: التركيز على الحلول المؤسسية..."
+                        },
+                        "itemExtraction": {
+                            "title": "استخراج العناصر",
+                            "description": "تعليمات لاستخراج العناصر من المحتوى.",
+                            "placeholder": "مثال: إعطاء الأولوية للأدوات الموثقة..."
+                        },
+                        "searchQuery": {
+                            "title": "توليد استعلامات البحث",
+                            "description": "تعليمات لتوليد استعلامات البحث.",
+                            "placeholder": "مثال: استهداف مستودعات GitHub..."
+                        },
+                        "categorization": {
+                            "title": "التصنيف",
+                            "description": "تعليمات لتصنيف العناصر المستخرجة.",
+                            "placeholder": "مثال: استخدام فئات تقنية..."
+                        },
+                        "deduplication": {
+                            "title": "إزالة التكرار",
+                            "description": "تعليمات لتحديد وإزالة التكرار.",
+                            "placeholder": "مثال: اعتبار المستودعات المتشابهة مكررة..."
+                        },
+                        "sourceValidation": {
+                            "title": "التحقق من المصدر",
+                            "description": "تعليمات للتحقق من روابط المصادر.",
+                            "placeholder": "مثال: تفضيل المواقع الرسمية..."
+                        }
+                    }
+                },
+                "websiteConfig": {
+                    "title": "تكوين الموقع",
+                    "subtitle": "تخصيص مظهر وسلوك موقع الدليل",
+                    "loadFailed": "فشل تحميل إعدادات الموقع",
+                    "saveSuccess": "تم حفظ إعدادات الموقع بنجاح",
+                    "saveFailed": "فشل حفظ إعدادات الموقع",
+                    "save": "حفظ الإعدادات",
+                    "sections": {
+                        "siteName": {
+                            "title": "هوية الموقع",
+                            "label": "اسم الموقع",
+                            "placeholder": "دليلي",
+                            "helper": "الاسم المعروض في رأس الموقع"
+                        },
+                        "global": {
+                            "title": "الميزات العامة",
+                            "categories": "الفئات",
+                            "categoriesHelper": "إظهار تصفية الفئات",
+                            "tags": "الوسوم",
+                            "tagsHelper": "إظهار تصفية الوسوم",
+                            "companies": "الشركات",
+                            "companiesHelper": "إظهار معلومات الشركة",
+                            "surveys": "الاستطلاعات",
+                            "surveysHelper": "تمكين الاستطلاعات"
+                        },
+                        "header": {
+                            "title": "إعدادات الرأس",
+                            "submit": "زر الإرسال",
+                            "submitHelper": "إظهار زر إرسال العنصر",
+                            "pricing": "رابط الأسعار",
+                            "pricingHelper": "إظهار رابط الأسعار",
+                            "layoutSelector": "محدد التخطيط",
+                            "layoutSelectorHelper": "السماح بالتبديل بين التخطيطات",
+                            "languageSelector": "محدد اللغة",
+                            "languageSelectorHelper": "السماح بتغيير اللغة",
+                            "themeSelector": "محدد السمة",
+                            "themeSelectorHelper": "السماح بالتبديل بين السمات",
+                            "defaultLayout": "التخطيط الافتراضي",
+                            "defaultTheme": "السمة الافتراضية",
+                            "themeLight": "فاتح",
+                            "themeDark": "داكن",
+                            "themeSystem": "النظام",
+                            "defaultPagination": "الترقيم الافتراضي",
+                            "paginationStandard": "قياسي",
+                            "paginationInfinite": "تمرير لانهائي",
+                            "paginationLoadMore": "تحميل المزيد"
+                        },
+                        "homepage": {
+                            "title": "إعدادات الصفحة الرئيسية",
+                            "hero": "قسم البطل",
+                            "heroHelper": "إظهار قسم البطل مع العنوان",
+                            "search": "شريط البحث",
+                            "searchHelper": "إظهار شريط البحث",
+                            "defaultView": "العرض الافتراضي",
+                            "viewClassic": "كلاسيكي",
+                            "viewGrid": "شبكة",
+                            "viewList": "قائمة",
+                            "defaultSort": "الترتيب الافتراضي",
+                            "sortPopularity": "الشعبية",
+                            "sortNewest": "الأحدث",
+                            "sortAlphabetical": "أبجدي"
+                        },
+                        "footer": {
+                            "title": "إعدادات التذييل",
+                            "subscribe": "الاشتراك في النشرة",
+                            "subscribeHelper": "إظهار نموذج الاشتراك",
+                            "version": "عرض الإصدار",
+                            "versionHelper": "إظهار الإصدار في التذييل",
+                            "themeSelector": "محدد سمة التذييل",
+                            "themeSelectorHelper": "إظهار مبدل السمة في التذييل"
+                        },
+                        "customMenu": {
+                            "title": "روابط القائمة المخصصة",
+                            "description": "إضافة روابط مخصصة إلى التنقل",
+                            "headerLinks": "روابط الرأس",
+                            "footerLinks": "روابط التذييل",
+                            "addLink": "إضافة رابط",
+                            "noLinks": "لا توجد روابط مخصصة",
+                            "labelPlaceholder": "تسمية الرابط",
+                            "pathPlaceholder": "/about أو https://...",
+                            "targetSelf": "نفس النافذة",
+                            "targetBlank": "نافذة جديدة"
+                        }
+                    }
+                }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "رمز Vercel مطلوب",
-                    "description": "لنشر دليلك على Vercel، تحتاج إلى تكوين رمز Vercel API في إعدادات حسابك.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "الذهاب إلى إعدادات رموز API",
                     "getTokenButton": "الحصول على رمز Vercel",
                     "howTo": {
                         "title": "كيفية تكوين رمز Vercel الخاص بك:",
                         "step1": "انقر على 'الحصول على رمز Vercel' لفتح لوحة تحكم Vercel",
                         "step2": "إنشاء رمز جديد بأذونات النشر",
-                        "step3": "نسخ الرمز المُنشأ",
-                        "step4": "الذهاب إلى إعدادات رموز API والصق رمزك في قسم Vercel"
+                        "step3": "قم بتكوين رمز API الخاص بـ {provider} في إعدادات الإضافة > {provider}",
+                        "step4": "ارجع إلى هنا لنشر دليلك"
                     }
                 },
                 "sharedNoTokenAlert": {
@@ -806,10 +1124,10 @@
                     "hint": "كمتعاون، يمكنك تشغيل عمليات النشر بمجرد أن يقوم المالك بتكوين تكامل Vercel الخاص به."
                 },
                 "form": {
-                    "deployToVercel": {
+                    "deployment": {
                         "title": "النشر على Vercel",
                         "description": "انشر مستودع موقع دليلك على Vercel.",
-                        "deployButton": "النشر الآن",
+                        "deployButton": "النشر إلى {provider}",
                         "deployingButton": "جارٍ النشر...",
                         "deployingStateButton": "جارٍ النشر ({state})...",
                         "successMessage": "تم نشر موقعك بنجاح!",
@@ -853,7 +1171,21 @@
                         "lastChecked": "آخر فحص",
                         "lastError": "آخر خطأ",
                         "updateSuccess": "تم تحديث الإعدادات بنجاح",
-                        "updateFailed": "فشل تحديث الإعدادات"
+                        "updateFailed": "فشل تحديث الإعدادات",
+                        "githubRequired": "اتصال GitHub مطلوب. اربط حسابك في الإعدادات."
+                    },
+                    "configDialog": {
+                        "title": "التكوين قبل النشر",
+                        "description": "مراجعة وتخصيص إعدادات موقعك قبل النشر",
+                        "siteName": "اسم الموقع",
+                        "siteNamePlaceholder": "دليلي",
+                        "siteNameHelper": "الاسم المعروض على موقعك",
+                        "advancedSettings": "إعدادات متقدمة",
+                        "advancedSettingsDescription": "تكوين خيارات إضافية",
+                        "loadFailed": "فشل تحميل الإعدادات",
+                        "saveAndDeploy": "حفظ ونشر",
+                        "skipAndDeploy": "تخطي ونشر",
+                        "cancel": "إلغاء"
                     }
                 }
             },
@@ -962,7 +1294,8 @@
                 "personalAccount": "سيتم إنشاء المستودع تحت حسابك الشخصي",
                 "organizations": "المنظمات",
                 "personalHelp": "سيتم إنشاء المستودع تحت حساب GitHub الشخصي الخاص بك",
-                "organizationHelp": "سيتم إنشاء المستودع تحت منظمة {org}"
+                "organizationHelp": "سيتم إنشاء المستودع تحت منظمة {org}",
+                "connectRequired": "قم بتوصيل مزود Git من الشريط الجانبي لاختيار مكان إنشاء المستودع."
             },
             "ai": {
                 "title": "إنشاء بالذكاء الاصطناعي",
@@ -1192,7 +1525,8 @@
                 "success": {
                     "started": "بدأ الاستيراد! جارٍ التوجيه إلى دليلك...",
                     "linked": "تم ربط الدليل بنجاح"
-                }
+                },
+                "detectionFailed": "لم نتمكن من اكتشاف التنسيق تلقائياً. يرجى تحديد كيفية استيراد هذا المستودع."
             }
         },
         "github": {
@@ -1254,6 +1588,34 @@
                 "title": "Webhooks",
                 "subtitle": "تكوين webhooks لتلقي التحديثات في الوقت الفعلي",
                 "configure": "تكوين Webhooks (قريباً)"
+            },
+            "screenshotone": {
+                "title": "تكامل ScreenshotOne",
+                "subtitle": "التقاط صور الشاشة تلقائياً باستخدام ScreenshotOne",
+                "connected": "متصل",
+                "notConnected": "غير متصل",
+                "connectedMessage": "حساب ScreenshotOne متصل. سيتم الالتقاط تلقائياً.",
+                "disconnect": "قطع اتصال ScreenshotOne",
+                "disconnecting": "جاري الإزالة...",
+                "accessKeyLabel": "مفتاح الوصول",
+                "placeholder": "مفتاح الوصول...",
+                "secretKeyLabel": "المفتاح السري (اختياري)",
+                "secretKeyPlaceholder": "المفتاح السري...",
+                "showKey": "إظهار",
+                "hideKey": "إخفاء",
+                "accessKeyHelp": "مطلوب للمصادقة مع ScreenshotOne API.",
+                "secretKeyHelp": "اختياري. يمكّن الروابط الموقعة. احصل على مفاتيحك من",
+                "dashboard": "لوحة تحكم ScreenshotOne",
+                "save": "حفظ المفاتيح",
+                "saving": "جاري الحفظ...",
+                "messages": {
+                    "accessKeyRequired": "أدخل مفتاح وصول صالح",
+                    "saveSuccess": "تم حفظ مفاتيح ScreenshotOne بنجاح",
+                    "saveFailed": "فشل حفظ مفاتيح ScreenshotOne",
+                    "removeSuccess": "تمت إزالة مفاتيح ScreenshotOne بنجاح",
+                    "removeFailed": "فشل إزالة مفاتيح ScreenshotOne",
+                    "unexpectedError": "حدث خطأ غير متوقع"
+                }
             }
         },
         "notifications": {
@@ -1358,7 +1720,19 @@
             "newChat": "محادثة جديدة",
             "loadingConversation": "جارٍ تحميل المحادثة…",
             "inputPlaceholder": "اوصف الدليل الذي تريد إنشاءه...",
-            "sendButton": "إرسال"
+            "sendButton": "إرسال",
+            "errors": {
+                "unableToSend": "تعذر إرسال الرسالة."
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {
@@ -1508,6 +1882,15 @@
                 "notAuthenticated": "غير مصادق",
                 "deleteFailed": "فشل حذف الحساب",
                 "deleteDisabled": "حذف الحساب معطل في العرض التوضيحي"
+            },
+            "screenshotone": {
+                "notAuthenticated": "غير مصادق",
+                "accessKeyRequired": "مفتاح الوصول مطلوب",
+                "saveFailed": "فشل حفظ مفاتيح ScreenshotOne",
+                "saveSuccess": "تم حفظ مفاتيح ScreenshotOne بنجاح",
+                "validationFailed": "المفاتيح المقدمة غير صالحة. تحقق وحاول مرة أخرى.",
+                "removeFailed": "فشل إزالة مفاتيح ScreenshotOne",
+                "removeSuccess": "تمت إزالة مفاتيح ScreenshotOne بنجاح"
             }
         },
         "deploy": {
@@ -1538,6 +1921,21 @@
             "username": {
                 "minLength": "يجب أن يحتوي اسم المستخدم على {length} أحرف على الأقل"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "إغلاق",
+            "dismiss": "إخفاء"
+        },
+        "theme": {
+            "toggle": "تبديل السمة",
+            "switchToLight": "التبديل إلى الوضع الفاتح",
+            "switchToDark": "التبديل إلى الوضع الداكن"
+        },
+        "visibility": {
+            "private": "خاص",
+            "public": "عام"
         }
     }
 }

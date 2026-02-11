@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import { MarkdownReadmeConfigDto } from '@packages/agent/dto';
+import { MarkdownReadmeConfigDto } from '@ever-works/agent/dto';
 import {
     DirectoryRepository,
     DirectoryMemberRepository,
     UserRepository,
-} from '@packages/agent/database';
-import { Directory, DirectoryMemberRole } from '@packages/agent/entities';
-import { validateSlug, BasePromptService } from '@packages/cli-shared';
+} from '@ever-works/agent/database';
+import { Directory, DirectoryMemberRole } from '@ever-works/agent/entities';
+import { validateSlug, BasePromptService } from '@ever-works/cli-shared';
 
 export interface DirectoryInputData {
     slug: string;
@@ -16,6 +16,7 @@ export interface DirectoryInputData {
     description: string;
     owner?: string;
     readmeConfig?: MarkdownReadmeConfigDto;
+    cancelled?: boolean;
 }
 
 export interface SlugConflictResolution {
@@ -76,13 +77,13 @@ export class DirectoryPromptService extends BasePromptService {
         if (wantsOptionalFields) {
             if (orgs) {
                 owner = await this.promptSelect(
-                    'GitHub Owner (username/organization)?',
+                    'Owner (username/organization)?',
                     orgs,
                     ownerDefault,
                 );
             } else {
                 owner = await this.promptOptionalText(
-                    'Owner (username/organization) (leave empty to use default GitHub user):',
+                    'Owner (username/organization) (leave empty to use default user):',
                     ownerDefault,
                 );
             }

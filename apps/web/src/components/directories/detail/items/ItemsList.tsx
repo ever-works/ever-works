@@ -13,9 +13,6 @@ import { getCategoryName, getCategoryNames } from '@/lib/utils/items';
 
 interface ItemsListProps {
     items: ItemData[];
-    directoryId: string;
-    canEdit?: boolean;
-    directoryWebsite?: string;
     /** Ref to imperatively add a new item to the list */
     addItemRef?: React.RefObject<((item: ItemData) => void) | null>;
 }
@@ -54,13 +51,7 @@ function useColumnCount(viewMode: 'grid' | 'list') {
     return columns;
 }
 
-export function ItemsList({
-    items: initialItems,
-    directoryId,
-    canEdit = false,
-    directoryWebsite,
-    addItemRef,
-}: ItemsListProps) {
+export function ItemsList({ items: initialItems, addItemRef }: ItemsListProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const [items, setItems] = useState(() => sortItems(initialItems));
     const [searchQuery, setSearchQuery] = useState('');
@@ -204,12 +195,9 @@ export function ItemsList({
                     items={filteredItems}
                     viewMode={viewMode}
                     columns={columns}
-                    directoryId={directoryId}
-                    canEdit={canEdit}
                     onItemDelete={handleItemDelete}
                     onItemUpdate={handleItemUpdate}
                     scrollContainerRef={scrollContainerRef}
-                    directoryWebsite={directoryWebsite}
                 />
             )}
         </div>
@@ -223,24 +211,18 @@ interface VirtualizedItemsListProps {
     items: ItemData[];
     viewMode: 'grid' | 'list';
     columns: number;
-    directoryId: string;
-    canEdit: boolean;
     onItemDelete: (itemSlug: string) => void;
     onItemUpdate: (item: Partial<ItemData> & { slug?: string }) => void;
     scrollContainerRef: React.RefObject<HTMLElement | null>;
-    directoryWebsite?: string;
 }
 
 function VirtualizedItemsList({
     items,
     viewMode,
     columns,
-    directoryId,
-    canEdit,
     onItemDelete,
     onItemUpdate,
     scrollContainerRef,
-    directoryWebsite,
 }: VirtualizedItemsListProps) {
     const listRef = useRef<HTMLDivElement>(null);
     const [scrollMargin, setScrollMargin] = useState(0);
@@ -308,13 +290,10 @@ function VirtualizedItemsList({
                                 key={item.slug}
                                 item={item}
                                 viewMode={viewMode}
-                                directoryId={directoryId}
-                                canEdit={canEdit}
                                 onDelete={() => onItemDelete(item.slug!)}
                                 onUpdate={(updated) =>
                                     onItemUpdate({ ...updated, slug: item.slug })
                                 }
-                                directoryWebsite={directoryWebsite}
                             />
                         ))}
                     </div>
