@@ -7,6 +7,7 @@ export type ClaudeCodeStepId =
 	| 'prepare-context'
 	| 'generate-items'
 	| 'collect-results'
+	| 'capture-screenshots'
 	| 'cleanup';
 
 /**
@@ -17,6 +18,7 @@ export const CLAUDE_CODE_STEP_IDS: readonly ClaudeCodeStepId[] = [
 	'prepare-context',
 	'generate-items',
 	'collect-results',
+	'capture-screenshots',
 	'cleanup'
 ] as const;
 

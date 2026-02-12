@@ -199,9 +199,9 @@ describe('ClaudeCodePlugin', () => {
 	});
 
 	describe('Step Definitions', () => {
-		it('should return 5 step definitions', () => {
+		it('should return 6 step definitions', () => {
 			const steps = plugin.getStepDefinitions();
-			expect(steps).toHaveLength(5);
+			expect(steps).toHaveLength(6);
 		});
 
 		it('should have correct step IDs in order', () => {
@@ -212,6 +212,7 @@ describe('ClaudeCodePlugin', () => {
 				'prepare-context',
 				'generate-items',
 				'collect-results',
+				'capture-screenshots',
 				'cleanup'
 			]);
 		});
@@ -226,6 +227,13 @@ describe('ClaudeCodePlugin', () => {
 			const cleanup = steps.find((s) => s.id === 'cleanup');
 			expect(cleanup?.position).toEqual({ type: 'last' });
 			expect(cleanup?.optional).toBe(true);
+		});
+
+		it('should have capture-screenshots as optional', () => {
+			const steps = plugin.getStepDefinitions();
+			const screenshot = steps.find((s) => s.id === 'capture-screenshots');
+			expect(screenshot).toBeDefined();
+			expect(screenshot?.optional).toBe(true);
 		});
 
 		it('should have no parallelizable steps', () => {
@@ -280,8 +288,8 @@ describe('ClaudeCodePlugin', () => {
 			expect(result.success).toBe(true);
 			expect(result.items).toHaveLength(1);
 			expect(result.items[0].name).toBe('Test Item');
-			expect(result.stepsCompleted).toBe(5);
-			expect(result.totalSteps).toBe(5);
+			expect(result.stepsCompleted).toBe(5); // screenshots skipped (no execContext)
+			expect(result.totalSteps).toBe(6);
 		});
 
 		it('should report progress during execution', async () => {
@@ -333,6 +341,81 @@ describe('ClaudeCodePlugin', () => {
 			expect(result.metrics).toBeDefined();
 			expect(result.metrics!.itemsProcessed).toBe(1);
 			expect(result.duration).toBeGreaterThanOrEqual(0);
+		});
+
+		it('should skip screenshots when no execContext is provided', async () => {
+			const ctx = createMockContext();
+			await plugin.onLoad(ctx);
+
+			const result = await plugin.execute(directory, request, existing);
+
+			expect(result.success).toBe(true);
+			// Screenshot step should be skipped, not failed
+			const state = plugin.getState();
+			const screenshotStep = state?.steps.get('capture-screenshots');
+			expect(screenshotStep?.status).toBe('skipped');
+		});
+
+		it('should succeed even when screenshot facade throws', async () => {
+			const ctx = createMockContext();
+			await plugin.onLoad(ctx);
+
+			const mockScreenshotFacade = {
+				isAvailable: () => true,
+				getSmartImage: vi.fn().mockRejectedValue(new Error('Screenshot service down')),
+				capture: vi.fn(),
+				getScreenshotUrl: vi.fn()
+			};
+
+			const result = await plugin.execute(directory, request, existing, {
+				execContext: {
+					aiFacade: {} as never,
+					searchFacade: {} as never,
+					screenshotFacade: mockScreenshotFacade as never,
+					contentExtractorFacade: {} as never,
+					logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+					directory,
+					user: { id: 'user1' }
+				}
+			});
+
+			// Pipeline should still succeed despite screenshot failure
+			expect(result.success).toBe(true);
+			expect(result.items).toHaveLength(1);
+		});
+
+		it('should capture screenshots when facade is available', async () => {
+			const ctx = createMockContext();
+			await plugin.onLoad(ctx);
+
+			const mockScreenshotFacade = {
+				isAvailable: () => true,
+				getSmartImage: vi.fn().mockResolvedValue({
+					primaryImage: 'https://img.example.com/screenshot.png',
+					source: 'screenshot'
+				}),
+				capture: vi.fn(),
+				getScreenshotUrl: vi.fn()
+			};
+
+			const result = await plugin.execute(directory, request, existing, {
+				execContext: {
+					aiFacade: {} as never,
+					searchFacade: {} as never,
+					screenshotFacade: mockScreenshotFacade as never,
+					contentExtractorFacade: {} as never,
+					logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+					directory,
+					user: { id: 'user1' }
+				}
+			});
+
+			expect(result.success).toBe(true);
+			expect(mockScreenshotFacade.getSmartImage).toHaveBeenCalled();
+			// Screenshot step should be completed
+			const state = plugin.getState();
+			const screenshotStep = state?.steps.get('capture-screenshots');
+			expect(screenshotStep?.status).toBe('completed');
 		});
 	});
 });

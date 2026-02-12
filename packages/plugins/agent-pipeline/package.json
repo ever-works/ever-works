@@ -1,0 +1,73 @@
+{
+	"name": "@ever-works/agent-pipeline-plugin",
+	"version": "1.0.0",
+	"description": "AI agent pipeline using Vercel AI SDK with tool-based generation",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"ai": "^6.0.0",
+		"@ai-sdk/openai-compatible": "^2.0.0",
+		"bash-tool": "^1.3.0",
+		"just-bash": "^2.9.0",
+		"zod": "^3.25.0"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.1"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "agent-pipeline",
+			"name": "Agent Pipeline",
+			"version": "1.0.0",
+			"category": "pipeline",
+			"capabilities": [
+				"pipeline",
+				"form-schema-provider"
+			],
+			"description": "AI agent pipeline using Vercel AI SDK with tool-based generation",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"builtIn": true,
+			"autoEnable": true,
+			"systemPlugin": true,
+			"visibility": "public",
+			"selectableProviderCategories": [
+				"ai-provider",
+				"search",
+				"screenshot",
+				"content-extractor"
+			]
+		}
+	}
+}

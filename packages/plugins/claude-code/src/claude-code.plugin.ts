@@ -8,21 +8,21 @@ import type {
 	PluginSettings,
 	PipelineStepDefinition,
 	PipelineState,
-	StepState,
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
 	PipelineResult,
 	DirectoryReference,
 	GenerationRequest,
 	ExistingItems,
-	MutableGenerationContext,
 	PluginManifest,
-	PluginHealthCheck
+	PluginHealthCheck,
+	StepStatus,
+	FacadeOptions
 } from '@ever-works/plugin';
-import type { StepStatus, PipelineMetrics } from '@ever-works/plugin';
 
 import type { ClaudeCodeStepId } from './types.js';
 import { CLAUDE_CODE_STEP_IDS, DEFAULT_CLI_VERSION, DEFAULT_MAX_TURNS, BASE_TEMP_DIR } from './types.js';
+import { STEP_DEFINITIONS } from './steps.js';
 import { ensureBinary } from './utils/binary-manager.js';
 import {
 	createWorkspace,
@@ -35,69 +35,23 @@ import {
 } from './utils/workspace-manager.js';
 import { executeClaudeCode } from './utils/process-runner.js';
 import { buildSystemPrompt, buildUserPrompt } from './prompt/system-prompt.js';
-
-/**
- * Step definitions for the Claude Code pipeline.
- * All 5 steps run sequentially.
- */
-const STEP_DEFINITIONS: readonly PipelineStepDefinition<ClaudeCodeStepId>[] = [
-	{
-		id: 'setup-claude-code',
-		name: 'Setup Claude Code',
-		description: 'Download and verify the Claude Code CLI binary',
-		position: { type: 'first' },
-		dependencies: [],
-		optional: false,
-		parallelizable: false,
-		estimatedDuration: 10
-	},
-	{
-		id: 'prepare-context',
-		name: 'Prepare Context',
-		description: 'Create workspace and seed existing items and metadata',
-		position: { type: 'after', stepId: 'setup-claude-code' },
-		dependencies: [{ stepId: 'setup-claude-code', required: true }],
-		optional: false,
-		parallelizable: false,
-		estimatedDuration: 5
-	},
-	{
-		id: 'generate-items',
-		name: 'Generate Items',
-		description: 'Execute Claude Code CLI to research and generate items',
-		position: { type: 'after', stepId: 'prepare-context' },
-		dependencies: [{ stepId: 'prepare-context', required: true }],
-		optional: false,
-		parallelizable: false,
-		estimatedDuration: 120
-	},
-	{
-		id: 'collect-results',
-		name: 'Collect Results',
-		description: 'Read generated item files and metadata from workspace',
-		position: { type: 'after', stepId: 'generate-items' },
-		dependencies: [{ stepId: 'generate-items', required: true }],
-		optional: false,
-		parallelizable: false,
-		estimatedDuration: 5
-	},
-	{
-		id: 'cleanup',
-		name: 'Cleanup',
-		description: 'Remove temporary workspace files',
-		position: { type: 'last' },
-		dependencies: [{ stepId: 'collect-results', required: false }],
-		optional: true,
-		parallelizable: false,
-		estimatedDuration: 2
-	}
-];
+import { captureScreenshots } from './utils/screenshot-capture.js';
+import {
+	initializeState,
+	updateStepState,
+	reportProgress,
+	resolveSettings,
+	resolveAuthEnv,
+	buildMetrics,
+	buildErrorResult,
+	buildCancelledResult
+} from './utils/pipeline-helpers.js';
 
 /**
  * Claude Code Generator Plugin
  *
  * Full pipeline plugin that delegates the entire generation to Claude Code.
- * This plugin runs a single Claude Code session that handles web search,
+ * Runs a single Claude Code session that handles web search,
  * content creation, and file generation autonomously.
  */
 export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
@@ -231,13 +185,14 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 				'',
 				'## How it works',
 				'',
-				'The plugin runs 5 sequential steps:',
+				'The plugin runs 6 sequential steps:',
 				'',
 				'1. **Setup Claude Code** - Downloads and caches the Claude Code CLI binary',
 				'2. **Prepare Context** - Creates a temporary workspace and seeds it with existing items and metadata',
 				'3. **Generate Items** - Executes Claude Code CLI to research and generate directory items as JSON files',
 				'4. **Collect Results** - Reads the generated JSON files back to build the pipeline result',
-				'5. **Cleanup** - Removes the temporary workspace',
+				'5. **Capture Screenshots** - Takes screenshots for items that need images',
+				'6. **Cleanup** - Removes the temporary workspace',
 				'',
 				'## Settings',
 				'',
@@ -287,19 +242,17 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 		this.abortController = new AbortController();
 		const signal = options?.signal ?? this.abortController.signal;
 
-		// Initialize pipeline state
-		this.state = this.initializeState();
+		this.state = initializeState();
 
 		const logger = this.context?.logger ?? console;
 		const userId = directory.user?.id;
 
 		if (!userId) {
-			return this.buildErrorResult(new Error('User ID is required'), startTime);
+			return this.handleError(new Error('User ID is required'), startTime);
 		}
 
 		try {
-			// Resolve settings
-			const settings = await this.resolveSettings(userId, directory.id);
+			const settings = await resolveSettings(this.context, userId, directory.id);
 			if (settings.model) {
 				logger.log(`Using model "${settings.model}" for this session as specified in settings`);
 			}
@@ -310,17 +263,17 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 			const model = settings.model as string | undefined;
 
 			// ── Step 1: Setup Claude Code ──────────────────────────────
-			this.updateStepState('setup-claude-code', 'running');
-			this.reportProgress(onProgress, 0, 0, 'Setup Claude Code');
+			this.setState('setup-claude-code', 'running');
+			reportProgress(onProgress, 0, 0, 'Setup Claude Code');
 
 			const binaryPath = await ensureBinary(version, logger);
-			this.updateStepState('setup-claude-code', 'completed');
+			this.setState('setup-claude-code', 'completed');
 
-			if (signal.aborted) return this.buildCancelledResult(startTime);
+			if (signal.aborted) return this.handleCancel(startTime);
 
 			// ── Step 2: Prepare Context ────────────────────────────────
-			this.updateStepState('prepare-context', 'running');
-			this.reportProgress(onProgress, 1, 20, 'Prepare Context');
+			this.setState('prepare-context', 'running');
+			reportProgress(onProgress, 1, 20, 'Prepare Context');
 
 			const configDir = `${BASE_TEMP_DIR}/${userId}`;
 			const workspacePath = await createWorkspace(userId, directory.id);
@@ -333,19 +286,19 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 				tags: existing.tags,
 				brands: existing.brands
 			});
-			this.updateStepState('prepare-context', 'completed');
+			this.setState('prepare-context', 'completed');
 
-			if (signal.aborted) return this.buildCancelledResult(startTime);
+			if (signal.aborted) return this.handleCancel(startTime);
 
 			// ── Step 3: Generate Items ─────────────────────────────────
-			this.updateStepState('generate-items', 'running');
-			this.reportProgress(onProgress, 2, 30, 'Generate Items');
+			this.setState('generate-items', 'running');
+			reportProgress(onProgress, 2, 30, 'Generate Items');
 
 			const promptOptions = { directory, request, existing, workspacePath };
 			const systemPrompt = buildSystemPrompt(promptOptions);
 			const userPrompt = buildUserPrompt(promptOptions);
 
-			const authEnv = this.resolveAuthEnv(settings);
+			const authEnv = resolveAuthEnv(settings);
 
 			const { promise, kill } = executeClaudeCode({
 				binaryPath,
@@ -367,61 +320,78 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 			this.killProcess = null;
 
 			if (execResult.killed || signal.aborted) {
-				this.updateStepState('generate-items', 'failed', 'Cancelled');
-				return this.buildCancelledResult(startTime);
+				this.setState('generate-items', 'failed', 'Cancelled');
+				return this.handleCancel(startTime);
 			}
 
 			if (execResult.exitCode !== 0) {
 				const errorMsg =
 					(execResult.stderr || execResult.stdout).slice(0, 500) || `Exit code ${execResult.exitCode}`;
 				logger.warn(`Claude Code exited with code ${execResult.exitCode}: ${errorMsg}`);
-				// Non-zero exit is a warning, not necessarily fatal.
-				// Claude Code may still have generated some items before exiting.
 			}
 
-			this.updateStepState('generate-items', 'completed');
+			this.setState('generate-items', 'completed');
 
 			// ── Step 4: Collect Results ────────────────────────────────
-			this.updateStepState('collect-results', 'running');
-			this.reportProgress(onProgress, 3, 85, 'Collect Results');
+			this.setState('collect-results', 'running');
+			reportProgress(onProgress, 3, 85, 'Collect Results');
 
 			const items = await readGeneratedItems(workspacePath, logger);
 			const metadata = collectMetadataFromItems(items);
-			this.updateStepState('collect-results', 'completed');
+			this.setState('collect-results', 'completed');
 
-			// ── Step 5: Cleanup ────────────────────────────────────────
-			this.updateStepState('cleanup', 'running');
-			this.reportProgress(onProgress, 4, 95, 'Cleanup');
+			// ── Step 5: Capture Screenshots ────────────────────────────
+			const execContext = options?.execContext;
+			const screenshotFacade = execContext?.screenshotFacade;
+
+			if (screenshotFacade?.isAvailable() && items.length > 0 && !signal.aborted) {
+				this.setState('capture-screenshots', 'running');
+				reportProgress(onProgress, 4, 87, 'Capture Screenshots');
+
+				const facadeOptions: FacadeOptions = {
+					userId: userId!,
+					directoryId: directory.id
+				};
+
+				const status = await captureScreenshots(items, {
+					screenshotFacade,
+					facadeOptions,
+					signal,
+					logger
+				});
+				this.setState('capture-screenshots', status);
+			} else {
+				this.setState('capture-screenshots', 'skipped' as StepStatus);
+			}
+
+			// ── Step 6: Cleanup ────────────────────────────────────────
+			this.setState('cleanup', 'running');
+			reportProgress(onProgress, 5, 95, 'Cleanup');
 
 			await cleanupWorkspace(userId, directory.id);
-			this.updateStepState('cleanup', 'completed');
+			this.setState('cleanup', 'completed');
 
 			// ── Build result ───────────────────────────────────────────
-			this.reportProgress(onProgress, 5, 100, 'Complete');
+			reportProgress(onProgress, 6, 100, 'Complete');
 
 			const duration = Date.now() - startTime;
-			const metrics = this.buildMetrics(startTime, duration, items.length);
-
 			return {
 				success: items.length > 0,
 				items,
 				categories: metadata.categories,
 				tags: metadata.tags,
 				brands: metadata.brands,
-				metrics,
+				metrics: buildMetrics(startTime, duration, items.length),
 				duration,
-				stepsCompleted: 5,
-				totalSteps: 5,
+				stepsCompleted: this.state!.completedSteps.length,
+				totalSteps: CLAUDE_CODE_STEP_IDS.length,
 				state: this.state!
 			};
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
 			logger.error(`Claude Code pipeline failed: ${err.message}`);
-
-			// Clean up workspace on failure
 			await cleanupWorkspace(userId, directory.id);
-
-			return this.buildErrorResult(err, startTime);
+			return this.handleError(err, startTime);
 		}
 	}
 
@@ -437,165 +407,22 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 
 	// ── Private helpers ────────────────────────────────────────────────
 
-	private initializeState(): PipelineState<ClaudeCodeStepId> {
-		const steps = new Map<ClaudeCodeStepId, StepState<ClaudeCodeStepId>>();
-		for (const def of STEP_DEFINITIONS) {
-			steps.set(def.id, { definition: def, status: 'pending' });
-		}
-
-		return {
-			steps,
-			completedSteps: [],
-			failedSteps: [],
-			isRunning: true,
-			isCancelled: false,
-			startedAt: Date.now()
-		};
-	}
-
-	private updateStepState(stepId: ClaudeCodeStepId, status: StepStatus, error?: string): void {
-		if (!this.state) return;
-
-		const existing = this.state.steps.get(stepId);
-		if (!existing) return;
-
-		const now = Date.now();
-		const updated: StepState<ClaudeCodeStepId> = {
-			...existing,
-			status,
-			startedAt: status === 'running' ? now : existing.startedAt,
-			completedAt: status === 'completed' || status === 'failed' ? now : undefined,
-			error: error ?? existing.error
-		};
-
-		const steps = new Map(this.state.steps);
-		steps.set(stepId, updated);
-
-		const completedSteps =
-			status === 'completed' ? [...this.state.completedSteps, stepId] : this.state.completedSteps;
-
-		const failedSteps = status === 'failed' ? [...this.state.failedSteps, stepId] : this.state.failedSteps;
-
-		this.state = {
-			...this.state,
-			steps,
-			currentStep: status === 'running' ? stepId : this.state.currentStep,
-			completedSteps,
-			failedSteps
-		};
-	}
-
-	private reportProgress(
-		onProgress: PipelineProgressCallback | undefined,
-		stepIndex: number,
-		percent: number,
-		stepName: string
-	): void {
-		onProgress?.({
-			percent,
-			currentStepIndex: stepIndex,
-			totalSteps: CLAUDE_CODE_STEP_IDS.length,
-			currentStepName: stepName
-		});
-	}
-
-	private async resolveSettings(userId: string, directoryId: string): Promise<PluginSettings> {
-		if (!this.context) {
-			return {};
-		}
-		try {
-			const [userSettings, directorySettings] = await Promise.all([
-				this.context.getSettings('user', userId),
-				this.context.getSettings('directory', directoryId)
-			]);
-
-			for (const key in directorySettings) {
-				if (directorySettings[key]) {
-					userSettings[key] = directorySettings[key];
-				}
-			}
-
-			return userSettings;
-		} catch {
-			return {};
-		}
-	}
-
-	private resolveAuthEnv(settings: PluginSettings): Record<string, string> {
-		const oauthToken = settings.oauthToken as string | undefined;
-		const apiKey = settings.apiKey as string | undefined;
-
-		// OAuth token takes precedence over API key
-		if (oauthToken) {
-			return { CLAUDE_CODE_OAUTH_TOKEN: oauthToken };
-		}
-		if (apiKey) {
-			return { ANTHROPIC_API_KEY: apiKey };
-		}
-		return {};
-	}
-
-	private buildMetrics(startTime: number, duration: number, itemCount: number): PipelineMetrics {
-		return {
-			startTime,
-			duration,
-			itemsProcessed: itemCount,
-			urlsExtracted: 0,
-			pagesRetrieved: 0,
-			itemsExtracted: itemCount,
-			itemsAfterDedup: itemCount,
-			steps: {}
-		};
-	}
-
-	private buildErrorResult(error: Error, startTime: number): PipelineResult {
-		// Mark current running step as failed
+	private setState(stepId: ClaudeCodeStepId, status: StepStatus, error?: string): void {
 		if (this.state) {
-			for (const [stepId, stepState] of this.state.steps) {
-				if (stepState.status === 'running') {
-					this.updateStepState(stepId, 'failed', error.message);
-					break;
-				}
-			}
+			this.state = updateStepState(this.state, stepId, status, error);
 		}
-
-		return {
-			success: false,
-			items: [],
-			categories: [],
-			tags: [],
-			brands: [],
-			duration: Date.now() - startTime,
-			stepsCompleted: this.state?.completedSteps.length ?? 0,
-			totalSteps: CLAUDE_CODE_STEP_IDS.length,
-			error,
-			failedStep: this.state?.failedSteps[this.state.failedSteps.length - 1],
-			state: this.state ?? this.initializeState()
-		};
 	}
 
-	private buildCancelledResult(startTime: number): PipelineResult {
-		if (this.state) {
-			this.state = {
-				...this.state,
-				isRunning: false,
-				isCancelled: true,
-				completedAt: Date.now()
-			};
-		}
+	private handleError(error: Error, startTime: number): PipelineResult {
+		const { result, state } = buildErrorResult(this.state, error, startTime);
+		this.state = state;
+		return result;
+	}
 
-		return {
-			success: false,
-			items: [],
-			categories: [],
-			tags: [],
-			brands: [],
-			duration: Date.now() - startTime,
-			stepsCompleted: this.state?.completedSteps.length ?? 0,
-			totalSteps: CLAUDE_CODE_STEP_IDS.length,
-			error: 'Pipeline cancelled',
-			state: this.state ?? this.initializeState()
-		};
+	private handleCancel(startTime: number): PipelineResult {
+		const { result, state } = buildCancelledResult(this.state, startTime);
+		this.state = state;
+		return result;
 	}
 }
 

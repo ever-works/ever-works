@@ -1,8 +1,8 @@
 /**
  * Text representation of the ItemData schema for inclusion in prompts.
- * This tells Claude Code what structure to use for each item file.
+ * This tells the AI what structure to use for each item file.
  */
-export const ITEM_SCHEMA_TEXT = `
+export const ITEM_SCHEMA_PROMPT_TEXT = `
 Each item must be a JSON file with the following structure:
 
 {
