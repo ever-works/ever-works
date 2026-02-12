@@ -132,10 +132,6 @@ describe('FullPipelineExecutorService', () => {
             onUnload: jest.fn(),
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             getStepDefinitions: jest.fn().mockReturnValue(stepDefinitions),
-            createExecutionPlan: jest.fn().mockReturnValue({
-                steps: stepDefinitions,
-                estimatedDuration: 30000,
-            }),
             execute: jest.fn().mockImplementation(() => {
                 if (executeError) {
                     return Promise.reject(executeError);

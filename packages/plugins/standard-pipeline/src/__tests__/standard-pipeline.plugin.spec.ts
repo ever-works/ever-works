@@ -350,12 +350,6 @@ describe('StandardPipelinePlugin', () => {
 				expect(plugin.isValidStepId('unknown-step')).toBe(false);
 			});
 
-			it('getStepIds should return all step IDs', () => {
-				const ids = plugin.getStepIds();
-				expect(Array.isArray(ids)).toBe(true);
-				expect(ids.length).toBe(15);
-			});
-
 			it('getStepDefinition should return step by ID', () => {
 				const step = plugin.getStepDefinition('web-search');
 				expect(step).toBeDefined();

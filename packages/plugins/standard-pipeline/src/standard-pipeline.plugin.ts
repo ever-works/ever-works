@@ -307,16 +307,8 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 		}
 	}
 
-	hasExecutor(stepId: BuiltInStepId): boolean {
-		return this.stepExecutors.has(stepId);
-	}
-
 	isValidStepId(stepId: string): stepId is BuiltInStepId {
 		return StandardPipelinePlugin.STEPS_MAP.has(stepId as BuiltInStepId);
-	}
-
-	getStepIds(): readonly BuiltInStepId[] {
-		return StandardPipelinePlugin.STEPS.map((step) => step.id);
 	}
 
 	getStepDefinition(stepId?: BuiltInStepId | string): PipelineStepDefinition<BuiltInStepId> | undefined {
@@ -701,7 +693,6 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 	// IPlugin lifecycle
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
-		context.logger.log('Standard Pipeline Plugin loading...');
 		this.registerBuiltInStepExecutors();
 		context.logger.log(`Standard Pipeline Plugin loaded with ${this.stepExecutors.size} step executors`);
 	}

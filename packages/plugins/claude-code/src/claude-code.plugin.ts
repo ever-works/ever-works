@@ -12,7 +12,6 @@ import type {
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
 	PipelineResult,
-	ExecutionPlan,
 	DirectoryReference,
 	GenerationRequest,
 	ExistingItems,
@@ -275,18 +274,6 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 
 	getStepDefinitions(): readonly PipelineStepDefinition[] {
 		return STEP_DEFINITIONS;
-	}
-
-	createExecutionPlan(_options?: PipelineExecutionOptions): ExecutionPlan {
-		return {
-			phases: CLAUDE_CODE_STEP_IDS.map((stepId, index) => ({
-				index,
-				stepIds: [stepId],
-				parallel: false
-			})),
-			totalSteps: CLAUDE_CODE_STEP_IDS.length,
-			estimatedDuration: STEP_DEFINITIONS.reduce((sum, s) => sum + (s.estimatedDuration ?? 0), 0)
-		};
 	}
 
 	async execute(

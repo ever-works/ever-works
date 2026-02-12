@@ -64,7 +64,6 @@ describe('PipelineOrchestratorService', () => {
             onUnload: jest.fn(),
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             getStepDefinitions: jest.fn().mockReturnValue([]),
-            createExecutionPlan: jest.fn(),
             execute: jest.fn().mockResolvedValue({
                 success: true,
                 items: [],

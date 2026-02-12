@@ -23,7 +23,6 @@ import type {
     PluginCategory,
     JsonSchema,
     PipelineState,
-    ExecutionPlan,
 } from '@ever-works/plugin';
 
 /**
@@ -67,30 +66,14 @@ export class MockPipelinePlugin implements IPipelinePlugin<string> {
         );
     }
 
-    createExecutionPlan(_options?: PipelineExecutionOptions): ExecutionPlan {
-        return {
-            phases: [],
-            totalSteps: this.steps.length,
-            estimatedDuration: this.steps.reduce((s, step) => s + (step.estimatedDuration ?? 0), 0),
-        };
-    }
-
     // --- Optional: engine-orchestrated step execution ---
 
     registerStepExecutor(stepId: string, executor: IBuiltInStepExecutor): void {
         this.stepExecutors.set(stepId, executor);
     }
 
-    hasExecutor(stepId: string): boolean {
-        return this.stepExecutors.has(stepId);
-    }
-
     isValidStepId(stepId: string): stepId is string {
         return this.steps.some((s) => s.id === stepId);
-    }
-
-    getStepIds(): readonly string[] {
-        return this.steps.map((step) => step.id);
     }
 
     async executeStep(

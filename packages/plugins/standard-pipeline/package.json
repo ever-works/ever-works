@@ -54,6 +54,7 @@
 			"license": "MIT",
 			"builtIn": true,
 			"autoEnable": true,
+			"systemPlugin": true,
 			"visibility": "public",
 			"defaultForCapabilities": [
 				"pipeline"

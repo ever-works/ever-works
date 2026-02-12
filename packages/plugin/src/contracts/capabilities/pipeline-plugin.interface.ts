@@ -1,7 +1,6 @@
 import type { IPlugin } from '../plugin.interface.js';
 import type { ItemData, Category, Tag, Brand, DomainAnalysis } from '@ever-works/contracts';
 import type { PipelineStepDefinition, PipelineState } from '../../pipeline/step-definition.types.js';
-import type { ExecutionPlan } from '../../pipeline/parallel-group.types.js';
 import type {
 	MutableGenerationContext,
 	GenerationRequest,
@@ -167,21 +166,14 @@ export interface IPipelinePlugin<TStepId extends string = string> extends IPlugi
 		onProgress?: PipelineProgressCallback
 	): Promise<PipelineResult>;
 
-	/** Create an execution plan (step ordering, parallelization) */
-	createExecutionPlan?(options?: PipelineExecutionOptions): ExecutionPlan;
-
 	// --- Optional: Engine-orchestrated step execution ---
 	// If these are implemented, the engine CAN run steps individually
 	// and pipeline-modifier plugins CAN inject/replace/disable steps.
 
 	/** Check if a step ID belongs to this pipeline */
 	isValidStepId?(stepId: string): stepId is TStepId;
-	/** Get all valid step IDs */
-	getStepIds?(): readonly TStepId[];
 	/** Register an executor for a step */
 	registerStepExecutor?(stepId: TStepId, executor: IBuiltInStepExecutor): void;
-	/** Check if executor is registered */
-	hasExecutor?(stepId: TStepId): boolean;
 	/** Execute a single step */
 	executeStep?(
 		stepId: TStepId | string,
@@ -194,17 +186,6 @@ export interface IPipelinePlugin<TStepId extends string = string> extends IPlugi
 	// --- Optional: lifecycle ---
 	cancel?(): Promise<void>;
 	getState?(): PipelineState | null;
-	resume?(
-		state: PipelineState,
-		context: MutableGenerationContext,
-		options?: PipelineExecutionOptions,
-		onProgress?: PipelineProgressCallback
-	): Promise<PipelineResult>;
-	executeWithContext?(
-		context: MutableGenerationContext,
-		options?: PipelineExecutionOptions,
-		onProgress?: PipelineProgressCallback
-	): Promise<PipelineResult>;
 }
 
 /**

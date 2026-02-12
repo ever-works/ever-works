@@ -234,24 +234,6 @@ describe('ClaudeCodePlugin', () => {
 		});
 	});
 
-	describe('Execution Plan', () => {
-		it('should create a plan with 5 sequential phases', () => {
-			const plan = plugin.createExecutionPlan();
-			expect(plan.phases).toHaveLength(5);
-			expect(plan.totalSteps).toBe(5);
-		});
-
-		it('should have all phases as non-parallel', () => {
-			const plan = plugin.createExecutionPlan();
-			expect(plan.phases.every((p) => p.parallel === false)).toBe(true);
-		});
-
-		it('should have estimated duration', () => {
-			const plan = plugin.createExecutionPlan();
-			expect(plan.estimatedDuration).toBeGreaterThan(0);
-		});
-	});
-
 	describe('Lifecycle', () => {
 		it('should load without error', async () => {
 			const ctx = createMockContext();
