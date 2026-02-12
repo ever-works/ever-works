@@ -29,31 +29,21 @@ describe('DataAggregationStep', () => {
 					_schema: unknown,
 					options?: { variables?: { items?: string; new?: string; existing?: string } }
 				) => {
-					// Check if this is an AI deduplication call (has items variable)
 					if (options?.variables?.items) {
-						const items = JSON.parse(options.variables.items);
 						return Promise.resolve({
-							result: { items },
+							result: { items: JSON.parse(options.variables.items) },
 							usage: null,
 							cost: null
 						});
 					}
-					// Check if this is a new items extraction call (has new and existing variables)
 					if (options?.variables?.new) {
-						// Return the new items (simulating AI returning genuinely new items)
-						const newItems = JSON.parse(options.variables.new);
 						return Promise.resolve({
-							result: { items: newItems },
+							result: { items: JSON.parse(options.variables.new) },
 							usage: null,
 							cost: null
 						});
 					}
-					// Keyword extraction call
-					return Promise.resolve({
-						result: { keywords: ['test', 'keyword'] },
-						usage: null,
-						cost: null
-					});
+					return Promise.resolve({ result: { keywords: ['test', 'keyword'] }, usage: null, cost: null });
 				}
 			),
 		isConfigured: vi.fn().mockReturnValue(true),
@@ -65,21 +55,6 @@ describe('DataAggregationStep', () => {
 		isConfigured: vi.fn().mockReturnValue(false)
 	});
 
-	const createMockDirectory = (): DirectoryReference => ({
-		id: 'test-dir-id',
-		slug: 'test-directory',
-		name: 'Test Directory'
-	});
-
-	const createMockRequest = (overrides?: Partial<GenerationRequest>): GenerationRequest =>
-		({
-			prompt: 'Test prompt',
-			config: {
-				...((overrides?.config as Record<string, unknown>) || {})
-			},
-			...overrides
-		}) as GenerationRequest;
-
 	const createMockItem = (name: string, source_url?: string): MutableItemData =>
 		({
 			name,
@@ -90,8 +65,8 @@ describe('DataAggregationStep', () => {
 
 	const createMockContext = (overrides?: Partial<MutableGenerationContext>): MutableGenerationContext =>
 		({
-			directory: createMockDirectory(),
-			request: createMockRequest(),
+			directory: { id: 'test-dir-id', slug: 'test-directory', name: 'Test Directory' } as DirectoryReference,
+			request: { prompt: 'Test prompt', config: {} } as GenerationRequest,
 			existing: { items: [] },
 			initialAiItems: [],
 			extractedWebItems: [],
@@ -128,7 +103,6 @@ describe('DataAggregationStep', () => {
 			mockContext.extractedWebItems = [createMockItem('Web Item 1')];
 
 			const result = await step.run(mockContext, mockExecContext);
-
 			expect(result.aggregatedItems.length).toBe(3);
 		});
 
@@ -136,7 +110,6 @@ describe('DataAggregationStep', () => {
 			mockContext.initialAiItems = [createMockItem('Duplicate Item'), createMockItem('Duplicate Item')];
 
 			const result = await step.run(mockContext, mockExecContext);
-
 			expect(result.aggregatedItems.length).toBe(1);
 		});
 
@@ -147,52 +120,92 @@ describe('DataAggregationStep', () => {
 			];
 
 			const result = await step.run(mockContext, mockExecContext);
-
 			expect(result.aggregatedItems.length).toBe(1);
 		});
 
 		it('should query external data sources when configured', async () => {
-			mockExecContext.dataSourceFacade.isConfigured = vi.fn().mockReturnValue(true);
-			mockExecContext.dataSourceFacade.queryAll = vi.fn().mockResolvedValue({
-				items: [createMockItem('External Item')],
+			mockExecContext.dataSourceFacade!.isConfigured = vi.fn().mockReturnValue(true);
+			mockExecContext.dataSourceFacade!.queryAll = vi.fn().mockResolvedValue({
+				items: [createMockItem('External Item', 'https://external.com')],
 				errors: []
 			});
 
 			const result = await step.run(mockContext, mockExecContext);
 
-			expect(mockExecContext.dataSourceFacade.queryAll).toHaveBeenCalled();
+			expect(mockExecContext.dataSourceFacade!.queryAll).toHaveBeenCalled();
 			expect(result.aggregatedItems.some((i) => i.name === 'External Item')).toBe(true);
 		});
 
+		it('should not run AI dedup on data source items', async () => {
+			const aiAskJson = mockExecContext.aiFacade.askJson as ReturnType<typeof vi.fn>;
+
+			mockExecContext.dataSourceFacade!.isConfigured = vi.fn().mockReturnValue(true);
+			mockExecContext.dataSourceFacade!.queryAll = vi.fn().mockResolvedValue({
+				items: Array.from({ length: 100 }, (_, i) => createMockItem(`DS Item ${i}`, `https://ds-${i}.com`)),
+				errors: []
+			});
+
+			await step.run(mockContext, mockExecContext);
+
+			// AI dedup should NOT be called for data source items
+			// Only keyword extraction should use askJson
+			const dedupCalls = aiAskJson.mock.calls.filter((call: unknown[]) => {
+				const opts = call[2] as { routing?: { taskId?: string } } | undefined;
+				return opts?.routing?.taskId === 'ai-deduplication';
+			});
+			expect(dedupCalls).toHaveLength(0);
+		});
+
+		it('should field-dedup data source items against existing + AI items', async () => {
+			mockContext.initialAiItems = [createMockItem('AI Tool', 'https://aitool.com')];
+			mockContext.existing = {
+				items: [createMockItem('Existing Tool', 'https://existing.com')]
+			};
+
+			mockExecContext.dataSourceFacade!.isConfigured = vi.fn().mockReturnValue(true);
+			mockExecContext.dataSourceFacade!.queryAll = vi.fn().mockResolvedValue({
+				items: [
+					createMockItem('Existing Tool', 'https://existing.com'),
+					createMockItem('AI Tool', 'https://aitool.com'),
+					createMockItem('New DS Tool', 'https://new-ds.com')
+				],
+				errors: []
+			});
+
+			const result = await step.run(mockContext, mockExecContext);
+
+			const dsItem = result.aggregatedItems.find((i) => i.name === 'New DS Tool');
+			expect(dsItem).toBeDefined();
+
+			const dupExisting = result.aggregatedItems.filter((i) => i.name === 'Existing Tool');
+			expect(dupExisting.length).toBeLessThanOrEqual(1);
+		});
+
 		it('should log data source errors', async () => {
-			mockExecContext.dataSourceFacade.isConfigured = vi.fn().mockReturnValue(true);
-			mockExecContext.dataSourceFacade.queryAll = vi.fn().mockResolvedValue({
+			mockExecContext.dataSourceFacade!.isConfigured = vi.fn().mockReturnValue(true);
+			mockExecContext.dataSourceFacade!.queryAll = vi.fn().mockResolvedValue({
 				items: [],
 				errors: [{ sourceId: 'test-source', error: 'Connection failed' }]
 			});
 
 			await step.run(mockContext, mockExecContext);
-
 			expect(mockExecContext.logger.warn).toHaveBeenCalledWith(expect.stringContaining('test-source'));
 		});
 
 		it('should handle data source query failures', async () => {
-			mockExecContext.dataSourceFacade.isConfigured = vi.fn().mockReturnValue(true);
-			mockExecContext.dataSourceFacade.queryAll = vi.fn().mockRejectedValue(new Error('Query failed'));
+			mockExecContext.dataSourceFacade!.isConfigured = vi.fn().mockReturnValue(true);
+			mockExecContext.dataSourceFacade!.queryAll = vi.fn().mockRejectedValue(new Error('Query failed'));
 
 			mockContext.initialAiItems = [createMockItem('Local Item')];
 
 			const result = await step.run(mockContext, mockExecContext);
 
 			expect(mockExecContext.logger.warn).toHaveBeenCalled();
-			// Should still process local items
 			expect(result.aggregatedItems.length).toBe(1);
 		});
 
 		it('should apply max_items limit', async () => {
-			mockContext.request = createMockRequest({
-				config: { max_items: 2 }
-			});
+			mockContext.request = { prompt: 'Test', config: { max_items: 2 } } as GenerationRequest;
 			mockContext.initialAiItems = [
 				createMockItem('Item 1', 'https://url1.com'),
 				createMockItem('Item 2', 'https://url2.com'),
@@ -201,7 +214,6 @@ describe('DataAggregationStep', () => {
 			];
 
 			const result = await step.run(mockContext, mockExecContext);
-
 			expect(result.aggregatedItems.length).toBeLessThanOrEqual(2);
 		});
 
@@ -210,39 +222,31 @@ describe('DataAggregationStep', () => {
 			mockContext.webPages = [{ source_url: 'https://example.com', raw_content: 'content', retrieved_at: '' }];
 
 			const result = await step.run(mockContext, mockExecContext);
-
 			expect(result.metrics.itemsExtracted).toBeDefined();
 			expect(result.metrics.itemsAfterDedup).toBeDefined();
 		});
 
 		it('should extract new items when existing items present', async () => {
-			mockContext.existing = {
-				items: [createMockItem('Existing Item', 'https://existing.com')]
-			};
+			mockContext.existing = { items: [createMockItem('Existing Item', 'https://existing.com')] };
 			mockContext.initialAiItems = [
 				createMockItem('Existing Item', 'https://existing.com'),
 				createMockItem('New Item', 'https://new.com')
 			];
 
 			const result = await step.run(mockContext, mockExecContext);
-
-			// Should filter out duplicates of existing items
 			expect(result.aggregatedItems.some((i) => i.name === 'New Item')).toBe(true);
 		});
 
 		it('should extract keywords using AI for data source filtering', async () => {
-			mockExecContext.dataSourceFacade.isConfigured = vi.fn().mockReturnValue(true);
-			mockExecContext.dataSourceFacade.queryAll = vi.fn().mockResolvedValue({
-				items: [],
-				errors: []
-			});
-			mockContext.request = createMockRequest({ prompt: 'Find vector databases' });
+			mockExecContext.dataSourceFacade!.isConfigured = vi.fn().mockReturnValue(true);
+			mockExecContext.dataSourceFacade!.queryAll = vi.fn().mockResolvedValue({ items: [], errors: [] });
+			mockContext.request = { prompt: 'Find vector databases' } as GenerationRequest;
 			mockContext.subject = 'vector databases';
 
 			await step.run(mockContext, mockExecContext);
 
 			expect(mockExecContext.aiFacade.askJson).toHaveBeenCalled();
-			const queryCall = mockExecContext.dataSourceFacade.queryAll.mock.calls[0][0];
+			const queryCall = (mockExecContext.dataSourceFacade!.queryAll as ReturnType<typeof vi.fn>).mock.calls[0][0];
 			expect(queryCall.filterContext.keywords).toBeDefined();
 		});
 
@@ -251,7 +255,6 @@ describe('DataAggregationStep', () => {
 			mockContext.extractedWebItems = [];
 
 			const result = await step.run(mockContext, mockExecContext);
-
 			expect(result.aggregatedItems).toEqual([]);
 		});
 
@@ -260,8 +263,6 @@ describe('DataAggregationStep', () => {
 			mockContext.initialAiItems = [createMockItem('Item 1')];
 
 			await step.run(mockContext, mockExecContext);
-
-			// The custom prompt should be used during AI deduplication
 			expect(mockExecContext.logger.log).toHaveBeenCalled();
 		});
 	});

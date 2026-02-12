@@ -72,6 +72,7 @@ describe('AgentPipelinePlugin', () => {
 			expect(manifest.selectableProviderCategories).toContain('search');
 			expect(manifest.selectableProviderCategories).toContain('screenshot');
 			expect(manifest.selectableProviderCategories).toContain('content-extractor');
+			expect(manifest.selectableProviderCategories).toContain('data-source');
 		});
 	});
 

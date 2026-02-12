@@ -7,208 +7,184 @@ import type {
 	IAiFacade,
 	FacadeOptions
 } from '@ever-works/plugin';
+import { deduplicateByField, filterNewItemsManually } from '@ever-works/plugin';
 import { z } from 'zod';
 import { BasePipelineStep } from '../base-pipeline-step.js';
-import { SharedUtils, NewItemsExtractor, AiDeduplicator } from './data-aggregation/index.js';
+import { NewItemsExtractor, AiDeduplicator } from './data-aggregation/index.js';
 
 /**
- * Data Aggregation Step
- *
- * Aggregates and deduplicates data from multiple sources (AI-generated items,
- * web-extracted items, and external data sources). Uses both field-based and
- * AI-based deduplication for comprehensive duplicate removal.
+ * Aggregates and deduplicates data from multiple sources.
+ * Data-source items skip AI dedup (field-based only);
+ * AI dedup runs only on AI-generated + web-extracted items.
  */
 export class DataAggregationStep extends BasePipelineStep {
 	readonly name = 'Deduplication and Data Aggregation';
 	readonly stepId = 'deduplication-and-data-aggregation' as const;
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
-		const {
-			request,
-			directory,
-			existing,
-			initialAiItems,
-			extractedWebItems,
-			webPages,
-			advancedPrompts,
+		const { request, directory, existing, initialAiItems, extractedWebItems, webPages, advancedPrompts, metrics } =
+			context;
+		const { logger } = execContext;
+
+		const aiWebItems = [...initialAiItems, ...extractedWebItems];
+		logger.debug(`[${directory.slug}] AI + Web items before dedup: ${aiWebItems.length}`);
+		logger.log(`[${directory.slug}] Deduplication and Data Aggregation - Starting`);
+
+		const existingItems = (existing.items as MutableItemData[]) || [];
+
+		// Phase 1: Deduplicate AI + web items (field-based + AI dedup)
+		const { aggregatedItems: dedupedAiWebItems, updatedMetrics } = await this.aggregateAndDeduplicateData(
+			directory.slug,
+			request.prompt || '',
+			existingItems,
+			aiWebItems,
+			webPages.length,
 			metrics,
-			pluginConfig
-		} = context;
-		const { logger, dataSourceFacade } = execContext;
+			advancedPrompts?.deduplication,
+			execContext
+		);
+
+		// Phase 2: Query data sources — field-based dedup only (no AI tokens)
+		const dataSourceItems = await this.queryAndDedupDataSources(
+			context,
+			execContext,
+			existingItems,
+			dedupedAiWebItems
+		);
+
+		let finalItems = [...dedupedAiWebItems, ...dataSourceItems];
+		finalItems = this.applyMaxItemsLimit(finalItems, request, directory.slug, logger);
+
+		context.aggregatedItems = finalItems;
+
+		if (updatedMetrics) {
+			context.metrics = { ...context.metrics, ...updatedMetrics, itemsAfterDedup: finalItems.length };
+		}
+
+		return context;
+	}
+
+	private async aggregateAndDeduplicateData(
+		directorySlug: string,
+		prompt: string,
+		existingItems: MutableItemData[],
+		newItems: MutableItemData[],
+		pagesProcessed: number,
+		metrics: PipelineMetrics,
+		customPrompt: string | null | undefined,
+		execContext: StepExecutionContext
+	): Promise<{ aggregatedItems: MutableItemData[]; updatedMetrics: Partial<PipelineMetrics> }> {
+		const { logger } = execContext;
+		const newItemsExtractor = new NewItemsExtractor(execContext);
+		const aiDeduplicator = new AiDeduplicator(execContext);
+
+		// Field-based dedup (fast)
+		let deduplicated = deduplicateByField(deduplicateByField(newItems, 'slug'), 'source_url');
+		logger.log(`[${directorySlug}] Field-based dedup: ${newItems.length} → ${deduplicated.length}`);
+
+		// Extract new items if existing items present
+		if (existingItems.length > 0 && deduplicated.length > 0) {
+			const prev = deduplicated.length;
+			deduplicated = await newItemsExtractor.extractNewItems(existingItems, deduplicated, metrics);
+			logger.log(`[${directorySlug}] New items extraction: ${prev} → ${deduplicated.length}`);
+		}
+
+		// AI-based dedup
+		if (deduplicated.length > 0) {
+			deduplicated = await aiDeduplicator.deduplicateWithAI(prompt, deduplicated, metrics, customPrompt);
+			logger.log(`[${directorySlug}] AI dedup: ${deduplicated.length} items remaining`);
+		}
+
+		return {
+			aggregatedItems: deduplicated,
+			updatedMetrics: {
+				urlsExtracted: pagesProcessed,
+				pagesRetrieved: pagesProcessed,
+				itemsExtracted: newItems.length,
+				itemsAfterDedup: deduplicated.length
+			}
+		};
+	}
+
+	private async queryAndDedupDataSources(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext,
+		existingItems: MutableItemData[],
+		dedupedAiWebItems: MutableItemData[]
+	): Promise<MutableItemData[]> {
+		const { dataSourceFacade, logger } = execContext;
+		if (!dataSourceFacade?.isConfigured()) return [];
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
 			directoryId: execContext.directory.id
 		};
 
-		// Combine AI-generated items and web-extracted items
-		let allDiscoveredItems = [...initialAiItems, ...extractedWebItems];
-		logger.debug(
-			`[${directory.slug}] Total discovered items (AI + Web before source validation): ${allDiscoveredItems.length}.`
-		);
-
-		// Query external data sources if facade is available and configured
-		if (dataSourceFacade?.isConfigured()) {
-			try {
-				// Extract keywords using AI for multilingual support
-				const keywords = await this.extractKeywords(
-					request.prompt,
-					context.subject,
-					execContext.aiFacade,
-					facadeOptions
-				);
-
-				// Build filter context for per-plugin relevance filtering
-				const filterContext: DataSourceFilterContext = {
-					prompt: request.prompt,
-					subject: context.subject,
-					keywords
-				};
-
-				const result = await dataSourceFacade.queryAll({
-					directoryId: directory.id,
-					userId: execContext.user!.id,
-					pluginConfig: pluginConfig,
-					filterContext: filterContext
-				});
-
-				if (result.items.length > 0) {
-					logger.log(`[${directory.slug}] External data sources returned ${result.items.length} items`);
-					allDiscoveredItems = [...allDiscoveredItems, ...result.items];
-				}
-
-				// Log any errors from data sources
-				for (const err of result.errors) {
-					logger.warn(`[${directory.slug}] Data source ${err.sourceId} failed: ${err.error}`);
-				}
-			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : String(error);
-				logger.warn(`[${directory.slug}] Data source query failed: ${errorMessage}`);
-			}
-		}
-
-		logger.log(`[${directory.slug}] Deduplication and Data Aggregation - Starting`);
-
-		const { aggregatedItems, updatedMetrics } = await this.aggregateAndDeduplicateData(
-			directory.slug,
-			request.prompt || '',
-			request.config || {},
-			(existing.items as MutableItemData[]) || [],
-			allDiscoveredItems,
-			webPages.length, // approximate, initially scanned = retrieved
-			metrics,
-			advancedPrompts?.deduplication,
-			execContext
-		);
-
-		context.aggregatedItems = aggregatedItems;
-
-		// Update metrics
-		if (updatedMetrics) {
-			context.metrics = {
-				...context.metrics,
-				...updatedMetrics
+		try {
+			const keywords = await this.extractKeywords(
+				context.request.prompt,
+				context.subject,
+				execContext.aiFacade,
+				facadeOptions
+			);
+			const filterContext: DataSourceFilterContext = {
+				prompt: context.request.prompt,
+				subject: context.subject,
+				keywords
 			};
-		}
 
-		return context;
-	}
+			const result = await dataSourceFacade.queryAll({
+				directoryId: context.directory.id,
+				userId: execContext.user!.id,
+				pluginConfig: context.pluginConfig,
+				filterContext
+			});
 
-	/**
-	 * Aggregates and deduplicates data from multiple sources
-	 */
-	private async aggregateAndDeduplicateData(
-		directorySlug: string,
-		prompt: string,
-		config: Record<string, unknown>,
-		existingItems: MutableItemData[],
-		newlyExtractedItemsThisRun: MutableItemData[],
-		pagesProcessedThisRun: number,
-		metrics: PipelineMetrics,
-		customPrompt: string | null | undefined,
-		execContext: StepExecutionContext
-	): Promise<{ aggregatedItems: MutableItemData[]; updatedMetrics: Partial<PipelineMetrics> }> {
-		const { logger } = execContext;
+			for (const err of result.errors) {
+				logger.warn(`[${context.directory.slug}] Data source ${err.sourceId} failed: ${err.error}`);
+			}
 
-		// Create utility instances
-		const sharedUtils = new SharedUtils(logger);
-		const newItemsExtractor = new NewItemsExtractor(execContext, sharedUtils);
-		const aiDeduplicator = new AiDeduplicator(execContext, sharedUtils);
+			if (result.items.length === 0) return [];
 
-		logger.debug(`[${directorySlug}] Starting data aggregation and deduplication.`);
+			logger.log(`[${context.directory.slug}] Data sources returned ${result.items.length} items`);
 
-		// Track metrics
-		let newItemsAddedToStoreCount = 0;
-
-		// Deduplicate by fields first (faster than AI)
-		logger.debug(`[${directorySlug}] Deduplicating items by fields`);
-		let deduplicated = sharedUtils.deduplicateByField(
-			sharedUtils.deduplicateByField(newlyExtractedItemsThisRun, 'slug'),
-			'source_url'
-		);
-
-		logger.log(
-			`[${directorySlug}] Field-based deduplication: ${newlyExtractedItemsThisRun.length} → ${deduplicated.length} items`
-		);
-
-		// Extract new items (if we have existing items)
-		if (existingItems.length > 0 && deduplicated.length > 0) {
-			logger.debug(`[${directorySlug}] Extracting new items.`);
-			const previousCount = deduplicated.length;
-
-			deduplicated = await newItemsExtractor.extractNewItems(existingItems, deduplicated, metrics);
-			newItemsAddedToStoreCount = deduplicated.length;
+			const baseline = [...existingItems, ...dedupedAiWebItems];
+			const filtered = filterNewItemsManually(baseline, result.items as MutableItemData[]);
 
 			logger.log(
-				`[${directorySlug}] New items extraction: ${previousCount} → ${newItemsAddedToStoreCount} items`
+				`[${context.directory.slug}] Data source field-dedup: ${result.items.length} → ${filtered.length} new`
 			);
+			return filtered;
+		} catch (error) {
+			logger.warn(
+				`[${context.directory.slug}] Data source query failed: ${error instanceof Error ? error.message : String(error)}`
+			);
+			return [];
 		}
-
-		// Deduplicate with AI (more sophisticated)
-		if (deduplicated.length > 0) {
-			logger.debug(`[${directorySlug}] Deduplicating items with AI.`);
-			deduplicated = await aiDeduplicator.deduplicateWithAI(prompt, deduplicated, metrics, customPrompt);
-			logger.log(`[${directorySlug}] AI-based deduplication: ${deduplicated.length} items remaining`);
-		}
-
-		// Apply max_items limit if specified (for sample mode or explicit limit)
-		const maxItems = config.max_items as number | undefined;
-		if (maxItems && deduplicated.length > maxItems) {
-			logger.log(`[${directorySlug}] Applying max_items limit: ${deduplicated.length} → ${maxItems} items`);
-			deduplicated = deduplicated.slice(0, maxItems);
-		}
-
-		// Calculate final output metrics
-		const updatedMetrics: Partial<PipelineMetrics> = {
-			urlsExtracted: pagesProcessedThisRun,
-			pagesRetrieved: pagesProcessedThisRun,
-			itemsExtracted: newlyExtractedItemsThisRun.length,
-			itemsAfterDedup: deduplicated.length
-		};
-
-		logger.log(
-			`[${directorySlug}] Data aggregation and deduplication complete. Final item count: ${deduplicated.length}`
-		);
-
-		return { aggregatedItems: deduplicated, updatedMetrics };
 	}
 
-	/**
-	 * Extracts keywords from prompt and subject for relevance filtering.
-	 * Uses AI for multilingual support when available, falls back to simple extraction.
-	 */
+	private applyMaxItemsLimit(
+		items: MutableItemData[],
+		request: MutableGenerationContext['request'],
+		directorySlug: string,
+		logger: StepExecutionContext['logger']
+	): MutableItemData[] {
+		const maxItems = (request.config || {}).max_items as number | undefined;
+		if (maxItems && items.length > maxItems) {
+			logger.log(`[${directorySlug}] Applying max_items limit: ${items.length} → ${maxItems}`);
+			return items.slice(0, maxItems);
+		}
+		return items;
+	}
+
 	private async extractKeywords(
 		prompt?: string,
 		subject?: string,
 		aiFacade?: IAiFacade,
 		facadeOptions?: FacadeOptions
 	): Promise<readonly string[]> {
-		// If no text to extract from, return empty
-		if (!prompt && !subject) {
-			return [];
-		}
+		if (!prompt && !subject) return [];
 
-		// Try AI extraction for multilingual support
 		if (aiFacade?.isConfigured() && prompt) {
 			try {
 				const { result } = await aiFacade.askJson(
@@ -220,45 +196,33 @@ Text: "${prompt}"
 ${subject ? `Subject: "${subject}"` : ''}
 
 Return only meaningful keywords, no common words or articles.`,
-					z.object({
-						keywords: z.array(z.string()).describe('Extracted keywords and key phrases')
-					}),
-					{
-						routing: { complexity: 'simple', taskId: 'keyword-extraction' }
-					},
+					z.object({ keywords: z.array(z.string()).describe('Extracted keywords and key phrases') }),
+					{ routing: { complexity: 'simple', taskId: 'keyword-extraction' } },
 					facadeOptions!
 				);
 
-				if (result.keywords && result.keywords.length > 0) {
-					// Add subject if provided and not already in keywords
-					const allKeywords = subject
+				if (result.keywords?.length > 0) {
+					const all = subject
 						? [subject.toLowerCase(), ...result.keywords.map((k: string) => k.toLowerCase())]
 						: result.keywords.map((k: string) => k.toLowerCase());
-
-					return [...new Set(allKeywords)];
+					return [...new Set(all)];
 				}
 			} catch {
-				// Fall through to simple extraction on AI failure
+				// Fall through to simple extraction
 			}
 		}
 
-		// Fallback: Simple extraction (works for any language, just splits on whitespace)
 		const keywords: string[] = [];
-
-		if (subject) {
-			keywords.push(subject.toLowerCase());
-		}
-
+		if (subject) keywords.push(subject.toLowerCase());
 		if (prompt) {
-			// Simple extraction: split by whitespace, filter short words
-			// This works for any language since we don't rely on language-specific stop words
-			const words = prompt
-				.toLowerCase()
-				.split(/\s+/)
-				.filter((w) => w.length > 2); // Shorter threshold for multilingual support
-			keywords.push(...words.slice(0, 10));
+			keywords.push(
+				...prompt
+					.toLowerCase()
+					.split(/\s+/)
+					.filter((w) => w.length > 2)
+					.slice(0, 10)
+			);
 		}
-
 		return [...new Set(keywords)];
 	}
 }

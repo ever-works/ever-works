@@ -6,6 +6,7 @@ import type {
 	IFormSchemaProvider,
 	PluginContext,
 	PluginCategory,
+	PluginLogger,
 	JsonSchema,
 	ValidationResult,
 	PluginSettings,
@@ -22,9 +23,10 @@ import type {
 	StepStatus,
 	FacadeOptions,
 	FormFieldDefinition,
-	FormFieldGroup
+	FormFieldGroup,
+	MutableItemData
 } from '@ever-works/plugin';
-import { collectMetadataFromItems } from '@ever-works/plugin';
+import { collectMetadataFromItems, createItemLookupIndex, isItemDuplicate } from '@ever-works/plugin';
 
 import type { AgentPipelineStepId } from './types.js';
 import { AGENT_PIPELINE_STEP_IDS, DEFAULT_MAX_STEPS } from './types.js';
@@ -48,13 +50,8 @@ import {
 	buildErrorResult,
 	buildCancelledResult
 } from './utils/pipeline-helpers.js';
+import { extractSimpleKeywords, appendToJsonlIndex } from './utils/data-source-helpers.js';
 
-/**
- * Agent Pipeline Plugin
- *
- * Self-managed pipeline that runs a single AI agent loop with tools
- * for web search, content extraction, and file management.
- */
 export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipelineStepId>, IFormSchemaProvider {
 	readonly id = 'agent-pipeline';
 	readonly name = 'Agent Pipeline';
@@ -100,11 +97,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {
-		return {
-			status: 'healthy',
-			message: 'Agent Pipeline plugin is ready',
-			checkedAt: Date.now()
-		};
+		return { status: 'healthy', message: 'Agent Pipeline plugin is ready', checkedAt: Date.now() };
 	}
 
 	getManifest(): PluginManifest {
@@ -121,7 +114,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			builtIn: true,
 			autoEnable: false,
 			visibility: 'public',
-			selectableProviderCategories: ['ai-provider', 'search', 'screenshot', 'content-extractor'],
+			selectableProviderCategories: ['ai-provider', 'search', 'screenshot', 'content-extractor', 'data-source'],
 			readme: [
 				'# Agent Pipeline Plugin',
 				'',
@@ -129,7 +122,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				'',
 				'## How it works',
 				'',
-				'1. **Prepare Context** - Loads existing items and metadata',
+				'1. **Prepare Context** - Loads existing items, queries data sources',
 				'2. **Generate Items** - AI agent researches and creates items',
 				'3. **Collect Results** - Gathers generated items',
 				'4. **Capture Screenshots** - Takes screenshots for items that need images',
@@ -201,30 +194,29 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			this.setState('prepare-context', 'running');
 			reportProgress(onProgress, 0, 10, 'Prepare Context');
 
-			const providerConfig = await execContext.aiFacade.getProviderConfig(facadeOptions);
-			if (!providerConfig.baseUrl || !providerConfig.apiKey) {
+			const { providerConfig, modelName } = await this.resolveAiProvider(execContext, facadeOptions);
+			if (!providerConfig || !modelName) {
 				return this.handleError(
 					new Error(
-						`AI provider "${providerConfig.providerId}" missing baseUrl or apiKey. ` +
-							'Please configure the AI provider settings.'
+						providerConfig
+							? `AI provider "${providerConfig.providerId}" has no model configured. ` +
+									'Set a defaultModel or complexModel in provider settings.'
+							: 'AI provider missing baseUrl or apiKey. Please configure the AI provider settings.'
 					),
 					startTime
 				);
 			}
 
-			const modelName = providerConfig.routing.complexModel || providerConfig.defaultModel;
-			if (!modelName) {
-				return this.handleError(
-					new Error(
-						`AI provider "${providerConfig.providerId}" has no model configured. ` +
-							'Set a defaultModel or complexModel in provider settings.'
-					),
-					startTime
-				);
-			}
-
-			// Create a sandboxed workspace for the agent to read/write files
 			const workspacePath = await createWorkspace(userId, directory.id, existing, directory, request);
+			const dataSourceItems = await this.queryDataSources(
+				execContext,
+				directory,
+				userId,
+				request,
+				existing,
+				workspacePath,
+				logger
+			);
 
 			this.setState('prepare-context', 'completed');
 			if (signal.aborted) return this.handleCancel(startTime);
@@ -233,41 +225,19 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			this.setState('generate-items', 'running');
 			reportProgress(onProgress, 1, 20, 'Generate Items');
 
-			logger.log(`Using AI provider "${providerConfig.providerName}" with model "${modelName}"`);
-
-			const provider = createOpenAICompatible({
-				name: providerConfig.providerId,
-				baseURL: providerConfig.baseUrl,
-				apiKey: providerConfig.apiKey
-			});
-			const model = provider(modelName);
-
-			const { tools } = await createAgentTools(
+			await this.runAgentGeneration(
+				providerConfig,
+				modelName,
 				workspacePath,
-				{
-					searchFacade: execContext.searchFacade,
-					contentExtractorFacade: execContext.contentExtractorFacade
-				},
+				execContext,
 				facadeOptions,
+				directory,
+				request,
+				existing,
 				onProgress,
-				AGENT_PIPELINE_STEP_IDS.length
+				signal,
+				logger
 			);
-
-			const promptOptions = { directory, request, existing };
-			const systemPrompt = buildSystemPrompt(promptOptions);
-			const userPrompt = buildUserPrompt(promptOptions);
-
-			const settings = await resolveSettings(this.context, userId, directory.id);
-			const maxSteps = (settings.maxSteps as number) || DEFAULT_MAX_STEPS;
-
-			await generateText({
-				model,
-				system: systemPrompt,
-				prompt: userPrompt,
-				tools: tools as Parameters<typeof generateText>[0]['tools'],
-				stopWhen: stepCountIs(maxSteps),
-				abortSignal: signal
-			});
 
 			if (signal.aborted) {
 				this.setState('generate-items', 'failed', 'Cancelled');
@@ -280,28 +250,12 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			this.setState('collect-results', 'running');
 			reportProgress(onProgress, 2, 82, 'Collect Results');
 
-			const items = await collectItemsFromWorkspace(workspacePath, logger);
+			const items = await this.collectAndMergeResults(workspacePath, dataSourceItems, logger);
 			const metadata = collectMetadataFromItems(items);
 			this.setState('collect-results', 'completed');
 
 			// ── Step 4: Capture Screenshots ────────────────────────────
-			const config = request.config || {};
-			const shouldCapture = config.capture_screenshots !== false;
-
-			if (shouldCapture && execContext.screenshotFacade.isAvailable() && items.length > 0 && !signal.aborted) {
-				this.setState('capture-screenshots', 'running');
-				reportProgress(onProgress, 3, 85, 'Capture Screenshots');
-
-				const status = await captureScreenshots(items, {
-					screenshotFacade: execContext.screenshotFacade,
-					facadeOptions,
-					signal,
-					logger
-				});
-				this.setState('capture-screenshots', status);
-			} else {
-				this.setState('capture-screenshots', 'skipped' as StepStatus);
-			}
+			await this.runScreenshotCapture(request, execContext, items, facadeOptions, signal, onProgress, logger);
 
 			// ── Step 5: Cleanup ────────────────────────────────────────
 			this.setState('cleanup', 'running');
@@ -314,19 +268,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			// ── Build result ───────────────────────────────────────────
 			reportProgress(onProgress, 5, 100, 'Complete');
 
-			const duration = Date.now() - startTime;
-			return {
-				success: items.length > 0,
-				items,
-				categories: metadata.categories,
-				tags: metadata.tags,
-				brands: metadata.brands,
-				metrics: buildMetrics(startTime, duration, items.length),
-				duration,
-				stepsCompleted: AGENT_PIPELINE_STEP_IDS.length,
-				totalSteps: AGENT_PIPELINE_STEP_IDS.length,
-				state: this.state!
-			};
+			return this.buildSuccessResult(items, metadata, startTime);
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
 			logger.error(`Agent pipeline failed: ${err.message}`);
@@ -344,6 +286,171 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 	}
 
 	// ── Private helpers ────────────────────────────────────────────────
+
+	private async resolveAiProvider(
+		execContext: NonNullable<PipelineExecutionOptions['execContext']>,
+		facadeOptions: FacadeOptions
+	): Promise<{
+		providerConfig: Awaited<ReturnType<typeof execContext.aiFacade.getProviderConfig>> | null;
+		modelName: string | null;
+	}> {
+		const providerConfig = await execContext.aiFacade.getProviderConfig(facadeOptions);
+		if (!providerConfig.baseUrl || !providerConfig.apiKey) {
+			return { providerConfig: null, modelName: null };
+		}
+		const modelName = providerConfig.routing.complexModel || providerConfig.defaultModel;
+		if (!modelName) {
+			return { providerConfig, modelName: null };
+		}
+		return { providerConfig, modelName };
+	}
+
+	private async queryDataSources(
+		execContext: NonNullable<PipelineExecutionOptions['execContext']>,
+		directory: DirectoryReference,
+		userId: string,
+		request: GenerationRequest,
+		existing: ExistingItems,
+		workspacePath: string,
+		logger: PluginLogger
+	): Promise<MutableItemData[]> {
+		if (!execContext.dataSourceFacade?.isConfigured()) return [];
+
+		try {
+			const keywords = extractSimpleKeywords(request.prompt, directory.name);
+			const result = await execContext.dataSourceFacade.queryAll({
+				directoryId: directory.id,
+				userId,
+				pluginConfig: request.config as Record<string, Record<string, unknown>> | undefined,
+				filterContext: { prompt: request.prompt, subject: directory.name, keywords }
+			});
+
+			for (const err of result.errors) {
+				logger.warn(`Data source ${err.sourceId} failed: ${err.error}`);
+			}
+
+			if (result.items.length === 0) return [];
+
+			const lookupIndex = createItemLookupIndex(existing.items as MutableItemData[]);
+			const newItems = (result.items as MutableItemData[]).filter((item) => !isItemDuplicate(item, lookupIndex));
+			await appendToJsonlIndex(workspacePath, newItems);
+			logger.log(`Data sources: ${result.items.length} queried, ${newItems.length} new items`);
+			return newItems;
+		} catch (error) {
+			logger.warn(`Data source query failed: ${error instanceof Error ? error.message : String(error)}`);
+			return [];
+		}
+	}
+
+	private async runAgentGeneration(
+		providerConfig: Awaited<
+			ReturnType<NonNullable<PipelineExecutionOptions['execContext']>['aiFacade']['getProviderConfig']>
+		>,
+		modelName: string,
+		workspacePath: string,
+		execContext: NonNullable<PipelineExecutionOptions['execContext']>,
+		facadeOptions: FacadeOptions,
+		directory: DirectoryReference,
+		request: GenerationRequest,
+		existing: ExistingItems,
+		onProgress: PipelineProgressCallback | undefined,
+		signal: AbortSignal,
+		logger: PluginLogger
+	): Promise<void> {
+		logger.log(`Using AI provider "${providerConfig.providerName}" with model "${modelName}"`);
+
+		const provider = createOpenAICompatible({
+			name: providerConfig.providerId,
+			baseURL: providerConfig.baseUrl!,
+			apiKey: providerConfig.apiKey!
+		});
+		const model = provider(modelName);
+
+		const { tools } = await createAgentTools(
+			workspacePath,
+			{
+				searchFacade: execContext.searchFacade,
+				contentExtractorFacade: execContext.contentExtractorFacade
+			},
+			facadeOptions,
+			onProgress,
+			AGENT_PIPELINE_STEP_IDS.length
+		);
+
+		const promptOptions = { directory, request, existing };
+		const systemPrompt = buildSystemPrompt(promptOptions);
+		const userPrompt = buildUserPrompt(promptOptions);
+
+		const settings = await resolveSettings(this.context, facadeOptions.userId, directory.id);
+		const maxSteps = (settings.maxSteps as number) || DEFAULT_MAX_STEPS;
+
+		await generateText({
+			model,
+			system: systemPrompt,
+			prompt: userPrompt,
+			tools: tools as Parameters<typeof generateText>[0]['tools'],
+			stopWhen: stepCountIs(maxSteps),
+			abortSignal: signal
+		});
+	}
+
+	private async collectAndMergeResults(
+		workspacePath: string,
+		dataSourceItems: MutableItemData[],
+		logger: PluginLogger
+	): Promise<MutableItemData[]> {
+		const agentItems = await collectItemsFromWorkspace(workspacePath, logger);
+		const agentLookup = createItemLookupIndex(agentItems as MutableItemData[]);
+		const uniqueDsItems = dataSourceItems.filter((item) => !isItemDuplicate(item, agentLookup));
+		return [...(agentItems as MutableItemData[]), ...uniqueDsItems];
+	}
+
+	private async runScreenshotCapture(
+		request: GenerationRequest,
+		execContext: NonNullable<PipelineExecutionOptions['execContext']>,
+		items: MutableItemData[],
+		facadeOptions: FacadeOptions,
+		signal: AbortSignal,
+		onProgress: PipelineProgressCallback | undefined,
+		logger: PluginLogger
+	): Promise<void> {
+		const shouldCapture = (request.config || {}).capture_screenshots !== false;
+
+		if (shouldCapture && execContext.screenshotFacade.isAvailable() && items.length > 0 && !signal.aborted) {
+			this.setState('capture-screenshots', 'running');
+			reportProgress(onProgress, 3, 85, 'Capture Screenshots');
+
+			const status = await captureScreenshots(items, {
+				screenshotFacade: execContext.screenshotFacade,
+				facadeOptions,
+				signal,
+				logger
+			});
+			this.setState('capture-screenshots', status);
+		} else {
+			this.setState('capture-screenshots', 'skipped' as StepStatus);
+		}
+	}
+
+	private buildSuccessResult(
+		items: MutableItemData[],
+		metadata: ReturnType<typeof collectMetadataFromItems>,
+		startTime: number
+	): PipelineResult {
+		const duration = Date.now() - startTime;
+		return {
+			success: items.length > 0,
+			items,
+			categories: metadata.categories,
+			tags: metadata.tags,
+			brands: metadata.brands,
+			metrics: buildMetrics(startTime, duration, items.length),
+			duration,
+			stepsCompleted: AGENT_PIPELINE_STEP_IDS.length,
+			totalSteps: AGENT_PIPELINE_STEP_IDS.length,
+			state: this.state!
+		};
+	}
 
 	private setState(stepId: AgentPipelineStepId, status: StepStatus, error?: string): void {
 		if (this.state) {

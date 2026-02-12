@@ -66,7 +66,8 @@
 				"ai-provider",
 				"search",
 				"screenshot",
-				"content-extractor"
+				"content-extractor",
+				"data-source"
 			]
 		}
 	}

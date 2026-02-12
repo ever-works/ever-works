@@ -7,3 +7,4 @@ export * from './step-execution-context.interface.js';
 export * from './built-in-step-executor.interface.js';
 export * from './workspace-utils.js';
 export * from './item-schema.js';
+export * from './dedup-utils.js';
