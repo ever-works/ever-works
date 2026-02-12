@@ -1,6 +1,5 @@
 import { generateText, stepCountIs } from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { Bash } from 'just-bash';
 import type {
 	IPlugin,
 	IPipelinePlugin,
@@ -38,7 +37,7 @@ import {
 } from './form-schema.js';
 import { buildSystemPrompt, buildUserPrompt } from './prompt/system-prompt.js';
 import { createAgentTools } from './tools/agent-tools.js';
-import { buildSandboxFiles, collectItemsFromSandbox } from './utils/sandbox-workspace.js';
+import { createWorkspace, collectItemsFromWorkspace, cleanupWorkspace } from './utils/sandbox-workspace.js';
 import { captureScreenshots } from './utils/screenshot-capture.js';
 import {
 	initializeState,
@@ -192,22 +191,11 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		}
 
 		const facadeOptions: FacadeOptions = { userId, directoryId: directory.id };
-		let sandbox: { stop?: () => Promise<void> } | null = null;
 
 		try {
 			// ── Step 1: Prepare Context ────────────────────────────────
 			this.setState('prepare-context', 'running');
 			reportProgress(onProgress, 0, 10, 'Prepare Context');
-
-			const sandboxFiles = buildSandboxFiles(existing, directory, request);
-			const bashSandbox = new Bash({ files: sandboxFiles });
-
-			this.setState('prepare-context', 'completed');
-			if (signal.aborted) return this.handleCancel(startTime);
-
-			// ── Step 2: Generate Items ─────────────────────────────────
-			this.setState('generate-items', 'running');
-			reportProgress(onProgress, 1, 20, 'Generate Items');
 
 			const providerConfig = await execContext.aiFacade.getProviderConfig(facadeOptions);
 			if (!providerConfig.baseUrl || !providerConfig.apiKey) {
@@ -231,6 +219,16 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				);
 			}
 
+			// Create a sandboxed workspace for the agent to read/write files
+			const workspacePath = await createWorkspace(userId, directory.id, existing, directory, request);
+
+			this.setState('prepare-context', 'completed');
+			if (signal.aborted) return this.handleCancel(startTime);
+
+			// ── Step 2: Generate Items ─────────────────────────────────
+			this.setState('generate-items', 'running');
+			reportProgress(onProgress, 1, 20, 'Generate Items');
+
 			logger.log(`Using AI provider "${providerConfig.providerName}" with model "${modelName}"`);
 
 			const provider = createOpenAICompatible({
@@ -240,8 +238,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			});
 			const model = provider(modelName);
 
-			const { tools, sandbox: toolSandbox } = await createAgentTools(
-				sandboxFiles,
+			const { tools } = await createAgentTools(
+				workspacePath,
 				{
 					searchFacade: execContext.searchFacade,
 					contentExtractorFacade: execContext.contentExtractorFacade
@@ -250,7 +248,6 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				onProgress,
 				AGENT_PIPELINE_STEP_IDS.length
 			);
-			sandbox = toolSandbox;
 
 			const promptOptions = { directory, request, existing };
 			const systemPrompt = buildSystemPrompt(promptOptions);
@@ -279,7 +276,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			this.setState('collect-results', 'running');
 			reportProgress(onProgress, 2, 82, 'Collect Results');
 
-			const items = await collectItemsFromSandbox(bashSandbox, logger);
+			const items = await collectItemsFromWorkspace(workspacePath, logger);
 			const metadata = collectMetadataFromItems(items);
 			this.setState('collect-results', 'completed');
 
@@ -306,8 +303,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			this.setState('cleanup', 'running');
 			reportProgress(onProgress, 4, 95, 'Cleanup');
 
-			await sandbox?.stop?.();
-			sandbox = null;
+			await cleanupWorkspace(userId, directory.id);
 
 			this.setState('cleanup', 'completed');
 
@@ -330,7 +326,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
 			logger.error(`Agent pipeline failed: ${err.message}`);
-			await sandbox?.stop?.();
+			await cleanupWorkspace(userId, directory.id);
 			return this.handleError(err, startTime);
 		}
 	}

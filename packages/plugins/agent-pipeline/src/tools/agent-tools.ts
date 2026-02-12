@@ -1,4 +1,5 @@
 import { createBashTool } from 'bash-tool';
+import { Bash, ReadWriteFs } from 'just-bash';
 import type {
 	ISearchFacade,
 	IContentExtractorFacade,
@@ -9,14 +10,13 @@ import { createSearchTool, createExtractContentTool, createReportProgressTool } 
 
 export interface SandboxAndTools {
 	readonly tools: Record<string, unknown>;
-	readonly sandbox: { stop?: () => Promise<void> };
 }
 
 /**
  * Create the full set of agent tools: bash-tool sandbox tools + facade tools.
  */
 export async function createAgentTools(
-	files: Record<string, string>,
+	workspacePath: string,
 	facades: {
 		searchFacade: ISearchFacade;
 		contentExtractorFacade: IContentExtractorFacade;
@@ -25,7 +25,10 @@ export async function createAgentTools(
 	onProgress: PipelineProgressCallback | undefined,
 	totalSteps: number
 ): Promise<SandboxAndTools> {
-	const { tools: bashTools, sandbox } = await createBashTool({ files });
+	const fs = new ReadWriteFs({ root: workspacePath });
+	const bashInstance = new Bash({ fs });
+
+	const { tools: bashTools } = await createBashTool({ sandbox: bashInstance });
 
 	const tools = {
 		...bashTools,
@@ -34,5 +37,5 @@ export async function createAgentTools(
 		reportProgress: createReportProgressTool(onProgress, 1, totalSteps)
 	};
 
-	return { tools, sandbox };
+	return { tools };
 }

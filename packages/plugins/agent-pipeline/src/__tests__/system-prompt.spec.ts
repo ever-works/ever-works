@@ -40,6 +40,7 @@ describe('system-prompt', () => {
 			});
 
 			expect(prompt).toContain('_meta/');
+			expect(prompt).toContain('existing-items.jsonl');
 			expect(prompt).toContain('categories.json');
 			expect(prompt).toContain('tags.json');
 			expect(prompt).toContain('brands.json');
@@ -115,6 +116,8 @@ describe('system-prompt', () => {
 			});
 
 			expect(prompt).toContain('Avoiding Duplicates');
+			expect(prompt).toContain('existing-items.jsonl');
+			expect(prompt).toContain('1 existing item files');
 		});
 
 		it('should include directory context when description exists', () => {
@@ -145,15 +148,15 @@ describe('system-prompt', () => {
 			expect(prompt).not.toContain('Directory Context');
 		});
 
-		it('should reference in-memory sandbox instead of filesystem path', () => {
+		it('should reference sandboxed directory instead of in-memory sandbox', () => {
 			const prompt = buildSystemPrompt({
 				directory: baseDirectory,
 				request: baseRequest,
 				existing: emptyExisting
 			});
 
-			expect(prompt).toContain('in-memory sandbox');
-			expect(prompt).not.toContain('Workspace path:');
+			expect(prompt).toContain('sandboxed directory on disk');
+			expect(prompt).not.toContain('in-memory sandbox');
 		});
 	});
 

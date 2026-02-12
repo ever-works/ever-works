@@ -14,7 +14,7 @@ import { MAX_EXTRACT_CONTENT_LENGTH } from '../types.js';
 export function createSearchTool(searchFacade: ISearchFacade, facadeOptions: FacadeOptions) {
 	return tool({
 		description: 'Search the web for information. Returns a list of results with title, URL, and relevance score.',
-		parameters: z.object({
+		inputSchema: z.object({
 			query: z.string().describe('The search query'),
 			maxResults: z.number().optional().default(10).describe('Maximum number of results to return (default 10)')
 		}),
@@ -41,7 +41,7 @@ export function createExtractContentTool(
 	return tool({
 		description:
 			"Extract the text content from a web page URL. Use this to read details from an item's official page.",
-		parameters: z.object({
+		inputSchema: z.object({
 			url: z.string().url().describe('The URL to extract content from')
 		}),
 		execute: async ({ url }) => {
@@ -68,7 +68,7 @@ export function createReportProgressTool(
 ) {
 	return tool({
 		description: 'Report your progress to the user. Call this periodically as you create items.',
-		parameters: z.object({
+		inputSchema: z.object({
 			itemsCreated: z.number().describe('Number of items created so far'),
 			message: z.string().optional().describe('Optional progress message')
 		}),
