@@ -44,9 +44,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const [confirmRecreate, setConfirmRecreate] = useState(false);
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
     const [isLoadingSchema, setIsLoadingSchema] = useState(false);
-    const $isLoadingSchema = useRef(isLoadingSchema);
-
-    $isLoadingSchema.current = isLoadingSchema;
+    const fetchVersionRef = useRef(0);
 
     // Check if directory has been generated before
     const isGenerated = !!config?.metadata;
@@ -87,44 +85,42 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
 
     // Load form schema when directory changes or pipeline provider changes
     useEffect(() => {
-        if ($isLoadingSchema.current) {
-            return;
-        }
+        const version = ++fetchVersionRef.current;
 
         async function loadFormSchema() {
             setIsLoadingSchema(true);
             try {
-                // Pass pipelineId if a full pipeline is selected
                 const pipelineId = providers.pipeline || undefined;
                 const result = await getFormSchema(directoryId, pipelineId);
 
+                // Discard stale response if pipeline changed while fetching
+                if (version !== fetchVersionRef.current) return;
+
                 if (result.success && result.data) {
                     setFormSchema(result.data);
-                    // Initialize plugin config with default values
                     const defaults: Record<string, unknown> = {};
                     if (result.data.defaultValues) {
                         Object.assign(defaults, result.data.defaultValues);
                     }
 
-                    // Only merge last request data if the pipeline matches what was used last time
                     const lastPipelineId = lastRequestData?.providers?.pipeline || null;
                     const currentPipelineId = providers.pipeline;
-
-                    // Treat null/undefined as equivalent (default pipeline)
                     const isSamePipeline =
                         (currentPipelineId || 'default') === (lastPipelineId || 'default');
 
-                    // Merge with last request data's plugin config if available and pipelines match
                     if (isSamePipeline && lastPluginConfigRef.current) {
                         Object.assign(defaults, lastPluginConfigRef.current);
                     }
                     setPluginConfig(defaults);
                 }
             } catch (error) {
+                if (version !== fetchVersionRef.current) return;
                 console.error('Failed to load form schema:', error);
                 toast.error(t('failedToLoadFormSchema'));
             } finally {
-                setIsLoadingSchema(false);
+                if (version === fetchVersionRef.current) {
+                    setIsLoadingSchema(false);
+                }
             }
         }
         loadFormSchema();

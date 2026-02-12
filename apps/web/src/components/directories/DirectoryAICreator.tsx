@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useEffect, useCallback } from 'react';
+import { useState, useTransition, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { createDirectoryWithAI } from '@/app/actions/dashboard';
@@ -43,13 +43,17 @@ export function DirectoryAICreator({
     const { providers, handleProviderChange, buildSelectedProviders, getUnconfiguredProviders } =
         useProviderSelection();
     const [pluginConfig, setPluginConfig] = useState<Record<string, unknown>>({});
+    const fetchVersionRef = useRef(0);
 
-    // Load form schema on mount
+    // Load form schema when pipeline provider changes
     useEffect(() => {
+        const version = ++fetchVersionRef.current;
+
         async function loadSchema() {
             try {
                 const pipelineId = providers.pipeline || undefined;
                 const result = await getGlobalFormSchema(pipelineId);
+                if (version !== fetchVersionRef.current) return;
                 if (result.success && result.data) {
                     setFormSchema(result.data);
                     if (result.data.defaultValues) {
@@ -57,6 +61,7 @@ export function DirectoryAICreator({
                     }
                 }
             } catch (error) {
+                if (version !== fetchVersionRef.current) return;
                 console.error('Failed to load form schema:', error);
             }
         }

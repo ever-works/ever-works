@@ -21,10 +21,7 @@ export async function createAgentTools(
 	totalSteps: number
 ): Promise<SandboxAndTools> {
 	// Dynamic imports — bash-tool and just-bash are ESM-only
-	const [{ createBashTool }, { Bash, ReadWriteFs }] = await Promise.all([
-		import('bash-tool'),
-		import('just-bash')
-	]);
+	const [{ createBashTool }, { Bash, ReadWriteFs }] = await Promise.all([import('bash-tool'), import('just-bash')]);
 
 	const fs = new ReadWriteFs({ root: workspacePath });
 	const bashInstance = new Bash({ fs });
