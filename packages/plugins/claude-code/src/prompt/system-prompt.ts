@@ -36,9 +36,11 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
 	sections.push(
 		'\n## Workspace Structure\n' +
 			'- Each item is a separate `.json` file in the workspace root (e.g., `my-item.json`)\n' +
-			'- The `_meta/` subdirectory contains **read-only reference data** seeded from existing items:\n' +
+			'- Existing items are already present as `.json` files; create NEW items alongside them\n' +
+			'- The `_meta/` subdirectory contains **read-only reference data**:\n' +
 			'  - `_meta/directory.json` - Directory metadata\n' +
 			'  - `_meta/request.json` - Generation request\n' +
+			'  - `_meta/existing-items.jsonl` - Existing items index (slug, name, source_url per line)\n' +
 			'  - `_meta/categories.json` - Categories currently used by existing items\n' +
 			'  - `_meta/tags.json` - Tags currently used by existing items\n' +
 			'  - `_meta/brands.json` - Brands currently used by existing items\n\n' +
@@ -89,14 +91,14 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
 	if (hasExisting) {
 		sections.push(
 			'\n## Avoiding Duplicates\n' +
-				'The workspace contains existing items. Before creating each item:\n' +
-				'- Test if filename exists: `test -f my-tool.json && echo "exists"`\n' +
-				'- Search for URLs: `grep -l "example.com" *.json`\n' +
-				'- Search for names/keywords: `grep -l \'"name".*"keyword"\' *.json`\n' +
-				'- Check `_meta/` files for existing categories, tags, brands\n\n' +
-				'**Do NOT** list or read all files - use targeted checks only.\n' +
-				'**Do NOT** create duplicates - focus on NEW complementary items.\n' +
-				'**May update** existing files if you find significantly better information.'
+				`The workspace already contains ${existingCount} existing item files (e.g., \`my-tool.json\`). ` +
+				'A lightweight index is available at `_meta/existing-items.jsonl` ' +
+				'(one JSON per line with slug, name, source_url).\n\n' +
+				'To check for duplicates, **use `grep`** on the index — do NOT read the entire file:\n' +
+				'- Search for URLs: `grep "example.com" _meta/existing-items.jsonl`\n' +
+				'- Search for names: `grep -i "keyword" _meta/existing-items.jsonl`\n\n' +
+				'You may read an individual existing item (e.g., `my-tool.json`) if you need to update it.\n' +
+				'**Do NOT** create duplicates — focus on NEW complementary items.'
 		);
 	}
 

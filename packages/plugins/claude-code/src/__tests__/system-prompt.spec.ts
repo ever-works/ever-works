@@ -45,6 +45,7 @@ describe('system-prompt', () => {
 			});
 
 			expect(prompt).toContain('_meta/');
+			expect(prompt).toContain('existing-items.jsonl');
 			expect(prompt).toContain('categories.json');
 			expect(prompt).toContain('tags.json');
 			expect(prompt).toContain('brands.json');
@@ -85,11 +86,10 @@ describe('system-prompt', () => {
 				workspacePath: defaultWorkspacePath
 			});
 
-			expect(prompt).not.toContain('Existing Items');
-			expect(prompt).not.toContain('duplicates');
+			expect(prompt).not.toContain('Avoiding Duplicates');
 		});
 
-		it('should include dedup instructions when existing items present', () => {
+		it('should include dedup instructions with JSONL reference when existing items present', () => {
 			const existingWithItems: ExistingItems = {
 				items: [
 					{
@@ -111,7 +111,9 @@ describe('system-prompt', () => {
 				workspacePath: defaultWorkspacePath
 			});
 
-			expect(prompt).toContain('duplicates');
+			expect(prompt).toContain('Avoiding Duplicates');
+			expect(prompt).toContain('existing-items.jsonl');
+			expect(prompt).toContain('1 existing item files');
 		});
 
 		it('should include directory context when description exists', () => {
