@@ -1,5 +1,6 @@
 import type {
 	IPlugin,
+	IPipelinePlugin,
 	PluginContext,
 	PluginCategory,
 	JsonSchema,
@@ -8,7 +9,6 @@ import type {
 	PipelineStepDefinition,
 	PipelineState,
 	StepState,
-	IFullPipelinePlugin,
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
 	PipelineResult,
@@ -101,12 +101,12 @@ const STEP_DEFINITIONS: readonly PipelineStepDefinition<ClaudeCodeStepId>[] = [
  * This plugin runs a single Claude Code session that handles web search,
  * content creation, and file generation autonomously.
  */
-export class ClaudeCodePlugin implements IPlugin, IFullPipelinePlugin {
+export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 	readonly id = 'claude-code';
 	readonly name = 'Claude Code Generator';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'pipeline';
-	readonly capabilities = ['full-pipeline'] as const;
+	readonly capabilities = ['pipeline'] as const;
 	readonly configurationMode = 'user-required' as const;
 
 	readonly settingsSchema: JsonSchema = {
@@ -224,6 +224,7 @@ export class ClaudeCodePlugin implements IPlugin, IFullPipelinePlugin {
 			builtIn: true,
 			autoEnable: false,
 			visibility: 'public',
+			selectableProviderCategories: ['screenshot'],
 			readme: [
 				'# Claude Code Generator Plugin',
 				'',
@@ -270,7 +271,7 @@ export class ClaudeCodePlugin implements IPlugin, IFullPipelinePlugin {
 		};
 	}
 
-	// ── IFullPipelinePlugin ────────────────────────────────────────────
+	// ── IPipelinePlugin ─────────────────────────────────────────────────
 
 	getStepDefinitions(): readonly PipelineStepDefinition[] {
 		return STEP_DEFINITIONS;

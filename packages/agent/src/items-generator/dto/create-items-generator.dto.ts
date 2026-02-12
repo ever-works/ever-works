@@ -147,7 +147,7 @@ export class CreateItemsGeneratorDto implements ICreateItemsGeneratorDto {
      * providers: {
      *   search: "tavily",
      *   ai: "openai",
-     *   pipeline: "default-pipeline"
+     *   pipeline: "standard-pipeline"
      * }
      * ```
      */

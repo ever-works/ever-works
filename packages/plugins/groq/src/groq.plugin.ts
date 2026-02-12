@@ -97,7 +97,7 @@ export class GroqPlugin extends BaseAiProvider {
 				'x-hidden': true
 			}
 		},
-		required: ['apiKey']
+		required: ['apiKey', 'defaultModel']
 	};
 
 	async onLoad(context: PluginContext): Promise<void> {

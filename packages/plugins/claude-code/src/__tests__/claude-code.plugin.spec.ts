@@ -128,8 +128,8 @@ describe('ClaudeCodePlugin', () => {
 			expect(plugin.category).toBe('pipeline');
 		});
 
-		it('should include full-pipeline capability', () => {
-			expect(plugin.capabilities).toContain('full-pipeline');
+		it('should include pipeline capability', () => {
+			expect(plugin.capabilities).toContain('pipeline');
 		});
 
 		it('should have user-required configuration mode', () => {

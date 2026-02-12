@@ -1,5 +1,6 @@
 import type {
 	IPlugin,
+	IPipelinePlugin,
 	PluginContext,
 	PluginCategory,
 	PluginManifest,
@@ -9,13 +10,20 @@ import type {
 	PluginSettings,
 	MutableGenerationContext,
 	PipelineStepDefinition,
+	PipelineExecutionOptions,
+	PipelineProgressCallback,
+	PipelineResult,
+	PipelineState,
 	StepExecutionOptions,
 	StepProgressCallback,
 	IBuiltInStepExecutor,
 	StepExecutionContext,
 	FormFieldDefinition,
 	FormFieldGroup,
-	IDefaultPipelinePlugin
+	DirectoryReference,
+	GenerationRequest,
+	ExistingItems,
+	IFormSchemaProvider
 } from '@ever-works/plugin';
 
 import type { BuiltInStepId } from './types.js';
@@ -37,12 +45,15 @@ import { ImageCaptureStep } from './steps/image-capture.step.js';
 import { MarkdownGenerationStep } from './steps/markdown-generation.step.js';
 
 /**
- * Default Pipeline Plugin - System plugin providing the standard generation pipeline.
+ * Standard Pipeline Plugin - The default 15-step generation pipeline.
  *
- * This plugin is the single source of truth for all built-in pipeline steps.
- * The pipeline engine queries this plugin for step definitions.
+ * This plugin is engine-orchestratable: it implements executeStep/registerStepExecutor
+ * so the engine can run steps individually and pipeline-modifier plugins can
+ * inject/replace/disable steps.
+ *
+ * Implements IPipelinePlugin (capability: 'pipeline') and IFormSchemaProvider.
  */
-export class DefaultPipelinePlugin implements IPlugin, IDefaultPipelinePlugin<BuiltInStepId> {
+export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, IFormSchemaProvider {
 	/**
 	 * Built-in pipeline step definitions with explicit dependencies.
 	 * Steps are organized by data flow: initialization -> generation -> search -> extraction -> aggregation -> output
@@ -268,40 +279,23 @@ export class DefaultPipelinePlugin implements IPlugin, IDefaultPipelinePlugin<Bu
 	];
 
 	private static readonly STEPS_MAP: Map<BuiltInStepId, PipelineStepDefinition<BuiltInStepId>> = new Map(
-		DefaultPipelinePlugin.STEPS.map((step) => [step.id, step])
+		StandardPipelinePlugin.STEPS.map((step) => [step.id, step])
 	);
 
-	// Static accessors
-	static isBuiltInStep(stepId: string): stepId is BuiltInStepId {
-		return DefaultPipelinePlugin.STEPS_MAP.has(stepId as BuiltInStepId);
-	}
-
-	static getBuiltInStep(stepId: BuiltInStepId): PipelineStepDefinition<BuiltInStepId> | undefined {
-		return DefaultPipelinePlugin.STEPS_MAP.get(stepId);
-	}
-
-	static getBuiltInStepIds(): BuiltInStepId[] {
-		return DefaultPipelinePlugin.STEPS.map((step) => step.id);
-	}
-
-	static getBuiltInSteps(): PipelineStepDefinition<BuiltInStepId>[] {
-		return [...DefaultPipelinePlugin.STEPS];
-	}
-
 	// IPlugin properties
-	readonly id = 'default-pipeline';
-	readonly name = 'Default Pipeline';
+	readonly id = 'standard-pipeline';
+	readonly name = 'Standard Pipeline';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'pipeline';
-	readonly capabilities: readonly string[] = ['pipeline-step', 'form-schema-provider', 'default-pipeline'];
+	readonly capabilities: readonly string[] = ['pipeline', 'form-schema-provider'];
 	readonly settingsSchema: JsonSchema = { type: 'object', properties: {} };
+	readonly systemPlugin = true;
 	readonly handledConfigFields = ['*'] as const;
-	readonly systemPlugin = true as const;
 
 	private stepExecutors = new Map<BuiltInStepId, IBuiltInStepExecutor>();
 	private context?: PluginContext;
 
-	// IDefaultPipelinePlugin methods
+	// IPipelinePlugin methods
 	registerStepExecutor(stepId: BuiltInStepId, executor: IBuiltInStepExecutor): void {
 		this.stepExecutors.set(stepId, executor);
 		this.context?.logger.debug(`Registered executor for step: ${stepId}`);
@@ -318,40 +312,37 @@ export class DefaultPipelinePlugin implements IPlugin, IDefaultPipelinePlugin<Bu
 	}
 
 	isValidStepId(stepId: string): stepId is BuiltInStepId {
-		return DefaultPipelinePlugin.isBuiltInStep(stepId);
+		return StandardPipelinePlugin.STEPS_MAP.has(stepId as BuiltInStepId);
 	}
 
 	getStepIds(): readonly BuiltInStepId[] {
-		return DefaultPipelinePlugin.getBuiltInStepIds();
+		return StandardPipelinePlugin.STEPS.map((step) => step.id);
 	}
 
 	getStepDefinition(stepId?: BuiltInStepId | string): PipelineStepDefinition<BuiltInStepId> | undefined {
 		if (stepId) {
-			return DefaultPipelinePlugin.STEPS_MAP.get(stepId as BuiltInStepId);
+			return StandardPipelinePlugin.STEPS_MAP.get(stepId as BuiltInStepId);
 		}
-		return DefaultPipelinePlugin.STEPS[0];
+		return StandardPipelinePlugin.STEPS[0];
 	}
 
 	getStepDefinitions(): PipelineStepDefinition<BuiltInStepId>[] {
-		return [...DefaultPipelinePlugin.STEPS];
+		return [...StandardPipelinePlugin.STEPS];
 	}
 
 	async execute(
-		context: MutableGenerationContext,
-		options?: StepExecutionOptions,
-		onProgress?: StepProgressCallback
-	): Promise<MutableGenerationContext> {
-		const stepId = options?.settings?.stepId as string;
-		const execContext = options?.settings?.execContext as StepExecutionContext;
-
-		if (!stepId) {
-			throw new Error('DefaultPipelinePlugin.execute() requires stepId in options.settings');
-		}
-		if (!execContext) {
-			throw new Error('DefaultPipelinePlugin.execute() requires execContext in options.settings');
-		}
-
-		return this.executeStep(stepId, context, execContext, options, onProgress);
+		_directory: DirectoryReference,
+		_request: GenerationRequest,
+		_existing: ExistingItems,
+		_options?: PipelineExecutionOptions,
+		_onProgress?: PipelineProgressCallback
+	): Promise<PipelineResult> {
+		// Standard pipeline is engine-orchestrated — it should never be called directly.
+		// The engine calls executeStep() for each step individually.
+		throw new Error(
+			'StandardPipelinePlugin.execute() should not be called directly. ' +
+				'Use the pipeline engine to orchestrate step execution.'
+		);
 	}
 
 	async executeStep(
@@ -710,9 +701,9 @@ export class DefaultPipelinePlugin implements IPlugin, IDefaultPipelinePlugin<Bu
 	// IPlugin lifecycle
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
-		context.logger.log('Default Pipeline Plugin loading...');
+		context.logger.log('Standard Pipeline Plugin loading...');
 		this.registerBuiltInStepExecutors();
-		context.logger.log(`Default Pipeline Plugin loaded with ${this.stepExecutors.size} step executors`);
+		context.logger.log(`Standard Pipeline Plugin loaded with ${this.stepExecutors.size} step executors`);
 	}
 
 	private registerBuiltInStepExecutors(): void {
@@ -750,10 +741,10 @@ export class DefaultPipelinePlugin implements IPlugin, IDefaultPipelinePlugin<Bu
 
 	async healthCheck(): Promise<PluginHealthCheck> {
 		const registeredSteps = this.stepExecutors.size;
-		const totalSteps = DefaultPipelinePlugin.STEPS.length;
+		const totalSteps = StandardPipelinePlugin.STEPS.length;
 		const allRegistered = registeredSteps === totalSteps;
 
-		const missingSteps = DefaultPipelinePlugin.STEPS.filter((s) => !this.stepExecutors.has(s.id)).map((s) => s.id);
+		const missingSteps = StandardPipelinePlugin.STEPS.filter((s) => !this.stepExecutors.has(s.id)).map((s) => s.id);
 
 		return {
 			status: allRegistered ? 'healthy' : 'degraded',
@@ -775,14 +766,17 @@ export class DefaultPipelinePlugin implements IPlugin, IDefaultPipelinePlugin<Bu
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'System plugin providing the default generation pipeline with 15 built-in steps',
+			description: 'Standard 15-step generation pipeline with AI, search, extraction, and categorization',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
 			license: 'MIT',
 			builtIn: true,
 			systemPlugin: true,
-			visibility: 'hidden',
+			autoEnable: true,
+			visibility: 'public',
+			defaultForCapabilities: ['pipeline'],
+			selectableProviderCategories: ['ai-provider', 'search', 'screenshot', 'content-extractor'],
 			homepage: 'https://ever.works',
 			icon: {
 				type: 'svg',
@@ -792,4 +786,4 @@ export class DefaultPipelinePlugin implements IPlugin, IDefaultPipelinePlugin<Bu
 	}
 }
 
-export default DefaultPipelinePlugin;
+export default StandardPipelinePlugin;

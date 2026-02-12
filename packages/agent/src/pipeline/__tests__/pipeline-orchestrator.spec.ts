@@ -8,18 +8,15 @@ import {
 import { StepPipelineExecutorService } from '../step-pipeline-executor.service';
 import { FullPipelineExecutorService } from '../full-pipeline-executor.service';
 import { PipelineBuilderService } from '../pipeline-builder.service';
-import { DefaultPipelinePlugin } from '@ever-works/default-pipeline-plugin';
+import { MockPipelinePlugin, createLinearChain } from './mock-pipeline-plugin';
 import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
-import { AiFacadeService } from '../../facades/ai.facade';
-import { SearchFacadeService } from '../../facades/search.facade';
-import { ScreenshotFacadeService } from '../../facades/screenshot.facade';
-import { ContentExtractorFacadeService } from '../../facades/content-extractor.facade';
+import { PipelineFacadeService } from '../pipeline-facade.service';
 import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
 import type {
     DirectoryReference,
     GenerationRequest,
     ExistingItems,
-    IFullPipelinePlugin,
+    IPipelinePlugin,
     IPlugin,
     PluginManifest,
     PluginCategory,
@@ -27,12 +24,15 @@ import type {
     PipelineStepDefinition,
 } from '@ever-works/plugin';
 
+/** Simple 3-step linear chain for orchestrator tests */
+const ORCHESTRATOR_STEPS = createLinearChain(['step-init', 'step-process', 'step-finalize']);
+
 describe('PipelineOrchestratorService', () => {
     let service: PipelineOrchestratorService;
     let stepExecutor: StepPipelineExecutorService;
     let fullExecutor: FullPipelineExecutorService;
     let registry: PluginRegistryService;
-    let defaultPlugin: DefaultPipelinePlugin;
+    let standardPlugin: MockPipelinePlugin;
 
     const mockDirectory: DirectoryReference = {
         id: 'dir-123',
@@ -52,13 +52,13 @@ describe('PipelineOrchestratorService', () => {
         tags: [],
     };
 
-    const createMockFullPipelinePlugin = (id: string): IFullPipelinePlugin =>
+    const createMockFullPipelinePlugin = (id: string): IPipelinePlugin =>
         ({
             id,
             name: `Full Pipeline ${id}`,
             version: '1.0.0',
             category: 'pipeline' as PluginCategory,
-            capabilities: ['full-pipeline'],
+            capabilities: ['pipeline'],
             settingsSchema: { type: 'object', properties: {} },
             onLoad: jest.fn(),
             onUnload: jest.fn(),
@@ -82,11 +82,11 @@ describe('PipelineOrchestratorService', () => {
                     isCancelled: false,
                 },
             }),
-        }) as unknown as IFullPipelinePlugin;
+        }) as unknown as IPipelinePlugin;
 
     const createMockManifest = (
         id: string,
-        capabilities: string[] = ['full-pipeline'],
+        capabilities: string[] = ['pipeline'],
     ): PluginManifest => ({
         id,
         name: `Plugin ${id}`,
@@ -104,7 +104,7 @@ describe('PipelineOrchestratorService', () => {
                 StepPipelineExecutorService,
                 FullPipelineExecutorService,
                 PipelineBuilderService,
-                DefaultPipelinePlugin,
+                MockPipelinePlugin,
                 PluginRegistryService,
                 {
                     provide: EventEmitter2,
@@ -123,34 +123,28 @@ describe('PipelineOrchestratorService', () => {
                     },
                 },
                 {
-                    provide: AiFacadeService,
+                    provide: PipelineFacadeService,
                     useValue: {
-                        generateText: jest.fn().mockResolvedValue(''),
-                        generateStructuredOutput: jest.fn().mockResolvedValue({}),
-                        isConfigured: jest.fn().mockReturnValue(true),
-                    },
-                },
-                {
-                    provide: SearchFacadeService,
-                    useValue: {
-                        search: jest.fn().mockResolvedValue([]),
-                        extractContent: jest.fn().mockResolvedValue(null),
-                        isConfigured: jest.fn().mockReturnValue(true),
-                    },
-                },
-                {
-                    provide: ScreenshotFacadeService,
-                    useValue: {
-                        capture: jest.fn().mockResolvedValue(null),
-                        isConfigured: jest.fn().mockReturnValue(true),
-                    },
-                },
-                {
-                    provide: ContentExtractorFacadeService,
-                    useValue: {
-                        extractContent: jest.fn().mockResolvedValue(null),
-                        canHandle: jest.fn().mockReturnValue(false),
-                        isConfigured: jest.fn().mockReturnValue(true),
+                        createStepExecutionContext: jest.fn().mockReturnValue({
+                            aiFacade: {},
+                            searchFacade: {},
+                            screenshotFacade: {},
+                            contentExtractorFacade: {},
+                            dataSourceFacade: undefined,
+                            logger: {
+                                log: jest.fn(),
+                                debug: jest.fn(),
+                                warn: jest.fn(),
+                                error: jest.fn(),
+                            },
+                            directory: {
+                                id: 'dir-123',
+                                name: 'Test',
+                                slug: 'test',
+                                user: { id: 'user-123' },
+                            },
+                            user: { id: 'user-123' },
+                        }),
                     },
                 },
                 {
@@ -166,24 +160,26 @@ describe('PipelineOrchestratorService', () => {
         stepExecutor = module.get<StepPipelineExecutorService>(StepPipelineExecutorService);
         fullExecutor = module.get<FullPipelineExecutorService>(FullPipelineExecutorService);
         registry = module.get<PluginRegistryService>(PluginRegistryService);
-        defaultPlugin = module.get<DefaultPipelinePlugin>(DefaultPipelinePlugin);
+        standardPlugin = module.get<MockPipelinePlugin>(MockPipelinePlugin);
 
-        // Register the default pipeline plugin in the registry so getDefaultPipelinePlugin() can find it
-        // Note: We intentionally do NOT include 'pipeline-step' capability because the DefaultPipelinePlugin
-        // provides the built-in steps (via static getBuiltInSteps()), not by implementing getStepDefinition().
-        registry.register(defaultPlugin, {
-            id: 'default-pipeline',
-            name: 'Default Pipeline',
+        // Configure the mock pipeline with our 3-step chain
+        standardPlugin.setSteps(ORCHESTRATOR_STEPS);
+
+        // Register the standard pipeline plugin in the registry
+        registry.register(standardPlugin, {
+            id: 'standard-pipeline',
+            name: 'Standard Pipeline',
             version: '1.0.0',
-            description: 'Default pipeline plugin for tests',
+            description: 'Standard pipeline plugin for tests',
             category: 'pipeline',
-            capabilities: ['default-pipeline'],
+            capabilities: ['pipeline'],
+            defaultForCapabilities: ['pipeline'],
         });
-        registry.updateState('default-pipeline', 'loaded');
+        registry.updateState('standard-pipeline', 'loaded');
 
         // Register mock executors for built-in steps
-        for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
-            defaultPlugin.registerStepExecutor(step.id as any, {
+        for (const step of standardPlugin.getStepDefinitions()) {
+            standardPlugin.registerStepExecutor(step.id, {
                 name: step.name,
                 run: jest.fn().mockImplementation((ctx: MutableGenerationContext) => {
                     ctx.shouldStop = true;
@@ -207,7 +203,7 @@ describe('PipelineOrchestratorService', () => {
             expect(executeSpy).toHaveBeenCalled();
         });
 
-        it('should use full executor when full pipeline plugin is enabled', async () => {
+        it('should use full executor when explicit full pipeline is specified', async () => {
             const plugin = createMockFullPipelinePlugin('full-pipeline-plugin');
             registry.register(
                 plugin as unknown as IPlugin,
@@ -219,12 +215,17 @@ describe('PipelineOrchestratorService', () => {
 
             const fullExecuteSpy = jest.spyOn(fullExecutor, 'execute');
 
-            await service.execute(mockDirectory, mockRequest, mockExisting);
+            const requestWithPipeline: GenerationRequest = {
+                ...mockRequest,
+                providers: { pipeline: 'full-pipeline-plugin' },
+            };
+
+            await service.execute(mockDirectory, requestWithPipeline, mockExisting);
 
             expect(fullExecuteSpy).toHaveBeenCalledWith(
                 plugin,
                 mockDirectory,
-                mockRequest,
+                requestWithPipeline,
                 mockExisting,
                 undefined,
                 undefined,
@@ -332,28 +333,34 @@ describe('PipelineOrchestratorService', () => {
             expect(stepExecuteSpy).toHaveBeenCalled();
         });
 
-        it('should auto-detect full pipeline when providers.pipeline is undefined', async () => {
-            const plugin = createMockFullPipelinePlugin('auto-detected-pipeline');
-            registry.register(
-                plugin as unknown as IPlugin,
-                createMockManifest('auto-detected-pipeline'),
-                {
-                    state: 'loaded',
-                },
-            );
+        it('should prefer defaultForCapabilities pipeline when auto-detecting', async () => {
+            const plugin = createMockFullPipelinePlugin('other-pipeline');
+            registry.register(plugin as unknown as IPlugin, createMockManifest('other-pipeline'), {
+                state: 'loaded',
+            });
 
-            const fullExecuteSpy = jest.spyOn(fullExecutor, 'execute');
+            const stepExecuteSpy = jest.spyOn(stepExecutor, 'execute');
 
-            // No providers at all → pipeline is undefined → auto-detect
+            // No providers at all → auto-detect → standard-pipeline wins via defaultForCapabilities
             await service.execute(mockDirectory, mockRequest, mockExisting);
 
-            expect(fullExecuteSpy).toHaveBeenCalledWith(
-                plugin,
+            expect(stepExecuteSpy).toHaveBeenCalled();
+            // Verify it resolved to standard-pipeline (step-orchestratable), not other-pipeline
+            expect(stepExecuteSpy).toHaveBeenCalledWith(
+                standardPlugin,
                 mockDirectory,
                 mockRequest,
                 mockExisting,
                 undefined,
                 undefined,
+            );
+        });
+
+        it('should throw when no pipeline plugin is available', async () => {
+            registry.clear();
+
+            await expect(service.execute(mockDirectory, mockRequest, mockExisting)).rejects.toThrow(
+                'No pipeline plugin available',
             );
         });
 
@@ -364,6 +371,7 @@ describe('PipelineOrchestratorService', () => {
             await service.execute(mockDirectory, mockRequest, mockExisting, options);
 
             expect(executeSpy).toHaveBeenCalledWith(
+                expect.anything(),
                 mockDirectory,
                 mockRequest,
                 mockExisting,
@@ -445,14 +453,15 @@ describe('PipelineOrchestratorService', () => {
         });
     });
 
-    describe('getAvailableFullPipelinePlugins()', () => {
-        it('should return empty array when no plugins', () => {
-            const plugins = service.getAvailableFullPipelinePlugins();
+    describe('getAvailablePipelinePlugins()', () => {
+        it('should return standard-pipeline when no other plugins', () => {
+            const plugins = service.getAvailablePipelinePlugins();
 
-            expect(plugins).toEqual([]);
+            expect(plugins).toHaveLength(1);
+            expect(plugins[0].id).toBe('standard-pipeline');
         });
 
-        it('should return enabled full pipeline plugins', () => {
+        it('should return all enabled pipeline plugins including standard', () => {
             const plugin1 = createMockFullPipelinePlugin('full-plugin-1');
             const plugin2 = createMockFullPipelinePlugin('full-plugin-2');
 
@@ -463,9 +472,9 @@ describe('PipelineOrchestratorService', () => {
                 state: 'loaded',
             });
 
-            const plugins = service.getAvailableFullPipelinePlugins();
+            const plugins = service.getAvailablePipelinePlugins();
 
-            expect(plugins).toHaveLength(2);
+            expect(plugins).toHaveLength(3);
         });
     });
 
@@ -476,7 +485,12 @@ describe('PipelineOrchestratorService', () => {
 
             await service.resumeFromCheckpoint('dir-123');
 
-            expect(resumeSpy).toHaveBeenCalledWith('dir-123', undefined, undefined);
+            expect(resumeSpy).toHaveBeenCalledWith(
+                expect.anything(),
+                'dir-123',
+                undefined,
+                undefined,
+            );
         });
     });
 

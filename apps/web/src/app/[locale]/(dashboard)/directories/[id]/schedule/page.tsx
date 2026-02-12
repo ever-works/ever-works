@@ -18,14 +18,14 @@ function resolveActiveProviders(
     allProviders: Record<string, ProviderOption[]>,
 ): ResolvedProvider[] {
     const scheduleLabels: Record<ProviderCategoryKey, string> = {
-        fullPipeline: 'Pipeline',
+        pipeline: 'Pipeline',
         ai: 'AI',
         search: 'Search',
         screenshot: 'Screenshot',
         contentExtractor: 'Extractor',
     };
     const categories = Object.entries(SELECTABLE_PROVIDER_CATEGORIES).map(([key, def]) => ({
-        key: (key === 'fullPipeline' ? 'pipeline' : def.uiKey) as keyof ProvidersDto,
+        key: def.uiKey as keyof ProvidersDto,
         label: scheduleLabels[key as ProviderCategoryKey],
         options: allProviders[def.uiKey],
     }));
@@ -64,7 +64,7 @@ export default async function DirectorySchedulePage({ params }: Params) {
         notFound();
     }
 
-    const pipelineProviders = formSchema?.providers?.fullPipeline ?? [];
+    const pipelineProviders = formSchema?.providers?.pipeline ?? [];
     const lastRunProviders = configRes?.config?.metadata?.last_request_data?.providers;
     const schedule = scheduleRes?.schedule || null;
 

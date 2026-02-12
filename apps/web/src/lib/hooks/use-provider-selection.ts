@@ -24,15 +24,12 @@ export function useProviderSelection(initial?: Partial<ProviderSelectionState>) 
         [],
     );
 
-    const isFullPipeline = providers.pipeline !== null;
-
     const buildSelectedProviders = useCallback(
         (formSchema?: GeneratorFormSchema | null) => {
             const result: Record<string, string> = {};
 
             if (providers.pipeline) {
                 result.pipeline = providers.pipeline;
-                return result;
             }
 
             for (const { uiKey } of getIndividualProviderCategories()) {
@@ -60,9 +57,7 @@ export function useProviderSelection(initial?: Partial<ProviderSelectionState>) 
             if (!formSchema) return [];
 
             if (providers.pipeline) {
-                const pp = formSchema.providers.fullPipeline.find(
-                    (p) => p.id === providers.pipeline,
-                );
+                const pp = formSchema.providers.pipeline.find((p) => p.id === providers.pipeline);
                 return pp && !pp.configured ? [pp.name] : [];
             }
 
@@ -94,7 +89,6 @@ export function useProviderSelection(initial?: Partial<ProviderSelectionState>) 
     return {
         providers,
         handleProviderChange,
-        isFullPipeline,
         buildSelectedProviders,
         getUnconfiguredProviders,
     };

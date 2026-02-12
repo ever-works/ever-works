@@ -78,13 +78,8 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const [pluginConfig, setPluginConfig] = useState<Record<string, unknown>>({});
 
     // Provider selection (null = use directory/system default)
-    const {
-        providers,
-        handleProviderChange,
-        isFullPipeline,
-        buildSelectedProviders,
-        getUnconfiguredProviders,
-    } = useProviderSelection(lastRequestData?.providers);
+    const { providers, handleProviderChange, buildSelectedProviders, getUnconfiguredProviders } =
+        useProviderSelection(lastRequestData?.providers);
 
     // Seed data from the previous generation — used once during schema init,
     // should not trigger re-fetches when the parent re-renders with a new config reference.
@@ -257,7 +252,6 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                             formSchema={formSchema}
                             providers={providers}
                             onProviderChange={handleProviderChange}
-                            isFullPipeline={isFullPipeline}
                         />
                     )}
 

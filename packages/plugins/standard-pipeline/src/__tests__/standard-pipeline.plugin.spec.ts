@@ -1,21 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { DefaultPipelinePlugin } from '../default-pipeline.plugin';
+import { StandardPipelinePlugin } from '../standard-pipeline.plugin';
 import type { PluginContext, FormFieldDefinition, FormFieldGroup } from '@ever-works/plugin';
 
-describe('DefaultPipelinePlugin', () => {
-	let plugin: DefaultPipelinePlugin;
+describe('StandardPipelinePlugin', () => {
+	let plugin: StandardPipelinePlugin;
 
 	beforeEach(() => {
-		plugin = new DefaultPipelinePlugin();
+		plugin = new StandardPipelinePlugin();
 	});
 
 	describe('Plugin Properties', () => {
 		it('should have correct id', () => {
-			expect(plugin.id).toBe('default-pipeline');
+			expect(plugin.id).toBe('standard-pipeline');
 		});
 
 		it('should have correct name', () => {
-			expect(plugin.name).toBe('Default Pipeline');
+			expect(plugin.name).toBe('Standard Pipeline');
 		});
 
 		it('should have correct version', () => {
@@ -26,16 +26,12 @@ describe('DefaultPipelinePlugin', () => {
 			expect(plugin.category).toBe('pipeline');
 		});
 
-		it('should include pipeline-step capability', () => {
-			expect(plugin.capabilities).toContain('pipeline-step');
+		it('should include pipeline capability', () => {
+			expect(plugin.capabilities).toContain('pipeline');
 		});
 
 		it('should include form-schema-provider capability', () => {
 			expect(plugin.capabilities).toContain('form-schema-provider');
-		});
-
-		it('should include default-pipeline capability', () => {
-			expect(plugin.capabilities).toContain('default-pipeline');
 		});
 
 		it('should be marked as system plugin', () => {
@@ -347,21 +343,21 @@ describe('DefaultPipelinePlugin', () => {
 			});
 		});
 
-		describe('Static Methods', () => {
-			it('isBuiltInStep should identify built-in steps', () => {
-				expect(DefaultPipelinePlugin.isBuiltInStep('web-search')).toBe(true);
-				expect(DefaultPipelinePlugin.isBuiltInStep('items-extraction')).toBe(true);
-				expect(DefaultPipelinePlugin.isBuiltInStep('unknown-step')).toBe(false);
+		describe('Instance Methods', () => {
+			it('isValidStepId should identify built-in steps', () => {
+				expect(plugin.isValidStepId('web-search')).toBe(true);
+				expect(plugin.isValidStepId('items-extraction')).toBe(true);
+				expect(plugin.isValidStepId('unknown-step')).toBe(false);
 			});
 
-			it('getBuiltInStepIds should return all step IDs', () => {
-				const ids = DefaultPipelinePlugin.getBuiltInStepIds();
+			it('getStepIds should return all step IDs', () => {
+				const ids = plugin.getStepIds();
 				expect(Array.isArray(ids)).toBe(true);
 				expect(ids.length).toBe(15);
 			});
 
-			it('getBuiltInStep should return step by ID', () => {
-				const step = DefaultPipelinePlugin.getBuiltInStep('web-search');
+			it('getStepDefinition should return step by ID', () => {
+				const step = plugin.getStepDefinition('web-search');
 				expect(step).toBeDefined();
 				expect(step?.id).toBe('web-search');
 			});
@@ -405,7 +401,7 @@ describe('DefaultPipelinePlugin', () => {
 		it('should report healthy status after onLoad', async () => {
 			// Create a mock context for onLoad
 			const mockContext = {
-				pluginId: 'default-pipeline',
+				pluginId: 'standard-pipeline',
 				logger: {
 					log: vi.fn(),
 					debug: vi.fn(),
@@ -434,7 +430,7 @@ describe('DefaultPipelinePlugin', () => {
 					isProduction: false,
 					isTest: true,
 					tempDir: '/tmp',
-					dataDir: '/tmp/plugins/default-pipeline',
+					dataDir: '/tmp/plugins/standard-pipeline',
 					features: new Set<string>()
 				},
 				envVars: {
@@ -457,7 +453,7 @@ describe('DefaultPipelinePlugin', () => {
 			};
 
 			// Create a fresh plugin and call onLoad
-			const freshPlugin = new DefaultPipelinePlugin();
+			const freshPlugin = new StandardPipelinePlugin();
 			await freshPlugin.onLoad(mockContext as unknown as PluginContext);
 
 			const health = await freshPlugin.healthCheck();
@@ -469,14 +465,31 @@ describe('DefaultPipelinePlugin', () => {
 	describe('Manifest', () => {
 		it('should return valid manifest', () => {
 			const manifest = plugin.getManifest();
-			expect(manifest.id).toBe('default-pipeline');
-			expect(manifest.name).toBe('Default Pipeline');
+			expect(manifest.id).toBe('standard-pipeline');
+			expect(manifest.name).toBe('Standard Pipeline');
 			expect(manifest.version).toBe('1.0.0');
 			expect(manifest.category).toBe('pipeline');
-			expect(manifest.capabilities).toContain('pipeline-step');
+			expect(manifest.capabilities).toContain('pipeline');
 			expect(manifest.capabilities).toContain('form-schema-provider');
 			expect(manifest.builtIn).toBe(true);
 			expect(manifest.systemPlugin).toBe(true);
+		});
+
+		it('should declare defaultForCapabilities', () => {
+			const manifest = plugin.getManifest();
+			expect(manifest.defaultForCapabilities).toContain('pipeline');
+		});
+
+		it('should declare selectableProviderCategories', () => {
+			const manifest = plugin.getManifest();
+			expect(manifest.selectableProviderCategories).toEqual(
+				expect.arrayContaining(['ai-provider', 'search', 'screenshot', 'content-extractor'])
+			);
+		});
+
+		it('should have public visibility', () => {
+			const manifest = plugin.getManifest();
+			expect(manifest.visibility).toBe('public');
 		});
 	});
 });

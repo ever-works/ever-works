@@ -176,7 +176,7 @@ describe('GeneratorFormSchemaService', () => {
 
         it('should exclude pipeline plugin from additional form fields (no double-counting)', async () => {
             const pipelinePlugin = createFormSchemaPlugin(
-                'default-pipeline',
+                'standard-pipeline',
                 [
                     {
                         name: 'pipeline_field',
@@ -201,7 +201,7 @@ describe('GeneratorFormSchemaService', () => {
             const dsRegistered = createRegistered(dsPlugin);
 
             mockRegistry.get.mockImplementation((id: string) => {
-                if (id === 'default-pipeline') return pipelineRegistered;
+                if (id === 'standard-pipeline') return pipelineRegistered;
                 return undefined;
             });
             mockRegistry.getByCapability.mockImplementation((cap: string) => {
@@ -341,13 +341,13 @@ describe('GeneratorFormSchemaService', () => {
 
         it('should skip the pipeline plugin during validation', async () => {
             const pipelinePlugin = createMockPlugin({
-                id: 'default-pipeline',
+                id: 'standard-pipeline',
                 capabilities: ['pipeline', 'form-schema-provider'],
             });
             const pipelineRegistered = createRegistered(pipelinePlugin);
 
             mockRegistry.get.mockImplementation((id: string) => {
-                if (id === 'default-pipeline') return pipelineRegistered;
+                if (id === 'standard-pipeline') return pipelineRegistered;
                 return undefined;
             });
             mockRegistry.getByCapability.mockReturnValue([pipelineRegistered]);
@@ -609,6 +609,81 @@ describe('GeneratorFormSchemaService', () => {
             await expect(
                 svc.validateSelectedProviders({ ai: 'my-plugin' }, { userId: 'u1' }),
             ).rejects.toThrow('not available');
+        });
+    });
+
+    describe('selectableProviderCategories filtering', () => {
+        it('should filter provider categories based on pipeline selectableProviderCategories', async () => {
+            const pipelinePlugin = createFormSchemaPlugin('claude-code', [], {
+                category: 'pipeline',
+                capabilities: ['pipeline', 'form-schema-provider'],
+            });
+            const pipelineRegistered = createRegistered(pipelinePlugin, {
+                selectableProviderCategories: ['screenshot'],
+            });
+
+            const aiPlugin = createMockPlugin({
+                id: 'openrouter',
+                capabilities: ['ai-provider'],
+            });
+            const aiRegistered = createRegistered(aiPlugin);
+
+            const screenshotPlugin = createMockPlugin({
+                id: 'screenshotone',
+                capabilities: ['screenshot'],
+            });
+            const screenshotRegistered = createRegistered(screenshotPlugin);
+
+            mockRegistry.get.mockImplementation((id: string) => {
+                if (id === 'claude-code') return pipelineRegistered;
+                return undefined;
+            });
+            mockRegistry.getByCapability.mockImplementation((cap: string) => {
+                if (cap === 'pipeline') return [pipelineRegistered];
+                if (cap === 'ai-provider') return [aiRegistered];
+                if (cap === 'screenshot') return [screenshotRegistered];
+                if (cap === 'form-schema-provider') return [pipelineRegistered];
+                return [];
+            });
+
+            const schema = await service.getFormSchema('claude-code');
+
+            // Screenshot should be populated (declared in selectableProviderCategories)
+            expect(schema.providers.screenshot.length).toBe(1);
+            // AI should be empty (not declared in selectableProviderCategories)
+            expect(schema.providers.ai.length).toBe(0);
+            // Pipeline should still be populated
+            expect(schema.providers.pipeline.length).toBe(1);
+        });
+
+        it('should show all provider categories when selectableProviderCategories is not set', async () => {
+            const pipelinePlugin = createFormSchemaPlugin('standard-pipeline', [], {
+                category: 'pipeline',
+                capabilities: ['pipeline', 'form-schema-provider'],
+            });
+            const pipelineRegistered = createRegistered(pipelinePlugin);
+
+            const aiPlugin = createMockPlugin({
+                id: 'openrouter',
+                capabilities: ['ai-provider'],
+            });
+            const aiRegistered = createRegistered(aiPlugin);
+
+            mockRegistry.get.mockImplementation((id: string) => {
+                if (id === 'standard-pipeline') return pipelineRegistered;
+                return undefined;
+            });
+            mockRegistry.getByCapability.mockImplementation((cap: string) => {
+                if (cap === 'pipeline') return [pipelineRegistered];
+                if (cap === 'ai-provider') return [aiRegistered];
+                if (cap === 'form-schema-provider') return [pipelineRegistered];
+                return [];
+            });
+
+            const schema = await service.getFormSchema('standard-pipeline');
+
+            // AI should be populated (no filtering when selectableProviderCategories is unset)
+            expect(schema.providers.ai.length).toBe(1);
         });
     });
 

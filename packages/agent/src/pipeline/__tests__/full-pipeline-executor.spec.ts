@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
 import { FullPipelineExecutorService } from '../full-pipeline-executor.service';
+import { PipelineFacadeService } from '../pipeline-facade.service';
 import { PipelineEvents } from '../step-pipeline-executor.service';
 
 // Silence logger during tests
@@ -14,7 +15,7 @@ import type {
     DirectoryReference,
     GenerationRequest,
     ExistingItems,
-    IFullPipelinePlugin,
+    IPipelinePlugin,
     PluginCategory,
     PipelineResult,
     PipelineStepDefinition,
@@ -78,7 +79,7 @@ describe('FullPipelineExecutorService', () => {
             supportsCancel?: boolean;
             supportsGetState?: boolean;
         } = {},
-    ): IFullPipelinePlugin => {
+    ): IPipelinePlugin => {
         const {
             executeResult = mockSuccessResult,
             executeError,
@@ -120,12 +121,12 @@ describe('FullPipelineExecutorService', () => {
             },
         ] as PipelineStepDefinition[];
 
-        const plugin: IFullPipelinePlugin = {
+        const plugin: IPipelinePlugin = {
             id,
             name: `Full Pipeline Plugin ${id}`,
             version: '1.0.0',
             category: 'pipeline' as PluginCategory,
-            capabilities: ['full-pipeline'],
+            capabilities: ['pipeline'],
             settingsSchema: { type: 'object', properties: {} },
             onLoad: jest.fn(),
             onUnload: jest.fn(),
@@ -174,6 +175,18 @@ describe('FullPipelineExecutorService', () => {
                         off: jest.fn(),
                     },
                 },
+                {
+                    provide: PipelineFacadeService,
+                    useValue: {
+                        createStepExecutionContext: jest.fn().mockReturnValue({
+                            ai: {},
+                            search: {},
+                            screenshot: {},
+                            contentExtractor: {},
+                            dataSource: {},
+                        }),
+                    },
+                },
             ],
         }).compile();
 
@@ -195,7 +208,7 @@ describe('FullPipelineExecutorService', () => {
                 mockDirectory,
                 mockRequest,
                 mockExisting,
-                undefined,
+                expect.objectContaining({ execContext: expect.any(Object) }),
                 undefined,
             );
             expect(result.success).toBe(true);
@@ -281,7 +294,7 @@ describe('FullPipelineExecutorService', () => {
                 mockDirectory,
                 mockRequest,
                 mockExisting,
-                options,
+                expect.objectContaining({ ...options, execContext: expect.any(Object) }),
                 undefined,
             );
         });
@@ -303,7 +316,7 @@ describe('FullPipelineExecutorService', () => {
                 mockDirectory,
                 mockRequest,
                 mockExisting,
-                undefined,
+                expect.objectContaining({ execContext: expect.any(Object) }),
                 onProgress,
             );
         });

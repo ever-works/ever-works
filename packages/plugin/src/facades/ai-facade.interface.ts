@@ -35,7 +35,7 @@ export interface AiRoutingOptions {
  */
 export interface AiModelRoutingSettings {
 	/** Default model when no complexity specified */
-	readonly defaultModel?: string;
+	readonly defaultModel: string;
 	/** Model for simple tasks (fast, economical) */
 	readonly simpleModel?: string;
 	/** Model for medium complexity tasks (balanced) */

@@ -41,11 +41,12 @@ describe('OpenRouterPlugin', () => {
 	});
 
 	describe('settingsSchema', () => {
-		it('should have required apiKey field', () => {
+		it('should have required apiKey and defaultModel fields', () => {
 			expect(plugin.settingsSchema).toBeDefined();
 			expect(plugin.settingsSchema.type).toBe('object');
 			expect(plugin.settingsSchema.properties).toHaveProperty('apiKey');
 			expect(plugin.settingsSchema.required).toContain('apiKey');
+			expect(plugin.settingsSchema.required).toContain('defaultModel');
 		});
 
 		it('should have apiKey as secret and user-scoped', () => {

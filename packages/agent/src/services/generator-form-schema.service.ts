@@ -63,11 +63,22 @@ export class GeneratorFormSchemaService {
         pipelineId?: string,
         options?: FormSchemaOptions,
     ): Promise<GeneratorFormSchema> {
+        // Resolve the selected pipeline plugin
+        const pipelinePlugin = this.resolvePipelinePlugin(pipelineId);
+
         // Get available providers for each capability category (filtered by enable status)
         const providers = await this.getAvailableProviders(options);
 
-        // Resolve the selected pipeline plugin
-        const pipelinePlugin = this.resolvePipelinePlugin(pipelineId);
+        // Filter provider categories by pipeline's selectableProviderCategories
+        const selectable = pipelinePlugin?.manifest.selectableProviderCategories;
+        if (selectable) {
+            for (const cat of getSelectableCategories()) {
+                if (cat.uiKey === 'pipeline') continue;
+                if (!selectable.includes(cat.capability)) {
+                    providers[cat.uiKey as keyof typeof providers] = [];
+                }
+            }
+        }
 
         // Get form fields and groups from the pipeline plugin
         let pluginFields: FormFieldDefinition[] = [];
@@ -568,13 +579,24 @@ export class GeneratorFormSchemaService {
             this.logger.warn(`Pipeline plugin not found or not enabled: ${pipelineId}`);
         }
 
-        // Fall back to default-pipeline
-        const defaultPipeline = this.pluginRegistry.get('default-pipeline');
-        if (defaultPipeline && defaultPipeline.state === 'loaded') {
-            return defaultPipeline;
+        // Find default pipeline via registry: prefer one with defaultForCapabilities
+        const pipelines = this.pluginRegistry.getByCapability(PLUGIN_CAPABILITIES.PIPELINE);
+
+        for (const registered of pipelines) {
+            if (registered.state !== 'loaded') continue;
+            if (registered.manifest.defaultForCapabilities?.includes('pipeline')) {
+                return registered;
+            }
         }
 
-        this.logger.warn('No default pipeline plugin found');
+        // Fallback: first loaded pipeline
+        for (const registered of pipelines) {
+            if (registered.state === 'loaded') {
+                return registered;
+            }
+        }
+
+        this.logger.warn('No pipeline plugin found');
         return undefined;
     }
 }

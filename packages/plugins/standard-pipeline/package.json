@@ -1,7 +1,7 @@
 {
-	"name": "@ever-works/default-pipeline-plugin",
+	"name": "@ever-works/standard-pipeline-plugin",
 	"version": "1.0.0",
-	"description": "Default Pipeline Plugin - System plugin providing the standard generation pipeline",
+	"description": "Standard Pipeline Plugin - Provides the standard 15-step generation pipeline",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -39,22 +39,31 @@
 	},
 	"everworks": {
 		"plugin": {
-			"id": "default-pipeline",
-			"name": "Default Pipeline",
+			"id": "standard-pipeline",
+			"name": "Standard Pipeline",
 			"version": "1.0.0",
 			"category": "pipeline",
 			"capabilities": [
-				"pipeline-step",
+				"pipeline",
 				"form-schema-provider"
 			],
-			"description": "System plugin providing the standard 15-step generation pipeline",
+			"description": "Standard 15-step generation pipeline with engine-orchestrated step execution",
 			"author": {
 				"name": "Ever Works Team"
 			},
 			"license": "MIT",
-			"systemPlugin": true,
 			"builtIn": true,
-			"visibility": "hidden"
+			"autoEnable": true,
+			"visibility": "public",
+			"defaultForCapabilities": [
+				"pipeline"
+			],
+			"selectableProviderCategories": [
+				"ai-provider",
+				"search",
+				"screenshot",
+				"content-extractor"
+			]
 		}
 	}
 }

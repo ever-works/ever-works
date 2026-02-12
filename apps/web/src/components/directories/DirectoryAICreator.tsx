@@ -40,13 +40,8 @@ export function DirectoryAICreator({
 
     // Provider/pipeline selection state
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
-    const {
-        providers,
-        handleProviderChange,
-        isFullPipeline,
-        buildSelectedProviders,
-        getUnconfiguredProviders,
-    } = useProviderSelection();
+    const { providers, handleProviderChange, buildSelectedProviders, getUnconfiguredProviders } =
+        useProviderSelection();
     const [pluginConfig, setPluginConfig] = useState<Record<string, unknown>>({});
 
     // Load form schema on mount
@@ -221,7 +216,6 @@ export function DirectoryAICreator({
                             formSchema={formSchema}
                             providers={providers}
                             onProviderChange={handleProviderChange}
-                            isFullPipeline={isFullPipeline}
                         />
                         {formSchema.pluginFields.length > 0 && (
                             <DynamicPluginFields

@@ -110,7 +110,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				'x-hidden': true
 			}
 		},
-		required: ['apiKey']
+		required: ['apiKey', 'defaultModel']
 	};
 
 	// Lifecycle hooks

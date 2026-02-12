@@ -105,13 +105,13 @@ export function ProviderSelector({
 }
 
 interface PipelineModeSelectorProps {
-    fullPipelineProviders: ProviderOption[];
+    pipelineProviders: ProviderOption[];
     selectedPipeline: string | null;
     onChange: (pipelineId: string | null) => void;
 }
 
 export function PipelineModeSelector({
-    fullPipelineProviders,
+    pipelineProviders,
     selectedPipeline,
     onChange,
 }: PipelineModeSelectorProps) {
@@ -148,7 +148,7 @@ export function PipelineModeSelector({
                     </div>
                 </label>
 
-                {fullPipelineProviders.map((provider) => {
+                {pipelineProviders.map((provider) => {
                     const radioLabel = (
                         <label className="flex items-start gap-3 cursor-pointer">
                             <input

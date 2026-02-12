@@ -56,8 +56,7 @@ export class GeneratePromptService extends BasePromptService {
         let pipelineId: string | null = null;
 
         // Check if full pipeline providers are available
-        const configuredPipelines =
-            schema.providers.fullPipeline?.filter((p) => p.configured) || [];
+        const configuredPipelines = schema.providers.pipeline?.filter((p) => p.configured) || [];
 
         if (configuredPipelines.length > 0) {
             const mode = await this.promptSelect(

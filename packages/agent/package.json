@@ -145,7 +145,6 @@
     },
     "dependencies": {
         "@ever-works/contracts": "workspace:*",
-        "@ever-works/default-pipeline-plugin": "workspace:*",
         "@ever-works/plugin": "workspace:*",
         "@langchain/textsplitters": "^0.1.0",
         "@nestjs/cache-manager": "^3.1.0",
