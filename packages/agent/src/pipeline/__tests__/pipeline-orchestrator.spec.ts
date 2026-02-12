@@ -478,15 +478,16 @@ describe('PipelineOrchestratorService', () => {
     });
 
     describe('resumeFromCheckpoint()', () => {
-        it('should delegate to step executor', async () => {
+        it('should delegate to step executor with pipelineId', async () => {
             const resumeSpy = jest.spyOn(stepExecutor, 'resumeFromCheckpoint');
             resumeSpy.mockResolvedValue(null);
 
-            await service.resumeFromCheckpoint('dir-123');
+            await service.resumeFromCheckpoint('dir-123', 'standard-pipeline');
 
             expect(resumeSpy).toHaveBeenCalledWith(
                 expect.anything(),
                 'dir-123',
+                'standard-pipeline',
                 undefined,
                 undefined,
             );
@@ -494,13 +495,91 @@ describe('PipelineOrchestratorService', () => {
     });
 
     describe('clearCheckpoint()', () => {
-        it('should delegate to step executor', async () => {
+        it('should delegate to step executor with pipelineId', async () => {
             const clearSpy = jest.spyOn(stepExecutor, 'clearCheckpoint');
             clearSpy.mockResolvedValue(undefined);
 
-            await service.clearCheckpoint('dir-123');
+            await service.clearCheckpoint('dir-123', 'standard-pipeline');
 
-            expect(clearSpy).toHaveBeenCalledWith('dir-123');
+            expect(clearSpy).toHaveBeenCalledWith('dir-123', 'standard-pipeline');
+        });
+    });
+
+    describe('resumeOrExecute()', () => {
+        it('should try resume for step-orchestratable pipeline and fall back to fresh execution', async () => {
+            const resumeSpy = jest.spyOn(stepExecutor, 'resumeFromCheckpoint');
+            resumeSpy.mockResolvedValue(null); // No checkpoint found
+
+            const executeSpy = jest.spyOn(stepExecutor, 'execute');
+
+            await service.resumeOrExecute(mockDirectory, mockRequest, mockExisting);
+
+            // Should have tried to resume first
+            expect(resumeSpy).toHaveBeenCalledWith(
+                standardPlugin,
+                mockDirectory.id,
+                standardPlugin.id,
+                undefined,
+                undefined,
+            );
+
+            // Should have fallen back to fresh execution
+            expect(executeSpy).toHaveBeenCalled();
+        });
+
+        it('should return resumed result when checkpoint exists', async () => {
+            const mockResult = {
+                success: true,
+                items: [],
+                categories: [],
+                tags: [],
+                brands: [],
+                duration: 500,
+                stepsCompleted: 3,
+                totalSteps: 3,
+                state: {
+                    steps: new Map(),
+                    completedSteps: ['step-init', 'step-process', 'step-finalize'],
+                    failedSteps: [],
+                    isRunning: false,
+                    isCancelled: false,
+                },
+            };
+
+            const resumeSpy = jest.spyOn(stepExecutor, 'resumeFromCheckpoint');
+            resumeSpy.mockResolvedValue(mockResult as any);
+
+            const executeSpy = jest.spyOn(stepExecutor, 'execute');
+
+            const result = await service.resumeOrExecute(mockDirectory, mockRequest, mockExisting);
+
+            expect(result.success).toBe(true);
+            // Should NOT have called fresh execute
+            expect(executeSpy).not.toHaveBeenCalled();
+        });
+
+        it('should skip resume for non-step-orchestratable pipelines', async () => {
+            const fullPlugin = createMockFullPipelinePlugin('full-pipeline-plugin');
+            registry.register(
+                fullPlugin as unknown as IPlugin,
+                createMockManifest('full-pipeline-plugin'),
+                { state: 'loaded' },
+            );
+
+            const resumeSpy = jest.spyOn(stepExecutor, 'resumeFromCheckpoint');
+            const fullExecuteSpy = jest.spyOn(fullExecutor, 'execute');
+
+            const requestWithPipeline: GenerationRequest = {
+                ...mockRequest,
+                providers: { pipeline: 'full-pipeline-plugin' },
+            };
+
+            await service.resumeOrExecute(mockDirectory, requestWithPipeline, mockExisting);
+
+            // Should NOT have tried to resume (full pipeline is not step-orchestratable)
+            expect(resumeSpy).not.toHaveBeenCalled();
+            // Should have gone straight to execute
+            expect(fullExecuteSpy).toHaveBeenCalled();
         });
     });
 });

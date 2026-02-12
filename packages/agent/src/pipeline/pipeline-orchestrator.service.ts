@@ -148,16 +148,61 @@ export class PipelineOrchestratorService {
 
     async resumeFromCheckpoint(
         directoryId: string,
+        pipelineId: string,
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult | null> {
         // Resume is only supported in step mode — resolve the default pipeline plugin
         const plugin = this.resolvePipelinePlugin(undefined, directoryId);
-        return this.stepExecutor.resumeFromCheckpoint(plugin, directoryId, options, onProgress);
+        return this.stepExecutor.resumeFromCheckpoint(
+            plugin,
+            directoryId,
+            pipelineId,
+            options,
+            onProgress,
+        );
     }
 
-    async clearCheckpoint(directoryId: string): Promise<void> {
-        await this.stepExecutor.clearCheckpoint(directoryId);
+    async clearCheckpoint(directoryId: string, pipelineId: string): Promise<void> {
+        await this.stepExecutor.clearCheckpoint(directoryId, pipelineId);
+    }
+
+    /**
+     * Try to resume from a checkpoint; if none exists, run a fresh execution.
+     * Only step-orchestratable pipelines support checkpoint resume.
+     */
+    async resumeOrExecute(
+        directory: DirectoryReference,
+        request: GenerationRequest,
+        existing: ExistingItems,
+        options?: PipelineExecutionOptions,
+        onProgress?: PipelineProgressCallback,
+    ): Promise<PipelineResult> {
+        const plugin = this.resolvePipelinePlugin(
+            request.providers?.pipeline,
+            directory.id,
+            directory.user?.id,
+        );
+
+        // Only step-orchestratable pipelines support checkpoint resume
+        if (isStepOrchestratablePipeline(plugin)) {
+            const resumed = await this.stepExecutor.resumeFromCheckpoint(
+                plugin,
+                directory.id,
+                plugin.id,
+                options,
+                onProgress,
+            );
+            if (resumed) {
+                this.logger.log(
+                    `Resumed from checkpoint for "${directory.id}", success=${resumed.success}`,
+                );
+                return resumed;
+            }
+        }
+
+        // No checkpoint or not resumable — fresh execution
+        return this.execute(directory, request, existing, options, onProgress);
     }
 
     /**

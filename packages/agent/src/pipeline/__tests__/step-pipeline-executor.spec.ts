@@ -265,12 +265,12 @@ describe('StepPipelineExecutorService', () => {
             );
         });
 
-        it('should save checkpoint after each step', async () => {
+        it('should save checkpoint after each step with pipeline-aware key', async () => {
             await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
 
-            // Verify checkpoint was saved as serialized string
+            // Verify checkpoint was saved with pipeline-aware key
             expect(cacheManager.set).toHaveBeenCalledWith(
-                `pipeline-checkpoint-${mockDirectory.id}`,
+                `pipeline-checkpoint-${mockDirectory.id}-${standardPlugin.id}`,
                 expect.any(String),
                 expect.any(Number),
             );
@@ -280,6 +280,17 @@ describe('StepPipelineExecutorService', () => {
             const checkpoint = superjson.parse<CheckpointData>(serialized);
             expect(checkpoint.stepIndex).toBe(0);
             expect(checkpoint.stepName).toBe('Step Init');
+            expect(checkpoint.pipelineId).toBe(standardPlugin.id);
+            expect(checkpoint.schemaVersion).toBe(2);
+        });
+
+        it('should clear checkpoint after successful pipeline completion', async () => {
+            await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
+
+            // Verify checkpoint was cleared on success
+            expect(cacheManager.del).toHaveBeenCalledWith(
+                `pipeline-checkpoint-${mockDirectory.id}-${standardPlugin.id}`,
+            );
         });
 
         it('should convert Sets and Maps to arrays when saving checkpoint', async () => {
@@ -560,7 +571,7 @@ describe('StepPipelineExecutorService', () => {
         it('should return null when no checkpoint exists', async () => {
             cacheManager.get.mockResolvedValue(undefined);
 
-            const checkpoint = await service.loadCheckpoint(mockDirectory.id);
+            const checkpoint = await service.loadCheckpoint(mockDirectory.id, 'standard-pipeline');
 
             expect(checkpoint).toBeNull();
         });
@@ -569,6 +580,7 @@ describe('StepPipelineExecutorService', () => {
             const mockCheckpoint: CheckpointData = {
                 stepIndex: 1,
                 stepName: 'Step Process',
+                pipelineId: 'standard-pipeline',
                 timestamp: new Date().toISOString(),
                 context: {
                     directory: mockDirectory,
@@ -600,27 +612,38 @@ describe('StepPipelineExecutorService', () => {
                     featuredItemHints: [],
                 },
                 completedSteps: ['step-init'],
-                schemaVersion: 1,
+                schemaVersion: 2,
             };
 
             // Serialize with superjson as the real implementation does
             cacheManager.get.mockResolvedValue(superjson.stringify(mockCheckpoint));
 
-            const checkpoint = await service.loadCheckpoint(mockDirectory.id);
+            const checkpoint = await service.loadCheckpoint(mockDirectory.id, 'standard-pipeline');
 
             expect(checkpoint).not.toBeNull();
             expect(checkpoint!.stepIndex).toBe(mockCheckpoint.stepIndex);
             expect(checkpoint!.stepName).toBe(mockCheckpoint.stepName);
+            expect(checkpoint!.pipelineId).toBe('standard-pipeline');
             expect(checkpoint!.schemaVersion).toBe(mockCheckpoint.schemaVersion);
+        });
+
+        it('should use pipeline-aware cache key', async () => {
+            cacheManager.get.mockResolvedValue(undefined);
+
+            await service.loadCheckpoint('dir-123', 'my-pipeline');
+
+            expect(cacheManager.get).toHaveBeenCalledWith(
+                'pipeline-checkpoint-dir-123-my-pipeline',
+            );
         });
     });
 
     describe('clearCheckpoint()', () => {
-        it('should delete checkpoint from cache', async () => {
-            await service.clearCheckpoint(mockDirectory.id);
+        it('should delete checkpoint from cache using pipeline-aware key', async () => {
+            await service.clearCheckpoint(mockDirectory.id, 'standard-pipeline');
 
             expect(cacheManager.del).toHaveBeenCalledWith(
-                `pipeline-checkpoint-${mockDirectory.id}`,
+                `pipeline-checkpoint-${mockDirectory.id}-standard-pipeline`,
             );
         });
     });
@@ -629,7 +652,11 @@ describe('StepPipelineExecutorService', () => {
         it('should return null when no checkpoint exists', async () => {
             cacheManager.get.mockResolvedValue(undefined);
 
-            const result = await service.resumeFromCheckpoint(standardPlugin, mockDirectory.id);
+            const result = await service.resumeFromCheckpoint(
+                standardPlugin,
+                mockDirectory.id,
+                standardPlugin.id,
+            );
 
             expect(result).toBeNull();
         });
@@ -638,6 +665,7 @@ describe('StepPipelineExecutorService', () => {
             const oldCheckpoint = {
                 stepIndex: 1,
                 stepName: 'Step Process',
+                pipelineId: standardPlugin.id,
                 timestamp: new Date().toISOString(),
                 context: {},
                 completedSteps: [],
@@ -647,11 +675,15 @@ describe('StepPipelineExecutorService', () => {
             // Serialize with superjson as the real implementation does
             cacheManager.get.mockResolvedValue(superjson.stringify(oldCheckpoint));
 
-            const result = await service.resumeFromCheckpoint(standardPlugin, mockDirectory.id);
+            const result = await service.resumeFromCheckpoint(
+                standardPlugin,
+                mockDirectory.id,
+                standardPlugin.id,
+            );
 
             expect(result).toBeNull();
             expect(cacheManager.del).toHaveBeenCalledWith(
-                `pipeline-checkpoint-${mockDirectory.id}`,
+                `pipeline-checkpoint-${mockDirectory.id}-${standardPlugin.id}`,
             );
         });
 
@@ -669,6 +701,7 @@ describe('StepPipelineExecutorService', () => {
             const mockCheckpoint: CheckpointData = {
                 stepIndex: 0,
                 stepName: 'Step Init',
+                pipelineId: standardPlugin.id,
                 timestamp: new Date().toISOString(),
                 context: {
                     directory: mockDirectory,
@@ -705,7 +738,7 @@ describe('StepPipelineExecutorService', () => {
                     subject: 'Test Subject',
                 },
                 completedSteps: [],
-                schemaVersion: 1,
+                schemaVersion: 2,
             };
 
             // Serialize with superjson as the real implementation does
@@ -727,7 +760,7 @@ describe('StepPipelineExecutorService', () => {
                 });
             }
 
-            await service.resumeFromCheckpoint(standardPlugin, mockDirectory.id);
+            await service.resumeFromCheckpoint(standardPlugin, mockDirectory.id, standardPlugin.id);
 
             expect(capturedContext).not.toBeNull();
             // Verify Sets were restored correctly
@@ -756,6 +789,7 @@ describe('StepPipelineExecutorService', () => {
             const mockCheckpoint: CheckpointData = {
                 stepIndex: 0,
                 stepName: 'Step Init',
+                pipelineId: standardPlugin.id,
                 timestamp: new Date().toISOString(),
                 context: {
                     directory: mockDirectory,
@@ -787,7 +821,7 @@ describe('StepPipelineExecutorService', () => {
                     featuredItemHints: [],
                 },
                 completedSteps: [],
-                schemaVersion: 1,
+                schemaVersion: 2,
             };
 
             // Serialize with superjson as the real implementation does
@@ -809,7 +843,7 @@ describe('StepPipelineExecutorService', () => {
                 });
             }
 
-            await service.resumeFromCheckpoint(standardPlugin, mockDirectory.id);
+            await service.resumeFromCheckpoint(standardPlugin, mockDirectory.id, standardPlugin.id);
 
             expect(capturedContext).not.toBeNull();
             expect(capturedContext!.processedSourceUrls instanceof Set).toBe(true);

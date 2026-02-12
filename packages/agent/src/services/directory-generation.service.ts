@@ -972,7 +972,9 @@ export class DirectoryGenerationService {
         let generationStats: GenerationStats | null = null;
 
         try {
-            const generated = await this.dataGenerator.initialize(directory, user, dto);
+            const generated = await this.dataGenerator.initialize(directory, user, dto, {
+                tryResume: context.triggeredBy === 'schedule',
+            });
 
             if (generated.success === false) {
                 const { error } = generated;

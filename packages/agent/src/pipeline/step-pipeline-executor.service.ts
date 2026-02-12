@@ -38,6 +38,8 @@ export interface CheckpointData {
     stepIndex: number;
     /** Name of the last completed step */
     stepName: string;
+    /** Pipeline plugin ID that created this checkpoint */
+    pipelineId: string;
     /** When the checkpoint was created */
     timestamp: string;
     /** Serializable context snapshot */
@@ -57,7 +59,7 @@ const CHECKPOINT_TTL_MS = 24 * 60 * 60 * 1000;
  * Current checkpoint schema version
  * Increment when checkpoint structure changes to invalidate old checkpoints
  */
-const CURRENT_CHECKPOINT_VERSION = 1;
+const CURRENT_CHECKPOINT_VERSION = 2;
 
 /**
  * Pipeline event names for lifecycle notifications.
@@ -179,6 +181,7 @@ export class StepPipelineExecutorService {
                         context,
                         currentStepIndex + groupSteps.indexOf(step),
                         pipeline.steps.length,
+                        plugin.id,
                         options,
                         onProgress,
                     ),
@@ -215,6 +218,8 @@ export class StepPipelineExecutorService {
                 `Pipeline completed: ${runner.getState().completedSteps.length}/${pipeline.steps.length} steps`,
             );
 
+            await this.clearCheckpoint(directory.id, plugin.id);
+
             return this.createSuccessResult(context, runner, startTime);
         } catch (error) {
             runner.completeExecution();
@@ -246,6 +251,7 @@ export class StepPipelineExecutorService {
         context: TypedGenerationContext,
         stepIndex: number,
         totalSteps: number,
+        pipelineId: string,
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<void> {
@@ -308,6 +314,7 @@ export class StepPipelineExecutorService {
             // Save checkpoint
             await this.saveCheckpoint(
                 directory,
+                pipelineId,
                 context,
                 stepIndex,
                 step.name,
@@ -351,10 +358,11 @@ export class StepPipelineExecutorService {
     async resumeFromCheckpoint(
         plugin: IPipelinePlugin,
         directoryId: string,
+        pipelineId: string,
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult | null> {
-        const checkpoint = await this.loadCheckpoint(directoryId);
+        const checkpoint = await this.loadCheckpoint(directoryId, pipelineId);
         if (!checkpoint) {
             this.logger.warn(`No checkpoint found for directory: ${directoryId}`);
             return null;
@@ -474,6 +482,7 @@ export class StepPipelineExecutorService {
      */
     private async saveCheckpoint(
         directory: DirectoryReference,
+        pipelineId: string,
         context: TypedGenerationContext,
         stepIndex: number,
         stepName: string,
@@ -483,12 +492,13 @@ export class StepPipelineExecutorService {
             return;
         }
 
-        const checkpointKey = `pipeline-checkpoint-${directory.id}`;
+        const checkpointKey = `pipeline-checkpoint-${directory.id}-${pipelineId}`;
         const snapshot = context.toSnapshot();
 
         const checkpointData: CheckpointData = {
             stepIndex,
             stepName,
+            pipelineId,
             timestamp: new Date().toISOString(),
             context: snapshot,
             completedSteps: [...completedSteps],
@@ -508,12 +518,12 @@ export class StepPipelineExecutorService {
     /**
      * Load checkpoint
      */
-    async loadCheckpoint(directoryId: string): Promise<CheckpointData | null> {
+    async loadCheckpoint(directoryId: string, pipelineId: string): Promise<CheckpointData | null> {
         if (!this.cacheManager) {
             return null;
         }
 
-        const checkpointKey = `pipeline-checkpoint-${directoryId}`;
+        const checkpointKey = `pipeline-checkpoint-${directoryId}-${pipelineId}`;
         try {
             const serialized = await this.cacheManager.get<string>(checkpointKey);
 
@@ -543,12 +553,12 @@ export class StepPipelineExecutorService {
     /**
      * Clear checkpoint for a directory
      */
-    async clearCheckpoint(directoryId: string): Promise<void> {
+    async clearCheckpoint(directoryId: string, pipelineId: string): Promise<void> {
         if (!this.cacheManager) {
             return;
         }
 
-        const checkpointKey = `pipeline-checkpoint-${directoryId}`;
+        const checkpointKey = `pipeline-checkpoint-${directoryId}-${pipelineId}`;
         await this.cacheManager.del(checkpointKey);
     }
 
