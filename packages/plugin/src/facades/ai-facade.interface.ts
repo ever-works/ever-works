@@ -81,6 +81,19 @@ export interface SchemaType<T = unknown> {
  * This is a simplified interface that steps use to interact with AI providers.
  * The actual implementation handles provider resolution, settings, and error handling.
  */
+export interface AiProviderConfig {
+	readonly providerId: string;
+	readonly providerName: string;
+	readonly baseUrl?: string;
+	readonly apiKey?: string;
+	readonly defaultModel?: string;
+	readonly routing: {
+		readonly simpleModel?: string;
+		readonly mediumModel?: string;
+		readonly complexModel?: string;
+	};
+}
+
 export interface IAiFacade {
 	/**
 	 * Send a prompt and get a structured JSON response.
@@ -151,4 +164,9 @@ export interface IAiFacade {
 	 * @returns List of available models with their capabilities
 	 */
 	getAvailableModels(facadeOptions: FacadeOptions): Promise<readonly AiModel[]>;
+
+	/**
+	 * Get the resolved provider configuration including connection details and model routing.
+	 */
+	getProviderConfig(facadeOptions: FacadeOptions): Promise<AiProviderConfig>;
 }

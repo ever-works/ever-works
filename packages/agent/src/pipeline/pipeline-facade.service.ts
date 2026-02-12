@@ -26,6 +26,7 @@ import type {
     DataSourceFacadeOptions,
     DataSourceFacadeResult,
     EnabledDataSource,
+    AiProviderConfig,
     FacadeOptions,
 } from '@ever-works/plugin';
 import { AiFacadeService } from '../facades/ai.facade';
@@ -145,6 +146,8 @@ export class PipelineFacadeService {
                 facade.testConnection(boundFacadeOptions),
             getAvailableModels: (_facadeOptions: FacadeOptions) =>
                 facade.getAvailableModels(boundFacadeOptions),
+            getProviderConfig: (_facadeOptions: FacadeOptions) =>
+                facade.getProviderConfig(boundFacadeOptions),
         };
     }
 
