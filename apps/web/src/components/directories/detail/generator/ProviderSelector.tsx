@@ -117,6 +117,10 @@ export function PipelineModeSelector({
 }: PipelineModeSelectorProps) {
     const t = useTranslations('dashboard.directoryDetail.generator');
 
+    // When selectedPipeline is null, the default pipeline is active
+    const effectiveSelected =
+        selectedPipeline ?? pipelineProviders.find((p) => p.isDefault)?.id ?? null;
+
     return (
         <div
             className={cn(
@@ -130,32 +134,15 @@ export function PipelineModeSelector({
             </h4>
 
             <div className="space-y-3">
-                <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                        type="radio"
-                        name="pipeline-mode"
-                        checked={!selectedPipeline}
-                        onChange={() => onChange(null)}
-                        className="mt-1"
-                    />
-                    <div className="flex-1">
-                        <span className="text-sm font-medium text-text dark:text-text-dark">
-                            {t('standardPipeline')}
-                        </span>
-                        <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                            {t('standardPipelineDescription')}
-                        </p>
-                    </div>
-                </label>
-
                 {pipelineProviders.map((provider) => {
+                    const isActive = effectiveSelected === provider.id;
                     const radioLabel = (
                         <label className="flex items-start gap-3 cursor-pointer">
                             <input
                                 type="radio"
                                 name="pipeline-mode"
-                                checked={selectedPipeline === provider.id}
-                                onChange={() => onChange(provider.id)}
+                                checked={isActive}
+                                onChange={() => onChange(provider.isDefault ? null : provider.id)}
                                 disabled={!provider.configured}
                                 className="mt-1"
                             />

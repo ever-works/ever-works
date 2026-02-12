@@ -39,6 +39,42 @@ async function createContext(
 export const directoryGenerationTask = task({
     id: 'directory-generation',
     maxDuration: 3600 * 5, // 5 hours
+    onFailure: async ({ payload, error }) => {
+        if (!payload) {
+            return;
+        }
+
+        let appContext: INestApplicationContext | undefined;
+
+        try {
+            appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
+                logger: createTriggerLogger('DirectoryGeneration:Failure'),
+            });
+
+            const { orchestrator, directory, user } = await createContext(appContext, payload);
+            const scheduleService = appContext.get(DirectoryScheduleService);
+
+            const errorMessage =
+                error instanceof Error ? error.message : String(error ?? 'Unknown error');
+
+            await orchestrator.handleFailure({
+                directory,
+                user,
+                dto: payload.dto,
+                historyId: payload.historyId,
+                historyStartedAt: payload.historyStartedAt,
+                errorMessage,
+            });
+
+            if (payload.triggerSource === 'schedule' && payload.scheduleId) {
+                await scheduleService.markRunFailed(payload.scheduleId, errorMessage);
+            }
+        } catch {
+            // Best-effort — if we can't even boot the context, nothing more we can do
+        } finally {
+            await appContext?.close();
+        }
+    },
     onCancel: async ({ payload }) => {
         if (!payload) {
             return;
