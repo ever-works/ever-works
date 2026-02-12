@@ -300,6 +300,10 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 		try {
 			// Resolve settings
 			const settings = await this.resolveSettings(userId, directory.id);
+			if (settings.model) {
+				logger.log(`Using model "${settings.model}" for this session as specified in settings`);
+			}
+
 			const version = (settings.version as string) || DEFAULT_CLI_VERSION;
 			const maxTurns = (settings.maxTurns as number) || DEFAULT_MAX_TURNS;
 			const maxBudgetUsd = settings.maxBudgetUsd as number | undefined;
