@@ -1,7 +1,7 @@
 {
 	"name": "@ever-works/agent-pipeline-plugin",
 	"version": "1.0.0",
-	"description": "AI agent pipeline using Vercel AI SDK with tool-based generation",
+	"description": "Autonomous tool-based pipeline that researches and generates directory items using an AI agent with web search, content extraction, and file management capabilities",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -53,7 +53,7 @@
 				"pipeline",
 				"form-schema-provider"
 			],
-			"description": "AI agent pipeline using Vercel AI SDK with tool-based generation",
+			"description": "Autonomous tool-based pipeline that researches and generates directory items using an AI agent with web search, content extraction, and file management capabilities",
 			"author": {
 				"name": "Ever Works Team"
 			},

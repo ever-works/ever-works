@@ -1,5 +1,3 @@
-import { createBashTool } from 'bash-tool';
-import { Bash, ReadWriteFs } from 'just-bash';
 import type {
 	ISearchFacade,
 	IContentExtractorFacade,
@@ -12,9 +10,6 @@ export interface SandboxAndTools {
 	readonly tools: Record<string, unknown>;
 }
 
-/**
- * Create the full set of agent tools: bash-tool sandbox tools + facade tools.
- */
 export async function createAgentTools(
 	workspacePath: string,
 	facades: {
@@ -25,6 +20,12 @@ export async function createAgentTools(
 	onProgress: PipelineProgressCallback | undefined,
 	totalSteps: number
 ): Promise<SandboxAndTools> {
+	// Dynamic imports — bash-tool and just-bash are ESM-only
+	const [{ createBashTool }, { Bash, ReadWriteFs }] = await Promise.all([
+		import('bash-tool'),
+		import('just-bash')
+	]);
+
 	const fs = new ReadWriteFs({ root: workspacePath });
 	const bashInstance = new Bash({ fs });
 
