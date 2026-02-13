@@ -1,5 +1,7 @@
 import type { ItemData, Category, Tag, Brand } from '../common/index.js';
 
+export { jsonrepair } from 'jsonrepair';
+
 /**
  * Generate a slug from a name.
  * Lowercase, replace spaces/special chars with hyphens, strip non-alphanumeric.

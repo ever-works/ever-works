@@ -120,7 +120,25 @@ describe('collect-results', () => {
 			expect(result[0].brand).toBe('TestBrand');
 		});
 
-		it('should handle completely invalid JSON', async () => {
+		it('should repair malformed JSON and accept the item', async () => {
+			// Trailing comma after last field — common AI output issue
+			setupSingleFile(
+				`{
+					"name": "VS Code",
+					"description": "A code editor",
+					"source_url": "https://code.visualstudio.com",
+					"category": "Code Editors",
+					"tags": ["editor", "ide"],
+				}`
+			);
+
+			const result = await readGeneratedItems('/workspace', mockLogger);
+			expect(result).toHaveLength(1);
+			expect(result[0].name).toBe('VS Code');
+			expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('Repaired malformed JSON'));
+		});
+
+		it('should skip items where even jsonrepair fails', async () => {
 			setupSingleFile('}}not json at all{{');
 
 			const result = await readGeneratedItems('/workspace', mockLogger);

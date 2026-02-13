@@ -2,7 +2,13 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { BASE_TEMP_DIR } from '../types.js';
 import type { ItemData, Category, Tag, Brand } from '@ever-works/plugin';
-import { slugify, collectMetadataFromItems, validateRequiredItemFields, normalizeItemTags } from '@ever-works/plugin';
+import {
+	slugify,
+	collectMetadataFromItems,
+	validateRequiredItemFields,
+	normalizeItemTags,
+	jsonrepair
+} from '@ever-works/plugin';
 
 // Re-export shared utilities so existing imports continue to work
 export { slugify, unslugify, collectMetadataFromItems } from '@ever-works/plugin';
@@ -174,7 +180,14 @@ export async function readGeneratedItems(workspacePath: string, logger?: Logger)
 				}
 
 				const content = await fs.readFile(path.join(workspacePath, fileName), 'utf-8');
-				const data = JSON.parse(content);
+				let data;
+				try {
+					data = JSON.parse(content);
+				} catch {
+					const repaired = jsonrepair(content);
+					data = JSON.parse(repaired);
+					logger?.warn(`Repaired malformed JSON in ${fileName}`);
+				}
 
 				if (!validateRequiredItemFields(data)) {
 					logger?.warn(
