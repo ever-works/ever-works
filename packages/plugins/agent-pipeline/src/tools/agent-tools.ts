@@ -26,7 +26,7 @@ export async function createAgentTools(
 	const fs = new ReadWriteFs({ root: workspacePath });
 	const bashInstance = new Bash({ fs });
 
-	const { tools: bashTools } = await createBashTool({ sandbox: bashInstance });
+	const { tools: bashTools } = await createBashTool({ sandbox: bashInstance, destination: '/' });
 
 	const tools = {
 		...bashTools,

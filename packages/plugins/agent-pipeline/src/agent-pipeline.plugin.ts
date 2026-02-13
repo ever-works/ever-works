@@ -51,6 +51,7 @@ import {
 	buildCancelledResult
 } from './utils/pipeline-helpers.js';
 import { extractSimpleKeywords, appendToJsonlIndex } from './utils/data-source-helpers.js';
+import { createToolCallRepairFn, withToolCallingRetry } from './utils/tool-call-resilience.js';
 
 export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipelineStepId>, IFormSchemaProvider {
 	readonly id = 'agent-pipeline';
@@ -401,14 +402,44 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		const settings = await resolveSettings(this.context, facadeOptions.userId, directory.id);
 		const maxSteps = (settings.maxSteps as number) || DEFAULT_MAX_STEPS;
 
-		await generateText({
-			model,
-			system: systemPrompt,
-			prompt: userPrompt,
-			tools: tools as Parameters<typeof generateText>[0]['tools'],
-			stopWhen: stepCountIs(maxSteps),
-			abortSignal: signal
-		});
+		const repairToolCall = createToolCallRepairFn(model, logger);
+
+		const result = await withToolCallingRetry(
+			() =>
+				generateText({
+					model,
+					system: systemPrompt,
+					prompt: userPrompt,
+					tools: tools as Parameters<typeof generateText>[0]['tools'],
+					stopWhen: stepCountIs(maxSteps),
+					abortSignal: signal,
+					experimental_repairToolCall: repairToolCall
+				}),
+			{
+				providerName: providerConfig.providerName ?? providerConfig.providerId,
+				modelName,
+				signal,
+				logger
+			}
+		);
+
+		// Log generation diagnostics
+		const totalToolCalls = result.steps.reduce((sum, step) => sum + step.toolCalls.length, 0);
+		const toolNames = [...new Set(result.steps.flatMap((step) => step.toolCalls.map((tc) => tc.toolName)))];
+		logger.log(
+			`Agent completed: ${result.steps.length} steps, ${totalToolCalls} tool calls` +
+				(toolNames.length > 0 ? ` (${toolNames.join(', ')})` : ' (no tools used)') +
+				`, finish=${result.finishReason}` +
+				`, tokens=${result.totalUsage.totalTokens ?? 'unknown'}`
+		);
+
+		if (totalToolCalls === 0) {
+			logger.warn(
+				`Model "${modelName}" returned without making any tool calls. ` +
+					'This usually means the model does not support tool calling or ignored the tools. ' +
+					`Response text: "${result.text.slice(0, 200)}${result.text.length > 200 ? '...' : ''}"`
+			);
+		}
 	}
 
 	private async collectAndMergeResults(
@@ -419,6 +450,10 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		const agentItems = await collectItemsFromWorkspace(workspacePath, logger);
 		const agentLookup = createItemLookupIndex(agentItems as MutableItemData[]);
 		const uniqueDsItems = dataSourceItems.filter((item) => !isItemDuplicate(item, agentLookup));
+		const total = agentItems.length + uniqueDsItems.length;
+		logger.log(
+			`Collected ${total} items (${agentItems.length} from agent, ${uniqueDsItems.length} from data sources)`
+		);
 		return [...(agentItems as MutableItemData[]), ...uniqueDsItems];
 	}
 
@@ -465,7 +500,13 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			duration,
 			stepsCompleted: AGENT_PIPELINE_STEP_IDS.length,
 			totalSteps: AGENT_PIPELINE_STEP_IDS.length,
-			state: this.state!
+			state: this.state!,
+			...(items.length === 0 && {
+				error:
+					'Pipeline completed but generated 0 items. ' +
+					'The AI model may not support tool calling or did not produce valid output. ' +
+					'Try using a different model (e.g. GPT-4o, Claude Sonnet).'
+			})
 		};
 	}
 

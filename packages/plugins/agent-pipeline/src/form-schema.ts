@@ -24,7 +24,7 @@ export function getFormFields(): FormFieldDefinition[] {
 			type: 'boolean',
 			label: 'Capture Screenshots',
 			description: 'Take screenshots for generated items',
-			defaultValue: true,
+			defaultValue: false,
 			group: 'features'
 		}
 	];
