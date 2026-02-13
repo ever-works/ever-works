@@ -10,6 +10,7 @@ import type {
     ChatCompletionChunk,
     AiRoutingOptions,
     AiModel,
+    AiProviderConfig,
     IAiFacade,
     FacadeOptions,
     AskJsonCompletionResponse,
@@ -317,6 +318,32 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             this.logger.warn(`Failed to get available models: ${(error as Error).message}`);
             return [];
         }
+    }
+
+    async getProviderConfig(facadeOptions: FacadeOptions): Promise<AiProviderConfig> {
+        const plugin = await this.resolvePlugin<IAiProviderPlugin>(
+            facadeOptions.providerOverride,
+            facadeOptions.userId,
+            facadeOptions.directoryId,
+        );
+
+        const settings = await this.getResolvedSettings(plugin.id, {
+            userId: facadeOptions.userId,
+            directoryId: facadeOptions.directoryId,
+        });
+
+        return {
+            providerId: plugin.id,
+            providerName: plugin.providerName,
+            baseUrl: this.getSettingTyped<string>(settings, 'baseUrl', 'string'),
+            apiKey: this.getSettingTyped<string>(settings, 'apiKey', 'string'),
+            defaultModel: this.getSettingTyped<string>(settings, 'defaultModel', 'string'),
+            routing: {
+                simpleModel: this.getSettingTyped<string>(settings, 'simpleModel', 'string'),
+                mediumModel: this.getSettingTyped<string>(settings, 'mediumModel', 'string'),
+                complexModel: this.getSettingTyped<string>(settings, 'complexModel', 'string'),
+            },
+        };
     }
 
     // Resolve model: modelOverride > complexity-based > defaultModel > plugin default

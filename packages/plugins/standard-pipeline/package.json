@@ -1,0 +1,71 @@
+{
+	"name": "@ever-works/standard-pipeline-plugin",
+	"version": "1.0.0",
+	"description": "Standard Pipeline Plugin - Provides the standard 15-step generation pipeline",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@langchain/textsplitters": "^0.1.0",
+		"stopword": "^3.1.5",
+		"string-similarity-js": "^2.1.4",
+		"zod": "^3.25.76"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "standard-pipeline",
+			"name": "Standard Pipeline",
+			"version": "1.0.0",
+			"category": "pipeline",
+			"capabilities": [
+				"pipeline",
+				"form-schema-provider"
+			],
+			"description": "Standard 15-step generation pipeline with engine-orchestrated step execution",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"builtIn": true,
+			"autoEnable": true,
+			"systemPlugin": true,
+			"visibility": "public",
+			"defaultForCapabilities": [
+				"pipeline"
+			],
+			"selectableProviderCategories": [
+				"ai-provider",
+				"search",
+				"screenshot",
+				"content-extractor"
+			]
+		}
+	}
+}

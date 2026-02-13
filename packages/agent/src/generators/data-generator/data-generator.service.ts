@@ -8,7 +8,6 @@ import type { Identifiable, ItemData, Category, Tag } from '@ever-works/contract
 import {
     CreateItemsGeneratorDto,
     GenerationMethod,
-    CompanyDto,
     ItemsGeneratorMetrics,
 } from '../../items-generator/dto';
 import { format } from 'date-fns';
@@ -23,6 +22,7 @@ import type {
     GenerationRequest,
     ExistingItems as PluginExistingItems,
     PipelineResult,
+    PipelineProgress,
 } from '@ever-works/plugin';
 
 const PARALLEL_WRITE_CONCURRENCY = 10;
@@ -91,6 +91,7 @@ export class DataGeneratorService {
         directory: Directory,
         user: User,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
+        options?: { tryResume?: boolean },
     ): Promise<InitializeResult> {
         this.logger.debug(
             `Initializing data repository for directory: ${JSON.stringify(createItemsGeneratorDto)}`,
@@ -117,9 +118,10 @@ export class DataGeneratorService {
             user,
             createItemsGeneratorDto,
             existingData,
-            (step) => {
-                this.onGenerationProgress(step, directory);
+            (progress) => {
+                this.onGenerationProgress(progress, directory);
             },
+            options?.tryResume,
         );
 
         // If pipeline failed or no items were generated, handle appropriately
@@ -328,7 +330,6 @@ export class DataGeneratorService {
 
             promises.push(
                 data.mergeConfig({
-                    ...this.withCompanyConfig(createItemsGeneratorDto.company),
                     version: await data.getNextVersion(),
                     metadata,
                 }),
@@ -623,14 +624,6 @@ export class DataGeneratorService {
     }
 
     /**
-     * Get last request data from config
-     */
-    async getLastRequestData(directory: Directory, user: User) {
-        const config = await this.config(directory, user);
-        return config.metadata?.last_request_data;
-    }
-
-    /**
      * Get existing items from the repository
      */
 
@@ -720,9 +713,8 @@ export class DataGeneratorService {
         };
     }
 
-    async config(directory: Directory, user: User) {
+    async getConfig(directory: Directory, user: User) {
         const data = await this.repositoryData(directory, user);
-
         return data.getConfig();
     }
 
@@ -794,6 +786,7 @@ export class DataGeneratorService {
             }>;
         },
         companyName?: string,
+        companyWebsite?: string,
     ): Promise<void> {
         const directoryOwner = this.getDirectoryOwner(directory);
         const committer = user.asCommitter();
@@ -820,6 +813,8 @@ export class DataGeneratorService {
         const newConfig = {
             ...currentConfig,
             company_name: companyName !== undefined ? companyName : currentConfig.company_name,
+            company_website:
+                companyWebsite !== undefined ? companyWebsite : currentConfig.company_website,
             settings: newSettings,
             custom_menu: customMenu !== undefined ? customMenu : currentConfig.custom_menu,
         };
@@ -883,7 +878,8 @@ export class DataGeneratorService {
             existingTags: Tag[];
             existingConfig: any;
         },
-        onProgress?: (step: string) => void,
+        onProgress?: (progress: PipelineProgress) => void,
+        tryResume?: boolean,
     ): Promise<PipelineResult> {
         // Handle existing data reset for RECREATE mode
         let existing = { ...existingData };
@@ -910,7 +906,6 @@ export class DataGeneratorService {
             name: dto.name,
             prompt: dto.prompt,
             generationMethod: dto.generation_method,
-            company: dto.company,
             config: dto.pluginConfig || {},
             pluginConfig: dto._processedPluginConfig || undefined,
             providers: dto.providers
@@ -936,17 +931,21 @@ export class DataGeneratorService {
         this.logger.log(`Executing pipeline for directory "${directory.slug}" (user: ${user.id})`);
 
         // Execute the pipeline - the orchestrator handles plugin resolution
-        return this.pipelineOrchestrator.execute(
-            directoryRef,
-            request,
-            pluginExisting,
-            undefined, // options
-            onProgress
-                ? (progress) => {
-                      onProgress(progress.currentStepName ?? progress.message ?? '');
-                  }
-                : undefined,
-        );
+        return tryResume
+            ? this.pipelineOrchestrator.resumeOrExecute(
+                  directoryRef,
+                  request,
+                  pluginExisting,
+                  undefined,
+                  onProgress,
+              )
+            : this.pipelineOrchestrator.execute(
+                  directoryRef,
+                  request,
+                  pluginExisting,
+                  undefined,
+                  onProgress,
+              );
     }
 
     /**
@@ -969,10 +968,14 @@ export class DataGeneratorService {
     /**
      * Callback for generation progress
      */
-    private async onGenerationProgress(step: string, directory: Directory) {
+    private async onGenerationProgress(progress: PipelineProgress, directory: Directory) {
         await this.directoryOperations.updateGenerateStatus(directory.id, {
             status: GenerateStatusType.GENERATING,
-            step,
+            step: progress.currentStepName ?? progress.message,
+            stepName: progress.currentStepName,
+            stepIndex: progress.currentStepIndex,
+            totalSteps: progress.totalSteps,
+            progress: progress.percent,
         });
     }
 
@@ -1037,15 +1040,6 @@ export class DataGeneratorService {
             map.set(item.id, item);
         }
         return Array.from(map.values());
-    }
-
-    private withCompanyConfig(company?: CompanyDto) {
-        return company
-            ? {
-                  company_name: company.name,
-                  company_website: company.website,
-              }
-            : {};
     }
 
     private getDefaultReadme(directory: Directory) {

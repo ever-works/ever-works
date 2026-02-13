@@ -109,6 +109,7 @@ export function DeployForm({ directory, isDeploying, providerName }: DeployFormP
                 try {
                     const result = await updateWebsiteSettings(directory.id, {
                         company_name: settings.company_name,
+                        company_website: settings.company_website,
                         ...settings.settings,
                         custom_menu: settings.custom_menu,
                     });

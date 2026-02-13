@@ -67,6 +67,7 @@ export interface DeleteDirectoryDto {
 export interface GenerateDirectoryDetailDto {
     directory_name: string;
     prompt: string;
+    ai_provider?: string;
 }
 
 export type GenerateStatus = {
@@ -278,6 +279,7 @@ export interface WebsiteSettings {
 
 export interface WebsiteSettingsResponse {
     company_name: string;
+    company_website: string;
     settings: WebsiteSettings;
     custom_menu: {
         header: CustomMenuItem[];
@@ -287,6 +289,7 @@ export interface WebsiteSettingsResponse {
 
 export interface UpdateWebsiteSettingsDto {
     company_name?: string;
+    company_website?: string;
     categories_enabled?: boolean;
     companies_enabled?: boolean;
     tags_enabled?: boolean;

@@ -24,7 +24,10 @@ describe('collect-results', () => {
 			vi.mocked(fs.readdir).mockResolvedValue([
 				{ name: 'item.json', isDirectory: () => false }
 			] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
-			vi.mocked(fs.readFile).mockResolvedValue(content);
+			vi.mocked(fs.readFile).mockImplementation(((filePath: string) => {
+				if (filePath.includes('seeded.json')) return Promise.reject(new Error('ENOENT'));
+				return Promise.resolve(content);
+			}) as typeof fs.readFile);
 		}
 
 		it('should accept item with all required fields', async () => {
@@ -145,6 +148,7 @@ describe('collect-results', () => {
 
 			vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
 				const p = filePath as string;
+				if (p.includes('seeded.json')) throw new Error('ENOENT');
 				if (p.endsWith('a.json')) return JSON.stringify(item1);
 				if (p.endsWith('b.json')) return JSON.stringify(item2);
 				throw new Error('Not found');
@@ -165,6 +169,7 @@ describe('collect-results', () => {
 
 			vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
 				const p = filePath as string;
+				if (p.includes('seeded.json')) throw new Error('ENOENT');
 				if (p.endsWith('/good.json')) return JSON.stringify(valid);
 				if (p.endsWith('/bad.json')) return JSON.stringify(invalid);
 				throw new Error('Not found');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useEffect, useCallback } from 'react';
+import { useState, useTransition, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { createDirectoryWithAI } from '@/app/actions/dashboard';
@@ -43,30 +43,42 @@ export function DirectoryAICreator({
     const {
         providers,
         handleProviderChange,
-        isFullPipeline,
         buildSelectedProviders,
         getUnconfiguredProviders,
+        syncResolvedPipeline,
     } = useProviderSelection();
     const [pluginConfig, setPluginConfig] = useState<Record<string, unknown>>({});
+    const fetchVersionRef = useRef(0);
+    const lastFetchedPipelineRef = useRef<string | undefined>(undefined);
 
-    // Load form schema on mount
+    // Load form schema when pipeline provider changes
     useEffect(() => {
+        const pipelineId = providers.pipeline || undefined;
+        if (pipelineId === lastFetchedPipelineRef.current && formSchema) return;
+
+        const version = ++fetchVersionRef.current;
+
         async function loadSchema() {
             try {
-                const pipelineId = providers.pipeline || undefined;
                 const result = await getGlobalFormSchema(pipelineId);
+                if (version !== fetchVersionRef.current) return;
                 if (result.success && result.data) {
+                    lastFetchedPipelineRef.current = result.data.resolvedPipelineId || pipelineId;
                     setFormSchema(result.data);
                     if (result.data.defaultValues) {
                         setPluginConfig({ ...result.data.defaultValues });
                     }
+
+                    // Sync pipeline selection to server-resolved ID
+                    syncResolvedPipeline(result.data);
                 }
             } catch (error) {
+                if (version !== fetchVersionRef.current) return;
                 console.error('Failed to load form schema:', error);
             }
         }
         loadSchema();
-    }, [providers.pipeline]);
+    }, [providers.pipeline, syncResolvedPipeline]);
 
     const handlePluginConfigChange = useCallback((values: Record<string, unknown>) => {
         setPluginConfig(values);
@@ -221,7 +233,6 @@ export function DirectoryAICreator({
                             formSchema={formSchema}
                             providers={providers}
                             onProviderChange={handleProviderChange}
-                            isFullPipeline={isFullPipeline}
                         />
                         {formSchema.pluginFields.length > 0 && (
                             <DynamicPluginFields

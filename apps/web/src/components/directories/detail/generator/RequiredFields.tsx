@@ -8,7 +8,6 @@ import { useTranslations } from 'next-intl';
 interface CoreFormData {
     name: string;
     prompt: string;
-    repository_description?: string;
 }
 
 interface RequiredFieldsProps {
@@ -53,18 +52,6 @@ export function RequiredFields({ formData, onChange }: RequiredFieldsProps) {
                     required
                     helperText={t('promptHelperText')}
                 />
-
-                {/* TODO: This field will be moved to the Directory Settings page. */}
-                <div className="hidden">
-                    <Textarea
-                        label={t('repositoryDescription')}
-                        value={formData.repository_description || ''}
-                        onChange={(e) => onChange({ repository_description: e.target.value })}
-                        placeholder={t('repositoryPlaceholder')}
-                        rows={2}
-                        variant="form"
-                    />
-                </div>
             </div>
         </div>
     );

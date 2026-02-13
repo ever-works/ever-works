@@ -283,6 +283,7 @@ export class DirectoriesController {
             generateDirectoryDetailDto.directory_name,
             generateDirectoryDetailDto.prompt,
             user,
+            generateDirectoryDetailDto.ai_provider,
         );
     }
 

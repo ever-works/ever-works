@@ -168,4 +168,16 @@ export interface PluginManifest {
 	readonly deprecated?: boolean;
 	/** Deprecation message */
 	readonly deprecationMessage?: string;
+	/**
+	 * Which provider categories this pipeline wants shown in the generator form.
+	 * e.g. ['ai-provider', 'search', 'screenshot', 'content-extractor']
+	 * If omitted, shows all individual provider selectors (backward compatible).
+	 * Only relevant for pipeline plugins.
+	 */
+	readonly selectableProviderCategories?: readonly string[];
+	/**
+	 * For pipeline-modifier plugins: which pipeline(s) they target.
+	 * e.g. ['standard-pipeline'] or ['*'] for all engine-orchestratable pipelines.
+	 */
+	readonly targetPipelines?: readonly string[];
 }

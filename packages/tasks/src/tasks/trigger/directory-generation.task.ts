@@ -11,6 +11,8 @@ import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities'
 import { DirectoryScheduleService } from '@ever-works/agent/services';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
+const nodeEnv = process.env.NODE_ENV || 'development';
+
 async function createContext(
     appContext: INestApplicationContext,
     payload: DirectoryGenerationPayload,
@@ -39,13 +41,49 @@ async function createContext(
 export const directoryGenerationTask = task({
     id: 'directory-generation',
     maxDuration: 3600 * 5, // 5 hours
+    onFailure: async ({ payload, error }) => {
+        if (!payload) {
+            return;
+        }
+
+        let appContext: INestApplicationContext | undefined;
+
+        try {
+            appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
+                logger: nodeEnv ? undefined : createTriggerLogger('DirectoryGeneration:Failure'),
+            });
+
+            const { orchestrator, directory, user } = await createContext(appContext, payload);
+            const scheduleService = appContext.get(DirectoryScheduleService);
+
+            const errorMessage =
+                error instanceof Error ? error.message : String(error ?? 'Unknown error');
+
+            await orchestrator.handleFailure({
+                directory,
+                user,
+                dto: payload.dto,
+                historyId: payload.historyId,
+                historyStartedAt: payload.historyStartedAt,
+                errorMessage,
+            });
+
+            if (payload.triggerSource === 'schedule' && payload.scheduleId) {
+                await scheduleService.markRunFailed(payload.scheduleId, errorMessage);
+            }
+        } catch {
+            // Best-effort — if we can't even boot the context, nothing more we can do
+        } finally {
+            await appContext?.close();
+        }
+    },
     onCancel: async ({ payload }) => {
         if (!payload) {
             return;
         }
 
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: createTriggerLogger('DirectoryGeneration:Cancel'),
+            logger: nodeEnv ? undefined : createTriggerLogger('DirectoryGeneration:Cancel'),
         });
 
         try {
@@ -69,7 +107,7 @@ export const directoryGenerationTask = task({
     },
     run: async (payload: DirectoryGenerationPayload) => {
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: createTriggerLogger('DirectoryGeneration'),
+            logger: nodeEnv ? undefined : createTriggerLogger('DirectoryGeneration'),
         });
 
         try {

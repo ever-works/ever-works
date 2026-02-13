@@ -65,7 +65,6 @@ export class TriggerGenerationOrchestrator {
 
             if (generated.stats.totalItemsCount > 0) {
                 await this.markdownGenerator.initialize(directory, user, {
-                    repository_description: dto.repository_description,
                     generation_method: dto.generation_method,
                     pr_update: generated.prUpdate,
                 });
@@ -155,6 +154,37 @@ export class TriggerGenerationOrchestrator {
         }
 
         return parsed;
+    }
+
+    async handleFailure({
+        directory,
+        historyId,
+        historyStartedAt,
+        errorMessage,
+    }: TriggerGenerationOptions & { errorMessage: string }): Promise<void> {
+        const finishedAt = new Date();
+        const startTime = this.resolveStartTime(historyStartedAt);
+        const duration = Math.max(
+            0,
+            Math.round((finishedAt.getTime() - startTime.getTime()) / 1000),
+        );
+
+        await Promise.all([
+            this.directoryOperations.recordGenerationFinishTime(directory.id, finishedAt),
+            this.directoryOperations.updateGenerateStatus(directory.id, {
+                status: GenerateStatusType.ERROR,
+                error: errorMessage,
+                step: null,
+            }),
+            this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
+                status: GenerateStatusType.ERROR,
+                finishedAt,
+                durationInSeconds: duration,
+                errorMessage,
+            }),
+        ]);
+
+        await this.directoryOperations.emitGenerationCompleted(directory.id);
     }
 
     async handleCancellation({

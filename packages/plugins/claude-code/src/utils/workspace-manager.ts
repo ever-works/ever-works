@@ -2,44 +2,19 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { BASE_TEMP_DIR } from '../types.js';
 import type { ItemData, Category, Tag, Brand } from '@ever-works/plugin';
+import { slugify, collectMetadataFromItems, validateRequiredItemFields, normalizeItemTags } from '@ever-works/plugin';
+
+// Re-export shared utilities so existing imports continue to work
+export { slugify, unslugify, collectMetadataFromItems } from '@ever-works/plugin';
 
 interface Logger {
 	log(message: string, ...args: unknown[]): void;
 	warn(message: string, ...args: unknown[]): void;
-	debug(message: string, ...args: unknown[]): void;
+	debug?(message: string, ...args: unknown[]): void;
 }
 
-/**
- * Generate a slug from a name.
- * Lowercase, replace spaces/special chars with hyphens, strip non-alphanumeric.
- */
-export function slugify(name: string): string {
-	return name
-		.toLowerCase()
-		.trim()
-		.replace(/[^a-z0-9\s_-]/g, '')
-		.replace(/[\s_]+/g, '-')
-		.replace(/-+/g, '-')
-		.replace(/^-|-$/g, '');
-}
-
-export function unslugify(slug: string): string {
-	return slug
-		.replace(/[-_]+/g, ' ')
-		.trim()
-		.split(' ')
-		.map((word) => {
-			if (!word) return '';
-
-			const firstPart = word.charAt(0).toUpperCase();
-			const rest = word.slice(1);
-			const hasExistingCaps = /[A-Z]/.test(rest);
-
-			return hasExistingCaps ? firstPart + rest : firstPart + rest.toLowerCase();
-		})
-		.join(' ')
-		.replace(/\s?\/\s?/g, '/');
-}
+/** Max concurrent file writes to avoid fd exhaustion. */
+const WRITE_CONCURRENCY = 64;
 
 /**
  * Deduplicate slugs by appending an index for collisions.
@@ -53,6 +28,18 @@ function deduplicateSlug(slug: string, existingSlugs: Set<string>): string {
 		index++;
 	}
 	return `${slug}-${index}`;
+}
+
+/**
+ * Run async tasks with bounded concurrency.
+ */
+async function parallelBatch<T>(tasks: (() => Promise<T>)[], concurrency: number): Promise<T[]> {
+	const results: T[] = [];
+	for (let i = 0; i < tasks.length; i += concurrency) {
+		const batch = tasks.slice(i, i + concurrency);
+		results.push(...(await Promise.all(batch.map((fn) => fn()))));
+	}
+	return results;
 }
 
 /**
@@ -79,22 +66,35 @@ export async function createWorkspace(userId: string, directoryId: string): Prom
 }
 
 /**
- * Seed existing items as individual JSON files in the workspace root.
- * Each file is named {slug}.json.
+ * Seed existing items as individual JSON files + JSONL dedup index + seeded manifest.
  */
 export async function seedExistingItems(workspacePath: string, items: readonly ItemData[]): Promise<void> {
 	if (!items.length) return;
 
+	const metaDir = path.join(workspacePath, '_meta');
 	const usedSlugs = new Set<string>();
+	const seededFiles: string[] = [];
+	const indexLines: string[] = [];
+	const itemWrites: (() => Promise<void>)[] = [];
 
 	for (const item of items) {
 		const baseSlug = item.slug || slugify(item.name);
 		const slug = deduplicateSlug(baseSlug, usedSlugs);
 		usedSlugs.add(slug);
 
-		const filePath = path.join(workspacePath, `${slug}.json`);
-		await fs.writeFile(filePath, JSON.stringify(item, null, 2), 'utf-8');
+		const fileName = `${slug}.json`;
+		seededFiles.push(fileName);
+		indexLines.push(JSON.stringify({ slug, name: item.name, source_url: item.source_url }));
+
+		itemWrites.push(() => fs.writeFile(path.join(workspacePath, fileName), JSON.stringify(item, null, 2), 'utf-8'));
 	}
+
+	await parallelBatch(itemWrites, WRITE_CONCURRENCY);
+
+	await Promise.all([
+		fs.writeFile(path.join(metaDir, 'seeded.json'), JSON.stringify(seededFiles), 'utf-8'),
+		fs.writeFile(path.join(metaDir, 'existing-items.jsonl'), indexLines.join('\n') + '\n', 'utf-8')
+	]);
 }
 
 /**
@@ -138,111 +138,61 @@ export async function seedMetadata(
 }
 
 /**
- * Read all generated item JSON files from the workspace root.
- * Skips _meta/ directory and invalid JSON files.
- * Validates required fields: name, description, source_url, category.
+ * Read generated/modified items from workspace. Skips unchanged seeded files via mtime.
  */
 export async function readGeneratedItems(workspacePath: string, logger?: Logger): Promise<ItemData[]> {
-	const entries = await fs.readdir(workspacePath, { withFileTypes: true });
-	const items: ItemData[] = [];
-
-	for (const entry of entries) {
-		// Skip directories (like _meta/) and non-JSON files
-		if (entry.isDirectory() || !entry.name.endsWith('.json')) {
-			continue;
-		}
-
-		const filePath = path.join(workspacePath, entry.name);
-		try {
-			const content = await fs.readFile(filePath, 'utf-8');
-			const data = JSON.parse(content);
-
-			// Validate required fields
-			if (!data.name || !data.description || !data.source_url || !data.category) {
-				logger?.warn(
-					`Skipping ${entry.name}: missing required fields (name, description, source_url, category)`
-				);
-				continue;
-			}
-
-			// Ensure tags is an array
-			if (!Array.isArray(data.tags)) {
-				data.tags = [];
-			}
-
-			items.push(data as ItemData);
-		} catch (err) {
-			logger?.warn(`Skipping ${entry.name}: ${err instanceof Error ? err.message : 'invalid JSON'}`);
-		}
+	let entries: string[];
+	try {
+		const dirEntries = await fs.readdir(workspacePath, { withFileTypes: true });
+		entries = dirEntries.filter((e) => !e.isDirectory() && e.name.endsWith('.json')).map((e) => e.name);
+	} catch {
+		logger?.warn('Could not read workspace directory');
+		return [];
 	}
 
-	return items;
-}
+	if (entries.length === 0) return [];
 
-/**
- * Collect categories, tags, and brands directly from the item data.
- * This is the source of truth — items define what categories/tags/brands exist.
- * Each unique value gets a generated id based on its slugified name.
- */
-export function collectMetadataFromItems(items: readonly ItemData[]): {
-	categories: Category[];
-	tags: Tag[];
-	brands: Brand[];
-} {
-	const categoryMap = new Map<string, Category>();
-	const tagMap = new Map<string, Tag>();
-	const brandMap = new Map<string, Brand>();
-
-	for (const item of items) {
-		// category can be string or string[]
-		const categories = Array.isArray(item.category) ? item.category : item.category ? [item.category] : [];
-		for (const cat of categories) {
-			const name = typeof cat === 'string' ? cat : '';
-			if (!name) continue;
-
-			const key = name.toLowerCase().trim();
-			if (!categoryMap.has(key)) {
-				categoryMap.set(key, { id: slugify(name) || key, name: unslugify(name) });
-			}
-		}
-
-		// tags can be string[] or Tag[]
-		if (Array.isArray(item.tags)) {
-			for (const tag of item.tags) {
-				const name = typeof tag === 'string' ? tag : tag?.name;
-				if (!name) continue;
-				const key = name.toLowerCase().trim();
-				if (!tagMap.has(key)) {
-					tagMap.set(key, { id: slugify(name) || key, name: unslugify(name) });
-				}
-			}
-		}
-
-		// brand can be string or Brand object
-		if (item.brand) {
-			const brandName = typeof item.brand === 'string' ? item.brand : item.brand.name;
-			const brandLogo =
-				typeof item.brand === 'string'
-					? (item.brand_logo_url ?? undefined)
-					: (item.brand.logo_url ?? undefined);
-			if (brandName) {
-				const key = brandName.toLowerCase().trim();
-				if (!brandMap.has(key)) {
-					brandMap.set(key, {
-						id: slugify(brandName) || key,
-						name: unslugify(brandName),
-						logo_url: brandLogo
-					});
-				}
-			}
-		}
+	let seededSet = new Set<string>();
+	let seedTime = 0;
+	try {
+		const manifestContent = await fs.readFile(path.join(workspacePath, '_meta', 'seeded.json'), 'utf-8');
+		seededSet = new Set(JSON.parse(manifestContent) as string[]);
+		const manifestStat = await fs.stat(path.join(workspacePath, '_meta', 'seeded.json'));
+		seedTime = manifestStat.mtimeMs;
+	} catch {
+		// No manifest — treat all files as new
 	}
 
-	return {
-		categories: [...categoryMap.values()],
-		tags: [...tagMap.values()],
-		brands: [...brandMap.values()]
-	};
+	const results = await Promise.all(
+		entries.map(async (fileName) => {
+			try {
+				if (seededSet.has(fileName) && seedTime > 0) {
+					const fileStat = await fs.stat(path.join(workspacePath, fileName));
+					if (fileStat.mtimeMs <= seedTime) {
+						return null;
+					}
+				}
+
+				const content = await fs.readFile(path.join(workspacePath, fileName), 'utf-8');
+				const data = JSON.parse(content);
+
+				if (!validateRequiredItemFields(data)) {
+					logger?.warn(
+						`Skipping ${fileName}: missing required fields (name, description, source_url, category)`
+					);
+					return null;
+				}
+
+				normalizeItemTags(data);
+				return data as ItemData;
+			} catch (err) {
+				logger?.warn(`Skipping ${fileName}: ${err instanceof Error ? err.message : 'invalid JSON'}`);
+				return null;
+			}
+		})
+	);
+
+	return results.filter((item): item is ItemData => item !== null);
 }
 
 /**
