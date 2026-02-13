@@ -53,7 +53,10 @@ export function usePluginSettings({
     const t = useTranslations('dashboard.plugins');
     const router = useRouter();
 
-    // Helper to split settings into regular and secret based on schema
+    // Helper to split settings into regular and secret based on schema,
+    // and populate schema defaults for visible fields that have no saved value.
+    // This ensures defaults are included in the save payload so the backend
+    // receives them and validation passes at both frontend and backend.
     const splitSettingsBySecret = useCallback(
         (allSettings: Record<string, unknown>) => {
             const regular: Record<string, unknown> = {};
@@ -70,9 +73,23 @@ export function usePluginSettings({
                 }
             }
 
+            if (schema?.properties) {
+                for (const [key, propSchema] of Object.entries(schema.properties)) {
+                    const prop = propSchema as PluginSettingsSchemaProperty;
+                    if (prop.hidden || prop.default === undefined) continue;
+                    const propScope = (prop.scope || 'global') as SettingScopeApi;
+                    if (!scopes.includes(propScope)) continue;
+
+                    const target = prop.secret ? secret : regular;
+                    if (!(key in target)) {
+                        target[key] = prop.default;
+                    }
+                }
+            }
+
             return { regular, secret };
         },
-        [schema],
+        [schema, scopes],
     );
 
     // Use stable empty object when initialSettings has no keys, so ref comparison works
