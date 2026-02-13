@@ -30,6 +30,11 @@ export function useProviderSelection(initial?: Partial<ProviderSelectionState>) 
 
             if (providers.pipeline) {
                 result.pipeline = providers.pipeline;
+            } else if (formSchema) {
+                const effectiveDefault = resolveEffectiveDefault(formSchema.providers.pipeline);
+                if (effectiveDefault) {
+                    result.pipeline = effectiveDefault.id;
+                }
             }
 
             for (const { uiKey } of getIndividualProviderCategories()) {
@@ -86,10 +91,30 @@ export function useProviderSelection(initial?: Partial<ProviderSelectionState>) 
         [providers],
     );
 
+    /**
+     * Sync the pipeline selection to the server-resolved pipeline ID.
+     * Trusts `resolvedPipelineId` from the backend; skips if a pipeline is already selected.
+     * Returns the resolved pipeline ID, or `null` if none was resolved.
+     */
+    const syncResolvedPipeline = useCallback(
+        (formSchema: GeneratorFormSchema): string | null => {
+            if (providers.pipeline) return null;
+
+            const resolvedId = formSchema.resolvedPipelineId;
+            if (resolvedId) {
+                handleProviderChange('pipeline', resolvedId);
+                return resolvedId;
+            }
+            return null;
+        },
+        [providers.pipeline, handleProviderChange],
+    );
+
     return {
         providers,
         handleProviderChange,
         buildSelectedProviders,
         getUnconfiguredProviders,
+        syncResolvedPipeline,
     };
 }

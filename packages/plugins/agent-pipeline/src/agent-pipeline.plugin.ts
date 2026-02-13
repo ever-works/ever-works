@@ -1,4 +1,4 @@
-import { generateText, stepCountIs } from 'ai';
+import { generateText, stepCountIs, wrapLanguageModel } from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type {
 	IPlugin,
@@ -365,7 +365,23 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			baseURL: providerConfig.baseUrl!,
 			apiKey: providerConfig.apiKey!
 		});
-		const model = provider(modelName);
+		const model = wrapLanguageModel({
+			model: provider(modelName),
+			middleware: {
+				specificationVersion: 'v3',
+				transformParams: async ({ params }) => ({
+					...params,
+					prompt: params.prompt.map((message) =>
+						message.role === 'assistant'
+							? {
+									...message,
+									content: message.content.filter((part) => part.type !== 'reasoning')
+								}
+							: message
+					)
+				})
+			}
+		});
 
 		const { tools } = await createAgentTools(
 			workspacePath,

@@ -40,25 +40,37 @@ export function DirectoryAICreator({
 
     // Provider/pipeline selection state
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
-    const { providers, handleProviderChange, buildSelectedProviders, getUnconfiguredProviders } =
-        useProviderSelection();
+    const {
+        providers,
+        handleProviderChange,
+        buildSelectedProviders,
+        getUnconfiguredProviders,
+        syncResolvedPipeline,
+    } = useProviderSelection();
     const [pluginConfig, setPluginConfig] = useState<Record<string, unknown>>({});
     const fetchVersionRef = useRef(0);
+    const lastFetchedPipelineRef = useRef<string | undefined>(undefined);
 
     // Load form schema when pipeline provider changes
     useEffect(() => {
+        const pipelineId = providers.pipeline || undefined;
+        if (pipelineId === lastFetchedPipelineRef.current && formSchema) return;
+
         const version = ++fetchVersionRef.current;
 
         async function loadSchema() {
             try {
-                const pipelineId = providers.pipeline || undefined;
                 const result = await getGlobalFormSchema(pipelineId);
                 if (version !== fetchVersionRef.current) return;
                 if (result.success && result.data) {
+                    lastFetchedPipelineRef.current = result.data.resolvedPipelineId || pipelineId;
                     setFormSchema(result.data);
                     if (result.data.defaultValues) {
                         setPluginConfig({ ...result.data.defaultValues });
                     }
+
+                    // Sync pipeline selection to server-resolved ID
+                    syncResolvedPipeline(result.data);
                 }
             } catch (error) {
                 if (version !== fetchVersionRef.current) return;
@@ -66,7 +78,7 @@ export function DirectoryAICreator({
             }
         }
         loadSchema();
-    }, [providers.pipeline]);
+    }, [providers.pipeline, syncResolvedPipeline]);
 
     const handlePluginConfigChange = useCallback((values: Record<string, unknown>) => {
         setPluginConfig(values);

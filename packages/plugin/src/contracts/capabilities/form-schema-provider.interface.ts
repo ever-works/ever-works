@@ -82,6 +82,8 @@ export function isFormSchemaProvider(plugin: IPlugin): plugin is IFormSchemaProv
  * Generator form schema returned by the API.
  */
 export interface GeneratorFormSchema {
+	/** Pipeline plugin ID the server resolved for this schema */
+	resolvedPipelineId?: string;
 	/** Available providers for each capability category (derived from SELECTABLE_PROVIDER_CATEGORIES) */
 	providers: FormSchemaProvidersType;
 	pluginFields: FormFieldDefinition[];

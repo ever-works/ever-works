@@ -142,7 +142,7 @@ export function PipelineModeSelector({
                                 type="radio"
                                 name="pipeline-mode"
                                 checked={isActive}
-                                onChange={() => onChange(provider.isDefault ? null : provider.id)}
+                                onChange={() => onChange(provider.id)}
                                 disabled={!provider.configured}
                                 className="mt-1"
                             />

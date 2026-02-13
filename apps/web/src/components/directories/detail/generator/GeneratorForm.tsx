@@ -45,6 +45,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
     const [isLoadingSchema, setIsLoadingSchema] = useState(false);
     const fetchVersionRef = useRef(0);
+    const lastFetchedPipelineRef = useRef<string | undefined>(undefined);
 
     // Check if directory has been generated before
     const isGenerated = !!config?.metadata;
@@ -76,8 +77,13 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const [pluginConfig, setPluginConfig] = useState<Record<string, unknown>>({});
 
     // Provider selection (null = use directory/system default)
-    const { providers, handleProviderChange, buildSelectedProviders, getUnconfiguredProviders } =
-        useProviderSelection(lastRequestData?.providers);
+    const {
+        providers,
+        handleProviderChange,
+        buildSelectedProviders,
+        getUnconfiguredProviders,
+        syncResolvedPipeline,
+    } = useProviderSelection(lastRequestData?.providers);
 
     // Seed data from the previous generation — used once during schema init,
     // should not trigger re-fetches when the parent re-renders with a new config reference.
@@ -85,18 +91,21 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
 
     // Load form schema when directory changes or pipeline provider changes
     useEffect(() => {
+        const pipelineId = providers.pipeline || undefined;
+        if (pipelineId === lastFetchedPipelineRef.current && formSchema) return;
+
         const version = ++fetchVersionRef.current;
 
         async function loadFormSchema() {
             setIsLoadingSchema(true);
             try {
-                const pipelineId = providers.pipeline || undefined;
                 const result = await getFormSchema(directoryId, pipelineId);
 
                 // Discard stale response if pipeline changed while fetching
                 if (version !== fetchVersionRef.current) return;
 
                 if (result.success && result.data) {
+                    lastFetchedPipelineRef.current = result.data.resolvedPipelineId || pipelineId;
                     setFormSchema(result.data);
                     const defaults: Record<string, unknown> = {};
                     if (result.data.defaultValues) {
@@ -112,6 +121,9 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                         Object.assign(defaults, lastPluginConfigRef.current);
                     }
                     setPluginConfig(defaults);
+
+                    // Sync pipeline selection to server-resolved ID
+                    syncResolvedPipeline(result.data);
                 }
             } catch (error) {
                 if (version !== fetchVersionRef.current) return;
@@ -124,7 +136,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             }
         }
         loadFormSchema();
-    }, [directoryId, t, providers.pipeline]);
+    }, [directoryId, t, providers.pipeline, syncResolvedPipeline]);
 
     const handleCoreDataChange = useCallback((updates: Partial<typeof coreData>) => {
         setCoreData((prev) => ({ ...prev, ...updates }));
