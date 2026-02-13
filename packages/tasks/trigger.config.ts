@@ -33,6 +33,7 @@ export default defineConfig({
             '@nestjs/websockets',
             '@nestjs/websockets/socket-module',
             '@nestjs/microservices',
+            '@nestjs/microservices/microservices-module',
             '@grpc/grpc-js',
             '@grpc/proto-loader',
             'kafkajs',
