@@ -3,7 +3,6 @@ import { serverMutation, serverFetch } from './server-api';
 import { APIResponse, ItemData } from './types';
 import type { GeneratorFormSchema } from '@ever-works/plugin';
 import type {
-    CompanyDto,
     ProvidersDto,
     CreateItemsGeneratorDto,
     UpdateItemsGeneratorDto,
@@ -28,7 +27,6 @@ export type { FormFieldDefinition, FormFieldGroup } from '@ever-works/contracts'
 
 // Re-export DTOs from centralized contracts package
 export type {
-    CompanyDto,
     ProvidersDto,
     CreateItemsGeneratorDto,
     UpdateItemsGeneratorDto,

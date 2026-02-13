@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class GenerateDirectoryDetailDto {
     @IsString()
@@ -8,4 +8,8 @@ export class GenerateDirectoryDetailDto {
     @IsString()
     @IsNotEmpty()
     prompt: string;
+
+    @IsOptional()
+    @IsString()
+    ai_provider?: string;
 }

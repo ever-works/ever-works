@@ -9,12 +9,7 @@ import {
 } from '@/lib/api';
 import { getTranslations } from 'next-intl/server';
 import { checkGitProviderConnection } from './oauth';
-import {
-    sanitizeName,
-    sanitizeDescription,
-    sanitizePrompt,
-    sanitizeStringArray,
-} from '@/lib/utils/sanitize';
+import { sanitizeName, sanitizePrompt, sanitizeStringArray } from '@/lib/utils/sanitize';
 
 /**
  * Sanitize plugin-specific configuration values.
@@ -56,18 +51,9 @@ export async function generateItems(directoryId: string, data: CreateItemsGenera
         const sanitizedData: CreateItemsGeneratorDto = {
             name: sanitizeName(data.name, 200),
             prompt: sanitizePrompt(data.prompt, 5000),
-            repository_description: data.repository_description
-                ? sanitizeDescription(data.repository_description, 500)
-                : undefined,
             generation_method: data.generation_method,
             update_with_pull_request: data.update_with_pull_request,
             website_repository_creation_method: data.website_repository_creation_method,
-            company: data.company
-                ? {
-                      name: sanitizeName(data.company.name, 200),
-                      website: data.company.website.trim(),
-                  }
-                : undefined,
             providers: data.providers,
             // Pass pluginConfig through (sanitization is plugin-specific)
             pluginConfig: data.pluginConfig ? sanitizePluginConfig(data.pluginConfig) : undefined,

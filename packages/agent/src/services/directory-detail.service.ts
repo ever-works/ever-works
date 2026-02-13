@@ -65,6 +65,7 @@ export class DirectoryDetailService {
         name: string,
         prompt: string,
         user: User,
+        aiProvider?: string,
     ): Promise<DirectoryDetails> {
         this.logger.log(`Extracting details for directory: ${name}`);
 
@@ -78,7 +79,7 @@ export class DirectoryDetailService {
                     variables: { name, prompt },
                     routing: { complexity: 'simple' },
                 },
-                { userId: user.id },
+                { userId: user.id, providerOverride: aiProvider },
             );
 
             // Generate unique slug

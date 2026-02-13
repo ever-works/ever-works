@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import type { FormFieldDefinition, FormFieldGroup } from '@/lib/api/types-only';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 interface DynamicPluginFieldsProps {
     fields: FormFieldDefinition[];
@@ -24,6 +24,17 @@ export function DynamicPluginFields({
     onChange,
 }: DynamicPluginFieldsProps) {
     const t = useTranslations('dashboard.directoryDetail.generator');
+
+    // Deduplicate fields by name (first occurrence wins)
+    const uniqueFields = useMemo(() => {
+        const seen = new Set<string>();
+        return fields.filter((f) => {
+            if (seen.has(f.name)) return false;
+            seen.add(f.name);
+            return true;
+        });
+    }, [fields]);
+
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
         // Start with collapsible groups that are not collapsed by default
         const expanded = new Set<string>();
@@ -256,14 +267,21 @@ export function DynamicPluginFields({
 
     // If no groups defined, render all fields in order
     if (!groups || groups.length === 0) {
-        return <div className="space-y-4">{fields.map(renderField)}</div>;
+        return <div className="space-y-4">{uniqueFields.map(renderField)}</div>;
     }
 
-    // Sort groups by order
-    const sortedGroups = [...groups].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    // Deduplicate groups by name (first wins), then sort by order
+    const seenGroups = new Set<string>();
+    const sortedGroups = [...groups]
+        .filter((g) => {
+            if (seenGroups.has(g.name)) return false;
+            seenGroups.add(g.name);
+            return true;
+        })
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
     // Get fields without a group
-    const ungroupedFields = fields.filter((f) => !f.group);
+    const ungroupedFields = uniqueFields.filter((f) => !f.group);
 
     return (
         <div className="space-y-6">
@@ -274,7 +292,7 @@ export function DynamicPluginFields({
 
             {/* Render grouped fields */}
             {sortedGroups.map((group) => {
-                const groupFields = fields.filter((f) => f.group === group.name);
+                const groupFields = uniqueFields.filter((f) => f.group === group.name);
                 if (groupFields.length === 0) return null;
 
                 const isExpanded = expandedGroups.has(group.name);

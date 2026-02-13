@@ -1,6 +1,6 @@
 import { Directory } from '@ever-works/cli-shared';
 import { getHttpClient } from './http-client';
-import type { CreateItemsGeneratorDto, ProvidersDto, CompanyDto } from '@ever-works/contracts/api';
+import type { CreateItemsGeneratorDto, ProvidersDto } from '@ever-works/contracts/api';
 import type {
     GeneratorFormSchema,
     ProviderOption,
@@ -14,7 +14,6 @@ import type {
 export type {
     CreateItemsGeneratorDto,
     ProvidersDto,
-    CompanyDto,
     GeneratorFormSchema,
     ProviderOption,
     GitProviderInfo,

@@ -1,4 +1,3 @@
-import type { CompanyDto } from './company.dto.js';
 import type { ProvidersDto } from './providers.dto.js';
 import { GenerationMethod, WebsiteRepositoryCreationMethod } from './generation-method.enum.js';
 
@@ -11,10 +10,6 @@ export interface CreateItemsGeneratorDto {
 	name: string;
 	/** Generation prompt */
 	prompt: string;
-	/** Company information */
-	company?: CompanyDto;
-	/** Repository description */
-	repository_description?: string;
 	/** Method for generation (create-update or recreate) */
 	generation_method?: GenerationMethod;
 	/** Whether to update with pull request */

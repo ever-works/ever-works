@@ -105,17 +105,21 @@ export function ProviderSelector({
 }
 
 interface PipelineModeSelectorProps {
-    fullPipelineProviders: ProviderOption[];
+    pipelineProviders: ProviderOption[];
     selectedPipeline: string | null;
     onChange: (pipelineId: string | null) => void;
 }
 
 export function PipelineModeSelector({
-    fullPipelineProviders,
+    pipelineProviders,
     selectedPipeline,
     onChange,
 }: PipelineModeSelectorProps) {
     const t = useTranslations('dashboard.directoryDetail.generator');
+
+    // When selectedPipeline is null, the default pipeline is active
+    const effectiveSelected =
+        selectedPipeline ?? pipelineProviders.find((p) => p.isDefault)?.id ?? null;
 
     return (
         <div
@@ -130,31 +134,14 @@ export function PipelineModeSelector({
             </h4>
 
             <div className="space-y-3">
-                <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                        type="radio"
-                        name="pipeline-mode"
-                        checked={!selectedPipeline}
-                        onChange={() => onChange(null)}
-                        className="mt-1"
-                    />
-                    <div className="flex-1">
-                        <span className="text-sm font-medium text-text dark:text-text-dark">
-                            {t('standardPipeline')}
-                        </span>
-                        <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                            {t('standardPipelineDescription')}
-                        </p>
-                    </div>
-                </label>
-
-                {fullPipelineProviders.map((provider) => {
+                {pipelineProviders.map((provider) => {
+                    const isActive = effectiveSelected === provider.id;
                     const radioLabel = (
                         <label className="flex items-start gap-3 cursor-pointer">
                             <input
                                 type="radio"
                                 name="pipeline-mode"
-                                checked={selectedPipeline === provider.id}
+                                checked={isActive}
                                 onChange={() => onChange(provider.id)}
                                 disabled={!provider.configured}
                                 className="mt-1"

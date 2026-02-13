@@ -128,8 +128,8 @@ describe('ClaudeCodePlugin', () => {
 			expect(plugin.category).toBe('pipeline');
 		});
 
-		it('should include full-pipeline capability', () => {
-			expect(plugin.capabilities).toContain('full-pipeline');
+		it('should include pipeline capability', () => {
+			expect(plugin.capabilities).toContain('pipeline');
 		});
 
 		it('should have user-required configuration mode', () => {
@@ -162,7 +162,6 @@ describe('ClaudeCodePlugin', () => {
 			const props = plugin.settingsSchema.properties!;
 			expect(props.maxTurns.type).toBe('integer');
 			expect(props.maxTurns['x-hidden']).toBe(true);
-			expect(props.maxTurns.default).toBe(50);
 		});
 
 		it('should have a required group for auth fields', () => {
@@ -199,9 +198,9 @@ describe('ClaudeCodePlugin', () => {
 	});
 
 	describe('Step Definitions', () => {
-		it('should return 5 step definitions', () => {
+		it('should return 6 step definitions', () => {
 			const steps = plugin.getStepDefinitions();
-			expect(steps).toHaveLength(5);
+			expect(steps).toHaveLength(6);
 		});
 
 		it('should have correct step IDs in order', () => {
@@ -212,6 +211,7 @@ describe('ClaudeCodePlugin', () => {
 				'prepare-context',
 				'generate-items',
 				'collect-results',
+				'capture-screenshots',
 				'cleanup'
 			]);
 		});
@@ -228,27 +228,16 @@ describe('ClaudeCodePlugin', () => {
 			expect(cleanup?.optional).toBe(true);
 		});
 
+		it('should have capture-screenshots as optional', () => {
+			const steps = plugin.getStepDefinitions();
+			const screenshot = steps.find((s) => s.id === 'capture-screenshots');
+			expect(screenshot).toBeDefined();
+			expect(screenshot?.optional).toBe(true);
+		});
+
 		it('should have no parallelizable steps', () => {
 			const steps = plugin.getStepDefinitions();
 			expect(steps.every((s) => s.parallelizable === false)).toBe(true);
-		});
-	});
-
-	describe('Execution Plan', () => {
-		it('should create a plan with 5 sequential phases', () => {
-			const plan = plugin.createExecutionPlan();
-			expect(plan.phases).toHaveLength(5);
-			expect(plan.totalSteps).toBe(5);
-		});
-
-		it('should have all phases as non-parallel', () => {
-			const plan = plugin.createExecutionPlan();
-			expect(plan.phases.every((p) => p.parallel === false)).toBe(true);
-		});
-
-		it('should have estimated duration', () => {
-			const plan = plugin.createExecutionPlan();
-			expect(plan.estimatedDuration).toBeGreaterThan(0);
 		});
 	});
 
@@ -298,8 +287,8 @@ describe('ClaudeCodePlugin', () => {
 			expect(result.success).toBe(true);
 			expect(result.items).toHaveLength(1);
 			expect(result.items[0].name).toBe('Test Item');
-			expect(result.stepsCompleted).toBe(5);
-			expect(result.totalSteps).toBe(5);
+			expect(result.stepsCompleted).toBe(5); // screenshots skipped (no execContext)
+			expect(result.totalSteps).toBe(6);
 		});
 
 		it('should report progress during execution', async () => {
@@ -351,6 +340,81 @@ describe('ClaudeCodePlugin', () => {
 			expect(result.metrics).toBeDefined();
 			expect(result.metrics!.itemsProcessed).toBe(1);
 			expect(result.duration).toBeGreaterThanOrEqual(0);
+		});
+
+		it('should skip screenshots when no execContext is provided', async () => {
+			const ctx = createMockContext();
+			await plugin.onLoad(ctx);
+
+			const result = await plugin.execute(directory, request, existing);
+
+			expect(result.success).toBe(true);
+			// Screenshot step should be skipped, not failed
+			const state = plugin.getState();
+			const screenshotStep = state?.steps.get('capture-screenshots');
+			expect(screenshotStep?.status).toBe('skipped');
+		});
+
+		it('should succeed even when screenshot facade throws', async () => {
+			const ctx = createMockContext();
+			await plugin.onLoad(ctx);
+
+			const mockScreenshotFacade = {
+				isAvailable: () => true,
+				getSmartImage: vi.fn().mockRejectedValue(new Error('Screenshot service down')),
+				capture: vi.fn(),
+				getScreenshotUrl: vi.fn()
+			};
+
+			const result = await plugin.execute(directory, request, existing, {
+				execContext: {
+					aiFacade: {} as never,
+					searchFacade: {} as never,
+					screenshotFacade: mockScreenshotFacade as never,
+					contentExtractorFacade: {} as never,
+					logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+					directory,
+					user: { id: 'user1' }
+				}
+			});
+
+			// Pipeline should still succeed despite screenshot failure
+			expect(result.success).toBe(true);
+			expect(result.items).toHaveLength(1);
+		});
+
+		it('should capture screenshots when facade is available', async () => {
+			const ctx = createMockContext();
+			await plugin.onLoad(ctx);
+
+			const mockScreenshotFacade = {
+				isAvailable: () => true,
+				getSmartImage: vi.fn().mockResolvedValue({
+					primaryImage: 'https://img.example.com/screenshot.png',
+					source: 'screenshot'
+				}),
+				capture: vi.fn(),
+				getScreenshotUrl: vi.fn()
+			};
+
+			const result = await plugin.execute(directory, request, existing, {
+				execContext: {
+					aiFacade: {} as never,
+					searchFacade: {} as never,
+					screenshotFacade: mockScreenshotFacade as never,
+					contentExtractorFacade: {} as never,
+					logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+					directory,
+					user: { id: 'user1' }
+				}
+			});
+
+			expect(result.success).toBe(true);
+			expect(mockScreenshotFacade.getSmartImage).toHaveBeenCalled();
+			// Screenshot step should be completed
+			const state = plugin.getState();
+			const screenshotStep = state?.steps.get('capture-screenshots');
+			expect(screenshotStep?.status).toBe('completed');
 		});
 	});
 });

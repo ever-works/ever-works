@@ -7,6 +7,7 @@ export type ClaudeCodeStepId =
 	| 'prepare-context'
 	| 'generate-items'
 	| 'collect-results'
+	| 'capture-screenshots'
 	| 'cleanup';
 
 /**
@@ -17,6 +18,7 @@ export const CLAUDE_CODE_STEP_IDS: readonly ClaudeCodeStepId[] = [
 	'prepare-context',
 	'generate-items',
 	'collect-results',
+	'capture-screenshots',
 	'cleanup'
 ] as const;
 
@@ -46,7 +48,7 @@ export const DEFAULT_CLI_VERSION = '2.1.37';
 /**
  * Default maximum number of agentic turns for Claude Code
  */
-export const DEFAULT_MAX_TURNS = 50;
+export const DEFAULT_MAX_TURNS = 500;
 
 /**
  * Maximum stdout/stderr buffer size (10MB) to prevent OOM

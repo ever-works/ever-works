@@ -5,7 +5,7 @@ import type { ParallelGroup } from './parallel-group.types.js';
  * A step executor - either built-in or plugin-provided
  */
 export type StepExecutor =
-	| { readonly type: 'builtin'; readonly serviceId: string }
+	| { readonly type: 'builtin'; readonly serviceId: string; readonly pluginId?: string }
 	| { readonly type: 'plugin'; readonly pluginId: string; readonly stepId: string };
 
 /**

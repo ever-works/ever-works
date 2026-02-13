@@ -7,20 +7,21 @@ import { PipelineBuilderService } from './pipeline-builder.service';
 import { StepPipelineExecutorService } from './step-pipeline-executor.service';
 import { FullPipelineExecutorService } from './full-pipeline-executor.service';
 import { PipelineOrchestratorService } from './pipeline-orchestrator.service';
+import { PipelineFacadeService } from './pipeline-facade.service';
 import { ProviderOverrideService } from './provider-override.service';
 
 /**
- * All pipeline providers
+ * All pipeline providers.
  *
- * Note: DefaultPipelinePlugin is NOT registered here as a NestJS provider.
- * It is loaded via the plugin system (PluginBootstrapService.bootstrap()).
- * The standalone plugin in @ever-works/default-pipeline-plugin is the single source of truth.
+ * Pipeline plugins (standard-pipeline, claude-code, etc.) are loaded via the
+ * plugin system (PluginBootstrapService.bootstrap()), not as NestJS providers.
  */
 const PROVIDERS = [
     PipelineBuilderService,
     StepPipelineExecutorService,
     FullPipelineExecutorService,
     PipelineOrchestratorService,
+    PipelineFacadeService,
     ProviderOverrideService,
 ];
 
@@ -32,6 +33,7 @@ const EXPORTS = [
     StepPipelineExecutorService,
     FullPipelineExecutorService,
     PipelineOrchestratorService,
+    PipelineFacadeService,
     ProviderOverrideService,
 ];
 
@@ -41,8 +43,8 @@ const EXPORTS = [
  * Note: This module relies on PluginsModule being registered globally via forRoot()
  * at the application root level. Do not import PluginsModule directly here.
  *
- * The DefaultPipelinePlugin is loaded via the plugin system, not as a NestJS provider.
- * Access it via PluginRegistryService.getPluginsByCapability('pipeline-step').
+ * Pipeline plugins are loaded via the plugin system, not as NestJS providers.
+ * Access them via PluginRegistryService.getByCapability('pipeline').
  */
 @Module({
     imports: [FacadesModule, EventEmitterModule.forRoot()],

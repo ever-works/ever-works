@@ -91,8 +91,8 @@ const CAPABILITY_METHOD_REQUIREMENTS: Record<string, string[]> = {
         'isAvailable',
         'getCapabilities',
     ],
-    [PLUGIN_CAPABILITIES.PIPELINE_STEP]: ['execute', 'getStepDefinition'],
-    [PLUGIN_CAPABILITIES.FULL_PIPELINE]: ['getStepDefinitions', 'createExecutionPlan', 'execute'],
+    [PLUGIN_CAPABILITIES.PIPELINE]: ['getStepDefinitions', 'execute'],
+    [PLUGIN_CAPABILITIES.PIPELINE_MODIFIER]: ['execute'],
     [PLUGIN_CAPABILITIES.FORM_FIELD]: ['getRegistration', 'validate'],
     [PLUGIN_CAPABILITIES.SUB_PROVIDER]: [
         'getRegistration',
@@ -107,14 +107,6 @@ const CAPABILITY_METHOD_REQUIREMENTS: Record<string, string[]> = {
         'getCapabilityImplementation',
         'hasCapability',
         'getCapabilityVersion',
-    ],
-    [PLUGIN_CAPABILITIES.DEFAULT_PIPELINE]: [
-        'getStepDefinitions',
-        'isValidStepId',
-        'getStepIds',
-        'registerStepExecutor',
-        'hasExecutor',
-        'executeStep',
     ],
 };
 
@@ -132,7 +124,7 @@ const CAPABILITY_PROPERTY_REQUIREMENTS: Record<string, string[]> = {
     [PLUGIN_CAPABILITIES.AI_PROVIDER]: ['providerType', 'providerName'],
     [PLUGIN_CAPABILITIES.FORM_FIELD]: ['fieldType'],
     [PLUGIN_CAPABILITIES.SUB_PROVIDER]: ['parentCapability', 'subProviderId'],
-    [PLUGIN_CAPABILITIES.DEFAULT_PIPELINE]: ['systemPlugin'],
+    [PLUGIN_CAPABILITIES.PIPELINE_MODIFIER]: ['targetPipelines'],
 };
 
 /**

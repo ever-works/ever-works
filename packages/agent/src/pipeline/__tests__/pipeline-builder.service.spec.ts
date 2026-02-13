@@ -6,31 +6,105 @@ import {
     MissingDependencyError,
 } from '../pipeline-builder.service';
 import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
-import { DefaultPipelinePlugin } from '@ever-works/default-pipeline-plugin';
+import { MockPipelinePlugin } from './mock-pipeline-plugin';
 import type {
     IPlugin,
     PluginManifest,
     PluginCategory,
     PipelineStepDefinition,
-    IPipelineStepPlugin,
+    IPipelineModifierPlugin,
     MutableGenerationContext,
     StepPosition,
+    IPipelinePlugin,
 } from '@ever-works/plugin';
+
+/**
+ * Compact 5-step pipeline with a fork for parallel-group testing.
+ *
+ *   prompt-processing (first)
+ *       ├→ domain-detection (parallel)
+ *       └→ web-search       (parallel)
+ *              └──────┬──────┘
+ *            data-aggregation
+ *            markdown-generation (last)
+ */
+const BUILDER_STEPS: PipelineStepDefinition[] = [
+    {
+        id: 'prompt-processing',
+        name: 'Prompt Processing',
+        position: { type: 'first' },
+        dependencies: [],
+        provides: ['subject'],
+        requires: [],
+        optional: false,
+        parallelizable: false,
+        estimatedDuration: 5,
+    },
+    {
+        id: 'domain-detection',
+        name: 'Domain Detection',
+        position: { type: 'after', stepId: 'prompt-processing' },
+        dependencies: [{ stepId: 'prompt-processing', required: true }],
+        provides: ['domainAnalysis'],
+        requires: ['subject'],
+        optional: false,
+        parallelizable: true,
+        estimatedDuration: 8,
+    },
+    {
+        id: 'web-search',
+        name: 'Web Search',
+        position: { type: 'after', stepId: 'prompt-processing' },
+        dependencies: [{ stepId: 'prompt-processing', required: true }],
+        provides: ['extractedUrls'],
+        requires: ['subject'],
+        optional: false,
+        parallelizable: true,
+        estimatedDuration: 10,
+    },
+    {
+        id: 'data-aggregation',
+        name: 'Data Aggregation',
+        position: { type: 'after', stepId: 'web-search' },
+        dependencies: [
+            { stepId: 'domain-detection', required: true },
+            { stepId: 'web-search', required: true },
+        ],
+        provides: ['aggregatedItems'],
+        requires: ['domainAnalysis', 'extractedUrls'],
+        optional: false,
+        parallelizable: false,
+        estimatedDuration: 10,
+    },
+    {
+        id: 'markdown-generation',
+        name: 'Markdown Generation',
+        position: { type: 'last' },
+        dependencies: [{ stepId: 'data-aggregation', required: true }],
+        provides: [],
+        requires: ['aggregatedItems'],
+        optional: false,
+        parallelizable: false,
+        estimatedDuration: 5,
+    },
+];
 
 describe('PipelineBuilderService', () => {
     let service: PipelineBuilderService;
     let registry: PluginRegistryService;
+    let standardPlugin: MockPipelinePlugin;
 
     const createMockPipelinePlugin = (
         id: string,
         stepDef: PipelineStepDefinition,
-    ): IPipelineStepPlugin =>
+    ): IPipelineModifierPlugin =>
         ({
             id,
             name: `Plugin ${id}`,
             version: '1.0.0',
             category: 'pipeline' as PluginCategory,
-            capabilities: ['pipeline-step'],
+            capabilities: ['pipeline-modifier'],
+            targetPipelines: ['standard-pipeline'],
             settingsSchema: { type: 'object', properties: {} },
             configurationMode: 'hybrid',
             onLoad: jest.fn(),
@@ -38,7 +112,7 @@ describe('PipelineBuilderService', () => {
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             getStepDefinition: () => stepDef,
             execute: jest.fn().mockImplementation((ctx) => Promise.resolve(ctx)),
-        }) as unknown as IPipelineStepPlugin;
+        }) as unknown as IPipelineModifierPlugin;
 
     const createMockManifest = (id: string): PluginManifest => ({
         id,
@@ -46,7 +120,8 @@ describe('PipelineBuilderService', () => {
         version: '1.0.0',
         description: 'Test plugin',
         category: 'pipeline' as PluginCategory,
-        capabilities: ['pipeline-step'],
+        capabilities: ['pipeline-modifier'],
+        targetPipelines: ['standard-pipeline'],
         autoEnable: true,
     });
 
@@ -55,6 +130,7 @@ describe('PipelineBuilderService', () => {
             providers: [
                 PipelineBuilderService,
                 PluginRegistryService,
+                MockPipelinePlugin,
                 {
                     provide: EventEmitter2,
                     useValue: {
@@ -68,6 +144,10 @@ describe('PipelineBuilderService', () => {
 
         service = module.get<PipelineBuilderService>(PipelineBuilderService);
         registry = module.get<PluginRegistryService>(PluginRegistryService);
+        standardPlugin = module.get<MockPipelinePlugin>(MockPipelinePlugin);
+
+        // Configure the mock pipeline with our compact step graph
+        standardPlugin.setSteps(BUILDER_STEPS);
     });
 
     afterEach(() => {
@@ -76,28 +156,28 @@ describe('PipelineBuilderService', () => {
 
     describe('build()', () => {
         it('should return built-in steps when no plugins enabled', async () => {
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
-            expect(pipeline.steps.length).toBe(DefaultPipelinePlugin.getBuiltInSteps().length);
-            expect(pipeline.source).toBe('standard');
+            expect(pipeline.steps.length).toBe(standardPlugin.getStepDefinitions().length);
+            expect(pipeline.source).toBe('standard-pipeline');
             expect(pipeline.disabledSteps.size).toBe(0);
             expect(pipeline.replacedSteps.size).toBe(0);
             expect(pipeline.injectedSteps.size).toBe(0);
         });
 
         it('should include all built-in step IDs', async () => {
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             const stepIds = pipeline.steps.map((s) => s.id);
-            for (const builtIn of DefaultPipelinePlugin.getBuiltInSteps()) {
+            for (const builtIn of standardPlugin.getStepDefinitions()) {
                 expect(stepIds).toContain(builtIn.id);
             }
         });
 
         it('should create executor map for built-in steps', async () => {
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
-            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
+            for (const step of standardPlugin.getStepDefinitions()) {
                 const executor = pipeline.executorMap.get(step.id);
                 expect(executor).toBeDefined();
                 expect(executor?.type).toBe('builtin');
@@ -105,7 +185,7 @@ describe('PipelineBuilderService', () => {
         });
 
         it('should identify parallel groups', async () => {
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             expect(pipeline.groups.length).toBeGreaterThan(0);
             // Verify all steps are in groups
@@ -116,7 +196,7 @@ describe('PipelineBuilderService', () => {
         });
 
         it('should calculate estimated duration', async () => {
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             expect(pipeline.estimatedDuration).toBeGreaterThan(0);
         });
@@ -137,7 +217,7 @@ describe('PipelineBuilderService', () => {
                 state: 'loaded',
             });
 
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             // The replacement step takes on the original step's ID for dependency resolution
             // but the name should be the replacement's name
@@ -155,7 +235,7 @@ describe('PipelineBuilderService', () => {
                 id: 'custom-prompt-processing',
                 name: 'Custom Prompt Processing',
                 position: { type: 'replace', stepId: 'prompt-processing' },
-                provides: ['subject', 'featuredItemHints'],
+                provides: ['subject'],
             };
 
             const plugin = createMockPipelinePlugin('prompt-plugin', replacementStep);
@@ -163,7 +243,7 @@ describe('PipelineBuilderService', () => {
                 state: 'loaded',
             });
 
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             // The executor is keyed by the original step ID (which the replacement step now uses)
             const executor = pipeline.executorMap.get('prompt-processing');
@@ -190,7 +270,7 @@ describe('PipelineBuilderService', () => {
                 state: 'loaded',
             });
 
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             const domainIndex = pipeline.steps.findIndex((s) => s.id === 'domain-detection');
             const injectedIndex = pipeline.steps.findIndex((s) => s.id === 'pre-domain-step');
@@ -215,7 +295,7 @@ describe('PipelineBuilderService', () => {
                 { state: 'loaded' },
             );
 
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             // After topological sort, the injected step should come after web-search
             // but before any step that depends on web-search's output
@@ -231,7 +311,7 @@ describe('PipelineBuilderService', () => {
         it('should not include disabled steps', async () => {
             // We need to test the disableStep method indirectly through build context
             // For now, verify that disabled steps set is properly tracked
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             // Initially no steps should be disabled
             expect(pipeline.disabledSteps.size).toBe(0);
@@ -252,7 +332,7 @@ describe('PipelineBuilderService', () => {
                 state: 'loaded',
             });
 
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             // After topological sort, step should still be early (no dependencies)
             const initIndex = pipeline.steps.findIndex((s) => s.id === 'init-step');
@@ -274,7 +354,7 @@ describe('PipelineBuilderService', () => {
                 state: 'loaded',
             });
 
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             const cleanupIndex = pipeline.steps.findIndex((s) => s.id === 'cleanup-step');
             expect(cleanupIndex).toBeGreaterThanOrEqual(0);
@@ -284,7 +364,7 @@ describe('PipelineBuilderService', () => {
 
     describe('topological sort', () => {
         it('should topologically sort steps by dependencies', async () => {
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             // Verify dependency order is maintained
             const stepIndexMap = new Map(pipeline.steps.map((s, i) => [s.id, i]));
@@ -332,8 +412,10 @@ describe('PipelineBuilderService', () => {
                 state: 'loaded',
             });
 
-            await expect(service.build()).rejects.toThrow(CircularDependencyError);
-            await expect(service.build()).rejects.toThrow(/step-a -> step-b -> step-a/);
+            await expect(service.build(standardPlugin)).rejects.toThrow(CircularDependencyError);
+            await expect(service.build(standardPlugin)).rejects.toThrow(
+                /step-a -> step-b -> step-a/,
+            );
         });
     });
 
@@ -361,7 +443,7 @@ describe('PipelineBuilderService', () => {
                 state: 'loaded',
             });
 
-            await expect(service.build()).rejects.toThrow(
+            await expect(service.build(standardPlugin)).rejects.toThrow(
                 'Duplicate step ID detected: "duplicate-step"',
             );
         });
@@ -369,22 +451,17 @@ describe('PipelineBuilderService', () => {
 
     describe('parallel groups', () => {
         it('should identify parallel groups for concurrent execution', async () => {
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             // Find groups with multiple steps (parallelizable)
             const parallelGroups = pipeline.groups.filter((g) => g.stepIds.length > 1);
 
-            // The built-in pipeline has some parallelizable steps
-            // (e.g., content-retrieval, items-extraction, image-capture are marked parallelizable)
+            // Our 5-step pipeline has domain-detection and web-search as parallel
             expect(pipeline.groups.length).toBeGreaterThan(0);
         });
 
         it('should correctly group independent steps (A -> [B, C] -> D)', async () => {
-            // Mock the built-in steps to create a specific dependency graph
-            // A -> B
-            // A -> C
-            // B, C -> D
-            // B and C are parallelizable
+            // Override steps to create a specific dependency graph
             const mockSteps: PipelineStepDefinition[] = [
                 {
                     id: 'step-a',
@@ -418,9 +495,9 @@ describe('PipelineBuilderService', () => {
                 },
             ];
 
-            jest.spyOn(DefaultPipelinePlugin, 'getBuiltInSteps').mockReturnValue(mockSteps as any);
+            jest.spyOn(standardPlugin, 'getStepDefinitions').mockReturnValue(mockSteps as any);
 
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             // We expect 3 groups: [A], [B, C], [D]
             expect(pipeline.groups).toHaveLength(3);
@@ -442,7 +519,7 @@ describe('PipelineBuilderService', () => {
         });
 
         it('should set maxConcurrent for parallel groups', async () => {
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             for (const group of pipeline.groups) {
                 if (group.stepIds.length > 1) {
@@ -453,7 +530,7 @@ describe('PipelineBuilderService', () => {
         });
 
         it('should track allRequired flag for groups', async () => {
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             for (const group of pipeline.groups) {
                 expect(typeof group.allRequired).toBe('boolean');
@@ -463,10 +540,10 @@ describe('PipelineBuilderService', () => {
 
     describe('getBuiltInSteps()', () => {
         it('should return copy of built-in steps', () => {
-            const steps = service.getBuiltInSteps();
+            const steps = service.getBuiltInSteps(standardPlugin);
 
-            expect(steps).toHaveLength(DefaultPipelinePlugin.getBuiltInSteps().length);
-            expect(steps).not.toBe(DefaultPipelinePlugin.getBuiltInSteps());
+            expect(steps).toHaveLength(standardPlugin.getStepDefinitions().length);
+            expect(steps).not.toBe(standardPlugin.getStepDefinitions());
         });
     });
 
@@ -498,7 +575,7 @@ describe('PipelineBuilderService', () => {
                 { state: 'unloaded' }, // Not loaded
             );
 
-            const pipeline = await service.build();
+            const pipeline = await service.build(standardPlugin);
 
             expect(pipeline.steps.some((s) => s.id === 'enabled-step')).toBe(true);
             expect(pipeline.steps.some((s) => s.id === 'disabled-step')).toBe(false);

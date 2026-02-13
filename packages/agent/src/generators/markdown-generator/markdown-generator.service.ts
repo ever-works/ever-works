@@ -11,7 +11,6 @@ import { GenerationMethod } from '../../items-generator/dto';
 import { DirectoryOperationsService } from '@src/directory-operations';
 
 type InitializeOptions = {
-    repository_description?: string;
     generation_method?: GenerationMethod;
     pr_update?: PRUpdate;
     remove_details?: string[];
@@ -29,7 +28,7 @@ export class MarkdownGeneratorService {
     async initialize(directory: Directory, user: User, options: InitializeOptions = {}) {
         const directoryOwner = directory.user as User;
         const committer = user.asCommitter();
-        const description = options?.repository_description || directory.description;
+        const description = directory.description;
 
         // Create repository through facade
         await this.gitFacade.createRepository(

@@ -4,8 +4,8 @@ export const PLUGIN_CAPABILITIES = {
 	SCREENSHOT: 'screenshot',
 	CONTENT_EXTRACTOR: 'content-extractor',
 	DATA_SOURCE: 'data-source',
-	PIPELINE_STEP: 'pipeline-step',
-	FULL_PIPELINE: 'full-pipeline',
+	PIPELINE: 'pipeline',
+	PIPELINE_MODIFIER: 'pipeline-modifier',
 	FORM_SCHEMA_PROVIDER: 'form-schema-provider',
 	FORM_FIELD: 'form-field',
 	DEPLOYMENT: 'deployment',
@@ -13,8 +13,7 @@ export const PLUGIN_CAPABILITIES = {
 	OAUTH: 'oauth',
 	SUB_PROVIDER: 'sub-provider',
 	CONFIG_AWARE: 'config-aware',
-	CUSTOM_CAPABILITY: 'custom-capability',
-	DEFAULT_PIPELINE: 'default-pipeline'
+	CUSTOM_CAPABILITY: 'custom-capability'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

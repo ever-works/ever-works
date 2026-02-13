@@ -22,6 +22,7 @@ import { revalidatePath } from 'next/cache';
 import { ROUTES } from '@/lib/constants';
 import { redirect } from 'next/navigation';
 import { sanitizeName, sanitizeDescription, sanitizePrompt } from '@/lib/utils/sanitize';
+import { slugify } from '@ever-works/plugin';
 
 const readmeConfigSchema = z.object({
     header: z.string().optional(),
@@ -230,10 +231,25 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
             };
         }
 
-        const directoryDetails = await directoryAPI.generateDetails({
-            directory_name: validation.data.name,
-            prompt: validation.data.prompt,
-        });
+        const aiProvider = request.providers?.ai;
+        const defaultDetails = {
+            name: validation.data.name,
+            slug: slugify(validation.data.name),
+            description: validation.data.prompt,
+            keywords: [] as string[],
+            categories: [] as string[],
+        };
+        let directoryDetails = defaultDetails;
+
+        if (aiProvider) {
+            directoryDetails = await directoryAPI
+                .generateDetails({
+                    directory_name: validation.data.name,
+                    prompt: validation.data.prompt,
+                    ai_provider: aiProvider,
+                })
+                .catch(() => defaultDetails);
+        }
 
         // Determine organization settings
         const { organization, owner } = checkOrganization(
@@ -860,6 +876,7 @@ export async function updateWebsiteSettings(
     directoryId: string,
     data: {
         company_name?: string;
+        company_website?: string;
         categories_enabled?: boolean;
         companies_enabled?: boolean;
         tags_enabled?: boolean;

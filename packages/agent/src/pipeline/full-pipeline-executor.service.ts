@@ -7,41 +7,36 @@ import type {
     PipelineExecutionOptions,
     PipelineProgressCallback,
     PipelineResult,
-    IFullPipelinePlugin,
+    IPipelinePlugin,
     PipelineEventPayload,
     PipelineCompletedPayload,
     PipelineFailedPayload,
 } from '@ever-works/plugin';
 import { PipelineEvents } from './step-pipeline-executor.service';
+import { PipelineFacadeService } from './pipeline-facade.service';
 import { validatePipelineResult } from './validators';
 
 /**
- * Executor for full pipeline plugins.
+ * Executor for self-managed pipeline plugins.
  *
- * This service delegates execution to IFullPipelinePlugin implementations,
- * which provide complete pipeline replacement capability. Full pipeline plugins
- * can completely override the standard step-based execution with their own
- * implementation.
+ * This service delegates execution to IPipelinePlugin implementations
+ * that own their execution entirely (not engine-orchestratable).
+ * It creates a StepExecutionContext and passes it via options.execContext.
  */
 @Injectable()
 export class FullPipelineExecutorService {
     private readonly logger = new Logger(FullPipelineExecutorService.name);
 
-    constructor(private readonly eventEmitter: EventEmitter2) {}
+    constructor(
+        private readonly eventEmitter: EventEmitter2,
+        private readonly facadeService: PipelineFacadeService,
+    ) {}
 
     /**
-     * Execute using a full pipeline plugin
-     *
-     * @param plugin - The full pipeline plugin to execute
-     * @param directory - Directory reference
-     * @param request - Generation request parameters
-     * @param existing - Existing items in directory
-     * @param options - Execution options
-     * @param onProgress - Progress callback
-     * @returns Pipeline execution result
+     * Execute using a pipeline plugin
      */
     async execute(
-        plugin: IFullPipelinePlugin,
+        plugin: IPipelinePlugin,
         directory: DirectoryReference,
         request: GenerationRequest,
         existing: ExistingItems,
@@ -61,12 +56,19 @@ export class FullPipelineExecutorService {
         });
 
         try {
-            // Delegate to the plugin's execute method
+            // Create execContext for the plugin to use facades
+            const execContext = this.facadeService.createStepExecutionContext(
+                directory,
+                request.providers,
+                options?.signal,
+            );
+
+            // Delegate to the plugin's execute method with execContext
             const rawResult = await plugin.execute(
                 directory,
                 request,
                 existing,
-                options,
+                { ...options, execContext },
                 onProgress,
             );
 
@@ -135,23 +137,15 @@ export class FullPipelineExecutorService {
 
     /**
      * Execute with cancellation support
-     *
-     * @param plugin - The full pipeline plugin
-     * @param directory - Directory reference
-     * @param request - Generation request
-     * @param existing - Existing items
-     * @param options - Execution options with signal
-     * @param onProgress - Progress callback
      */
     async executeWithCancellation(
-        plugin: IFullPipelinePlugin,
+        plugin: IPipelinePlugin,
         directory: DirectoryReference,
         request: GenerationRequest,
         existing: ExistingItems,
         options: PipelineExecutionOptions & { signal: AbortSignal },
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
-        // If plugin supports cancellation, use it
         if (plugin.cancel && options.signal) {
             const abortHandler = () => {
                 this.logger.log(`Cancelling full pipeline for plugin "${plugin.id}"`);
@@ -176,18 +170,15 @@ export class FullPipelineExecutorService {
             }
         }
 
-        // Otherwise, just execute normally
         return this.execute(plugin, directory, request, existing, options, onProgress);
     }
 
     /**
      * Get the current state of a running pipeline (if supported by plugin)
-     *
-     * @param plugin - The full pipeline plugin
      */
     getPluginState(
-        plugin: IFullPipelinePlugin,
-    ): ReturnType<NonNullable<IFullPipelinePlugin['getState']>> | null {
+        plugin: IPipelinePlugin,
+    ): ReturnType<NonNullable<IPipelinePlugin['getState']>> | null {
         if (plugin.getState) {
             return plugin.getState();
         }

@@ -516,7 +516,7 @@ export class DirectoryScheduleService {
 
         try {
             const config = await this.dataGeneratorService
-                .config(directory, user)
+                .getConfig(directory, user)
                 .catch(() => null);
 
             if (!config?.metadata?.last_request_data) {
@@ -539,8 +539,8 @@ export class DirectoryScheduleService {
     }
 
     private validateProviderOverrides(overrides: ProvidersDto): void {
-        const dtoFields = Object.entries(SELECTABLE_PROVIDER_CATEGORIES).map(([key, def]) =>
-            key === 'fullPipeline' ? 'pipeline' : def.uiKey,
+        const dtoFields = Object.entries(SELECTABLE_PROVIDER_CATEGORIES).map(
+            ([key, def]) => def.uiKey,
         );
         for (const field of dtoFields) {
             const pluginId = overrides[field as keyof ProvidersDto];

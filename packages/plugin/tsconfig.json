@@ -3,6 +3,7 @@
 		"module": "ESNext",
 		"moduleResolution": "bundler",
 		"target": "ES2021",
+		"lib": ["ES2021", "ES2022.Intl"],
 		"strict": true,
 		"strictNullChecks": true,
 		"noImplicitAny": true,

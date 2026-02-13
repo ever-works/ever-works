@@ -1168,12 +1168,23 @@
                     "saveSuccess": "Website settings saved successfully",
                     "saveFailed": "Failed to save website settings",
                     "save": "Save Settings",
+                    "tabs": {
+                        "general": "General",
+                        "header": "Header",
+                        "homepage": "Homepage",
+                        "footer": "Footer"
+                    },
                     "sections": {
                         "siteName": {
                             "title": "Site Identity",
                             "label": "Site Name",
                             "placeholder": "My Directory",
                             "helper": "The name displayed on your website header and browser tab"
+                        },
+                        "siteUrl": {
+                            "label": "Site URL",
+                            "placeholder": "https://example.com",
+                            "helper": "The URL of your company or directory website"
                         },
                         "global": {
                             "title": "Global Features",
@@ -1198,6 +1209,7 @@
                             "languageSelectorHelper": "Allow users to change language",
                             "themeSelector": "Theme Selector",
                             "themeSelectorHelper": "Allow users to switch between themes",
+                            "defaults": "Defaults",
                             "defaultLayout": "Default Layout",
                             "defaultTheme": "Default Theme",
                             "themeLight": "Light",
@@ -1214,6 +1226,7 @@
                             "heroHelper": "Show the hero section with title and description",
                             "search": "Search Bar",
                             "searchHelper": "Show the search bar on homepage",
+                            "defaults": "Defaults",
                             "defaultView": "Default View",
                             "viewClassic": "Classic",
                             "viewGrid": "Grid",
