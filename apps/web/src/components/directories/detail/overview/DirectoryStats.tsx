@@ -3,6 +3,7 @@
 import { Directory } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
+import { GenerateStatusType } from '@/lib/api/enums';
 
 interface DirectoryStatsProps {
     directory: Directory;
@@ -59,6 +60,65 @@ function StatCard({ title, value, icon, trend, color }: StatCardProps) {
     );
 }
 
+const generationStatusConfigs: Record<
+    string,
+    { iconPath: string; iconClass: string; color: string; label: string }
+> = {
+    [GenerateStatusType.GENERATED]: {
+        iconPath: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+        iconClass: 'w-5 h-5 text-green-600 dark:text-green-400',
+        color: 'bg-green-100 dark:bg-green-900',
+        label: 'generated',
+    },
+    [GenerateStatusType.GENERATING]: {
+        iconPath:
+            'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
+        iconClass: 'w-5 h-5 text-blue-600 dark:text-blue-400',
+        color: 'bg-blue-100 dark:bg-blue-900',
+        label: 'generating',
+    },
+    [GenerateStatusType.ERROR]: {
+        iconPath: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+        iconClass: 'w-5 h-5 text-red-600 dark:text-red-400',
+        color: 'bg-red-100 dark:bg-red-900',
+        label: 'error',
+    },
+    [GenerateStatusType.CANCELLED]: {
+        iconPath: 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636',
+        iconClass: 'w-5 h-5 text-gray-600 dark:text-gray-400',
+        color: 'bg-gray-100 dark:bg-gray-900',
+        label: 'cancelled',
+    },
+};
+
+const defaultStatusConfig = {
+    iconPath: 'M12 6v6m0 0v6m0-6h6m-6 0H6',
+    iconClass: 'w-5 h-5 text-gray-600 dark:text-gray-400',
+    color: 'bg-gray-100 dark:bg-gray-900',
+    label: 'not started',
+};
+
+function getGenerationStatusStat(directory: Directory, t: ReturnType<typeof useTranslations>) {
+    const status = directory.generateStatus?.status;
+    const config = (status && generationStatusConfigs[status]) || defaultStatusConfig;
+
+    return {
+        title: t('generationStatus'),
+        value: config.label,
+        icon: (
+            <svg className={config.iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d={config.iconPath}
+                />
+            </svg>
+        ),
+        color: config.color,
+    };
+}
+
 export function DirectoryStats({ categoriesCount, itemsCount, directory }: DirectoryStatsProps) {
     const t = useTranslations('dashboard.directoryDetail.stats');
 
@@ -103,26 +163,7 @@ export function DirectoryStats({ categoriesCount, itemsCount, directory }: Direc
             ),
             color: 'bg-purple-100 dark:bg-purple-900',
         },
-        {
-            title: t('generationStatus'),
-            value: directory.generateStatus?.status || 'Not Started',
-            icon: (
-                <svg
-                    className="w-5 h-5 text-green-600 dark:text-green-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                </svg>
-            ),
-            color: 'bg-green-100 dark:bg-green-900',
-        },
+        getGenerationStatusStat(directory, t),
         {
             title: t('daysActive'),
             value: Math.floor(
