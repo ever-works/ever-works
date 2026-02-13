@@ -31,6 +31,7 @@
 		"@ai-sdk/openai-compatible": "^2.0.29",
 		"bash-tool": "^1.3.14",
 		"just-bash": "^2.9.8",
+		"stopword": "^3.1.5",
 		"zod": "^3.25.0"
 	},
 	"peerDependencies": {
@@ -59,8 +60,8 @@
 			},
 			"license": "MIT",
 			"builtIn": true,
-			"autoEnable": true,
-			"systemPlugin": true,
+			"autoEnable": false,
+			"systemPlugin": false,
 			"visibility": "public",
 			"selectableProviderCategories": [
 				"ai-provider",

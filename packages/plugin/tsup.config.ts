@@ -13,7 +13,8 @@ export default defineConfig({
 		'src/testing/index.ts',
 		'src/api/index.ts',
 		'src/git/index.ts',
-		'src/ai/index.ts'
+		'src/ai/index.ts',
+		'src/keywords/index.ts'
 	],
 	format: ['esm', 'cjs'],
 	dts: true,

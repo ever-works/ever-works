@@ -765,6 +765,9 @@ importers:
       jsonrepair:
         specifier: ^3.13.2
         version: 3.13.2
+      stopword:
+        specifier: ^3.1.5
+        version: 3.1.5
       zod:
         specifier: ^3.25.0
         version: 3.25.76
@@ -778,6 +781,9 @@ importers:
       '@types/node':
         specifier: ^22.19.3
         version: 22.19.3
+      '@types/stopword':
+        specifier: ^2.0.3
+        version: 2.0.3
       isomorphic-git:
         specifier: ^1.36.3
         version: 1.36.3
@@ -805,6 +811,9 @@ importers:
       just-bash:
         specifier: ^2.9.8
         version: 2.9.8
+      stopword:
+        specifier: ^3.1.5
+        version: 3.1.5
       zod:
         specifier: ^3.25.0
         version: 3.25.76
@@ -848,6 +857,10 @@ importers:
         version: 3.2.4(@types/debug@4.1.12)(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(yaml@2.8.2)
 
   packages/plugins/apify:
+    dependencies:
+      stopword:
+        specifier: ^3.1.5
+        version: 3.1.5
     devDependencies:
       '@ever-works/contracts':
         specifier: workspace:*
@@ -1149,6 +1162,9 @@ importers:
       '@langchain/textsplitters':
         specifier: ^0.1.0
         version: 0.1.0(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@6.15.0(ws@8.18.3)(zod@3.25.76)))
+      stopword:
+        specifier: ^3.1.5
+        version: 3.1.5
       string-similarity-js:
         specifier: ^2.1.4
         version: 2.1.4
@@ -4317,6 +4333,9 @@ packages:
 
   '@types/stack-utils@2.0.3':
     resolution: {integrity: sha512-9aEbYZ3TbYMznPdcdr3SmIrLXwC/AKZXQeCf9Pgao5CKb8CyHuEX5jzWPTkvregvhRJHcpRO6BFoGW9ycaOkYw==}
+
+  '@types/stopword@2.0.3':
+    resolution: {integrity: sha512-hioMj0lOvISM+EDevf7ijG8EMbU+J3pj4SstCyfQC1t39uPYpAe7beSfBdU6c1d9jeECTQQtR3UJWtVoUO8Weg==}
 
   '@types/superagent@8.1.9':
     resolution: {integrity: sha512-pTVjI73witn+9ILmoJdajHGW2jkSaOzhiFYF1Rd3EQ94kymLqB9PjD9ISg7WaALC7+dCHT0FGe9T2LktLq/3GQ==}
@@ -8904,6 +8923,9 @@ packages:
   std-env@3.10.0:
     resolution: {integrity: sha512-5GS12FdOZNliM5mAOxFRg7Ir0pWz8MdpYm6AY6VPkGpbA7ZzmbzNcBJQ0GPvvyWgcY7QAhCgf9Uy89I03faLkg==}
 
+  stopword@3.1.5:
+    resolution: {integrity: sha512-OgLYGVFCNa430WOrj9tYZhQge5yg6vd6JsKredveAqEhdLVQkfrpnQIGjx0L9lLqzL4Kq4J8yNTcfQR/MpBwhg==}
+
   streamsearch@1.1.0:
     resolution: {integrity: sha512-Mcc5wHehp9aXz1ax6bZUyY5afg9u2rv5cqQI3mRrYkGC8rW2hM02jWuwjtL++LS5qinSyhj2QfLyNsuc+VsExg==}
     engines: {node: '>=10.0.0'}
@@ -13051,6 +13073,8 @@ snapshots:
       '@types/node': 22.19.3
 
   '@types/stack-utils@2.0.3': {}
+
+  '@types/stopword@2.0.3': {}
 
   '@types/superagent@8.1.9':
     dependencies:
@@ -18787,6 +18811,8 @@ snapshots:
   statuses@2.0.2: {}
 
   std-env@3.10.0: {}
+
+  stopword@3.1.5: {}
 
   streamsearch@1.1.0: {}
 

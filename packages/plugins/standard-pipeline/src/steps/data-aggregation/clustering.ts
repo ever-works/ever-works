@@ -1,5 +1,6 @@
 import stringSimilarity from 'string-similarity-js';
 import type { MutableItemData, StepExecutionContext } from '@ever-works/plugin';
+import { extractKeywords } from '@ever-works/plugin/keywords';
 
 export const MAX_CLUSTER_SIZE = 30;
 const SIMILARITY_THRESHOLD = 0.5;
@@ -116,86 +117,6 @@ export function groupSimilarItems(items: MutableItemData[], logger: Logger): Mut
 	logger.log(`Cluster sizes: ${sizes.slice(0, 10).join(', ')}${sizes.length > 10 ? '...' : ''}`);
 
 	return finalClusters;
-}
-
-const STOP_WORDS = new Set([
-	'the',
-	'and',
-	'for',
-	'are',
-	'but',
-	'not',
-	'you',
-	'all',
-	'can',
-	'had',
-	'her',
-	'was',
-	'one',
-	'our',
-	'out',
-	'day',
-	'get',
-	'has',
-	'him',
-	'his',
-	'how',
-	'its',
-	'may',
-	'new',
-	'now',
-	'old',
-	'see',
-	'two',
-	'who',
-	'boy',
-	'did',
-	'man',
-	'way',
-	'she',
-	'use',
-	'your',
-	'said',
-	'each',
-	'make',
-	'most',
-	'over',
-	'such',
-	'very',
-	'what',
-	'with',
-	'have',
-	'from',
-	'they',
-	'know',
-	'want',
-	'been',
-	'good',
-	'much',
-	'some',
-	'time',
-	'will',
-	'when',
-	'come',
-	'here',
-	'just',
-	'like',
-	'long',
-	'many',
-	'than',
-	'them',
-	'well',
-	'were'
-]);
-
-function extractKeywords(text: string): string[] {
-	if (!text) return [];
-	return text
-		.toLowerCase()
-		.replace(/[^\w\s]/g, ' ')
-		.split(/\s+/)
-		.filter((word) => word.length > 2 && !STOP_WORDS.has(word))
-		.slice(0, 20);
 }
 
 export function findRelevantExistingItems(

@@ -25,6 +25,7 @@
 	},
 	"dependencies": {
 		"@langchain/textsplitters": "^0.1.0",
+		"stopword": "^3.1.5",
 		"string-similarity-js": "^2.1.4",
 		"zod": "^3.25.76"
 	},

@@ -68,6 +68,11 @@
 			"types": "./dist/ai/index.d.ts",
 			"import": "./dist/ai/index.js",
 			"require": "./dist/ai/index.cjs"
+		},
+		"./keywords": {
+			"types": "./dist/keywords/index.d.ts",
+			"import": "./dist/keywords/index.js",
+			"require": "./dist/keywords/index.cjs"
 		}
 	},
 	"files": [
@@ -82,18 +87,20 @@
 		"test:watch": "vitest"
 	},
 	"devDependencies": {
-		"@types/node": "^22.19.3",
-		"@langchain/openai": "^0.6.17",
 		"@langchain/core": "^0.3.80",
+		"@langchain/openai": "^0.6.17",
+		"@types/node": "^22.19.3",
+		"@types/stopword": "^2.0.3",
 		"isomorphic-git": "^1.36.3",
 		"tsup": "^8.0.0",
 		"typescript": "^5.9.3",
 		"vitest": "^3.2.1"
 	},
 	"peerDependencies": {
-		"isomorphic-git": "^1.27.0",
+		"@langchain/core": "^0.3.80",
 		"@langchain/openai": "^0.6.17",
-		"@langchain/core": "^0.3.80"
+		"isomorphic-git": "^1.27.0",
+		"stopword": "^3.1.5"
 	},
 	"peerDependenciesMeta": {
 		"isomorphic-git": {
@@ -103,6 +110,9 @@
 			"optional": true
 		},
 		"@langchain/core": {
+			"optional": true
+		},
+		"stopword": {
 			"optional": true
 		}
 	},

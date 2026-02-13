@@ -8,15 +8,11 @@ import type {
 	FacadeOptions
 } from '@ever-works/plugin';
 import { deduplicateByField, filterNewItemsManually } from '@ever-works/plugin';
+import { extractKeywordsFromPrompt } from '@ever-works/plugin/keywords';
 import { z } from 'zod';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { NewItemsExtractor, AiDeduplicator } from './data-aggregation/index.js';
 
-/**
- * Aggregates and deduplicates data from multiple sources.
- * Data-source items skip AI dedup (field-based only);
- * AI dedup runs only on AI-generated + web-extracted items.
- */
 export class DataAggregationStep extends BasePipelineStep {
 	readonly name = 'Deduplication and Data Aggregation';
 	readonly stepId = 'deduplication-and-data-aggregation' as const;
@@ -32,7 +28,6 @@ export class DataAggregationStep extends BasePipelineStep {
 
 		const existingItems = (existing.items as MutableItemData[]) || [];
 
-		// Phase 1: Deduplicate AI + web items (field-based + AI dedup)
 		const { aggregatedItems: dedupedAiWebItems, updatedMetrics } = await this.aggregateAndDeduplicateData(
 			directory.slug,
 			request.prompt || '',
@@ -44,7 +39,6 @@ export class DataAggregationStep extends BasePipelineStep {
 			execContext
 		);
 
-		// Phase 2: Query data sources — field-based dedup only (no AI tokens)
 		const dataSourceItems = await this.queryAndDedupDataSources(
 			context,
 			execContext,
@@ -78,18 +72,15 @@ export class DataAggregationStep extends BasePipelineStep {
 		const newItemsExtractor = new NewItemsExtractor(execContext);
 		const aiDeduplicator = new AiDeduplicator(execContext);
 
-		// Field-based dedup (fast)
 		let deduplicated = deduplicateByField(deduplicateByField(newItems, 'slug'), 'source_url');
 		logger.log(`[${directorySlug}] Field-based dedup: ${newItems.length} → ${deduplicated.length}`);
 
-		// Extract new items if existing items present
 		if (existingItems.length > 0 && deduplicated.length > 0) {
 			const prev = deduplicated.length;
 			deduplicated = await newItemsExtractor.extractNewItems(existingItems, deduplicated, metrics);
 			logger.log(`[${directorySlug}] New items extraction: ${prev} → ${deduplicated.length}`);
 		}
 
-		// AI-based dedup
 		if (deduplicated.length > 0) {
 			deduplicated = await aiDeduplicator.deduplicateWithAI(prompt, deduplicated, metrics, customPrompt);
 			logger.log(`[${directorySlug}] AI dedup: ${deduplicated.length} items remaining`);
@@ -212,17 +203,6 @@ Return only meaningful keywords, no common words or articles.`,
 			}
 		}
 
-		const keywords: string[] = [];
-		if (subject) keywords.push(subject.toLowerCase());
-		if (prompt) {
-			keywords.push(
-				...prompt
-					.toLowerCase()
-					.split(/\s+/)
-					.filter((w) => w.length > 2)
-					.slice(0, 10)
-			);
-		}
-		return [...new Set(keywords)];
+		return extractKeywordsFromPrompt(prompt, subject, 10);
 	}
 }

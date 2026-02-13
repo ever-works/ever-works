@@ -113,6 +113,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			license: 'MIT',
 			builtIn: true,
 			autoEnable: false,
+			systemPlugin: false,
 			visibility: 'public',
 			selectableProviderCategories: ['ai-provider', 'search', 'screenshot', 'content-extractor', 'data-source'],
 			readme: [
@@ -200,7 +201,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 					new Error(
 						providerConfig
 							? `AI provider "${providerConfig.providerId}" has no model configured. ` +
-									'Set a defaultModel or complexModel in provider settings.'
+							'Set a defaultModel or complexModel in provider settings.'
 							: 'AI provider missing baseUrl or apiKey. Please configure the AI provider settings.'
 					),
 					startTime
