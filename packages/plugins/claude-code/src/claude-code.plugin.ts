@@ -376,7 +376,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 
 			const duration = Date.now() - startTime;
 			return {
-				success: items.length > 0,
+				success: true,
 				items,
 				categories: metadata.categories,
 				tags: metadata.tags,
