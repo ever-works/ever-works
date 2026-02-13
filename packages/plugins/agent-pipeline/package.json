@@ -1,7 +1,7 @@
 {
 	"name": "@ever-works/agent-pipeline-plugin",
 	"version": "1.0.0",
-	"description": "Autonomous tool-based pipeline that researches and generates directory items using an AI agent with web search, content extraction, and file management capabilities",
+	"description": "Autonomous tool-based pipeline that researches and generates directory items using an AI agent",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -54,7 +54,7 @@
 				"pipeline",
 				"form-schema-provider"
 			],
-			"description": "Autonomous tool-based pipeline that researches and generates directory items using an AI agent with web search, content extraction, and file management capabilities",
+			"description": "Autonomous tool-based pipeline that researches and generates directory items using an AI agent",
 			"author": {
 				"name": "Ever Works Team"
 			},
