@@ -10,7 +10,6 @@ import {
 } from '@/lib/api/types-only';
 import { RequiredFields } from './RequiredFields';
 import { UpdateItemsFields } from './UpdateItemsFields';
-import { CompanyFields } from './CompanyFields';
 import { DynamicPluginFields } from './DynamicPluginFields';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -26,7 +25,6 @@ import { generateItems, updateItems } from '@/app/actions/dashboard/generator';
 import { useTranslations } from 'next-intl';
 import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/enums';
 import { getFormSchema } from '@/app/actions/dashboard/generator-form';
-import { CollapsibleSection } from '../shared';
 import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import { ProviderSelectionSection } from '@/components/directories/shared/ProviderSelectionSection';
 
@@ -44,9 +42,8 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const [confirmRecreate, setConfirmRecreate] = useState(false);
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
     const [isLoadingSchema, setIsLoadingSchema] = useState(false);
-    const $isLoadingSchema = useRef(isLoadingSchema);
-
-    $isLoadingSchema.current = isLoadingSchema;
+    const fetchVersionRef = useRef(0);
+    const lastFetchedPipelineRef = useRef<string | undefined>(undefined);
 
     // Check if directory has been generated before
     const isGenerated = !!config?.metadata;
@@ -57,16 +54,12 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const [coreData, setCoreData] = useState<{
         name: string;
         prompt: string;
-        company?: { name: string; website: string };
-        repository_description?: string;
         generation_method?: GenerationMethod;
         update_with_pull_request?: boolean;
         website_repository_creation_method?: WebsiteRepositoryCreationMethod;
     }>({
         name: directory.name,
         prompt: initialPrompt,
-        company: lastRequestData?.company || undefined,
-        repository_description: lastRequestData?.repository_description || '',
         generation_method: GenerationMethod.CREATE_UPDATE,
         update_with_pull_request: false,
         website_repository_creation_method:
@@ -81,9 +74,9 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const {
         providers,
         handleProviderChange,
-        isFullPipeline,
         buildSelectedProviders,
         getUnconfiguredProviders,
+        syncResolvedPipeline,
     } = useProviderSelection(lastRequestData?.providers);
 
     // Seed data from the previous generation — used once during schema init,
@@ -92,48 +85,52 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
 
     // Load form schema when directory changes or pipeline provider changes
     useEffect(() => {
-        if ($isLoadingSchema.current) {
-            return;
-        }
+        const pipelineId = providers.pipeline || undefined;
+        if (pipelineId === lastFetchedPipelineRef.current && formSchema) return;
+
+        const version = ++fetchVersionRef.current;
 
         async function loadFormSchema() {
             setIsLoadingSchema(true);
             try {
-                // Pass pipelineId if a full pipeline is selected
-                const pipelineId = providers.pipeline || undefined;
                 const result = await getFormSchema(directoryId, pipelineId);
 
+                // Discard stale response if pipeline changed while fetching
+                if (version !== fetchVersionRef.current) return;
+
                 if (result.success && result.data) {
+                    lastFetchedPipelineRef.current = result.data.resolvedPipelineId || pipelineId;
                     setFormSchema(result.data);
-                    // Initialize plugin config with default values
                     const defaults: Record<string, unknown> = {};
                     if (result.data.defaultValues) {
                         Object.assign(defaults, result.data.defaultValues);
                     }
 
-                    // Only merge last request data if the pipeline matches what was used last time
                     const lastPipelineId = lastRequestData?.providers?.pipeline || null;
                     const currentPipelineId = providers.pipeline;
-
-                    // Treat null/undefined as equivalent (default pipeline)
                     const isSamePipeline =
                         (currentPipelineId || 'default') === (lastPipelineId || 'default');
 
-                    // Merge with last request data's plugin config if available and pipelines match
                     if (isSamePipeline && lastPluginConfigRef.current) {
                         Object.assign(defaults, lastPluginConfigRef.current);
                     }
                     setPluginConfig(defaults);
+
+                    // Sync pipeline selection to server-resolved ID
+                    syncResolvedPipeline(result.data);
                 }
             } catch (error) {
+                if (version !== fetchVersionRef.current) return;
                 console.error('Failed to load form schema:', error);
                 toast.error(t('failedToLoadFormSchema'));
             } finally {
-                setIsLoadingSchema(false);
+                if (version === fetchVersionRef.current) {
+                    setIsLoadingSchema(false);
+                }
             }
         }
         loadFormSchema();
-    }, [directoryId, t, providers.pipeline]);
+    }, [directoryId, t, providers.pipeline, syncResolvedPipeline]);
 
     const handleCoreDataChange = useCallback((updates: Partial<typeof coreData>) => {
         setCoreData((prev) => ({ ...prev, ...updates }));
@@ -190,8 +187,6 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                 const generateData: CreateItemsGeneratorDto = {
                     name: coreData.name,
                     prompt: coreData.prompt,
-                    company: coreData.company,
-                    repository_description: coreData.repository_description,
                     generation_method: coreData.generation_method,
                     update_with_pull_request: coreData.update_with_pull_request,
                     website_repository_creation_method: coreData.website_repository_creation_method,
@@ -257,21 +252,8 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                             formSchema={formSchema}
                             providers={providers}
                             onProviderChange={handleProviderChange}
-                            isFullPipeline={isFullPipeline}
                         />
                     )}
-
-                    {/* Company Information */}
-                    <CollapsibleSection
-                        title={t('companyInformation')}
-                        description={t('companyInfoDescription')}
-                        defaultExpanded={false}
-                    >
-                        <CompanyFields
-                            company={coreData.company}
-                            onChange={(company) => handleCoreDataChange({ company })}
-                        />
-                    </CollapsibleSection>
 
                     {/* Dynamic Plugin Fields */}
 

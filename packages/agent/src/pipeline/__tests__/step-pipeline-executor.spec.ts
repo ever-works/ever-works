@@ -14,14 +14,11 @@ jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
 jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
 jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
 import { PipelineBuilderService } from '../pipeline-builder.service';
-import { DefaultPipelinePlugin } from '@ever-works/default-pipeline-plugin';
+import { MockPipelinePlugin, createLinearChain } from './mock-pipeline-plugin';
 import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
 import { TypedGenerationContext } from '../generation-context';
 import * as superjson from 'superjson';
-import { AiFacadeService } from '../../facades/ai.facade';
-import { SearchFacadeService } from '../../facades/search.facade';
-import { ScreenshotFacadeService } from '../../facades/screenshot.facade';
-import { ContentExtractorFacadeService } from '../../facades/content-extractor.facade';
+import { PipelineFacadeService } from '../pipeline-facade.service';
 import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
 import type {
     DirectoryReference,
@@ -31,10 +28,13 @@ import type {
     PipelineExecutionOptions,
 } from '@ever-works/plugin';
 
+/** Simple 3-step linear chain for executor tests */
+const EXECUTOR_STEPS = createLinearChain(['step-init', 'step-process', 'step-finalize']);
+
 describe('StepPipelineExecutorService', () => {
     let service: StepPipelineExecutorService;
     let pipelineBuilder: PipelineBuilderService;
-    let defaultPlugin: DefaultPipelinePlugin;
+    let standardPlugin: MockPipelinePlugin;
     let registry: PluginRegistryService;
     let eventEmitter: EventEmitter2;
     let cacheManager: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
@@ -68,7 +68,7 @@ describe('StepPipelineExecutorService', () => {
             providers: [
                 StepPipelineExecutorService,
                 PipelineBuilderService,
-                DefaultPipelinePlugin,
+                MockPipelinePlugin,
                 PluginRegistryService,
                 {
                     provide: EventEmitter2,
@@ -83,46 +83,50 @@ describe('StepPipelineExecutorService', () => {
                     useValue: cacheManager,
                 },
                 {
-                    provide: AiFacadeService,
+                    provide: PipelineFacadeService,
                     useValue: {
-                        generateText: jest.fn().mockResolvedValue(''),
-                        generateStructuredOutput: jest.fn().mockResolvedValue({}),
-                        askJson: jest
-                            .fn()
-                            .mockResolvedValue({ result: {}, usage: null, cost: null }),
-                        createChatCompletion: jest.fn().mockResolvedValue({
-                            choices: [{ message: { content: '' } }],
+                        createStepExecutionContext: jest.fn().mockReturnValue({
+                            aiFacade: {
+                                askJson: jest
+                                    .fn()
+                                    .mockResolvedValue({ result: {}, usage: null, cost: null }),
+                                createChatCompletion: jest.fn().mockResolvedValue({
+                                    choices: [{ message: { content: '' } }],
+                                }),
+                                createStreamingChatCompletion: jest.fn(),
+                                isConfigured: jest.fn().mockReturnValue(true),
+                                testConnection: jest.fn().mockResolvedValue(true),
+                                getAvailableModels: jest.fn().mockResolvedValue([]),
+                            },
+                            searchFacade: {
+                                search: jest.fn().mockResolvedValue([]),
+                                isConfigured: jest.fn().mockReturnValue(true),
+                            },
+                            screenshotFacade: {
+                                capture: jest.fn().mockResolvedValue(null),
+                                getSmartImage: jest.fn().mockResolvedValue(null),
+                                getScreenshotUrl: jest.fn().mockResolvedValue(null),
+                                isAvailable: jest.fn().mockReturnValue(true),
+                            },
+                            contentExtractorFacade: {
+                                extractContent: jest.fn().mockResolvedValue(null),
+                                isConfigured: jest.fn().mockReturnValue(true),
+                            },
+                            dataSourceFacade: undefined,
+                            logger: {
+                                log: jest.fn(),
+                                debug: jest.fn(),
+                                warn: jest.fn(),
+                                error: jest.fn(),
+                            },
+                            directory: {
+                                id: 'dir-123',
+                                name: 'Test Directory',
+                                slug: 'test-directory',
+                                user: { id: 'user-123' },
+                            },
+                            user: { id: 'user-123' },
                         }),
-                        createStreamingChatCompletion: jest.fn(),
-                        testConnection: jest.fn().mockResolvedValue(true),
-                        getAvailableModels: jest.fn().mockResolvedValue([]),
-                        isConfigured: jest.fn().mockReturnValue(true),
-                    },
-                },
-                {
-                    provide: SearchFacadeService,
-                    useValue: {
-                        search: jest.fn().mockResolvedValue([]),
-                        extractContent: jest.fn().mockResolvedValue(null),
-                        isConfigured: jest.fn().mockReturnValue(true),
-                    },
-                },
-                {
-                    provide: ScreenshotFacadeService,
-                    useValue: {
-                        capture: jest.fn().mockResolvedValue(null),
-                        getSmartImage: jest.fn().mockResolvedValue(null),
-                        getScreenshotUrl: jest.fn().mockResolvedValue(null),
-                        isAvailable: jest.fn().mockReturnValue(true),
-                        isConfigured: jest.fn().mockReturnValue(true),
-                    },
-                },
-                {
-                    provide: ContentExtractorFacadeService,
-                    useValue: {
-                        extractContent: jest.fn().mockResolvedValue(null),
-                        canHandle: jest.fn().mockReturnValue(false),
-                        isConfigured: jest.fn().mockReturnValue(true),
                     },
                 },
                 {
@@ -136,9 +140,12 @@ describe('StepPipelineExecutorService', () => {
 
         service = module.get<StepPipelineExecutorService>(StepPipelineExecutorService);
         pipelineBuilder = module.get<PipelineBuilderService>(PipelineBuilderService);
-        defaultPlugin = module.get<DefaultPipelinePlugin>(DefaultPipelinePlugin);
+        standardPlugin = module.get<MockPipelinePlugin>(MockPipelinePlugin);
         registry = module.get<PluginRegistryService>(PluginRegistryService);
         eventEmitter = module.get<EventEmitter2>(EventEmitter2);
+
+        // Configure the mock pipeline with our 3-step chain
+        standardPlugin.setSteps(EXECUTOR_STEPS);
     });
 
     afterEach(() => {
@@ -148,28 +155,24 @@ describe('StepPipelineExecutorService', () => {
 
     describe('execute()', () => {
         beforeEach(() => {
-            // Register the default pipeline plugin in the registry so getDefaultPipelinePlugin() can find it
-            // Note: We intentionally do NOT include 'pipeline-step' capability because the DefaultPipelinePlugin
-            // provides the built-in steps (via static getBuiltInSteps()), not by implementing getStepDefinition().
-            // If we included 'pipeline-step', the pipeline builder would try to call getStepDefinition() on it
-            // which would cause issues.
-            registry.register(defaultPlugin, {
-                id: 'default-pipeline',
-                name: 'Default Pipeline',
+            // Register the standard pipeline plugin in the registry
+            registry.register(standardPlugin, {
+                id: 'standard-pipeline',
+                name: 'Standard Pipeline',
                 version: '1.0.0',
-                description: 'Default pipeline plugin for tests',
+                description: 'Standard pipeline plugin for tests',
                 category: 'pipeline',
-                capabilities: ['default-pipeline'],
+                capabilities: ['pipeline'],
             });
-            registry.updateState('default-pipeline', 'loaded');
+            registry.updateState('standard-pipeline', 'loaded');
 
-            // Register mock executors for all built-in steps
-            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
-                defaultPlugin.registerStepExecutor(step.id as any, {
+            // Register mock executors for all steps
+            for (const step of standardPlugin.getStepDefinitions()) {
+                standardPlugin.registerStepExecutor(step.id, {
                     name: step.name,
                     run: jest.fn().mockImplementation((ctx: MutableGenerationContext) => {
-                        // Mark shouldStop on prompt-comparison to stop early for tests
-                        if (step.id === 'prompt-comparison') {
+                        // Mark shouldStop on first step to stop early for tests
+                        if (step.id === 'step-init') {
                             ctx.shouldStop = true;
                         }
                         return Promise.resolve(ctx);
@@ -179,7 +182,12 @@ describe('StepPipelineExecutorService', () => {
         });
 
         it('should execute pipeline and emit started event', async () => {
-            const result = await service.execute(mockDirectory, mockRequest, mockExisting);
+            const result = await service.execute(
+                standardPlugin,
+                mockDirectory,
+                mockRequest,
+                mockExisting,
+            );
 
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PipelineEvents.STARTED,
@@ -191,67 +199,78 @@ describe('StepPipelineExecutorService', () => {
         });
 
         it('should emit step-started event for each step', async () => {
-            await service.execute(mockDirectory, mockRequest, mockExisting);
+            await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
 
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PipelineEvents.STEP_STARTED,
                 expect.objectContaining({
-                    stepId: 'prompt-comparison',
-                    stepName: 'Prompt Comparison',
+                    stepId: 'step-init',
+                    stepName: 'Step Init',
                     stepIndex: 0,
                 }),
             );
         });
 
         it('should emit step-completed after step success', async () => {
-            await service.execute(mockDirectory, mockRequest, mockExisting);
+            await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
 
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PipelineEvents.STEP_COMPLETED,
                 expect.objectContaining({
-                    stepId: 'prompt-comparison',
-                    stepName: 'Prompt Comparison',
+                    stepId: 'step-init',
+                    stepName: 'Step Init',
                 }),
             );
         });
 
         it('should stop pipeline when shouldStop is set', async () => {
-            const result = await service.execute(mockDirectory, mockRequest, mockExisting);
+            const result = await service.execute(
+                standardPlugin,
+                mockDirectory,
+                mockRequest,
+                mockExisting,
+            );
 
-            // Should have stopped after prompt-comparison (which sets shouldStop)
+            // Should have stopped after step-init (which sets shouldStop)
             expect(result.stepsCompleted).toBe(1);
         });
 
         it('should skip steps in skipSteps option', async () => {
             // Reset shouldStop behavior
-            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
-                defaultPlugin.registerStepExecutor(step.id as any, {
+            for (const step of standardPlugin.getStepDefinitions()) {
+                standardPlugin.registerStepExecutor(step.id, {
                     name: step.name,
                     run: jest.fn().mockImplementation((ctx) => Promise.resolve(ctx)),
                 });
             }
 
             const options: PipelineExecutionOptions = {
-                skipSteps: ['prompt-comparison'],
+                skipSteps: ['step-init'],
             };
 
-            const result = await service.execute(mockDirectory, mockRequest, mockExisting, options);
+            const result = await service.execute(
+                standardPlugin,
+                mockDirectory,
+                mockRequest,
+                mockExisting,
+                options,
+            );
 
-            // prompt-comparison should have been skipped
+            // step-init should have been skipped
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PipelineEvents.STEP_SKIPPED,
                 expect.objectContaining({
-                    stepId: 'prompt-comparison',
+                    stepId: 'step-init',
                 }),
             );
         });
 
-        it('should save checkpoint after each step', async () => {
-            await service.execute(mockDirectory, mockRequest, mockExisting);
+        it('should save checkpoint after each step with pipeline-aware key', async () => {
+            await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
 
-            // Verify checkpoint was saved as serialized string
+            // Verify checkpoint was saved with pipeline-aware key
             expect(cacheManager.set).toHaveBeenCalledWith(
-                `pipeline-checkpoint-${mockDirectory.id}`,
+                `pipeline-checkpoint-${mockDirectory.id}-${standardPlugin.id}`,
                 expect.any(String),
                 expect.any(Number),
             );
@@ -260,13 +279,24 @@ describe('StepPipelineExecutorService', () => {
             const serialized = cacheManager.set.mock.calls[0][1];
             const checkpoint = superjson.parse<CheckpointData>(serialized);
             expect(checkpoint.stepIndex).toBe(0);
-            expect(checkpoint.stepName).toBe('Prompt Comparison');
+            expect(checkpoint.stepName).toBe('Step Init');
+            expect(checkpoint.pipelineId).toBe(standardPlugin.id);
+            expect(checkpoint.schemaVersion).toBe(2);
+        });
+
+        it('should clear checkpoint after successful pipeline completion', async () => {
+            await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
+
+            // Verify checkpoint was cleared on success
+            expect(cacheManager.del).toHaveBeenCalledWith(
+                `pipeline-checkpoint-${mockDirectory.id}-${standardPlugin.id}`,
+            );
         });
 
         it('should convert Sets and Maps to arrays when saving checkpoint', async () => {
             // Add some data to Sets and Maps
-            defaultPlugin.registerStepExecutor('prompt-comparison' as any, {
-                name: 'Prompt Comparison',
+            standardPlugin.registerStepExecutor('step-init', {
+                name: 'Step Init',
                 run: jest.fn().mockImplementation((ctx) => {
                     ctx.processedSourceUrls.add('https://example.com');
                     ctx.contentCache.set('url1', 'content1');
@@ -276,7 +306,7 @@ describe('StepPipelineExecutorService', () => {
                 }),
             });
 
-            await service.execute(mockDirectory, mockRequest, mockExisting);
+            await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
 
             // Verify that checkpoint was serialized with superjson
             const serializedCheckpoint = cacheManager.set.mock.calls[0][1];
@@ -294,7 +324,12 @@ describe('StepPipelineExecutorService', () => {
         });
 
         it('should track per-step metrics', async () => {
-            const result = await service.execute(mockDirectory, mockRequest, mockExisting);
+            const result = await service.execute(
+                standardPlugin,
+                mockDirectory,
+                mockRequest,
+                mockExisting,
+            );
 
             // The state should have completed steps
             expect(result.state.completedSteps.length).toBeGreaterThan(0);
@@ -304,9 +339,15 @@ describe('StepPipelineExecutorService', () => {
             const controller = new AbortController();
             controller.abort();
 
-            const result = await service.execute(mockDirectory, mockRequest, mockExisting, {
-                signal: controller.signal,
-            });
+            const result = await service.execute(
+                standardPlugin,
+                mockDirectory,
+                mockRequest,
+                mockExisting,
+                {
+                    signal: controller.signal,
+                },
+            );
 
             expect(result.success).toBe(false);
             expect(eventEmitter.emit).toHaveBeenCalledWith(
@@ -317,20 +358,26 @@ describe('StepPipelineExecutorService', () => {
 
         it('should continue on error when continueOnError is true', async () => {
             // Make first step fail
-            defaultPlugin.registerStepExecutor('prompt-comparison' as any, {
-                name: 'Prompt Comparison',
+            standardPlugin.registerStepExecutor('step-init', {
+                name: 'Step Init',
                 run: jest.fn().mockRejectedValue(new Error('Test error')),
             });
 
-            const result = await service.execute(mockDirectory, mockRequest, mockExisting, {
-                continueOnError: true,
-            });
+            const result = await service.execute(
+                standardPlugin,
+                mockDirectory,
+                mockRequest,
+                mockExisting,
+                {
+                    continueOnError: true,
+                },
+            );
 
-            // Should have continued despite error (prompt-comparison is not optional)
+            // Should have continued despite error (step-init is not optional)
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PipelineEvents.STEP_FAILED,
                 expect.objectContaining({
-                    stepId: 'prompt-comparison',
+                    stepId: 'step-init',
                     error: 'Test error',
                 }),
             );
@@ -383,17 +430,13 @@ describe('StepPipelineExecutorService', () => {
                 source: 'test',
             } as any);
 
-            // Register executors for these custom steps (using defaultPlugin as a container)
-            // In a real scenario these would be looked up via the map, here we reuse the default plugin's registry
-            // but we need to patch the getDefaultPipelinePlugin private method or ensures it uses the registry
-            // The service uses getDefaultPipelinePlugin() which looks up 'default-pipeline'
-            // We can add our custom steps to the default plugin mock
-            defaultPlugin.registerStepExecutor('start' as any, startStep);
-            defaultPlugin.registerStepExecutor('p1' as any, parallel1);
-            defaultPlugin.registerStepExecutor('p2' as any, parallel2);
+            // Register executors for these custom steps
+            standardPlugin.registerStepExecutor('start', startStep);
+            standardPlugin.registerStepExecutor('p1', parallel1);
+            standardPlugin.registerStepExecutor('p2', parallel2);
 
             const startTime = Date.now();
-            await service.execute(mockDirectory, mockRequest, mockExisting);
+            await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
             const duration = Date.now() - startTime;
 
             // Verification
@@ -409,33 +452,35 @@ describe('StepPipelineExecutorService', () => {
     });
 
     describe('provider overrides', () => {
+        let facadeServiceMock: { createStepExecutionContext: jest.Mock };
+
         beforeEach(() => {
-            registry.register(defaultPlugin, {
-                id: 'default-pipeline',
-                name: 'Default Pipeline',
+            registry.register(standardPlugin, {
+                id: 'standard-pipeline',
+                name: 'Standard Pipeline',
                 version: '1.0.0',
-                description: 'Default pipeline plugin for tests',
+                description: 'Standard pipeline plugin for tests',
                 category: 'pipeline',
-                capabilities: ['default-pipeline'],
+                capabilities: ['pipeline'],
             });
-            registry.updateState('default-pipeline', 'loaded');
+            registry.updateState('standard-pipeline', 'loaded');
+
+            // Get reference to the mock facade service
+            facadeServiceMock = (service as any).facadeService;
+
+            // Register step executors for all steps
+            for (const step of standardPlugin.getStepDefinitions()) {
+                standardPlugin.registerStepExecutor(step.id, {
+                    name: step.name,
+                    run: jest.fn().mockImplementation((ctx: MutableGenerationContext) => {
+                        ctx.shouldStop = true;
+                        return Promise.resolve(ctx);
+                    }),
+                });
+            }
         });
 
-        it('should pass provider overrides from request to bound AI facade', async () => {
-            const aiFacadeMock = {
-                askJson: jest.fn().mockResolvedValue({ result: {}, usage: null, cost: null }),
-                createChatCompletion: jest.fn().mockResolvedValue({
-                    choices: [{ message: { content: '' } }],
-                }),
-                createStreamingChatCompletion: jest.fn(),
-                isConfigured: jest.fn().mockReturnValue(true),
-                testConnection: jest.fn().mockResolvedValue(true),
-                getAvailableModels: jest.fn().mockResolvedValue([]),
-            };
-
-            // Override the aiFacade on the service to spy on calls
-            (service as any).aiFacade = aiFacadeMock;
-
+        it('should pass provider overrides from request to facade service', async () => {
             const requestWithProviders: GenerationRequest = {
                 prompt: 'Generate test items',
                 config: {},
@@ -447,121 +492,50 @@ describe('StepPipelineExecutorService', () => {
                 },
             };
 
-            // Register a step executor that uses the AI facade
-            defaultPlugin.registerStepExecutor('prompt-comparison' as any, {
-                name: 'Prompt Comparison',
-                run: jest.fn().mockImplementation(async (ctx, execContext) => {
-                    // Use the AI facade to trigger the bound call
-                    await execContext.aiFacade.askJson(
-                        'test prompt',
-                        {} as any,
-                        {},
-                        { userId: execContext.user!.id, directoryId: execContext.directory.id },
-                    );
-                    ctx.shouldStop = true;
-                    return ctx;
-                }),
-            });
+            await service.execute(
+                standardPlugin,
+                mockDirectory,
+                requestWithProviders,
+                mockExisting,
+            );
 
-            // Register remaining step executors
-            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
-                if (step.id !== 'prompt-comparison') {
-                    defaultPlugin.registerStepExecutor(step.id as any, {
-                        name: step.name,
-                        run: jest.fn().mockResolvedValue(undefined),
-                    });
-                }
-            }
-
-            await service.execute(mockDirectory, requestWithProviders, mockExisting);
-
-            // Verify the AI facade was called with providerOverride
-            expect(aiFacadeMock.askJson).toHaveBeenCalledWith(
-                'test prompt',
-                expect.anything(),
-                expect.anything(),
-                expect.objectContaining({
-                    directoryId: 'dir-123',
-                    userId: 'user-123',
-                    providerOverride: 'openai',
-                }),
+            // Verify facade service was called with provider overrides
+            expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(
+                mockDirectory,
+                requestWithProviders.providers,
+                undefined,
             );
         });
 
-        it('should not include providerOverride when request has no providers', async () => {
-            const aiFacadeMock = {
-                askJson: jest.fn().mockResolvedValue({ result: {}, usage: null, cost: null }),
-                createChatCompletion: jest.fn().mockResolvedValue({
-                    choices: [{ message: { content: '' } }],
-                }),
-                createStreamingChatCompletion: jest.fn(),
-                isConfigured: jest.fn().mockReturnValue(true),
-                testConnection: jest.fn().mockResolvedValue(true),
-                getAvailableModels: jest.fn().mockResolvedValue([]),
-            };
+        it('should not include provider overrides when request has no providers', async () => {
+            await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
 
-            (service as any).aiFacade = aiFacadeMock;
-
-            defaultPlugin.registerStepExecutor('prompt-comparison' as any, {
-                name: 'Prompt Comparison',
-                run: jest.fn().mockImplementation(async (ctx, execContext) => {
-                    await execContext.aiFacade.askJson(
-                        'test prompt',
-                        {} as any,
-                        {},
-                        { userId: execContext.user!.id, directoryId: execContext.directory.id },
-                    );
-                    ctx.shouldStop = true;
-                    return ctx;
-                }),
-            });
-
-            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
-                if (step.id !== 'prompt-comparison') {
-                    defaultPlugin.registerStepExecutor(step.id as any, {
-                        name: step.name,
-                        run: jest.fn().mockResolvedValue(undefined),
-                    });
-                }
-            }
-
-            await service.execute(mockDirectory, mockRequest, mockExisting);
-
-            // Verify the AI facade was called without providerOverride
-            expect(aiFacadeMock.askJson).toHaveBeenCalledWith(
-                'test prompt',
-                expect.anything(),
-                expect.anything(),
-                expect.objectContaining({
-                    directoryId: 'dir-123',
-                    userId: 'user-123',
-                    providerOverride: undefined,
-                }),
+            // Verify facade service was called without provider overrides
+            expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(
+                mockDirectory,
+                undefined,
+                undefined,
             );
         });
 
-        it('should throw when directory has no user context', async () => {
+        it('should fail when facade service throws for missing user context', async () => {
             const directoryWithoutUser: DirectoryReference = {
                 id: 'dir-no-user',
                 name: 'No User Dir',
                 slug: 'no-user-dir',
             };
 
-            defaultPlugin.registerStepExecutor('prompt-comparison' as any, {
-                name: 'Prompt Comparison',
-                run: jest.fn().mockResolvedValue(undefined),
+            // Make facade service throw for directories without user
+            facadeServiceMock.createStepExecutionContext.mockImplementation(() => {
+                throw new Error('User context is required for pipeline execution.');
             });
 
-            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
-                if (step.id !== 'prompt-comparison') {
-                    defaultPlugin.registerStepExecutor(step.id as any, {
-                        name: step.name,
-                        run: jest.fn().mockResolvedValue(undefined),
-                    });
-                }
-            }
-
-            const result = await service.execute(directoryWithoutUser, mockRequest, mockExisting);
+            const result = await service.execute(
+                standardPlugin,
+                directoryWithoutUser,
+                mockRequest,
+                mockExisting,
+            );
 
             expect(result.success).toBe(false);
             expect(result.error).toBeDefined();
@@ -571,8 +545,8 @@ describe('StepPipelineExecutorService', () => {
     describe('skip steps when data already provided', () => {
         it('should skip step when all provided data keys are available', async () => {
             // Register executors that check for skipping
-            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
-                defaultPlugin.registerStepExecutor(step.id as any, {
+            for (const step of standardPlugin.getStepDefinitions()) {
+                standardPlugin.registerStepExecutor(step.id, {
                     name: step.name,
                     run: jest.fn().mockImplementation((ctx) => {
                         // Stop after first step
@@ -582,7 +556,12 @@ describe('StepPipelineExecutorService', () => {
                 });
             }
 
-            const result = await service.execute(mockDirectory, mockRequest, mockExisting);
+            const result = await service.execute(
+                standardPlugin,
+                mockDirectory,
+                mockRequest,
+                mockExisting,
+            );
 
             expect(result).toBeDefined();
         });
@@ -592,15 +571,16 @@ describe('StepPipelineExecutorService', () => {
         it('should return null when no checkpoint exists', async () => {
             cacheManager.get.mockResolvedValue(undefined);
 
-            const checkpoint = await service.loadCheckpoint(mockDirectory.id);
+            const checkpoint = await service.loadCheckpoint(mockDirectory.id, 'standard-pipeline');
 
             expect(checkpoint).toBeNull();
         });
 
         it('should return checkpoint data when exists', async () => {
             const mockCheckpoint: CheckpointData = {
-                stepIndex: 5,
-                stepName: 'Web Search',
+                stepIndex: 1,
+                stepName: 'Step Process',
+                pipelineId: 'standard-pipeline',
                 timestamp: new Date().toISOString(),
                 context: {
                     directory: mockDirectory,
@@ -631,28 +611,39 @@ describe('StepPipelineExecutorService', () => {
                     allPriorityCategories: [],
                     featuredItemHints: [],
                 },
-                completedSteps: ['prompt-comparison', 'prompt-processing'],
-                schemaVersion: 1,
+                completedSteps: ['step-init'],
+                schemaVersion: 2,
             };
 
             // Serialize with superjson as the real implementation does
             cacheManager.get.mockResolvedValue(superjson.stringify(mockCheckpoint));
 
-            const checkpoint = await service.loadCheckpoint(mockDirectory.id);
+            const checkpoint = await service.loadCheckpoint(mockDirectory.id, 'standard-pipeline');
 
             expect(checkpoint).not.toBeNull();
             expect(checkpoint!.stepIndex).toBe(mockCheckpoint.stepIndex);
             expect(checkpoint!.stepName).toBe(mockCheckpoint.stepName);
+            expect(checkpoint!.pipelineId).toBe('standard-pipeline');
             expect(checkpoint!.schemaVersion).toBe(mockCheckpoint.schemaVersion);
+        });
+
+        it('should use pipeline-aware cache key', async () => {
+            cacheManager.get.mockResolvedValue(undefined);
+
+            await service.loadCheckpoint('dir-123', 'my-pipeline');
+
+            expect(cacheManager.get).toHaveBeenCalledWith(
+                'pipeline-checkpoint-dir-123-my-pipeline',
+            );
         });
     });
 
     describe('clearCheckpoint()', () => {
-        it('should delete checkpoint from cache', async () => {
-            await service.clearCheckpoint(mockDirectory.id);
+        it('should delete checkpoint from cache using pipeline-aware key', async () => {
+            await service.clearCheckpoint(mockDirectory.id, 'standard-pipeline');
 
             expect(cacheManager.del).toHaveBeenCalledWith(
-                `pipeline-checkpoint-${mockDirectory.id}`,
+                `pipeline-checkpoint-${mockDirectory.id}-standard-pipeline`,
             );
         });
     });
@@ -661,15 +652,20 @@ describe('StepPipelineExecutorService', () => {
         it('should return null when no checkpoint exists', async () => {
             cacheManager.get.mockResolvedValue(undefined);
 
-            const result = await service.resumeFromCheckpoint(mockDirectory.id);
+            const result = await service.resumeFromCheckpoint(
+                standardPlugin,
+                mockDirectory.id,
+                standardPlugin.id,
+            );
 
             expect(result).toBeNull();
         });
 
         it('should reject checkpoints with incompatible schema version', async () => {
             const oldCheckpoint = {
-                stepIndex: 5,
-                stepName: 'Web Search',
+                stepIndex: 1,
+                stepName: 'Step Process',
+                pipelineId: standardPlugin.id,
                 timestamp: new Date().toISOString(),
                 context: {},
                 completedSteps: [],
@@ -679,28 +675,33 @@ describe('StepPipelineExecutorService', () => {
             // Serialize with superjson as the real implementation does
             cacheManager.get.mockResolvedValue(superjson.stringify(oldCheckpoint));
 
-            const result = await service.resumeFromCheckpoint(mockDirectory.id);
+            const result = await service.resumeFromCheckpoint(
+                standardPlugin,
+                mockDirectory.id,
+                standardPlugin.id,
+            );
 
             expect(result).toBeNull();
             expect(cacheManager.del).toHaveBeenCalledWith(
-                `pipeline-checkpoint-${mockDirectory.id}`,
+                `pipeline-checkpoint-${mockDirectory.id}-${standardPlugin.id}`,
             );
         });
 
         it('should properly restore Sets and Maps from checkpoint', async () => {
-            registry.register(defaultPlugin, {
-                id: 'default-pipeline',
-                name: 'Default Pipeline',
+            registry.register(standardPlugin, {
+                id: 'standard-pipeline',
+                name: 'Standard Pipeline',
                 version: '1.0.0',
-                description: 'Default pipeline plugin for tests',
+                description: 'Standard pipeline plugin for tests',
                 category: 'pipeline',
-                capabilities: ['default-pipeline'],
+                capabilities: ['pipeline'],
             });
-            registry.updateState('default-pipeline', 'loaded');
+            registry.updateState('standard-pipeline', 'loaded');
 
             const mockCheckpoint: CheckpointData = {
                 stepIndex: 0,
-                stepName: 'Prompt Comparison',
+                stepName: 'Step Init',
+                pipelineId: standardPlugin.id,
                 timestamp: new Date().toISOString(),
                 context: {
                     directory: mockDirectory,
@@ -737,7 +738,7 @@ describe('StepPipelineExecutorService', () => {
                     subject: 'Test Subject',
                 },
                 completedSteps: [],
-                schemaVersion: 1,
+                schemaVersion: 2,
             };
 
             // Serialize with superjson as the real implementation does
@@ -745,12 +746,12 @@ describe('StepPipelineExecutorService', () => {
 
             let capturedContext: TypedGenerationContext | null = null;
 
-            // Register all built-in step executors
-            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
-                defaultPlugin.registerStepExecutor(step.id as any, {
+            // Register all step executors
+            for (const step of standardPlugin.getStepDefinitions()) {
+                standardPlugin.registerStepExecutor(step.id, {
                     name: step.name,
                     run: jest.fn().mockImplementation((ctx) => {
-                        if (step.id === 'prompt-comparison') {
+                        if (step.id === 'step-init') {
                             capturedContext = ctx;
                         }
                         ctx.shouldStop = true;
@@ -759,7 +760,7 @@ describe('StepPipelineExecutorService', () => {
                 });
             }
 
-            await service.resumeFromCheckpoint(mockDirectory.id);
+            await service.resumeFromCheckpoint(standardPlugin, mockDirectory.id, standardPlugin.id);
 
             expect(capturedContext).not.toBeNull();
             // Verify Sets were restored correctly
@@ -775,19 +776,20 @@ describe('StepPipelineExecutorService', () => {
         });
 
         it('should handle empty Sets and Maps in checkpoint', async () => {
-            registry.register(defaultPlugin, {
-                id: 'default-pipeline',
-                name: 'Default Pipeline',
+            registry.register(standardPlugin, {
+                id: 'standard-pipeline',
+                name: 'Standard Pipeline',
                 version: '1.0.0',
-                description: 'Default pipeline plugin for tests',
+                description: 'Standard pipeline plugin for tests',
                 category: 'pipeline',
-                capabilities: ['default-pipeline'],
+                capabilities: ['pipeline'],
             });
-            registry.updateState('default-pipeline', 'loaded');
+            registry.updateState('standard-pipeline', 'loaded');
 
             const mockCheckpoint: CheckpointData = {
-                stepIndex: 1,
-                stepName: 'Prompt Comparison',
+                stepIndex: 0,
+                stepName: 'Step Init',
+                pipelineId: standardPlugin.id,
                 timestamp: new Date().toISOString(),
                 context: {
                     directory: mockDirectory,
@@ -819,23 +821,29 @@ describe('StepPipelineExecutorService', () => {
                     featuredItemHints: [],
                 },
                 completedSteps: [],
-                schemaVersion: 1,
+                schemaVersion: 2,
             };
 
             // Serialize with superjson as the real implementation does
             cacheManager.get.mockResolvedValue(superjson.stringify(mockCheckpoint));
 
             let capturedContext: TypedGenerationContext | null = null;
-            defaultPlugin.registerStepExecutor('prompt-comparison', {
-                name: 'Prompt Comparison',
-                run: jest.fn().mockImplementation((ctx) => {
-                    capturedContext = ctx;
-                    ctx.shouldStop = true;
-                    return Promise.resolve(ctx);
-                }),
-            });
 
-            await service.resumeFromCheckpoint(mockDirectory.id);
+            // Register all step executors
+            for (const step of standardPlugin.getStepDefinitions()) {
+                standardPlugin.registerStepExecutor(step.id, {
+                    name: step.name,
+                    run: jest.fn().mockImplementation((ctx) => {
+                        if (step.id === 'step-init') {
+                            capturedContext = ctx;
+                        }
+                        ctx.shouldStop = true;
+                        return Promise.resolve(ctx);
+                    }),
+                });
+            }
+
+            await service.resumeFromCheckpoint(standardPlugin, mockDirectory.id, standardPlugin.id);
 
             expect(capturedContext).not.toBeNull();
             expect(capturedContext!.processedSourceUrls instanceof Set).toBe(true);
@@ -847,21 +855,20 @@ describe('StepPipelineExecutorService', () => {
 
     describe('executeWithContext()', () => {
         it('should execute using provided context', async () => {
-            // Register the default pipeline plugin in the registry
-            // Note: We intentionally do NOT include 'pipeline-step' capability (see execute() beforeEach for details)
-            registry.register(defaultPlugin, {
-                id: 'default-pipeline',
-                name: 'Default Pipeline',
+            // Register the standard pipeline plugin in the registry
+            registry.register(standardPlugin, {
+                id: 'standard-pipeline',
+                name: 'Standard Pipeline',
                 version: '1.0.0',
-                description: 'Default pipeline plugin for tests',
+                description: 'Standard pipeline plugin for tests',
                 category: 'pipeline',
-                capabilities: ['default-pipeline'],
+                capabilities: ['pipeline'],
             });
-            registry.updateState('default-pipeline', 'loaded');
+            registry.updateState('standard-pipeline', 'loaded');
 
             // Register mock executors
-            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
-                defaultPlugin.registerStepExecutor(step.id as any, {
+            for (const step of standardPlugin.getStepDefinitions()) {
+                standardPlugin.registerStepExecutor(step.id, {
                     name: step.name,
                     run: jest.fn().mockImplementation((ctx) => {
                         ctx.shouldStop = true;
@@ -872,7 +879,7 @@ describe('StepPipelineExecutorService', () => {
 
             const context = new TypedGenerationContext(mockDirectory, mockRequest, mockExisting);
 
-            const result = await service.executeWithContext(context);
+            const result = await service.executeWithContext(standardPlugin, context);
 
             expect(result).toBeDefined();
             expect(result.success).toBe(true);

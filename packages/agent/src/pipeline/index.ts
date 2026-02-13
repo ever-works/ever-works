@@ -9,8 +9,6 @@
 export { TypedGenerationContext } from './generation-context';
 
 // Re-export IBuiltInStepExecutor type from the plugin SDK
-// The DefaultPipelinePlugin is loaded via the plugin system, not as a NestJS provider.
-// Access it via PluginRegistryService.getPluginsByCapability('pipeline-step').
 export type { IBuiltInStepExecutor } from '@ever-works/plugin';
 
 // Pipeline builder service
@@ -36,6 +34,9 @@ export {
 
 // Full pipeline executor
 export { FullPipelineExecutorService } from './full-pipeline-executor.service';
+
+// Pipeline facade service (shared facade binding)
+export { PipelineFacadeService } from './pipeline-facade.service';
 
 // Pipeline orchestrator (main entry point)
 export {

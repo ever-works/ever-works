@@ -361,21 +361,22 @@ describe('PluginClassValidatorService', () => {
             expect(result.errors?.some((e) => e.message.includes('providerType'))).toBe(true);
         });
 
-        it('should validate pipeline-step capability', () => {
+        it('should validate pipeline-modifier capability', () => {
             const plugin = createValidPlugin({
-                capabilities: ['pipeline-step'],
+                capabilities: ['pipeline-modifier'],
             }) as any;
             plugin.execute = jest.fn();
             plugin.getStepDefinition = jest.fn();
+            plugin.targetPipelines = ['standard-pipeline'];
 
             const result = service.validateCapabilities(plugin);
 
             expect(result.valid).toBe(true);
         });
 
-        it('should validate full-pipeline capability', () => {
+        it('should validate pipeline capability', () => {
             const plugin = createValidPlugin({
-                capabilities: ['full-pipeline'],
+                capabilities: ['pipeline'],
             }) as any;
             plugin.execute = jest.fn();
             plugin.getStepDefinitions = jest.fn();
@@ -439,50 +440,29 @@ describe('PluginClassValidatorService', () => {
             expect(result.valid).toBe(true);
         });
 
-        it('should validate default-pipeline capability', () => {
+        it('should fail when pipeline-modifier methods are missing', () => {
             const plugin = createValidPlugin({
-                capabilities: ['default-pipeline'],
+                capabilities: ['pipeline-modifier'],
             }) as any;
-            plugin.systemPlugin = true;
-            plugin.getStepDefinitions = jest.fn();
-            plugin.isValidStepId = jest.fn();
-            plugin.getStepIds = jest.fn();
-            plugin.registerStepExecutor = jest.fn();
-            plugin.hasExecutor = jest.fn();
-            plugin.executeStep = jest.fn();
-
-            const result = service.validateCapabilities(plugin);
-
-            expect(result.valid).toBe(true);
-        });
-
-        it('should fail when default-pipeline methods are missing', () => {
-            const plugin = createValidPlugin({
-                capabilities: ['default-pipeline'],
-            }) as any;
-            plugin.systemPlugin = true;
+            plugin.targetPipelines = ['standard-pipeline'];
 
             const result = service.validateCapabilities(plugin);
 
             expect(result.valid).toBe(false);
-            expect(result.errors?.some((e) => e.message.includes('getStepDefinitions'))).toBe(true);
+            expect(result.errors?.some((e) => e.message.includes('execute'))).toBe(true);
         });
 
-        it('should fail when default-pipeline property is missing', () => {
+        it('should fail when pipeline-modifier targetPipelines is missing', () => {
             const plugin = createValidPlugin({
-                capabilities: ['default-pipeline'],
+                capabilities: ['pipeline-modifier'],
             }) as any;
-            plugin.getStepDefinitions = jest.fn();
-            plugin.isValidStepId = jest.fn();
-            plugin.getStepIds = jest.fn();
-            plugin.registerStepExecutor = jest.fn();
-            plugin.hasExecutor = jest.fn();
-            plugin.executeStep = jest.fn();
+            plugin.execute = jest.fn();
+            plugin.getStepDefinition = jest.fn();
 
             const result = service.validateCapabilities(plugin);
 
             expect(result.valid).toBe(false);
-            expect(result.errors?.some((e) => e.message.includes('systemPlugin'))).toBe(true);
+            expect(result.errors?.some((e) => e.message.includes('targetPipelines'))).toBe(true);
         });
 
         it('should validate custom-capability capability', () => {

@@ -6,24 +6,28 @@ import type {
     PipelineExecutionOptions,
     PipelineProgressCallback,
     PipelineResult,
-    IFullPipelinePlugin,
+    IPipelinePlugin,
     IPlugin,
 } from '@ever-works/plugin';
-import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+import {
+    isPipelinePlugin,
+    isStepOrchestratablePipeline,
+    PLUGIN_CAPABILITIES,
+} from '@ever-works/plugin';
 
 import { StepPipelineExecutorService } from './step-pipeline-executor.service';
 import { FullPipelineExecutorService } from './full-pipeline-executor.service';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 
-function isFullPipelinePlugin(plugin: IPlugin): plugin is IFullPipelinePlugin {
-    return plugin.capabilities.includes(PLUGIN_CAPABILITIES.FULL_PIPELINE);
-}
-
 export type PipelineExecutionMode = 'step' | 'full';
 
 /**
  * Main entry point for pipeline execution.
- * Decides between step-based and full pipeline execution based on available plugins.
+ * Routes to step-based or self-managed execution based on pipeline plugin type.
+ *
+ * All pipelines are `IPipelinePlugin`. Routing logic:
+ * - Engine-orchestratable pipelines (e.g. standard-pipeline) → StepPipelineExecutorService
+ * - Self-managed pipelines (e.g. claude-code) → FullPipelineExecutorService
  */
 @Injectable()
 export class PipelineOrchestratorService {
@@ -42,34 +46,19 @@ export class PipelineOrchestratorService {
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
-        const pipelineOverride = request.providers?.pipeline;
+        const pipelineId = request.providers?.pipeline;
 
-        let fullPipelinePlugin: IFullPipelinePlugin | null = null;
+        const plugin = this.resolvePipelinePlugin(pipelineId, directory.id, directory.user?.id);
 
-        if (typeof pipelineOverride === 'string') {
-            // User explicitly selected a full-pipeline plugin by ID
-            fullPipelinePlugin = this.resolveExplicitPipeline(pipelineOverride);
-        } else if (pipelineOverride === null) {
-            // User explicitly chose "standard pipeline" — skip full pipeline
-            fullPipelinePlugin = null;
-        } else {
-            // No explicit selection (undefined) — auto-detect from directory settings
-            fullPipelinePlugin = await this.findFullPipelinePlugin(
-                directory.id,
-                directory.user?.id,
-            );
-        }
-
-        const mode: PipelineExecutionMode = fullPipelinePlugin ? 'full' : 'step';
+        const mode: PipelineExecutionMode = isStepOrchestratablePipeline(plugin) ? 'step' : 'full';
 
         this.logger.log(
-            `Executing pipeline for directory "${directory.id}" in ${mode} mode` +
-                (fullPipelinePlugin ? ` (via plugin: ${fullPipelinePlugin.id})` : ''),
+            `Executing pipeline for directory "${directory.id}" in ${mode} mode (via plugin: ${plugin.id})`,
         );
 
-        if (fullPipelinePlugin) {
-            return this.fullExecutor.execute(
-                fullPipelinePlugin,
+        if (mode === 'step') {
+            return this.stepExecutor.execute(
+                plugin,
                 directory,
                 request,
                 existing,
@@ -78,10 +67,10 @@ export class PipelineOrchestratorService {
             );
         }
 
-        return this.stepExecutor.execute(directory, request, existing, options, onProgress);
+        return this.fullExecutor.execute(plugin, directory, request, existing, options, onProgress);
     }
 
-    /** Execute with explicit mode selection, regardless of available plugins */
+    /** Execute with explicit mode selection */
     async executeWithMode(
         mode: PipelineExecutionMode,
         directory: DirectoryReference,
@@ -95,28 +84,28 @@ export class PipelineOrchestratorService {
         );
 
         if (mode === 'full') {
-            const fullPipelinePlugin = await this.findFullPipelinePlugin(
-                directory.id,
-                directory.user?.id,
+            // Find a self-managed (non-step-orchestratable) pipeline plugin
+            const fullPlugin = this.getAvailablePipelinePlugins().find(
+                (p) => !isStepOrchestratablePipeline(p),
             );
-            if (!fullPipelinePlugin) {
-                this.logger.warn(
-                    'Full mode requested but no full pipeline plugin available, falling back to step mode',
+            if (fullPlugin) {
+                return this.fullExecutor.execute(
+                    fullPlugin,
+                    directory,
+                    request,
+                    existing,
+                    options,
+                    onProgress,
                 );
-                return this.stepExecutor.execute(directory, request, existing, options, onProgress);
             }
-
-            return this.fullExecutor.execute(
-                fullPipelinePlugin,
-                directory,
-                request,
-                existing,
-                options,
-                onProgress,
+            this.logger.warn(
+                'Full mode requested but no self-managed pipeline available, falling back to step mode',
             );
         }
 
-        return this.stepExecutor.execute(directory, request, existing, options, onProgress);
+        // Step mode (or fallback from full mode)
+        const plugin = this.resolvePipelinePlugin(undefined, directory.id, directory.user?.id);
+        return this.stepExecutor.execute(plugin, directory, request, existing, options, onProgress);
     }
 
     async getRecommendedMode(
@@ -127,90 +116,141 @@ export class PipelineOrchestratorService {
         reason: string;
         plugin?: string;
     }> {
-        const fullPipelinePlugin = await this.findFullPipelinePlugin(directoryId, userId);
-
-        if (fullPipelinePlugin) {
+        // Check if any self-managed (non-step-orchestratable) pipeline is available
+        const fullPlugin = this.getAvailablePipelinePlugins().find(
+            (p) => !isStepOrchestratablePipeline(p),
+        );
+        if (fullPlugin) {
             return {
                 mode: 'full',
-                reason: `Full pipeline plugin "${fullPipelinePlugin.name}" is enabled`,
-                plugin: fullPipelinePlugin.id,
+                reason: `Self-managed pipeline plugin "${fullPlugin.name}" is available`,
+                plugin: fullPlugin.id,
             };
         }
 
         return {
             mode: 'step',
-            reason: 'No full pipeline plugin available, using step-based execution',
+            reason: 'No self-managed pipeline plugin available',
         };
     }
 
-    async hasFullPipelinePlugin(directoryId?: string, userId?: string): Promise<boolean> {
-        return (await this.findFullPipelinePlugin(directoryId, userId)) !== null;
+    async hasFullPipelinePlugin(): Promise<boolean> {
+        return this.getAvailablePipelinePlugins().some((p) => !isStepOrchestratablePipeline(p));
     }
 
-    getAvailableFullPipelinePlugins(): IFullPipelinePlugin[] {
+    getAvailablePipelinePlugins(): IPipelinePlugin[] {
         return this.registry
-            .getByCapability(PLUGIN_CAPABILITIES.FULL_PIPELINE)
+            .getByCapability(PLUGIN_CAPABILITIES.PIPELINE)
             .filter((p) => p.state === 'loaded')
             .map((p) => p.plugin)
-            .filter(isFullPipelinePlugin);
+            .filter(isPipelinePlugin);
     }
 
     async resumeFromCheckpoint(
         directoryId: string,
+        pipelineId: string,
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult | null> {
-        // Resume is only supported in step mode
-        return this.stepExecutor.resumeFromCheckpoint(directoryId, options, onProgress);
+        // Resume is only supported in step mode — resolve the default pipeline plugin
+        const plugin = this.resolvePipelinePlugin(undefined, directoryId);
+        return this.stepExecutor.resumeFromCheckpoint(
+            plugin,
+            directoryId,
+            pipelineId,
+            options,
+            onProgress,
+        );
     }
 
-    async clearCheckpoint(directoryId: string): Promise<void> {
-        await this.stepExecutor.clearCheckpoint(directoryId);
+    async clearCheckpoint(directoryId: string, pipelineId: string): Promise<void> {
+        await this.stepExecutor.clearCheckpoint(directoryId, pipelineId);
     }
 
-    private resolveExplicitPipeline(pluginId: string): IFullPipelinePlugin | null {
-        const registered = this.registry.get(pluginId);
-        if (!registered || registered.state !== 'loaded') {
-            this.logger.warn(
-                `Requested pipeline plugin "${pluginId}" not found or not enabled, falling back to step mode`,
+    /**
+     * Try to resume from a checkpoint; if none exists, run a fresh execution.
+     * Only step-orchestratable pipelines support checkpoint resume.
+     */
+    async resumeOrExecute(
+        directory: DirectoryReference,
+        request: GenerationRequest,
+        existing: ExistingItems,
+        options?: PipelineExecutionOptions,
+        onProgress?: PipelineProgressCallback,
+    ): Promise<PipelineResult> {
+        const plugin = this.resolvePipelinePlugin(
+            request.providers?.pipeline,
+            directory.id,
+            directory.user?.id,
+        );
+
+        // Only step-orchestratable pipelines support checkpoint resume
+        if (isStepOrchestratablePipeline(plugin)) {
+            const resumed = await this.stepExecutor.resumeFromCheckpoint(
+                plugin,
+                directory.id,
+                plugin.id,
+                options,
+                onProgress,
             );
-            return null;
+            if (resumed) {
+                this.logger.log(
+                    `Resumed from checkpoint for "${directory.id}", success=${resumed.success}`,
+                );
+                return resumed;
+            }
         }
-        if (!isFullPipelinePlugin(registered.plugin)) {
-            this.logger.warn(
-                `Plugin "${pluginId}" does not have full-pipeline capability, falling back to step mode`,
-            );
-            return null;
-        }
-        return registered.plugin;
+
+        // No checkpoint or not resumable — fresh execution
+        return this.execute(directory, request, existing, options, onProgress);
     }
 
-    private async findFullPipelinePlugin(
+    /**
+     * Resolve the pipeline plugin to use.
+     *
+     * Priority:
+     * 1. Explicit pipelineId from request
+     * 2. First enabled pipeline with defaultForCapabilities: ['pipeline']
+     * 3. First loaded+enabled pipeline plugin
+     */
+    private resolvePipelinePlugin(
+        pipelineId?: string | null,
         directoryId?: string,
         userId?: string,
-    ): Promise<IFullPipelinePlugin | null> {
-        const plugins = this.registry.getByCapability(PLUGIN_CAPABILITIES.FULL_PIPELINE);
-
-        for (const registered of plugins) {
-            if (registered.state !== 'loaded') {
-                continue;
+    ): IPipelinePlugin {
+        if (typeof pipelineId === 'string') {
+            const registered = this.registry.get(pipelineId);
+            if (registered?.state === 'loaded' && isPipelinePlugin(registered.plugin)) {
+                return registered.plugin;
             }
-
-            const isEnabled = await this.registry.isPluginEnabledForScope(
-                registered.plugin.id,
-                directoryId,
-                userId,
+            this.logger.warn(
+                `Pipeline plugin "${pipelineId}" not available, falling back to auto-detect`,
             );
-            if (!isEnabled) {
-                continue;
-            }
+            // Fall through to auto-detect
+        }
 
-            if (isFullPipelinePlugin(registered.plugin)) {
-                this.logger.debug(`Found full pipeline plugin: ${registered.plugin.id}`);
+        // Auto-detect: find first pipeline with defaultForCapabilities
+        const pipelines = this.registry.getByCapability(PLUGIN_CAPABILITIES.PIPELINE);
+
+        // First: find one with defaultForCapabilities: ['pipeline'] that is loaded
+        for (const registered of pipelines) {
+            if (registered.state !== 'loaded') continue;
+            if (!isPipelinePlugin(registered.plugin)) continue;
+            if (registered.manifest.defaultForCapabilities?.includes('pipeline')) {
                 return registered.plugin;
             }
         }
 
-        return null;
+        // Fallback: first loaded pipeline
+        for (const registered of pipelines) {
+            if (registered.state !== 'loaded') continue;
+            if (isPipelinePlugin(registered.plugin)) {
+                return registered.plugin;
+            }
+        }
+
+        throw new Error(
+            'No pipeline plugin available. Ensure at least one pipeline plugin is loaded.',
+        );
     }
 }

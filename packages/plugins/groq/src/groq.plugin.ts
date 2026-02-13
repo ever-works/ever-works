@@ -45,7 +45,7 @@ export class GroqPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'openai/gpt-oss-120b',
+				default: 'qwen/qwen3-32b',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -53,7 +53,7 @@ export class GroqPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Handles tags, short descriptions, and quick classifications',
-				default: 'openai/gpt-oss-120b',
+				default: 'qwen/qwen3-32b',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -61,7 +61,7 @@ export class GroqPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Handles listings, summaries, and content reformatting',
-				default: 'openai/gpt-oss-120b',
+				default: 'qwen/qwen3-32b',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -69,7 +69,7 @@ export class GroqPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'openai/gpt-oss-120b',
+				default: 'qwen/qwen3-32b',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -97,14 +97,14 @@ export class GroqPlugin extends BaseAiProvider {
 				'x-hidden': true
 			}
 		},
-		required: ['apiKey']
+		required: ['apiKey', 'defaultModel']
 	};
 
 	async onLoad(context: PluginContext): Promise<void> {
 		await super.onLoad(context);
 		this.aiOps = new AiOperations({
 			apiKey: '',
-			model: 'openai/gpt-oss-120b',
+			model: 'qwen/qwen3-32b',
 			baseURL: 'https://api.groq.com/openai/v1',
 			temperature: 0.7,
 			maxTokens: 4096,
@@ -164,7 +164,7 @@ export class GroqPlugin extends BaseAiProvider {
 	}
 
 	protected getDefaultModelId(): string {
-		return 'openai/gpt-oss-120b';
+		return 'qwen/qwen3-32b';
 	}
 
 	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {

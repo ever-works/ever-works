@@ -131,24 +131,31 @@ export class GitHubPlugin extends BaseGitProvider implements IGitProviderPlugin 
 }
 ```
 
-### Creating a Pipeline Step Plugin
+### Creating a Pipeline Modifier Plugin
+
+Pipeline modifiers add, replace, or disable steps in an existing pipeline:
 
 ```typescript
-import { BasePipelineStep, type MutableGenerationContext } from '@ever-works/plugin';
+import { BasePipelineStep, type IPipelineModifierPlugin, type MutableGenerationContext } from '@ever-works/plugin';
 
-export class MyPipelineStep extends BasePipelineStep {
-	readonly id = 'my-step';
-	readonly name = 'My Custom Step';
+export class MyModifierPlugin extends BasePipelineStep implements IPipelineModifierPlugin {
+	readonly id = 'my-modifier';
+	readonly name = 'My Modifier';
 	readonly version = '1.0.0';
-	readonly stepId = 'custom:my-step';
-	readonly stepName = 'My Step';
-	readonly stepDescription = 'Does something custom';
-	readonly stepPosition = { after: 'fetch-page-content' };
+	readonly targetPipelines = ['standard-pipeline'];
 
-	async execute(context: MutableGenerationContext): Promise<void> {
-		this.reportProgress(0, 'Starting...');
+	getStepDefinition() {
+		return {
+			id: 'custom-step',
+			name: 'Custom Step',
+			position: { type: 'after', stepId: 'web-search' },
+			provides: ['customData']
+		};
+	}
+
+	async execute(context: MutableGenerationContext): Promise<MutableGenerationContext> {
 		// Your logic here
-		this.reportProgress(100, 'Complete');
+		return context;
 	}
 }
 ```
@@ -180,22 +187,22 @@ describe('MyPlugin', () => {
 
 ## Available Capabilities
 
-| Capability          | Interface                 | Description                       |
-| ------------------- | ------------------------- | --------------------------------- |
-| `git-provider`      | `IGitProviderPlugin`      | Git repository & API operations   |
-| `oauth`             | `IOAuthPlugin`            | OAuth-based authentication        |
-| `deployment`        | `IDeploymentPlugin`       | Deploy to hosting platforms       |
-| `screenshot`        | `IScreenshotPlugin`       | Capture web page screenshots      |
-| `search`            | `ISearchPlugin`           | Web search integration            |
-| `content-extractor` | `IContentExtractorPlugin` | Extract content from web pages    |
-| `data-source`       | `IDataSourcePlugin`       | External data sources             |
-| `ai-provider`       | `IAiProviderPlugin`       | AI/LLM providers                  |
-| `pipeline-step`     | `IPipelineStepPlugin`     | Custom pipeline steps             |
-| `full-pipeline`     | `IFullPipelinePlugin`     | Complete pipeline implementations |
-| `form-field`        | `IFormFieldPlugin`        | Custom form fields                |
-| `sub-provider`      | `ISubProviderPlugin`      | Sub-provider implementations      |
-| `config-aware`      | `IConfigAwarePlugin`      | React to config changes           |
-| `custom-capability` | `ICustomCapabilityPlugin` | Define custom capabilities        |
+| Capability          | Interface                 | Description                     |
+| ------------------- | ------------------------- | ------------------------------- |
+| `git-provider`      | `IGitProviderPlugin`      | Git repository & API operations |
+| `oauth`             | `IOAuthPlugin`            | OAuth-based authentication      |
+| `deployment`        | `IDeploymentPlugin`       | Deploy to hosting platforms     |
+| `screenshot`        | `IScreenshotPlugin`       | Capture web page screenshots    |
+| `search`            | `ISearchPlugin`           | Web search integration          |
+| `content-extractor` | `IContentExtractorPlugin` | Extract content from web pages  |
+| `data-source`       | `IDataSourcePlugin`       | External data sources           |
+| `ai-provider`       | `IAiProviderPlugin`       | AI/LLM providers                |
+| `pipeline`          | `IPipelinePlugin`         | Pipeline implementations        |
+| `pipeline-modifier` | `IPipelineModifierPlugin` | Pipeline step modifiers         |
+| `form-field`        | `IFormFieldPlugin`        | Custom form fields              |
+| `sub-provider`      | `ISubProviderPlugin`      | Sub-provider implementations    |
+| `config-aware`      | `IConfigAwarePlugin`      | React to config changes         |
+| `custom-capability` | `ICustomCapabilityPlugin` | Define custom capabilities      |
 
 ## Git Provider Architecture
 

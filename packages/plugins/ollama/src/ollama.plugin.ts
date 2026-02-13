@@ -97,7 +97,7 @@ export class OllamaPlugin extends BaseAiProvider {
 				'x-hidden': true
 			}
 		},
-		required: ['baseUrl']
+		required: ['baseUrl', 'defaultModel']
 	};
 
 	async onLoad(context: PluginContext): Promise<void> {

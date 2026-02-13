@@ -43,7 +43,7 @@
 			"version": "1.0.0",
 			"category": "pipeline",
 			"capabilities": [
-				"full-pipeline"
+				"pipeline"
 			],
 			"description": "Full pipeline plugin that delegates the entire generation to Claude Code",
 			"author": {

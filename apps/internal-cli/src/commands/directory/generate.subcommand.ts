@@ -6,7 +6,6 @@ import { DirectoryRepository, UserRepository } from '@ever-works/agent/database'
 import { DirectoryGenerationService, DirectoryQueryService } from '@ever-works/agent/services';
 import {
     CreateItemsGeneratorDto,
-    CompanyDto,
     GenerationMethod,
     WebsiteRepositoryCreationMethod,
 } from '@ever-works/agent/items-generator';
@@ -258,16 +257,6 @@ export class GenerateSubCommand extends CommandRunner {
         const options: Partial<CreateItemsGeneratorDto> = {};
         const pluginConfig: Record<string, unknown> = {};
 
-        // Company information (core field)
-        const wantsCompany = await this.promptConfirm(
-            'Do you want to specify company information?',
-            false,
-        );
-
-        if (wantsCompany) {
-            options.company = await this.promptCompanyInfo();
-        }
-
         // Categories and keywords (pipeline-specific fields -> pluginConfig)
         const wantsCategories = await this.promptConfirm(
             'Do you want to specify initial categories?',
@@ -308,17 +297,6 @@ export class GenerateSubCommand extends CommandRunner {
 
         if (wantsSourceUrls) {
             pluginConfig.source_urls = await this.promptUrlArray('Enter source URLs:');
-        }
-
-        // Repository description (core field)
-        const wantsRepoDescription = await this.promptConfirm(
-            'Do you want to specify a repository description?',
-            false,
-        );
-
-        if (wantsRepoDescription) {
-            options.repository_description =
-                await this.promptOptionalText('Repository description:');
         }
 
         // Generation method (core field)
@@ -377,24 +355,6 @@ export class GenerateSubCommand extends CommandRunner {
         }
 
         return options;
-    }
-
-    private async promptCompanyInfo(): Promise<CompanyDto> {
-        console.log(chalk.yellow('\nCompany Information:'));
-
-        const name = await this.promptRequiredText(
-            'Company name:',
-            undefined,
-            this.validateName.bind(this),
-        );
-
-        const website = await this.promptRequiredText(
-            'Company website URL:',
-            undefined,
-            this.validateUrl.bind(this),
-        );
-
-        return { name, website };
     }
 
     private async promptConfigOptions(): Promise<Record<string, unknown>> {
@@ -474,10 +434,6 @@ export class GenerateSubCommand extends CommandRunner {
         console.log(chalk.gray(`Name: ${dto.name}`));
         console.log(chalk.gray(`Prompt: ${dto.prompt}`));
 
-        if (dto.company) {
-            console.log(chalk.gray(`Company: ${dto.company.name} (${dto.company.website})`));
-        }
-
         // Access pipeline-specific fields from pluginConfig
         const config = dto.pluginConfig as Record<string, unknown> | undefined;
 
@@ -499,10 +455,6 @@ export class GenerateSubCommand extends CommandRunner {
         const sourceUrls = config?.source_urls as string[] | undefined;
         if (sourceUrls?.length) {
             console.log(chalk.gray(`Source URLs: ${sourceUrls.length} URLs`));
-        }
-
-        if (dto.repository_description) {
-            console.log(chalk.gray(`Repository Description: ${dto.repository_description}`));
         }
 
         console.log(chalk.gray(`Generation Method: ${dto.generation_method}`));

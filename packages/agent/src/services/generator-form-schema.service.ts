@@ -63,11 +63,22 @@ export class GeneratorFormSchemaService {
         pipelineId?: string,
         options?: FormSchemaOptions,
     ): Promise<GeneratorFormSchema> {
+        // Resolve the selected pipeline plugin
+        const pipelinePlugin = await this.resolvePipelinePlugin(pipelineId, options);
+
         // Get available providers for each capability category (filtered by enable status)
         const providers = await this.getAvailableProviders(options);
 
-        // Resolve the selected pipeline plugin
-        const pipelinePlugin = this.resolvePipelinePlugin(pipelineId);
+        // Filter provider categories by pipeline's selectableProviderCategories
+        const selectable = pipelinePlugin?.manifest.selectableProviderCategories;
+        if (selectable) {
+            for (const cat of getSelectableCategories()) {
+                if (cat.uiKey === 'pipeline') continue;
+                if (!selectable.includes(cat.capability)) {
+                    providers[cat.uiKey as keyof typeof providers] = [];
+                }
+            }
+        }
 
         // Get form fields and groups from the pipeline plugin
         let pluginFields: FormFieldDefinition[] = [];
@@ -88,17 +99,23 @@ export class GeneratorFormSchemaService {
             );
         }
 
-        // Collect form fields from enabled form-schema-provider plugins (excluding pipeline)
+        // Collect form fields from enabled form-schema-provider plugins (excluding pipelines)
+        // Pipeline fields take precedence — skip duplicates by field name
         const dsFields = await this.getAdditionalFormFields(options);
-        pluginFields = [...pluginFields, ...dsFields.fields];
+        const existingFieldNames = new Set(pluginFields.map((f) => f.name));
+        const newFields = dsFields.fields.filter((f) => !existingFieldNames.has(f.name));
+        pluginFields = [...pluginFields, ...newFields];
         if (dsFields.groups.length > 0) {
-            pluginGroups = [...(pluginGroups ?? []), ...dsFields.groups];
+            const existingGroupNames = new Set(pluginGroups?.map((g) => g.name) ?? []);
+            const newGroups = dsFields.groups.filter((g) => !existingGroupNames.has(g.name));
+            pluginGroups = [...(pluginGroups ?? []), ...newGroups];
         }
         if (dsFields.defaultValues && Object.keys(dsFields.defaultValues).length > 0) {
             defaultValues = { ...defaultValues, ...dsFields.defaultValues };
         }
 
         return {
+            resolvedPipelineId: pipelinePlugin?.plugin.id,
             providers,
             pluginFields,
             pluginGroups,
@@ -115,7 +132,7 @@ export class GeneratorFormSchemaService {
         values: Record<string, unknown>,
         options?: FormSchemaOptions,
     ): Promise<ValidationResult> {
-        const pipelinePlugin = this.resolvePipelinePlugin(pipelineId);
+        const pipelinePlugin = await this.resolvePipelinePlugin(pipelineId, options);
 
         if (pipelinePlugin && isFormSchemaProvider(pipelinePlugin.plugin)) {
             const result = await pipelinePlugin.plugin.validateFormInput(values);
@@ -150,7 +167,7 @@ export class GeneratorFormSchemaService {
         const pluginConfig: Record<string, Record<string, unknown>> = {};
 
         // Let the pipeline plugin transform first
-        const pipelinePlugin = this.resolvePipelinePlugin(pipelineId);
+        const pipelinePlugin = await this.resolvePipelinePlugin(pipelineId, options);
         if (pipelinePlugin && isFormSchemaProvider(pipelinePlugin.plugin)) {
             const transform = pipelinePlugin.plugin.transformFormValues;
             if (transform) {
@@ -196,13 +213,16 @@ export class GeneratorFormSchemaService {
         const plugins = this.pluginRegistry.getByCapability(
             PLUGIN_CAPABILITIES.FORM_SCHEMA_PROVIDER,
         );
-        const pipelinePlugin = this.resolvePipelinePlugin();
-        const pipelineId = pipelinePlugin?.plugin.id;
+        const pipelineIds = new Set(
+            this.pluginRegistry
+                .getByCapability(PLUGIN_CAPABILITIES.PIPELINE)
+                .map((p) => p.plugin.id),
+        );
         const errors: string[] = [];
 
         for (const registered of plugins) {
             if (registered.state !== 'loaded') continue;
-            if (registered.plugin.id === pipelineId) continue;
+            if (pipelineIds.has(registered.plugin.id)) continue;
 
             const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
                 registered.plugin.id,
@@ -535,14 +555,17 @@ export class GeneratorFormSchemaService {
         const plugins = this.pluginRegistry.getByCapability(
             PLUGIN_CAPABILITIES.FORM_SCHEMA_PROVIDER,
         );
-        const pipelinePlugin = this.resolvePipelinePlugin();
-        const pipelineId = pipelinePlugin?.plugin.id;
+        // Exclude ALL pipeline plugins — their fields are handled via resolvePipelinePlugin()
+        const pipelineIds = new Set(
+            this.pluginRegistry
+                .getByCapability(PLUGIN_CAPABILITIES.PIPELINE)
+                .map((p) => p.plugin.id),
+        );
         const result: RegisteredPlugin[] = [];
 
         for (const registered of plugins) {
             if (registered.state !== 'loaded') continue;
-            // Pipeline plugin is already handled separately by resolvePipelinePlugin
-            if (registered.plugin.id === pipelineId) continue;
+            if (pipelineIds.has(registered.plugin.id)) continue;
 
             if (options?.directoryId || options?.userId) {
                 const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
@@ -559,7 +582,11 @@ export class GeneratorFormSchemaService {
         return result;
     }
 
-    private resolvePipelinePlugin(pipelineId?: string): RegisteredPlugin | undefined {
+    private async resolvePipelinePlugin(
+        pipelineId?: string,
+        options?: FormSchemaOptions,
+    ): Promise<RegisteredPlugin | undefined> {
+        // 1. Explicit pipelineId — use it directly
         if (pipelineId) {
             const registered = this.pluginRegistry.get(pipelineId);
             if (registered && registered.state === 'loaded') {
@@ -568,13 +595,42 @@ export class GeneratorFormSchemaService {
             this.logger.warn(`Pipeline plugin not found or not enabled: ${pipelineId}`);
         }
 
-        // Fall back to default-pipeline
-        const defaultPipeline = this.pluginRegistry.get('default-pipeline');
-        if (defaultPipeline && defaultPipeline.state === 'loaded') {
-            return defaultPipeline;
+        // 2. Directory's activeCapability for 'pipeline'
+        if (options?.directoryId && this.directoryPluginRepository) {
+            try {
+                const activePlugin = await this.directoryPluginRepository.findActiveByCapability(
+                    options.directoryId,
+                    'pipeline',
+                );
+                if (activePlugin) {
+                    const registered = this.pluginRegistry.get(activePlugin.pluginId);
+                    if (registered && registered.state === 'loaded') {
+                        return registered;
+                    }
+                }
+            } catch {
+                // No active pipeline set for this directory
+            }
         }
 
-        this.logger.warn('No default pipeline plugin found');
+        // 3. Default pipeline via defaultForCapabilities
+        const pipelines = this.pluginRegistry.getByCapability(PLUGIN_CAPABILITIES.PIPELINE);
+
+        for (const registered of pipelines) {
+            if (registered.state !== 'loaded') continue;
+            if (registered.manifest.defaultForCapabilities?.includes('pipeline')) {
+                return registered;
+            }
+        }
+
+        // 4. Fallback: first loaded pipeline
+        for (const registered of pipelines) {
+            if (registered.state === 'loaded') {
+                return registered;
+            }
+        }
+
+        this.logger.warn('No pipeline plugin found');
         return undefined;
     }
 }

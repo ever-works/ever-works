@@ -11,12 +11,7 @@ import { cn } from '@/lib/utils/cn';
  * Internal capabilities that are not user-selectable per directory.
  * These represent implementation contracts, not switchable providers.
  */
-const HIDDEN_CAPABILITIES = new Set([
-    'form-schema-provider',
-    'pipeline-step',
-    'default-pipeline',
-    'oauth',
-]);
+const HIDDEN_CAPABILITIES = new Set(['form-schema-provider', 'pipeline-modifier', 'oauth']);
 
 interface DirectoryPluginsListProps {
     directoryId: string;

@@ -27,7 +27,7 @@ export const SELECTABLE_PROVIDER_CATEGORIES = {
 		uiKey: 'contentExtractor',
 		selectableInForm: true
 	},
-	fullPipeline: { capability: 'full-pipeline', uiKey: 'fullPipeline', selectableInForm: true }
+	pipeline: { capability: 'pipeline', uiKey: 'pipeline', selectableInForm: true }
 } as const satisfies Record<string, ProviderCategoryDefinition>;
 
 /**
@@ -38,30 +38,11 @@ export type ProviderCategoryKey = keyof typeof SELECTABLE_PROVIDER_CATEGORIES;
 /**
  * Type representing the UI keys used in forms and DTOs.
  * Derived from SELECTABLE_PROVIDER_CATEGORIES to ensure consistency.
- *
- * Use this type for form handlers and provider selection callbacks.
- *
- * @example
- * ```ts
- * const handleProviderChange = (category: ProviderUIKey, value: string | null) => {
- *     setProviders((prev) => ({ ...prev, [category]: value }));
- * };
- * ```
  */
 export type ProviderUIKey = (typeof SELECTABLE_PROVIDER_CATEGORIES)[ProviderCategoryKey]['uiKey'];
 
 /**
  * Get the capability name from a UI key.
- *
- * @param uiKey - The UI key (e.g., 'ai', 'contentExtractor')
- * @returns The capability name (e.g., 'ai-provider', 'content-extractor')
- * @throws Error if the UI key is not found
- *
- * @example
- * ```ts
- * getCapabilityFromUIKey('ai'); // Returns 'ai-provider'
- * getCapabilityFromUIKey('contentExtractor'); // Returns 'content-extractor'
- * ```
  */
 export function getCapabilityFromUIKey(uiKey: string): string {
 	const entry = Object.values(SELECTABLE_PROVIDER_CATEGORIES).find((c) => c.uiKey === uiKey);
@@ -73,16 +54,6 @@ export function getCapabilityFromUIKey(uiKey: string): string {
 
 /**
  * Get the UI key from a capability name.
- *
- * @param capability - The capability name (e.g., 'ai-provider', 'content-extractor')
- * @returns The UI key (e.g., 'ai', 'contentExtractor')
- * @throws Error if the capability is not found
- *
- * @example
- * ```ts
- * getUIKeyFromCapability('ai-provider'); // Returns 'ai'
- * getUIKeyFromCapability('content-extractor'); // Returns 'contentExtractor'
- * ```
  */
 export function getUIKeyFromCapability(capability: string): string {
 	const entry = Object.values(SELECTABLE_PROVIDER_CATEGORIES).find((c) => c.capability === capability);
@@ -94,8 +65,6 @@ export function getUIKeyFromCapability(capability: string): string {
 
 /**
  * Get all selectable provider categories as an array.
- *
- * @returns Array of provider category definitions
  */
 export function getSelectableCategories(): ProviderCategoryDefinition[] {
 	return Object.values(SELECTABLE_PROVIDER_CATEGORIES).filter((c) => c.selectableInForm);
@@ -110,14 +79,9 @@ export type FormSchemaProvidersType = {
 
 /**
  * Provider selection state for the generator form.
- * Note: 'fullPipeline' is renamed to 'pipeline' for API consistency.
  */
 export type ProviderSelectionState = {
-	[K in Exclude<ProviderCategoryKey, 'fullPipeline'> as (typeof SELECTABLE_PROVIDER_CATEGORIES)[K]['uiKey']]:
-		| string
-		| null;
-} & {
-	pipeline: string | null;
+	[K in ProviderCategoryKey as (typeof SELECTABLE_PROVIDER_CATEGORIES)[K]['uiKey']]: string | null;
 };
 
 /**
@@ -127,26 +91,25 @@ export type SelectableProviderCategory = keyof ProviderSelectionState;
 
 /**
  * Keys of individual (non-pipeline) provider categories.
- * Use in `Record<IndividualCategoryKey, T>` to force exhaustive label maps.
  */
-export type IndividualCategoryKey = Exclude<ProviderCategoryKey, 'fullPipeline'>;
+export type IndividualCategoryKey = Exclude<ProviderCategoryKey, 'pipeline'>;
 
 export interface IndividualProviderCategory {
 	readonly categoryKey: IndividualCategoryKey;
-	readonly uiKey: IndividualCategoryKey;
+	readonly uiKey: string;
 	readonly capability: string;
 }
 
 /**
- * Individual provider categories (excluding fullPipeline).
+ * Individual provider categories (excluding pipeline).
  * Derives from SELECTABLE_PROVIDER_CATEGORIES so new categories are picked up automatically.
  */
 export function getIndividualProviderCategories(): IndividualProviderCategory[] {
 	return (Object.entries(SELECTABLE_PROVIDER_CATEGORIES) as [ProviderCategoryKey, ProviderCategoryDefinition][])
-		.filter(([key]) => key !== 'fullPipeline')
+		.filter(([key]) => key !== 'pipeline')
 		.map(([key, def]) => ({
 			categoryKey: key as IndividualCategoryKey,
-			uiKey: def.uiKey as IndividualCategoryKey,
+			uiKey: def.uiKey,
 			capability: def.capability
 		}));
 }

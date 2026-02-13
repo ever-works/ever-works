@@ -5,20 +5,20 @@ import type {
     ExecutablePipeline,
     ParallelGroup,
     StepExecutor,
-    IPipelineStepPlugin,
+    IPipelinePlugin,
+    IPipelineModifierPlugin,
 } from '@ever-works/plugin';
-import { isPipelineStepPlugin, PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+import { isPipelineModifierPlugin, PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import {
     PluginRegistryService,
     RegisteredPlugin,
 } from '../plugins/services/plugin-registry.service';
-import { DefaultPipelinePlugin } from '@ever-works/default-pipeline-plugin';
 
 /**
  * Create an empty executable pipeline
- * @param source - The source of the pipeline (standard or plugin ID)
+ * @param source - The source of the pipeline (plugin ID)
  */
-function createExecutablePipeline(source: 'standard' | string = 'standard'): ExecutablePipeline {
+function createExecutablePipeline(source: string = 'standard'): ExecutablePipeline {
     return {
         steps: [],
         groups: [],
@@ -82,16 +82,8 @@ export class MissingDependencyError extends Error {
 }
 
 /**
- * Service for building executable pipelines from built-in steps and plugin contributions.
+ * Service for building executable pipelines from pipeline plugin steps and modifier contributions.
  *
- * This service implements Tasks 3.4-3.8:
- * - 3.4: Pipeline compilation from multiple sources
- * - 3.5: Step replacement
- * - 3.6: Step injection (before/after)
- * - 3.7: Step disabling
- * - 3.8: Append/prepend positioning
- *
- * Uses three-level enable resolution: Directory > User > autoEnable.
  */
 @Injectable()
 export class PipelineBuilderService {
@@ -102,16 +94,22 @@ export class PipelineBuilderService {
     /**
      * Build an executable pipeline for a directory.
      *
+     * @param pipeline - The resolved pipeline plugin instance
      * @param directoryId - The directory to build the pipeline for
      * @param userId - Optional user ID for user-level plugin resolution
      * @returns A fully compiled ExecutablePipeline ready for execution
      */
-    async build(directoryId?: string, userId?: string): Promise<ExecutablePipeline> {
-        this.logger.debug(`Building pipeline for directory: ${directoryId || 'global'}`);
+    async build(
+        pipeline: IPipelinePlugin,
+        directoryId?: string,
+        userId?: string,
+    ): Promise<ExecutablePipeline> {
+        this.logger.debug(
+            `Building pipeline for directory: ${directoryId || 'global'} using pipeline: ${pipeline.id}`,
+        );
 
-        // 1. Start with built-in steps from DefaultPipelinePlugin (single source of truth)
-        // We widen the type to PipelineStepDefinition[] since plugins can inject custom steps
-        let steps: PipelineStepDefinition[] = DefaultPipelinePlugin.getBuiltInSteps();
+        // 1. Start with steps from the resolved pipeline plugin
+        let steps: PipelineStepDefinition[] = [...pipeline.getStepDefinitions()];
 
         // 2. Initialize build context
         const buildContext: BuildContext = {
@@ -122,32 +120,22 @@ export class PipelineBuilderService {
             appendSteps: [],
         };
 
-        // 3. Get enabled pipeline plugins (with directory-scoped filtering)
-        const plugins = await this.getEnabledPipelinePlugins(directoryId, userId);
-        this.logger.debug(`Found ${plugins.length} enabled pipeline plugins`);
+        // 3. Get enabled modifier plugins (with directory-scoped filtering)
+        const modifiers = await this.getEnabledModifierPlugins(pipeline.id, directoryId, userId);
+        this.logger.debug(`Found ${modifiers.length} enabled modifier plugins`);
 
-        // 4. Process each plugin's step contributions
-        //    Skip the default-pipeline plugin — its steps already form the base
-        //    pipeline loaded via DefaultPipelinePlugin.getBuiltInSteps() above.
-        for (const { registered, pipelinePlugin } of plugins) {
-            if (registered.plugin.id === 'default-pipeline') continue;
-            this.processPluginSteps(pipelinePlugin, registered.plugin.id, buildContext);
+        // 4. Process each modifier's step contributions
+        for (const { registered, modifierPlugin } of modifiers) {
+            this.processModifierSteps(modifierPlugin, registered.plugin.id, buildContext);
         }
 
         // 5. Apply modifications in order
-        // 5a. Apply replacements (Task 3.5)
         steps = this.applyReplacements(steps, buildContext.replacements);
-
-        // 5b. Apply disabling (Task 3.7)
         steps = this.applyDisabling(steps, buildContext.disabledSteps);
-
-        // 5c. Apply injections - before/after (Task 3.6)
         steps = this.applyInjections(steps, buildContext.injections);
-
-        // 5d. Apply prepend/append (Task 3.8)
         steps = this.applyPrependAppend(steps, buildContext.prependSteps, buildContext.appendSteps);
 
-        // 5e. Check for duplicate step IDs (Fix #2)
+        // 5e. Check for duplicate step IDs
         this.checkForDuplicateStepIds(steps);
 
         // 6. Topological sort to respect dependencies
@@ -159,6 +147,7 @@ export class PipelineBuilderService {
         // 8. Build executor map
         const executorMap = this.buildExecutorMap(
             orderedSteps,
+            pipeline,
             buildContext.replacements,
             buildContext.injections,
             buildContext.prependSteps,
@@ -166,8 +155,8 @@ export class PipelineBuilderService {
         );
 
         // 9. Create the executable pipeline
-        const pipeline: ExecutablePipeline = {
-            ...createExecutablePipeline('standard'),
+        const result: ExecutablePipeline = {
+            ...createExecutablePipeline(pipeline.id),
             steps: orderedSteps,
             groups,
             executorMap,
@@ -187,18 +176,15 @@ export class PipelineBuilderService {
         };
 
         this.logger.log(
-            `Built pipeline with ${pipeline.steps.length} steps, ` +
-                `${pipeline.groups.length} parallel groups, ` +
-                `${pipeline.replacedSteps.size} replacements, ` +
-                `${pipeline.disabledSteps.size} disabled`,
+            `Built pipeline with ${result.steps.length} steps, ` +
+                `${result.groups.length} parallel groups, ` +
+                `${result.replacedSteps.size} replacements, ` +
+                `${result.disabledSteps.size} disabled`,
         );
 
-        return pipeline;
+        return result;
     }
 
-    /**
-     * Check for duplicate step IDs
-     */
     private checkForDuplicateStepIds(steps: PipelineStepDefinition[]): void {
         const ids = new Set<string>();
         for (const step of steps) {
@@ -212,74 +198,64 @@ export class PipelineBuilderService {
     }
 
     /**
-     * Get enabled plugins that provide pipeline steps.
-     * Uses directory-scoped filtering to only include plugins enabled for this context.
+     * Get enabled modifier plugins that target the given pipeline.
      */
-    private async getEnabledPipelinePlugins(
+    private async getEnabledModifierPlugins(
+        pipelineId: string,
         directoryId?: string,
         userId?: string,
     ): Promise<
         Array<{
             registered: RegisteredPlugin;
-            pipelinePlugin: IPipelineStepPlugin;
+            modifierPlugin: IPipelineModifierPlugin;
         }>
     > {
         const result: Array<{
             registered: RegisteredPlugin;
-            pipelinePlugin: IPipelineStepPlugin;
+            modifierPlugin: IPipelineModifierPlugin;
         }> = [];
 
-        // Get all enabled plugins with pipeline-step capability
         const pluginsWithCapability = this.registry.getByCapability(
-            PLUGIN_CAPABILITIES.PIPELINE_STEP,
+            PLUGIN_CAPABILITIES.PIPELINE_MODIFIER,
         );
 
         for (const registered of pluginsWithCapability) {
-            // Only include enabled plugins at registry level
-            if (registered.state !== 'loaded') {
-                continue;
-            }
+            if (registered.state !== 'loaded') continue;
 
-            // Check directory-specific enabled state
             const isEnabled = await this.registry.isPluginEnabledForScope(
                 registered.plugin.id,
                 directoryId,
                 userId,
             );
-            if (!isEnabled) {
-                continue;
-            }
+            if (!isEnabled) continue;
 
-            // Verify it implements IPipelineStepPlugin
-            if (isPipelineStepPlugin(registered.plugin)) {
-                result.push({
-                    registered,
-                    pipelinePlugin: registered.plugin,
-                });
-            }
+            if (!isPipelineModifierPlugin(registered.plugin)) continue;
+
+            // Check targetPipelines
+            const targets =
+                registered.plugin.targetPipelines ?? registered.manifest.targetPipelines;
+            if (!targets?.includes(pipelineId) && !targets?.includes('*')) continue;
+
+            result.push({
+                registered,
+                modifierPlugin: registered.plugin,
+            });
         }
 
         return result;
     }
 
-    /**
-     * Process steps from a plugin and categorize them by position type
-     */
-    private processPluginSteps(
-        plugin: IPipelineStepPlugin,
+    private processModifierSteps(
+        modifier: IPipelineModifierPlugin,
         pluginId: string,
         context: BuildContext,
     ): void {
-        // Get step definition (single step) or check for multi-step support
-        const stepDef = plugin.getStepDefinition();
-
-        // Process the step's position
-        this.processStepPosition(stepDef, pluginId, context);
+        const stepDef = modifier.getStepDefinition?.();
+        if (stepDef) {
+            this.processStepPosition(stepDef, pluginId, context);
+        }
     }
 
-    /**
-     * Process a step's position and add it to the appropriate collection
-     */
     private processStepPosition(
         step: PipelineStepDefinition,
         pluginId: string,
@@ -289,7 +265,6 @@ export class PipelineBuilderService {
 
         switch (position.type) {
             case 'replace':
-                // Task 3.5: Step replacement
                 if (context.replacements.has(position.stepId)) {
                     this.logger.warn(
                         `Multiple plugins trying to replace step "${position.stepId}". ` +
@@ -304,7 +279,6 @@ export class PipelineBuilderService {
 
             case 'before':
             case 'after':
-                // Task 3.6: Step injection
                 context.injections.push({ step, position, pluginId });
                 this.logger.debug(
                     `Plugin "${pluginId}" injects step "${step.id}" ${position.type} "${position.stepId}"`,
@@ -312,13 +286,11 @@ export class PipelineBuilderService {
                 break;
 
             case 'first':
-                // Task 3.8: Prepend
                 context.prependSteps.push({ step, pluginId });
                 this.logger.debug(`Plugin "${pluginId}" prepends step "${step.id}"`);
                 break;
 
             case 'last':
-                // Task 3.8: Append
                 context.appendSteps.push({ step, pluginId });
                 this.logger.debug(`Plugin "${pluginId}" appends step "${step.id}"`);
                 break;
@@ -328,12 +300,6 @@ export class PipelineBuilderService {
         }
     }
 
-    /**
-     *
-     * When a step is replaced, the replacement step takes on the original step's ID
-     * for dependency resolution purposes. This ensures that other steps that depend
-     * on the original step will still work correctly.
-     */
     private applyReplacements(
         steps: PipelineStepDefinition[],
         replacements: Map<string, { step: PipelineStepDefinition; pluginId: string }>,
@@ -342,17 +308,12 @@ export class PipelineBuilderService {
             const replacement = replacements.get(step.id);
             if (replacement) {
                 this.logger.debug(`Replacing step "${step.id}" with "${replacement.step.id}"`);
-                // The replacement step takes on the original step's ID for dependency resolution
-                // but we track the original replacement step ID in the replacedSteps map
                 return {
                     ...replacement.step,
-                    // Keep the original step's ID so dependencies still work
                     id: step.id,
-                    // Inherit dependencies if replacement doesn't specify them
                     dependencies: replacement.step.dependencies?.length
                         ? replacement.step.dependencies
                         : step.dependencies,
-                    // Inherit provides if replacement doesn't specify them
                     provides: replacement.step.provides?.length
                         ? replacement.step.provides
                         : step.provides,
@@ -362,8 +323,6 @@ export class PipelineBuilderService {
         });
     }
 
-    /**
-     */
     private applyDisabling(
         steps: PipelineStepDefinition[],
         disabledSteps: Set<string>,
@@ -377,15 +336,12 @@ export class PipelineBuilderService {
         });
     }
 
-    /**
-     */
     private applyInjections(
         steps: PipelineStepDefinition[],
         injections: InjectedStep[],
     ): PipelineStepDefinition[] {
         const result = [...steps];
 
-        // Group injections by target step for efficiency
         const beforeInjections = new Map<string, PipelineStepDefinition[]>();
         const afterInjections = new Map<string, PipelineStepDefinition[]>();
 
@@ -410,20 +366,16 @@ export class PipelineBuilderService {
             }
         }
 
-        // Apply injections by walking through steps and inserting
         const finalResult: PipelineStepDefinition[] = [];
 
         for (const step of result) {
-            // Insert "before" steps
             const beforeSteps = beforeInjections.get(step.id);
             if (beforeSteps) {
                 finalResult.push(...beforeSteps);
             }
 
-            // Add the original step
             finalResult.push(step);
 
-            // Insert "after" steps
             const afterSteps = afterInjections.get(step.id);
             if (afterSteps) {
                 finalResult.push(...afterSteps);
@@ -433,8 +385,6 @@ export class PipelineBuilderService {
         return finalResult;
     }
 
-    /**
-     */
     private applyPrependAppend(
         steps: PipelineStepDefinition[],
         prependSteps: Array<{ step: PipelineStepDefinition; pluginId: string }>,
@@ -443,26 +393,19 @@ export class PipelineBuilderService {
         return [...prependSteps.map((p) => p.step), ...steps, ...appendSteps.map((a) => a.step)];
     }
 
-    /**
-     * Topological sort of steps based on dependencies.
-     * Uses Kahn's algorithm for cycle detection.
-     */
     private topologicalSort(steps: PipelineStepDefinition[]): PipelineStepDefinition[] {
         const stepMap = new Map(steps.map((s) => [s.id, s]));
         const inDegree = new Map<string, number>();
         const graph = new Map<string, Set<string>>();
 
-        // Initialize in-degree and adjacency list
         for (const step of steps) {
             inDegree.set(step.id, 0);
             graph.set(step.id, new Set());
         }
 
-        // Build the graph
         for (const step of steps) {
             if (step.dependencies) {
                 for (const dep of step.dependencies) {
-                    // Only count dependencies that exist in our step set
                     if (stepMap.has(dep.stepId)) {
                         graph.get(dep.stepId)!.add(step.id);
                         inDegree.set(step.id, (inDegree.get(step.id) || 0) + 1);
@@ -473,7 +416,6 @@ export class PipelineBuilderService {
             }
         }
 
-        // Find all nodes with no incoming edges
         const queue: string[] = [];
         for (const [stepId, degree] of inDegree) {
             if (degree === 0) {
@@ -495,7 +437,6 @@ export class PipelineBuilderService {
                 sorted.push(step);
             }
 
-            // Process dependents
             for (const dependent of graph.get(current) || []) {
                 const newDegree = (inDegree.get(dependent) || 0) - 1;
                 inDegree.set(dependent, newDegree);
@@ -506,7 +447,6 @@ export class PipelineBuilderService {
             }
         }
 
-        // Check for cycles
         if (sorted.length !== steps.length) {
             const remainingSteps = steps.filter((s) => !visited.has(s.id));
             const cycle = this.findCycle(remainingSteps, graph);
@@ -522,9 +462,6 @@ export class PipelineBuilderService {
         return sorted;
     }
 
-    /**
-     * Find a cycle in the dependency graph for better error reporting
-     */
     private findCycle(nodes: PipelineStepDefinition[], graph: Map<string, Set<string>>): string[] {
         const visited = new Set<string>();
         const recursionStack = new Set<string>();
@@ -536,7 +473,6 @@ export class PipelineBuilderService {
 
             const dependents = graph.get(nodeId) || new Set();
             for (const dependent of dependents) {
-                // Only consider nodes involved in the remaining set
                 if (!nodes.some((n) => n.id === dependent)) continue;
 
                 if (!visited.has(dependent)) {
@@ -566,10 +502,6 @@ export class PipelineBuilderService {
         return [];
     }
 
-    /**
-     * Identify groups of steps that can run in parallel.
-     * Steps with the same set of completed dependencies can run together.
-     */
     private identifyParallelGroups(steps: PipelineStepDefinition[]): ParallelGroup[] {
         const groups: ParallelGroup[] = [];
         const completedSteps = new Set<string>();
@@ -578,13 +510,11 @@ export class PipelineBuilderService {
         const DEFAULT_CONCURRENCY = 4;
 
         for (const step of steps) {
-            // Check if all dependencies are complete
             const dependenciesComplete =
                 !step.dependencies ||
                 step.dependencies.every((d) => !d.required || completedSteps.has(d.stepId));
 
             if (!dependenciesComplete) {
-                // Flush current group and start new one
                 if (currentGroup.length > 0) {
                     groups.push(
                         this.createParallelGroup(
@@ -599,11 +529,9 @@ export class PipelineBuilderService {
                 }
             }
 
-            // Check if step can be parallelized
             if (step.parallelizable && dependenciesComplete) {
                 currentGroup.push(step.id);
             } else {
-                // Non-parallelizable step - flush and add as single-step group
                 if (currentGroup.length > 0) {
                     groups.push(
                         this.createParallelGroup(
@@ -623,7 +551,6 @@ export class PipelineBuilderService {
             }
         }
 
-        // Flush remaining
         if (currentGroup.length > 0) {
             groups.push(
                 this.createParallelGroup(groupIndex++, currentGroup, steps, DEFAULT_CONCURRENCY),
@@ -633,9 +560,6 @@ export class PipelineBuilderService {
         return groups;
     }
 
-    /**
-     * Create a parallel group
-     */
     private createParallelGroup(
         index: number,
         stepIds: string[],
@@ -655,10 +579,12 @@ export class PipelineBuilderService {
     }
 
     /**
-     * Build the executor map for all steps
+     * Build the executor map for all steps.
+     * Uses the pipeline's isValidStepId to determine builtin vs plugin steps.
      */
     private buildExecutorMap(
         steps: PipelineStepDefinition[],
+        pipeline: IPipelinePlugin,
         replacements: Map<string, { step: PipelineStepDefinition; pluginId: string }>,
         injections: InjectedStep[],
         prependSteps: Array<{ step: PipelineStepDefinition; pluginId: string }>,
@@ -666,13 +592,9 @@ export class PipelineBuilderService {
     ): Map<string, StepExecutor> {
         const executorMap = new Map<string, StepExecutor>();
 
-        // Create a lookup for plugin-provided steps
-        // For replacements, we map the ORIGINAL step ID to the plugin (since the replacement
-        // step takes on the original's ID in the pipeline)
         const pluginSteps = new Map<string, { pluginId: string; originalStepId: string }>();
 
         for (const [originalId, { step, pluginId }] of replacements) {
-            // Map the original ID (which is what the step now has) to the plugin
             pluginSteps.set(originalId, { pluginId, originalStepId: step.id });
         }
         for (const injection of injections) {
@@ -698,20 +620,18 @@ export class PipelineBuilderService {
             const pluginInfo = pluginSteps.get(step.id);
 
             if (pluginInfo) {
-                // Plugin-provided step
                 executorMap.set(step.id, {
                     type: 'plugin',
                     pluginId: pluginInfo.pluginId,
                     stepId: pluginInfo.originalStepId,
                 });
-            } else if (DefaultPipelinePlugin.isBuiltInStep(step.id)) {
-                // Built-in step
+            } else if (pipeline.isValidStepId?.(step.id) ?? true) {
                 executorMap.set(step.id, {
                     type: 'builtin',
                     serviceId: step.id,
+                    pluginId: pipeline.id,
                 });
             } else {
-                // Unknown step - should not happen
                 this.logger.warn(`Unknown step "${step.id}" - no executor assigned`);
             }
         }
@@ -719,28 +639,21 @@ export class PipelineBuilderService {
         return executorMap;
     }
 
-    /**
-     * Calculate estimated total duration
-     */
     private calculateEstimatedDuration(steps: PipelineStepDefinition[]): number {
         return steps.reduce((total, step) => {
-            return total + (step.estimatedDuration || 10) * 1000; // Convert to ms
+            return total + (step.estimatedDuration || 10) * 1000;
         }, 0);
     }
 
-    /**
-     * Disable a step by ID.
-     * This is used when plugins request disabling of built-in steps.
-     */
     disableStep(stepId: string, context: BuildContext): void {
         context.disabledSteps.add(stepId);
         this.logger.debug(`Step "${stepId}" marked for disabling`);
     }
 
     /**
-     * Get the current built-in steps (for testing/inspection)
+     * Get the current built-in steps from a pipeline plugin (for testing/inspection)
      */
-    getBuiltInSteps(): PipelineStepDefinition[] {
-        return DefaultPipelinePlugin.getBuiltInSteps();
+    getBuiltInSteps(pipeline: IPipelinePlugin): readonly PipelineStepDefinition[] {
+        return pipeline.getStepDefinitions();
     }
 }

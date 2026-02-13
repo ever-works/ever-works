@@ -4,7 +4,8 @@ import type { IDeploymentPlugin } from '../contracts/capabilities/deployment.int
 import type { IScreenshotPlugin } from '../contracts/capabilities/screenshot.interface.js';
 import type { ISearchPlugin } from '../contracts/capabilities/search.interface.js';
 import type { IAiProviderPlugin } from '../contracts/capabilities/ai-provider.interface.js';
-import type { IPipelineStepPlugin } from '../contracts/capabilities/pipeline-step.interface.js';
+import type { IPipelineModifierPlugin } from '../contracts/capabilities/pipeline-modifier.interface.js';
+import type { IPipelinePlugin } from '../contracts/capabilities/pipeline-plugin.interface.js';
 import { isPluginCategory, PLUGIN_CATEGORIES } from '../contracts/plugin-manifest.types.js';
 import { createTestHarness, type PluginTestHarness, type PluginTestResult } from './plugin-test-harness.js';
 
@@ -269,21 +270,67 @@ export async function testAiProviderContract(plugin: IAiProviderPlugin): Promise
 }
 
 /**
- * Contract test suite for pipeline step plugins
+ * Contract test suite for pipeline plugins
  */
-export async function testPipelineStepContract(plugin: IPipelineStepPlugin): Promise<PluginTestResult[]> {
+export async function testPipelineContract(plugin: IPipelinePlugin): Promise<PluginTestResult[]> {
 	const results = await testBasePluginContract(plugin);
 	const harness = createTestHarness(plugin);
 
 	results.push(
-		await harness.test('has pipeline-step capability', async () => {
-			harness.assert(plugin.capabilities.includes('pipeline-step'), 'must have pipeline-step capability');
+		await harness.test('has pipeline capability', async () => {
+			harness.assert(plugin.capabilities.includes('pipeline'), 'must have pipeline capability');
 		})
 	);
 
 	results.push(
-		await harness.test('implements getStepDefinition', async () => {
-			harness.assert(typeof plugin.getStepDefinition === 'function', 'getStepDefinition must be a function');
+		await harness.test('implements getStepDefinitions', async () => {
+			harness.assert(typeof plugin.getStepDefinitions === 'function', 'getStepDefinitions must be a function');
+			const steps = plugin.getStepDefinitions();
+			harness.assert(Array.isArray(steps), 'getStepDefinitions must return an array');
+			harness.assert(steps.length > 0, 'getStepDefinitions must return at least one step');
+		})
+	);
+
+	results.push(
+		await harness.test('implements execute', async () => {
+			harness.assert(typeof plugin.execute === 'function', 'execute must be a function');
+		})
+	);
+
+	results.push(
+		await harness.test('step definitions have required fields', async () => {
+			const steps = plugin.getStepDefinitions();
+			for (const step of steps) {
+				harness.assert(typeof step.id === 'string', `step.id must be a string, got ${typeof step.id}`);
+				harness.assert(typeof step.name === 'string', `step.name must be a string, got ${typeof step.name}`);
+				harness.assert(
+					typeof step.position === 'object',
+					`step.position must be an object for step "${step.id}"`
+				);
+			}
+		})
+	);
+
+	return results;
+}
+
+/**
+ * Contract test suite for pipeline modifier plugins
+ */
+export async function testPipelineModifierContract(plugin: IPipelineModifierPlugin): Promise<PluginTestResult[]> {
+	const results = await testBasePluginContract(plugin);
+	const harness = createTestHarness(plugin);
+
+	results.push(
+		await harness.test('has pipeline-modifier capability', async () => {
+			harness.assert(plugin.capabilities.includes('pipeline-modifier'), 'must have pipeline-modifier capability');
+		})
+	);
+
+	results.push(
+		await harness.test('has targetPipelines', async () => {
+			harness.assert(Array.isArray(plugin.targetPipelines), 'targetPipelines must be an array');
+			harness.assert(plugin.targetPipelines.length > 0, 'targetPipelines must not be empty');
 		})
 	);
 
@@ -295,7 +342,7 @@ export async function testPipelineStepContract(plugin: IPipelineStepPlugin): Pro
 
 	results.push(
 		await harness.test('getStepDefinition returns valid definition', async () => {
-			const definition = plugin.getStepDefinition();
+			const definition = plugin.getStepDefinition?.();
 			harness.assert(definition !== undefined, 'definition must not be undefined');
 			if (definition) {
 				harness.assert(typeof definition.id === 'string', 'definition.id must be a string');
@@ -338,8 +385,12 @@ export async function runContractTests(plugin: IPlugin): Promise<PluginTestResul
 		results.push(...(await testAiProviderContract(plugin as IAiProviderPlugin)));
 	}
 
-	if (plugin.capabilities.includes('pipeline-step')) {
-		results.push(...(await testPipelineStepContract(plugin as IPipelineStepPlugin)));
+	if (plugin.capabilities.includes('pipeline')) {
+		results.push(...(await testPipelineContract(plugin as IPipelinePlugin)));
+	}
+
+	if (plugin.capabilities.includes('pipeline-modifier')) {
+		results.push(...(await testPipelineModifierContract(plugin as IPipelineModifierPlugin)));
 	}
 
 	return results;

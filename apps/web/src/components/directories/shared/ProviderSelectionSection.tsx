@@ -14,40 +14,42 @@ interface ProviderSelectionSectionProps {
     formSchema: GeneratorFormSchema;
     providers: ProviderSelectionState;
     onProviderChange: (category: SelectableProviderCategory, value: string | null) => void;
-    isFullPipeline: boolean;
 }
 
 export function ProviderSelectionSection({
     formSchema,
     providers,
     onProviderChange,
-    isFullPipeline,
 }: ProviderSelectionSectionProps) {
     const t = useTranslations('dashboard.directoryDetail.generator');
 
+    const individualCategories = getIndividualProviderCategories().filter(({ uiKey }) => {
+        const options = formSchema.providers[uiKey as keyof GeneratorFormSchema['providers']];
+        return options && options.length > 0;
+    });
+
     return (
         <>
-            {formSchema.providers.fullPipeline.length > 0 && (
+            {formSchema.providers.pipeline.length > 1 && (
                 <PipelineModeSelector
-                    fullPipelineProviders={formSchema.providers.fullPipeline}
+                    pipelineProviders={formSchema.providers.pipeline}
                     selectedPipeline={providers.pipeline}
                     onChange={(pipelineId) => onProviderChange('pipeline', pipelineId)}
                 />
             )}
 
-            {!isFullPipeline && (
+            {individualCategories.length > 0 && (
                 <CollapsibleSection
                     title={t('providerSelection')}
                     description={t('providerSelectionDescription')}
                     defaultExpanded={true}
                 >
                     <div className="space-y-3">
-                        {getIndividualProviderCategories().map(({ uiKey }) => {
+                        {individualCategories.map(({ uiKey }) => {
                             const options =
                                 formSchema.providers[
                                     uiKey as keyof GeneratorFormSchema['providers']
                                 ];
-                            if (!options || options.length === 0) return null;
                             const labelKey = `${uiKey}Provider` as Parameters<typeof t>[0];
                             return (
                                 <ProviderSelector

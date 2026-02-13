@@ -11,11 +11,6 @@ import type {
 import type { FormFieldCondition } from '@ever-works/contracts';
 import { getIndividualProviderCategories, type IndividualCategoryKey } from '@ever-works/plugin';
 
-export interface CompanyDto {
-    name: string;
-    website: string;
-}
-
 export interface ProviderSelectionResult {
     providers: Partial<ProvidersDto>;
     pipelineId: string | null;
@@ -56,8 +51,7 @@ export class GeneratePromptService extends BasePromptService {
         let pipelineId: string | null = null;
 
         // Check if full pipeline providers are available
-        const configuredPipelines =
-            schema.providers.fullPipeline?.filter((p) => p.configured) || [];
+        const configuredPipelines = schema.providers.pipeline?.filter((p) => p.configured) || [];
 
         if (configuredPipelines.length > 0) {
             const mode = await this.promptSelect(
@@ -217,40 +211,12 @@ export class GeneratePromptService extends BasePromptService {
     }
 
     /**
-     * Prompts for company information
-     */
-    async promptCompanyInfo(): Promise<CompanyDto> {
-        this.displayInfo('Company Information');
-
-        const name = await this.promptRequiredText(
-            'Company name:',
-            undefined,
-            this.validateName.bind(this),
-        );
-
-        const website = await this.promptRequiredText(
-            'Company website:',
-            undefined,
-            this.validateUrl.bind(this),
-        );
-
-        return { name, website };
-    }
-
-    /**
      * Displays generation summary
      */
     displayGenerationSummary(dto: CreateItemsGeneratorDto): void {
         this.displaySectionHeader('Generation Summary');
         console.log(chalk.gray('Name:'), chalk.white(dto.name));
         console.log(chalk.gray('Prompt:'), chalk.white(dto.prompt));
-
-        if (dto.company) {
-            console.log(
-                chalk.gray('Company:'),
-                chalk.white(`${dto.company.name} (${dto.company.website})`),
-            );
-        }
 
         if (dto.providers) {
             const providerEntries = Object.entries(dto.providers).filter(([, v]) => v);
@@ -264,13 +230,6 @@ export class GeneratePromptService extends BasePromptService {
 
         if (dto.generation_method) {
             console.log(chalk.gray('Generation Method:'), chalk.white(dto.generation_method));
-        }
-
-        if (dto.repository_description) {
-            console.log(
-                chalk.gray('Repository Description:'),
-                chalk.white(dto.repository_description),
-            );
         }
 
         if (dto.pluginConfig) {

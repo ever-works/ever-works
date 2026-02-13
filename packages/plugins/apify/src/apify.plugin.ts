@@ -13,6 +13,7 @@ import type {
 	DataSourceQueryResult,
 	DataSourceMetadata
 } from '@ever-works/plugin';
+import { extractKeywords } from '@ever-works/plugin/keywords';
 import type { FormFieldDefinition, FormFieldGroup, ItemData } from '@ever-works/contracts';
 
 /**
@@ -356,24 +357,9 @@ export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvi
 			keywords.forEach((k) => keywordSet.add(k.toLowerCase()));
 		}
 
-		if (subject) {
-			subject
-				.toLowerCase()
-				.split(/\s+/)
-				.forEach((w) => {
-					if (w.length > 3) keywordSet.add(w);
-				});
-		}
-
-		if (prompt) {
-			// Extract significant words from prompt
-			const stopWords = new Set(['the', 'and', 'for', 'with', 'about', 'this', 'that', 'from']);
-			prompt
-				.toLowerCase()
-				.split(/\s+/)
-				.filter((w) => w.length > 3 && !stopWords.has(w))
-				.slice(0, 10)
-				.forEach((w) => keywordSet.add(w));
+		if (subject || prompt) {
+			const extracted = extractKeywords([subject, prompt].filter(Boolean).join(' '), { maxKeywords: 15 });
+			extracted.forEach((k) => keywordSet.add(k));
 		}
 
 		// If no keywords, return all items

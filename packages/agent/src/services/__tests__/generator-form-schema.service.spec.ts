@@ -3,6 +3,7 @@ import type {
     PluginRegistryService,
     RegisteredPlugin,
 } from '@src/plugins/services/plugin-registry.service';
+import type { DirectoryPluginRepository } from '@src/plugins/repositories/directory-plugin.repository';
 import type {
     IPlugin,
     IFormSchemaProvider,
@@ -176,7 +177,7 @@ describe('GeneratorFormSchemaService', () => {
 
         it('should exclude pipeline plugin from additional form fields (no double-counting)', async () => {
             const pipelinePlugin = createFormSchemaPlugin(
-                'default-pipeline',
+                'standard-pipeline',
                 [
                     {
                         name: 'pipeline_field',
@@ -201,7 +202,7 @@ describe('GeneratorFormSchemaService', () => {
             const dsRegistered = createRegistered(dsPlugin);
 
             mockRegistry.get.mockImplementation((id: string) => {
-                if (id === 'default-pipeline') return pipelineRegistered;
+                if (id === 'standard-pipeline') return pipelineRegistered;
                 return undefined;
             });
             mockRegistry.getByCapability.mockImplementation((cap: string) => {
@@ -341,13 +342,13 @@ describe('GeneratorFormSchemaService', () => {
 
         it('should skip the pipeline plugin during validation', async () => {
             const pipelinePlugin = createMockPlugin({
-                id: 'default-pipeline',
+                id: 'standard-pipeline',
                 capabilities: ['pipeline', 'form-schema-provider'],
             });
             const pipelineRegistered = createRegistered(pipelinePlugin);
 
             mockRegistry.get.mockImplementation((id: string) => {
-                if (id === 'default-pipeline') return pipelineRegistered;
+                if (id === 'standard-pipeline') return pipelineRegistered;
                 return undefined;
             });
             mockRegistry.getByCapability.mockReturnValue([pipelineRegistered]);
@@ -612,6 +613,81 @@ describe('GeneratorFormSchemaService', () => {
         });
     });
 
+    describe('selectableProviderCategories filtering', () => {
+        it('should filter provider categories based on pipeline selectableProviderCategories', async () => {
+            const pipelinePlugin = createFormSchemaPlugin('claude-code', [], {
+                category: 'pipeline',
+                capabilities: ['pipeline', 'form-schema-provider'],
+            });
+            const pipelineRegistered = createRegistered(pipelinePlugin, {
+                selectableProviderCategories: ['screenshot'],
+            });
+
+            const aiPlugin = createMockPlugin({
+                id: 'openrouter',
+                capabilities: ['ai-provider'],
+            });
+            const aiRegistered = createRegistered(aiPlugin);
+
+            const screenshotPlugin = createMockPlugin({
+                id: 'screenshotone',
+                capabilities: ['screenshot'],
+            });
+            const screenshotRegistered = createRegistered(screenshotPlugin);
+
+            mockRegistry.get.mockImplementation((id: string) => {
+                if (id === 'claude-code') return pipelineRegistered;
+                return undefined;
+            });
+            mockRegistry.getByCapability.mockImplementation((cap: string) => {
+                if (cap === 'pipeline') return [pipelineRegistered];
+                if (cap === 'ai-provider') return [aiRegistered];
+                if (cap === 'screenshot') return [screenshotRegistered];
+                if (cap === 'form-schema-provider') return [pipelineRegistered];
+                return [];
+            });
+
+            const schema = await service.getFormSchema('claude-code');
+
+            // Screenshot should be populated (declared in selectableProviderCategories)
+            expect(schema.providers.screenshot.length).toBe(1);
+            // AI should be empty (not declared in selectableProviderCategories)
+            expect(schema.providers.ai.length).toBe(0);
+            // Pipeline should still be populated
+            expect(schema.providers.pipeline.length).toBe(1);
+        });
+
+        it('should show all provider categories when selectableProviderCategories is not set', async () => {
+            const pipelinePlugin = createFormSchemaPlugin('standard-pipeline', [], {
+                category: 'pipeline',
+                capabilities: ['pipeline', 'form-schema-provider'],
+            });
+            const pipelineRegistered = createRegistered(pipelinePlugin);
+
+            const aiPlugin = createMockPlugin({
+                id: 'openrouter',
+                capabilities: ['ai-provider'],
+            });
+            const aiRegistered = createRegistered(aiPlugin);
+
+            mockRegistry.get.mockImplementation((id: string) => {
+                if (id === 'standard-pipeline') return pipelineRegistered;
+                return undefined;
+            });
+            mockRegistry.getByCapability.mockImplementation((cap: string) => {
+                if (cap === 'pipeline') return [pipelineRegistered];
+                if (cap === 'ai-provider') return [aiRegistered];
+                if (cap === 'form-schema-provider') return [pipelineRegistered];
+                return [];
+            });
+
+            const schema = await service.getFormSchema('standard-pipeline');
+
+            // AI should be populated (no filtering when selectableProviderCategories is unset)
+            expect(schema.providers.ai.length).toBe(1);
+        });
+    });
+
     describe('validateFormValues', () => {
         it('should validate form-schema-provider plugin form values', async () => {
             const dsPlugin = createFormSchemaPlugin('apify', [], {
@@ -656,6 +732,183 @@ describe('GeneratorFormSchemaService', () => {
             );
 
             expect(result.valid).toBe(true);
+        });
+    });
+
+    describe('resolvedPipelineId', () => {
+        it('should include resolvedPipelineId in response when pipeline is resolved', async () => {
+            const pipelinePlugin = createFormSchemaPlugin('standard-pipeline', [], {
+                category: 'pipeline',
+                capabilities: ['pipeline', 'form-schema-provider'],
+            });
+            const pipelineRegistered = createRegistered(pipelinePlugin, {
+                defaultForCapabilities: ['pipeline'],
+            });
+
+            mockRegistry.get.mockImplementation((id: string) => {
+                if (id === 'standard-pipeline') return pipelineRegistered;
+                return undefined;
+            });
+            mockRegistry.getByCapability.mockImplementation((cap: string) => {
+                if (cap === 'pipeline') return [pipelineRegistered];
+                if (cap === 'form-schema-provider') return [pipelineRegistered];
+                return [];
+            });
+
+            const schema = await service.getFormSchema(undefined);
+
+            expect(schema.resolvedPipelineId).toBe('standard-pipeline');
+        });
+
+        it('should include explicit pipelineId in resolvedPipelineId', async () => {
+            const pipelinePlugin = createFormSchemaPlugin('agent-pipeline', [], {
+                category: 'pipeline',
+                capabilities: ['pipeline', 'form-schema-provider'],
+            });
+            const pipelineRegistered = createRegistered(pipelinePlugin);
+
+            mockRegistry.get.mockImplementation((id: string) => {
+                if (id === 'agent-pipeline') return pipelineRegistered;
+                return undefined;
+            });
+            mockRegistry.getByCapability.mockImplementation((cap: string) => {
+                if (cap === 'pipeline') return [pipelineRegistered];
+                if (cap === 'form-schema-provider') return [pipelineRegistered];
+                return [];
+            });
+
+            const schema = await service.getFormSchema('agent-pipeline');
+
+            expect(schema.resolvedPipelineId).toBe('agent-pipeline');
+        });
+
+        it('should be undefined when no pipeline plugin is found', async () => {
+            mockRegistry.getByCapability.mockReturnValue([]);
+
+            const schema = await service.getFormSchema(undefined);
+
+            expect(schema.resolvedPipelineId).toBeUndefined();
+        });
+    });
+
+    describe('activeCapability pipeline resolution', () => {
+        it('should resolve pipeline from directory activeCapability when no explicit pipelineId', async () => {
+            const standardPipeline = createFormSchemaPlugin('standard-pipeline', [], {
+                category: 'pipeline',
+                capabilities: ['pipeline', 'form-schema-provider'],
+            });
+            const standardRegistered = createRegistered(standardPipeline, {
+                defaultForCapabilities: ['pipeline'],
+            });
+
+            const agentPipeline = createFormSchemaPlugin('agent-pipeline', [], {
+                category: 'pipeline',
+                capabilities: ['pipeline', 'form-schema-provider'],
+            });
+            const agentRegistered = createRegistered(agentPipeline);
+
+            mockRegistry.get.mockImplementation((id: string) => {
+                if (id === 'standard-pipeline') return standardRegistered;
+                if (id === 'agent-pipeline') return agentRegistered;
+                return undefined;
+            });
+            mockRegistry.getByCapability.mockImplementation((cap: string) => {
+                if (cap === 'pipeline') return [standardRegistered, agentRegistered];
+                if (cap === 'form-schema-provider') return [standardRegistered, agentRegistered];
+                return [];
+            });
+
+            const mockDirPluginRepo = {
+                findActiveByCapability: jest.fn().mockResolvedValue({
+                    pluginId: 'agent-pipeline',
+                }),
+            } as unknown as jest.Mocked<DirectoryPluginRepository>;
+
+            const svc = new GeneratorFormSchemaService(mockRegistry, mockDirPluginRepo);
+
+            const schema = await svc.getFormSchema(undefined, { directoryId: 'dir-1' });
+
+            expect(schema.resolvedPipelineId).toBe('agent-pipeline');
+        });
+
+        it('should fall back to defaultForCapabilities when no activeCapability is set', async () => {
+            const standardPipeline = createFormSchemaPlugin('standard-pipeline', [], {
+                category: 'pipeline',
+                capabilities: ['pipeline', 'form-schema-provider'],
+            });
+            const standardRegistered = createRegistered(standardPipeline, {
+                defaultForCapabilities: ['pipeline'],
+            });
+
+            const agentPipeline = createFormSchemaPlugin('agent-pipeline', [], {
+                category: 'pipeline',
+                capabilities: ['pipeline', 'form-schema-provider'],
+            });
+            const agentRegistered = createRegistered(agentPipeline);
+
+            mockRegistry.get.mockImplementation((id: string) => {
+                if (id === 'standard-pipeline') return standardRegistered;
+                if (id === 'agent-pipeline') return agentRegistered;
+                return undefined;
+            });
+            mockRegistry.getByCapability.mockImplementation((cap: string) => {
+                if (cap === 'pipeline') return [standardRegistered, agentRegistered];
+                if (cap === 'form-schema-provider') return [standardRegistered, agentRegistered];
+                return [];
+            });
+
+            const mockDirPluginRepo = {
+                findActiveByCapability: jest.fn().mockResolvedValue(null),
+            } as unknown as jest.Mocked<DirectoryPluginRepository>;
+
+            const svc = new GeneratorFormSchemaService(mockRegistry, mockDirPluginRepo);
+
+            const schema = await svc.getFormSchema(undefined, { directoryId: 'dir-1' });
+
+            expect(schema.resolvedPipelineId).toBe('standard-pipeline');
+        });
+
+        it('should prefer explicit pipelineId over activeCapability', async () => {
+            const standardPipeline = createFormSchemaPlugin('standard-pipeline', [], {
+                category: 'pipeline',
+                capabilities: ['pipeline', 'form-schema-provider'],
+            });
+            const standardRegistered = createRegistered(standardPipeline, {
+                defaultForCapabilities: ['pipeline'],
+            });
+
+            const agentPipeline = createFormSchemaPlugin('agent-pipeline', [], {
+                category: 'pipeline',
+                capabilities: ['pipeline', 'form-schema-provider'],
+            });
+            const agentRegistered = createRegistered(agentPipeline);
+
+            mockRegistry.get.mockImplementation((id: string) => {
+                if (id === 'standard-pipeline') return standardRegistered;
+                if (id === 'agent-pipeline') return agentRegistered;
+                return undefined;
+            });
+            mockRegistry.getByCapability.mockImplementation((cap: string) => {
+                if (cap === 'pipeline') return [standardRegistered, agentRegistered];
+                if (cap === 'form-schema-provider') return [standardRegistered, agentRegistered];
+                return [];
+            });
+
+            const mockDirPluginRepo = {
+                findActiveByCapability: jest.fn().mockResolvedValue({
+                    pluginId: 'agent-pipeline',
+                }),
+            } as unknown as jest.Mocked<DirectoryPluginRepository>;
+
+            const svc = new GeneratorFormSchemaService(mockRegistry, mockDirPluginRepo);
+
+            // Explicit standard-pipeline should win over activeCapability's agent-pipeline
+            const schema = await svc.getFormSchema('standard-pipeline', {
+                directoryId: 'dir-1',
+            });
+
+            // Explicit pipelineId takes priority over directory's activeCapability
+            expect(schema.resolvedPipelineId).toBe('standard-pipeline');
         });
     });
 });

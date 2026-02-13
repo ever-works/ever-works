@@ -1,25 +1,26 @@
 import { BasePlugin } from './base-plugin.js';
+import type { IPipelineModifierPlugin } from '../contracts/capabilities/pipeline-modifier.interface.js';
 import type {
-	IPipelineStepPlugin,
 	StepExecutionOptions,
 	StepProgressCallback,
 	StepProgress
-} from '../contracts/capabilities/pipeline-step.interface.js';
+} from '../contracts/capabilities/pipeline-plugin.interface.js';
 import type { MutableGenerationContext } from '../pipeline/generation-context.interface.js';
 import type { PipelineStepDefinition, StepPosition } from '../pipeline/step-definition.types.js';
 import type { PluginCategory } from '../contracts/plugin-manifest.types.js';
 
 /**
- * Abstract base class for pipeline step plugins.
- * Subclasses must implement: stepId, stepName, stepPosition, execute()
+ * Abstract base class for pipeline modifier plugins.
+ * Subclasses must implement: stepId, stepName, stepPosition, targetPipelines, execute()
  */
-export abstract class BasePipelineStep extends BasePlugin implements IPipelineStepPlugin {
+export abstract class BasePipelineStep extends BasePlugin implements IPipelineModifierPlugin {
 	readonly category: PluginCategory = 'pipeline';
-	readonly capabilities: readonly string[] = ['pipeline-step'];
+	readonly capabilities: readonly string[] = ['pipeline-modifier'];
 
 	abstract readonly stepId: string;
 	abstract readonly stepName: string;
 	abstract readonly stepPosition: StepPosition;
+	abstract readonly targetPipelines: readonly string[];
 
 	readonly stepDescription?: string;
 	readonly provides: readonly string[] = [];

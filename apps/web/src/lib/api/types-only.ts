@@ -44,7 +44,6 @@ export type {
 
 export type {
     // From items-generator.ts
-    CompanyDto,
     ProvidersDto,
     CreateItemsGeneratorDto,
     UpdateItemsGeneratorDto,

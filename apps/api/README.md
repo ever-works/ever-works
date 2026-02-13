@@ -147,7 +147,6 @@ To generate data and create a GitHub repository for the directory, send a POST r
     "update_with_pull_request": true,
     "badge_evaluation_enabled": false,
     "website_repository_creation_method": "create-using-template",
-    "repository_description": "A curated list of the best time tracking software and tools for businesses.",
     "config": {
         "max_search_queries": 10,
         "max_results_per_query": 25,
@@ -168,7 +167,6 @@ To generate data and create a GitHub repository for the directory, send a POST r
 | `name`                               | string   | `required` | -                       | Display name for the directory                                                                            |
 | `prompt`                             | string   | `required` | -                       | Description/prompt for item generation. URLs mentioned here will be automatically extracted and processed |
 | `company`                            | object   | `optional` | -                       | Company information (see Company Object below)                                                            |
-| `repository_description`             | string   | `optional` | -                       | Description for the generated github repository                                                           |
 | `target_keywords`                    | string[] | `optional` | `[]`                    | Keywords to focus the search and generation                                                               |
 | `initial_categories`                 | string[] | `optional` | `[]`                    | Initial categories to assign to generated items                                                           |
 | `priority_categories`                | string[] | `optional` | `[]`                    | Categories that should appear first in the final output (can also be extracted from prompt)               |
