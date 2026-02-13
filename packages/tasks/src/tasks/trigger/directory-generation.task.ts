@@ -11,7 +11,6 @@ import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities'
 import { DirectoryScheduleService } from '@ever-works/agent/services';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
-const nodeEnv = process.env.NODE_ENV || 'development';
 
 async function createContext(
     appContext: INestApplicationContext,
@@ -45,6 +44,9 @@ export const directoryGenerationTask = task({
         if (!payload) {
             return;
         }
+
+        const nodeEnv = process.env.NODE_ENV || 'development';
+
 
         let appContext: INestApplicationContext | undefined;
 
@@ -82,6 +84,9 @@ export const directoryGenerationTask = task({
             return;
         }
 
+        const nodeEnv = process.env.NODE_ENV || 'development';
+
+
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
             logger: nodeEnv ? undefined : createTriggerLogger('DirectoryGeneration:Cancel'),
         });
@@ -106,6 +111,8 @@ export const directoryGenerationTask = task({
         }
     },
     run: async (payload: DirectoryGenerationPayload) => {
+        const nodeEnv = process.env.NODE_ENV || 'development';
+
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
             logger: nodeEnv ? undefined : createTriggerLogger('DirectoryGeneration'),
         });
