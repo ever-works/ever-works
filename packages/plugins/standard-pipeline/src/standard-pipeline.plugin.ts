@@ -333,7 +333,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 		// The engine calls executeStep() for each step individually.
 		throw new Error(
 			'StandardPipelinePlugin.execute() should not be called directly. ' +
-				'Use the pipeline engine to orchestrate step execution.'
+			'Use the pipeline engine to orchestrate step execution.'
 		);
 	}
 
@@ -791,7 +791,6 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 				'- **Extensible** — pipeline-modifier plugins can inject, replace, or disable individual steps',
 				'- **Provider-agnostic** — works with any AI, search, screenshot, or content-extractor plugin'
 			].join('\n'),
-			homepage: 'https://ever.works',
 			icon: {
 				type: 'svg',
 				value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>'
