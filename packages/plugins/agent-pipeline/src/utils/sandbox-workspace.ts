@@ -2,7 +2,7 @@ import { mkdir, writeFile, readdir, readFile, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ItemData, DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
-import { slugify, validateRequiredItemFields, normalizeItemTags } from '@ever-works/plugin';
+import { slugify, validateRequiredItemFields, normalizeItemTags, jsonrepair } from '@ever-works/plugin';
 
 interface Logger {
 	log(message: string, ...args: unknown[]): void;
@@ -158,7 +158,14 @@ export async function collectItemsFromWorkspace(workspacePath: string, logger?: 
 				}
 
 				const content = await readFile(join(workspacePath, fileName), 'utf-8');
-				const data = JSON.parse(content);
+				let data;
+				try {
+					data = JSON.parse(content);
+				} catch {
+					const repaired = jsonrepair(content);
+					data = JSON.parse(repaired);
+					logger?.warn(`Repaired malformed JSON in ${fileName}`);
+				}
 
 				if (!validateRequiredItemFields(data)) {
 					logger?.warn(

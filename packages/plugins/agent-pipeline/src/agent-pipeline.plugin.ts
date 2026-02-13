@@ -491,7 +491,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 	): PipelineResult {
 		const duration = Date.now() - startTime;
 		return {
-			success: items.length > 0,
+			success: true,
 			items,
 			categories: metadata.categories,
 			tags: metadata.tags,
@@ -500,13 +500,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			duration,
 			stepsCompleted: AGENT_PIPELINE_STEP_IDS.length,
 			totalSteps: AGENT_PIPELINE_STEP_IDS.length,
-			state: this.state!,
-			...(items.length === 0 && {
-				error:
-					'Pipeline completed but generated 0 items. ' +
-					'The AI model may not support tool calling or did not produce valid output. ' +
-					'Try using a different model (e.g. GPT-4o, Claude Sonnet).'
-			})
+			state: this.state!
 		};
 	}
 

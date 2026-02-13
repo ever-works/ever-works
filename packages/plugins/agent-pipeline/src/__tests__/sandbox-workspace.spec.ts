@@ -259,6 +259,31 @@ describe('sandbox-workspace', () => {
 			expect(items[0].description).toBe('Updated description');
 		});
 
+		it('should repair malformed JSON and accept the item', async () => {
+			const logger = { log: vi.fn(), warn: vi.fn() };
+			const dir = join(tmpdir(), `test-collect-${randomUUID()}`);
+			await mkdir(dir, { recursive: true });
+
+			// Trailing comma — common AI output issue
+			await writeFile(
+				join(dir, 'malformed.json'),
+				`{
+					"name": "Cursor",
+					"description": "AI code editor",
+					"source_url": "https://cursor.sh",
+					"category": "Editors",
+					"tags": ["ai"],
+				}`
+			);
+
+			const items = await collectItemsFromWorkspace(dir, logger);
+			expect(items).toHaveLength(1);
+			expect(items[0].name).toBe('Cursor');
+			expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Repaired malformed JSON'));
+
+			await rm(dir, { recursive: true, force: true });
+		});
+
 		it('should skip invalid items and log warnings', async () => {
 			const logger = { log: vi.fn(), warn: vi.fn() };
 			const dir = join(tmpdir(), `test-collect-${randomUUID()}`);
