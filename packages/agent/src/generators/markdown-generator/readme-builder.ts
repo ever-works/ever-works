@@ -1,5 +1,7 @@
-import { slugifyText } from '../../utils/text.utils';
+import GithubSlugger from 'github-slugger';
 import type { ItemData } from '@ever-works/plugin';
+
+const slugger = new GithubSlugger();
 
 export class ReadmeBuilder {
     private content: string = '';
@@ -43,7 +45,7 @@ export class ReadmeBuilder {
         if (this.isTocEnabled) {
             toc += '## 📑 Table of Contents\n\n';
             this.toc.forEach(({ header, count }) => {
-                const slug = slugifyText(header);
+                const slug = slugger.slug(header);
                 let label = header;
                 if (count !== undefined) {
                     label += ` (${count.toLocaleString('en-US')})`;

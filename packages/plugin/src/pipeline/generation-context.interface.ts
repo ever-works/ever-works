@@ -63,9 +63,6 @@ export interface GenerationRequest {
 	/** Generation method (create-update or recreate) */
 	readonly generationMethod?: 'create-update' | 'recreate' | string;
 
-	/** Company information */
-	readonly company?: { name: string; website: string };
-
 	// ============================================================================
 	// Plugin Configuration (Dynamic)
 	// ============================================================================

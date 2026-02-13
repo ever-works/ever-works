@@ -8,7 +8,6 @@ import type { Identifiable, ItemData, Category, Tag } from '@ever-works/contract
 import {
     CreateItemsGeneratorDto,
     GenerationMethod,
-    CompanyDto,
     ItemsGeneratorMetrics,
 } from '../../items-generator/dto';
 import { format } from 'date-fns';
@@ -331,7 +330,6 @@ export class DataGeneratorService {
 
             promises.push(
                 data.mergeConfig({
-                    ...this.withCompanyConfig(createItemsGeneratorDto.company),
                     version: await data.getNextVersion(),
                     metadata,
                 }),
@@ -797,6 +795,7 @@ export class DataGeneratorService {
             }>;
         },
         companyName?: string,
+        companyWebsite?: string,
     ): Promise<void> {
         const directoryOwner = this.getDirectoryOwner(directory);
         const committer = user.asCommitter();
@@ -823,6 +822,8 @@ export class DataGeneratorService {
         const newConfig = {
             ...currentConfig,
             company_name: companyName !== undefined ? companyName : currentConfig.company_name,
+            company_website:
+                companyWebsite !== undefined ? companyWebsite : currentConfig.company_website,
             settings: newSettings,
             custom_menu: customMenu !== undefined ? customMenu : currentConfig.custom_menu,
         };
@@ -914,7 +915,6 @@ export class DataGeneratorService {
             name: dto.name,
             prompt: dto.prompt,
             generationMethod: dto.generation_method,
-            company: dto.company,
             config: dto.pluginConfig || {},
             pluginConfig: dto._processedPluginConfig || undefined,
             providers: dto.providers
@@ -1049,15 +1049,6 @@ export class DataGeneratorService {
             map.set(item.id, item);
         }
         return Array.from(map.values());
-    }
-
-    private withCompanyConfig(company?: CompanyDto) {
-        return company
-            ? {
-                  company_name: company.name,
-                  company_website: company.website,
-              }
-            : {};
     }
 
     private getDefaultReadme(directory: Directory) {

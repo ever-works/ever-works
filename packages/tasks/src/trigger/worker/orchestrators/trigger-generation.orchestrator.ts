@@ -65,7 +65,6 @@ export class TriggerGenerationOrchestrator {
 
             if (generated.stats.totalItemsCount > 0) {
                 await this.markdownGenerator.initialize(directory, user, {
-                    repository_description: dto.repository_description,
                     generation_method: dto.generation_method,
                     pr_update: generated.prUpdate,
                 });

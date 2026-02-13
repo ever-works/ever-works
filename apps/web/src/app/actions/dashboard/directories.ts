@@ -876,6 +876,7 @@ export async function updateWebsiteSettings(
     directoryId: string,
     data: {
         company_name?: string;
+        company_website?: string;
         categories_enabled?: boolean;
         companies_enabled?: boolean;
         tags_enabled?: boolean;

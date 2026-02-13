@@ -123,24 +123,10 @@ export const generateCommand = new Command('generate')
                 );
             }
 
-            // Company information (optional)
-            const companyConfig = await inquirer.prompt([
-                {
-                    type: 'confirm',
-                    name: 'addCompany',
-                    message: 'Add company information?',
-                    default: false,
-                },
-            ]);
-
             const createItemsGeneratorDto: CreateItemsGeneratorDto = {
                 name: requiredData.name,
                 prompt: requiredData.prompt,
             };
-
-            if (companyConfig.addCompany) {
-                createItemsGeneratorDto.company = await generatePrompt.promptCompanyInfo();
-            }
 
             // Set providers if any were selected
             const hasProviders = Object.values(providerResult.providers).some(Boolean);

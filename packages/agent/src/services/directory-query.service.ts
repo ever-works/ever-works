@@ -228,6 +228,7 @@ export class DirectoryQueryService {
             return {
                 status: 'success',
                 company_name: config?.company_name || 'Acme',
+                company_website: config?.company_website || '',
                 settings: config?.settings || {},
                 custom_menu: config?.custom_menu || { header: [], footer: [] },
             };
@@ -241,6 +242,7 @@ export class DirectoryQueryService {
                 return {
                     status: 'success',
                     company_name: 'Acme',
+                    company_website: '',
                     settings: {},
                     custom_menu: { header: [], footer: [] },
                 };
@@ -260,6 +262,7 @@ export class DirectoryQueryService {
         user: User,
         dto: {
             company_name?: string;
+            company_website?: string;
             categories_enabled?: boolean;
             companies_enabled?: boolean;
             tags_enabled?: boolean;
@@ -305,13 +308,14 @@ export class DirectoryQueryService {
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
 
         try {
-            const { custom_menu, company_name, ...settings } = dto;
+            const { custom_menu, company_name, company_website, ...settings } = dto;
             await this.dataGenerator.updateWebsiteSettings(
                 directory,
                 user,
                 settings,
                 custom_menu,
                 company_name,
+                company_website,
             );
             return {
                 status: 'success',
