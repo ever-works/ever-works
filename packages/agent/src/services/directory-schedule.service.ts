@@ -516,7 +516,7 @@ export class DirectoryScheduleService {
 
         try {
             const config = await this.dataGeneratorService
-                .config(directory, user)
+                .getConfig(directory, user)
                 .catch(() => null);
 
             if (!config?.metadata?.last_request_data) {

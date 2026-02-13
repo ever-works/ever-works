@@ -211,13 +211,19 @@ export class DirectoryGenerationService {
 
         let lastRequestData;
         try {
-            lastRequestData = await this.dataGenerator
-                .getLastRequestData(directory, user)
-                .catch(() => null);
+            const config = await this.dataGenerator.getConfig(directory, user);
 
-            if (!lastRequestData) {
+            if (!config?.metadata?.last_request_data) {
                 throw new Error('No previous request data found');
             }
+
+            // change the last request data prompt to use initial prompt if the update is triggered by schedule,
+            // to prevent unpredictable results caused by using the last run prompt
+            // which may have been modified by the user in a way that is incompatible with the schedule's expectations.
+            lastRequestData = {
+                ...config.metadata.last_request_data,
+                prompt: config.metadata.initial_prompt ?? config.metadata.last_request_data.prompt,
+            };
         } catch (error) {
             this.logger.error(
                 `Failed to load last request data for directory ${directoryId}`,

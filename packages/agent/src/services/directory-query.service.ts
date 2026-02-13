@@ -192,7 +192,7 @@ export class DirectoryQueryService {
         const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);
 
         try {
-            const config = await this.dataGenerator.config(directory, user);
+            const config = await this.dataGenerator.getConfig(directory, user);
             return {
                 status: 'success',
                 config,
@@ -224,7 +224,7 @@ export class DirectoryQueryService {
         const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);
 
         try {
-            const config = await this.dataGenerator.config(directory, user);
+            const config = await this.dataGenerator.getConfig(directory, user);
             return {
                 status: 'success',
                 company_name: config?.company_name || 'Acme',

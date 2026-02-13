@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities/user.entity';
-import { DataRepository, IDataConfig, PRUpdate } from './data-repository';
+import { DataRepository, PRUpdate } from './data-repository';
 import { slugifyText } from '../../utils/text.utils';
 import type { Identifiable, ItemData, Category, Tag } from '@ever-works/contracts';
 import {
@@ -624,14 +624,6 @@ export class DataGeneratorService {
     }
 
     /**
-     * Get last request data from config
-     */
-    async getLastRequestData(directory: Directory, user: User) {
-        const config = await this.config(directory, user);
-        return config.metadata?.last_request_data;
-    }
-
-    /**
      * Get existing items from the repository
      */
 
@@ -721,9 +713,8 @@ export class DataGeneratorService {
         };
     }
 
-    async config(directory: Directory, user: User) {
+    async getConfig(directory: Directory, user: User) {
         const data = await this.repositoryData(directory, user);
-
         return data.getConfig();
     }
 
@@ -913,11 +904,7 @@ export class DataGeneratorService {
 
         const request: GenerationRequest = {
             name: dto.name,
-            // If initial_prompt exists in existing config, it means we have run at least one generation before and we want to keep using the same prompt for consistency,
-            // even if the user changed the prompt in the UI.
-            // This is because changing the prompt after the first generation can lead to unpredictable results and a worse experience.
-            // The prompt should only be updated on the very first generation when there is no existing prompt yet.
-            prompt: existing.existingConfig?.metadata?.initial_prompt || dto.prompt,
+            prompt: dto.prompt,
             generationMethod: dto.generation_method,
             config: dto.pluginConfig || {},
             pluginConfig: dto._processedPluginConfig || undefined,
@@ -1011,7 +998,7 @@ export class DataGeneratorService {
                 data.getCategories().catch(() => []),
                 data.getTags().catch(() => []),
                 data.getItems().catch(() => []),
-                data.getConfig().catch(() => null) as IDataConfig | null,
+                data.getConfig().catch(() => null),
             ]);
 
             return {
