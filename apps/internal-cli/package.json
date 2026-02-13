@@ -17,8 +17,8 @@
         "test:cli": "cd dist && npm install && node cli.js --help"
     },
     "dependencies": {
-        "@nestjs/common": "^11.1.11",
-        "@nestjs/core": "^11.1.11",
+        "@nestjs/common": "^11.1.13",
+        "@nestjs/core": "^11.1.13",
         "@nestjs/event-emitter": "^3.0.1",
         "@ever-works/vercel-plugin": "workspace:*",
         "@ever-works/agent": "workspace:*",
