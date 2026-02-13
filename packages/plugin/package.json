@@ -92,6 +92,7 @@
 		"@types/node": "^22.19.3",
 		"@types/stopword": "^2.0.3",
 		"isomorphic-git": "^1.36.3",
+		"stopword": "^3.1.5",
 		"tsup": "^8.0.0",
 		"typescript": "^5.9.3",
 		"vitest": "^3.2.1"

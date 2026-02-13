@@ -31,7 +31,9 @@ export function useProviderSelection(initial?: Partial<ProviderSelectionState>) 
             if (providers.pipeline) {
                 result.pipeline = providers.pipeline;
             } else if (formSchema) {
-                const effectiveDefault = resolveEffectiveDefault(formSchema.providers.pipeline);
+                const effectiveDefault = formSchema.providers.pipeline
+                    ? resolveEffectiveDefault(formSchema.providers.pipeline)
+                    : null;
                 if (effectiveDefault) {
                     result.pipeline = effectiveDefault.id;
                 }
@@ -62,7 +64,7 @@ export function useProviderSelection(initial?: Partial<ProviderSelectionState>) 
             if (!formSchema) return [];
 
             if (providers.pipeline) {
-                const pp = formSchema.providers.pipeline.find((p) => p.id === providers.pipeline);
+                const pp = formSchema.providers.pipeline?.find((p) => p.id === providers.pipeline);
                 return pp && !pp.configured ? [pp.name] : [];
             }
 
