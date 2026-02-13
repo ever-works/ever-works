@@ -160,10 +160,10 @@ describe('withToolCallingRetry', () => {
 			withToolCallingRetry(fn, {
 				...baseOptions,
 				providerName: 'groq',
-				modelName: 'openai/gpt-oss-120b',
+				modelName: 'qwen/qwen3-32b',
 				maxRetries: 0
 			})
-		).rejects.toThrow(/openai\/gpt-oss-120b.*groq/);
+		).rejects.toThrow(/qwen\/qwen3-32b.*groq/);
 	});
 
 	it('does not retry non-tool-calling errors', async () => {

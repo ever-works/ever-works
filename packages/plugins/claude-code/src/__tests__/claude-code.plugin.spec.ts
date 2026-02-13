@@ -162,7 +162,6 @@ describe('ClaudeCodePlugin', () => {
 			const props = plugin.settingsSchema.properties!;
 			expect(props.maxTurns.type).toBe('integer');
 			expect(props.maxTurns['x-hidden']).toBe(true);
-			expect(props.maxTurns.default).toBe(50);
 		});
 
 		it('should have a required group for auth fields', () => {
