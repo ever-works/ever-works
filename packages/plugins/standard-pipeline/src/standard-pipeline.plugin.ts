@@ -333,7 +333,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 		// The engine calls executeStep() for each step individually.
 		throw new Error(
 			'StandardPipelinePlugin.execute() should not be called directly. ' +
-			'Use the pipeline engine to orchestrate step execution.'
+				'Use the pipeline engine to orchestrate step execution.'
 		);
 	}
 

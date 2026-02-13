@@ -67,6 +67,7 @@ export interface DeleteDirectoryDto {
 export interface GenerateDirectoryDetailDto {
     directory_name: string;
     prompt: string;
+    ai_provider?: string;
 }
 
 export type GenerateStatus = {

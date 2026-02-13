@@ -58,6 +58,9 @@ import { DirectoryImportService } from './directory-import.service';
 import { NotificationService } from '@src/notifications/notification.service';
 import { ScreenshotFacadeService } from '@src/facades';
 import { GeneratorFormSchemaService } from './generator-form-schema.service';
+import { PluginOperationsService } from '@src/plugins/services/plugin-operations.service';
+import { getCapabilityFromUIKey, SELECTABLE_PROVIDER_CATEGORIES } from '@ever-works/plugin';
+import { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dto';
 
 export interface BulkCaptureImagesDto {
     itemSlugs?: string[];
@@ -119,6 +122,7 @@ export class DirectoryGenerationService {
         private readonly userRepository: UserRepository,
         private readonly screenshotFacade: ScreenshotFacadeService,
         private readonly generatorFormSchemaService: GeneratorFormSchemaService,
+        private readonly pluginOperationsService: PluginOperationsService,
         @Optional()
         @Inject(DIRECTORY_GENERATION_DISPATCHER)
         private readonly generationDispatcher?: DirectoryGenerationDispatcher,
@@ -138,6 +142,9 @@ export class DirectoryGenerationService {
         const triggerContext = this.resolveContext(context);
 
         const scopeOptions = { userId: user.id, directoryId };
+
+        // Auto-enable selected providers for this directory before validation
+        await this.ensureProvidersEnabledForDirectory(dto.providers, directoryId, user.id);
 
         // Validate selected providers before starting generation
         await this.generatorFormSchemaService.validateSelectedProviders(
@@ -255,6 +262,9 @@ export class DirectoryGenerationService {
         }
 
         const scopeOptions = { userId: user.id, directoryId };
+
+        // Auto-enable selected providers for this directory before validation
+        await this.ensureProvidersEnabledForDirectory(payload.providers, directoryId, user.id);
 
         // Validate selected providers before starting generation
         await this.generatorFormSchemaService.validateSelectedProviders(
@@ -844,6 +854,40 @@ export class DirectoryGenerationService {
                 error: errorMessage,
             }),
         ]);
+    }
+
+    /**
+     * Auto-enable selected providers for a directory before generation starts.
+     * This ensures DirectoryPluginEntity records exist so resolvePluginEnabled() returns true.
+     */
+    private async ensureProvidersEnabledForDirectory(
+        providers: ProvidersDto | undefined,
+        directoryId: string,
+        userId: string,
+    ): Promise<void> {
+        if (!providers) return;
+
+        const uiKeys = Object.values(SELECTABLE_PROVIDER_CATEGORIES).map((c) => c.uiKey);
+
+        for (const uiKey of uiKeys) {
+            const pluginId = providers[uiKey as keyof ProvidersDto];
+            if (!pluginId) continue;
+
+            try {
+                const capability = getCapabilityFromUIKey(uiKey);
+                await this.pluginOperationsService.enablePluginForDirectory(
+                    directoryId,
+                    pluginId,
+                    userId,
+                    { activeCapability: capability },
+                );
+                this.logger.debug(
+                    `Auto-enabled provider "${pluginId}" (${capability}) for directory ${directoryId}`,
+                );
+            } catch {
+                // Skip silently — plugin may already be enabled or is a system plugin
+            }
+        }
     }
 
     private async runInProcessGeneration(
