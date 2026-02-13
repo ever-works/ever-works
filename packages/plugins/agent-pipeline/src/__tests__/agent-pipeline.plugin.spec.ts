@@ -115,24 +115,6 @@ describe('AgentPipelinePlugin', () => {
 			expect(fields.length).toBeGreaterThan(0);
 		});
 
-		it('should include source_urls field', () => {
-			const fields = plugin.getFormFields();
-			const sourceUrls = fields.find((f) => f.name === 'source_urls');
-
-			expect(sourceUrls).toBeDefined();
-			expect(sourceUrls!.type).toBe('tags');
-			expect(sourceUrls!.group).toBe('sources');
-		});
-
-		it('should include max_items field', () => {
-			const fields = plugin.getFormFields();
-			const maxItems = fields.find((f) => f.name === 'max_items');
-
-			expect(maxItems).toBeDefined();
-			expect(maxItems!.type).toBe('number');
-			expect(maxItems!.defaultValue).toBe(50);
-		});
-
 		it('should include capture_screenshots field', () => {
 			const fields = plugin.getFormFields();
 			const screenshots = fields.find((f) => f.name === 'capture_screenshots');
@@ -149,59 +131,26 @@ describe('AgentPipelinePlugin', () => {
 			expect(groups.length).toBeGreaterThan(0);
 		});
 
-		it('should include sources group', () => {
+		it('should include features group', () => {
 			const groups = plugin.getFormGroups!();
-			const sources = groups.find((g) => g.name === 'sources');
+			const features = groups.find((g) => g.name === 'features');
 
-			expect(sources).toBeDefined();
-			expect(sources!.title).toBe('Data Sources');
-		});
-
-		it('should have groups ordered correctly', () => {
-			const groups = plugin.getFormGroups!();
-			const orders = groups.map((g) => g.order);
-
-			for (let i = 1; i < orders.length; i++) {
-				expect(orders[i]).toBeGreaterThan(orders[i - 1] as any);
-			}
+			expect(features).toBeDefined();
+			expect(features!.title).toBe('Generation Features');
 		});
 	});
 
 	describe('validateFormInput', () => {
 		it('should validate valid input', () => {
-			const result = plugin.validateFormInput({ max_items: 50 });
-			expect(result.valid).toBe(true);
-		});
-
-		it('should reject invalid max_items', () => {
-			const result = plugin.validateFormInput({ max_items: 0 });
-			expect(result.valid).toBe(false);
-		});
-
-		it('should reject max_items over 500', () => {
-			const result = plugin.validateFormInput({ max_items: 501 });
-			expect(result.valid).toBe(false);
-		});
-
-		it('should reject invalid URLs in source_urls', () => {
-			const result = plugin.validateFormInput({
-				source_urls: ['not-a-url']
-			});
-			expect(result.valid).toBe(false);
-		});
-
-		it('should accept valid URLs in source_urls', () => {
-			const result = plugin.validateFormInput({
-				source_urls: ['https://example.com']
-			});
+			const result = plugin.validateFormInput({});
 			expect(result.valid).toBe(true);
 		});
 	});
 
 	describe('getDefaultValues', () => {
-		it('should return defaults matching field definitions', () => {
+		it('should return defaults for capture_screenshots', () => {
 			const defaults = plugin.getDefaultValues!();
-			expect(defaults.max_items).toBe(50);
+			expect(defaults.capture_screenshots).toBe(false);
 		});
 	});
 
