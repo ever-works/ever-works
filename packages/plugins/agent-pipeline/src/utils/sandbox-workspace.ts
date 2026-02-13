@@ -182,4 +182,15 @@ export async function collectItemsFromWorkspace(workspacePath: string, logger?: 
 export async function cleanupWorkspace(userId: string, directoryId: string): Promise<void> {
 	const workspacePath = getWorkspacePath(userId, directoryId);
 	await rm(workspacePath, { recursive: true, force: true });
+
+	// Remove parent user directory if now empty
+	const userDir = join(BASE_DIR, userId);
+	try {
+		const remaining = await readdir(userDir);
+		if (remaining.length === 0) {
+			await rm(userDir, { recursive: true, force: true });
+		}
+	} catch {
+		// Already gone — ignore
+	}
 }
