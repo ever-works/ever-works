@@ -444,8 +444,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 
 		// Resolve provider names for user-facing warnings
 		const [searchProviderName, extractProviderName] = await Promise.all([
-			execContext.searchFacade.getActiveProviderName?.(facadeOptions).catch(() => null) ?? null,
-			execContext.contentExtractorFacade.getActiveProviderName?.(facadeOptions).catch(() => null) ?? null
+			execContext.searchFacade.getActiveProviderName?.(facadeOptions)?.catch(() => null) ?? null,
+			execContext.contentExtractorFacade.getActiveProviderName?.(facadeOptions)?.catch(() => null) ?? null
 		]);
 
 		const toolLabels: Record<string, { label: string; impact: string }> = {
