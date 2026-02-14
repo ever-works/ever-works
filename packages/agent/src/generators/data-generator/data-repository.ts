@@ -442,9 +442,24 @@ export class DataRepository {
 
     async writeItem(item: ItemData) {
         const { slug, ...rest } = item; // we don't want to write slug to the file
+        const filepath = path.join(this.getItemPath(item.slug), `${item.slug}.yml`);
+
+        // Skip write when content is unchanged (avoids spurious Git diffs)
+        try {
+            const existingContent = await fs.readFile(filepath, 'utf-8');
+            const existingData = yaml.parse(existingContent);
+            if (existingData) {
+                const { updated_at: _existingTs, ...existingRest } = existingData;
+                if (yaml.stringify(existingRest) === yaml.stringify(rest)) {
+                    return;
+                }
+            }
+        } catch {
+            // File doesn't exist yet — proceed with write
+        }
+
         const updated_at = format(new Date(), 'yyyy-MM-dd HH:mm');
         const str = yaml.stringify({ ...rest, updated_at });
-        const filepath = path.join(this.getItemPath(item.slug), `${item.slug}.yml`);
         await fs.writeFile(filepath, str, 'utf-8');
     }
 

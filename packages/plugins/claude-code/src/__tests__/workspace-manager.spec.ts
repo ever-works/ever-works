@@ -34,7 +34,7 @@ describe('workspace-manager', () => {
 	});
 
 	describe('seedExistingItems', () => {
-		it('should write item files, seeded manifest, and JSONL index', async () => {
+		it('should write item files, seeded hash manifest, and JSONL index', async () => {
 			vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
 			const items: ItemData[] = [
@@ -56,7 +56,10 @@ describe('workspace-manager', () => {
 			expect(writePaths).toContain('/workspace/_meta/existing-items.jsonl');
 
 			const seededCall = vi.mocked(fs.writeFile).mock.calls.find((c) => (c[0] as string).includes('seeded.json'));
-			expect(JSON.parse(seededCall![1] as string)).toEqual(['cursor.json']);
+			const seededData = JSON.parse(seededCall![1] as string);
+			expect(seededData).toBeTypeOf('object');
+			expect(seededData).toHaveProperty('cursor.json');
+			expect(seededData['cursor.json']).toMatch(/^[a-f0-9]{64}$/);
 
 			const jsonlCall = vi
 				.mocked(fs.writeFile)
@@ -153,7 +156,17 @@ describe('workspace-manager', () => {
 			expect(result[0].name).toBe('Item');
 		});
 
-		it('should skip unchanged seeded files via mtime', async () => {
+		it('should skip unchanged seeded files via content hash', async () => {
+			const seededContent = JSON.stringify({
+				name: 'Seeded Item',
+				description: 'Desc',
+				source_url: 'https://seeded.com',
+				category: 'Cat',
+				tags: []
+			});
+			const { createHash } = await import('node:crypto');
+			const seededHash = createHash('sha256').update(seededContent).digest('hex');
+
 			vi.mocked(fs.readdir).mockResolvedValue([
 				{ name: 'seeded.json', isDirectory: () => false },
 				{ name: 'new-item.json', isDirectory: () => false }
@@ -161,8 +174,9 @@ describe('workspace-manager', () => {
 
 			vi.mocked(fs.readFile).mockImplementation(((filePath: string) => {
 				if (filePath.includes('seeded.json') && filePath.includes('_meta')) {
-					return Promise.resolve(JSON.stringify(['seeded.json']));
+					return Promise.resolve(JSON.stringify({ 'seeded.json': seededHash }));
 				}
+				if (filePath.includes('seeded.json')) return Promise.resolve(seededContent);
 				return Promise.resolve(
 					JSON.stringify({
 						name: 'New Item',
@@ -174,12 +188,6 @@ describe('workspace-manager', () => {
 				);
 			}) as typeof fs.readFile);
 
-			vi.mocked(fs.stat).mockImplementation(((filePath: string) => {
-				if (filePath.includes('_meta')) return Promise.resolve({ mtimeMs: 1000 });
-				if (filePath.includes('seeded.json')) return Promise.resolve({ mtimeMs: 900 });
-				return Promise.resolve({ mtimeMs: 2000 });
-			}) as unknown as typeof fs.stat);
-
 			const result = await readGeneratedItems('/workspace', mockLogger);
 
 			expect(result).toHaveLength(1);
@@ -187,12 +195,18 @@ describe('workspace-manager', () => {
 		});
 
 		it('should return modified seeded files', async () => {
+			const originalContent = JSON.stringify({ name: 'Cursor', description: 'Original' });
+			const { createHash } = await import('node:crypto');
+			const originalHash = createHash('sha256').update(originalContent).digest('hex');
+
 			vi.mocked(fs.readdir).mockResolvedValue([
 				{ name: 'cursor.json', isDirectory: () => false }
 			] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 
 			vi.mocked(fs.readFile).mockImplementation(((filePath: string) => {
-				if (filePath.includes('_meta')) return Promise.resolve(JSON.stringify(['cursor.json']));
+				if (filePath.includes('_meta')) {
+					return Promise.resolve(JSON.stringify({ 'cursor.json': originalHash }));
+				}
 				return Promise.resolve(
 					JSON.stringify({
 						name: 'Cursor',
@@ -203,11 +217,6 @@ describe('workspace-manager', () => {
 					})
 				);
 			}) as typeof fs.readFile);
-
-			vi.mocked(fs.stat).mockImplementation(((filePath: string) => {
-				if (filePath.includes('_meta')) return Promise.resolve({ mtimeMs: 1000 });
-				return Promise.resolve({ mtimeMs: 2000 });
-			}) as unknown as typeof fs.stat);
 
 			const result = await readGeneratedItems('/workspace', mockLogger);
 
