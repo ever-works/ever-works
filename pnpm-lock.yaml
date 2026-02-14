@@ -915,6 +915,10 @@ importers:
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.11)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.0)(yaml@2.8.2)
 
   packages/plugins/exa:
+    dependencies:
+      exa-js:
+        specifier: ^2.4.0
+        version: 2.4.0(ws@8.19.0)
     devDependencies:
       '@ever-works/plugin':
         specifier: workspace:*
@@ -5644,6 +5648,10 @@ packages:
     resolution: {integrity: sha512-uc47g4b+4k/M/SeaW1y4OApx+mtLWl92l5LMPP0GNXctZqELk+YGgOPIIC5elYmUH4OuoK3JLhuRUYegeySiFA==}
     engines: {node: '>=12'}
 
+  dotenv@16.4.7:
+    resolution: {integrity: sha512-47qPchRCykZC03FhkYAhrvwU4xDBFIj1QPqaarj6mdM/hgUzfPHcpkHJOn3mJAufFeeAxAzeGsr5X0M4k6fLZQ==}
+    engines: {node: '>=12'}
+
   dotenv@16.6.1:
     resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
     engines: {node: '>=12'}
@@ -5945,6 +5953,9 @@ packages:
 
   evt@2.5.9:
     resolution: {integrity: sha512-GpjX476FSlttEGWHT8BdVMoI8wGXQGbEOtKcP4E+kggg+yJzXBZN2n4x7TS/zPBJ1DZqWI+rguZZApjjzQ0HpA==}
+
+  exa-js@2.4.0:
+    resolution: {integrity: sha512-zOFClWWZnh9wyUN3xiBgbhuT8DsS62uZJY+P9toN4KgxyCRQma7aU89/7UCtrXNwq5kEFAACw4eualXcTKjiAQ==}
 
   execa@0.10.0:
     resolution: {integrity: sha512-7XOMnz8Ynx1gGo/3hyV9loYNPWM94jG3+3T3Y8tsfSstFmETmENCMU/A/zj8Lyaj1lkgEepKepvd6240tBRvlw==}
@@ -14478,6 +14489,8 @@ snapshots:
     dependencies:
       dotenv: 16.6.1
 
+  dotenv@16.4.7: {}
+
   dotenv@16.6.1: {}
 
   dotenv@17.2.3: {}
@@ -14866,6 +14879,17 @@ snapshots:
       minimal-polyfills: 2.2.3
       run-exclusive: 2.2.19
       tsafe: 1.8.12
+
+  exa-js@2.4.0(ws@8.19.0):
+    dependencies:
+      cross-fetch: 4.1.0
+      dotenv: 16.4.7
+      openai: 5.12.2(ws@8.19.0)(zod@3.25.76)
+      zod: 3.25.76
+      zod-to-json-schema: 3.25.1(zod@3.25.76)
+    transitivePeerDependencies:
+      - encoding
+      - ws
 
   execa@0.10.0:
     dependencies:

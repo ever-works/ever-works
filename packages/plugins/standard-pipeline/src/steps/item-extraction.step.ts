@@ -76,8 +76,8 @@ export class ItemExtractionStep extends BasePipelineStep {
 	private readonly BATCH_SIZE = 10;
 
 	private readonly textSplitter = new RecursiveCharacterTextSplitter({
-		chunkSize: 6000,
-		chunkOverlap: 200,
+		chunkSize: this.MAX_CHUNK_SIZE,
+		chunkOverlap: this.CHUNK_OVERLAP,
 		separators: ['\n## ', '\n### ', '\n#### ', '\n\n', '\n', '. ', ' ', '']
 	});
 

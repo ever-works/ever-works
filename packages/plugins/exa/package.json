@@ -23,7 +23,9 @@
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage"
 	},
-	"dependencies": {},
+	"dependencies": {
+		"exa-js": "^2.4.0"
+	},
 	"peerDependencies": {
 		"@ever-works/plugin": "workspace:*"
 	},
@@ -40,7 +42,8 @@
 			"version": "1.0.0",
 			"category": "search",
 			"capabilities": [
-				"search"
+				"search",
+				"content-extractor"
 			],
 			"description": "AI-native search using the Exa API. Supports neural, keyword, and auto search modes with optional category filtering.",
 			"author": {

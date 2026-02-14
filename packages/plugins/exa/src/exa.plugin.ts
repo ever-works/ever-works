@@ -1,6 +1,7 @@
 import type {
 	IPlugin,
 	ISearchPlugin,
+	IContentExtractorPlugin,
 	PluginContext,
 	PluginCategory,
 	PluginManifest,
@@ -11,8 +12,12 @@ import type {
 	SearchOptions,
 	SearchResponse,
 	SearchResult,
-	RateLimitInfo
+	RateLimitInfo,
+	ContentExtractionOptions,
+	ContentExtractionResult
 } from '@ever-works/plugin';
+
+import { Exa } from 'exa-js';
 
 const SEARCH_TYPES = ['auto', 'neural', 'keyword'] as const;
 
@@ -25,18 +30,15 @@ const TIME_RANGE_DAYS: Record<string, number> = {
 	year: 365
 };
 
-/**
- * Exa Search Plugin
- *
- * Provides AI-native search using the Exa API with neural, keyword, and auto modes.
- * Uses plain fetch() — no SDK required.
- */
-export class ExaSearchPlugin implements IPlugin, ISearchPlugin {
+const API_KEY_ERROR =
+	'Exa API key not configured. Set it in plugin settings or via PLUGIN_EXA_API_KEY environment variable.';
+
+export class ExaSearchPlugin implements IPlugin, ISearchPlugin, IContentExtractorPlugin {
 	readonly id = 'exa';
 	readonly name = 'Exa';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'search';
-	readonly capabilities: readonly string[] = ['search'];
+	readonly capabilities: readonly string[] = ['search', 'content-extractor'];
 	readonly providerName = 'Exa';
 
 	readonly settingsSchema: JsonSchema = {
@@ -85,72 +87,44 @@ export class ExaSearchPlugin implements IPlugin, ISearchPlugin {
 	// ============================================================================
 
 	async search(options: SearchOptions): Promise<SearchResponse> {
-		const apiKey = options.settings?.apiKey as string;
-		if (!apiKey) {
-			throw new Error(
-				'Exa API key not configured. ' +
-					'Set it in plugin settings or via PLUGIN_EXA_API_KEY environment variable.'
-			);
-		}
-
+		const client = this.getClient(options.settings);
 		const startTime = Date.now();
 		const searchType = (options.settings?.searchType as string) || 'auto';
 		const limit = options.limit || (options.settings?.maxResults as number) || 10;
 		const category = (options.settings?.category as string) || '';
 
-		// Build request body
-		const body: Record<string, unknown> = {
-			query: options.query,
+		const searchOptions: Record<string, unknown> = {
 			numResults: limit,
 			type: searchType
 		};
 
-		// Category filter
 		if (category) {
-			body.category = category;
+			searchOptions.category = category;
 		}
-
-		// Domain filters (natively supported by Exa)
 		if (options.includeDomains && options.includeDomains.length > 0) {
-			body.includeDomains = [...options.includeDomains];
+			searchOptions.includeDomains = [...options.includeDomains];
 		}
 		if (options.excludeDomains && options.excludeDomains.length > 0) {
-			body.excludeDomains = [...options.excludeDomains];
+			searchOptions.excludeDomains = [...options.excludeDomains];
 		}
 
-		// Time range → startPublishedDate (ISO 8601)
 		if (options.timeRange && options.timeRange !== 'all') {
 			const days = TIME_RANGE_DAYS[options.timeRange];
 			if (days) {
 				const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-				body.startPublishedDate = startDate.toISOString();
+				searchOptions.startPublishedDate = startDate.toISOString();
 			}
 		}
 
 		try {
-			const response = await fetch('https://api.exa.ai/search', {
-				method: 'POST',
-				headers: {
-					'x-api-key': apiKey,
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(body)
-			});
+			const response = await client.search(options.query, searchOptions);
 
-			if (!response.ok) {
-				const errorText = await response.text();
-				throw new Error(`Exa request failed (${response.status}): ${errorText}`);
-			}
-
-			const data = await response.json();
-
-			const exaResults = (data.results || []) as Array<Record<string, unknown>>;
-			const results: SearchResult[] = exaResults.map((r: Record<string, unknown>, index: number) => ({
-				title: (r.title as string) || '',
-				url: (r.url as string) || '',
-				publishedDate: r.publishedDate as string | undefined,
-				source: r.author as string | undefined,
-				faviconUrl: r.favicon as string | undefined,
+			const results: SearchResult[] = response.results.map((r, index) => ({
+				title: r.title || '',
+				url: r.url || '',
+				publishedDate: r.publishedDate,
+				source: r.author,
+				faviconUrl: r.favicon,
 				position: index + 1
 			}));
 
@@ -158,7 +132,7 @@ export class ExaSearchPlugin implements IPlugin, ISearchPlugin {
 				results,
 				query: options.query,
 				totalResults: results.length,
-				hasMore: false, // Exa has no pagination
+				hasMore: false,
 				duration: Date.now() - startTime
 			};
 		} catch (error) {
@@ -180,8 +154,102 @@ export class ExaSearchPlugin implements IPlugin, ISearchPlugin {
 	}
 
 	// ============================================================================
+	// IContentExtractorPlugin Interface
+	// ============================================================================
+
+	async extract(options: ContentExtractionOptions): Promise<ContentExtractionResult> {
+		const startTime = Date.now();
+
+		try {
+			const client = this.getClient(options.settings);
+			const response = await client.getContents([options.url], { text: true, livecrawl: 'fallback' });
+
+			if (!response.results || response.results.length === 0) {
+				return {
+					success: false,
+					url: options.url,
+					error: 'No content extracted',
+					duration: Date.now() - startTime
+				};
+			}
+
+			const result = response.results[0];
+			const text = result.text || '';
+
+			return {
+				success: true,
+				url: options.url,
+				finalUrl: result.url !== options.url ? result.url : undefined,
+				content: text,
+				title: result.title || undefined,
+				duration: Date.now() - startTime,
+				wordCount: text ? text.split(/\s+/).length : 0
+			};
+		} catch (error) {
+			return {
+				success: false,
+				url: options.url,
+				error: error instanceof Error ? error.message : String(error),
+				duration: Date.now() - startTime
+			};
+		}
+	}
+
+	async extractBatch(
+		urls: readonly string[],
+		options?: Partial<ContentExtractionOptions>
+	): Promise<readonly ContentExtractionResult[]> {
+		const startTime = Date.now();
+
+		try {
+			const client = this.getClient(options?.settings);
+			const response = await client.getContents([...urls], { text: true, livecrawl: 'fallback' });
+
+			return response.results.map((result) => {
+				const text = result.text || '';
+				return {
+					success: true,
+					url: result.url,
+					content: text,
+					title: result.title || undefined,
+					duration: Date.now() - startTime,
+					wordCount: text ? text.split(/\s+/).length : 0
+				};
+			});
+		} catch (error) {
+			return urls.map((url) => ({
+				success: false,
+				url,
+				error: error instanceof Error ? error.message : String(error),
+				duration: Date.now() - startTime
+			}));
+		}
+	}
+
+	async canExtract(url: string): Promise<boolean> {
+		try {
+			const parsed = new URL(url);
+			return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+		} catch {
+			return false;
+		}
+	}
+
+	getSupportedFormats(): readonly ('text' | 'html' | 'markdown')[] {
+		return ['text'];
+	}
+
+	// ============================================================================
 	// IPlugin Lifecycle
 	// ============================================================================
+
+	private getClient(settings?: PluginSettings): Exa {
+		const apiKey = settings?.apiKey as string;
+		if (!apiKey) {
+			throw new Error(API_KEY_ERROR);
+		}
+		return new Exa(apiKey);
+	}
 
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
@@ -247,7 +315,7 @@ export class ExaSearchPlugin implements IPlugin, ISearchPlugin {
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'AI-native search using the Exa API with neural, keyword, and auto search modes',
+			description: 'AI-native search and content extraction using the Exa API',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -258,18 +326,19 @@ export class ExaSearchPlugin implements IPlugin, ISearchPlugin {
 			readme: [
 				'## What does Exa do?',
 				'',
-				'Exa is an AI-native search engine that understands meaning, not just keywords. It offers neural search (semantic understanding), keyword search (traditional matching), and an auto mode that picks the best approach for each query.',
+				'Exa is an AI-native search engine that understands meaning, not just keywords. It offers neural search (semantic understanding), keyword search (traditional matching), and an auto mode that picks the best approach for each query. It can also extract clean text content from web pages.',
 				'',
 				'## Why use it?',
 				'',
 				'- **Neural search** — finds results based on meaning, not just keyword matching',
+				'- **Content extraction** — pulls clean text from any web page URL',
 				'- **Category filtering** — restrict to companies, research papers, news, tweets, GitHub repos, or personal sites',
 				'- **Domain control** — include or exclude specific domains from results',
 				'- **Time filtering** — find results from the last day, week, month, or year',
 				'',
 				'## How it works in Ever Works',
 				'',
-				'When enabled and set as the active search provider, Exa is used during directory generation to find information about each item. Its neural search mode is particularly useful for finding semantically relevant content that keyword-based engines might miss.',
+				'When enabled and set as the active search provider, Exa is used during directory generation to find information about each item. Its neural search mode is particularly useful for finding semantically relevant content that keyword-based engines might miss. The content extraction capability can pull text from web pages for enriching directory items.',
 				'',
 				'## Getting started',
 				'',
