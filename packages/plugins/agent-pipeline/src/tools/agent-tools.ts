@@ -27,13 +27,16 @@ export async function createAgentTools(
 	const fs = new ReadWriteFs({ root: workspacePath });
 	const bashInstance = new Bash({ fs });
 
-	const { tools: bashTools } = await createBashTool({ sandbox: bashInstance, destination: '/' });
+	const { tools: bashTools, sandbox: wrappedSandbox } = await createBashTool({
+		sandbox: bashInstance,
+		destination: '/'
+	});
 
 	const tools = {
 		bash: bashTools.bash,
 		readFile: bashTools.readFile,
-		createFile: createCreateFileTool(bashInstance),
-		updateFile: createUpdateFileTool(bashInstance),
+		createFile: createCreateFileTool(wrappedSandbox, '/'),
+		updateFile: createUpdateFileTool(wrappedSandbox, '/'),
 		search: createSearchTool(facades.searchFacade, facadeOptions),
 		extractContent: createExtractContentTool(facades.contentExtractorFacade, facadeOptions),
 		reportProgress: createReportProgressTool(onProgress, 1, totalSteps)
