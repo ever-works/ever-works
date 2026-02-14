@@ -1,0 +1,63 @@
+{
+	"name": "@ever-works/jina-plugin",
+	"version": "1.0.0",
+	"description": "Jina AI Plugin - Web search and content extraction using Jina AI APIs",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "jina",
+			"name": "Jina AI",
+			"version": "1.0.0",
+			"category": "search",
+			"capabilities": [
+				"search",
+				"content-extractor"
+			],
+			"description": "Web search and content extraction using Jina AI APIs. Search via s.jina.ai and extract content via r.jina.ai, no SDK needed.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"autoEnable": false,
+			"systemPlugin": false,
+			"builtIn": true,
+			"envVars": [
+				{
+					"name": "PLUGIN_JINA_API_KEY",
+					"required": false,
+					"secret": true,
+					"description": "Jina API key (optional - free tier works without key)"
+				}
+			]
+		}
+	}
+}

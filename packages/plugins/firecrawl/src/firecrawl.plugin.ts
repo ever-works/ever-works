@@ -53,25 +53,17 @@ export class FirecrawlPlugin implements IPlugin, IContentExtractorPlugin {
 
 		try {
 			const client = this.getClient(options.settings);
-			const response = await client.scrapeUrl(options.url, { formats: ['markdown'] });
+			const doc = await client.scrape(options.url, { formats: ['markdown'] });
 
-			if (!response.success) {
-				return {
-					success: false,
-					url: options.url,
-					error: 'Firecrawl scrape failed',
-					duration: Date.now() - startTime
-				};
-			}
-
-			const markdown = response.markdown || '';
-			const title = response.metadata?.title || undefined;
+			const markdown = doc.markdown || '';
+			const title = doc.metadata?.title || undefined;
+			const finalUrl = doc.metadata?.url;
 			const wordCount = markdown ? markdown.split(/\s+/).filter((w: string) => w.length > 0).length : 0;
 
 			return {
 				success: true,
 				url: options.url,
-				finalUrl: response.metadata?.sourceURL !== options.url ? response.metadata?.sourceURL : undefined,
+				finalUrl: finalUrl && finalUrl !== options.url ? finalUrl : undefined,
 				title,
 				content: markdown,
 				markdown,
@@ -98,30 +90,24 @@ export class FirecrawlPlugin implements IPlugin, IContentExtractorPlugin {
 
 		// Try batch API first, fall back to sequential
 		try {
-			if (typeof client.batchScrapeUrls === 'function') {
-				const response = await client.batchScrapeUrls([...urls], { formats: ['markdown'] });
+			const job = await client.batchScrape([...urls], { options: { formats: ['markdown'] } });
 
-				if (response.success && response.data) {
-					return response.data.map(
-						(item: { markdown?: string; metadata?: { title?: string; sourceURL?: string } }) => {
-							const markdown = item.markdown || '';
-							const wordCount = markdown
-								? markdown.split(/\s+/).filter((w: string) => w.length > 0).length
-								: 0;
+			if (job.data && job.data.length > 0) {
+				return job.data.map((doc) => {
+					const markdown = doc.markdown || '';
+					const wordCount = markdown ? markdown.split(/\s+/).filter((w: string) => w.length > 0).length : 0;
 
-							return {
-								success: true,
-								url: item.metadata?.sourceURL || '',
-								title: item.metadata?.title || undefined,
-								content: markdown,
-								markdown,
-								duration: Date.now() - startTime,
-								wordCount,
-								readingTime: Math.ceil(wordCount / 200)
-							};
-						}
-					);
-				}
+					return {
+						success: true,
+						url: doc.metadata?.url || '',
+						title: doc.metadata?.title || undefined,
+						content: markdown,
+						markdown,
+						duration: Date.now() - startTime,
+						wordCount,
+						readingTime: Math.ceil(wordCount / 200)
+					};
+				});
 			}
 		} catch {
 			// Fall through to sequential extraction

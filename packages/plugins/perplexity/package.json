@@ -1,0 +1,65 @@
+{
+	"name": "@ever-works/perplexity-plugin",
+	"version": "1.0.0",
+	"description": "Perplexity Plugin - AI-powered web search with citations",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@perplexity-ai/perplexity_ai": "^0.25.0"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "perplexity",
+			"name": "Perplexity",
+			"version": "1.0.0",
+			"category": "search",
+			"capabilities": [
+				"search"
+			],
+			"description": "AI-powered web search with citations using the Perplexity API. Returns search results enriched with AI-generated context.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"autoEnable": false,
+			"systemPlugin": false,
+			"builtIn": true,
+			"envVars": [
+				{
+					"name": "PLUGIN_PERPLEXITY_API_KEY",
+					"required": false,
+					"secret": true,
+					"description": "Perplexity API key (optional - can be set via admin/user settings)"
+				}
+			]
+		}
+	}
+}
