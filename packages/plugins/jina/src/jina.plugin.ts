@@ -57,7 +57,7 @@ export class JinaReaderPlugin implements IPlugin, ISearchPlugin, IContentExtract
 	readonly id = 'jina';
 	readonly name = 'Jina AI';
 	readonly version = '1.0.0';
-	readonly category: PluginCategory = 'search';
+	readonly category: PluginCategory = 'content-extractor';
 	readonly capabilities: readonly string[] = ['search', 'content-extractor'];
 	readonly providerName = 'Jina';
 

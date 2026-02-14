@@ -40,7 +40,7 @@
 			"id": "scrapfly",
 			"name": "Scrapfly",
 			"version": "1.0.0",
-			"category": "screenshot",
+			"category": "content-extractor",
 			"capabilities": [
 				"screenshot",
 				"content-extractor"

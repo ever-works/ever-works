@@ -37,7 +37,7 @@
 			"id": "jina",
 			"name": "Jina AI",
 			"version": "1.0.0",
-			"category": "search",
+			"category": "content-extractor",
 			"capabilities": [
 				"search",
 				"content-extractor"
