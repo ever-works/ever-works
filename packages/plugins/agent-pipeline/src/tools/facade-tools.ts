@@ -53,7 +53,10 @@ export function createSearchTool(
 				if (breaker.isTripped('search')) {
 					return { results: [], error: breaker.getUnavailableMessage('search') };
 				}
-				return { results: [], error: `Search failed: ${error.message}. You may retry with a different query.` };
+				return {
+					results: [],
+					error: `Search failed: ${error.message}. You may retry once. If search keeps failing, only use data you already retrieved — do NOT fabricate items from memory.`
+				};
 			}
 		}
 	});
@@ -106,7 +109,7 @@ export function createExtractContentTool(
 				return {
 					url,
 					content: '',
-					error: `Content extraction failed: ${error.message}. You may retry with a different URL.`
+					error: `Content extraction failed: ${error.message}. You may retry once with a different URL.`
 				};
 			}
 		}

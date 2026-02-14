@@ -13,14 +13,10 @@ export interface TrippedTool {
 }
 
 /**
- * Lightweight circuit breaker for external service tools.
+ * Tracks consecutive failures per tool. After `threshold` failures
+ * the breaker "trips" and short-circuits subsequent calls.
  *
- * Tracks consecutive failures per tool name. After `threshold` consecutive
- * failures the breaker "trips" and short-circuits subsequent calls so the
- * AI model stops retrying a broken service.
- *
- * No half-open / reset-timer state — agent sessions are short-lived, so
- * once a service is confirmed dead it stays dead for the session.
+ * No half-open state — agent sessions are short-lived.
  */
 export class ToolCircuitBreaker {
 	private readonly failures = new Map<string, number>();
@@ -33,10 +29,7 @@ export class ToolCircuitBreaker {
 		this.logger = options?.logger;
 	}
 
-	/**
-	 * Record a failure for the given tool.
-	 * @returns `true` if this failure caused the breaker to trip.
-	 */
+	/** @returns `true` if this failure caused the breaker to trip. */
 	recordFailure(toolName: string, error?: unknown): boolean {
 		const count = (this.failures.get(toolName) ?? 0) + 1;
 		this.failures.set(toolName, count);
@@ -52,9 +45,7 @@ export class ToolCircuitBreaker {
 		return false;
 	}
 
-	/**
-	 * Record a success — resets the failure counter (only while breaker is closed).
-	 */
+	/** Resets the failure counter (only while breaker is closed). */
 	recordSuccess(toolName: string): void {
 		if (!this.isTripped(toolName)) {
 			this.failures.delete(toolName);
@@ -62,33 +53,22 @@ export class ToolCircuitBreaker {
 		}
 	}
 
-	/**
-	 * Whether the breaker has tripped (failures >= threshold).
-	 */
 	isTripped(toolName: string): boolean {
 		return (this.failures.get(toolName) ?? 0) >= this.threshold;
 	}
 
-	/**
-	 * Imperative message telling the model to stop calling this tool.
-	 */
 	getUnavailableMessage(toolName: string): string {
-		return `${toolName} service is unavailable after repeated failures. Do NOT call this tool again — use other tools or your own knowledge instead.`;
+		return (
+			`${toolName} service is unavailable after repeated failures. Do NOT call this tool again. ` +
+			'Do NOT fabricate items from memory — only create items from data you already retrieved via tools in this session.'
+		);
 	}
 
-	/**
-	 * Returns all tools whose breakers have tripped, with the last error reason.
-	 */
-	getTrippedTools(): TrippedTool[] {
-		const tripped: TrippedTool[] = [];
-		for (const [toolName, count] of this.failures) {
-			if (count >= this.threshold) {
-				tripped.push({
-					name: toolName,
-					reason: this.lastErrors.get(toolName) ?? 'unknown error'
-				});
-			}
-		}
-		return tripped;
+	/** Returns all tools with outstanding consecutive failures (includes tripped). */
+	getFailedTools(): TrippedTool[] {
+		return [...this.failures.keys()].map((name) => ({
+			name,
+			reason: this.lastErrors.get(name) ?? 'unknown error'
+		}));
 	}
 }

@@ -459,7 +459,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			}
 		};
 
-		return breaker.getTrippedTools().map((tool) => {
+		return breaker.getFailedTools().map((tool) => {
 			const info = toolLabels[tool.name] ?? { label: tool.name, impact: 'Results may be less accurate.' };
 			return `${info.label} was unavailable during generation (${tool.reason}). ${info.impact}`;
 		});
