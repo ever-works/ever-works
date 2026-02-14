@@ -60,6 +60,15 @@ export class FirecrawlPlugin implements IPlugin, IContentExtractorPlugin {
 			const finalUrl = doc.metadata?.url;
 			const wordCount = markdown ? markdown.split(/\s+/).filter((w: string) => w.length > 0).length : 0;
 
+			if (!markdown) {
+				return {
+					success: false,
+					url: options.url,
+					error: 'No content extracted from page',
+					duration: Date.now() - startTime
+				};
+			}
+
 			return {
 				success: true,
 				url: options.url,
@@ -93,13 +102,24 @@ export class FirecrawlPlugin implements IPlugin, IContentExtractorPlugin {
 			const job = await client.batchScrape([...urls], { options: { formats: ['markdown'] } });
 
 			if (job.data && job.data.length > 0) {
-				return job.data.map((doc) => {
+				return job.data.map((doc, index) => {
 					const markdown = doc.markdown || '';
 					const wordCount = markdown ? markdown.split(/\s+/).filter((w: string) => w.length > 0).length : 0;
+					const requestedUrl = urls[index] || doc.metadata?.url || '';
+
+					if (!markdown) {
+						return {
+							success: false,
+							url: requestedUrl,
+							error: 'No content extracted from page',
+							duration: Date.now() - startTime
+						};
+					}
 
 					return {
 						success: true,
-						url: doc.metadata?.url || '',
+						url: requestedUrl,
+						finalUrl: doc.metadata?.url && doc.metadata.url !== requestedUrl ? doc.metadata.url : undefined,
 						title: doc.metadata?.title || undefined,
 						content: markdown,
 						markdown,

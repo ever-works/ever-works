@@ -205,11 +205,13 @@ export class ExaSearchPlugin implements IPlugin, ISearchPlugin, IContentExtracto
 			const client = this.getClient(options?.settings);
 			const response = await client.getContents([...urls], { text: true, livecrawl: 'fallback' });
 
-			return response.results.map((result) => {
+			return response.results.map((result, index) => {
 				const text = result.text || '';
+				const requestedUrl = urls[index] || result.url;
 				return {
 					success: true,
-					url: result.url,
+					url: requestedUrl,
+					finalUrl: result.url !== requestedUrl ? result.url : undefined,
 					content: text,
 					title: result.title || undefined,
 					duration: Date.now() - startTime,

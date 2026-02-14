@@ -82,13 +82,21 @@ export class PerplexitySearchPlugin implements IPlugin, ISearchPlugin {
 
 			const response = await client.search.create(searchParams);
 
-			const results: SearchResult[] = (response.results || []).map((r, index) => ({
-				title: r.title || '',
-				url: r.url || '',
-				snippet: r.snippet || '',
-				position: index + 1,
-				source: r.url ? new URL(r.url).hostname : undefined
-			}));
+			const results: SearchResult[] = (response.results || []).map((r, index) => {
+				let source: string | undefined;
+				try {
+					if (r.url) source = new URL(r.url).hostname;
+				} catch {
+					// malformed URL
+				}
+				return {
+					title: r.title || '',
+					url: r.url || '',
+					snippet: r.snippet || '',
+					position: index + 1,
+					source
+				};
+			});
 
 			return {
 				results,

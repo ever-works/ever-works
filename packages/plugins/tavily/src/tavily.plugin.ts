@@ -145,14 +145,18 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 		try {
 			const response = await client.extract(urls as string[]);
 
-			return response.results.map((result) => ({
-				success: true,
-				url: result.url,
-				content: result.rawContent,
-				markdown: result.rawContent,
-				duration: Date.now() - startTime,
-				wordCount: result.rawContent ? result.rawContent.split(/\s+/).length : 0
-			}));
+			return response.results.map((result, index) => {
+				const requestedUrl = urls[index] || result.url;
+				return {
+					success: true,
+					url: requestedUrl,
+					finalUrl: result.url !== requestedUrl ? result.url : undefined,
+					content: result.rawContent,
+					markdown: result.rawContent,
+					duration: Date.now() - startTime,
+					wordCount: result.rawContent ? result.rawContent.split(/\s+/).length : 0
+				};
+			});
 		} catch (error) {
 			return urls.map((url) => ({
 				success: false,

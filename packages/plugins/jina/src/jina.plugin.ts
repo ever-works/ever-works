@@ -126,14 +126,22 @@ export class JinaReaderPlugin implements IPlugin, ISearchPlugin, IContentExtract
 
 			const json = (await response.json()) as JinaSearchResponse;
 
-			const results: SearchResult[] = (json.data || []).map((r, index) => ({
-				title: r.title || '',
-				url: r.url || '',
-				snippet: r.description || '',
-				position: index + 1,
-				publishedDate: r.date || undefined,
-				source: r.url ? new URL(r.url).hostname : undefined
-			}));
+			const results: SearchResult[] = (json.data || []).map((r, index) => {
+				let source: string | undefined;
+				try {
+					if (r.url) source = new URL(r.url).hostname;
+				} catch {
+					// malformed URL
+				}
+				return {
+					title: r.title || '',
+					url: r.url || '',
+					snippet: r.description || '',
+					position: index + 1,
+					publishedDate: r.date || undefined,
+					source
+				};
+			});
 
 			return {
 				results,

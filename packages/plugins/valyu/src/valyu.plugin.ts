@@ -59,7 +59,7 @@ export class ValyuSearchPlugin implements IPlugin, ISearchPlugin, IContentExtrac
 		const startTime = Date.now();
 
 		const maxNumResults = options.limit || 20;
-		const responseLength = (options.settings?.responseLength as ValyuSearchOptions['responseLength']) || 'short';
+		const responseLength = (options.settings?.responseLength as ValyuSearchOptions['responseLength']) || 'medium';
 
 		try {
 			const searchOptions: ValyuSearchOptions = {
@@ -185,11 +185,13 @@ export class ValyuSearchPlugin implements IPlugin, ISearchPlugin, IContentExtrac
 				const batch = urls.slice(i, i + batchSize);
 				const response = await client.contents(batch as string[]);
 
-				const results = (response.results || []).map((result) => {
+				const results = (response.results || []).map((result, index) => {
 					const content = typeof result.content === 'string' ? result.content : String(result.content || '');
+					const requestedUrl = batch[index] || result.url;
 					return {
 						success: true,
-						url: result.url,
+						url: requestedUrl,
+						finalUrl: result.url !== requestedUrl ? result.url : undefined,
 						title: result.title,
 						content,
 						markdown: content,

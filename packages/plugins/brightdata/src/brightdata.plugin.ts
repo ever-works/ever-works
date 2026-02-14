@@ -95,13 +95,22 @@ export class BrightDataPlugin implements IPlugin, ISearchPlugin, IContentExtract
 				this.context?.logger.warn('Bright Data search returned non-JSON body');
 			}
 
-			const searchResults: SearchResult[] = organicResults.slice(0, options.limit || 20).map((r, index) => ({
-				title: r.title || '',
-				url: r.url || r.link || '',
-				snippet: r.description || r.snippet || '',
-				position: index + 1,
-				source: r.url || r.link ? new URL(r.url || r.link || '').hostname : undefined
-			}));
+			const searchResults: SearchResult[] = organicResults.slice(0, options.limit || 20).map((r, index) => {
+				const rawUrl = r.url || r.link || '';
+				let source: string | undefined;
+				try {
+					if (rawUrl) source = new URL(rawUrl).hostname;
+				} catch {
+					// malformed URL — skip source
+				}
+				return {
+					title: r.title || '',
+					url: rawUrl,
+					snippet: r.description || r.snippet || '',
+					position: index + 1,
+					source
+				};
+			});
 
 			return {
 				results: searchResults,
