@@ -1,0 +1,66 @@
+{
+	"name": "@ever-works/valyu-plugin",
+	"version": "1.0.0",
+	"description": "Valyu Plugin - Web search and content extraction using Valyu API",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"valyu-js": "^2.5.4"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "valyu",
+			"name": "Valyu",
+			"version": "1.0.0",
+			"category": "search",
+			"capabilities": [
+				"search",
+				"content-extractor"
+			],
+			"description": "AI-native search and content extraction using the Valyu API. Supports web, proprietary, and news search with optional content extraction from URLs.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"autoEnable": false,
+			"systemPlugin": false,
+			"builtIn": true,
+			"envVars": [
+				{
+					"name": "PLUGIN_VALYU_API_KEY",
+					"required": false,
+					"secret": true,
+					"description": "Valyu API key (optional - can be set via admin/user settings)"
+				}
+			]
+		}
+	}
+}
