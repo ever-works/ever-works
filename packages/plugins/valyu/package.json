@@ -1,7 +1,7 @@
 {
-	"name": "@ever-works/exa-plugin",
+	"name": "@ever-works/valyu-plugin",
 	"version": "1.0.0",
-	"description": "Exa Plugin - Neural and keyword search using the Exa API",
+	"description": "Valyu Plugin - Web search and content extraction using Valyu API",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -24,7 +24,7 @@
 		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
-		"exa-js": "^2.4.0"
+		"valyu-js": "^2.5.4"
 	},
 	"peerDependencies": {
 		"@ever-works/plugin": "workspace:*"
@@ -37,15 +37,15 @@
 	},
 	"everworks": {
 		"plugin": {
-			"id": "exa",
-			"name": "Exa",
+			"id": "valyu",
+			"name": "Valyu",
 			"version": "1.0.0",
 			"category": "search",
 			"capabilities": [
 				"search",
 				"content-extractor"
 			],
-			"description": "AI-native search using the Exa API. Supports neural, keyword, and auto search modes with optional category filtering.",
+			"description": "AI-native search and content extraction using the Valyu API. Supports web, proprietary, and news search with optional content extraction from URLs.",
 			"author": {
 				"name": "Ever Works Team"
 			},
@@ -55,10 +55,10 @@
 			"builtIn": true,
 			"envVars": [
 				{
-					"name": "PLUGIN_EXA_API_KEY",
+					"name": "PLUGIN_VALYU_API_KEY",
 					"required": false,
 					"secret": true,
-					"description": "Exa API key (optional - can be set via admin/user settings)"
+					"description": "Valyu API key (optional - can be set via admin/user settings)"
 				}
 			]
 		}

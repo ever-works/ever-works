@@ -132,7 +132,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			].join('\n'),
 			icon: {
 				type: 'svg',
-				value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="4"/><circle cx="9" cy="16" r="1"/><circle cx="15" cy="16" r="1"/><path d="M9 19h6"/></svg>'
+				value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none"><defs><linearGradient id="g" x1="4" y1="44" x2="44" y2="4"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#06B6D4"/></linearGradient></defs><rect x="4" y="4" width="40" height="40" rx="12" fill="url(#g)"/><path d="M15 15l9 9M15 33l9-9M33 24h-9" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".5"/><circle cx="15" cy="15" r="4" fill="#fff" fill-opacity=".9"/><circle cx="15" cy="33" r="4" fill="#fff" fill-opacity=".9"/><circle cx="33" cy="24" r="5" fill="#FCD34D"/></svg>'
 			}
 		};
 	}

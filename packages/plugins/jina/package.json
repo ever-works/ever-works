@@ -1,7 +1,7 @@
 {
-	"name": "@ever-works/exa-plugin",
+	"name": "@ever-works/jina-plugin",
 	"version": "1.0.0",
-	"description": "Exa Plugin - Neural and keyword search using the Exa API",
+	"description": "Jina AI Plugin - Web search and content extraction using Jina AI APIs",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -23,9 +23,6 @@
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage"
 	},
-	"dependencies": {
-		"exa-js": "^2.4.0"
-	},
 	"peerDependencies": {
 		"@ever-works/plugin": "workspace:*"
 	},
@@ -37,15 +34,15 @@
 	},
 	"everworks": {
 		"plugin": {
-			"id": "exa",
-			"name": "Exa",
+			"id": "jina",
+			"name": "Jina AI",
 			"version": "1.0.0",
-			"category": "search",
+			"category": "content-extractor",
 			"capabilities": [
 				"search",
 				"content-extractor"
 			],
-			"description": "AI-native search using the Exa API. Supports neural, keyword, and auto search modes with optional category filtering.",
+			"description": "Web search and content extraction using Jina AI APIs. Search via s.jina.ai and extract content via r.jina.ai, no SDK needed.",
 			"author": {
 				"name": "Ever Works Team"
 			},
@@ -55,10 +52,10 @@
 			"builtIn": true,
 			"envVars": [
 				{
-					"name": "PLUGIN_EXA_API_KEY",
+					"name": "PLUGIN_JINA_API_KEY",
 					"required": false,
 					"secret": true,
-					"description": "Exa API key (optional - can be set via admin/user settings)"
+					"description": "Jina API key (optional - free tier works without key)"
 				}
 			]
 		}

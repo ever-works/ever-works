@@ -1,7 +1,7 @@
 {
-	"name": "@ever-works/exa-plugin",
+	"name": "@ever-works/perplexity-plugin",
 	"version": "1.0.0",
-	"description": "Exa Plugin - Neural and keyword search using the Exa API",
+	"description": "Perplexity Plugin - AI-powered web search with citations",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -24,7 +24,7 @@
 		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
-		"exa-js": "^2.4.0"
+		"@perplexity-ai/perplexity_ai": "^0.25.0"
 	},
 	"peerDependencies": {
 		"@ever-works/plugin": "workspace:*"
@@ -37,15 +37,14 @@
 	},
 	"everworks": {
 		"plugin": {
-			"id": "exa",
-			"name": "Exa",
+			"id": "perplexity",
+			"name": "Perplexity",
 			"version": "1.0.0",
 			"category": "search",
 			"capabilities": [
-				"search",
-				"content-extractor"
+				"search"
 			],
-			"description": "AI-native search using the Exa API. Supports neural, keyword, and auto search modes with optional category filtering.",
+			"description": "AI-powered web search with citations using the Perplexity API. Returns search results enriched with AI-generated context.",
 			"author": {
 				"name": "Ever Works Team"
 			},
@@ -55,10 +54,10 @@
 			"builtIn": true,
 			"envVars": [
 				{
-					"name": "PLUGIN_EXA_API_KEY",
+					"name": "PLUGIN_PERPLEXITY_API_KEY",
 					"required": false,
 					"secret": true,
-					"description": "Exa API key (optional - can be set via admin/user settings)"
+					"description": "Perplexity API key (optional - can be set via admin/user settings)"
 				}
 			]
 		}
