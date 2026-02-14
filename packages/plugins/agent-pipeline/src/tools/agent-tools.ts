@@ -5,6 +5,7 @@ import type {
 	PipelineProgressCallback
 } from '@ever-works/plugin';
 import { createSearchTool, createExtractContentTool, createReportProgressTool } from './facade-tools.js';
+import { createCreateFileTool, createUpdateFileTool } from './file-tools.js';
 
 export interface SandboxAndTools {
 	readonly tools: Record<string, unknown>;
@@ -29,7 +30,10 @@ export async function createAgentTools(
 	const { tools: bashTools } = await createBashTool({ sandbox: bashInstance, destination: '/' });
 
 	const tools = {
-		...bashTools,
+		bash: bashTools.bash,
+		readFile: bashTools.readFile,
+		createFile: createCreateFileTool(bashInstance),
+		updateFile: createUpdateFileTool(bashInstance),
 		search: createSearchTool(facades.searchFacade, facadeOptions),
 		extractContent: createExtractContentTool(facades.contentExtractorFacade, facadeOptions),
 		reportProgress: createReportProgressTool(onProgress, 1, totalSteps)

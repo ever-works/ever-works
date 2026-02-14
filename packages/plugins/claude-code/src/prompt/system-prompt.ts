@@ -96,10 +96,14 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
 				`The workspace already contains ${existingCount} existing item files (e.g., \`my-tool.json\`). ` +
 				'A lightweight index is available at `_meta/existing-items.jsonl` ' +
 				'(one JSON per line with slug, name, source_url).\n\n' +
+				'Before creating a new item file, check if a file with that slug already exists in the workspace.\n\n' +
 				'To check for duplicates, **use `grep`** on the index — do NOT read the entire file:\n' +
 				'- Search for URLs: `grep "example.com" _meta/existing-items.jsonl`\n' +
 				'- Search for names: `grep -i "keyword" _meta/existing-items.jsonl`\n\n' +
-				'You may read an individual existing item (e.g., `my-tool.json`) if you need to update it.\n' +
+				'**Do NOT** modify or rewrite existing item files unless the user request specifically asks for ' +
+				'updates (e.g., reorganization, merging categories, updating fields). ' +
+				'Only create NEW items alongside existing ones.\n\n' +
+				'You may read an individual existing item (e.g., `my-tool.json`) for reference.\n' +
 				'**Do NOT** create duplicates — focus on NEW complementary items.'
 		);
 	}
