@@ -1,6 +1,7 @@
-import { mkdir, writeFile, readdir, readFile, rm, stat } from 'node:fs/promises';
+import { mkdir, writeFile, readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
 import type { ItemData, DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
 import { slugify, validateRequiredItemFields, normalizeItemTags, jsonrepair } from '@ever-works/plugin';
 
@@ -39,7 +40,7 @@ export function getWorkspacePath(userId: string, directoryId: string): string {
 }
 
 /**
- * Create workspace, seed existing items as individual files + JSONL dedup index + seeded manifest.
+ * Create workspace, seed existing items as individual files + JSONL dedup index + hash manifest.
  */
 export async function createWorkspace(
 	userId: string,
@@ -53,7 +54,7 @@ export async function createWorkspace(
 
 	await mkdir(metaDir, { recursive: true });
 
-	const seededFiles: string[] = [];
+	const seededManifest: Record<string, string> = {};
 	const usedSlugs = new Set<string>();
 	const itemWrites: (() => Promise<void>)[] = [];
 	const indexLines: string[] = [];
@@ -64,10 +65,11 @@ export async function createWorkspace(
 		usedSlugs.add(slug);
 
 		const fileName = `${slug}.json`;
-		seededFiles.push(fileName);
+		const content = JSON.stringify(item, null, 2);
+		seededManifest[fileName] = createHash('sha256').update(content).digest('hex');
 		indexLines.push(JSON.stringify({ slug, name: item.name, source_url: item.source_url }));
 
-		itemWrites.push(() => writeFile(join(workspacePath, fileName), JSON.stringify(item, null, 2), 'utf-8'));
+		itemWrites.push(() => writeFile(join(workspacePath, fileName), content, 'utf-8'));
 	}
 
 	if (itemWrites.length > 0) {
@@ -92,7 +94,7 @@ export async function createWorkspace(
 		)
 	);
 
-	metaWrites.push(writeFile(join(metaDir, 'seeded.json'), JSON.stringify(seededFiles), 'utf-8'));
+	metaWrites.push(writeFile(join(metaDir, 'seeded.json'), JSON.stringify(seededManifest), 'utf-8'));
 
 	if (indexLines.length > 0) {
 		metaWrites.push(writeFile(join(metaDir, 'existing-items.jsonl'), indexLines.join('\n') + '\n', 'utf-8'));
@@ -118,7 +120,7 @@ export async function createWorkspace(
 }
 
 /**
- * Collect generated/modified items from workspace. Skips unchanged seeded files via mtime.
+ * Collect generated/modified items from workspace. Skips unchanged seeded files via content hash.
  */
 export async function collectItemsFromWorkspace(workspacePath: string, logger?: Logger): Promise<ItemData[]> {
 	let entries: string[];
@@ -136,13 +138,10 @@ export async function collectItemsFromWorkspace(workspacePath: string, logger?: 
 		return [];
 	}
 
-	let seededSet = new Set<string>();
-	let seedTime = 0;
+	let seededHashes: Record<string, string> = {};
 	try {
 		const manifestContent = await readFile(join(workspacePath, '_meta', 'seeded.json'), 'utf-8');
-		seededSet = new Set(JSON.parse(manifestContent) as string[]);
-		const manifestStat = await stat(join(workspacePath, '_meta', 'seeded.json'));
-		seedTime = manifestStat.mtimeMs;
+		seededHashes = JSON.parse(manifestContent) as Record<string, string>;
 	} catch {
 		// No manifest — treat all files as new
 	}
@@ -150,14 +149,15 @@ export async function collectItemsFromWorkspace(workspacePath: string, logger?: 
 	const results = await Promise.all(
 		fileNames.map(async (fileName) => {
 			try {
-				if (seededSet.has(fileName) && seedTime > 0) {
-					const fileStat = await stat(join(workspacePath, fileName));
-					if (fileStat.mtimeMs <= seedTime) {
+				const content = await readFile(join(workspacePath, fileName), 'utf-8');
+
+				const seededHash = seededHashes[fileName];
+				if (seededHash) {
+					const currentHash = createHash('sha256').update(content).digest('hex');
+					if (currentHash === seededHash) {
 						return null;
 					}
 				}
-
-				const content = await readFile(join(workspacePath, fileName), 'utf-8');
 				let data;
 				try {
 					data = JSON.parse(content);

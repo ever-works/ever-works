@@ -3,7 +3,6 @@ import { mkdir, writeFile, readFile, rm, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { setTimeout as sleep } from 'node:timers/promises';
 import { createWorkspace, collectItemsFromWorkspace, cleanupWorkspace } from '../utils/sandbox-workspace';
 import type { DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
 
@@ -127,7 +126,7 @@ describe('sandbox-workspace', () => {
 			expect(first.description).toBeUndefined();
 		});
 
-		it('should write seeded manifest', async () => {
+		it('should write seeded hash manifest', async () => {
 			const userId = uniqueUserId();
 			const existing: ExistingItems = {
 				items: [
@@ -147,7 +146,9 @@ describe('sandbox-workspace', () => {
 			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseDirectory, baseRequest);
 
 			const seeded = JSON.parse(await readFile(join(workspacePath, '_meta', 'seeded.json'), 'utf-8'));
-			expect(seeded).toEqual(['cursor.json']);
+			expect(seeded).toBeTypeOf('object');
+			expect(seeded).toHaveProperty('cursor.json');
+			expect(seeded['cursor.json']).toMatch(/^[a-f0-9]{64}$/);
 		});
 
 		it('should not create JSONL index when no existing items', async () => {
@@ -203,8 +204,6 @@ describe('sandbox-workspace', () => {
 
 			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseDirectory, baseRequest);
 
-			await sleep(50);
-
 			await writeFile(
 				join(workspacePath, 'new-tool.json'),
 				JSON.stringify({
@@ -241,7 +240,7 @@ describe('sandbox-workspace', () => {
 
 			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseDirectory, baseRequest);
 
-			await sleep(50);
+			// Overwrite with different content — hash will differ
 			await writeFile(
 				join(workspacePath, 'cursor.json'),
 				JSON.stringify({

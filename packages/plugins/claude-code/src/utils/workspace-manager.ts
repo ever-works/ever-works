@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { createHash } from 'node:crypto';
 import { BASE_TEMP_DIR } from '../types.js';
 import type { ItemData, Category, Tag, Brand } from '@ever-works/plugin';
 import {
@@ -72,14 +73,14 @@ export async function createWorkspace(userId: string, directoryId: string): Prom
 }
 
 /**
- * Seed existing items as individual JSON files + JSONL dedup index + seeded manifest.
+ * Seed existing items as individual JSON files + JSONL dedup index + hash manifest.
  */
 export async function seedExistingItems(workspacePath: string, items: readonly ItemData[]): Promise<void> {
 	if (!items.length) return;
 
 	const metaDir = path.join(workspacePath, '_meta');
 	const usedSlugs = new Set<string>();
-	const seededFiles: string[] = [];
+	const seededManifest: Record<string, string> = {};
 	const indexLines: string[] = [];
 	const itemWrites: (() => Promise<void>)[] = [];
 
@@ -89,16 +90,17 @@ export async function seedExistingItems(workspacePath: string, items: readonly I
 		usedSlugs.add(slug);
 
 		const fileName = `${slug}.json`;
-		seededFiles.push(fileName);
+		const content = JSON.stringify(item, null, 2);
+		seededManifest[fileName] = createHash('sha256').update(content).digest('hex');
 		indexLines.push(JSON.stringify({ slug, name: item.name, source_url: item.source_url }));
 
-		itemWrites.push(() => fs.writeFile(path.join(workspacePath, fileName), JSON.stringify(item, null, 2), 'utf-8'));
+		itemWrites.push(() => fs.writeFile(path.join(workspacePath, fileName), content, 'utf-8'));
 	}
 
 	await parallelBatch(itemWrites, WRITE_CONCURRENCY);
 
 	await Promise.all([
-		fs.writeFile(path.join(metaDir, 'seeded.json'), JSON.stringify(seededFiles), 'utf-8'),
+		fs.writeFile(path.join(metaDir, 'seeded.json'), JSON.stringify(seededManifest), 'utf-8'),
 		fs.writeFile(path.join(metaDir, 'existing-items.jsonl'), indexLines.join('\n') + '\n', 'utf-8')
 	]);
 }
@@ -144,7 +146,7 @@ export async function seedMetadata(
 }
 
 /**
- * Read generated/modified items from workspace. Skips unchanged seeded files via mtime.
+ * Read generated/modified items from workspace. Skips unchanged seeded files via content hash.
  */
 export async function readGeneratedItems(workspacePath: string, logger?: Logger): Promise<ItemData[]> {
 	let entries: string[];
@@ -158,13 +160,10 @@ export async function readGeneratedItems(workspacePath: string, logger?: Logger)
 
 	if (entries.length === 0) return [];
 
-	let seededSet = new Set<string>();
-	let seedTime = 0;
+	let seededHashes: Record<string, string> = {};
 	try {
 		const manifestContent = await fs.readFile(path.join(workspacePath, '_meta', 'seeded.json'), 'utf-8');
-		seededSet = new Set(JSON.parse(manifestContent) as string[]);
-		const manifestStat = await fs.stat(path.join(workspacePath, '_meta', 'seeded.json'));
-		seedTime = manifestStat.mtimeMs;
+		seededHashes = JSON.parse(manifestContent) as Record<string, string>;
 	} catch {
 		// No manifest — treat all files as new
 	}
@@ -172,14 +171,16 @@ export async function readGeneratedItems(workspacePath: string, logger?: Logger)
 	const results = await Promise.all(
 		entries.map(async (fileName) => {
 			try {
-				if (seededSet.has(fileName) && seedTime > 0) {
-					const fileStat = await fs.stat(path.join(workspacePath, fileName));
-					if (fileStat.mtimeMs <= seedTime) {
+				const content = await fs.readFile(path.join(workspacePath, fileName), 'utf-8');
+
+				const seededHash = seededHashes[fileName];
+				if (seededHash) {
+					const currentHash = createHash('sha256').update(content).digest('hex');
+					if (currentHash === seededHash) {
 						return null;
 					}
 				}
 
-				const content = await fs.readFile(path.join(workspacePath, fileName), 'utf-8');
 				let data;
 				try {
 					data = JSON.parse(content);
