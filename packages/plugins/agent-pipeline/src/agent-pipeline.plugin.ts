@@ -227,7 +227,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			this.setState('generate-items', 'running');
 			reportProgress(onProgress, 1, 20, 'Generate Items');
 
-			await this.runAgentGeneration(
+			const warnings = await this.runAgentGeneration(
 				providerConfig,
 				modelName,
 				workspacePath,
@@ -270,7 +270,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			// ── Build result ───────────────────────────────────────────
 			reportProgress(onProgress, 5, 100, 'Complete');
 
-			return this.buildSuccessResult(items, metadata, startTime);
+			return this.buildSuccessResult(items, metadata, startTime, warnings);
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
 			logger.error(`Agent pipeline failed: ${err.message}`);
@@ -358,7 +358,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		onProgress: PipelineProgressCallback | undefined,
 		signal: AbortSignal,
 		logger: PluginLogger
-	): Promise<void> {
+	): Promise<string[]> {
 		logger.log(`Using AI provider "${providerConfig.providerName}" with model "${modelName}"`);
 
 		const provider = createOpenAICompatible({
@@ -384,7 +384,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			}
 		});
 
-		const { tools } = await createAgentTools(
+		const { tools, breaker } = await createAgentTools(
 			workspacePath,
 			{
 				searchFacade: execContext.searchFacade,
@@ -392,7 +392,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			},
 			facadeOptions,
 			onProgress,
-			AGENT_PIPELINE_STEP_IDS.length
+			AGENT_PIPELINE_STEP_IDS.length,
+			logger
 		);
 
 		const promptOptions = { directory, request, existing };
@@ -440,6 +441,28 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 					`Response text: "${result.text.slice(0, 200)}${result.text.length > 200 ? '...' : ''}"`
 			);
 		}
+
+		// Resolve provider names for user-facing warnings
+		const [searchProviderName, extractProviderName] = await Promise.all([
+			execContext.searchFacade.getActiveProviderName?.(facadeOptions).catch(() => null) ?? null,
+			execContext.contentExtractorFacade.getActiveProviderName?.(facadeOptions).catch(() => null) ?? null
+		]);
+
+		const toolLabels: Record<string, { label: string; impact: string }> = {
+			search: {
+				label: searchProviderName ? `Web search (${searchProviderName})` : 'Web search',
+				impact: 'Some results may be missing.'
+			},
+			extractContent: {
+				label: extractProviderName ? `Content extraction (${extractProviderName})` : 'Content extraction',
+				impact: 'Item details may be incomplete.'
+			}
+		};
+
+		return breaker.getTrippedTools().map((tool) => {
+			const info = toolLabels[tool.name] ?? { label: tool.name, impact: 'Results may be less accurate.' };
+			return `${info.label} was unavailable during generation (${tool.reason}). ${info.impact}`;
+		});
 	}
 
 	private async collectAndMergeResults(
@@ -487,7 +510,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 	private buildSuccessResult(
 		items: MutableItemData[],
 		metadata: ReturnType<typeof collectMetadataFromItems>,
-		startTime: number
+		startTime: number,
+		warnings?: string[]
 	): PipelineResult {
 		const duration = Date.now() - startTime;
 		return {
@@ -500,7 +524,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			duration,
 			stepsCompleted: AGENT_PIPELINE_STEP_IDS.length,
 			totalSteps: AGENT_PIPELINE_STEP_IDS.length,
-			state: this.state!
+			state: this.state!,
+			warnings
 		};
 	}
 

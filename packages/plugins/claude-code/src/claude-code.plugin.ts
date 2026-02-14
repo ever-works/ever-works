@@ -352,10 +352,13 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				return this.handleCancel(startTime);
 			}
 
+			let generationWarning: string | undefined;
 			if (execResult.exitCode !== 0) {
-				const errorMsg =
-					(execResult.stderr || execResult.stdout).slice(0, 500) || `Exit code ${execResult.exitCode}`;
-				logger.warn(`Claude Code exited with code ${execResult.exitCode}: ${errorMsg}`);
+				const detail =
+					(execResult.stderr || execResult.stdout).slice(0, 500) || `exit code ${execResult.exitCode}`;
+
+				logger.warn(`Claude Code exited with code ${execResult.exitCode}: ${detail}`);
+				generationWarning = `Claude Code finished with an error (${detail.split('\n')[0].trim()}).`;
 			}
 
 			this.setState('generate-items', 'completed');
@@ -405,6 +408,8 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			reportProgress(onProgress, 6, 100, 'Complete');
 
 			const duration = Date.now() - startTime;
+			const warnings = generationWarning ? [generationWarning] : undefined;
+
 			return {
 				success: true,
 				items,
@@ -415,7 +420,8 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				duration,
 				stepsCompleted: this.state!.completedSteps.length,
 				totalSteps: CLAUDE_CODE_STEP_IDS.length,
-				state: this.state!
+				state: this.state!,
+				warnings
 			};
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));

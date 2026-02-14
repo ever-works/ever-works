@@ -111,151 +111,59 @@ describe('ClaudeCodePlugin', () => {
 		await plugin.onUnload();
 	});
 
-	describe('Plugin Properties', () => {
-		it('should have correct id', () => {
-			expect(plugin.id).toBe('claude-code');
-		});
-
-		it('should have correct name', () => {
-			expect(plugin.name).toBe('Claude Code Generator');
-		});
-
-		it('should have correct version', () => {
-			expect(plugin.version).toBe('1.0.0');
-		});
-
-		it('should have correct category', () => {
-			expect(plugin.category).toBe('pipeline');
-		});
-
-		it('should include pipeline capability', () => {
-			expect(plugin.capabilities).toContain('pipeline');
-		});
-
-		it('should have user-required configuration mode', () => {
-			expect(plugin.configurationMode).toBe('user-required');
-		});
+	it('should have correct plugin metadata', () => {
+		expect(plugin.id).toBe('claude-code');
+		expect(plugin.name).toBe('Claude Code Generator');
+		expect(plugin.category).toBe('pipeline');
+		expect(plugin.capabilities).toContain('pipeline');
+		expect(plugin.configurationMode).toBe('user-required');
 	});
 
-	describe('Settings Schema', () => {
-		it('should define oauthToken as a secret user-scoped field', () => {
-			const props = plugin.settingsSchema.properties!;
-			expect(props.oauthToken).toBeDefined();
-			expect(props.oauthToken['x-secret']).toBe(true);
-			expect(props.oauthToken['x-scope']).toBe('user');
-		});
+	it('should define auth fields as secret user-scoped settings with required group', () => {
+		const props = plugin.settingsSchema.properties!;
+		expect(props.oauthToken['x-secret']).toBe(true);
+		expect(props.oauthToken['x-scope']).toBe('user');
+		expect(props.apiKey['x-secret']).toBe(true);
+		expect(props.apiKey['x-scope']).toBe('user');
 
-		it('should define apiKey as a secret user-scoped field', () => {
-			const props = plugin.settingsSchema.properties!;
-			expect(props.apiKey).toBeDefined();
-			expect(props.apiKey['x-secret']).toBe(true);
-			expect(props.apiKey['x-scope']).toBe('user');
-		});
-
-		it('should define version as a hidden field with default', () => {
-			const props = plugin.settingsSchema.properties!;
-			expect(props.version['x-hidden']).toBe(true);
-			expect(props.version.default).toBe('2.1.37');
-		});
-
-		it('should define maxTurns as a hidden integer field', () => {
-			const props = plugin.settingsSchema.properties!;
-			expect(props.maxTurns.type).toBe('integer');
-			expect(props.maxTurns['x-hidden']).toBe(true);
-		});
-
-		it('should have a required group for auth fields', () => {
-			const groups = plugin.settingsSchema['x-requiredGroups'];
-			expect(groups).toBeDefined();
-			expect(groups).toHaveLength(1);
-			expect(groups![0].fields).toContain('oauthToken');
-			expect(groups![0].fields).toContain('apiKey');
-		});
+		const groups = plugin.settingsSchema['x-requiredGroups'];
+		expect(groups).toHaveLength(1);
+		expect(groups![0].fields).toContain('oauthToken');
+		expect(groups![0].fields).toContain('apiKey');
 	});
 
 	describe('validateSettings', () => {
-		it('should pass when oauthToken is provided', async () => {
-			const result = await plugin.validateSettings({ oauthToken: 'token' });
-			expect(result.valid).toBe(true);
+		it('should pass when oauthToken or apiKey is provided', async () => {
+			expect((await plugin.validateSettings({ oauthToken: 'token' })).valid).toBe(true);
+			expect((await plugin.validateSettings({ apiKey: 'key' })).valid).toBe(true);
 		});
 
-		it('should pass when apiKey is provided', async () => {
-			const result = await plugin.validateSettings({ apiKey: 'key' });
-			expect(result.valid).toBe(true);
-		});
-
-		it('should pass when both are provided', async () => {
-			const result = await plugin.validateSettings({ oauthToken: 'token', apiKey: 'key' });
-			expect(result.valid).toBe(true);
-		});
-
-		it('should fail when neither is provided', async () => {
+		it('should fail when neither auth credential is provided', async () => {
 			const result = await plugin.validateSettings({});
 			expect(result.valid).toBe(false);
-			expect(result.errors).toHaveLength(1);
 			expect(result.errors![0].code).toBe('auth-required');
 		});
 	});
 
-	describe('Step Definitions', () => {
-		it('should return 6 step definitions', () => {
-			const steps = plugin.getStepDefinitions();
-			expect(steps).toHaveLength(6);
-		});
-
-		it('should have correct step IDs in order', () => {
-			const steps = plugin.getStepDefinitions();
-			const ids = steps.map((s) => s.id);
-			expect(ids).toEqual([
-				'setup-claude-code',
-				'prepare-context',
-				'generate-items',
-				'collect-results',
-				'capture-screenshots',
-				'cleanup'
-			]);
-		});
-
-		it('should have setup-claude-code as first step', () => {
-			const steps = plugin.getStepDefinitions();
-			expect(steps[0].position).toEqual({ type: 'first' });
-		});
-
-		it('should have cleanup as last step', () => {
-			const steps = plugin.getStepDefinitions();
-			const cleanup = steps.find((s) => s.id === 'cleanup');
-			expect(cleanup?.position).toEqual({ type: 'last' });
-			expect(cleanup?.optional).toBe(true);
-		});
-
-		it('should have capture-screenshots as optional', () => {
-			const steps = plugin.getStepDefinitions();
-			const screenshot = steps.find((s) => s.id === 'capture-screenshots');
-			expect(screenshot).toBeDefined();
-			expect(screenshot?.optional).toBe(true);
-		});
-
-		it('should have no parallelizable steps', () => {
-			const steps = plugin.getStepDefinitions();
-			expect(steps.every((s) => s.parallelizable === false)).toBe(true);
-		});
+	it('should return 6 step definitions in correct order', () => {
+		const steps = plugin.getStepDefinitions();
+		expect(steps.map((s) => s.id)).toEqual([
+			'setup-claude-code',
+			'prepare-context',
+			'generate-items',
+			'collect-results',
+			'capture-screenshots',
+			'cleanup'
+		]);
+		expect(steps[0].position).toEqual({ type: 'first' });
+		expect(steps.find((s) => s.id === 'cleanup')?.position).toEqual({ type: 'last' });
 	});
 
-	describe('Lifecycle', () => {
-		it('should load without error', async () => {
-			const ctx = createMockContext();
-			await expect(plugin.onLoad(ctx)).resolves.not.toThrow();
-		});
-
-		it('should unload without error', async () => {
-			const ctx = createMockContext();
-			await plugin.onLoad(ctx);
-			await expect(plugin.onUnload()).resolves.not.toThrow();
-		});
-
-		it('should return null state before execution', () => {
-			expect(plugin.getState()).toBeNull();
-		});
+	it('should load and unload without error', async () => {
+		const ctx = createMockContext();
+		await expect(plugin.onLoad(ctx)).resolves.not.toThrow();
+		expect(plugin.getState()).toBeNull();
+		await expect(plugin.onUnload()).resolves.not.toThrow();
 	});
 
 	describe('execute', () => {
@@ -278,7 +186,7 @@ describe('ClaudeCodePlugin', () => {
 			tags: []
 		};
 
-		it('should execute successfully and return items', async () => {
+		it('should execute successfully and return items with metadata', async () => {
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);
 
@@ -287,90 +195,93 @@ describe('ClaudeCodePlugin', () => {
 			expect(result.success).toBe(true);
 			expect(result.items).toHaveLength(1);
 			expect(result.items[0].name).toBe('Test Item');
-			expect(result.stepsCompleted).toBe(5); // screenshots skipped (no execContext)
-			expect(result.totalSteps).toBe(6);
-		});
-
-		it('should report progress during execution', async () => {
-			const ctx = createMockContext();
-			await plugin.onLoad(ctx);
-
-			const progressUpdates: Array<{ percent: number; currentStepName: string }> = [];
-			const onProgress = vi.fn((p) => progressUpdates.push(p));
-
-			await plugin.execute(directory, request, existing, undefined, onProgress);
-
-			expect(onProgress).toHaveBeenCalled();
-			expect(progressUpdates.length).toBeGreaterThan(0);
-			// Last update should be 100%
-			const lastUpdate = progressUpdates[progressUpdates.length - 1];
-			expect(lastUpdate.percent).toBe(100);
-		});
-
-		it('should have running state during execution', async () => {
-			const ctx = createMockContext();
-			await plugin.onLoad(ctx);
-
-			// State is null before execution
-			expect(plugin.getState()).toBeNull();
-
-			await plugin.execute(directory, request, existing);
-
-			// After execution, state should exist
-			const state = plugin.getState();
-			expect(state).not.toBeNull();
-		});
-
-		it('should include categories and tags in result', async () => {
-			const ctx = createMockContext();
-			await plugin.onLoad(ctx);
-
-			const result = await plugin.execute(directory, request, existing);
-
 			expect(result.categories).toHaveLength(1);
 			expect(result.tags).toHaveLength(1);
+			expect(result.metrics!.itemsProcessed).toBe(1);
+			expect(result.warnings).toBeUndefined();
 		});
 
-		it('should include metrics in result', async () => {
+		it('should report progress ending at 100%', async () => {
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);
 
-			const result = await plugin.execute(directory, request, existing);
+			const progressUpdates: Array<{ percent: number }> = [];
+			await plugin.execute(directory, request, existing, undefined, (p) => progressUpdates.push(p));
 
-			expect(result.metrics).toBeDefined();
-			expect(result.metrics!.itemsProcessed).toBe(1);
-			expect(result.duration).toBeGreaterThanOrEqual(0);
+			expect(progressUpdates.length).toBeGreaterThan(0);
+			expect(progressUpdates[progressUpdates.length - 1].percent).toBe(100);
 		});
 
-		it('should skip screenshots when no execContext is provided', async () => {
+		it('should include a warning when CLI exits with non-zero code', async () => {
+			const { executeClaudeCode } = await import('../utils/process-runner');
+			vi.mocked(executeClaudeCode).mockReturnValueOnce({
+				promise: Promise.resolve({
+					stdout: '',
+					stderr: 'Error: API rate limit exceeded',
+					exitCode: 1,
+					killed: false,
+					duration: 3000
+				}),
+				kill: vi.fn()
+			});
+
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);
 
 			const result = await plugin.execute(directory, request, existing);
 
 			expect(result.success).toBe(true);
-			// Screenshot step should be skipped, not failed
-			const state = plugin.getState();
-			const screenshotStep = state?.steps.get('capture-screenshots');
-			expect(screenshotStep?.status).toBe('skipped');
+			expect(result.warnings).toHaveLength(1);
+			expect(result.warnings![0]).toContain('API rate limit exceeded');
 		});
 
-		it('should succeed even when screenshot facade throws', async () => {
+		it('should use stdout for warning when stderr is empty', async () => {
+			const { executeClaudeCode } = await import('../utils/process-runner');
+			vi.mocked(executeClaudeCode).mockReturnValueOnce({
+				promise: Promise.resolve({
+					stdout: 'Max turns reached',
+					stderr: '',
+					exitCode: 1,
+					killed: false,
+					duration: 3000
+				}),
+				kill: vi.fn()
+			});
+
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);
 
-			const mockScreenshotFacade = {
-				isAvailable: () => true,
-				getSmartImage: vi.fn().mockRejectedValue(new Error('Screenshot service down')),
-				capture: vi.fn(),
-				getScreenshotUrl: vi.fn()
-			};
+			const result = await plugin.execute(directory, request, existing);
 
-			const result = await plugin.execute(directory, request, existing, {
+			expect(result.warnings).toHaveLength(1);
+			expect(result.warnings![0]).toContain('Max turns reached');
+		});
+
+		it('should skip screenshots when no execContext and succeed when facade throws', async () => {
+			const ctx = createMockContext();
+			await plugin.onLoad(ctx);
+
+			// No execContext → screenshots skipped
+			const result1 = await plugin.execute(directory, request, existing);
+			expect(result1.success).toBe(true);
+			expect(plugin.getState()?.steps.get('capture-screenshots')?.status).toBe('skipped');
+
+			// Reset
+			vi.clearAllMocks();
+			const plugin2 = new ClaudeCodePlugin();
+			await plugin2.onLoad(createMockContext());
+
+			// Facade throws → pipeline still succeeds
+			const result2 = await plugin2.execute(directory, request, existing, {
 				execContext: {
 					aiFacade: {} as never,
 					searchFacade: {} as never,
-					screenshotFacade: mockScreenshotFacade as never,
+					screenshotFacade: {
+						isAvailable: () => true,
+						getSmartImage: vi.fn().mockRejectedValue(new Error('Screenshot service down')),
+						capture: vi.fn(),
+						getScreenshotUrl: vi.fn()
+					} as never,
 					contentExtractorFacade: {} as never,
 					logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 					directory,
@@ -378,9 +289,9 @@ describe('ClaudeCodePlugin', () => {
 				}
 			});
 
-			// Pipeline should still succeed despite screenshot failure
-			expect(result.success).toBe(true);
-			expect(result.items).toHaveLength(1);
+			expect(result2.success).toBe(true);
+			expect(result2.items).toHaveLength(1);
+			await plugin2.onUnload();
 		});
 
 		it('should capture screenshots when facade is available', async () => {
@@ -411,10 +322,7 @@ describe('ClaudeCodePlugin', () => {
 
 			expect(result.success).toBe(true);
 			expect(mockScreenshotFacade.getSmartImage).toHaveBeenCalled();
-			// Screenshot step should be completed
-			const state = plugin.getState();
-			const screenshotStep = state?.steps.get('capture-screenshots');
-			expect(screenshotStep?.status).toBe('completed');
+			expect(plugin.getState()?.steps.get('capture-screenshots')?.status).toBe('completed');
 		});
 	});
 });

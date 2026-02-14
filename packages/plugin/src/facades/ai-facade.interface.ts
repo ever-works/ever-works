@@ -4,6 +4,7 @@ import type {
 	ChatCompletionResponse,
 	ChatCompletionChunk
 } from '../contracts/capabilities/ai-provider.interface.js';
+import type { IBaseFacade } from './base-facade.interface.js';
 import type { FacadeOptions } from './facade-options.interface.js';
 
 /**
@@ -94,7 +95,7 @@ export interface AiProviderConfig {
 	};
 }
 
-export interface IAiFacade {
+export interface IAiFacade extends IBaseFacade {
 	/**
 	 * Send a prompt and get a structured JSON response.
 	 *
@@ -139,11 +140,6 @@ export interface IAiFacade {
 		options: ChatCompletionOptions,
 		facadeOptions: FacadeOptions
 	): AsyncGenerator<ChatCompletionChunk>;
-
-	/**
-	 * Check if AI service is configured and available.
-	 */
-	isConfigured(): boolean;
 
 	/**
 	 * Test the AI provider connection.

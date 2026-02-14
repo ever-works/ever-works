@@ -108,10 +108,25 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
             [GenerateStatusType.GENERATED]: {
                 title: t('generated.title'),
                 description: t('generated.description'),
-                color: 'border-success/20 dark:border-success/30 bg-success/5 dark:bg-success/10',
-                iconBg: 'bg-success/10 dark:bg-success/20',
-                iconColor: 'text-success',
-                icon: (
+                color: generateStatus.warnings?.length
+                    ? 'border-amber-500/20 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-900/10'
+                    : 'border-success/20 dark:border-success/30 bg-success/5 dark:bg-success/10',
+                iconBg: generateStatus.warnings?.length
+                    ? 'bg-amber-100 dark:bg-amber-900/20'
+                    : 'bg-success/10 dark:bg-success/20',
+                iconColor: generateStatus.warnings?.length
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-success',
+                icon: generateStatus.warnings?.length ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+                        />
+                    </svg>
+                ) : (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                             strokeLinecap="round"
@@ -122,21 +137,41 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                     </svg>
                 ),
                 action: (
-                    <div className="flex gap-2">
-                        <Button
-                            href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/items`}
-                            variant="secondary"
-                            size="sm"
-                        >
-                            {t('generated.viewItems')}
-                        </Button>
-                        <Button
-                            href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
-                            variant="ghost"
-                            size="sm"
-                        >
-                            {t('generated.regenerate')}
-                        </Button>
+                    <div>
+                        {generateStatus.warnings?.length ? (
+                            <div className="mb-3 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2">
+                                <p className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
+                                    {t('generated.withWarnings')}
+                                </p>
+                                <ul className="space-y-0.5">
+                                    {generateStatus.warnings.map((warning, i) => (
+                                        <li
+                                            key={i}
+                                            className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5"
+                                        >
+                                            <span className="shrink-0 mt-0.5">&#x2022;</span>
+                                            <span>{warning}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ) : null}
+                        <div className="flex gap-2">
+                            <Button
+                                href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/items`}
+                                variant="secondary"
+                                size="sm"
+                            >
+                                {t('generated.viewItems')}
+                            </Button>
+                            <Button
+                                href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
+                                variant="ghost"
+                                size="sm"
+                            >
+                                {t('generated.regenerate')}
+                            </Button>
+                        </div>
                     </div>
                 ),
             },

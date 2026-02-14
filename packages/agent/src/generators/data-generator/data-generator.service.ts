@@ -55,6 +55,7 @@ export type InitializeResult =
           success: true;
           prUpdate: PRUpdate | null;
           stats: GenerationStats;
+          warnings?: string[];
       }
     | {
           success: false;
@@ -148,11 +149,9 @@ export class DataGeneratorService {
                 metrics: this.convertPipelineMetrics(pipelineResult),
             };
 
-            return {
-                success: true,
-                prUpdate: null,
-                stats,
-            };
+            const warnings = pipelineResult.warnings?.slice();
+
+            return { success: true, prUpdate: null, stats, warnings };
         }
 
         const { categories: newCategories, items: newItems, tags: newTags } = pipelineResult;
@@ -491,10 +490,13 @@ export class DataGeneratorService {
                 );
             }
 
+            const warnings = pipelineResult.warnings?.slice();
+
             return {
                 success: true,
                 prUpdate,
                 stats,
+                warnings,
             };
         } catch (err) {
             this.logger.error('Failed to initialize data repository', err);

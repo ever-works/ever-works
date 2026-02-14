@@ -1020,6 +1020,7 @@ export class DirectoryGenerationService {
 
         let hasError = false;
         let generationStats: GenerationStats | null = null;
+        let generationWarnings: string[] | undefined;
 
         try {
             const generated = await this.dataGenerator.initialize(directory, user, dto, {
@@ -1033,6 +1034,7 @@ export class DirectoryGenerationService {
             }
 
             generationStats = generated.stats;
+            generationWarnings = generated.warnings;
 
             if ((generated.stats?.totalItemsCount ?? 0) > 0) {
                 await this.markdownGenerator.initialize(directory, user, {
@@ -1097,6 +1099,7 @@ export class DirectoryGenerationService {
                 this.directoryRepository.updateGenerateStatus(directory.id, {
                     status: GenerateStatusType.GENERATED,
                     step: null,
+                    warnings: generationWarnings,
                 }),
             ]);
 

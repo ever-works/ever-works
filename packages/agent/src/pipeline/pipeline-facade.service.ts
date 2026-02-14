@@ -198,6 +198,7 @@ export class PipelineFacadeService {
                     providerOverride: ctx.providerOverrides?.screenshot,
                 }),
             isAvailable: () => facade.isAvailable(),
+            isConfigured: () => facade.isConfigured(),
         };
     }
 

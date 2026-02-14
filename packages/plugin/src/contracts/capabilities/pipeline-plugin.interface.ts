@@ -92,6 +92,8 @@ export interface PipelineResult {
 	readonly failedStep?: string;
 	/** Pipeline state */
 	readonly state?: PipelineState;
+	/** Non-fatal warnings (e.g. degraded services, circuit breaker trips) */
+	readonly warnings?: readonly string[];
 }
 
 // ============================================================================

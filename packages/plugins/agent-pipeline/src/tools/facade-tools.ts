@@ -4,14 +4,27 @@ import type {
 	ISearchFacade,
 	IContentExtractorFacade,
 	FacadeOptions,
-	PipelineProgressCallback
+	PipelineProgressCallback,
+	PluginLogger
 } from '@ever-works/plugin';
 import { MAX_EXTRACT_CONTENT_LENGTH } from '../types.js';
+import type { ToolCircuitBreaker } from '../utils/tool-circuit-breaker.js';
+
+export interface FacadeToolOptions {
+	breaker: ToolCircuitBreaker;
+	logger: PluginLogger;
+}
 
 /**
  * Create a search tool that wraps the search facade.
  */
-export function createSearchTool(searchFacade: ISearchFacade, facadeOptions: FacadeOptions) {
+export function createSearchTool(
+	searchFacade: ISearchFacade,
+	facadeOptions: FacadeOptions,
+	toolOptions: FacadeToolOptions
+) {
+	const { breaker, logger } = toolOptions;
+
 	return tool({
 		description: 'Search the web for information. Returns a list of results with title, URL, and relevance score.',
 		inputSchema: z.object({
@@ -19,13 +32,29 @@ export function createSearchTool(searchFacade: ISearchFacade, facadeOptions: Fac
 			maxResults: z.number().optional().default(10).describe('Maximum number of results to return (default 10)')
 		}),
 		execute: async ({ query, maxResults }) => {
-			const results = await searchFacade.search(query, { maxResults }, facadeOptions);
-			return results.map((r) => ({
-				title: r.title,
-				url: r.url,
-				score: r.score,
-				publishedDate: r.publishedDate
-			}));
+			if (breaker.isTripped('search')) {
+				return { results: [], error: breaker.getUnavailableMessage('search') };
+			}
+
+			try {
+				const results = await searchFacade.search(query, { maxResults }, facadeOptions);
+				breaker.recordSuccess('search');
+				return results.map((r) => ({
+					title: r.title,
+					url: r.url,
+					score: r.score,
+					publishedDate: r.publishedDate
+				}));
+			} catch (err) {
+				const error = err instanceof Error ? err : new Error(String(err));
+				logger.warn(`Search tool error: ${error.message}`);
+				breaker.recordFailure('search', error);
+
+				if (breaker.isTripped('search')) {
+					return { results: [], error: breaker.getUnavailableMessage('search') };
+				}
+				return { results: [], error: `Search failed: ${error.message}. You may retry with a different query.` };
+			}
 		}
 	});
 }
@@ -36,8 +65,11 @@ export function createSearchTool(searchFacade: ISearchFacade, facadeOptions: Fac
  */
 export function createExtractContentTool(
 	contentExtractorFacade: IContentExtractorFacade,
-	facadeOptions: FacadeOptions
+	facadeOptions: FacadeOptions,
+	toolOptions: FacadeToolOptions
 ) {
+	const { breaker, logger } = toolOptions;
+
 	return tool({
 		description:
 			"Extract the text content from a web page URL. Use this to read details from an item's official page.",
@@ -45,15 +77,38 @@ export function createExtractContentTool(
 			url: z.string().url().describe('The URL to extract content from')
 		}),
 		execute: async ({ url }) => {
-			const result = await contentExtractorFacade.extractContent(url, undefined, facadeOptions);
-			if (!result?.rawContent) {
-				return { url, content: '', error: 'Failed to extract content' };
+			if (breaker.isTripped('extractContent')) {
+				return { url, content: '', error: breaker.getUnavailableMessage('extractContent') };
 			}
-			const content =
-				result.rawContent.length > MAX_EXTRACT_CONTENT_LENGTH
-					? result.rawContent.slice(0, MAX_EXTRACT_CONTENT_LENGTH) + '\n\n[Content truncated]'
-					: result.rawContent;
-			return { url, content, images: result.images };
+
+			try {
+				const result = await contentExtractorFacade.extractContent(url, undefined, facadeOptions);
+
+				// Null/empty content is NOT a service failure — don't trip the breaker
+				if (!result?.rawContent) {
+					return { url, content: '', error: 'Failed to extract content from this URL' };
+				}
+
+				breaker.recordSuccess('extractContent');
+				const content =
+					result.rawContent.length > MAX_EXTRACT_CONTENT_LENGTH
+						? result.rawContent.slice(0, MAX_EXTRACT_CONTENT_LENGTH) + '\n\n[Content truncated]'
+						: result.rawContent;
+				return { url, content, images: result.images };
+			} catch (err) {
+				const error = err instanceof Error ? err : new Error(String(err));
+				logger.warn(`ExtractContent tool error: ${error.message}`);
+				breaker.recordFailure('extractContent', error);
+
+				if (breaker.isTripped('extractContent')) {
+					return { url, content: '', error: breaker.getUnavailableMessage('extractContent') };
+				}
+				return {
+					url,
+					content: '',
+					error: `Content extraction failed: ${error.message}. You may retry with a different URL.`
+				};
+			}
 		}
 	});
 }

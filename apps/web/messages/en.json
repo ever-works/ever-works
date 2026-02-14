@@ -607,6 +607,7 @@
                 "generated": {
                     "title": "Generation Complete",
                     "description": "Your directory has been successfully populated with items.",
+                    "withWarnings": "Completed with warnings:",
                     "viewItems": "View Items",
                     "regenerate": "Regenerate"
                 },
