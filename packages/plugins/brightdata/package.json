@@ -1,7 +1,7 @@
 {
-	"name": "@ever-works/exa-plugin",
+	"name": "@ever-works/brightdata-plugin",
 	"version": "1.0.0",
-	"description": "Exa Plugin - Neural and keyword search using the Exa API",
+	"description": "Bright Data Plugin - Web search and content extraction using Bright Data API",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -24,7 +24,7 @@
 		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
-		"exa-js": "^2.4.0"
+		"@brightdata/sdk": "^0.2.0"
 	},
 	"peerDependencies": {
 		"@ever-works/plugin": "workspace:*"
@@ -37,15 +37,15 @@
 	},
 	"everworks": {
 		"plugin": {
-			"id": "exa",
-			"name": "Exa",
+			"id": "brightdata",
+			"name": "Bright Data",
 			"version": "1.0.0",
 			"category": "search",
 			"capabilities": [
 				"search",
 				"content-extractor"
 			],
-			"description": "AI-native search using the Exa API. Supports neural, keyword, and auto search modes with optional category filtering.",
+			"description": "Web search (SERP API) and content extraction (Web Scraper) using the Bright Data API. Handles bot detection bypass and supports multiple search engines.",
 			"author": {
 				"name": "Ever Works Team"
 			},
@@ -55,10 +55,10 @@
 			"builtIn": true,
 			"envVars": [
 				{
-					"name": "PLUGIN_EXA_API_KEY",
+					"name": "PLUGIN_BRIGHTDATA_API_KEY",
 					"required": false,
 					"secret": true,
-					"description": "Exa API key (optional - can be set via admin/user settings)"
+					"description": "Bright Data API key (optional - can be set via admin/user settings)"
 				}
 			]
 		}

@@ -1,7 +1,7 @@
 {
-	"name": "@ever-works/exa-plugin",
+	"name": "@ever-works/firecrawl-plugin",
 	"version": "1.0.0",
-	"description": "Exa Plugin - Neural and keyword search using the Exa API",
+	"description": "Firecrawl Plugin - Content extraction using the Firecrawl API",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -24,7 +24,7 @@
 		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
-		"exa-js": "^2.4.0"
+		"@mendable/firecrawl-js": "^4.12.1"
 	},
 	"peerDependencies": {
 		"@ever-works/plugin": "workspace:*"
@@ -37,15 +37,14 @@
 	},
 	"everworks": {
 		"plugin": {
-			"id": "exa",
-			"name": "Exa",
+			"id": "firecrawl",
+			"name": "Firecrawl",
 			"version": "1.0.0",
-			"category": "search",
+			"category": "content-extractor",
 			"capabilities": [
-				"search",
 				"content-extractor"
 			],
-			"description": "AI-native search using the Exa API. Supports neural, keyword, and auto search modes with optional category filtering.",
+			"description": "Content extraction using the Firecrawl API. Scrapes web pages and returns clean markdown content.",
 			"author": {
 				"name": "Ever Works Team"
 			},
@@ -55,10 +54,10 @@
 			"builtIn": true,
 			"envVars": [
 				{
-					"name": "PLUGIN_EXA_API_KEY",
+					"name": "PLUGIN_FIRECRAWL_API_KEY",
 					"required": false,
 					"secret": true,
-					"description": "Exa API key (optional - can be set via admin/user settings)"
+					"description": "Firecrawl API key (optional - can be set via admin/user settings)"
 				}
 			]
 		}
