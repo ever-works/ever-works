@@ -1,6 +1,7 @@
 import type {
 	IPlugin,
 	IPipelinePlugin,
+	IFormSchemaProvider,
 	PluginContext,
 	PluginCategory,
 	JsonSchema,
@@ -17,7 +18,9 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	StepStatus,
-	FacadeOptions
+	FacadeOptions,
+	FormFieldDefinition,
+	FormFieldGroup
 } from '@ever-works/plugin';
 
 import type { ClaudeCodeStepId } from './types.js';
@@ -46,6 +49,12 @@ import {
 	buildErrorResult,
 	buildCancelledResult
 } from './utils/pipeline-helpers.js';
+import {
+	getFormFields as formFields,
+	getFormGroups as formGroups,
+	validateFormInput as formValidate,
+	getDefaultValues as formDefaults
+} from './form-schema.js';
 
 /**
  * Claude Code Generator Plugin
@@ -54,13 +63,14 @@ import {
  * Runs a single Claude Code session that handles web search,
  * content creation, and file generation autonomously.
  */
-export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
+export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider {
 	readonly id = 'claude-code';
 	readonly name = 'Claude Code Generator';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'pipeline';
-	readonly capabilities = ['pipeline'] as const;
+	readonly capabilities = ['pipeline', 'form-schema-provider'] as const;
 	readonly configurationMode = 'user-required' as const;
+	readonly handledConfigFields = ['*'] as const;
 
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
@@ -225,6 +235,24 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 		};
 	}
 
+	// ── IFormSchemaProvider ─────────────────────────────────────────────
+
+	getFormFields(): FormFieldDefinition[] {
+		return formFields();
+	}
+
+	getFormGroups(): FormFieldGroup[] {
+		return formGroups();
+	}
+
+	validateFormInput(values: Record<string, unknown>): ValidationResult {
+		return formValidate(values);
+	}
+
+	getDefaultValues(): Record<string, unknown> {
+		return formDefaults(this.getFormFields());
+	}
+
 	// ── IPipelinePlugin ─────────────────────────────────────────────────
 
 	getStepDefinitions(): readonly PipelineStepDefinition[] {
@@ -344,7 +372,9 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 			const execContext = options?.execContext;
 			const screenshotFacade = execContext?.screenshotFacade;
 
-			if (screenshotFacade?.isAvailable() && items.length > 0 && !signal.aborted) {
+			const shouldCapture = (request.config || {}).capture_screenshots !== false;
+
+			if (shouldCapture && screenshotFacade?.isAvailable() && items.length > 0 && !signal.aborted) {
 				this.setState('capture-screenshots', 'running');
 				reportProgress(onProgress, 4, 87, 'Capture Screenshots');
 

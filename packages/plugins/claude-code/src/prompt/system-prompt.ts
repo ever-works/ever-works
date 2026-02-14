@@ -1,5 +1,6 @@
 import type { DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
 import { ITEM_SCHEMA_PROMPT_TEXT } from '@ever-works/plugin';
+import { DEFAULT_TARGET_ITEMS } from '../form-schema.js';
 
 export interface SystemPromptOptions {
 	readonly directory: DirectoryReference;
@@ -13,9 +14,10 @@ export interface SystemPromptOptions {
  * Uses --append-system-prompt to preserve Claude Code's tool capabilities.
  */
 export function buildSystemPrompt(options: SystemPromptOptions): string {
-	const { directory, existing, workspacePath } = options;
+	const { directory, request, existing, workspacePath } = options;
 	const existingCount = existing.items.length;
 	const hasExisting = existingCount > 0;
+	const targetItems = ((request.config || {}).target_items as number) || DEFAULT_TARGET_ITEMS;
 
 	const sections: string[] = [];
 
@@ -121,6 +123,15 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
 		);
 	}
 
+	// Generation target
+	sections.push(
+		`\n## Generation Target\n` +
+			`Aim to generate approximately **${targetItems}** new items. ` +
+			'This is a target — prioritize quality and relevance over hitting the exact number, ' +
+			'but do not stop early if there are more relevant items to find. ' +
+			'Do not count existing items toward this target.'
+	);
+
 	// Directory context
 	if (directory.description) {
 		sections.push(
@@ -138,6 +149,7 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
 export function buildUserPrompt(options: SystemPromptOptions): string {
 	const { directory, request, existing } = options;
 	const hasExisting = existing.items.length > 0;
+	const targetItems = ((request.config || {}).target_items as number) || DEFAULT_TARGET_ITEMS;
 	const parts: string[] = [];
 
 	if (request.prompt) {
@@ -167,6 +179,8 @@ export function buildUserPrompt(options: SystemPromptOptions): string {
 				'The system will automatically update _meta/ files based on your items.'
 		);
 	}
+
+	parts.push(`\nTarget: generate approximately ${targetItems} new items.`);
 
 	return parts.join('\n');
 }
