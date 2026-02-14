@@ -56,7 +56,7 @@ export class ContentExtractorFacadeService
 
     async extractContent(
         url: string,
-        options: FacadeExtractionOptions | undefined,
+        _options: FacadeExtractionOptions | undefined,
         facadeOptions: FacadeOptions,
     ): Promise<FacadeExtractedContent | null> {
         try {
