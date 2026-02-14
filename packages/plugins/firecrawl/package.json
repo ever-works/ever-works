@@ -1,0 +1,65 @@
+{
+	"name": "@ever-works/firecrawl-plugin",
+	"version": "1.0.0",
+	"description": "Firecrawl Plugin - Content extraction using the Firecrawl API",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@mendable/firecrawl-js": "^4.12.1"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "firecrawl",
+			"name": "Firecrawl",
+			"version": "1.0.0",
+			"category": "content-extractor",
+			"capabilities": [
+				"content-extractor"
+			],
+			"description": "Content extraction using the Firecrawl API. Scrapes web pages and returns clean markdown content.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"autoEnable": false,
+			"systemPlugin": false,
+			"builtIn": true,
+			"envVars": [
+				{
+					"name": "PLUGIN_FIRECRAWL_API_KEY",
+					"required": false,
+					"secret": true,
+					"description": "Firecrawl API key (optional - can be set via admin/user settings)"
+				}
+			]
+		}
+	}
+}
