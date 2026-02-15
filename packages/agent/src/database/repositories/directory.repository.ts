@@ -208,6 +208,9 @@ export class DirectoryRepository {
         id: string,
         generateStatus: Directory['generateStatus'],
     ): Promise<void> {
+        if (generateStatus?.warnings?.length) {
+            generateStatus = { ...generateStatus, warnings: [...new Set(generateStatus.warnings)] };
+        }
         await this.repository.update(id, { generateStatus, generationProgressedAt: new Date() });
     }
 

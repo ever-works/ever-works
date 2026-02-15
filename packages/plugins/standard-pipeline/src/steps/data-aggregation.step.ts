@@ -55,7 +55,11 @@ export class DataAggregationStep extends BasePipelineStep {
 
 		if (finalItems.length === 0) {
 			context.shouldStop = true;
-			this.addWarning(context, 'No items available after aggregation. The pipeline will stop.');
+			if (existingItems.length > 0) {
+				this.addWarning(context, 'No new items found. The directory already has existing items.');
+			} else {
+				this.addWarning(context, 'No items were generated or found from any source.');
+			}
 		}
 
 		if (updatedMetrics) {

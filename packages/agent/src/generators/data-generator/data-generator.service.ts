@@ -61,6 +61,7 @@ export type InitializeResult =
     | {
           success: false;
           error: InitializeError;
+          warnings?: string[];
       };
 
 type UpdateMarkdownTemplateResult = {
@@ -132,6 +133,7 @@ export class DataGeneratorService {
                             ? pipelineResult.error
                             : new Error(String(pipelineResult.error)),
                 },
+                warnings: pipelineResult.warnings?.slice(),
             };
         }
 

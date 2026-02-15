@@ -1008,6 +1008,7 @@ export class DirectoryGenerationService {
 
             if (generated.success === false) {
                 const { error } = generated;
+                generationWarnings = generated.warnings;
                 this.logger.error(`Data generation failed: ${error.message}`);
                 throw error.cause || new Error(error.message);
             }
@@ -1041,6 +1042,7 @@ export class DirectoryGenerationService {
                 this.directoryRepository.updateGenerateStatus(directory.id, {
                     status: GenerateStatusType.ERROR,
                     error: normalizeGeneratorError(error),
+                    warnings: generationWarnings,
                 }),
             ]);
 

@@ -395,10 +395,21 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 		meta: { duration: number; stepsCompleted: number; totalSteps: number; state?: PipelineState }
 	): PipelineResult {
 		const ctx = context as TypedGenerationContext;
-		const hasItems = ctx.finalItems.length > 0;
+		const hasNewItems = ctx.finalItems.length > 0;
+		const hasExistingItems = (ctx.existing.items?.length ?? 0) > 0;
 		ctx.updateMetrics({ duration: meta.duration, itemsProcessed: ctx.finalItems.length });
+		let error: string | undefined;
+		const warnings = [...ctx.warnings];
+		if (!hasNewItems && !hasExistingItems) {
+			if (warnings.length > 0) {
+				error = warnings.pop();
+			} else {
+				error = 'Pipeline completed but generated no items.';
+			}
+		}
+
 		return {
-			success: hasItems,
+			success: hasNewItems || hasExistingItems,
 			items: ctx.finalItems,
 			categories: ctx.finalCategories,
 			tags: ctx.finalTags,
@@ -407,8 +418,8 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 			stepsCompleted: meta.stepsCompleted,
 			totalSteps: meta.totalSteps,
 			state: meta.state,
-			warnings: ctx.warnings.length > 0 ? ctx.warnings : undefined,
-			error: hasItems ? undefined : 'Pipeline completed but generated no items.'
+			warnings,
+			error
 		};
 	}
 

@@ -118,13 +118,33 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                 title: t('error.title'),
                 description: generateStatus.error || t('error.description'),
                 action: (
-                    <Button
-                        href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
-                        variant="primary"
-                        size="sm"
-                    >
-                        {t('error.retry')}
-                    </Button>
+                    <div>
+                        {generateStatus.warnings?.length ? (
+                            <div className="mb-3 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2">
+                                <p className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
+                                    {t('generated.withWarnings')}
+                                </p>
+                                <ul className="space-y-0.5">
+                                    {generateStatus.warnings.map((warning, i) => (
+                                        <li
+                                            key={i}
+                                            className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5"
+                                        >
+                                            <span className="shrink-0 mt-0.5">&#x2022;</span>
+                                            <span>{warning}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ) : null}
+                        <Button
+                            href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
+                            variant="primary"
+                            size="sm"
+                        >
+                            {t('error.retry')}
+                        </Button>
+                    </div>
                 ),
             },
             [GenerateStatusType.CANCELLED]: {
