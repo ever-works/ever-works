@@ -1015,19 +1015,22 @@ export class DirectoryGenerationService {
             }
 
             generationStats = generated.stats;
+            const newItemsCount = generated.stats?.newItemsCount ?? 0;
 
-            if ((generated.stats?.totalItemsCount ?? 0) > 0) {
+            if (newItemsCount > 0) {
                 await this.markdownGenerator.initialize(directory, user, {
                     generation_method: dto.generation_method,
                     pr_update: generated.prUpdate,
                 });
             }
 
-            await this.websiteGenerator.initialize(
-                directory,
-                user,
-                dto.website_repository_creation_method,
-            );
+            if (generated.hasExistingItems || newItemsCount > 0) {
+                await this.websiteGenerator.initialize(
+                    directory,
+                    user,
+                    dto.website_repository_creation_method,
+                );
+            }
 
             if (history) {
                 await this.generationHistoryRepository.updateEntry(history.id, {
