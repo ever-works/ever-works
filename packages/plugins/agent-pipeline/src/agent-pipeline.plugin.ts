@@ -459,10 +459,16 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			}
 		};
 
-		return breaker.getFailedTools().map((tool) => {
+		const warnings = breaker.getFailedTools().map((tool) => {
 			const info = toolLabels[tool.name] ?? { label: tool.name, impact: 'Results may be less accurate.' };
 			return `${info.label} was unavailable during generation (${tool.reason}). ${info.impact}`;
 		});
+
+		if (warnings.length > 0) {
+			logger.warn(`Generation warnings (${warnings.length}): ${warnings.join(' | ')}`);
+		}
+
+		return warnings;
 	}
 
 	private async collectAndMergeResults(

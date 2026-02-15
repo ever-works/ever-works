@@ -432,6 +432,7 @@
                 "notStarted": "Not Started",
                 "generating": "Generating",
                 "generated": "Generated",
+                "generatedWithWarnings": "Generated with warnings",
                 "error": "Error",
                 "cancelled": "Cancelled"
             },

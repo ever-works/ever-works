@@ -1,20 +1,19 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import { DataGeneratorService } from '@ever-works/agent/generators';
+import { DataGeneratorService, GenerationStats } from '@ever-works/agent/generators';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
 import { WebsiteGeneratorService } from '@ever-works/agent/generators';
 import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
 import { CreateItemsGeneratorDto } from '@ever-works/agent/items-generator';
-import { DirectoryOperationsService } from '@ever-works/agent/directory-operations';
+import {
+    DirectoryOperationsService,
+    buildStatsUpdate,
+} from '@ever-works/agent/directory-operations';
 import { NotificationService } from '@ever-works/agent/notifications';
-import { ItemsGeneratorMetrics } from '@ever-works/agent/items-generator';
-import { classifyGenerationError, notifyForClassifiedError } from '@ever-works/agent/services';
-
-type GenerationStats = {
-    newItemsCount: number;
-    updatedItemsCount: number;
-    totalItemsCount: number;
-    metrics?: ItemsGeneratorMetrics;
-};
+import {
+    classifyGenerationError,
+    notifyForClassifiedError,
+    normalizeGeneratorError,
+} from '@ever-works/agent/services';
 
 export type TriggerGenerationOptions = {
     directory: Directory;
@@ -53,6 +52,7 @@ export class TriggerGenerationOrchestrator {
 
         let hasError = false;
         let generationStats: GenerationStats | null = null;
+        let generationWarnings: string[] | undefined;
 
         try {
             const generated = await this.dataGenerator.initialize(directory, user, dto);
@@ -62,6 +62,7 @@ export class TriggerGenerationOrchestrator {
             }
 
             generationStats = generated.stats;
+            generationWarnings = generated.warnings;
 
             if (generated.stats.totalItemsCount > 0) {
                 await this.markdownGenerator.initialize(directory, user, {
@@ -77,10 +78,7 @@ export class TriggerGenerationOrchestrator {
             );
 
             await this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
-                newItemsCount: generationStats?.newItemsCount ?? 0,
-                updatedItemsCount: generationStats?.updatedItemsCount ?? 0,
-                totalItemsCount: generationStats?.totalItemsCount ?? 0,
-                metrics: generationStats?.metrics,
+                ...buildStatsUpdate(generationStats),
             });
         } catch (error) {
             hasError = true;
@@ -89,7 +87,7 @@ export class TriggerGenerationOrchestrator {
                 this.directoryOperations.recordGenerationFinishTime(directory.id, new Date()),
                 this.directoryOperations.updateGenerateStatus(directory.id, {
                     status: GenerateStatusType.ERROR,
-                    error: error instanceof Error ? error.message : String(error),
+                    error: normalizeGeneratorError(error),
                 }),
             ]);
 
@@ -99,11 +97,8 @@ export class TriggerGenerationOrchestrator {
                 status: GenerateStatusType.ERROR,
                 finishedAt: endTime,
                 durationInSeconds: duration,
-                errorMessage: error instanceof Error ? error.message : String(error),
-                newItemsCount: generationStats?.newItemsCount ?? 0,
-                updatedItemsCount: generationStats?.updatedItemsCount ?? 0,
-                totalItemsCount: generationStats?.totalItemsCount ?? 0,
-                metrics: generationStats?.metrics,
+                errorMessage: normalizeGeneratorError(error),
+                ...buildStatsUpdate(generationStats),
             });
 
             this.logger.error('Generation failed', error as Error);
@@ -122,15 +117,13 @@ export class TriggerGenerationOrchestrator {
                     this.directoryOperations.updateGenerateStatus(directory.id, {
                         status: GenerateStatusType.GENERATED,
                         step: null,
+                        warnings: generationWarnings,
                     }),
                     this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
                         status: GenerateStatusType.GENERATED,
                         finishedAt: endTime,
                         durationInSeconds: duration,
-                        newItemsCount: generationStats?.newItemsCount ?? 0,
-                        updatedItemsCount: generationStats?.updatedItemsCount ?? 0,
-                        totalItemsCount: generationStats?.totalItemsCount ?? 0,
-                        metrics: generationStats?.metrics,
+                        ...buildStatsUpdate(generationStats),
                     }),
                 ]);
             }

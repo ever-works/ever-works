@@ -5,6 +5,7 @@ import { GenerationMetrics } from '@src/entities/directory-generation-history.en
 import { GenerateStatusType } from '@src/entities/types';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DirectoryGenerationCompletedEvent } from '@src/events';
+import { GenerationStats } from '../generators/data-generator/data-generator.service';
 
 export type GenerationHistoryUpdateInput = {
     status?: GenerateStatusType;
@@ -18,6 +19,20 @@ export type GenerationHistoryUpdateInput = {
     metrics?: GenerationMetrics | null;
     parameters?: Record<string, any> | null;
 };
+
+export function buildStatsUpdate(
+    stats: GenerationStats | null | undefined,
+): Pick<
+    GenerationHistoryUpdateInput,
+    'newItemsCount' | 'updatedItemsCount' | 'totalItemsCount' | 'metrics'
+> {
+    return {
+        newItemsCount: stats?.newItemsCount ?? 0,
+        updatedItemsCount: stats?.updatedItemsCount ?? 0,
+        totalItemsCount: stats?.totalItemsCount ?? 0,
+        metrics: stats?.metrics,
+    };
+}
 
 @Injectable()
 export class DirectoryOperationsService {

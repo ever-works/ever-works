@@ -58,6 +58,7 @@ import { DirectoryImportService } from './directory-import.service';
 import { NotificationService } from '@src/notifications/notification.service';
 import { ScreenshotFacadeService } from '@src/facades';
 import { GeneratorFormSchemaService } from './generator-form-schema.service';
+import { buildStatsUpdate } from '../directory-operations/directory-operations.service';
 import { PluginOperationsService } from '@src/plugins/services/plugin-operations.service';
 import { getCapabilityFromUIKey, SELECTABLE_PROVIDER_CATEGORIES } from '@ever-works/plugin';
 import { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dto';
@@ -1051,10 +1052,7 @@ export class DirectoryGenerationService {
 
             if (history) {
                 await this.generationHistoryRepository.updateEntry(history.id, {
-                    newItemsCount: generationStats?.newItemsCount ?? 0,
-                    updatedItemsCount: generationStats?.updatedItemsCount ?? 0,
-                    totalItemsCount: generationStats?.totalItemsCount ?? 0,
-                    metrics: generationStats?.metrics,
+                    ...buildStatsUpdate(generationStats),
                 });
             }
         } catch (error) {
@@ -1074,10 +1072,7 @@ export class DirectoryGenerationService {
                     finishedAt: endTime,
                     durationInSeconds: duration,
                     errorMessage: normalizeGeneratorError(error),
-                    newItemsCount: generationStats?.newItemsCount ?? 0,
-                    updatedItemsCount: generationStats?.updatedItemsCount ?? 0,
-                    totalItemsCount: generationStats?.totalItemsCount ?? 0,
-                    metrics: generationStats?.metrics,
+                    ...buildStatsUpdate(generationStats),
                 });
             }
 
@@ -1110,10 +1105,7 @@ export class DirectoryGenerationService {
                     status: GenerateStatusType.GENERATED,
                     finishedAt: endTime,
                     durationInSeconds: duration,
-                    newItemsCount: generationStats?.newItemsCount ?? 0,
-                    updatedItemsCount: generationStats?.updatedItemsCount ?? 0,
-                    totalItemsCount: generationStats?.totalItemsCount ?? 0,
-                    metrics: generationStats?.metrics,
+                    ...buildStatsUpdate(generationStats),
                 });
             }
         }
