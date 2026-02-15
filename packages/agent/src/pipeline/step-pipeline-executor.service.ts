@@ -21,6 +21,7 @@ import type {
     PipelineStepFailedPayload,
     PipelineCompletedPayload,
     PipelineFailedPayload,
+    ExecutablePipeline,
 } from '@ever-works/plugin';
 import { isPipelineModifierPlugin } from '@ever-works/plugin';
 import { PipelineBuilderService } from './pipeline-builder.service';
@@ -198,7 +199,7 @@ export class StepPipelineExecutorService {
 
     private async processStep(
         step: PipelineStepDefinition,
-        pipeline: any,
+        pipeline: ExecutablePipeline,
         plugin: IPipelinePlugin,
         runner: ExecutablePipelineRunner,
         context: IPipelineContext,

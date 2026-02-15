@@ -1,4 +1,12 @@
-import type { ItemData, Category, Tag, Brand, DomainAnalysis, WebPageData, PipelineMetrics } from '@ever-works/plugin';
+import type {
+	MutableItemData,
+	Category,
+	Tag,
+	Brand,
+	DomainAnalysis,
+	WebPageData,
+	PipelineMetrics
+} from '@ever-works/plugin';
 
 export type StepDataKey =
 	| 'extractedUrls'
@@ -28,10 +36,10 @@ export interface StepDataTypes {
 	webPages: WebPageData[];
 	processedSourceUrls: Set<string>;
 	contentCache: Map<string, string>;
-	initialAiItems: ItemData[];
-	extractedWebItems: ItemData[];
-	aggregatedItems: ItemData[];
-	finalItems: ItemData[];
+	initialAiItems: MutableItemData[];
+	extractedWebItems: MutableItemData[];
+	aggregatedItems: MutableItemData[];
+	finalItems: MutableItemData[];
 	finalCategories: Category[];
 	finalTags: Tag[];
 	finalBrands: Brand[];

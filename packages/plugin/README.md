@@ -276,7 +276,7 @@ import { IPlugin, BasePlugin, createMockPluginContext } from '@ever-works/plugin
 import { IPlugin, IGitProviderPlugin, IGitOperations } from '@ever-works/plugin/contracts';
 
 // Pipeline types
-import { BuiltInStepId, MutableGenerationContext } from '@ever-works/plugin/pipeline';
+import { IPipelineContext, PipelineStepDefinition } from '@ever-works/plugin/pipeline';
 
 // Events
 import { PluginEventName, PluginEventPayloads } from '@ever-works/plugin/events';
