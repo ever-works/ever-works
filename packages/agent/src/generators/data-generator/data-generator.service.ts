@@ -968,7 +968,7 @@ export class DataGeneratorService {
     private async onGenerationProgress(progress: PipelineProgress, directory: Directory) {
         await this.directoryOperations.updateGenerateStatus(directory.id, {
             status: GenerateStatusType.GENERATING,
-            step: progress.currentStepName ?? progress.message,
+            step: progress.message ?? progress.currentStepName,
             stepName: progress.currentStepName,
             stepIndex: progress.currentStepIndex,
             totalSteps: progress.totalSteps,

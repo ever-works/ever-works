@@ -366,6 +366,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			baseURL: providerConfig.baseUrl!,
 			apiKey: providerConfig.apiKey!
 		});
+
 		const model = wrapLanguageModel({
 			model: provider(modelName),
 			middleware: {
