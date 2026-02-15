@@ -48,6 +48,14 @@ export abstract class BaseOrchestrator {
         historyStartedAt,
         errorMessage,
     }: OrchestratorFailureOptions): Promise<void> {
+        // If the orchestrator already recorded the failure (with warnings etc.),
+        // do not overwrite it — this handler is only a safety net.
+        const currentStatus = await this.directoryOperations.getGenerateStatus(directory.id);
+        if (currentStatus?.status === GenerateStatusType.ERROR) {
+            await this.directoryOperations.emitGenerationCompleted(directory.id);
+            return;
+        }
+
         const finishedAt = new Date();
         const startTime = this.resolveStartTime(historyStartedAt);
         const duration = Math.max(0, calculateDurationSeconds(startTime, finishedAt));

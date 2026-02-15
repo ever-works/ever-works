@@ -69,6 +69,11 @@ export class DirectoryOperationsService {
         await this.directoryRepository.update(id, updateData);
     }
 
+    async getGenerateStatus(id: string): Promise<Directory['generateStatus'] | undefined> {
+        const directory = await this.directoryRepository.findById(id);
+        return directory?.generateStatus;
+    }
+
     async updateGenerateStatus(id: string, status: Directory['generateStatus']): Promise<void> {
         if (status?.warnings?.length) {
             status = { ...status, warnings: [...new Set(status.warnings)] };

@@ -121,6 +121,8 @@ export class DataGeneratorService {
             options?.tryResume,
         );
 
+        const warnings = pipelineResult.warnings?.slice();
+
         // If pipeline failed or no items were generated, handle appropriately
         if (!pipelineResult.success) {
             return {
@@ -133,7 +135,7 @@ export class DataGeneratorService {
                             ? pipelineResult.error
                             : new Error(String(pipelineResult.error)),
                 },
-                warnings: pipelineResult.warnings?.slice(),
+                warnings,
             };
         }
 
@@ -145,8 +147,6 @@ export class DataGeneratorService {
                 totalItemsCount: 0,
                 metrics: this.convertPipelineMetrics(pipelineResult),
             };
-
-            const warnings = pipelineResult.warnings?.slice();
 
             return { success: true, prUpdate: null, stats, warnings };
         }
@@ -200,6 +200,7 @@ export class DataGeneratorService {
                     message: `Failed to clone repository ${directory.getRepoOwner()}/${repo}`,
                     cause: err instanceof Error ? err : new Error(String(err)),
                 },
+                warnings,
             };
         }
 
@@ -215,6 +216,7 @@ export class DataGeneratorService {
                     message: 'Failed to create data repository from cloned directory',
                     cause: err instanceof Error ? err : new Error(String(err)),
                 },
+                warnings,
             };
         }
 
@@ -487,8 +489,6 @@ export class DataGeneratorService {
                 );
             }
 
-            const warnings = pipelineResult.warnings?.slice();
-
             return {
                 success: true,
                 prUpdate,
@@ -504,6 +504,7 @@ export class DataGeneratorService {
                     message: 'Failed to complete data repository initialization',
                     cause: err instanceof Error ? err : new Error(String(err)),
                 },
+                warnings,
             };
         }
     }
