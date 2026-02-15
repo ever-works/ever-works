@@ -70,6 +70,9 @@ export class DirectoryOperationsService {
     }
 
     async updateGenerateStatus(id: string, status: Directory['generateStatus']): Promise<void> {
+        if (status?.warnings?.length) {
+            status = { ...status, warnings: [...new Set(status.warnings)] };
+        }
         await this.directoryRepository.updateGenerateStatus(id, status);
     }
 

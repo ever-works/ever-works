@@ -52,9 +52,11 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
         ]);
 
         let generationStats: GenerationStats | null = null;
+        let generationWarnings: string[] | undefined;
 
         try {
             const generated = await this.dataGenerator.initialize(directory, user, dto);
+            generationWarnings = generated.warnings;
 
             if (generated.success === false) {
                 throw new Error(generated.error.message);
@@ -82,7 +84,7 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
                 this.directoryOperations.updateGenerateStatus(directory.id, {
                     status: GenerateStatusType.GENERATED,
                     step: null,
-                    warnings: generated.warnings,
+                    warnings: generationWarnings,
                 }),
                 this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
                     status: GenerateStatusType.GENERATED,
@@ -99,6 +101,7 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
                 this.directoryOperations.updateGenerateStatus(directory.id, {
                     status: GenerateStatusType.ERROR,
                     error: normalizeGeneratorError(error),
+                    warnings: generationWarnings,
                 }),
             ]);
 

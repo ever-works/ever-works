@@ -1006,15 +1006,15 @@ export class DirectoryGenerationService {
                 tryResume: context.triggeredBy === 'schedule',
             });
 
+            generationWarnings = generated.warnings;
+
             if (generated.success === false) {
                 const { error } = generated;
-                generationWarnings = generated.warnings;
                 this.logger.error(`Data generation failed: ${error.message}`);
                 throw error.cause || new Error(error.message);
             }
 
             generationStats = generated.stats;
-            generationWarnings = generated.warnings;
 
             if ((generated.stats?.totalItemsCount ?? 0) > 0) {
                 await this.markdownGenerator.initialize(directory, user, {
