@@ -1,10 +1,6 @@
 import { z } from 'zod';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	PipelineMetrics,
-	FacadeOptions
-} from '@ever-works/plugin';
+import type { StepExecutionContext, FacadeOptions } from '@ever-works/plugin';
+import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
 const PROMPT_PROCESSING_PROMPT = `
@@ -123,7 +119,10 @@ export class PromptProcessingStep extends BasePipelineStep {
 	readonly stepId = 'prompt-processing' as const;
 	readonly name = 'Prompt Processing';
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { request, existing, directory, metrics } = context;
 		const { logger, aiFacade } = execContext;
 		const config = request.config || {};
@@ -211,7 +210,7 @@ export class PromptProcessingStep extends BasePipelineStep {
 	private async processPrompt(
 		context: MutableGenerationContext,
 		prompt: string,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
 		facadeOptions: FacadeOptions

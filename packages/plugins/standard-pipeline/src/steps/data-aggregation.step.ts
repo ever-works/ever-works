@@ -1,13 +1,12 @@
 import type {
-	MutableGenerationContext,
 	StepExecutionContext,
-	PipelineMetrics,
 	MutableItemData,
 	DataSourceFilterContext,
 	IAiFacade,
 	FacadeOptions
 } from '@ever-works/plugin';
 import { deduplicateByField, filterNewItemsManually } from '@ever-works/plugin';
+import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { extractKeywordsFromPrompt } from '@ever-works/plugin/keywords';
 import { z } from 'zod';
 import { BasePipelineStep } from '../base-pipeline-step.js';
@@ -17,7 +16,10 @@ export class DataAggregationStep extends BasePipelineStep {
 	readonly name = 'Deduplication and Data Aggregation';
 	readonly stepId = 'deduplication-and-data-aggregation' as const;
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { request, directory, existing, initialAiItems, extractedWebItems, webPages, advancedPrompts, metrics } =
 			context;
 		const { logger } = execContext;
@@ -64,10 +66,10 @@ export class DataAggregationStep extends BasePipelineStep {
 		existingItems: MutableItemData[],
 		newItems: MutableItemData[],
 		pagesProcessed: number,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		customPrompt: string | null | undefined,
 		execContext: StepExecutionContext
-	): Promise<{ aggregatedItems: MutableItemData[]; updatedMetrics: Partial<PipelineMetrics> }> {
+	): Promise<{ aggregatedItems: MutableItemData[]; updatedMetrics: Partial<StandardPipelineMetrics> }> {
 		const { logger } = execContext;
 		const newItemsExtractor = new NewItemsExtractor(execContext);
 		const aiDeduplicator = new AiDeduplicator(execContext);

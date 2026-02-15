@@ -1,4 +1,5 @@
-import type { MutableGenerationContext, StepExecutionContext, WebPageData, FacadeOptions } from '@ever-works/plugin';
+import type { StepExecutionContext, WebPageData, FacadeOptions } from '@ever-works/plugin';
+import type { MutableGenerationContext } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
 /**
@@ -13,7 +14,10 @@ export class WebSearchStep extends BasePipelineStep {
 	readonly stepId = 'web-search' as const;
 	private readonly BATCH_SIZE = 10;
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { request, directory, extractedUrls, searchQueries, processedSourceUrls } = context;
 		const { logger, searchFacade, contentExtractorFacade } = execContext;
 		const config = request.config || {};

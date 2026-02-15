@@ -1,26 +1,4 @@
-import type {
-	ItemData,
-	Category,
-	Tag,
-	Brand,
-	MutableItemData,
-	DomainAnalysis,
-	WebPageData
-} from '@ever-works/contracts';
-import type { PipelineMetrics } from './step-types.js';
-
-/**
- * Per-directory custom prompts that are appended to standard prompts
- */
-export interface AdvancedPromptsContext {
-	readonly relevanceAssessment?: string | null;
-	readonly itemGeneration?: string | null;
-	readonly itemExtraction?: string | null;
-	readonly searchQuery?: string | null;
-	readonly categorization?: string | null;
-	readonly deduplication?: string | null;
-	readonly sourceValidation?: string | null;
-}
+import type { ItemData, Category, Tag, Brand } from '@ever-works/contracts';
 
 /**
  * User reference for settings resolution and context.
@@ -131,99 +109,13 @@ export interface ExistingItems {
 }
 
 /**
- * Mutable generation context used during pipeline execution
+ * Minimal pipeline context interface.
+ * All pipeline-specific context types extend this.
+ * The engine works with this interface only — it never accesses pipeline-specific fields.
  */
-export interface MutableGenerationContext {
-	/** Directory being generated for */
-	directory: DirectoryReference;
-	/** Generation request parameters */
-	request: GenerationRequest;
-	/** Existing items in directory */
-	existing: ExistingItems;
-
-	// State accumulated during steps
-	extractedUrls: string[];
-	searchQueries: string[];
-	webPages: WebPageData[];
-	processedSourceUrls: Set<string>;
-
-	/** Content cache: source_url -> raw_content (for reuse in markdown generation) */
-	contentCache: Map<string, string>;
-
-	initialAiItems: MutableItemData[];
-	extractedWebItems: MutableItemData[];
-	aggregatedItems: MutableItemData[];
-	finalItems: MutableItemData[];
-	finalCategories: Category[];
-	finalTags: Tag[];
-	finalBrands: Brand[];
-
-	/** Domain intelligence */
-	domainAnalysis?: DomainAnalysis;
-
-	/** Pipeline metrics */
-	metrics: PipelineMetrics;
-
-	/** Internal state */
-	allInitialCategories: string[];
-	allPriorityCategories: string[];
-	featuredItemHints: string[];
-	subject?: string;
-
-	/** Per-directory advanced prompts */
-	advancedPrompts?: AdvancedPromptsContext | null;
-
-	/** Control flag to stop pipeline */
-	shouldStop?: boolean;
-
-	/** Non-fatal warnings accumulated during pipeline execution */
-	warnings: string[];
-
-	/**
-	 * Plugin configuration from GeneratorForm.
-	 * Maps plugin ID to per-directory settings including 'enabled' flags.
-	 *
-	 * This is passed from the GeneratorForm via CreateItemsGeneratorDto
-	 * and used by DataSourceFacade to determine which plugins to query.
-	 *
-	 * Example:
-	 * ```typescript
-	 * {
-	 *   'apify': { enabled: true, datasetId: '5uxB4x3zYjV5S7nFd' },
-	 *   'notion-extractor': { enabled: false }
-	 * }
-	 * ```
-	 */
-	pluginConfig?: Record<string, Record<string, unknown>>;
-}
-
-/**
- * Read-only generation context snapshot
- */
-export interface GenerationContextSnapshot {
+export interface IPipelineContext {
 	readonly directory: DirectoryReference;
 	readonly request: GenerationRequest;
-	readonly existing: ExistingItems;
-	readonly extractedUrls: readonly string[];
-	readonly searchQueries: readonly string[];
-	readonly webPages: readonly WebPageData[];
-	readonly processedSourceUrls: ReadonlySet<string>;
-	readonly contentCache: ReadonlyMap<string, string>;
-	readonly initialAiItems: readonly ItemData[];
-	readonly extractedWebItems: readonly ItemData[];
-	readonly aggregatedItems: readonly ItemData[];
-	readonly finalItems: readonly ItemData[];
-	readonly finalCategories: readonly Category[];
-	readonly finalTags: readonly Tag[];
-	readonly finalBrands: readonly Brand[];
-	readonly domainAnalysis?: DomainAnalysis;
-	readonly metrics: PipelineMetrics;
-	readonly allInitialCategories: readonly string[];
-	readonly allPriorityCategories: readonly string[];
-	readonly featuredItemHints: readonly string[];
-	readonly subject?: string;
-	readonly advancedPrompts?: AdvancedPromptsContext | null;
-	readonly shouldStop?: boolean;
-	readonly warnings: readonly string[];
-	readonly pluginConfig?: Record<string, Record<string, unknown>>;
+	shouldStop?: boolean;
+	warnings: string[];
 }

@@ -1,10 +1,6 @@
 import { z } from 'zod';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	PipelineMetrics,
-	FacadeOptions
-} from '@ever-works/plugin';
+import type { StepExecutionContext, FacadeOptions } from '@ever-works/plugin';
+import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { getErrorStack } from '../utils/error.utils.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
@@ -37,7 +33,10 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 	readonly name = 'Search Query Generation';
 	readonly stepId = 'search-queries-generation' as const;
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { request, directory, metrics, advancedPrompts } = context;
 		const { logger, aiFacade } = execContext;
 		const config = request.config || {};
@@ -78,7 +77,7 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 		description: string,
 		targetKeywords: string[],
 		maxSearchQueries: number,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		customPrompt: string | null | undefined,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],

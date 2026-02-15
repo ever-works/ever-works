@@ -1,11 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WebSearchStep } from '../steps/web-search.step';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	DirectoryReference,
-	GenerationRequest
-} from '@ever-works/plugin';
+import type { StepExecutionContext, DirectoryReference, GenerationRequest } from '@ever-works/plugin';
+import type { MutableGenerationContext } from '../context/index.js';
 
 describe('WebSearchStep', () => {
 	let step: WebSearchStep;

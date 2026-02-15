@@ -1,10 +1,5 @@
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	PipelineMetrics,
-	MutableItemData,
-	FacadeOptions
-} from '@ever-works/plugin';
+import type { StepExecutionContext, MutableItemData, FacadeOptions } from '@ever-works/plugin';
+import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { slugifyText } from '../utils/text.utils.js';
 import { getErrorStack } from '../utils/error.utils.js';
@@ -76,7 +71,10 @@ export class AiItemGenerationStep extends BasePipelineStep {
 	readonly name = 'AI Item Generation';
 	readonly stepId = 'ai-first-items-generation' as const;
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { request, directory, featuredItemHints, metrics, advancedPrompts } = context;
 		const { logger, aiFacade } = execContext;
 		const config = request.config || {};
@@ -124,7 +122,7 @@ export class AiItemGenerationStep extends BasePipelineStep {
 		topicDescription: string,
 		targetKeywords: string[],
 		featuredItemHints: string[] = [],
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		customPrompt: string | null | undefined,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],

@@ -2,7 +2,7 @@ import type { IPlugin } from '../plugin.interface.js';
 import type { ItemData, Category, Tag, Brand, DomainAnalysis } from '@ever-works/contracts';
 import type { PipelineStepDefinition, PipelineState } from '../../pipeline/step-definition.types.js';
 import type {
-	MutableGenerationContext,
+	IPipelineContext,
 	GenerationRequest,
 	ExistingItems,
 	DirectoryReference
@@ -179,11 +179,46 @@ export interface IPipelinePlugin<TStepId extends string = string> extends IPlugi
 	/** Execute a single step */
 	executeStep?(
 		stepId: TStepId | string,
-		context: MutableGenerationContext,
+		context: IPipelineContext,
 		execContext: StepExecutionContext,
 		options?: StepExecutionOptions,
 		onProgress?: StepProgressCallback
-	): Promise<MutableGenerationContext>;
+	): Promise<IPipelineContext>;
+
+	// --- Optional: context lifecycle hooks ---
+	// When implemented, the engine delegates context creation, snapshotting,
+	// result extraction, and skip/circuit-breaker logic to the plugin.
+
+	createContext?(
+		directory: DirectoryReference,
+		request: GenerationRequest,
+		existing: ExistingItems
+	): IPipelineContext;
+	contextToSnapshot?(context: IPipelineContext): unknown;
+	contextFromSnapshot?(snapshot: unknown): IPipelineContext;
+	extractResult?(
+		context: IPipelineContext,
+		meta: { duration: number; stepsCompleted: number; totalSteps: number; state?: PipelineState }
+	): PipelineResult;
+	/**
+	 * Determines whether a checkpoint is worth resuming from.
+	 *
+	 * Called by the engine after deserializing a checkpoint. If this returns false,
+	 * the checkpoint is discarded and the pipeline restarts from scratch.
+	 *
+	 * Typical checks:
+	 * - `snapshot.shouldStop` is not set (pipeline wasn't explicitly stopped)
+	 * - Data-producing steps that already ran actually produced data
+	 * - The snapshot is not stale or corrupted
+	 *
+	 * When not implemented, the engine assumes all checkpoints are viable.
+	 *
+	 * @param snapshot - The opaque context snapshot stored in the checkpoint
+	 * @param completedSteps - IDs of steps that completed before the checkpoint was saved
+	 * @returns true if the checkpoint is worth resuming, false to discard and restart
+	 */
+	isCheckpointViable?(snapshot: unknown, completedSteps: string[]): boolean;
+	canSkipStep?(stepId: string, context: IPipelineContext): boolean;
 
 	// --- Optional: lifecycle ---
 	cancel?(): Promise<void>;

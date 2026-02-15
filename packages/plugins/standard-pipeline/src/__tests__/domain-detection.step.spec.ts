@@ -1,11 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DomainDetectionStep } from '../steps/domain-detection.step';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	DirectoryReference,
-	GenerationRequest
-} from '@ever-works/plugin';
+import type { StepExecutionContext, DirectoryReference, GenerationRequest } from '@ever-works/plugin';
+import type { MutableGenerationContext } from '../context/index.js';
 
 describe('DomainDetectionStep', () => {
 	let step: DomainDetectionStep;

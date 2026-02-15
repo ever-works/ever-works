@@ -1,4 +1,5 @@
-import type { MutableGenerationContext, StepExecutionContext, DomainType, FacadeOptions } from '@ever-works/plugin';
+import type { StepExecutionContext, DomainType, FacadeOptions } from '@ever-works/plugin';
+import type { MutableGenerationContext } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
 const IMAGE_CAPTURE_DELAY_MS = 500;
@@ -13,7 +14,10 @@ export class ImageCaptureStep extends BasePipelineStep {
 	readonly name = 'Image Capture';
 	readonly stepId = 'image-capture' as const;
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { directory, request, finalItems, domainAnalysis } = context;
 		const { logger, screenshotFacade } = execContext;
 		const config = request.config || {};

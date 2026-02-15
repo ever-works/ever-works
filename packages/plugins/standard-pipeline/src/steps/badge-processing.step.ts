@@ -1,13 +1,7 @@
 import { z } from 'zod';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	PipelineMetrics,
-	MutableItemData,
-	ItemBadges,
-	FacadeOptions
-} from '@ever-works/plugin';
+import type { StepExecutionContext, MutableItemData, ItemBadges, FacadeOptions } from '@ever-works/plugin';
 import { DomainType } from '@ever-works/plugin';
+import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
 interface BadgeEvaluationResult {
@@ -78,7 +72,10 @@ export class BadgeProcessingStep extends BasePipelineStep {
 	readonly stepId = 'badges-processing' as const;
 	private readonly CONCURRENCY_LIMIT = 10;
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { request, finalItems, metrics, domainAnalysis } = context;
 		const { logger, aiFacade } = execContext;
 		const config = request.config || {};
@@ -112,7 +109,7 @@ export class BadgeProcessingStep extends BasePipelineStep {
 	private async processBadges(
 		items: MutableItemData[],
 		domainType: DomainType,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
 		facadeOptions: FacadeOptions
@@ -149,7 +146,7 @@ export class BadgeProcessingStep extends BasePipelineStep {
 	private async evaluateItemsBadges(
 		items: MutableItemData[],
 		domainType: DomainType,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
 		facadeOptions: FacadeOptions
@@ -180,7 +177,7 @@ export class BadgeProcessingStep extends BasePipelineStep {
 	private async evaluateItemBadges(
 		item: MutableItemData,
 		domainType: DomainType,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
 		facadeOptions: FacadeOptions

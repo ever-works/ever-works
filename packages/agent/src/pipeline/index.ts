@@ -5,9 +5,6 @@
  * It supports step replacement, injection, disabling, and positioning through plugins.
  */
 
-// Type-safe generation context
-export { TypedGenerationContext } from './generation-context';
-
 // Re-export IBuiltInStepExecutor type from the plugin SDK
 export type { IBuiltInStepExecutor } from '@ever-works/plugin';
 

@@ -1,31 +1,27 @@
-import type {
-	IBuiltInStepExecutor,
-	MutableGenerationContext,
-	StepExecutionContext,
-	PipelineMetrics
-} from '@ever-works/plugin';
+import type { IBuiltInStepExecutor, IPipelineContext, StepExecutionContext } from '@ever-works/plugin';
+import type { MutableGenerationContext, StandardPipelineMetrics } from './context/index.js';
 import { getErrorMessage } from './utils/error.utils.js';
 import type { BuiltInStepId } from './types.js';
 
 /**
- * Base class for all default pipeline steps.
- *
- * Provides:
- * - Consistent metrics accumulation
- * - Standardized error handling
- * - Common logging patterns
+ * Base class for all standard pipeline steps.
+ * run() satisfies IBuiltInStepExecutor; execute() is what steps implement.
  */
 export abstract class BasePipelineStep implements IBuiltInStepExecutor {
 	abstract readonly name: string;
 	abstract readonly stepId: BuiltInStepId;
 
-	abstract run(
+	async run(context: IPipelineContext, execContext: StepExecutionContext): Promise<IPipelineContext> {
+		return this.execute(context as MutableGenerationContext, execContext);
+	}
+
+	abstract execute(
 		context: MutableGenerationContext,
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext>;
 
 	protected accumulateMetrics(
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		usage: { inputTokens: number; outputTokens: number; totalTokens: number } | null,
 		cost: number | null
 	): void {

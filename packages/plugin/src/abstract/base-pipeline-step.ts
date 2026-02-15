@@ -5,15 +5,18 @@ import type {
 	StepProgressCallback,
 	StepProgress
 } from '../contracts/capabilities/pipeline-plugin.interface.js';
-import type { MutableGenerationContext } from '../pipeline/generation-context.interface.js';
+import type { IPipelineContext } from '../pipeline/generation-context.interface.js';
 import type { PipelineStepDefinition, StepPosition } from '../pipeline/step-definition.types.js';
 import type { PluginCategory } from '../contracts/plugin-manifest.types.js';
 
 /**
  * Abstract base class for pipeline modifier plugins.
- * Subclasses must implement: stepId, stepName, stepPosition, targetPipelines, execute()
+ * TContext defaults to IPipelineContext; subclasses can narrow it.
  */
-export abstract class BasePipelineStep extends BasePlugin implements IPipelineModifierPlugin {
+export abstract class BasePipelineStep<TContext extends IPipelineContext = IPipelineContext>
+	extends BasePlugin
+	implements IPipelineModifierPlugin
+{
 	readonly category: PluginCategory = 'pipeline';
 	readonly capabilities: readonly string[] = ['pipeline-modifier'];
 
@@ -30,10 +33,10 @@ export abstract class BasePipelineStep extends BasePlugin implements IPipelineMo
 	readonly estimatedDuration?: number;
 
 	abstract execute(
-		context: MutableGenerationContext,
+		context: TContext,
 		options?: StepExecutionOptions,
 		onProgress?: StepProgressCallback
-	): Promise<MutableGenerationContext>;
+	): Promise<TContext>;
 
 	getStepDefinition(): PipelineStepDefinition {
 		return {
@@ -49,31 +52,20 @@ export abstract class BasePipelineStep extends BasePlugin implements IPipelineMo
 		};
 	}
 
-	async canSkip(_context: MutableGenerationContext): Promise<boolean> {
+	async canSkip(_context: TContext): Promise<boolean> {
 		return this.optional;
 	}
 
-	async estimateDuration(_context: MutableGenerationContext): Promise<number> {
-		return (this.estimatedDuration ?? 5) * 1000;
-	}
-
-	/** Validates that required data keys are present in context */
-	async validate(context: MutableGenerationContext): Promise<{ valid: boolean; error?: string }> {
+	async validate(context: TContext): Promise<{ valid: boolean; error?: string }> {
 		for (const key of this.requires) {
-			if (!(key in context) || context[key as keyof MutableGenerationContext] === undefined) {
-				return {
-					valid: false,
-					error: `Missing required data: ${key}`
-				};
+			if (!(key in context) || (context as unknown as Record<string, unknown>)[key] === undefined) {
+				return { valid: false, error: `Missing required data: ${key}` };
 			}
 		}
 		return { valid: true };
 	}
 
-	/** Override to implement rollback on failure */
-	async rollback(_context: MutableGenerationContext, _error: Error): Promise<void> {}
-
-	// Helper methods
+	async rollback(_context: TContext, _error: Error): Promise<void> {}
 
 	protected createProgress(
 		percent: number,
@@ -101,14 +93,8 @@ export abstract class BasePipelineStep extends BasePlugin implements IPipelineMo
 		}
 	}
 
-	protected shouldAbort(context: MutableGenerationContext, options?: StepExecutionOptions): boolean {
-		if (context.shouldStop) {
-			return true;
-		}
-		if (options?.signal?.aborted) {
-			return true;
-		}
-		return false;
+	protected shouldAbort(context: TContext, options?: StepExecutionOptions): boolean {
+		return context.shouldStop === true || options?.signal?.aborted === true;
 	}
 
 	protected static after<TStepId extends string>(stepId: TStepId): StepPosition<TStepId> {
