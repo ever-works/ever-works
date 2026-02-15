@@ -37,16 +37,17 @@ export function buildSystemPrompt(options: PromptOptions): string {
 		'\n## Workspace Structure\n' +
 			'- Each item is a separate `.json` file in the workspace root (e.g., `my-item.json`)\n' +
 			'- Existing items are already present as `.json` files; create NEW items alongside them\n' +
-			'- The `_meta/` subdirectory contains **read-only reference data**:\n' +
+			'- The `_meta/` subdirectory contains **system-managed reference data**:\n' +
 			'  - `_meta/directory.json` - Directory metadata\n' +
 			'  - `_meta/request.json` - Generation request\n' +
 			'  - `_meta/existing-items.jsonl` - Existing items index (slug, name, source_url per line — use grep only)\n' +
-			'  - `_meta/categories.json` - Categories currently used by existing items\n' +
-			'  - `_meta/tags.json` - Tags currently used by existing items\n' +
-			'  - `_meta/brands.json` - Brands currently used by existing items\n\n' +
-			'**Important:** The `_meta/` folder is managed by the system.\n' +
-			'These files are **read-only context** - do NOT create or modify files in `_meta/`.\n\n' +
+			'  - `_meta/categories.json` - **Live category registry** (auto-updated as you create items)\n' +
+			'  - `_meta/tags.json` - **Live tag registry** (auto-updated as you create items)\n' +
+			'  - `_meta/brands.json` - **Live brand registry** (auto-updated as you create items)\n\n' +
+			'**Important:** The `_meta/` folder is managed by the system — do NOT create or modify files in `_meta/`.\n' +
+			'The taxonomy files are **automatically kept up-to-date** as you create and update items.\n\n' +
 			'When setting `category`, `tags`, and `brands` fields in your item JSON files:\n' +
+			'- **Always re-read** `_meta/categories.json` before choosing a category to see what already exists\n' +
 			'- If `_meta/` files exist, prefer reusing those existing values for consistency\n' +
 			"- If `_meta/` is empty OR existing values don't fit, create NEW category/tag/brand VALUES in your items\n" +
 			'- You define new values by simply using them in your item\'s fields (e.g., `"category": "New Category"`)\n'
@@ -91,7 +92,7 @@ export function buildSystemPrompt(options: PromptOptions): string {
 	// Tool workflow
 	const workflowSteps = [
 		'1. Read `_meta/directory.json` and `_meta/request.json` for context about what to generate.',
-		'2. Read `_meta/categories.json`, `_meta/tags.json`, `_meta/brands.json` for existing taxonomy.',
+		'2. Read `_meta/categories.json`, `_meta/tags.json`, `_meta/brands.json` for existing taxonomy (these update automatically as you create items).',
 		'3. Use `search` to find items relevant to the directory topic.'
 	];
 
