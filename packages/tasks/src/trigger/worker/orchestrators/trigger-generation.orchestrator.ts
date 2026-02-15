@@ -63,19 +63,22 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
             }
 
             generationStats = generated.stats;
+            const newItemsCount = generated.stats?.newItemsCount ?? 0;
 
-            if (generated.stats.totalItemsCount > 0) {
+            if (newItemsCount > 0) {
                 await this.markdownGenerator.initialize(directory, user, {
                     generation_method: dto.generation_method,
                     pr_update: generated.prUpdate,
                 });
             }
 
-            await this.websiteGenerator.initialize(
-                directory,
-                user,
-                dto.website_repository_creation_method,
-            );
+            if (newItemsCount > 0 || generated.hasExistingItems) {
+                await this.websiteGenerator.initialize(
+                    directory,
+                    user,
+                    dto.website_repository_creation_method,
+                );
+            }
 
             const endTime = new Date();
 

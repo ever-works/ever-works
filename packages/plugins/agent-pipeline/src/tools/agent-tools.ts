@@ -7,6 +7,7 @@ import type {
 } from '@ever-works/plugin';
 import { createSearchTool, createExtractContentTool, createReportProgressTool } from './facade-tools.js';
 import { createCreateFileTool, createUpdateFileTool } from './file-tools.js';
+import { createValidateItemJsonTool } from './validate-json-tools.js';
 import { ToolCircuitBreaker } from '../utils/tool-circuit-breaker.js';
 
 export interface SandboxAndTools {
@@ -44,6 +45,7 @@ export async function createAgentTools(
 		readFile: bashTools.readFile,
 		createFile: createCreateFileTool(wrappedSandbox, '/'),
 		updateFile: createUpdateFileTool(wrappedSandbox, '/'),
+		validateItemJson: createValidateItemJsonTool(wrappedSandbox, '/'),
 		search: createSearchTool(facades.searchFacade, facadeOptions, toolOptions),
 		extractContent: createExtractContentTool(facades.contentExtractorFacade, facadeOptions, toolOptions),
 		reportProgress: createReportProgressTool(onProgress, 1, totalSteps)
