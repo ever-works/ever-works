@@ -1,11 +1,12 @@
 'use client';
 
 import { cn } from '@/lib/utils/cn';
+import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import type { Directory } from '@/lib/api/directory';
-import { DirectoryMemberRole, GenerateStatusType } from '@/lib/api/enums';
+import { DirectoryMemberRole } from '@/lib/api/enums';
 import { Users } from 'lucide-react';
 import { ShowDateTime } from '../ui/show-datetime';
 
@@ -23,8 +24,11 @@ const formatDate = (date: string, locale: string) => {
 
 export function DirectoryCard({ directory }: DirectoryCardProps) {
     const t = useTranslations('dashboard.directoryCard');
+    const tStatus = useTranslations('dashboard.directoryDetail.status');
 
     const status = directory.generateStatus?.status;
+    const hasWarnings = !!directory.generateStatus?.warnings?.length;
+    const statusConfig = getGenerationStatusConfig(status, { hasWarnings });
     const userRole = directory.userRole;
     const isShared = userRole && userRole !== DirectoryMemberRole.OWNER;
 
@@ -60,19 +64,10 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                 <span
                     className={cn(
                         'px-2 py-1 rounded text-xs font-medium whitespace-nowrap shrink-0',
-                        status === GenerateStatusType.ERROR && 'bg-danger/10 text-danger',
-                        status === GenerateStatusType.GENERATING && 'bg-info/10 text-info',
-                        status === GenerateStatusType.GENERATED && 'bg-success/10 text-success',
-                        status === GenerateStatusType.CANCELLED &&
-                            'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
-                        !status && 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+                        statusConfig.badge,
                     )}
                 >
-                    {status === GenerateStatusType.ERROR && t('status.error')}
-                    {status === GenerateStatusType.GENERATING && t('status.generating')}
-                    {status === GenerateStatusType.GENERATED && t('status.generated')}
-                    {status === GenerateStatusType.CANCELLED && t('status.cancelled')}
-                    {!status && t('status.idle')}
+                    {tStatus(hasWarnings ? 'generated' : statusConfig.labelKey)}
                 </span>
             </div>
 
