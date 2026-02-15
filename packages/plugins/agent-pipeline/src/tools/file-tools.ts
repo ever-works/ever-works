@@ -1,6 +1,7 @@
 import nodePath from 'node:path';
 import { tool } from 'ai';
 import { z } from 'zod';
+import { syncTaxonomyFromFile } from '../utils/taxonomy-sync.js';
 
 interface WrappedSandbox {
 	readFile(path: string): Promise<string>;
@@ -30,6 +31,16 @@ export function createCreateFileTool(sandbox: WrappedSandbox, cwd: string) {
 				// File doesn't exist — proceed
 			}
 			await sandbox.writeFiles([{ path: resolvedPath, content }]);
+			try {
+				await syncTaxonomyFromFile(
+					(p) => sandbox.readFile(p),
+					(p, c) => sandbox.writeFiles([{ path: p, content: c }]),
+					resolvedPath,
+					content
+				);
+			} catch {
+				/* best-effort */
+			}
 			return { success: true, path };
 		}
 	});
@@ -57,6 +68,16 @@ export function createUpdateFileTool(sandbox: WrappedSandbox, cwd: string) {
 				};
 			}
 			await sandbox.writeFiles([{ path: resolvedPath, content }]);
+			try {
+				await syncTaxonomyFromFile(
+					(p) => sandbox.readFile(p),
+					(p, c) => sandbox.writeFiles([{ path: p, content: c }]),
+					resolvedPath,
+					content
+				);
+			} catch {
+				/* best-effort */
+			}
 			return { success: true, path };
 		}
 	});
