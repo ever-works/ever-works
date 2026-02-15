@@ -5,7 +5,7 @@ import { WebsiteRepositoryCreationMethod } from '../../items-generator/dto/creat
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities/user.entity';
 import { WEBSITE_TEMPLATE_CONFIG } from './config/website-template.config';
-import { config } from '@src/config';
+import { getDirectoryOwner } from '../../utils/directory.utils';
 import * as fs from 'node:fs/promises';
 
 @Injectable()
@@ -18,7 +18,7 @@ export class WebsiteGeneratorService {
     ) {}
 
     private async duplicate(directory: Directory, user: User) {
-        const directoryOwner = directory.user as User;
+        const directoryOwner = getDirectoryOwner(directory);
         const committer = user.asCommitter();
 
         await this.cleanup(directory);
@@ -53,7 +53,12 @@ export class WebsiteGeneratorService {
         );
 
         // Remove origin and add new one pointing to target
-        await this.removeAndAddRemote(templateDir, targetCloneUrl);
+        await this.gitFacade.replaceRemote(
+            directory.gitProvider,
+            templateDir,
+            'origin',
+            targetCloneUrl,
+        );
 
         // Push to target
         await this.gitFacade.push(
@@ -65,7 +70,7 @@ export class WebsiteGeneratorService {
     }
 
     private async createUsingTemplate(directory: Directory, user: User) {
-        const directoryOwner = directory.user as User;
+        const directoryOwner = getDirectoryOwner(directory);
 
         return this.gitFacade.createRepositoryFromTemplate(
             WEBSITE_TEMPLATE_CONFIG.owner,
@@ -111,45 +116,14 @@ export class WebsiteGeneratorService {
 
     /** Sync all branches from template to directory's website repo */
     async syncAllBranchesFromTemplate(directory: Directory, user: User) {
-        const directoryOwner = directory.user as User;
-
-        const branchMapping = directory.websiteTemplateUseBeta
-            ? { [config.websiteTemplate.getBetaBranch()]: 'main' }
-            : undefined;
-
-        this.logger.log(
-            `Syncing all branches from template to ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}` +
-                (branchMapping ? ` (beta: ${Object.keys(branchMapping)[0]}→main)` : ''),
-        );
-
-        try {
-            const result = await this.branchSyncService.syncAllBranches({
-                targetOwner: directory.getRepoOwner(),
-                targetRepo: directory.getWebsiteRepo(),
-                userId: directoryOwner.id,
-                committer: user.asCommitter(),
-                forcePush: true,
-                branchMapping,
-                providerId: directory.gitProvider,
-            });
-
-            this.logger.log(
-                `Branch sync completed: ${result.synced} synced, ${result.errors} errors`,
-            );
-
-            return result;
-        } catch (error) {
-            this.logger.error(`Failed to sync branches from template: ${error.message}`);
-            // Don't throw - branch sync failure shouldn't fail the entire initialization
-            return null;
-        }
+        return this.branchSyncService.syncFromTemplate(directory, user);
     }
 
     /**
      * Remove repository for a directory
      */
     async removeRepository(directory: Directory, user: User): Promise<void> {
-        const directoryOwner = directory.user as User;
+        const directoryOwner = getDirectoryOwner(directory);
         const websiteRepo = directory.getWebsiteRepo();
 
         try {
@@ -170,19 +144,5 @@ export class WebsiteGeneratorService {
         );
 
         return fs.rm(dataDir, { recursive: true, force: true });
-    }
-
-    private async removeAndAddRemote(dir: string, newRemoteUrl: string): Promise<void> {
-        // Use isomorphic-git to remove and add remote
-        const git = await import('isomorphic-git');
-        const nodeFs = await import('node:fs');
-
-        try {
-            await git.deleteRemote({ fs: nodeFs.default, dir, remote: 'origin' });
-        } catch {
-            // Remote might not exist
-        }
-
-        await git.addRemote({ fs: nodeFs.default, dir, remote: 'origin', url: newRemoteUrl });
     }
 }

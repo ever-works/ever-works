@@ -95,35 +95,11 @@ export class AiOperations {
 			);
 
 			const tracker = new TokenUsageTracker();
-			let result: unknown;
+			const result = skip.has('structured_output')
+				? await this.invokeWithJsonRepair(llm, prompt, schema, tracker)
+				: await this.invokeStructured(llm, prompt, schema, model, tracker);
 
-			try {
-				const structured = llm.withStructuredOutput(schema);
-				result = await structured.invoke([new HumanMessage(prompt)], {
-					callbacks: [tracker]
-				});
-			} catch (structuredError) {
-				if (this.parseRejectedParam(structuredError)) {
-					throw structuredError;
-				}
-
-				console.warn(
-					`[AiOperations] Structured output failed for model "${model}", falling back to jsonrepair:`,
-					structuredError instanceof Error ? structuredError.message : structuredError
-				);
-
-				const raw = await llm.invoke([new HumanMessage(prompt)], {
-					callbacks: [tracker]
-				});
-				const content = typeof raw.content === 'string' ? raw.content : '';
-				result = schema.parse(JSON.parse(jsonrepair(content)));
-			}
-
-			return {
-				result,
-				model,
-				usage: this.mapTokenUsage(tracker)
-			};
+			return { result, model, usage: this.mapTokenUsage(tracker) };
 		});
 	}
 
@@ -297,6 +273,41 @@ export class AiOperations {
 	// Private helpers
 	// ========================================================================
 
+	/** Attempt structured output; re-throw cacheable rejections, fall back to jsonrepair for other errors. */
+	private async invokeStructured(
+		llm: ChatOpenAI,
+		prompt: string,
+		schema: ZodType,
+		model: string,
+		tracker: TokenUsageTracker
+	): Promise<unknown> {
+		try {
+			return await llm.withStructuredOutput(schema).invoke([new HumanMessage(prompt)], {
+				callbacks: [tracker]
+			});
+		} catch (error) {
+			if (this.parseRejectedParam(error)) throw error;
+
+			console.warn(
+				`[AiOperations] Structured output failed for model "${model}", falling back to jsonrepair:`,
+				error instanceof Error ? error.message : error
+			);
+			return this.invokeWithJsonRepair(llm, prompt, schema, tracker);
+		}
+	}
+
+	/** Raw invoke → jsonrepair → zod parse. */
+	private async invokeWithJsonRepair(
+		llm: ChatOpenAI,
+		prompt: string,
+		schema: ZodType,
+		tracker: TokenUsageTracker
+	): Promise<unknown> {
+		const raw = await llm.invoke([new HumanMessage(prompt)], { callbacks: [tracker] });
+		const content = typeof raw.content === 'string' ? raw.content : '';
+		return schema.parse(JSON.parse(jsonrepair(content)));
+	}
+
 	private mergeConfig(overrides?: Partial<AiOperationsConfig>): AiOperationsConfig {
 		if (!overrides) return this.defaultConfig;
 		return { ...this.defaultConfig, ...overrides };
@@ -368,6 +379,8 @@ export class AiOperations {
 		const msg = error.message.toLowerCase();
 		if (msg.includes("'temperature'") || msg.includes('"temperature"')) return 'temperature';
 		if (msg.includes("'reasoning'") || msg.includes("'reasoning_effort'")) return 'reasoning';
+		if (msg.includes('json_schema') || msg.includes('response_format') || msg.includes('structured output'))
+			return 'structured_output';
 		return undefined;
 	}
 

@@ -1,10 +1,6 @@
 import { z } from 'zod';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	PipelineMetrics,
-	FacadeOptions
-} from '@ever-works/plugin';
+import type { StepExecutionContext, FacadeOptions } from '@ever-works/plugin';
+import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
 const PROMPT_COMPARISON_PROMPT =
@@ -58,7 +54,10 @@ export class PromptComparisonStep extends BasePipelineStep {
 	readonly name = 'Prompt Comparison';
 	readonly stepId = 'prompt-comparison' as const;
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { request, existing, directory } = context;
 		const { logger, aiFacade } = execContext;
 
@@ -118,7 +117,7 @@ export class PromptComparisonStep extends BasePipelineStep {
 	private async comparePrompts(
 		existingPrompt: string,
 		newPrompt: string,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		aiFacade: StepExecutionContext['aiFacade'],
 		logger: StepExecutionContext['logger'],
 		facadeOptions: FacadeOptions

@@ -11,6 +11,7 @@ import { delay } from './pipeline-helpers.js';
 
 const TOOL_ERROR_PATTERNS = [
 	'parsing failed',
+	'failed to parse',
 	'tool call validation',
 	'not in request.tools',
 	'tool_use_failed',

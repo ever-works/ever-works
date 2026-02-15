@@ -7,6 +7,7 @@ import { WEBSITE_TEMPLATE_CONFIG } from './config/website-template.config';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { config } from '@src/config';
+import { getDirectoryOwner } from '../../utils/directory.utils';
 
 @Injectable()
 export class WebsiteUpdateService {
@@ -33,7 +34,7 @@ export class WebsiteUpdateService {
         commitSha?: string;
         branchSync?: BranchSyncSummary;
     }> {
-        const directoryOwner = directory.user as User;
+        const directoryOwner = getDirectoryOwner(directory);
         const websiteRepo = directory.getWebsiteRepo();
         const branch = options?.branch || WEBSITE_TEMPLATE_CONFIG.branch;
 
@@ -98,38 +99,7 @@ export class WebsiteUpdateService {
         directory: Directory,
         user: User,
     ): Promise<BranchSyncSummary | null> {
-        const directoryOwner = directory.user as User;
-
-        const branchMapping = directory.websiteTemplateUseBeta
-            ? { [config.websiteTemplate.getBetaBranch()]: 'main' }
-            : undefined;
-
-        this.logger.log(
-            `Syncing all branches from template to ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}` +
-                (branchMapping ? ` (beta: ${Object.keys(branchMapping)[0]}→main)` : ''),
-        );
-
-        try {
-            const result = await this.branchSyncService.syncAllBranches({
-                targetOwner: directory.getRepoOwner(),
-                targetRepo: directory.getWebsiteRepo(),
-                userId: directoryOwner.id,
-                committer: user.asCommitter(),
-                forcePush: true,
-                branchMapping,
-                providerId: directory.gitProvider,
-            });
-
-            this.logger.log(
-                `Branch sync completed: ${result.synced} synced, ${result.errors} errors`,
-            );
-
-            return result;
-        } catch (error) {
-            this.logger.error(`Failed to sync branches from template: ${error.message}`);
-            // Don't throw - branch sync failure shouldn't fail the entire update
-            return null;
-        }
+        return this.branchSyncService.syncFromTemplate(directory, user);
     }
 
     /**
@@ -144,7 +114,7 @@ export class WebsiteUpdateService {
         branch: string;
         error?: string;
     }> {
-        const directoryOwner = directory.user as User;
+        const directoryOwner = getDirectoryOwner(directory);
         const branch = directory.websiteTemplateUseBeta
             ? config.websiteTemplate.getBetaBranch()
             : WEBSITE_TEMPLATE_CONFIG.branch;
@@ -185,7 +155,7 @@ export class WebsiteUpdateService {
      * Updates a forked repository by pulling from upstream
      */
     private async updateFork(directory: Directory, user: User): Promise<boolean> {
-        const directoryOwner = directory.user as User;
+        const directoryOwner = getDirectoryOwner(directory);
         const committer = user.asCommitter();
         const websiteRepo = directory.getWebsiteRepo();
 
@@ -230,7 +200,7 @@ export class WebsiteUpdateService {
         user: User,
         branch: string = WEBSITE_TEMPLATE_CONFIG.branch,
     ): Promise<void> {
-        const directoryOwner = directory.user as User;
+        const directoryOwner = getDirectoryOwner(directory);
         const websiteRepo = directory.getWebsiteRepo();
 
         await this.gitFacade.removeLocalDir(
@@ -259,7 +229,12 @@ export class WebsiteUpdateService {
 
         // Remove existing origin and add new one
         await this.gitFacade.switchBranch(directory.gitProvider, originalDir, branch);
-        await this.updateRemote(originalDir, targetRepoUrl);
+        await this.gitFacade.replaceRemote(
+            directory.gitProvider,
+            originalDir,
+            'origin',
+            targetRepoUrl,
+        );
 
         // Push to the target repository
         await this.gitFacade.push(
@@ -280,7 +255,7 @@ export class WebsiteUpdateService {
         user: User,
         branch: string = WEBSITE_TEMPLATE_CONFIG.branch,
     ): Promise<void> {
-        const directoryOwner = directory.user as User;
+        const directoryOwner = getDirectoryOwner(directory);
         const committer = user.asCommitter();
         const websiteRepo = directory.getWebsiteRepo();
 
@@ -360,18 +335,5 @@ export class WebsiteUpdateService {
                 await fs.copyFile(sourcePath, targetPath);
             }
         }
-    }
-
-    private async updateRemote(dir: string, newRemoteUrl: string): Promise<void> {
-        const git = await import('isomorphic-git');
-        const nodeFs = await import('node:fs');
-
-        try {
-            await git.deleteRemote({ fs: nodeFs.default, dir, remote: 'origin' });
-        } catch {
-            // Remote might not exist
-        }
-
-        await git.addRemote({ fs: nodeFs.default, dir, remote: 'origin', url: newRemoteUrl });
     }
 }

@@ -1,12 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MarkdownGenerationStep } from '../steps/markdown-generation.step';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	DirectoryReference,
-	GenerationRequest,
-	MutableItemData
-} from '@ever-works/plugin';
+import type { StepExecutionContext, DirectoryReference, GenerationRequest, MutableItemData } from '@ever-works/plugin';
+import type { MutableGenerationContext } from '../context/index.js';
 
 describe('MarkdownGenerationStep', () => {
 	let step: MarkdownGenerationStep;
@@ -65,6 +60,7 @@ describe('MarkdownGenerationStep', () => {
 			finalItems: [createMockItem('Test Item', 'https://example.com')],
 			contentCache: new Map<string, string>(),
 			metrics: { steps: {} },
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

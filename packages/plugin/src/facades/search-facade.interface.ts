@@ -1,3 +1,4 @@
+import type { IBaseFacade } from './base-facade.interface.js';
 import type { FacadeOptions } from './facade-options.interface.js';
 
 export interface SearchFacadeResult {
@@ -19,7 +20,7 @@ export interface SearchFacadeOptions {
  * Provides web search capabilities ONLY.
  * Content extraction is handled by ContentExtractorFacade.
  */
-export interface ISearchFacade {
+export interface ISearchFacade extends IBaseFacade {
 	/**
 	 * @example
 	 * ```typescript
@@ -33,6 +34,4 @@ export interface ISearchFacade {
 		options: SearchFacadeOptions | undefined,
 		facadeOptions: FacadeOptions
 	): Promise<SearchFacadeResult[]>;
-
-	isConfigured(): boolean;
 }

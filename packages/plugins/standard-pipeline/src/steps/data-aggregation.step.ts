@@ -1,23 +1,26 @@
 import type {
-	MutableGenerationContext,
 	StepExecutionContext,
-	PipelineMetrics,
 	MutableItemData,
 	DataSourceFilterContext,
 	IAiFacade,
 	FacadeOptions
 } from '@ever-works/plugin';
 import { deduplicateByField, filterNewItemsManually } from '@ever-works/plugin';
+import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { extractKeywordsFromPrompt } from '@ever-works/plugin/keywords';
 import { z } from 'zod';
 import { BasePipelineStep } from '../base-pipeline-step.js';
+import { sanitizeErrorForUser } from '../utils/error.utils.js';
 import { NewItemsExtractor, AiDeduplicator } from './data-aggregation/index.js';
 
 export class DataAggregationStep extends BasePipelineStep {
 	readonly name = 'Deduplication and Data Aggregation';
 	readonly stepId = 'deduplication-and-data-aggregation' as const;
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { request, directory, existing, initialAiItems, extractedWebItems, webPages, advancedPrompts, metrics } =
 			context;
 		const { logger } = execContext;
@@ -51,6 +54,15 @@ export class DataAggregationStep extends BasePipelineStep {
 
 		context.aggregatedItems = finalItems;
 
+		if (finalItems.length === 0) {
+			context.shouldStop = true;
+			if (existingItems.length > 0) {
+				this.addWarning(context, 'No new items found. The directory already has existing items.');
+			} else {
+				this.addWarning(context, 'No items were generated or found from any source.');
+			}
+		}
+
 		if (updatedMetrics) {
 			context.metrics = { ...context.metrics, ...updatedMetrics, itemsAfterDedup: finalItems.length };
 		}
@@ -64,10 +76,10 @@ export class DataAggregationStep extends BasePipelineStep {
 		existingItems: MutableItemData[],
 		newItems: MutableItemData[],
 		pagesProcessed: number,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		customPrompt: string | null | undefined,
 		execContext: StepExecutionContext
-	): Promise<{ aggregatedItems: MutableItemData[]; updatedMetrics: Partial<PipelineMetrics> }> {
+	): Promise<{ aggregatedItems: MutableItemData[]; updatedMetrics: Partial<StandardPipelineMetrics> }> {
 		const { logger } = execContext;
 		const newItemsExtractor = new NewItemsExtractor(execContext);
 		const aiDeduplicator = new AiDeduplicator(execContext);
@@ -133,6 +145,10 @@ export class DataAggregationStep extends BasePipelineStep {
 
 			for (const err of result.errors) {
 				logger.warn(`[${context.directory.slug}] Data source ${err.sourceId} failed: ${err.error}`);
+				this.addWarning(
+					context,
+					`Data source "${err.sourceId}" failed: ${sanitizeErrorForUser(String(err.error))}`
+				);
 			}
 
 			if (result.items.length === 0) return [];

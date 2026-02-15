@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import type { MutableItemData, StepExecutionContext, PipelineMetrics, FacadeOptions } from '@ever-works/plugin';
+import type { MutableItemData, StepExecutionContext, FacadeOptions } from '@ever-works/plugin';
+import type { StandardPipelineMetrics } from '../../context/index.js';
 import { filterNewItemsManually } from '@ever-works/plugin';
 import { slugifyText } from '../../utils/text.utils.js';
 import { getErrorMessage, getErrorStack } from '../../utils/error.utils.js';
@@ -26,7 +27,7 @@ export class NewItemsExtractor {
 	async extractNewItems(
 		existingItems: MutableItemData[],
 		newItems: MutableItemData[],
-		metrics: PipelineMetrics
+		metrics: StandardPipelineMetrics
 	): Promise<MutableItemData[]> {
 		if (!newItems || newItems.length === 0) return [];
 		if (!existingItems || existingItems.length === 0) return newItems;
@@ -56,7 +57,7 @@ export class NewItemsExtractor {
 	private async processSingleBatch(
 		existingItems: MutableItemData[],
 		newItems: MutableItemData[],
-		metrics: PipelineMetrics
+		metrics: StandardPipelineMetrics
 	): Promise<MutableItemData[]> {
 		try {
 			const relevant = findRelevantExistingItems(newItems, existingItems, 40);
@@ -97,7 +98,7 @@ export class NewItemsExtractor {
 	private async processLargeArray(
 		existingItems: MutableItemData[],
 		newItems: MutableItemData[],
-		metrics: PipelineMetrics
+		metrics: StandardPipelineMetrics
 	): Promise<MutableItemData[]> {
 		const groups = groupSimilarItems(newItems, this.logger);
 		this.logger.log(`Grouped ${newItems.length} new items into ${groups.length} clusters`);
@@ -143,7 +144,7 @@ export class NewItemsExtractor {
 	private async processBatchWithRelevant(
 		relevantExisting: MutableItemData[],
 		newItems: MutableItemData[],
-		metrics: PipelineMetrics
+		metrics: StandardPipelineMetrics
 	): Promise<MutableItemData[]> {
 		try {
 			const { result, usage, cost } = await this.aiFacade.askJson<ExtractedItems>(
@@ -183,7 +184,7 @@ export class NewItemsExtractor {
 	}
 
 	private accumulateMetrics(
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		usage: { inputTokens: number; outputTokens: number; totalTokens: number } | null,
 		cost: number | null
 	): void {

@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import { GenerateStatusType } from '../../entities/types';
 import { LEGAL_NOTICE, LICENSE_TEXT } from './texts';
 import { DirectoryOperationsService } from '@src/directory-operations';
+import { getDirectoryOwner } from '../../utils/directory.utils';
 import pMap from 'p-map';
 import { config } from '../../config';
 import { PipelineOrchestratorService } from '../../pipeline';
@@ -55,10 +56,12 @@ export type InitializeResult =
           success: true;
           prUpdate: PRUpdate | null;
           stats: GenerationStats;
+          warnings?: string[];
       }
     | {
           success: false;
           error: InitializeError;
+          warnings?: string[];
       };
 
 type UpdateMarkdownTemplateResult = {
@@ -78,13 +81,7 @@ export class DataGeneratorService {
     ) {}
 
     private getDirectoryOwner(directory: Directory): User {
-        const owner = directory.user;
-        if (!owner || typeof owner.id !== 'string') {
-            throw new Error(
-                `Directory owner not loaded for directory ${directory.id}. Ensure the user relation is joined.`,
-            );
-        }
-        return owner as User;
+        return getDirectoryOwner(directory);
     }
 
     async initialize(
@@ -124,6 +121,8 @@ export class DataGeneratorService {
             options?.tryResume,
         );
 
+        const warnings = pipelineResult.warnings?.slice();
+
         // If pipeline failed or no items were generated, handle appropriately
         if (!pipelineResult.success) {
             return {
@@ -136,6 +135,7 @@ export class DataGeneratorService {
                             ? pipelineResult.error
                             : new Error(String(pipelineResult.error)),
                 },
+                warnings,
             };
         }
 
@@ -148,11 +148,7 @@ export class DataGeneratorService {
                 metrics: this.convertPipelineMetrics(pipelineResult),
             };
 
-            return {
-                success: true,
-                prUpdate: null,
-                stats,
-            };
+            return { success: true, prUpdate: null, stats, warnings };
         }
 
         const { categories: newCategories, items: newItems, tags: newTags } = pipelineResult;
@@ -204,6 +200,7 @@ export class DataGeneratorService {
                     message: `Failed to clone repository ${directory.getRepoOwner()}/${repo}`,
                     cause: err instanceof Error ? err : new Error(String(err)),
                 },
+                warnings,
             };
         }
 
@@ -219,6 +216,7 @@ export class DataGeneratorService {
                     message: 'Failed to create data repository from cloned directory',
                     cause: err instanceof Error ? err : new Error(String(err)),
                 },
+                warnings,
             };
         }
 
@@ -495,6 +493,7 @@ export class DataGeneratorService {
                 success: true,
                 prUpdate,
                 stats,
+                warnings,
             };
         } catch (err) {
             this.logger.error('Failed to initialize data repository', err);
@@ -505,6 +504,7 @@ export class DataGeneratorService {
                     message: 'Failed to complete data repository initialization',
                     cause: err instanceof Error ? err : new Error(String(err)),
                 },
+                warnings,
             };
         }
     }
@@ -971,7 +971,7 @@ export class DataGeneratorService {
     private async onGenerationProgress(progress: PipelineProgress, directory: Directory) {
         await this.directoryOperations.updateGenerateStatus(directory.id, {
             status: GenerateStatusType.GENERATING,
-            step: progress.currentStepName ?? progress.message,
+            step: progress.message ?? progress.currentStepName,
             stepName: progress.currentStepName,
             stepIndex: progress.currentStepIndex,
             totalSteps: progress.totalSteps,

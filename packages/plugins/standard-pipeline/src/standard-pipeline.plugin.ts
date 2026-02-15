@@ -1,6 +1,6 @@
 import type {
-	IPlugin,
 	IPipelinePlugin,
+	IPipelineContext,
 	PluginContext,
 	PluginCategory,
 	PluginManifest,
@@ -8,7 +8,6 @@ import type {
 	JsonSchema,
 	ValidationResult,
 	PluginSettings,
-	MutableGenerationContext,
 	PipelineStepDefinition,
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
@@ -25,6 +24,9 @@ import type {
 	ExistingItems,
 	IFormSchemaProvider
 } from '@ever-works/plugin';
+import type { MutableGenerationContext, GenerationContextSnapshot } from './context/index.js';
+import type { StepDataKey } from './context/index.js';
+import { TypedGenerationContext } from './context/index.js';
 
 import type { BuiltInStepId } from './types.js';
 
@@ -137,7 +139,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 			description: 'Executes search queries to find relevant URLs',
 			position: { type: 'after', stepId: 'search-queries-generation' },
 			dependencies: [{ stepId: 'search-queries-generation', required: true }],
-			provides: ['extractedUrls'],
+			provides: ['extractedUrls', 'webPages', 'processedSourceUrls', 'contentCache'],
 			requires: ['searchQueries'],
 			optional: false,
 			parallelizable: false,
@@ -164,7 +166,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 				{ stepId: 'content-retrieval', required: true },
 				{ stepId: 'domain-detection', required: true }
 			],
-			provides: ['webPages'],
+			provides: [],
 			requires: ['webPages', 'domainAnalysis'],
 			optional: false,
 			parallelizable: false,
@@ -227,7 +229,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 			description: 'Validates source URLs and ensures they are accessible',
 			position: { type: 'after', stepId: 'categories-tags-processing' },
 			dependencies: [{ stepId: 'categories-tags-processing', required: true }],
-			provides: ['finalItems'],
+			provides: [],
 			requires: ['finalItems'],
 			optional: true,
 			parallelizable: true,
@@ -241,7 +243,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 			description: 'Evaluates and assigns badges to items',
 			position: { type: 'after', stepId: 'sources-validation' },
 			dependencies: [{ stepId: 'categories-tags-processing', required: true }],
-			provides: ['finalItems'],
+			provides: [],
 			requires: ['finalItems'],
 			optional: true,
 			parallelizable: false,
@@ -253,7 +255,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 			description: 'Captures screenshots or fetches images for items',
 			position: { type: 'after', stepId: 'badges-processing' },
 			dependencies: [{ stepId: 'categories-tags-processing', required: true }],
-			provides: ['finalItems'],
+			provides: [],
 			requires: ['finalItems'],
 			optional: true,
 			parallelizable: true,
@@ -270,7 +272,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 				{ stepId: 'image-capture', required: false },
 				{ stepId: 'badges-processing', required: false }
 			],
-			provides: ['finalItems'],
+			provides: [],
 			requires: ['finalItems', 'contentCache'],
 			optional: true,
 			parallelizable: true,
@@ -339,11 +341,11 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 
 	async executeStep(
 		stepId: BuiltInStepId | string,
-		context: MutableGenerationContext,
+		context: IPipelineContext,
 		execContext: StepExecutionContext,
 		options?: StepExecutionOptions,
 		onProgress?: StepProgressCallback
-	): Promise<MutableGenerationContext> {
+	): Promise<IPipelineContext> {
 		const executor = this.stepExecutors.get(stepId as BuiltInStepId);
 
 		if (!executor) {
@@ -370,15 +372,98 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 		}
 	}
 
-	async canSkip(context: MutableGenerationContext): Promise<boolean> {
-		return context.shouldStop === true;
+	// --- Context lifecycle hooks ---
+
+	createContext(
+		directory: DirectoryReference,
+		request: GenerationRequest,
+		existing: ExistingItems
+	): IPipelineContext {
+		return new TypedGenerationContext(directory, request, existing);
 	}
 
-	async validate(context: MutableGenerationContext): Promise<{ valid: boolean; error?: string }> {
-		if (context.shouldStop) {
-			return { valid: false, error: 'Pipeline stopped' };
+	contextToSnapshot(context: IPipelineContext): unknown {
+		return (context as TypedGenerationContext).toSnapshot();
+	}
+
+	contextFromSnapshot(snapshot: unknown): IPipelineContext {
+		return TypedGenerationContext.fromSnapshot(snapshot as GenerationContextSnapshot);
+	}
+
+	extractResult(
+		context: IPipelineContext,
+		meta: { duration: number; stepsCompleted: number; totalSteps: number; state?: PipelineState }
+	): PipelineResult {
+		const ctx = context as TypedGenerationContext;
+		const hasNewItems = ctx.finalItems.length > 0;
+		const hasExistingItems = (ctx.existing.items?.length ?? 0) > 0;
+		ctx.updateMetrics({ duration: meta.duration, itemsProcessed: ctx.finalItems.length });
+		let error: string | undefined;
+		if (!hasNewItems && !hasExistingItems) {
+			if (ctx.warnings.length > 0) {
+				error = ctx.warnings[ctx.warnings.length - 1];
+			} else {
+				error = 'Pipeline completed but generated no items.';
+			}
 		}
-		return { valid: true };
+
+		return {
+			success: hasNewItems || hasExistingItems,
+			items: ctx.finalItems,
+			categories: ctx.finalCategories,
+			tags: ctx.finalTags,
+			brands: ctx.finalBrands,
+			duration: meta.duration,
+			stepsCompleted: meta.stepsCompleted,
+			totalSteps: meta.totalSteps,
+			state: meta.state,
+			warnings: ctx.warnings,
+			error
+		};
+	}
+
+	/**
+	 * Determines if a checkpoint is worth resuming.
+	 *
+	 * Returns false (discard) when:
+	 * - The pipeline was explicitly stopped (shouldStop === true)
+	 * - Data-producing steps ran but produced nothing (empty pipeline — no point resuming)
+	 *
+	 * Returns true (resume) when:
+	 * - Any intermediate data exists (webPages, items, etc.)
+	 * - No data-producing steps have completed yet (too early to judge)
+	 */
+	isCheckpointViable(snapshot: unknown, completedSteps: string[]): boolean {
+		const ctx = snapshot as GenerationContextSnapshot;
+
+		// Explicitly stopped — discard
+		if (ctx.shouldStop) return false;
+
+		// Any intermediate data means progress was made — resume
+		const hasData =
+			ctx.webPages.length > 0 ||
+			ctx.initialAiItems.length > 0 ||
+			ctx.extractedWebItems.length > 0 ||
+			ctx.aggregatedItems.length > 0 ||
+			ctx.finalItems.length > 0;
+		if (hasData) return true;
+
+		// If data-producing steps already ran but produced nothing, don't resume
+		const dataStepIds: string[] = this.getStepDefinitions()
+			.filter((s) =>
+				s.provides?.some((k) =>
+					['webPages', 'initialAiItems', 'extractedWebItems', 'aggregatedItems', 'finalItems'].includes(k)
+				)
+			)
+			.map((s) => s.id);
+		return !completedSteps.some((id) => dataStepIds.includes(id));
+	}
+
+	canSkipStep(stepId: string, context: IPipelineContext): boolean {
+		const ctx = context as TypedGenerationContext;
+		const step = this.getStepDefinition(stepId as BuiltInStepId);
+		if (!step?.provides?.length) return false;
+		return step.provides.every((key) => ctx.hasStepResult(key as StepDataKey));
 	}
 
 	// IFormSchemaProvider methods

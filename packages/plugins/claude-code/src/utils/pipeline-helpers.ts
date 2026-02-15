@@ -119,10 +119,6 @@ export function buildMetrics(startTime: number, duration: number, itemCount: num
 		startTime,
 		duration,
 		itemsProcessed: itemCount,
-		urlsExtracted: 0,
-		pagesRetrieved: 0,
-		itemsExtracted: itemCount,
-		itemsAfterDedup: itemCount,
 		steps: {}
 	};
 }

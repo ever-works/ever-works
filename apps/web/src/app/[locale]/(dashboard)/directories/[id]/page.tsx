@@ -23,7 +23,9 @@ export default async function DirectoryOverviewPage({ params }: Params) {
         !directory.generateStatus?.status ||
         directory.generateStatus?.status === GenerateStatusType.ERROR ||
         directory.generateStatus?.status === GenerateStatusType.GENERATING ||
-        directory.generateStatus?.status === GenerateStatusType.CANCELLED;
+        directory.generateStatus?.status === GenerateStatusType.CANCELLED ||
+        (directory.generateStatus?.status === GenerateStatusType.GENERATED &&
+            !!directory.generateStatus?.warnings?.length);
 
     return (
         <div className="space-y-6">

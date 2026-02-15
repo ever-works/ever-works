@@ -3,6 +3,11 @@ import { delay } from './pipeline-helpers.js';
 
 const IMAGE_CAPTURE_DELAY_MS = 500;
 
+export interface ScreenshotCaptureResult {
+	status: StepStatus;
+	errors: string[];
+}
+
 interface ScreenshotContext {
 	screenshotFacade: {
 		isAvailable(): boolean;
@@ -19,10 +24,10 @@ interface ScreenshotContext {
 /**
  * Captures screenshots for items that need images.
  * This step is always non-fatal — errors are logged but never propagate.
- *
- * @returns The step status: 'completed' if screenshots were captured, 'failed' if the step errored.
  */
-export async function captureScreenshots(items: ItemData[], ctx: ScreenshotContext): Promise<StepStatus> {
+export async function captureScreenshots(items: ItemData[], ctx: ScreenshotContext): Promise<ScreenshotCaptureResult> {
+	const errors: string[] = [];
+
 	try {
 		const itemsNeedingImages = items.filter(
 			(item) => item.source_url && (!item.images || item.images.length === 0)
@@ -41,17 +46,19 @@ export async function captureScreenshots(items: ItemData[], ctx: ScreenshotConte
 					(item as { images?: string[] }).images = [result.primaryImage, ...(item.images || [])];
 				}
 			} catch (error) {
-				ctx.logger.warn(
-					`Failed to capture image for ${item.name}: ${error instanceof Error ? error.message : 'Unknown error'}`
-				);
+				const reason = error instanceof Error ? error.message : 'Unknown error';
+				ctx.logger.warn(`Failed to capture image for ${item.name}: ${reason}`);
+				errors.push(reason);
 			}
 
 			await delay(IMAGE_CAPTURE_DELAY_MS);
 		}
 
-		return 'completed';
+		return { status: 'completed', errors };
 	} catch (error) {
-		ctx.logger.warn(`Screenshot step failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-		return 'failed';
+		const reason = error instanceof Error ? error.message : 'Unknown error';
+		ctx.logger.warn(`Screenshot step failed: ${reason}`);
+		errors.push(reason);
+		return { status: 'failed', errors };
 	}
 }

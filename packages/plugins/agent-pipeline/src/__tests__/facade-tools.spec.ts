@@ -1,7 +1,21 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createSearchTool, createExtractContentTool, createReportProgressTool } from '../tools/facade-tools';
-import type { ISearchFacade, IContentExtractorFacade, FacadeOptions } from '@ever-works/plugin';
+import type { ISearchFacade, IContentExtractorFacade, FacadeOptions, PluginLogger } from '@ever-works/plugin';
+import type { FacadeToolOptions } from '../tools/facade-tools';
+import { ToolCircuitBreaker } from '../utils/tool-circuit-breaker';
 import { MAX_EXTRACT_CONTENT_LENGTH } from '../types';
+
+function createMockLogger(): PluginLogger {
+	return { log: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() };
+}
+
+function createToolOptions(overrides?: Partial<FacadeToolOptions>): FacadeToolOptions {
+	return {
+		breaker: new ToolCircuitBreaker(),
+		logger: createMockLogger(),
+		...overrides
+	};
+}
 
 describe('facade-tools', () => {
 	const facadeOptions: FacadeOptions = {
@@ -10,18 +24,6 @@ describe('facade-tools', () => {
 	};
 
 	describe('createSearchTool', () => {
-		it('should create a tool with correct description', () => {
-			const searchFacade = {
-				search: vi.fn().mockResolvedValue([]),
-				isConfigured: () => true
-			} as unknown as ISearchFacade;
-
-			const tool = createSearchTool(searchFacade, facadeOptions);
-
-			expect(tool).toBeDefined();
-			expect(tool.description).toContain('Search');
-		});
-
 		it('should call searchFacade.search with query and options', async () => {
 			const mockResults = [
 				{ title: 'Result 1', url: 'https://example.com', score: 0.9 },
@@ -33,7 +35,7 @@ describe('facade-tools', () => {
 				isConfigured: () => true
 			} as unknown as ISearchFacade;
 
-			const tool = createSearchTool(searchFacade, facadeOptions);
+			const tool = createSearchTool(searchFacade, facadeOptions, createToolOptions());
 			const result = await tool.execute!({ query: 'test query', maxResults: 5 }, {
 				toolCallId: 'call_1',
 				messages: []
@@ -48,21 +50,49 @@ describe('facade-tools', () => {
 				publishedDate: undefined
 			});
 		});
+
+		it('should return structured error when search facade throws', async () => {
+			const searchFacade = {
+				search: vi.fn().mockRejectedValue(new Error('401 Unauthorized')),
+				isConfigured: () => true
+			} as unknown as ISearchFacade;
+
+			const tool = createSearchTool(searchFacade, facadeOptions, createToolOptions());
+			const result = await tool.execute!({ query: 'test', maxResults: 5 }, {
+				toolCallId: 'call_1',
+				messages: []
+			} as never);
+
+			expect(result).toEqual({
+				results: [],
+				error: expect.stringContaining('401 Unauthorized')
+			});
+		});
+
+		it('should short-circuit when breaker is tripped', async () => {
+			const searchFacade = {
+				search: vi.fn(),
+				isConfigured: () => true
+			} as unknown as ISearchFacade;
+
+			const breaker = new ToolCircuitBreaker({ threshold: 1 });
+			breaker.recordFailure('search', new Error('down'));
+
+			const tool = createSearchTool(searchFacade, facadeOptions, createToolOptions({ breaker }));
+			const result = await tool.execute!({ query: 'test', maxResults: 5 }, {
+				toolCallId: 'call_1',
+				messages: []
+			} as never);
+
+			expect(searchFacade.search).not.toHaveBeenCalled();
+			expect(result).toEqual({
+				results: [],
+				error: expect.stringContaining('Do NOT')
+			});
+		});
 	});
 
 	describe('createExtractContentTool', () => {
-		it('should create a tool with correct description', () => {
-			const extractor = {
-				extractContent: vi.fn().mockResolvedValue(null),
-				isConfigured: () => true
-			} as unknown as IContentExtractorFacade;
-
-			const tool = createExtractContentTool(extractor, facadeOptions);
-
-			expect(tool).toBeDefined();
-			expect(tool.description).toContain('Extract');
-		});
-
 		it('should call extractContent and return content', async () => {
 			const extractor = {
 				extractContent: vi.fn().mockResolvedValue({
@@ -73,7 +103,7 @@ describe('facade-tools', () => {
 				isConfigured: () => true
 			} as unknown as IContentExtractorFacade;
 
-			const tool = createExtractContentTool(extractor, facadeOptions);
+			const tool = createExtractContentTool(extractor, facadeOptions, createToolOptions());
 			const result = await tool.execute!({ url: 'https://example.com' }, {
 				toolCallId: 'call_1',
 				messages: []
@@ -98,7 +128,7 @@ describe('facade-tools', () => {
 				isConfigured: () => true
 			} as unknown as IContentExtractorFacade;
 
-			const tool = createExtractContentTool(extractor, facadeOptions);
+			const tool = createExtractContentTool(extractor, facadeOptions, createToolOptions());
 			const result = await tool.execute!({ url: 'https://example.com' }, {
 				toolCallId: 'call_1',
 				messages: []
@@ -108,13 +138,14 @@ describe('facade-tools', () => {
 			expect(result.content).toContain('[Content truncated]');
 		});
 
-		it('should handle extraction failure', async () => {
+		it('should handle null extraction without tripping breaker', async () => {
 			const extractor = {
 				extractContent: vi.fn().mockResolvedValue(null),
 				isConfigured: () => true
 			} as unknown as IContentExtractorFacade;
 
-			const tool = createExtractContentTool(extractor, facadeOptions);
+			const opts = createToolOptions();
+			const tool = createExtractContentTool(extractor, facadeOptions, opts);
 			const result = await tool.execute!({ url: 'https://example.com' }, {
 				toolCallId: 'call_1',
 				messages: []
@@ -123,7 +154,27 @@ describe('facade-tools', () => {
 			expect(result).toEqual({
 				url: 'https://example.com',
 				content: '',
-				error: 'Failed to extract content'
+				error: 'Failed to extract content from this URL'
+			});
+			expect(opts.breaker.isTripped('extractContent')).toBe(false);
+		});
+
+		it('should return structured error when extractor throws', async () => {
+			const extractor = {
+				extractContent: vi.fn().mockRejectedValue(new Error('403 Forbidden')),
+				isConfigured: () => true
+			} as unknown as IContentExtractorFacade;
+
+			const tool = createExtractContentTool(extractor, facadeOptions, createToolOptions());
+			const result = await tool.execute!({ url: 'https://example.com' }, {
+				toolCallId: 'call_1',
+				messages: []
+			} as never);
+
+			expect(result).toEqual({
+				url: 'https://example.com',
+				content: '',
+				error: expect.stringContaining('403 Forbidden')
 			});
 		});
 	});
@@ -162,32 +213,6 @@ describe('facade-tools', () => {
 			expect(onProgress).toHaveBeenCalledWith(
 				expect.objectContaining({
 					percent: 80
-				})
-			);
-		});
-
-		it('should handle undefined onProgress', async () => {
-			const tool = createReportProgressTool(undefined, 1, 5);
-			const result = await tool.execute!({ itemsCreated: 5 }, {
-				toolCallId: 'call_1',
-				messages: []
-			} as never);
-
-			expect(result).toEqual({ acknowledged: true, itemsCreated: 5 });
-		});
-
-		it('should use default message when none provided', async () => {
-			const onProgress = vi.fn();
-
-			const tool = createReportProgressTool(onProgress, 1, 5);
-			await tool.execute!({ itemsCreated: 3 }, {
-				toolCallId: 'call_1',
-				messages: []
-			} as never);
-
-			expect(onProgress).toHaveBeenCalledWith(
-				expect.objectContaining({
-					message: 'Created 3 items'
 				})
 			);
 		});

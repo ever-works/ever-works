@@ -1,5 +1,7 @@
-import type { MutableGenerationContext, StepExecutionContext, WebPageData, FacadeOptions } from '@ever-works/plugin';
+import type { StepExecutionContext, WebPageData, FacadeOptions } from '@ever-works/plugin';
+import type { MutableGenerationContext } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
+import { sanitizeErrorForUser } from '../utils/error.utils.js';
 
 /**
  * Web Search Step
@@ -13,7 +15,10 @@ export class WebSearchStep extends BasePipelineStep {
 	readonly stepId = 'web-search' as const;
 	private readonly BATCH_SIZE = 10;
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { request, directory, extractedUrls, searchQueries, processedSourceUrls } = context;
 		const { logger, searchFacade, contentExtractorFacade } = execContext;
 		const config = request.config || {};
@@ -39,8 +44,13 @@ export class WebSearchStep extends BasePipelineStep {
 			logger.debug(`[${directory.slug}] Retrieved ${initialWebPages.length} web pages from extracted URLs`);
 		}
 
+		// Resolve search provider name for user-facing warnings
+		const searchProviderName =
+			(await searchFacade.getActiveProviderName?.(facadeOptions)?.catch(() => null)) ?? null;
+		const providerLabel = searchProviderName ? `Web search (${searchProviderName})` : 'Web search';
+
 		// Then proceed with normal web search
-		const searchWebPages = await this.retrieveWebPages(
+		const { pages: searchWebPages, errorReasons } = await this.retrieveWebPages(
 			directory.slug,
 			searchQueries,
 			processedSourceUrls,
@@ -50,6 +60,12 @@ export class WebSearchStep extends BasePipelineStep {
 			logger,
 			facadeOptions
 		);
+
+		// Surface unique search errors as warnings
+		if (errorReasons.length > 0) {
+			const uniqueErrors = [...new Set(errorReasons.map(sanitizeErrorForUser))];
+			this.addWarning(context, `${providerLabel} errors: ${uniqueErrors.join('; ')}`);
+		}
 
 		// Combine web pages from both sources
 		const webPages = [...initialWebPages, ...searchWebPages];
@@ -63,6 +79,10 @@ export class WebSearchStep extends BasePipelineStep {
 			if (page.source_url && page.raw_content) {
 				context.contentCache.set(page.source_url, page.raw_content);
 			}
+		}
+
+		if (webPages.length === 0 && searchQueries.length > 0) {
+			this.addWarning(context, `${providerLabel} produced no results. Check your search provider configuration.`);
 		}
 
 		return context;
@@ -80,7 +100,7 @@ export class WebSearchStep extends BasePipelineStep {
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
 		logger: StepExecutionContext['logger'],
 		facadeOptions: FacadeOptions
-	): Promise<WebPageData[]> {
+	): Promise<{ pages: WebPageData[]; errorReasons: string[] }> {
 		const allFetchedPages: WebPageData[] = [];
 		const currentRunProcessedUrls = new Set<string>();
 
@@ -105,14 +125,18 @@ export class WebSearchStep extends BasePipelineStep {
 				logger.debug(`[${slug}] Found ${results.length} results for query: "${query}"`);
 				return { query, results, success: true };
 			} catch (error) {
-				logger.error(
-					`[${slug}] Error executing search query "${query}": ${error instanceof Error ? error.message : String(error)}`
-				);
-				return { query, results: [], success: false };
+				const errorReason = error instanceof Error ? error.message : String(error);
+				logger.error(`[${slug}] Error executing search query "${query}": ${errorReason}`);
+				return { query, results: [], success: false, errorReason };
 			}
 		});
 
 		const searchResults = await Promise.all(searchPromises);
+
+		// Collect error reasons from failed queries
+		const errorReasons = searchResults
+			.filter((r) => !r.success && r.errorReason)
+			.map((r) => r.errorReason as string);
 
 		// Process all search results and extract unique URLs to fetch
 		const urlsToFetch: Array<{ url: string; query: string }> = [];
@@ -196,7 +220,7 @@ export class WebSearchStep extends BasePipelineStep {
 
 		logger.log(`[${slug}] Web page retrieval complete. Retrieved ${allFetchedPages.length} pages.`);
 
-		return allFetchedPages;
+		return { pages: allFetchedPages, errorReasons };
 	}
 
 	/**

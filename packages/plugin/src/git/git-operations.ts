@@ -330,6 +330,15 @@ export class GitOperations implements IGitOperations {
 		await git.addRemote({ fs, dir, remote, url });
 	}
 
+	async replaceRemote(dir: string, remote: string, url: string): Promise<void> {
+		try {
+			await this.remoteRemove(dir, remote);
+		} catch {
+			// Remote might not exist
+		}
+		await this.remoteAdd(dir, remote, url);
+	}
+
 	async fetch(dir: string, token: string, remote: string = 'origin'): Promise<void> {
 		const auth = this.getAuth(token);
 		await git.fetch({

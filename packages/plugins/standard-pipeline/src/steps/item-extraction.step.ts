@@ -1,13 +1,7 @@
 import { z } from 'zod';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	PipelineMetrics,
-	WebPageData,
-	MutableItemData,
-	FacadeOptions
-} from '@ever-works/plugin';
+import type { StepExecutionContext, WebPageData, MutableItemData, FacadeOptions } from '@ever-works/plugin';
+import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { slugifyText } from '../utils/text.utils.js';
 import { getErrorStack } from '../utils/error.utils.js';
@@ -81,7 +75,10 @@ export class ItemExtractionStep extends BasePipelineStep {
 		separators: ['\n## ', '\n### ', '\n#### ', '\n\n', '\n', '. ', ' ', '']
 	});
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { request, directory, webPages, featuredItemHints, metrics, advancedPrompts } = context;
 		const { logger, aiFacade } = execContext;
 
@@ -111,6 +108,10 @@ export class ItemExtractionStep extends BasePipelineStep {
 
 		context.extractedWebItems = extractedWebItems;
 
+		if (extractedWebItems.length === 0 && webPages.length > 0) {
+			this.addWarning(context, `Item extraction produced 0 items from ${webPages.length} pages.`);
+		}
+
 		return context;
 	}
 
@@ -125,7 +126,7 @@ export class ItemExtractionStep extends BasePipelineStep {
 		relevantPages: WebPageData[],
 		featuredItemHints: string[] = [],
 		withTags = false,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		customPrompt: string | null | undefined,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],

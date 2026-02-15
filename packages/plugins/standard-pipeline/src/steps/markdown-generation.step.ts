@@ -1,11 +1,6 @@
 import { z } from 'zod';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	PipelineMetrics,
-	MutableItemData,
-	FacadeOptions
-} from '@ever-works/plugin';
+import type { StepExecutionContext, MutableItemData, FacadeOptions } from '@ever-works/plugin';
+import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { getErrorStack } from '../utils/error.utils.js';
 
@@ -45,7 +40,10 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 	readonly stepId = 'markdown-generation' as const;
 	private readonly BATCH_SIZE = 10;
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { directory, finalItems, contentCache, metrics } = context;
 		const { logger, aiFacade, contentExtractorFacade } = execContext;
 
@@ -81,7 +79,7 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 	private async generateMarkdownForItems(
 		items: MutableItemData[],
 		contentCache: Map<string, string> | undefined,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
@@ -143,7 +141,7 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 	private async generateMarkdown(
 		item: MutableItemData,
 		contentCache: Map<string, string> | undefined,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],

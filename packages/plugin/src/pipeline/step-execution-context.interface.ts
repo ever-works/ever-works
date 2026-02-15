@@ -26,33 +26,8 @@ export interface StepLogger {
  * The context is created by the pipeline executor and populated with
  * facade implementations that handle provider resolution and settings.
  *
- * @example
- * ```typescript
- * class MyStep implements IBuiltInStepExecutor {
- *     async run(
- *         context: MutableGenerationContext,
- *         execContext: StepExecutionContext
- *     ): Promise<MutableGenerationContext> {
- *         // Use AI facade
- *         const { result } = await execContext.aiFacade.askJson(
- *             'Analyze: {text}',
- *             schema,
- *             { variables: { text: 'hello' } },
- *             { userId: execContext.user!.id, directoryId: execContext.directory.id }
- *         );
- *
- *         // Use search facade
- *         const results = await execContext.searchFacade.search('query');
- *
- *         // Use screenshot facade
- *         const screenshot = await execContext.screenshotFacade.capture({
- *             url: 'https://example.com'
- *         });
- *
- *         return context;
- *     }
- * }
- * ```
+ * Provides access to facades (AI, Search, Screenshot, etc.) and utilities
+ * needed during step execution.
  */
 export interface StepExecutionContext {
 	/**

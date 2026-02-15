@@ -16,7 +16,6 @@ jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
 import { PipelineBuilderService } from '../pipeline-builder.service';
 import { MockPipelinePlugin, createLinearChain } from './mock-pipeline-plugin';
 import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
-import { TypedGenerationContext } from '../generation-context';
 import * as superjson from 'superjson';
 import { PipelineFacadeService } from '../pipeline-facade.service';
 import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
@@ -24,7 +23,7 @@ import type {
     DirectoryReference,
     GenerationRequest,
     ExistingItems,
-    MutableGenerationContext,
+    IPipelineContext,
     PipelineExecutionOptions,
 } from '@ever-works/plugin';
 
@@ -170,7 +169,7 @@ describe('StepPipelineExecutorService', () => {
             for (const step of standardPlugin.getStepDefinitions()) {
                 standardPlugin.registerStepExecutor(step.id, {
                     name: step.name,
-                    run: jest.fn().mockImplementation((ctx: MutableGenerationContext) => {
+                    run: jest.fn().mockImplementation((ctx: IPipelineContext) => {
                         // Mark shouldStop on first step to stop early for tests
                         if (step.id === 'step-init') {
                             ctx.shouldStop = true;
@@ -281,7 +280,7 @@ describe('StepPipelineExecutorService', () => {
             expect(checkpoint.stepIndex).toBe(0);
             expect(checkpoint.stepName).toBe('Step Init');
             expect(checkpoint.pipelineId).toBe(standardPlugin.id);
-            expect(checkpoint.schemaVersion).toBe(2);
+            expect(checkpoint.schemaVersion).toBe(4);
         });
 
         it('should clear checkpoint after successful pipeline completion', async () => {
@@ -293,14 +292,12 @@ describe('StepPipelineExecutorService', () => {
             );
         });
 
-        it('should convert Sets and Maps to arrays when saving checkpoint', async () => {
-            // Add some data to Sets and Maps
+        it('should call contextToSnapshot when saving checkpoint', async () => {
+            const snapshotSpy = jest.spyOn(standardPlugin, 'contextToSnapshot');
+
             standardPlugin.registerStepExecutor('step-init', {
                 name: 'Step Init',
                 run: jest.fn().mockImplementation((ctx) => {
-                    ctx.processedSourceUrls.add('https://example.com');
-                    ctx.contentCache.set('url1', 'content1');
-                    ctx.contentCache.set('url2', 'content2');
                     ctx.shouldStop = true;
                     return Promise.resolve(ctx);
                 }),
@@ -308,19 +305,24 @@ describe('StepPipelineExecutorService', () => {
 
             await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
 
-            // Verify that checkpoint was serialized with superjson
+            // Verify contextToSnapshot was called for checkpoint serialization
+            expect(snapshotSpy).toHaveBeenCalled();
+            expect(snapshotSpy).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    directory: mockDirectory,
+                    request: mockRequest,
+                    warnings: expect.any(Array),
+                }),
+            );
+
+            // Verify checkpoint was saved as serialized string
             const serializedCheckpoint = cacheManager.set.mock.calls[0][1];
             expect(typeof serializedCheckpoint).toBe('string');
 
-            // Parse and verify Sets and Maps were preserved
+            // Verify the snapshot is stored in the checkpoint
             const savedCheckpoint = superjson.parse<CheckpointData>(serializedCheckpoint);
-            expect(savedCheckpoint.context.processedSourceUrls instanceof Set).toBe(true);
-            expect(savedCheckpoint.context.processedSourceUrls.has('https://example.com')).toBe(
-                true,
-            );
-            expect(savedCheckpoint.context.contentCache instanceof Map).toBe(true);
-            expect(savedCheckpoint.context.contentCache.get('url1')).toBe('content1');
-            expect(savedCheckpoint.context.contentCache.get('url2')).toBe('content2');
+            expect((savedCheckpoint.context as any).directory).toEqual(mockDirectory);
+            expect((savedCheckpoint.context as any).request).toEqual(mockRequest);
         });
 
         it('should track per-step metrics', async () => {
@@ -472,7 +474,7 @@ describe('StepPipelineExecutorService', () => {
             for (const step of standardPlugin.getStepDefinitions()) {
                 standardPlugin.registerStepExecutor(step.id, {
                     name: step.name,
-                    run: jest.fn().mockImplementation((ctx: MutableGenerationContext) => {
+                    run: jest.fn().mockImplementation((ctx: IPipelineContext) => {
                         ctx.shouldStop = true;
                         return Promise.resolve(ctx);
                     }),
@@ -586,33 +588,12 @@ describe('StepPipelineExecutorService', () => {
                     directory: mockDirectory,
                     request: mockRequest,
                     existing: mockExisting,
-                    extractedUrls: ['https://example.com'],
-                    searchQueries: [],
-                    webPages: [],
-                    processedSourceUrls: new Set(),
-                    contentCache: new Map(),
-                    initialAiItems: [],
-                    extractedWebItems: [],
-                    aggregatedItems: [],
-                    finalItems: [],
-                    finalCategories: [],
-                    finalTags: [],
-                    finalBrands: [],
-                    metrics: {
-                        startTime: Date.now(),
-                        itemsProcessed: 0,
-                        urlsExtracted: 0,
-                        pagesRetrieved: 0,
-                        itemsExtracted: 0,
-                        itemsAfterDedup: 0,
-                        steps: {},
-                    },
-                    allInitialCategories: [],
-                    allPriorityCategories: [],
-                    featuredItemHints: [],
+                    shouldStop: false,
+                    warnings: [],
+                    data: {},
                 },
                 completedSteps: ['step-init'],
-                schemaVersion: 2,
+                schemaVersion: 4,
             };
 
             // Serialize with superjson as the real implementation does
@@ -687,7 +668,7 @@ describe('StepPipelineExecutorService', () => {
             );
         });
 
-        it('should properly restore Sets and Maps from checkpoint', async () => {
+        it('should restore context from checkpoint via contextFromSnapshot', async () => {
             registry.register(standardPlugin, {
                 id: 'standard-pipeline',
                 name: 'Standard Pipeline',
@@ -707,44 +688,19 @@ describe('StepPipelineExecutorService', () => {
                     directory: mockDirectory,
                     request: mockRequest,
                     existing: mockExisting,
-                    extractedUrls: ['https://example.com'],
-                    searchQueries: ['test query'],
-                    webPages: [],
-                    // Use real Set and Map - superjson handles serialization
-                    processedSourceUrls: new Set(['https://processed.com', 'https://url2.com']),
-                    contentCache: new Map([
-                        ['url1', 'content1'],
-                        ['url2', 'content2'],
-                    ]),
-                    initialAiItems: [],
-                    extractedWebItems: [],
-                    aggregatedItems: [],
-                    finalItems: [],
-                    finalCategories: [],
-                    finalTags: [],
-                    finalBrands: [],
-                    metrics: {
-                        startTime: Date.now(),
-                        itemsProcessed: 10,
-                        urlsExtracted: 5,
-                        pagesRetrieved: 3,
-                        itemsExtracted: 8,
-                        itemsAfterDedup: 7,
-                        steps: {},
-                    },
-                    allInitialCategories: ['cat1'],
-                    allPriorityCategories: ['cat2'],
-                    featuredItemHints: ['hint1'],
-                    subject: 'Test Subject',
+                    shouldStop: false,
+                    warnings: ['prior warning'],
+                    data: { key1: 'value1' },
                 },
                 completedSteps: [],
-                schemaVersion: 2,
+                schemaVersion: 4,
             };
 
             // Serialize with superjson as the real implementation does
             cacheManager.get.mockResolvedValue(superjson.stringify(mockCheckpoint));
 
-            let capturedContext: TypedGenerationContext | null = null;
+            const fromSnapshotSpy = jest.spyOn(standardPlugin, 'contextFromSnapshot');
+            let capturedContext: IPipelineContext | null = null;
 
             // Register all step executors
             for (const step of standardPlugin.getStepDefinitions()) {
@@ -762,20 +718,17 @@ describe('StepPipelineExecutorService', () => {
 
             await service.resumeFromCheckpoint(standardPlugin, mockDirectory.id, standardPlugin.id);
 
+            // Verify contextFromSnapshot was called
+            expect(fromSnapshotSpy).toHaveBeenCalled();
             expect(capturedContext).not.toBeNull();
-            // Verify Sets were restored correctly
-            expect(capturedContext!.processedSourceUrls instanceof Set).toBe(true);
-            expect(capturedContext!.processedSourceUrls.has('https://processed.com')).toBe(true);
-            expect(capturedContext!.processedSourceUrls.has('https://url2.com')).toBe(true);
-            expect(capturedContext!.processedSourceUrls.size).toBe(2);
-            // Verify Maps were restored correctly
-            expect(capturedContext!.contentCache instanceof Map).toBe(true);
-            expect(capturedContext!.contentCache.get('url1')).toBe('content1');
-            expect(capturedContext!.contentCache.get('url2')).toBe('content2');
-            expect(capturedContext!.contentCache.size).toBe(2);
+            // Verify the restored context has the expected shape
+            expect(capturedContext!.directory).toEqual(mockDirectory);
+            expect(capturedContext!.request).toEqual(mockRequest);
+            expect(capturedContext!.warnings).toEqual(['prior warning']);
+            expect((capturedContext as any).data).toEqual({ key1: 'value1' });
         });
 
-        it('should handle empty Sets and Maps in checkpoint', async () => {
+        it('should restore context with empty data from checkpoint', async () => {
             registry.register(standardPlugin, {
                 id: 'standard-pipeline',
                 name: 'Standard Pipeline',
@@ -795,39 +748,18 @@ describe('StepPipelineExecutorService', () => {
                     directory: mockDirectory,
                     request: mockRequest,
                     existing: mockExisting,
-                    extractedUrls: [],
-                    searchQueries: [],
-                    webPages: [],
-                    processedSourceUrls: new Set(),
-                    contentCache: new Map(),
-                    initialAiItems: [],
-                    extractedWebItems: [],
-                    aggregatedItems: [],
-                    finalItems: [],
-                    finalCategories: [],
-                    finalTags: [],
-                    finalBrands: [],
-                    metrics: {
-                        startTime: Date.now(),
-                        itemsProcessed: 0,
-                        urlsExtracted: 0,
-                        pagesRetrieved: 0,
-                        itemsExtracted: 0,
-                        itemsAfterDedup: 0,
-                        steps: {},
-                    },
-                    allInitialCategories: [],
-                    allPriorityCategories: [],
-                    featuredItemHints: [],
+                    shouldStop: false,
+                    warnings: [],
+                    data: {},
                 },
                 completedSteps: [],
-                schemaVersion: 2,
+                schemaVersion: 4,
             };
 
             // Serialize with superjson as the real implementation does
             cacheManager.get.mockResolvedValue(superjson.stringify(mockCheckpoint));
 
-            let capturedContext: TypedGenerationContext | null = null;
+            let capturedContext: IPipelineContext | null = null;
 
             // Register all step executors
             for (const step of standardPlugin.getStepDefinitions()) {
@@ -846,10 +778,9 @@ describe('StepPipelineExecutorService', () => {
             await service.resumeFromCheckpoint(standardPlugin, mockDirectory.id, standardPlugin.id);
 
             expect(capturedContext).not.toBeNull();
-            expect(capturedContext!.processedSourceUrls instanceof Set).toBe(true);
-            expect(capturedContext!.processedSourceUrls.size).toBe(0);
-            expect(capturedContext!.contentCache instanceof Map).toBe(true);
-            expect(capturedContext!.contentCache.size).toBe(0);
+            expect(capturedContext!.directory).toEqual(mockDirectory);
+            expect(capturedContext!.warnings).toEqual([]);
+            expect((capturedContext as any).data).toEqual({});
         });
     });
 
@@ -877,11 +808,12 @@ describe('StepPipelineExecutorService', () => {
                 });
             }
 
-            const context = new TypedGenerationContext(mockDirectory, mockRequest, mockExisting);
+            const context = standardPlugin.createContext(mockDirectory, mockRequest, mockExisting);
 
             const result = await service.executeWithContext(standardPlugin, context);
 
             expect(result).toBeDefined();
+            // Mock plugin's extractResult always returns success: true with empty items
             expect(result.success).toBe(true);
         });
     });

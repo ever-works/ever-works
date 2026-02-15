@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
 import { WEBSITE_TEMPLATE_CONFIG } from './config/website-template.config';
+import { getDirectoryOwner } from '../../utils/directory.utils';
+import { config } from '../../config';
 import type { GitCommitter } from '@ever-works/plugin';
+import { Directory } from '../../entities/directory.entity';
+import { User } from '../../entities/user.entity';
 import * as fs from 'node:fs/promises';
 
 export interface BranchSyncResult {
@@ -27,6 +31,44 @@ export class BranchSyncService {
     private readonly MAX_CONCURRENT_SYNCS = 1;
 
     constructor(private readonly gitFacade: GitFacadeService) {}
+
+    /**
+     * Sync all template branches to a directory's website repo.
+     * Swallows errors so that a branch sync failure does not fail the caller.
+     */
+    async syncFromTemplate(directory: Directory, user: User): Promise<BranchSyncSummary | null> {
+        const directoryOwner = getDirectoryOwner(directory);
+
+        const branchMapping = directory.websiteTemplateUseBeta
+            ? { [config.websiteTemplate.getBetaBranch()]: 'main' }
+            : undefined;
+
+        this.logger.log(
+            `Syncing all branches from template to ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}` +
+                (branchMapping ? ` (beta: ${Object.keys(branchMapping)[0]}→main)` : ''),
+        );
+
+        try {
+            const result = await this.syncAllBranches({
+                targetOwner: directory.getRepoOwner(),
+                targetRepo: directory.getWebsiteRepo(),
+                userId: directoryOwner.id,
+                committer: user.asCommitter(),
+                forcePush: true,
+                branchMapping,
+                providerId: directory.gitProvider,
+            });
+
+            this.logger.log(
+                `Branch sync completed: ${result.synced} synced, ${result.errors} errors`,
+            );
+
+            return result;
+        } catch (error) {
+            this.logger.error(`Failed to sync branches from template: ${error.message}`);
+            return null;
+        }
+    }
 
     /**
      * Sync branches from template repository to target repository
@@ -179,12 +221,12 @@ export class BranchSyncService {
 
             // Rename branch if needed
             if (targetBranch !== branchName) {
-                await this.renameBranch(tempDir, branchName, targetBranch);
+                await this.gitFacade.renameBranch(providerId, tempDir, branchName, targetBranch);
             }
 
             // Update remote to point to target repo
             const targetRepoUrl = this.gitFacade.getCloneUrl(providerId, targetOwner, targetRepo);
-            await this.updateRemote(tempDir, targetRepoUrl);
+            await this.gitFacade.replaceRemote(providerId, tempDir, 'origin', targetRepoUrl);
 
             // Push to target
             await this.gitFacade.push({ dir: tempDir, force: forcePush }, { userId, providerId });
@@ -207,31 +249,5 @@ export class BranchSyncService {
                 await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
             }
         }
-    }
-
-    private async renameBranch(dir: string, oldName: string, newName: string): Promise<void> {
-        const git = await import('isomorphic-git');
-        const nodeFs = await import('node:fs');
-
-        await git.renameBranch({
-            fs: nodeFs.default,
-            dir,
-            oldref: oldName,
-            ref: newName,
-            checkout: true,
-        });
-    }
-
-    private async updateRemote(dir: string, newRemoteUrl: string): Promise<void> {
-        const git = await import('isomorphic-git');
-        const nodeFs = await import('node:fs');
-
-        try {
-            await git.deleteRemote({ fs: nodeFs.default, dir, remote: 'origin' });
-        } catch {
-            // Remote might not exist
-        }
-
-        await git.addRemote({ fs: nodeFs.default, dir, remote: 'origin', url: newRemoteUrl });
     }
 }
