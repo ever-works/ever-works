@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createCreateFileTool, createUpdateFileTool } from '../tools/file-tools';
+import * as taxonomySync from '../utils/taxonomy-sync';
 
 function createMockSandbox(existingFiles: Record<string, string> = {}) {
 	const files = new Map(Object.entries(existingFiles));
@@ -49,6 +50,35 @@ describe('file-tools', () => {
 			expect(result).toEqual({ success: true, path: 'sub/file.json' });
 			expect(sandbox.writeFiles).toHaveBeenCalledWith([{ path: '/workspace/sub/file.json', content: '{}' }]);
 		});
+
+		it('should trigger taxonomy sync after write', async () => {
+			const spy = vi.spyOn(taxonomySync, 'syncTaxonomyFromFile').mockResolvedValue();
+			const sandbox = createMockSandbox();
+			const tool = createCreateFileTool(sandbox, '/workspace');
+			const content = JSON.stringify({ name: 'Tool', category: 'AI' });
+
+			await (tool as any).execute({ path: 'tool.json', content });
+
+			expect(spy).toHaveBeenCalledWith(
+				expect.any(Function),
+				expect.any(Function),
+				'/workspace/tool.json',
+				content
+			);
+			spy.mockRestore();
+		});
+
+		it('should succeed even if taxonomy sync fails', async () => {
+			const spy = vi.spyOn(taxonomySync, 'syncTaxonomyFromFile').mockRejectedValue(new Error('sync failed'));
+			const sandbox = createMockSandbox();
+			const tool = createCreateFileTool(sandbox, '/workspace');
+			const content = JSON.stringify({ name: 'Tool', category: 'AI' });
+
+			const result = await (tool as any).execute({ path: 'tool.json', content });
+
+			expect(result).toEqual({ success: true, path: 'tool.json' });
+			spy.mockRestore();
+		});
 	});
 
 	describe('updateFile', () => {
@@ -86,6 +116,23 @@ describe('file-tools', () => {
 			expect(sandbox.writeFiles).toHaveBeenCalledWith([
 				{ path: '/workspace/data.json', content: '{"updated":true}' }
 			]);
+		});
+
+		it('should trigger taxonomy sync after update', async () => {
+			const spy = vi.spyOn(taxonomySync, 'syncTaxonomyFromFile').mockResolvedValue();
+			const content = JSON.stringify({ name: 'Tool', category: 'AI' });
+			const sandbox = createMockSandbox({ '/workspace/tool.json': '{"name":"Old"}' });
+			const tool = createUpdateFileTool(sandbox, '/workspace');
+
+			await (tool as any).execute({ path: 'tool.json', content });
+
+			expect(spy).toHaveBeenCalledWith(
+				expect.any(Function),
+				expect.any(Function),
+				'/workspace/tool.json',
+				content
+			);
+			spy.mockRestore();
 		});
 	});
 });
