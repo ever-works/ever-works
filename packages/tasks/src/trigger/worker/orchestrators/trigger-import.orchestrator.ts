@@ -1,10 +1,15 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
-import { DirectoryOperationsService } from '@ever-works/agent/directory-operations';
+import {
+    DirectoryOperationsService,
+    buildImportStatsUpdate,
+} from '@ever-works/agent/directory-operations';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { DirectoryImportPayload, DirectoryImportResult } from '@ever-works/agent/tasks';
-import { classifyGenerationError, notifyForClassifiedError } from '@ever-works/agent/services';
+import { normalizeGeneratorError } from '@ever-works/agent/services';
 import { ImportExecutorService } from '@ever-works/agent/import';
+import { calculateDurationSeconds } from '@ever-works/agent/utils';
+import { BaseOrchestrator } from './base-orchestrator';
 
 export type TriggerImportOptions = {
     directory: Directory;
@@ -20,15 +25,18 @@ export type TriggerImportCancellationOptions = {
 };
 
 @Injectable()
-export class TriggerImportOrchestrator {
-    private readonly logger = new Logger(TriggerImportOrchestrator.name);
+export class TriggerImportOrchestrator extends BaseOrchestrator {
+    protected readonly logger = new Logger(TriggerImportOrchestrator.name);
+    protected readonly operationLabel = 'Import';
 
     constructor(
         private readonly importExecutor: ImportExecutorService,
-        private readonly directoryOperations: DirectoryOperationsService,
+        directoryOperations: DirectoryOperationsService,
         @Optional()
-        private readonly notificationService?: NotificationService,
-    ) {}
+        notificationService?: NotificationService,
+    ) {
+        super(directoryOperations, notificationService);
+    }
 
     async run({ directory, user, payload, gitToken }: TriggerImportOptions): Promise<void> {
         const startTime = this.resolveStartTime(payload.historyStartedAt);
@@ -45,88 +53,63 @@ export class TriggerImportOrchestrator {
             }),
         ]);
 
-        let hasError = false;
         let result: DirectoryImportResult | null = null;
 
         try {
-            const token = gitToken;
-
-            if (payload.sourceType === 'data_repo') {
-                if (!token) {
-                    throw new Error('GitHub token not available');
-                }
-                result = await this.importExecutor.importFromDataRepo({
-                    directory,
-                    user,
-                    source: { owner: payload.sourceOwner, repo: payload.sourceRepo },
-                    token,
-                });
-            } else if (payload.sourceType === 'awesome_readme') {
-                result = await this.importExecutor.importFromAwesomeReadme({
-                    directory,
-                    user,
-                    sourceUrl: payload.sourceUrl,
-                    token,
-                    aiProviderOverride: payload.providers?.ai,
-                });
-            } else if (payload.sourceType === 'link_existing') {
-                if (!token) {
-                    throw new Error('GitHub token not available');
-                }
-                result = await this.importExecutor.linkExistingDataRepo({
-                    directory,
-                    user,
-                    source: { owner: payload.sourceOwner, repo: payload.sourceRepo },
-                    token,
-                    createMissingRepos: payload.options?.createMissingRepos ?? false,
-                });
-            } else {
-                throw new Error(`Unsupported source type: ${payload.sourceType}`);
-            }
+            result = await this.importExecutor.executeBySourceType({
+                directory,
+                user,
+                sourceType: payload.sourceType,
+                sourceOwner: payload.sourceOwner,
+                sourceRepo: payload.sourceRepo,
+                sourceUrl: payload.sourceUrl,
+                token: gitToken,
+                createMissingRepos: payload.options?.createMissingRepos,
+                aiProviderOverride: payload.providers?.ai,
+            });
 
             if (!result.success) {
                 throw new Error(result.error || 'Import failed');
             }
 
-            await this.directoryOperations.updateGenerationHistory(
-                directory.id,
-                payload.historyId,
-                {
-                    newItemsCount: result.itemsImported ?? 0,
-                    totalItemsCount: result.itemsImported ?? 0,
-                    metrics: result.metrics
-                        ? {
-                              total_tokens_used: result.metrics.total_tokens_used ?? 0,
-                              total_cost: result.metrics.total_cost ?? 0,
-                              new_items_added_to_store: result.itemsImported ?? 0,
-                              total_items_in_store: result.itemsImported ?? 0,
-                          }
-                        : undefined,
-                },
-            );
-        } catch (error) {
-            hasError = true;
+            const endTime = new Date();
 
             await Promise.all([
-                this.directoryOperations.recordGenerationFinishTime(directory.id, new Date()),
+                this.directoryOperations.recordGenerationFinishTime(directory.id, endTime),
+                this.directoryOperations.updateGenerateStatus(directory.id, {
+                    status: GenerateStatusType.GENERATED,
+                    step: null,
+                }),
+                this.directoryOperations.updateGenerationHistory(directory.id, payload.historyId, {
+                    status: GenerateStatusType.GENERATED,
+                    finishedAt: endTime,
+                    durationInSeconds: calculateDurationSeconds(startTime, endTime),
+                    ...buildImportStatsUpdate(result),
+                }),
+                this.directoryOperations.updateDirectory(directory.id, {
+                    itemsCount: result?.itemsImported ?? 0,
+                }),
+            ]);
+        } catch (error) {
+            const endTime = new Date();
+
+            await Promise.all([
+                this.directoryOperations.recordGenerationFinishTime(directory.id, endTime),
                 this.directoryOperations.updateGenerateStatus(directory.id, {
                     status: GenerateStatusType.ERROR,
-                    error: error instanceof Error ? error.message : String(error),
+                    error: normalizeGeneratorError(error),
                 }),
             ]);
 
-            const endTime = new Date();
-            const duration = Math.round((endTime.getTime() - startTime.getTime()) / 1000);
             await this.directoryOperations.updateGenerationHistory(
                 directory.id,
                 payload.historyId,
                 {
                     status: GenerateStatusType.ERROR,
                     finishedAt: endTime,
-                    durationInSeconds: duration,
-                    errorMessage: error instanceof Error ? error.message : String(error),
-                    newItemsCount: result?.itemsImported ?? 0,
-                    totalItemsCount: result?.itemsImported ?? 0,
+                    durationInSeconds: calculateDurationSeconds(startTime, endTime),
+                    errorMessage: normalizeGeneratorError(error),
+                    ...buildImportStatsUpdate(result),
                 },
             );
 
@@ -136,104 +119,7 @@ export class TriggerImportOrchestrator {
 
             throw error;
         } finally {
-            if (!hasError) {
-                const endTime = new Date();
-                const duration = Math.round((endTime.getTime() - startTime.getTime()) / 1000);
-
-                await Promise.all([
-                    this.directoryOperations.recordGenerationFinishTime(directory.id, endTime),
-                    this.directoryOperations.updateGenerateStatus(directory.id, {
-                        status: GenerateStatusType.GENERATED,
-                        step: null,
-                    }),
-                    this.directoryOperations.updateGenerationHistory(
-                        directory.id,
-                        payload.historyId,
-                        {
-                            status: GenerateStatusType.GENERATED,
-                            finishedAt: endTime,
-                            durationInSeconds: duration,
-                            newItemsCount: result?.itemsImported ?? 0,
-                            totalItemsCount: result?.itemsImported ?? 0,
-                        },
-                    ),
-                    this.directoryOperations.updateDirectory(directory.id, {
-                        itemsCount: result?.itemsImported ?? 0,
-                    }),
-                ]);
-            }
-
             await this.directoryOperations.emitGenerationCompleted(directory.id);
-        }
-    }
-
-    async handleCancellation({
-        directory,
-        historyId,
-        historyStartedAt,
-    }: TriggerImportCancellationOptions): Promise<void> {
-        const finishedAt = new Date();
-        const startTime = this.resolveStartTime(historyStartedAt);
-        const duration = Math.max(
-            0,
-            Math.round((finishedAt.getTime() - startTime.getTime()) / 1000),
-        );
-        const message = 'Import cancelled';
-
-        await Promise.all([
-            this.directoryOperations.recordGenerationFinishTime(directory.id, finishedAt),
-            this.directoryOperations.updateGenerateStatus(directory.id, {
-                status: GenerateStatusType.CANCELLED,
-                error: message,
-                step: null,
-            }),
-            this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
-                status: GenerateStatusType.CANCELLED,
-                finishedAt,
-                durationInSeconds: duration,
-                errorMessage: message,
-            }),
-        ]);
-
-        await this.directoryOperations.emitGenerationCompleted(directory.id);
-    }
-
-    private resolveStartTime(historyStartedAt?: string): Date {
-        if (!historyStartedAt) {
-            return new Date();
-        }
-
-        const parsed = new Date(historyStartedAt);
-
-        if (Number.isNaN(parsed.getTime())) {
-            this.logger.warn(
-                `Invalid historyStartedAt provided (${historyStartedAt}), falling back to current time`,
-            );
-            return new Date();
-        }
-
-        return parsed;
-    }
-
-    private async handleErrorNotification(
-        error: unknown,
-        user: User,
-        directory: Directory,
-    ): Promise<void> {
-        if (!this.notificationService) {
-            return;
-        }
-
-        const classification = classifyGenerationError(error);
-
-        if (classification.type !== 'unknown') {
-            await notifyForClassifiedError(
-                this.notificationService,
-                user.id,
-                directory.id,
-                directory.name,
-                classification,
-            );
         }
     }
 }

@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import { GenerateStatusType } from '../../entities/types';
 import { LEGAL_NOTICE, LICENSE_TEXT } from './texts';
 import { DirectoryOperationsService } from '@src/directory-operations';
+import { getDirectoryOwner } from '../../utils/directory.utils';
 import pMap from 'p-map';
 import { config } from '../../config';
 import { PipelineOrchestratorService } from '../../pipeline';
@@ -79,13 +80,7 @@ export class DataGeneratorService {
     ) {}
 
     private getDirectoryOwner(directory: Directory): User {
-        const owner = directory.user;
-        if (!owner || typeof owner.id !== 'string') {
-            throw new Error(
-                `Directory owner not loaded for directory ${directory.id}. Ensure the user relation is joined.`,
-            );
-        }
-        return owner as User;
+        return getDirectoryOwner(directory);
     }
 
     async initialize(

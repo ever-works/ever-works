@@ -20,6 +20,10 @@ import type {
     GitProviderInfo,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
+import { OAuthTokenRepository } from '../database/repositories/oauth-token.repository';
+import { FacadeError } from './base.facade';
 
 // Facade-specific types that don't require token (facade resolves token internally)
 export interface FacadeCloneOptions {
@@ -35,18 +39,10 @@ export interface FacadePushOptions {
     readonly force?: boolean;
     readonly maxRetries?: number;
 }
-import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
-import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
-import { OAuthTokenRepository } from '../database/repositories/oauth-token.repository';
 
-export class GitFacadeError extends Error {
-    constructor(
-        message: string,
-        public readonly operation: string,
-        public readonly provider?: string,
-        public readonly cause?: Error,
-    ) {
-        super(message);
+export class GitFacadeError extends FacadeError {
+    constructor(message: string, operation: string, provider?: string, cause?: Error) {
+        super(message, operation, provider, cause);
         this.name = 'GitFacadeError';
     }
 }
@@ -636,9 +632,29 @@ export class GitFacadeService implements IGitFacade {
         return enabled.plugin as IGitProviderPlugin;
     }
 
+    async replaceRemote(
+        providerId: string,
+        dir: string,
+        remote: string,
+        url: string,
+    ): Promise<void> {
+        const plugin = this.getPluginSync(providerId);
+        return plugin.replaceRemote(dir, remote, url);
+    }
+
     async removeLocalDir(providerId: string, owner: string, repo: string): Promise<void> {
         const plugin = this.getPluginSync(providerId);
         return plugin.removeLocalDir(owner, repo);
+    }
+
+    async renameBranch(
+        providerId: string,
+        dir: string,
+        oldName: string,
+        newName: string,
+    ): Promise<void> {
+        const plugin = this.getPluginSync(providerId);
+        return plugin.renameBranch(dir, oldName, newName);
     }
 
     private async resolvePluginAndToken(

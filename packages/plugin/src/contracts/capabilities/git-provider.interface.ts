@@ -159,6 +159,8 @@ export interface IGitOperations {
 	getStatus(dir: string): Promise<GitFileChange[]>;
 	getLocalDir(owner: string, repo: string): string;
 	removeLocalDir(owner: string, repo: string): Promise<void>;
+	replaceRemote(dir: string, remote: string, url: string): Promise<void>;
+	renameBranch(dir: string, oldName: string, newName: string): Promise<void>;
 }
 
 /**

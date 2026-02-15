@@ -14,7 +14,7 @@ import { UpdateDirectoryDto } from '@src/dto';
 import { DeleteDirectoryDto, DeleteDirectoryResponseDto } from '@src/items-generator/dto';
 import { User } from '@src/entities/user.entity';
 import { DirectoryOwnershipService } from './directory-ownership.service';
-import { normalizeGeneratorError } from './utils/error.utils';
+import { rethrowAsNormalized } from './utils/error.utils';
 import { GenerateStatusType } from '@src/entities/types';
 import { DeployFacadeService } from '@src/facades/deploy.facade';
 
@@ -71,16 +71,7 @@ export class DirectoryLifecycleService {
                 directory: dir,
             };
         } catch (error) {
-            if (error instanceof HttpException) {
-                throw error;
-            }
-
-            this.logger.error('Failed to create directory:', error);
-
-            throw new BadRequestException({
-                status: 'error',
-                message: normalizeGeneratorError(error),
-            });
+            rethrowAsNormalized(error, this.logger, 'creating directory');
         }
     }
 
@@ -144,16 +135,7 @@ export class DirectoryLifecycleService {
                 directory: updatedDirectory,
             };
         } catch (error) {
-            if (error instanceof HttpException) {
-                throw error;
-            }
-
-            this.logger.error('Failed to update directory:', error);
-
-            throw new BadRequestException({
-                status: 'error',
-                message: normalizeGeneratorError(error),
-            });
+            rethrowAsNormalized(error, this.logger, 'updating directory');
         }
     }
 
@@ -211,11 +193,7 @@ export class DirectoryLifecycleService {
                         : 'Directory already up to date.',
             };
         } catch (error) {
-            this.logger.error('Failed to sync directory from data repository', error);
-            throw new BadRequestException({
-                status: 'error',
-                message: normalizeGeneratorError(error),
-            });
+            rethrowAsNormalized(error, this.logger, 'syncing directory from data repository');
         }
     }
 
@@ -288,16 +266,8 @@ export class DirectoryLifecycleService {
                 deleted_repositories: deletedRepositories,
             };
         } catch (error) {
-            if (error instanceof HttpException) {
-                throw error;
-            }
-
-            this.logger.error('Error deleting directory:', error);
-
-            throw new BadRequestException({
-                status: 'error',
+            rethrowAsNormalized(error, this.logger, 'deleting directory', {
                 slug: directory?.slug || '',
-                message: normalizeGeneratorError(error),
             });
         }
     }

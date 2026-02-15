@@ -10,15 +10,11 @@ import type {
 import { PLUGIN_CAPABILITIES, isOAuthPlugin } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { OAuthTokenRepository } from '../database/repositories/oauth-token.repository';
+import { FacadeError } from './base.facade';
 
-export class OAuthFacadeError extends Error {
-    constructor(
-        message: string,
-        public readonly operation: string,
-        public readonly provider?: string,
-        public readonly cause?: Error,
-    ) {
-        super(message);
+export class OAuthFacadeError extends FacadeError {
+    constructor(message: string, operation: string, provider?: string, cause?: Error) {
+        super(message, operation, provider, cause);
         this.name = 'OAuthFacadeError';
     }
 }

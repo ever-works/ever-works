@@ -79,6 +79,10 @@
         "./pipeline": {
             "types": "./dist/pipeline/index.d.ts",
             "default": "./dist/pipeline/index.js"
+        },
+        "./utils": {
+            "types": "./dist/utils/index.d.ts",
+            "default": "./dist/utils/index.js"
         }
     },
     "scripts": {
@@ -162,8 +166,6 @@
         "date-fns": "^4.1.0",
         "deepmerge": "^4.3.1",
         "github-slugger": "^2.0.0",
-        "import-in-the-middle": "^2.0.1",
-        "isomorphic-git": "^1.36.1",
         "lodash": "^4.17.21",
         "p-map": "^7.0.4",
         "semver": "^7.7.3",

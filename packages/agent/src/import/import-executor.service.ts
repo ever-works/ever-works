@@ -9,6 +9,19 @@ import { AwesomeReadmeParserService } from './awesome-readme-parser.service';
 import { Directory, ImportSourceType } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
 import { DirectoryImportResult, DirectoryImportErrorCode } from '@src/tasks/directory-import.types';
+import { GIT_TOKEN_NOT_AVAILABLE } from '@src/constants/messages';
+
+export interface ExecuteBySourceTypeOptions {
+    directory: Directory;
+    user: User;
+    sourceType: ImportSourceType;
+    sourceOwner: string;
+    sourceRepo: string;
+    sourceUrl: string;
+    token?: string;
+    createMissingRepos?: boolean;
+    aiProviderOverride?: string;
+}
 
 export interface ImportFromDataRepoOptions {
     directory: Directory;
@@ -288,6 +301,46 @@ export class ImportExecutorService {
                 error: (error as Error).message,
                 errorCode: DirectoryImportErrorCode.CLONE_FAILED,
             };
+        }
+    }
+
+    async executeBySourceType(opts: ExecuteBySourceTypeOptions): Promise<DirectoryImportResult> {
+        const { directory, user, sourceType, token } = opts;
+
+        switch (sourceType) {
+            case 'data_repo': {
+                if (!token) {
+                    throw new Error(GIT_TOKEN_NOT_AVAILABLE);
+                }
+                return this.importFromDataRepo({
+                    directory,
+                    user,
+                    source: { owner: opts.sourceOwner, repo: opts.sourceRepo },
+                    token,
+                });
+            }
+            case 'awesome_readme':
+                return this.importFromAwesomeReadme({
+                    directory,
+                    user,
+                    sourceUrl: opts.sourceUrl,
+                    token,
+                    aiProviderOverride: opts.aiProviderOverride,
+                });
+            case 'link_existing': {
+                if (!token) {
+                    throw new Error(GIT_TOKEN_NOT_AVAILABLE);
+                }
+                return this.linkExistingDataRepo({
+                    directory,
+                    user,
+                    source: { owner: opts.sourceOwner, repo: opts.sourceRepo },
+                    token,
+                    createMissingRepos: opts.createMissingRepos ?? false,
+                });
+            }
+            default:
+                throw new Error(`Unsupported source type: ${sourceType}`);
         }
     }
 }
