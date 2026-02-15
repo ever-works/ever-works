@@ -20,7 +20,8 @@ describe('ImageCaptureStep', () => {
 			primaryImage: 'https://screenshots.example.com/image.png',
 			source: 'screenshot'
 		}),
-		isAvailable: vi.fn().mockReturnValue(true)
+		isAvailable: vi.fn().mockReturnValue(true),
+		getActiveProviderName: vi.fn().mockResolvedValue('ScreenshotOne')
 	});
 
 	const createMockDirectory = (): DirectoryReference => ({
@@ -91,13 +92,14 @@ describe('ImageCaptureStep', () => {
 			expect(result).toBe(mockContext);
 		});
 
-		it('should skip when screenshot service is not available', async () => {
+		it('should skip when screenshot service is not available and add warning', async () => {
 			mockExecContext.screenshotFacade.isAvailable = vi.fn().mockReturnValue(false);
 
 			const result = await step.run(mockContext, mockExecContext);
 
 			expect(mockExecContext.screenshotFacade.getSmartImage).not.toHaveBeenCalled();
 			expect(mockExecContext.logger.warn).toHaveBeenCalledWith(expect.stringContaining('not configured'));
+			expect(result.warnings).toContainEqual(expect.stringContaining('Screenshot provider is not configured'));
 			expect(result).toBe(mockContext);
 		});
 
@@ -148,7 +150,7 @@ describe('ImageCaptureStep', () => {
 			expect(result.finalItems[0].images).toContain('https://screenshots.example.com/image.png');
 		});
 
-		it('should handle screenshot errors gracefully', async () => {
+		it('should handle screenshot errors gracefully and add warning with provider name', async () => {
 			mockExecContext.screenshotFacade.getSmartImage = vi.fn().mockRejectedValue(new Error('Screenshot failed'));
 
 			const result = await step.run(mockContext, mockExecContext);
@@ -157,6 +159,24 @@ describe('ImageCaptureStep', () => {
 				expect.stringContaining('Failed to capture image')
 			);
 			expect(result.finalItems[0].images).toBeUndefined();
+			expect(result.warnings).toContainEqual(
+				expect.stringContaining('Screenshot capture (ScreenshotOne) failed for 1 item(s)')
+			);
+		});
+
+		it('should aggregate unique errors into a single warning', async () => {
+			mockContext.finalItems = [
+				createMockItem('Item 1', 'https://example1.com'),
+				createMockItem('Item 2', 'https://example2.com'),
+				createMockItem('Item 3', 'https://example3.com')
+			];
+			mockExecContext.screenshotFacade.getSmartImage = vi.fn().mockRejectedValue(new Error('401 Unauthorized'));
+
+			const result = await step.run(mockContext, mockExecContext);
+
+			expect(result.warnings).toHaveLength(1);
+			expect(result.warnings[0]).toContain('Screenshot capture (ScreenshotOne) failed for 3 item(s)');
+			expect(result.warnings[0]).toContain('401 Unauthorized');
 		});
 
 		it('should process multiple items', async () => {

@@ -257,7 +257,16 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			this.setState('collect-results', 'completed');
 
 			// ── Step 4: Capture Screenshots ────────────────────────────
-			await this.runScreenshotCapture(request, execContext, items, facadeOptions, signal, onProgress, logger);
+			const screenshotWarnings = await this.runScreenshotCapture(
+				request,
+				execContext,
+				items,
+				facadeOptions,
+				signal,
+				onProgress,
+				logger
+			);
+			warnings.push(...screenshotWarnings);
 
 			// ── Step 5: Cleanup ────────────────────────────────────────
 			this.setState('cleanup', 'running');
@@ -495,23 +504,37 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		signal: AbortSignal,
 		onProgress: PipelineProgressCallback | undefined,
 		logger: PluginLogger
-	): Promise<void> {
+	): Promise<string[]> {
 		const shouldCapture = (request.config || {}).capture_screenshots !== false;
 
-		if (shouldCapture && execContext.screenshotFacade.isAvailable() && items.length > 0 && !signal.aborted) {
-			this.setState('capture-screenshots', 'running');
-			reportProgress(onProgress, 3, 85, 'Capture Screenshots');
-
-			const status = await captureScreenshots(items, {
-				screenshotFacade: execContext.screenshotFacade,
-				facadeOptions,
-				signal,
-				logger
-			});
-			this.setState('capture-screenshots', status);
-		} else {
+		if (!shouldCapture || items.length === 0 || signal.aborted) {
 			this.setState('capture-screenshots', 'skipped' as StepStatus);
+			return [];
 		}
+
+		if (!execContext.screenshotFacade.isAvailable()) {
+			this.setState('capture-screenshots', 'skipped' as StepStatus);
+			return ['Screenshot provider is not configured. Enable a screenshot plugin to capture item images.'];
+		}
+
+		this.setState('capture-screenshots', 'running');
+		reportProgress(onProgress, 3, 85, 'Capture Screenshots');
+
+		const { status, errors } = await captureScreenshots(items, {
+			screenshotFacade: execContext.screenshotFacade,
+			facadeOptions,
+			signal,
+			logger
+		});
+		this.setState('capture-screenshots', status);
+
+		if (errors.length > 0) {
+			const providerName = await execContext.screenshotFacade.getActiveProviderName?.(facadeOptions);
+			const label = providerName ? `Screenshot capture (${providerName})` : 'Screenshot capture';
+			const unique = [...new Set(errors)];
+			return [`${label} failed for ${errors.length} item(s): ${unique.join('; ')}`];
+		}
+		return [];
 	}
 
 	private buildSuccessResult(

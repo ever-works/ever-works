@@ -278,7 +278,6 @@ export class PromptProcessingStep extends BasePipelineStep {
 			};
 		} catch (error) {
 			logger.error(`Error processing prompt: ${error instanceof Error ? error.message : String(error)}`);
-			this.addWarning(context, 'AI could not process your prompt. Basic text analysis was used instead.');
 
 			const fallbackUrls = this.extractUrlsWithRegex(prompt);
 			const rewrittenPrompt =

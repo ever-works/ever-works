@@ -283,7 +283,9 @@ describe('ContentFilteringStep', () => {
 			const result = await step.run(mockContext, mockExecContext);
 
 			expect(result.webPages.length).toBe(0);
-			expect(result.warnings).toContain('Content filtering removed all 1 pages as irrelevant.');
+			expect(result.warnings).toContain(
+				'Content filtering removed all 1 pages as irrelevant. Try adjusting your prompt to be more specific.'
+			);
 		});
 
 		it('should not add warning when filtering reduces but does not eliminate pages', async () => {

@@ -50,6 +50,11 @@ export class ContentRetrievalStep extends BasePipelineStep {
 			`[${directory.slug}] Processing ${urlsToProcess.length} URLs (${allUrls.length - urlsToProcess.length} already processed)`
 		);
 
+		// Resolve provider name for user-facing warnings
+		const extractorName =
+			(await contentExtractorFacade.getActiveProviderName?.(facadeOptions)?.catch(() => null)) ?? null;
+		const providerLabel = extractorName ? `Content extraction (${extractorName})` : 'Content extraction';
+
 		// Process all URLs using ContentExtractorFacade (unified content extraction)
 		const retrievedPages = await this.processUrls(
 			directory.slug,
@@ -75,7 +80,10 @@ export class ContentRetrievalStep extends BasePipelineStep {
 		);
 
 		if (retrievedPages.length === 0 && urlsToProcess.length > 0) {
-			this.addWarning(context, `Content retrieval failed for all ${urlsToProcess.length} URLs.`);
+			this.addWarning(
+				context,
+				`${providerLabel} failed for all ${urlsToProcess.length} URLs. Check your content extraction provider configuration.`
+			);
 		}
 
 		return context;

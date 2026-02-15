@@ -172,15 +172,13 @@ export class AiItemGenerationStep extends BasePipelineStep {
 				logger.warn(
 					`[${directorySlug}] AI cannot confidently proceed with item generation for topic "${topicName}" due to prompt clarity. Reason: ${assessment.reason_if_cannot_proceed || 'No specific reason provided.'}`
 				);
-				this.addWarning(
-					context,
-					`AI cannot confidently generate items: ${assessment.reason_if_cannot_proceed || 'unclear prompt'}`
-				);
-				if (assessment.suggested_clarifications && assessment.suggested_clarifications.length > 0) {
-					logger.warn(
-						`[${directorySlug}] AI suggested clarifications: ${assessment.suggested_clarifications.join('; ')}`
-					);
-				}
+				const reason = assessment.reason_if_cannot_proceed || 'unclear prompt';
+				const clarifications = assessment.suggested_clarifications;
+				const suggestions =
+					Array.isArray(clarifications) && clarifications.length > 0
+						? ` Suggestions: ${clarifications.join('; ')}`
+						: '';
+				this.addWarning(context, `AI cannot confidently generate items: ${reason}.${suggestions}`);
 				return [];
 			}
 
@@ -254,10 +252,6 @@ export class AiItemGenerationStep extends BasePipelineStep {
 			logger.error(
 				`[${directorySlug}] Error generating initial items with AI for topic ${topicName}: ${this.formatError(error)}`,
 				getErrorStack(error)
-			);
-			this.addWarning(
-				context,
-				'AI item generation failed. The pipeline will rely on web search and data sources.'
 			);
 		}
 

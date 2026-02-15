@@ -615,6 +615,7 @@
                 "error": {
                     "title": "Generation Failed",
                     "description": "An error occurred during generation.",
+                    "withWarnings": "Generation failed with errors:",
                     "retry": "Retry Generation"
                 },
                 "cancelled": {

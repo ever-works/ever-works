@@ -134,7 +134,6 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 				getErrorStack(error)
 			);
 			logger.warn(`[${name}] Falling back to basic query generation due to LLM error.`);
-			this.addWarning(context, 'AI-powered search query generation failed. Using basic search queries.');
 			return this.generateFallbackQueries(name, targetKeywords, maxSearchQueries);
 		}
 	}

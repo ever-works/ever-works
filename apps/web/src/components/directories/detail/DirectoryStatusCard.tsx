@@ -120,15 +120,15 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                 action: (
                     <div>
                         {generateStatus.warnings?.length ? (
-                            <div className="mb-3 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2">
-                                <p className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
-                                    {t('generated.withWarnings')}
+                            <div className="mb-3 rounded-md bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/70 dark:border-rose-800/40 px-3 py-2">
+                                <p className="text-xs font-medium text-rose-900 dark:text-rose-300 mb-1">
+                                    {t('error.withWarnings')}
                                 </p>
                                 <ul className="space-y-0.5">
                                     {generateStatus.warnings.map((warning, i) => (
                                         <li
                                             key={i}
-                                            className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5"
+                                            className="text-xs text-rose-800 dark:text-rose-300/80 flex items-start gap-1.5"
                                         >
                                             <span className="shrink-0 mt-0.5">&#x2022;</span>
                                             <span>{warning}</span>

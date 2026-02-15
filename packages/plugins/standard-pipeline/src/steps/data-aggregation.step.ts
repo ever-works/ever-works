@@ -10,6 +10,7 @@ import type { MutableGenerationContext, StandardPipelineMetrics } from '../conte
 import { extractKeywordsFromPrompt } from '@ever-works/plugin/keywords';
 import { z } from 'zod';
 import { BasePipelineStep } from '../base-pipeline-step.js';
+import { sanitizeErrorForUser } from '../utils/error.utils.js';
 import { NewItemsExtractor, AiDeduplicator } from './data-aggregation/index.js';
 
 export class DataAggregationStep extends BasePipelineStep {
@@ -144,6 +145,10 @@ export class DataAggregationStep extends BasePipelineStep {
 
 			for (const err of result.errors) {
 				logger.warn(`[${context.directory.slug}] Data source ${err.sourceId} failed: ${err.error}`);
+				this.addWarning(
+					context,
+					`Data source "${err.sourceId}" failed: ${sanitizeErrorForUser(String(err.error))}`
+				);
 			}
 
 			if (result.items.length === 0) return [];

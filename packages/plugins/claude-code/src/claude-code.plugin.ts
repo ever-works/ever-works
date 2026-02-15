@@ -20,7 +20,8 @@ import type {
 	StepStatus,
 	FacadeOptions,
 	FormFieldDefinition,
-	FormFieldGroup
+	FormFieldGroup,
+	ItemData
 } from '@ever-works/plugin';
 
 import type { ClaudeCodeStepId } from './types.js';
@@ -372,30 +373,16 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			this.setState('collect-results', 'completed');
 
 			// ── Step 5: Capture Screenshots ────────────────────────────
-			const execContext = options?.execContext;
-			const screenshotFacade = execContext?.screenshotFacade;
-
-			const shouldCapture = (request.config || {}).capture_screenshots !== false;
-
-			if (shouldCapture && screenshotFacade?.isAvailable() && items.length > 0 && !signal.aborted) {
-				this.setState('capture-screenshots', 'running');
-				reportProgress(onProgress, 4, 87, 'Capture Screenshots');
-
-				const facadeOptions: FacadeOptions = {
-					userId: userId!,
-					directoryId: directory.id
-				};
-
-				const status = await captureScreenshots(items, {
-					screenshotFacade,
-					facadeOptions,
-					signal,
-					logger
-				});
-				this.setState('capture-screenshots', status);
-			} else {
-				this.setState('capture-screenshots', 'skipped' as StepStatus);
-			}
+			const screenshotWarnings = await this.runScreenshotCapture(
+				request,
+				options?.execContext,
+				items,
+				userId,
+				directory.id,
+				signal,
+				onProgress,
+				logger
+			);
 
 			// ── Step 6: Cleanup ────────────────────────────────────────
 			this.setState('cleanup', 'running');
@@ -408,7 +395,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			reportProgress(onProgress, 6, 100, 'Complete');
 
 			const duration = Date.now() - startTime;
-			const warnings = generationWarning ? [generationWarning] : undefined;
+			const warnings = [...(generationWarning ? [generationWarning] : []), ...screenshotWarnings];
 
 			return {
 				success: true,
@@ -421,7 +408,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				stepsCompleted: this.state!.completedSteps.length,
 				totalSteps: CLAUDE_CODE_STEP_IDS.length,
 				state: this.state!,
-				warnings
+				warnings: warnings.length > 0 ? warnings : undefined
 			};
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
@@ -442,6 +429,50 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 	}
 
 	// ── Private helpers ────────────────────────────────────────────────
+
+	private async runScreenshotCapture(
+		request: GenerationRequest,
+		execContext: PipelineExecutionOptions['execContext'],
+		items: ItemData[],
+		userId: string,
+		directoryId: string,
+		signal: AbortSignal,
+		onProgress: PipelineProgressCallback | undefined,
+		logger: { log(...args: unknown[]): void; warn(...args: unknown[]): void }
+	): Promise<string[]> {
+		const shouldCapture = (request.config || {}).capture_screenshots !== false;
+		const screenshotFacade = execContext?.screenshotFacade;
+
+		if (!shouldCapture || items.length === 0 || signal.aborted || !screenshotFacade) {
+			this.setState('capture-screenshots', 'skipped' as StepStatus);
+			return [];
+		}
+
+		if (!screenshotFacade.isAvailable()) {
+			this.setState('capture-screenshots', 'skipped' as StepStatus);
+			return ['Screenshot provider is not configured. Enable a screenshot plugin to capture item images.'];
+		}
+
+		this.setState('capture-screenshots', 'running');
+		reportProgress(onProgress, 4, 87, 'Capture Screenshots');
+
+		const { status, errors } = await captureScreenshots(items, {
+			screenshotFacade,
+			facadeOptions: { userId, directoryId },
+			signal,
+			logger
+		});
+		this.setState('capture-screenshots', status);
+
+		if (errors.length > 0) {
+			const facadeOptions = { userId, directoryId };
+			const providerName = await screenshotFacade.getActiveProviderName?.(facadeOptions);
+			const label = providerName ? `Screenshot capture (${providerName})` : 'Screenshot capture';
+			const unique = [...new Set(errors)];
+			return [`${label} failed for ${errors.length} item(s): ${unique.join('; ')}`];
+		}
+		return [];
+	}
 
 	private setState(stepId: ClaudeCodeStepId, status: StepStatus, error?: string): void {
 		if (this.state) {

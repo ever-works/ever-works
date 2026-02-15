@@ -148,7 +148,7 @@ describe('AiItemGenerationStep', () => {
 
 			expect(result.initialAiItems).toEqual([]);
 			expect(mockExecContext.logger.warn).toHaveBeenCalled();
-			expect(result.warnings).toContain('AI cannot confidently generate items: Topic is too vague');
+			expect(result.warnings).toContain('AI cannot confidently generate items: Topic is too vague.');
 		});
 
 		it('should skip when AI provider is not configured', async () => {
@@ -244,7 +244,7 @@ describe('AiItemGenerationStep', () => {
 			expect(result.initialAiItems.length).toBe(1);
 		});
 
-		it('should handle AI errors gracefully during generation and add warning', async () => {
+		it('should handle AI errors gracefully during generation', async () => {
 			mockExecContext.aiFacade.askJson = vi
 				.fn()
 				.mockResolvedValueOnce({
@@ -258,9 +258,6 @@ describe('AiItemGenerationStep', () => {
 
 			expect(mockExecContext.logger.error).toHaveBeenCalled();
 			expect(result.initialAiItems).toEqual([]);
-			expect(result.warnings).toContain(
-				'AI item generation failed. The pipeline will rely on web search and data sources.'
-			);
 		});
 
 		it('should add warning when AI returns 0 items', async () => {

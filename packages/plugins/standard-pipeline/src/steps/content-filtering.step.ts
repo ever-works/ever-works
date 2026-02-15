@@ -79,7 +79,10 @@ export class ContentFilteringStep extends BasePipelineStep {
 			logger.log(`[${directory.slug}] Filtered down to ${filteredWebPages.length} relevant pages.`);
 
 			if (filteredWebPages.length === 0 && webPages.length > 0) {
-				this.addWarning(context, `Content filtering removed all ${webPages.length} pages as irrelevant.`);
+				this.addWarning(
+					context,
+					`Content filtering removed all ${webPages.length} pages as irrelevant. Try adjusting your prompt to be more specific.`
+				);
 			}
 
 			context.webPages = filteredWebPages;
