@@ -29,6 +29,8 @@ export type GenerateStatus = {
     progress?: number;
     /** Error message if status is ERROR */
     error?: string;
+    /** Warnings from circuit breaker or degraded services */
+    warnings?: string[];
 };
 
 export enum SubscriptionPlanCode {

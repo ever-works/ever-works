@@ -1,3 +1,4 @@
+import type { IBaseFacade } from './base-facade.interface.js';
 import type { FacadeOptions } from './facade-options.interface.js';
 
 export interface FacadeExtractedContent {
@@ -21,7 +22,7 @@ export interface FacadeExtractionOptions {
  * 2. Non-system extractors (Tavily Extract, Firecrawl)
  * 3. System/default extractor (local-content-extractor)
  */
-export interface IContentExtractorFacade {
+export interface IContentExtractorFacade extends IBaseFacade {
 	/**
 	 * @example
 	 * ```typescript
@@ -39,6 +40,4 @@ export interface IContentExtractorFacade {
 		options: FacadeExtractionOptions | undefined,
 		facadeOptions: FacadeOptions
 	): Promise<FacadeExtractedContent | null>;
-
-	isConfigured(): boolean;
 }

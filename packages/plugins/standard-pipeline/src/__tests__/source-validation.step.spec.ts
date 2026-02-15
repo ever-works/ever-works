@@ -1,12 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SourceValidationStep } from '../steps/source-validation.step';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	DirectoryReference,
-	GenerationRequest,
-	MutableItemData
-} from '@ever-works/plugin';
+import type { StepExecutionContext, DirectoryReference, GenerationRequest, MutableItemData } from '@ever-works/plugin';
+import type { MutableGenerationContext } from '../context/index.js';
 
 describe('SourceValidationStep', () => {
 	let step: SourceValidationStep;
@@ -77,6 +72,7 @@ describe('SourceValidationStep', () => {
 			metrics: { steps: {} },
 			advancedPrompts: {},
 			subject: 'test topic',
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

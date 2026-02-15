@@ -1,12 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BadgeProcessingStep } from '../steps/badge-processing.step';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	DirectoryReference,
-	GenerationRequest,
-	MutableItemData
-} from '@ever-works/plugin';
+import type { StepExecutionContext, DirectoryReference, GenerationRequest, MutableItemData } from '@ever-works/plugin';
+import type { MutableGenerationContext } from '../context/index.js';
 
 describe('BadgeProcessingStep', () => {
 	let step: BadgeProcessingStep;
@@ -68,6 +63,7 @@ describe('BadgeProcessingStep', () => {
 			finalItems: [createMockItem('Test Repo', 'https://github.com/user/repo')],
 			metrics: { steps: {} },
 			domainAnalysis: { domain_type: 'software', confidence: 0.9 },
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

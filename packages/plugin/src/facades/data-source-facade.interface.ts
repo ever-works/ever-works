@@ -1,5 +1,6 @@
 import type { MutableItemData, Category, Tag, Brand } from '@ever-works/contracts';
 import type { DataSourceFilterContext } from '../contracts/capabilities/data-source.interface.js';
+import type { IBaseFacade } from './base-facade.interface.js';
 
 export interface DataSourceFacadeOptions {
 	/** User ID for settings resolution */
@@ -51,7 +52,7 @@ export interface EnabledDataSource {
  * Provides unified access to external data sources (Apify, etc.).
  * Checks DirectoryPlugin.enabled (Level 2) or autoEnable in manifest.
  */
-export interface IDataSourceFacade {
+export interface IDataSourceFacade extends IBaseFacade {
 	/**
 	 * Query all enabled data sources and aggregate their items.
 	 * Checks DirectoryPlugin.enabled or autoEnable manifest flag.
@@ -62,9 +63,4 @@ export interface IDataSourceFacade {
 	 * Get a list of all enabled data sources for a directory.
 	 */
 	getEnabledSources(directoryId: string, userId: string): Promise<EnabledDataSource[]>;
-
-	/**
-	 * Check if any data source plugin is configured and available.
-	 */
-	isConfigured(): boolean;
 }

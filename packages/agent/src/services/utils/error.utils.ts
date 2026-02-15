@@ -1,3 +1,24 @@
+import { BadRequestException, HttpException, Logger } from '@nestjs/common';
+
+export function rethrowAsNormalized(
+    error: unknown,
+    logger: Logger,
+    context: string,
+    extraFields?: Record<string, unknown>,
+): never {
+    if (error instanceof HttpException) {
+        throw error;
+    }
+
+    logger.error(`Error ${context}:`, error);
+
+    throw new BadRequestException({
+        status: 'error',
+        message: normalizeGeneratorError(error),
+        ...extraFields,
+    });
+}
+
 export function normalizeGeneratorError(error: any): string {
     if (!error) {
         return 'Unknown error';

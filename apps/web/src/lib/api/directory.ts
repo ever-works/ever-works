@@ -84,6 +84,8 @@ export type GenerateStatus = {
     progress?: number;
     /** Error message if status is ERROR */
     error?: string;
+    /** Warnings from degraded services (e.g. circuit breaker tripped) */
+    warnings?: string[];
 };
 
 export type GetProjectsReadyState =

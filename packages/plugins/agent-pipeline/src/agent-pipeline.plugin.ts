@@ -227,7 +227,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			this.setState('generate-items', 'running');
 			reportProgress(onProgress, 1, 20, 'Generate Items');
 
-			await this.runAgentGeneration(
+			const warnings = await this.runAgentGeneration(
 				providerConfig,
 				modelName,
 				workspacePath,
@@ -257,7 +257,16 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			this.setState('collect-results', 'completed');
 
 			// ── Step 4: Capture Screenshots ────────────────────────────
-			await this.runScreenshotCapture(request, execContext, items, facadeOptions, signal, onProgress, logger);
+			const screenshotWarnings = await this.runScreenshotCapture(
+				request,
+				execContext,
+				items,
+				facadeOptions,
+				signal,
+				onProgress,
+				logger
+			);
+			warnings.push(...screenshotWarnings);
 
 			// ── Step 5: Cleanup ────────────────────────────────────────
 			this.setState('cleanup', 'running');
@@ -270,7 +279,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			// ── Build result ───────────────────────────────────────────
 			reportProgress(onProgress, 5, 100, 'Complete');
 
-			return this.buildSuccessResult(items, metadata, startTime);
+			return this.buildSuccessResult(items, metadata, startTime, warnings);
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
 			logger.error(`Agent pipeline failed: ${err.message}`);
@@ -358,7 +367,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		onProgress: PipelineProgressCallback | undefined,
 		signal: AbortSignal,
 		logger: PluginLogger
-	): Promise<void> {
+	): Promise<string[]> {
 		logger.log(`Using AI provider "${providerConfig.providerName}" with model "${modelName}"`);
 
 		const provider = createOpenAICompatible({
@@ -366,6 +375,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			baseURL: providerConfig.baseUrl!,
 			apiKey: providerConfig.apiKey!
 		});
+
 		const model = wrapLanguageModel({
 			model: provider(modelName),
 			middleware: {
@@ -384,7 +394,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			}
 		});
 
-		const { tools } = await createAgentTools(
+		const { tools, breaker } = await createAgentTools(
 			workspacePath,
 			{
 				searchFacade: execContext.searchFacade,
@@ -392,7 +402,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			},
 			facadeOptions,
 			onProgress,
-			AGENT_PIPELINE_STEP_IDS.length
+			AGENT_PIPELINE_STEP_IDS.length,
+			logger
 		);
 
 		const promptOptions = { directory, request, existing };
@@ -440,6 +451,34 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 					`Response text: "${result.text.slice(0, 200)}${result.text.length > 200 ? '...' : ''}"`
 			);
 		}
+
+		// Resolve provider names for user-facing warnings
+		const [searchProviderName, extractProviderName] = await Promise.all([
+			execContext.searchFacade.getActiveProviderName?.(facadeOptions)?.catch(() => null) ?? null,
+			execContext.contentExtractorFacade.getActiveProviderName?.(facadeOptions)?.catch(() => null) ?? null
+		]);
+
+		const toolLabels: Record<string, { label: string; impact: string }> = {
+			search: {
+				label: searchProviderName ? `Web search (${searchProviderName})` : 'Web search',
+				impact: 'Some results may be missing.'
+			},
+			extractContent: {
+				label: extractProviderName ? `Content extraction (${extractProviderName})` : 'Content extraction',
+				impact: 'Item details may be incomplete.'
+			}
+		};
+
+		const warnings = breaker.getFailedTools().map((tool) => {
+			const info = toolLabels[tool.name] ?? { label: tool.name, impact: 'Results may be less accurate.' };
+			return `${info.label} was unavailable during generation (${tool.reason}). ${info.impact}`;
+		});
+
+		if (warnings.length > 0) {
+			logger.warn(`Generation warnings (${warnings.length}): ${warnings.join(' | ')}`);
+		}
+
+		return warnings;
 	}
 
 	private async collectAndMergeResults(
@@ -465,29 +504,44 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		signal: AbortSignal,
 		onProgress: PipelineProgressCallback | undefined,
 		logger: PluginLogger
-	): Promise<void> {
+	): Promise<string[]> {
 		const shouldCapture = (request.config || {}).capture_screenshots !== false;
 
-		if (shouldCapture && execContext.screenshotFacade.isAvailable() && items.length > 0 && !signal.aborted) {
-			this.setState('capture-screenshots', 'running');
-			reportProgress(onProgress, 3, 85, 'Capture Screenshots');
-
-			const status = await captureScreenshots(items, {
-				screenshotFacade: execContext.screenshotFacade,
-				facadeOptions,
-				signal,
-				logger
-			});
-			this.setState('capture-screenshots', status);
-		} else {
+		if (!shouldCapture || items.length === 0 || signal.aborted) {
 			this.setState('capture-screenshots', 'skipped' as StepStatus);
+			return [];
 		}
+
+		if (!execContext.screenshotFacade.isAvailable()) {
+			this.setState('capture-screenshots', 'skipped' as StepStatus);
+			return ['Screenshot provider is not configured. Enable a screenshot plugin to capture item images.'];
+		}
+
+		this.setState('capture-screenshots', 'running');
+		reportProgress(onProgress, 3, 85, 'Capture Screenshots');
+
+		const { status, errors } = await captureScreenshots(items, {
+			screenshotFacade: execContext.screenshotFacade,
+			facadeOptions,
+			signal,
+			logger
+		});
+		this.setState('capture-screenshots', status);
+
+		if (errors.length > 0) {
+			const providerName = await execContext.screenshotFacade.getActiveProviderName?.(facadeOptions);
+			const label = providerName ? `Screenshot capture (${providerName})` : 'Screenshot capture';
+			const unique = [...new Set(errors)];
+			return [`${label} failed for ${errors.length} item(s): ${unique.join('; ')}`];
+		}
+		return [];
 	}
 
 	private buildSuccessResult(
 		items: MutableItemData[],
 		metadata: ReturnType<typeof collectMetadataFromItems>,
-		startTime: number
+		startTime: number,
+		warnings?: string[]
 	): PipelineResult {
 		const duration = Date.now() - startTime;
 		return {
@@ -500,7 +554,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			duration,
 			stepsCompleted: AGENT_PIPELINE_STEP_IDS.length,
 			totalSteps: AGENT_PIPELINE_STEP_IDS.length,
-			state: this.state!
+			state: this.state!,
+			warnings
 		};
 	}
 

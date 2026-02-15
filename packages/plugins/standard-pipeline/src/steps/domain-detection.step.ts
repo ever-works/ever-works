@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import type { MutableGenerationContext, StepExecutionContext, DomainType, FacadeOptions } from '@ever-works/plugin';
+import type { StepExecutionContext, DomainType, FacadeOptions } from '@ever-works/plugin';
+import type { MutableGenerationContext } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
 /**
@@ -35,7 +36,10 @@ export class DomainDetectionStep extends BasePipelineStep {
 	readonly name = 'Domain Detection';
 	readonly stepId = 'domain-detection' as const;
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { request, directory, metrics } = context;
 		const { logger, aiFacade } = execContext;
 		const { name, prompt } = request;

@@ -1,4 +1,5 @@
 import type { OAuthConfig, OAuthToken, OAuthUser } from '../contracts/capabilities/oauth.interface.js';
+import type { IBaseFacade } from './base-facade.interface.js';
 
 /**
  * Information about an available OAuth provider.
@@ -21,12 +22,7 @@ export interface OAuthProviderInfo {
  * This facade is separate from git-provider to allow ANY plugin with OAuth
  * capability to use OAuth authentication (e.g., Slack, Notion, Salesforce).
  */
-export interface IOAuthFacade {
-	/**
-	 * Check if any OAuth provider is configured and available.
-	 */
-	isConfigured(): boolean;
-
+export interface IOAuthFacade extends IBaseFacade {
 	/**
 	 * Get list of available OAuth providers.
 	 */

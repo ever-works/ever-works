@@ -15,7 +15,7 @@ import type {
     PipelineResult,
     StepExecutionOptions,
     StepProgressCallback,
-    MutableGenerationContext,
+    IPipelineContext,
     StepExecutionContext,
     DirectoryReference,
     GenerationRequest,
@@ -24,6 +24,31 @@ import type {
     JsonSchema,
     PipelineState,
 } from '@ever-works/plugin';
+
+/**
+ * Simple mock pipeline context for tests.
+ * Stores step data in a generic record rather than typed fields.
+ */
+class MockPipelineContext implements IPipelineContext {
+    directory: DirectoryReference;
+    request: GenerationRequest;
+    existing: ExistingItems;
+    shouldStop?: boolean;
+    warnings: string[] = [];
+
+    /** Generic data storage for step provides/requires */
+    data: Record<string, unknown> = {};
+
+    constructor(
+        directory: DirectoryReference,
+        request: GenerationRequest,
+        existing: ExistingItems,
+    ) {
+        this.directory = directory;
+        this.request = request;
+        this.existing = existing;
+    }
+}
 
 /**
  * Injectable mock pipeline plugin used in pipeline service tests.
@@ -78,11 +103,11 @@ export class MockPipelinePlugin implements IPipelinePlugin<string> {
 
     async executeStep(
         stepId: string,
-        context: MutableGenerationContext,
+        context: IPipelineContext,
         _execContext: StepExecutionContext,
         options?: StepExecutionOptions,
         onProgress?: StepProgressCallback,
-    ): Promise<MutableGenerationContext> {
+    ): Promise<IPipelineContext> {
         const executor = this.stepExecutors.get(stepId);
         if (!executor) {
             throw new Error(`No executor registered for step "${stepId}"`);
@@ -101,6 +126,61 @@ export class MockPipelinePlugin implements IPipelinePlugin<string> {
             onProgress({ percent: 100, message: `Completed ${executor.name}` });
         }
         return result;
+    }
+
+    // --- Lifecycle hooks for engine-orchestrated execution ---
+
+    createContext(
+        directory: DirectoryReference,
+        request: GenerationRequest,
+        existing: ExistingItems,
+    ): IPipelineContext {
+        return new MockPipelineContext(directory, request, existing);
+    }
+
+    contextToSnapshot(context: IPipelineContext): unknown {
+        return { ...context };
+    }
+
+    contextFromSnapshot(snapshot: unknown): IPipelineContext {
+        const s = snapshot as any;
+        const ctx = new MockPipelineContext(s.directory, s.request, s.existing);
+        ctx.shouldStop = s.shouldStop;
+        ctx.warnings = s.warnings ?? [];
+        ctx.data = s.data ?? {};
+        return ctx;
+    }
+
+    extractResult(
+        context: IPipelineContext,
+        meta: {
+            duration: number;
+            stepsCompleted: number;
+            totalSteps: number;
+            state?: PipelineState;
+        },
+    ): PipelineResult {
+        return {
+            success: true,
+            items: [],
+            categories: [],
+            tags: [],
+            brands: [],
+            duration: meta.duration,
+            stepsCompleted: meta.stepsCompleted,
+            totalSteps: meta.totalSteps,
+            state: meta.state,
+            warnings: context.warnings.length > 0 ? context.warnings : undefined,
+            error: undefined,
+        };
+    }
+
+    isCheckpointViable(_snapshot: unknown, _completedSteps: string[]): boolean {
+        return true;
+    }
+
+    canSkipStep(_stepId: string, _context: IPipelineContext): boolean {
+        return false;
     }
 
     // --- Lifecycle stubs ---

@@ -20,7 +20,7 @@ import type {
     IPlugin,
     PluginManifest,
     PluginCategory,
-    MutableGenerationContext,
+    IPipelineContext,
     PipelineStepDefinition,
 } from '@ever-works/plugin';
 
@@ -180,7 +180,7 @@ describe('PipelineOrchestratorService', () => {
         for (const step of standardPlugin.getStepDefinitions()) {
             standardPlugin.registerStepExecutor(step.id, {
                 name: step.name,
-                run: jest.fn().mockImplementation((ctx: MutableGenerationContext) => {
+                run: jest.fn().mockImplementation((ctx: IPipelineContext) => {
                     ctx.shouldStop = true;
                     return Promise.resolve(ctx);
                 }),

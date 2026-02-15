@@ -43,7 +43,8 @@
 			"version": "1.0.0",
 			"category": "pipeline",
 			"capabilities": [
-				"pipeline"
+				"pipeline",
+				"form-schema-provider"
 			],
 			"description": "Full pipeline plugin that delegates the entire generation to Claude Code",
 			"author": {

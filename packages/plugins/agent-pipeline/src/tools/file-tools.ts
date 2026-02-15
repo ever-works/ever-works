@@ -1,19 +1,17 @@
+import nodePath from 'node:path';
 import { tool } from 'ai';
 import { z } from 'zod';
 
-interface SandboxLike {
-	readonly fs: {
-		exists(path: string): Promise<boolean>;
-	};
+interface WrappedSandbox {
 	readFile(path: string): Promise<string>;
-	writeFile(path: string, content: string): Promise<void>;
+	writeFiles(files: Array<{ path: string; content: string }>): Promise<void>;
 }
 
 /**
  * Create a `createFile` tool that writes a new file.
  * Returns an error if the file already exists, directing the agent to use `updateFile` instead.
  */
-export function createCreateFileTool(sandbox: SandboxLike) {
+export function createCreateFileTool(sandbox: WrappedSandbox, cwd: string) {
 	return tool({
 		description: 'Create a new file. Fails if the file already exists — use updateFile to modify existing files.',
 		inputSchema: z.object({
@@ -21,13 +19,17 @@ export function createCreateFileTool(sandbox: SandboxLike) {
 			content: z.string().describe('Content to write to the file')
 		}),
 		execute: async ({ path, content }) => {
-			if (await sandbox.fs.exists(path)) {
+			const resolvedPath = nodePath.posix.resolve(cwd, path);
+			try {
+				await sandbox.readFile(resolvedPath);
 				return {
 					success: false,
 					error: `File "${path}" already exists. Use the updateFile tool to modify existing files.`
 				};
+			} catch {
+				// File doesn't exist — proceed
 			}
-			await sandbox.writeFile(path, content);
+			await sandbox.writeFiles([{ path: resolvedPath, content }]);
 			return { success: true, path };
 		}
 	});
@@ -37,7 +39,7 @@ export function createCreateFileTool(sandbox: SandboxLike) {
  * Create an `updateFile` tool that overwrites an existing file.
  * Returns an error if the file does not exist, directing the agent to use `createFile` instead.
  */
-export function createUpdateFileTool(sandbox: SandboxLike) {
+export function createUpdateFileTool(sandbox: WrappedSandbox, cwd: string) {
 	return tool({
 		description: 'Update an existing file. Fails if the file does not exist — use createFile to create new files.',
 		inputSchema: z.object({
@@ -45,13 +47,16 @@ export function createUpdateFileTool(sandbox: SandboxLike) {
 			content: z.string().describe('New content for the file')
 		}),
 		execute: async ({ path, content }) => {
-			if (!(await sandbox.fs.exists(path))) {
+			const resolvedPath = nodePath.posix.resolve(cwd, path);
+			try {
+				await sandbox.readFile(resolvedPath);
+			} catch {
 				return {
 					success: false,
 					error: `File "${path}" does not exist. Use the createFile tool to create new files.`
 				};
 			}
-			await sandbox.writeFile(path, content);
+			await sandbox.writeFiles([{ path: resolvedPath, content }]);
 			return { success: true, path };
 		}
 	});

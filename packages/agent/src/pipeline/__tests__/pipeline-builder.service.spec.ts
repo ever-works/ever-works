@@ -13,7 +13,6 @@ import type {
     PluginCategory,
     PipelineStepDefinition,
     IPipelineModifierPlugin,
-    MutableGenerationContext,
     StepPosition,
     IPipelinePlugin,
 } from '@ever-works/plugin';

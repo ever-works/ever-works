@@ -1,5 +1,6 @@
 import type { DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
 import { ITEM_SCHEMA_PROMPT_TEXT } from '@ever-works/plugin';
+import { DEFAULT_TARGET_ITEMS } from '../form-schema.js';
 
 export interface PromptOptions {
 	readonly directory: DirectoryReference;
@@ -11,9 +12,10 @@ export interface PromptOptions {
  * Build the system prompt for the AI agent.
  */
 export function buildSystemPrompt(options: PromptOptions): string {
-	const { directory, existing } = options;
+	const { directory, request, existing } = options;
 	const existingCount = existing.items.length;
 	const hasExisting = existingCount > 0;
+	const targetItems = ((request.config || {}).target_items as number) || DEFAULT_TARGET_ITEMS;
 
 	const sections: string[] = [];
 
@@ -61,7 +63,8 @@ export function buildSystemPrompt(options: PromptOptions): string {
 			'3. Use the `search` tool to find items and the `extractContent` tool to verify and gather detailed information.\n' +
 			'4. Do NOT include items only tangentially related to the topic — every item must clearly match the user request.\n' +
 			'5. Ignore blog posts, news articles, or marketing pages as items unless specifically requested.\n' +
-			'6. File names should be URL-friendly slugs (e.g., `my-awesome-tool.json`).'
+			'6. File names should be URL-friendly slugs (e.g., `my-awesome-tool.json`).\n' +
+			'7. **If the search tool fails or is unavailable, STOP creating new items.** Only write items for data you already retrieved via tools. Never generate items from your own knowledge — every item must be backed by tool-retrieved data from this session.'
 	);
 
 	// Category & Tag rules
@@ -102,7 +105,7 @@ export function buildSystemPrompt(options: PromptOptions): string {
 		`${hasExisting ? '5' : '4'}. For each new item, use \`extractContent\` on its official URL to gather detailed information.`,
 		`${hasExisting ? '6' : '5'}. Use \`createFile\` to write a JSON file for each new item (e.g., \`{slug}.json\`) in the workspace root.`,
 		`${hasExisting ? '7' : '6'}. Use \`reportProgress\` periodically to report how many items you have created.`,
-		`${hasExisting ? '8' : '7'}. Continue searching and creating items until you have covered the topic thoroughly.`
+		`${hasExisting ? '8' : '7'}. Continue searching and creating items until you reach approximately ${targetItems} new items.`
 	);
 
 	sections.push('\n## Recommended Workflow\n' + workflowSteps.join('\n'));
@@ -139,6 +142,15 @@ export function buildSystemPrompt(options: PromptOptions): string {
 		);
 	}
 
+	// Generation target
+	sections.push(
+		`\n## Generation Target\n` +
+			`Aim to generate approximately **${targetItems}** new items. ` +
+			'This is a target — prioritize quality and relevance over hitting the exact number, ' +
+			'but do not stop early if there are more relevant items to find. ' +
+			'Do not count existing items toward this target.'
+	);
+
 	// Directory context
 	if (directory.description) {
 		sections.push(
@@ -155,6 +167,7 @@ export function buildSystemPrompt(options: PromptOptions): string {
 export function buildUserPrompt(options: PromptOptions): string {
 	const { directory, request, existing } = options;
 	const hasExisting = existing.items.length > 0;
+	const targetItems = ((request.config || {}).target_items as number) || DEFAULT_TARGET_ITEMS;
 	const parts: string[] = [];
 
 	if (request.prompt) {
@@ -185,6 +198,8 @@ export function buildUserPrompt(options: PromptOptions): string {
 				'Use reportProgress to update on your progress.'
 		);
 	}
+
+	parts.push(`\nTarget: generate approximately ${targetItems} new items.`);
 
 	return parts.join('\n');
 }

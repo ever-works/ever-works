@@ -56,6 +56,11 @@ export abstract class BaseFacadeService {
         protected readonly directoryPluginRepository?: DirectoryPluginRepository,
     ) {}
 
+    async getActiveProviderName(facadeOptions: FacadeOptions): Promise<string | null> {
+        const info = await this.getDefaultProvider(facadeOptions.directoryId, facadeOptions.userId);
+        return info?.name ?? null;
+    }
+
     isConfigured(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.length > 0 && plugins.some((p) => p.state === 'loaded');

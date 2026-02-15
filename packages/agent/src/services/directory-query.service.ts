@@ -7,7 +7,7 @@ import { User } from '@src/entities/user.entity';
 import { Directory } from '@src/entities/directory.entity';
 import { DirectoryMemberRole } from '@src/entities/types';
 import { DirectoryOwnershipService } from './directory-ownership.service';
-import { normalizeGeneratorError } from './utils/error.utils';
+import { normalizeGeneratorError, rethrowAsNormalized } from './utils/error.utils';
 import {
     DirectoryGenerationHistoryDto,
     DirectoryGenerationHistoryListDto,
@@ -108,16 +108,7 @@ export class DirectoryQueryService {
                 offset,
             };
         } catch (error) {
-            if (error instanceof HttpException) {
-                throw error;
-            }
-
-            this.logger.error('Failed to get directories:', error);
-
-            throw new BadRequestException({
-                status: 'error',
-                message: normalizeGeneratorError(error),
-            });
+            rethrowAsNormalized(error, this.logger, 'getting directories');
         }
     }
 
@@ -138,16 +129,7 @@ export class DirectoryQueryService {
                 directory: directoryWithRole,
             };
         } catch (error) {
-            if (error instanceof HttpException) {
-                throw error;
-            }
-
-            this.logger.error('Failed to get directory:', error);
-
-            throw new BadRequestException({
-                status: 'error',
-                message: normalizeGeneratorError(error),
-            });
+            rethrowAsNormalized(error, this.logger, 'getting directory');
         }
     }
 
@@ -322,17 +304,7 @@ export class DirectoryQueryService {
                 message: 'Website settings updated successfully',
             };
         } catch (error) {
-            if (error instanceof HttpException) {
-                throw error;
-            }
-
-            const errMessage = normalizeGeneratorError(error);
-            this.logger.error('Failed to update website settings:', error);
-
-            throw new BadRequestException({
-                status: 'error',
-                message: errMessage,
-            });
+            rethrowAsNormalized(error, this.logger, 'updating website settings');
         }
     }
 

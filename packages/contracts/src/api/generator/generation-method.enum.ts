@@ -3,7 +3,8 @@
  */
 export enum GenerationMethod {
 	CREATE_UPDATE = 'create-update',
-	RECREATE = 'recreate'
+	RECREATE = 'recreate',
+	IMPORT = 'import'
 }
 
 /**

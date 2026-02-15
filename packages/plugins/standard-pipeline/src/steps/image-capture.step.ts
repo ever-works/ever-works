@@ -1,5 +1,7 @@
-import type { MutableGenerationContext, StepExecutionContext, DomainType, FacadeOptions } from '@ever-works/plugin';
+import type { StepExecutionContext, DomainType, FacadeOptions } from '@ever-works/plugin';
+import type { MutableGenerationContext } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
+import { sanitizeErrorForUser } from '../utils/error.utils.js';
 
 const IMAGE_CAPTURE_DELAY_MS = 500;
 
@@ -13,7 +15,10 @@ export class ImageCaptureStep extends BasePipelineStep {
 	readonly name = 'Image Capture';
 	readonly stepId = 'image-capture' as const;
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { directory, request, finalItems, domainAnalysis } = context;
 		const { logger, screenshotFacade } = execContext;
 		const config = request.config || {};
@@ -30,6 +35,10 @@ export class ImageCaptureStep extends BasePipelineStep {
 
 		if (!screenshotFacade.isAvailable()) {
 			logger.warn(`[${directory.slug}] Screenshot service not configured, skipping image capture`);
+			this.addWarning(
+				context,
+				'Screenshot provider is not configured. Enable a screenshot plugin to capture item images.'
+			);
 			return context;
 		}
 
@@ -52,6 +61,8 @@ export class ImageCaptureStep extends BasePipelineStep {
 			`[${directory.slug}] Capturing images for ${itemsNeedingImages.length} items (domain: ${domainType})`
 		);
 
+		const captureErrors: string[] = [];
+
 		for (const item of itemsNeedingImages) {
 			try {
 				const result = await screenshotFacade.getSmartImage(
@@ -68,12 +79,19 @@ export class ImageCaptureStep extends BasePipelineStep {
 					logger.debug(`[${directory.slug}] Captured ${result.source} image for ${item.name}`);
 				}
 			} catch (error) {
-				logger.warn(
-					`[${directory.slug}] Failed to capture image for ${item.name}: ${error instanceof Error ? error.message : 'Unknown error'}`
-				);
+				const reason = error instanceof Error ? error.message : 'Unknown error';
+				logger.warn(`[${directory.slug}] Failed to capture image for ${item.name}: ${reason}`);
+				captureErrors.push(reason);
 			}
 
 			await this.delay(IMAGE_CAPTURE_DELAY_MS);
+		}
+
+		if (captureErrors.length > 0) {
+			const providerName = await screenshotFacade.getActiveProviderName?.(facadeOptions);
+			const label = providerName ? `Screenshot capture (${providerName})` : 'Screenshot capture';
+			const uniqueErrors = [...new Set(captureErrors.map(sanitizeErrorForUser))];
+			this.addWarning(context, `${label} failed for ${captureErrors.length} item(s): ${uniqueErrors.join('; ')}`);
 		}
 
 		logger.log(`[${directory.slug}] Image capture complete for ${itemsNeedingImages.length} items`);

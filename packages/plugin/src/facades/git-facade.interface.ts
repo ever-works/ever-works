@@ -1,5 +1,6 @@
 import type { GitCommitter, GitFileChange } from '../contracts/capabilities/git-provider.interface.js';
 import type { PluginIcon } from '../contracts/plugin-manifest.types.js';
+import type { IBaseFacade } from './base-facade.interface.js';
 
 /**
  * Options for cloning or pulling a repository.
@@ -62,7 +63,7 @@ export interface GitProviderInfo {
  * - OAuth token management
  * - Error handling
  */
-export interface IGitFacade {
+export interface IGitFacade extends IBaseFacade {
 	// ==========================================
 	// Local Git Operations (require providerId)
 	// ==========================================
@@ -187,9 +188,4 @@ export interface IGitFacade {
 	// ==========================================
 	// Utility Methods
 	// ==========================================
-
-	/**
-	 * Check if any git provider is configured.
-	 */
-	isConfigured(): boolean;
 }

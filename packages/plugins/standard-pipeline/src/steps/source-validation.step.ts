@@ -1,11 +1,6 @@
 import { z } from 'zod';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	PipelineMetrics,
-	MutableItemData,
-	FacadeOptions
-} from '@ever-works/plugin';
+import type { StepExecutionContext, MutableItemData, FacadeOptions } from '@ever-works/plugin';
+import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
 
@@ -60,7 +55,10 @@ export class SourceValidationStep extends BasePipelineStep {
 	readonly stepId = 'sources-validation' as const;
 	private readonly BATCH_SIZE = 15;
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { directory, finalItems, metrics, subject, advancedPrompts } = context;
 		const { logger, aiFacade, searchFacade, contentExtractorFacade } = execContext;
 
@@ -90,7 +88,7 @@ export class SourceValidationStep extends BasePipelineStep {
 
 	private async filterAndValidateSourceItems(
 		items: MutableItemData[],
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		subject: string | undefined,
 		customPrompt: string | null | undefined,
 		logger: StepExecutionContext['logger'],
@@ -155,7 +153,7 @@ export class SourceValidationStep extends BasePipelineStep {
 
 	private async validateAndFetchSourceUrl(
 		currentItem: MutableItemData,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		subject: string | undefined,
 		customPrompt: string | null | undefined,
 		logger: StepExecutionContext['logger'],
@@ -314,7 +312,7 @@ export class SourceValidationStep extends BasePipelineStep {
 		itemName: string,
 		itemDescription: string,
 		candidateUrl: string,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		customPrompt: string | null | undefined,
 		aiFacade: StepExecutionContext['aiFacade'],
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
