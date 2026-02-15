@@ -56,11 +56,13 @@ export type InitializeResult =
           success: true;
           prUpdate: PRUpdate | null;
           stats: GenerationStats;
+          hasExistingItems: boolean;
           warnings?: string[];
       }
     | {
           success: false;
           error: InitializeError;
+          hasExistingItems?: boolean;
           warnings?: string[];
       };
 
@@ -148,7 +150,7 @@ export class DataGeneratorService {
                 metrics: this.convertPipelineMetrics(pipelineResult),
             };
 
-            return { success: true, prUpdate: null, stats, warnings };
+            return { success: true, prUpdate: null, stats, warnings, hasExistingItems: existed };
         }
 
         const { categories: newCategories, items: newItems, tags: newTags } = pipelineResult;
@@ -493,6 +495,7 @@ export class DataGeneratorService {
                 success: true,
                 prUpdate,
                 stats,
+                hasExistingItems: existed,
                 warnings,
             };
         } catch (err) {
@@ -1214,6 +1217,7 @@ export class DataGeneratorService {
             return {
                 success: true,
                 prUpdate: null,
+                hasExistingItems: false,
                 stats: {
                     newItemsCount: itemsWithSlugs.length,
                     updatedItemsCount: 0,
@@ -1317,6 +1321,7 @@ export class DataGeneratorService {
                 return {
                     success: true,
                     prUpdate: null,
+                    hasExistingItems: existingItems.length > 0,
                     stats: {
                         newItemsCount: 0,
                         updatedItemsCount: 0,
@@ -1385,6 +1390,7 @@ export class DataGeneratorService {
 
             return {
                 success: true,
+                hasExistingItems: existingItems.length > 0,
                 prUpdate,
                 stats,
             };
