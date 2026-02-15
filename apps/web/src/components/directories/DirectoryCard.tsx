@@ -67,7 +67,7 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                         statusConfig.badge,
                     )}
                 >
-                    {tStatus(hasWarnings ? 'generated' : statusConfig.labelKey)}
+                    {tStatus(statusConfig.labelKey)}
                 </span>
             </div>
 

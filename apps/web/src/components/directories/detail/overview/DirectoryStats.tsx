@@ -72,7 +72,7 @@ function getGenerationStatusStat(
 
     return {
         title: t('generationStatus'),
-        value: tStatus(hasWarnings ? 'generated' : config.labelKey),
+        value: tStatus(config.labelKey),
         icon: (
             <Icon
                 className={cn('w-5 h-5', config.stat.iconColor, config.animate && 'animate-spin')}
