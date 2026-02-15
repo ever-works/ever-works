@@ -7,12 +7,12 @@ import type {
     DirectoryReference,
     GenerationRequest,
     ExistingItems,
+    IPipelineContext,
     PipelineExecutionOptions,
     PipelineProgressCallback,
     PipelineResult,
     PipelineStepDefinition,
     StepMetrics,
-    StepDataKey,
     IPipelinePlugin,
     IPipelineModifierPlugin,
     PipelineEventPayload,
@@ -21,49 +21,27 @@ import type {
     PipelineStepFailedPayload,
     PipelineCompletedPayload,
     PipelineFailedPayload,
-    GenerationContextSnapshot,
+    ExecutablePipeline,
 } from '@ever-works/plugin';
 import { isPipelineModifierPlugin } from '@ever-works/plugin';
 import { PipelineBuilderService } from './pipeline-builder.service';
 import { PipelineFacadeService } from './pipeline-facade.service';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
-import { TypedGenerationContext } from './generation-context';
 import { ExecutablePipelineRunner } from './executable-pipeline.class';
 
-/**
- * Checkpoint data structure for pipeline recovery.
- */
 export interface CheckpointData {
-    /** Index of the last completed step */
     stepIndex: number;
-    /** Name of the last completed step */
     stepName: string;
-    /** Pipeline plugin ID that created this checkpoint */
     pipelineId: string;
-    /** When the checkpoint was created */
     timestamp: string;
-    /** Serializable context snapshot */
-    context: GenerationContextSnapshot;
-    /** Steps that have been completed */
+    context: unknown;
     completedSteps: string[];
-    /** Schema version for validation */
     schemaVersion: number;
 }
 
-/**
- * Checkpoint TTL in milliseconds (24 hours)
- */
 const CHECKPOINT_TTL_MS = 24 * 60 * 60 * 1000;
+const CURRENT_CHECKPOINT_VERSION = 4;
 
-/**
- * Current checkpoint schema version
- * Increment when checkpoint structure changes to invalidate old checkpoints
- */
-const CURRENT_CHECKPOINT_VERSION = 2;
-
-/**
- * Pipeline event names for lifecycle notifications.
- */
 export const PipelineEvents = {
     STARTED: 'pipeline:started',
     STEP_STARTED: 'pipeline:step-started',
@@ -76,15 +54,10 @@ export const PipelineEvents = {
 } as const;
 
 /**
- * Step-based pipeline executor service.
+ * Context-agnostic step-based pipeline executor.
  *
- * This service executes engine-orchestratable pipelines step by step, supporting:
- * - Built-in steps via IPipelinePlugin.executeStep()
- * - Plugin-provided steps via IPipelineModifierPlugin
- * - Step skipping when data already provided
- * - Per-step metrics tracking
- * - Checkpoint saving for resume capability
- * - Event hooks for pipeline lifecycle
+ * The engine delegates context creation, snapshotting, result extraction,
+ * and skip/circuit-breaker logic to the pipeline plugin via lifecycle hooks.
  */
 @Injectable()
 export class StepPipelineExecutorService {
@@ -98,17 +71,6 @@ export class StepPipelineExecutorService {
         @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
     ) {}
 
-    /**
-     * Execute the pipeline for a directory.
-     *
-     * @param plugin - The resolved pipeline plugin instance
-     * @param directory - Directory reference
-     * @param request - Generation request parameters
-     * @param existing - Existing items in directory
-     * @param options - Execution options
-     * @param onProgress - Progress callback
-     * @returns Pipeline execution result
-     */
     async execute(
         plugin: IPipelinePlugin,
         directory: DirectoryReference,
@@ -117,13 +79,18 @@ export class StepPipelineExecutorService {
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
-        const context = new TypedGenerationContext(directory, request, existing);
+        if (!plugin.createContext) {
+            throw new Error(
+                `Pipeline plugin "${plugin.id}" must implement createContext() for engine-orchestrated execution.`,
+            );
+        }
+        const context = plugin.createContext(directory, request, existing);
         return this.executePipeline(plugin, context, options, onProgress);
     }
 
     private async executePipeline(
         plugin: IPipelinePlugin,
-        context: TypedGenerationContext,
+        context: IPipelineContext,
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
@@ -134,44 +101,39 @@ export class StepPipelineExecutorService {
             `Starting step-based pipeline execution for directory: ${directory.id} via plugin: ${plugin.id}`,
         );
 
-        // 1. Build the pipeline (with directory-scoped plugin resolution)
         const pipeline = await this.pipelineBuilder.build(plugin, directory.id, directory.user?.id);
         const runner = new ExecutablePipelineRunner(pipeline, this.eventEmitter);
 
-        // 2. Emit pipeline:started event
         this.emitPipelineEvent(PipelineEvents.STARTED, {
             directoryId: directory.id,
             pipelineId: plugin.id,
         });
 
-        // 3. Start execution tracking
         runner.startExecution();
 
         let lastCompletedStepIndex = -1;
         let currentStepIndex = 0;
 
         try {
-            // 4. Execute groups in order
             for (const group of pipeline.groups) {
-                // Check for cancellation
                 if (options?.signal?.aborted) {
                     this.logger.log(`Pipeline cancelled before group ${group.id}`);
                     runner.cancelExecution();
                     this.emitPipelineEvent(PipelineEvents.CANCELLED, {
                         directoryId: directory.id,
                     });
-                    const nextStep = group.stepIds[0];
-                    return this.createCancelledResult(context, runner, startTime, nextStep);
+                    return this.buildResult(plugin, context, runner, startTime, {
+                        error: `Pipeline cancelled at step: ${group.stepIds[0]}`,
+                        failedStep: group.stepIds[0],
+                    });
                 }
 
-                // Get steps for this group
                 const groupSteps = group.stepIds
                     .map((id) => pipeline.steps.find((s) => s.id === id))
                     .filter((s): s is PipelineStepDefinition => s !== undefined);
 
                 if (groupSteps.length === 0) continue;
 
-                // Execute steps in the group (parallel or sequential)
                 const stepPromises = groupSteps.map((step) =>
                     this.processStep(
                         step,
@@ -198,19 +160,12 @@ export class StepPipelineExecutorService {
                 }
             }
 
-            // 5. Complete execution
             runner.completeExecution();
-
-            context.updateMetrics({
-                duration: Date.now() - startTime,
-                itemsProcessed: context.finalItems.length,
-            });
 
             this.emitPipelineCompleted(
                 directory.id,
                 Date.now() - startTime,
                 runner.getState().completedSteps.length,
-                context,
                 plugin.id,
             );
 
@@ -220,10 +175,9 @@ export class StepPipelineExecutorService {
 
             await this.clearCheckpoint(directory.id, plugin.id);
 
-            return this.createSuccessResult(context, runner, startTime);
+            return this.buildResult(plugin, context, runner, startTime);
         } catch (error) {
             runner.completeExecution();
-
             const failedStep = pipeline.steps[currentStepIndex]?.id;
 
             this.emitPipelineFailed(
@@ -236,28 +190,25 @@ export class StepPipelineExecutorService {
 
             this.logger.error(`Pipeline failed: ${(error as Error).message}`);
 
-            return this.createFailedResult(context, runner, startTime, error as Error, failedStep);
+            return this.buildResult(plugin, context, runner, startTime, {
+                error: error as Error,
+                failedStep,
+            });
         }
     }
 
-    /**
-     * Process a single step with error handling, metrics, and events
-     */
     private async processStep(
         step: PipelineStepDefinition,
-        pipeline: any,
+        pipeline: ExecutablePipeline,
         plugin: IPipelinePlugin,
         runner: ExecutablePipelineRunner,
-        context: TypedGenerationContext,
+        context: IPipelineContext,
         stepIndex: number,
         totalSteps: number,
         pipelineId: string,
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<void> {
-        const directory = context.directory;
-
-        // Check if step should be skipped via options
         if (options?.skipSteps?.includes(step.id)) {
             this.logger.debug(`Skipping step "${step.id}" (in skipSteps)`);
             runner.markStepSkipped(step.id, 'skipped by options');
@@ -265,31 +216,27 @@ export class StepPipelineExecutorService {
             return;
         }
 
-        // Check if onlySteps is specified and this step is not in it
         if (options?.onlySteps && !options.onlySteps.includes(step.id)) {
             this.logger.debug(`Skipping step "${step.id}" (not in onlySteps)`);
             runner.markStepSkipped(step.id, 'not in onlySteps');
             return;
         }
 
-        // Check if step can be skipped (data already provided)
-        if (await this.canSkipStep(step, context)) {
+        if (plugin.canSkipStep?.(step.id, context)) {
             this.logger.debug(`Skipping step "${step.id}" (data already provided)`);
             runner.markStepSkipped(step.id, 'data already provided');
             this.emitStepSkipped(step, stepIndex, totalSteps);
             return;
         }
 
-        // Emit step:started event
         runner.startStep(step.id);
         this.emitStepEvent(PipelineEvents.STEP_STARTED, step, stepIndex, totalSteps);
 
-        // Report progress
         if (onProgress) {
             onProgress({
                 percent: Math.round((stepIndex / totalSteps) * 100),
                 currentStepIndex: stepIndex,
-                totalSteps: totalSteps,
+                totalSteps,
                 currentStepName: step.name,
                 message: `Executing: ${step.name}`,
             });
@@ -298,7 +245,6 @@ export class StepPipelineExecutorService {
         const stepStartTime = Date.now();
 
         try {
-            // Execute the step
             const executor = pipeline.executorMap.get(step.id);
             if (!executor) {
                 throw new Error(`No executor found for step "${step.id}"`);
@@ -306,14 +252,12 @@ export class StepPipelineExecutorService {
 
             await this.executeStep(step, executor, plugin, context, options);
 
-            // Record metrics
             const metrics = this.createStepMetrics(step, stepStartTime, true);
-            context.recordStepMetrics(step.id, metrics);
             runner.markStepComplete(step.id, metrics);
 
-            // Save checkpoint
             await this.saveCheckpoint(
-                directory,
+                plugin,
+                context.directory,
                 pipelineId,
                 context,
                 stepIndex,
@@ -321,15 +265,12 @@ export class StepPipelineExecutorService {
                 runner.getState().completedSteps,
             );
 
-            // Emit step:completed event
             this.emitStepCompleted(step, stepIndex, totalSteps, metrics.duration ?? 0);
         } catch (error) {
             const err = error as Error;
             const metrics = this.createStepMetrics(step, stepStartTime, false, err.message);
-            context.recordStepMetrics(step.id, metrics);
             runner.markStepFailed(step.id, err);
 
-            // Emit step:failed event
             this.emitStepFailed(step, stepIndex, totalSteps, err, step.optional ?? false);
 
             if (!options?.continueOnError && !step.optional) {
@@ -340,21 +281,15 @@ export class StepPipelineExecutorService {
         }
     }
 
-    /**
-     * Execute with an existing context (for resume scenarios)
-     */
     async executeWithContext(
         plugin: IPipelinePlugin,
-        context: TypedGenerationContext,
+        context: IPipelineContext,
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
         return this.executePipeline(plugin, context, options, onProgress);
     }
 
-    /**
-     * Resume pipeline from checkpoint
-     */
     async resumeFromCheckpoint(
         plugin: IPipelinePlugin,
         directoryId: string,
@@ -368,11 +303,28 @@ export class StepPipelineExecutorService {
             return null;
         }
 
+        const viable =
+            plugin.isCheckpointViable?.(checkpoint.context, checkpoint.completedSteps) ?? true;
+
+        if (!viable) {
+            this.logger.warn(`Checkpoint for directory ${directoryId} is not viable. Discarding.`);
+            await this.clearCheckpoint(directoryId, pipelineId);
+            return null;
+        }
+
+        if (!plugin.contextFromSnapshot) {
+            this.logger.warn(
+                `Pipeline plugin "${plugin.id}" does not implement contextFromSnapshot(). Cannot resume.`,
+            );
+            await this.clearCheckpoint(directoryId, pipelineId);
+            return null;
+        }
+
         this.logger.log(
             `Resuming pipeline from checkpoint at step ${checkpoint.stepIndex}: ${checkpoint.stepName}`,
         );
 
-        const context = TypedGenerationContext.fromSnapshot(checkpoint.context);
+        const context = plugin.contextFromSnapshot(checkpoint.context);
 
         const resumeOptions: PipelineExecutionOptions = {
             ...options,
@@ -382,33 +334,15 @@ export class StepPipelineExecutorService {
         return this.executeWithContext(plugin, context, resumeOptions, onProgress);
     }
 
-    /**
-     * Check if step can be skipped because data is already provided
-     */
-    private async canSkipStep(
-        step: PipelineStepDefinition,
-        context: TypedGenerationContext,
-    ): Promise<boolean> {
-        if (!step.provides?.length) {
-            return false;
-        }
-
-        return step.provides.every((key) => context.hasStepResult(key as StepDataKey));
-    }
-
-    /**
-     * Execute a single step
-     */
     private async executeStep(
         step: PipelineStepDefinition,
         executor:
             | { type: 'builtin'; serviceId: string; pluginId?: string }
             | { type: 'plugin'; pluginId: string; stepId: string },
         plugin: IPipelinePlugin,
-        context: TypedGenerationContext,
+        context: IPipelineContext,
         options?: PipelineExecutionOptions,
     ): Promise<void> {
-        // Create execution context with bound facades
         const execContext = this.facadeService.createStepExecutionContext(
             context.directory,
             context.request.providers,
@@ -416,14 +350,12 @@ export class StepPipelineExecutorService {
         );
 
         if (executor.type === 'builtin') {
-            // Execute via the pipeline plugin's own executeStep method
             await plugin.executeStep!(step.id, context, execContext, {
                 timeout: options?.timeout,
                 signal: options?.signal,
                 settings: options?.stepSettings?.[step.id] ?? {},
             });
         } else {
-            // Execute via modifier plugin
             const modifierPlugin = this.getModifierPluginExecutor(executor.pluginId);
             if (!modifierPlugin) {
                 throw new Error(
@@ -443,25 +375,14 @@ export class StepPipelineExecutorService {
         }
     }
 
-    /**
-     * Get modifier plugin executor by ID
-     */
     private getModifierPluginExecutor(pluginId: string): IPipelineModifierPlugin | null {
         const registered = this.registry.get(pluginId);
         if (!registered || registered.state !== 'loaded') {
             return null;
         }
-
-        if (isPipelineModifierPlugin(registered.plugin)) {
-            return registered.plugin;
-        }
-
-        return null;
+        return isPipelineModifierPlugin(registered.plugin) ? registered.plugin : null;
     }
 
-    /**
-     * Create step metrics for tracking execution performance
-     */
     private createStepMetrics(
         step: PipelineStepDefinition,
         startTime: number,
@@ -477,23 +398,25 @@ export class StepPipelineExecutorService {
         };
     }
 
-    /**
-     * Save checkpoint for pipeline recovery
-     */
+    // ============================================================================
+    // Checkpoint Management
+    // ============================================================================
+
     private async saveCheckpoint(
+        plugin: IPipelinePlugin,
         directory: DirectoryReference,
         pipelineId: string,
-        context: TypedGenerationContext,
+        context: IPipelineContext,
         stepIndex: number,
         stepName: string,
         completedSteps: readonly string[],
     ): Promise<void> {
-        if (!this.cacheManager) {
+        if (!this.cacheManager || !plugin.contextToSnapshot) {
             return;
         }
 
         const checkpointKey = `pipeline-checkpoint-${directory.id}-${pipelineId}`;
-        const snapshot = context.toSnapshot();
+        const snapshot = plugin.contextToSnapshot(context);
 
         const checkpointData: CheckpointData = {
             stepIndex,
@@ -515,9 +438,6 @@ export class StepPipelineExecutorService {
         }
     }
 
-    /**
-     * Load checkpoint
-     */
     async loadCheckpoint(directoryId: string, pipelineId: string): Promise<CheckpointData | null> {
         if (!this.cacheManager) {
             return null;
@@ -526,13 +446,11 @@ export class StepPipelineExecutorService {
         const checkpointKey = `pipeline-checkpoint-${directoryId}-${pipelineId}`;
         try {
             const serialized = await this.cacheManager.get<string>(checkpointKey);
-
             if (!serialized) {
                 return null;
             }
 
             const data = superjson.parse<CheckpointData>(serialized);
-
             const schemaVersion = data.schemaVersion ?? 0;
             if (schemaVersion !== CURRENT_CHECKPOINT_VERSION) {
                 this.logger.warn(
@@ -550,20 +468,64 @@ export class StepPipelineExecutorService {
         }
     }
 
-    /**
-     * Clear checkpoint for a directory
-     */
     async clearCheckpoint(directoryId: string, pipelineId: string): Promise<void> {
         if (!this.cacheManager) {
             return;
         }
-
-        const checkpointKey = `pipeline-checkpoint-${directoryId}-${pipelineId}`;
-        await this.cacheManager.del(checkpointKey);
+        await this.cacheManager.del(`pipeline-checkpoint-${directoryId}-${pipelineId}`);
     }
 
     // ============================================================================
-    // Event Emission Helpers
+    // Result Building
+    // ============================================================================
+
+    private buildResult(
+        plugin: IPipelinePlugin,
+        context: IPipelineContext,
+        runner: ExecutablePipelineRunner,
+        startTime: number,
+        failure?: { error?: Error | string; failedStep?: string },
+    ): PipelineResult {
+        const meta = {
+            duration: Date.now() - startTime,
+            stepsCompleted: runner.getState().completedSteps.length,
+            totalSteps: runner.getPipeline().steps.length,
+            state: runner.getState(),
+        };
+
+        if (plugin.extractResult) {
+            const result = plugin.extractResult(context, meta);
+            if (failure) {
+                return {
+                    ...result,
+                    success: false,
+                    error: failure.error,
+                    failedStep: failure.failedStep,
+                };
+            }
+            return result;
+        }
+
+        // Fallback for plugins that don't implement extractResult
+        const warnings = context.warnings.length > 0 ? context.warnings : undefined;
+        return {
+            success: !failure,
+            items: [],
+            categories: [],
+            tags: [],
+            brands: [],
+            duration: meta.duration,
+            stepsCompleted: meta.stepsCompleted,
+            totalSteps: meta.totalSteps,
+            state: meta.state,
+            warnings,
+            error: failure?.error,
+            failedStep: failure?.failedStep,
+        };
+    }
+
+    // ============================================================================
+    // Event Emission
     // ============================================================================
 
     private emitPipelineEvent(event: string, payload: Partial<PipelineEventPayload>): void {
@@ -636,7 +598,6 @@ export class StepPipelineExecutorService {
         directoryId: string,
         duration: number,
         stepsCompleted: number,
-        context: TypedGenerationContext,
         source: string,
     ): void {
         this.eventEmitter.emit(PipelineEvents.COMPLETED, {
@@ -645,10 +606,10 @@ export class StepPipelineExecutorService {
             pipelineId: source,
             duration,
             stepsCompleted,
-            items: context.finalItems,
-            categories: context.finalCategories,
-            tags: context.finalTags,
-            brands: context.finalBrands,
+            items: [],
+            categories: [],
+            tags: [],
+            brands: [],
         } as PipelineCompletedPayload);
     }
 
@@ -667,70 +628,5 @@ export class StepPipelineExecutorService {
             failedStep,
             completedSteps,
         } as PipelineFailedPayload);
-    }
-
-    // ============================================================================
-    // Result Creation Helpers
-    // ============================================================================
-
-    private createSuccessResult(
-        context: TypedGenerationContext,
-        runner: ExecutablePipelineRunner,
-        startTime: number,
-    ): PipelineResult {
-        return {
-            success: true,
-            items: context.finalItems,
-            categories: context.finalCategories,
-            tags: context.finalTags,
-            brands: context.finalBrands,
-            duration: Date.now() - startTime,
-            stepsCompleted: runner.getState().completedSteps.length,
-            totalSteps: runner.getPipeline().steps.length,
-            state: runner.getState(),
-        };
-    }
-
-    private createFailedResult(
-        context: TypedGenerationContext,
-        runner: ExecutablePipelineRunner,
-        startTime: number,
-        error: Error,
-        failedStep?: string,
-    ): PipelineResult {
-        return {
-            success: false,
-            items: context.finalItems,
-            categories: context.finalCategories,
-            tags: context.finalTags,
-            brands: context.finalBrands,
-            duration: Date.now() - startTime,
-            stepsCompleted: runner.getState().completedSteps.length,
-            totalSteps: runner.getPipeline().steps.length,
-            error,
-            failedStep,
-            state: runner.getState(),
-        };
-    }
-
-    private createCancelledResult(
-        context: TypedGenerationContext,
-        runner: ExecutablePipelineRunner,
-        startTime: number,
-        cancelledAtStep: string,
-    ): PipelineResult {
-        return {
-            success: false,
-            items: context.finalItems,
-            categories: context.finalCategories,
-            tags: context.finalTags,
-            brands: context.finalBrands,
-            duration: Date.now() - startTime,
-            stepsCompleted: runner.getState().completedSteps.length,
-            totalSteps: runner.getPipeline().steps.length,
-            error: `Pipeline cancelled at step: ${cancelledAtStep}`,
-            failedStep: cancelledAtStep,
-            state: runner.getState(),
-        };
     }
 }

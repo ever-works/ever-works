@@ -1,4 +1,5 @@
-import type { MutableGenerationContext, StepExecutionContext, WebPageData, FacadeOptions } from '@ever-works/plugin';
+import type { StepExecutionContext, WebPageData, FacadeOptions } from '@ever-works/plugin';
+import type { MutableGenerationContext } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
 /**
@@ -13,7 +14,10 @@ export class ContentRetrievalStep extends BasePipelineStep {
 	private readonly BATCH_SIZE = 10;
 	private readonly BATCH_DELAY_MS = 500;
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { request, directory, extractedUrls, processedSourceUrls } = context;
 		const { logger, contentExtractorFacade } = execContext;
 		const config = request.config || {};
@@ -46,6 +50,11 @@ export class ContentRetrievalStep extends BasePipelineStep {
 			`[${directory.slug}] Processing ${urlsToProcess.length} URLs (${allUrls.length - urlsToProcess.length} already processed)`
 		);
 
+		// Resolve provider name for user-facing warnings
+		const extractorName =
+			(await contentExtractorFacade.getActiveProviderName?.(facadeOptions)?.catch(() => null)) ?? null;
+		const providerLabel = extractorName ? `Content extraction (${extractorName})` : 'Content extraction';
+
 		// Process all URLs using ContentExtractorFacade (unified content extraction)
 		const retrievedPages = await this.processUrls(
 			directory.slug,
@@ -69,6 +78,13 @@ export class ContentRetrievalStep extends BasePipelineStep {
 		logger.log(
 			`[${directory.slug}] Content Retrieval complete. Retrieved ${retrievedPages.length} pages (total: ${context.webPages.length})`
 		);
+
+		if (retrievedPages.length === 0 && urlsToProcess.length > 0) {
+			this.addWarning(
+				context,
+				`${providerLabel} failed for all ${urlsToProcess.length} URLs. Check your content extraction provider configuration.`
+			);
+		}
 
 		return context;
 	}

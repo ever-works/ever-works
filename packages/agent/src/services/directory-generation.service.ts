@@ -58,6 +58,8 @@ import { DirectoryImportService } from './directory-import.service';
 import { NotificationService } from '@src/notifications/notification.service';
 import { ScreenshotFacadeService } from '@src/facades';
 import { GeneratorFormSchemaService } from './generator-form-schema.service';
+import { buildStatsUpdate } from '../directory-operations/directory-operations.service';
+import { calculateDurationSeconds } from '../utils/time.utils';
 import { PluginOperationsService } from '@src/plugins/services/plugin-operations.service';
 import { getCapabilityFromUIKey, SELECTABLE_PROVIDER_CATEGORIES } from '@ever-works/plugin';
 import { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dto';
@@ -85,15 +87,7 @@ export interface BulkCaptureImagesResponseDto {
     message?: string;
 }
 
-type GenerationTriggerContext = {
-    triggeredBy: 'user' | 'schedule' | 'api';
-    scheduleId?: string;
-    billingMode?: DirectoryScheduleBillingMode;
-};
-
-const DEFAULT_GENERATION_CONTEXT: GenerationTriggerContext = {
-    triggeredBy: 'user',
-};
+import { GenerationTriggerContext, DEFAULT_TRIGGER_CONTEXT } from './types/trigger-context.types';
 
 export type UpdateItemsGeneratorOptions = {
     directoryId: string;
@@ -135,7 +129,7 @@ export class DirectoryGenerationService {
         dto: CreateItemsGeneratorDto,
         user: User,
         awaitCompletion = true,
-        context: GenerationTriggerContext = DEFAULT_GENERATION_CONTEXT,
+        context: GenerationTriggerContext = DEFAULT_TRIGGER_CONTEXT,
     ): Promise<ItemsGeneratorResponseDto> {
         // Require editor role to generate/update items
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
@@ -143,26 +137,7 @@ export class DirectoryGenerationService {
 
         const scopeOptions = { userId: user.id, directoryId };
 
-        // Auto-enable selected providers for this directory before validation
-        await this.ensureProvidersEnabledForDirectory(dto.providers, directoryId, user.id);
-
-        // Validate selected providers before starting generation
-        await this.generatorFormSchemaService.validateSelectedProviders(
-            dto.providers,
-            scopeOptions,
-        );
-
-        // Validate data source plugins are configured
-        await this.generatorFormSchemaService.validateFormSchemaPlugins(scopeOptions);
-
-        // Process form config: separate pipeline config from per-plugin config
-        const processed = await this.generatorFormSchemaService.processFormConfig(
-            dto.providers?.pipeline,
-            dto.pluginConfig,
-            scopeOptions,
-        );
-        dto.pluginConfig = processed.config;
-        dto._processedPluginConfig = processed.pluginConfig;
+        await this.prepareProviders(dto, scopeOptions);
 
         const history = await this.createGenerationHistoryRecord(
             directory,
@@ -202,7 +177,7 @@ export class DirectoryGenerationService {
             updateDto,
             user,
             awaitCompletion = true,
-            context = DEFAULT_GENERATION_CONTEXT,
+            context = DEFAULT_TRIGGER_CONTEXT,
         } = options;
 
         // Require editor role to generate/update items
@@ -269,26 +244,7 @@ export class DirectoryGenerationService {
 
         const scopeOptions = { userId: user.id, directoryId };
 
-        // Auto-enable selected providers for this directory before validation
-        await this.ensureProvidersEnabledForDirectory(payload.providers, directoryId, user.id);
-
-        // Validate selected providers before starting generation
-        await this.generatorFormSchemaService.validateSelectedProviders(
-            payload.providers,
-            scopeOptions,
-        );
-
-        // Validate data source plugins are configured
-        await this.generatorFormSchemaService.validateFormSchemaPlugins(scopeOptions);
-
-        // Process form config: separate pipeline config from per-plugin config
-        const processed = await this.generatorFormSchemaService.processFormConfig(
-            payload.providers?.pipeline,
-            payload.pluginConfig,
-            scopeOptions,
-        );
-        payload.pluginConfig = processed.config;
-        payload._processedPluginConfig = processed.pluginConfig;
+        await this.prepareProviders(payload, scopeOptions);
 
         if (context.triggeredBy === 'schedule') {
             payload.config = {
@@ -862,6 +818,29 @@ export class DirectoryGenerationService {
         ]);
     }
 
+    private async prepareProviders(
+        dto: CreateItemsGeneratorDto,
+        scopeOptions: { userId: string; directoryId: string },
+    ): Promise<void> {
+        await this.ensureProvidersEnabledForDirectory(
+            dto.providers,
+            scopeOptions.directoryId,
+            scopeOptions.userId,
+        );
+        await this.generatorFormSchemaService.validateSelectedProviders(
+            dto.providers,
+            scopeOptions,
+        );
+        await this.generatorFormSchemaService.validateFormSchemaPlugins(scopeOptions);
+        const processed = await this.generatorFormSchemaService.processFormConfig(
+            dto.providers?.pipeline,
+            dto.pluginConfig,
+            scopeOptions,
+        );
+        dto.pluginConfig = processed.config;
+        dto._processedPluginConfig = processed.pluginConfig;
+    }
+
     /**
      * Auto-enable selected providers for a directory before generation starts.
      * This ensures DirectoryPluginEntity records exist so resolvePluginEnabled() returns true.
@@ -901,7 +880,7 @@ export class DirectoryGenerationService {
         user: User,
         dto: CreateItemsGeneratorDto,
         history?: DirectoryGenerationHistory,
-        context: GenerationTriggerContext = DEFAULT_GENERATION_CONTEXT,
+        context: GenerationTriggerContext = DEFAULT_TRIGGER_CONTEXT,
     ) {
         try {
             await this.processGeneration(directory, user, dto, history, context);
@@ -1000,7 +979,7 @@ export class DirectoryGenerationService {
         user: User,
         dto: CreateItemsGeneratorDto,
         history?: DirectoryGenerationHistory,
-        context: GenerationTriggerContext = DEFAULT_GENERATION_CONTEXT,
+        context: GenerationTriggerContext = DEFAULT_TRIGGER_CONTEXT,
     ) {
         const startTime = new Date();
 
@@ -1020,11 +999,14 @@ export class DirectoryGenerationService {
 
         let hasError = false;
         let generationStats: GenerationStats | null = null;
+        let generationWarnings: string[] | undefined;
 
         try {
             const generated = await this.dataGenerator.initialize(directory, user, dto, {
                 tryResume: context.triggeredBy === 'schedule',
             });
+
+            generationWarnings = generated.warnings;
 
             if (generated.success === false) {
                 const { error } = generated;
@@ -1049,33 +1031,28 @@ export class DirectoryGenerationService {
 
             if (history) {
                 await this.generationHistoryRepository.updateEntry(history.id, {
-                    newItemsCount: generationStats?.newItemsCount ?? 0,
-                    updatedItemsCount: generationStats?.updatedItemsCount ?? 0,
-                    totalItemsCount: generationStats?.totalItemsCount ?? 0,
-                    metrics: generationStats?.metrics,
+                    ...buildStatsUpdate(generationStats),
                 });
             }
         } catch (error) {
+            const endTime = new Date();
+
             await Promise.all([
-                this.directoryRepository.recordGenerationFinishTime(directory.id, new Date()),
+                this.directoryRepository.recordGenerationFinishTime(directory.id, endTime),
                 this.directoryRepository.updateGenerateStatus(directory.id, {
                     status: GenerateStatusType.ERROR,
                     error: normalizeGeneratorError(error),
+                    warnings: generationWarnings,
                 }),
             ]);
 
             if (history) {
-                const endTime = new Date();
-                const duration = Math.round((endTime.getTime() - startTime.getTime()) / 1000);
                 await this.generationHistoryRepository.updateEntry(history.id, {
                     status: GenerateStatusType.ERROR,
                     finishedAt: endTime,
-                    durationInSeconds: duration,
+                    durationInSeconds: calculateDurationSeconds(startTime, endTime),
                     errorMessage: normalizeGeneratorError(error),
-                    newItemsCount: generationStats?.newItemsCount ?? 0,
-                    updatedItemsCount: generationStats?.updatedItemsCount ?? 0,
-                    totalItemsCount: generationStats?.totalItemsCount ?? 0,
-                    metrics: generationStats?.metrics,
+                    ...buildStatsUpdate(generationStats),
                 });
             }
 
@@ -1097,20 +1074,17 @@ export class DirectoryGenerationService {
                 this.directoryRepository.updateGenerateStatus(directory.id, {
                     status: GenerateStatusType.GENERATED,
                     step: null,
+                    warnings: generationWarnings,
                 }),
             ]);
 
             if (history) {
                 const endTime = new Date();
-                const duration = Math.round((endTime.getTime() - startTime.getTime()) / 1000);
                 await this.generationHistoryRepository.updateEntry(history.id, {
                     status: GenerateStatusType.GENERATED,
                     finishedAt: endTime,
-                    durationInSeconds: duration,
-                    newItemsCount: generationStats?.newItemsCount ?? 0,
-                    updatedItemsCount: generationStats?.updatedItemsCount ?? 0,
-                    totalItemsCount: generationStats?.totalItemsCount ?? 0,
-                    metrics: generationStats?.metrics,
+                    durationInSeconds: calculateDurationSeconds(startTime, endTime),
+                    ...buildStatsUpdate(generationStats),
                 });
             }
         }
@@ -1135,11 +1109,11 @@ export class DirectoryGenerationService {
 
     private resolveContext(context?: GenerationTriggerContext): GenerationTriggerContext {
         if (!context) {
-            return { ...DEFAULT_GENERATION_CONTEXT };
+            return { ...DEFAULT_TRIGGER_CONTEXT };
         }
 
         return {
-            triggeredBy: context.triggeredBy || DEFAULT_GENERATION_CONTEXT.triggeredBy,
+            triggeredBy: context.triggeredBy || DEFAULT_TRIGGER_CONTEXT.triggeredBy,
             scheduleId: context.scheduleId,
             billingMode: context.billingMode,
         };

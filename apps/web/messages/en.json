@@ -432,6 +432,7 @@
                 "notStarted": "Not Started",
                 "generating": "Generating",
                 "generated": "Generated",
+                "generatedWithWarnings": "Generated with warnings",
                 "error": "Error",
                 "cancelled": "Cancelled"
             },
@@ -607,12 +608,14 @@
                 "generated": {
                     "title": "Generation Complete",
                     "description": "Your directory has been successfully populated with items.",
+                    "withWarnings": "Completed with warnings:",
                     "viewItems": "View Items",
                     "regenerate": "Regenerate"
                 },
                 "error": {
                     "title": "Generation Failed",
                     "description": "An error occurred during generation.",
+                    "withWarnings": "Generation failed with errors:",
                     "retry": "Retry Generation"
                 },
                 "cancelled": {

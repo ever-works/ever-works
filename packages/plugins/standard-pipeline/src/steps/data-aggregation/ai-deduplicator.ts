@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import type { MutableItemData, StepExecutionContext, PipelineMetrics, FacadeOptions } from '@ever-works/plugin';
+import type { MutableItemData, StepExecutionContext, FacadeOptions } from '@ever-works/plugin';
+import type { StandardPipelineMetrics } from '../../context/index.js';
 import { slugifyText } from '../../utils/text.utils.js';
 import { extractedItemsSchema } from '../../schemas/item-extraction.schemas.js';
 import { getErrorMessage, getErrorStack } from '../../utils/error.utils.js';
@@ -29,7 +30,7 @@ export class AiDeduplicator {
 	async deduplicateWithAI(
 		description: string,
 		items: MutableItemData[],
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		customPrompt?: string | null
 	): Promise<MutableItemData[]> {
 		if (!items || items.length === 0) return [];
@@ -46,7 +47,7 @@ export class AiDeduplicator {
 	private async processSingleBatch(
 		description: string,
 		items: MutableItemData[],
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		customPrompt?: string | null
 	): Promise<MutableItemData[]> {
 		try {
@@ -86,7 +87,7 @@ export class AiDeduplicator {
 	private async processLargeArray(
 		description: string,
 		items: MutableItemData[],
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		customPrompt?: string | null
 	): Promise<MutableItemData[]> {
 		const startTime = Date.now();
@@ -135,7 +136,7 @@ export class AiDeduplicator {
 	}
 
 	private accumulateMetrics(
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		usage: { inputTokens: number; outputTokens: number; totalTokens: number } | null,
 		cost: number | null
 	): void {

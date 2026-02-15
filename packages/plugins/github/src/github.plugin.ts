@@ -319,6 +319,16 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 		return this.gitOps!.removeLocalDir(owner, repo);
 	}
 
+	async replaceRemote(dir: string, remote: string, url: string): Promise<void> {
+		this.ensureGitOps();
+		return this.gitOps!.replaceRemote(dir, remote, url);
+	}
+
+	async renameBranch(dir: string, oldName: string, newName: string): Promise<void> {
+		this.ensureGitOps();
+		return this.gitOps!.renameBranch(dir, oldName, newName);
+	}
+
 	// Content access methods
 
 	async getFileContent(

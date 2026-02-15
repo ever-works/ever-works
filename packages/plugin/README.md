@@ -136,7 +136,7 @@ export class GitHubPlugin extends BaseGitProvider implements IGitProviderPlugin 
 Pipeline modifiers add, replace, or disable steps in an existing pipeline:
 
 ```typescript
-import { BasePipelineStep, type IPipelineModifierPlugin, type MutableGenerationContext } from '@ever-works/plugin';
+import { BasePipelineStep, type IPipelineModifierPlugin, type IPipelineContext } from '@ever-works/plugin';
 
 export class MyModifierPlugin extends BasePipelineStep implements IPipelineModifierPlugin {
 	readonly id = 'my-modifier';
@@ -153,7 +153,7 @@ export class MyModifierPlugin extends BasePipelineStep implements IPipelineModif
 		};
 	}
 
-	async execute(context: MutableGenerationContext): Promise<MutableGenerationContext> {
+	async execute(context: IPipelineContext): Promise<IPipelineContext> {
 		// Your logic here
 		return context;
 	}
@@ -276,7 +276,7 @@ import { IPlugin, BasePlugin, createMockPluginContext } from '@ever-works/plugin
 import { IPlugin, IGitProviderPlugin, IGitOperations } from '@ever-works/plugin/contracts';
 
 // Pipeline types
-import { BuiltInStepId, MutableGenerationContext } from '@ever-works/plugin/pipeline';
+import { IPipelineContext, PipelineStepDefinition } from '@ever-works/plugin/pipeline';
 
 // Events
 import { PluginEventName, PluginEventPayloads } from '@ever-works/plugin/events';

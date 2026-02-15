@@ -1,12 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ContentFilteringStep } from '../steps/content-filtering.step';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	DirectoryReference,
-	GenerationRequest,
-	WebPageData
-} from '@ever-works/plugin';
+import type { StepExecutionContext, DirectoryReference, GenerationRequest, WebPageData } from '@ever-works/plugin';
+import type { MutableGenerationContext } from '../context/index.js';
 
 describe('ContentFilteringStep', () => {
 	let step: ContentFilteringStep;
@@ -66,6 +61,7 @@ describe('ContentFilteringStep', () => {
 			webPages: [createMockWebPage('A'.repeat(200))],
 			metrics: { steps: {} },
 			advancedPrompts: {},
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;
@@ -271,6 +267,49 @@ describe('ContentFilteringStep', () => {
 			const result = await step.run(mockContext, mockExecContext);
 
 			expect(result.webPages).toEqual([]);
+		});
+
+		it('should add warning when all pages are filtered out', async () => {
+			mockExecContext.aiFacade.askJson = vi.fn().mockResolvedValue({
+				result: {
+					relevant: false,
+					relevance_score: 0.1,
+					reason: 'Not relevant'
+				},
+				usage: null,
+				cost: null
+			});
+
+			const result = await step.run(mockContext, mockExecContext);
+
+			expect(result.webPages.length).toBe(0);
+			expect(result.warnings).toContain(
+				'Content filtering removed all 1 pages as irrelevant. Try adjusting your prompt to be more specific.'
+			);
+		});
+
+		it('should not add warning when filtering reduces but does not eliminate pages', async () => {
+			mockContext.webPages = [
+				createMockWebPage('A'.repeat(200), 'https://page1.com'),
+				createMockWebPage('B'.repeat(200), 'https://page2.com')
+			];
+			mockExecContext.aiFacade.askJson = vi
+				.fn()
+				.mockResolvedValueOnce({
+					result: { relevant: true, relevance_score: 0.8, reason: 'Relevant' },
+					usage: null,
+					cost: null
+				})
+				.mockResolvedValueOnce({
+					result: { relevant: false, relevance_score: 0.1, reason: 'Not relevant' },
+					usage: null,
+					cost: null
+				});
+
+			const result = await step.run(mockContext, mockExecContext);
+
+			expect(result.webPages.length).toBe(1);
+			expect(result.warnings.length).toBe(0);
 		});
 	});
 });

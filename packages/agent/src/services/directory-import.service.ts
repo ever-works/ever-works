@@ -31,6 +31,7 @@ import {
 import { Directory, ImportSourceType, SourceRepository } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
 import { DirectoryGenerationCompletedEvent } from '@src/events';
+import { buildImportStatsUpdate } from '@src/directory-operations';
 import {
     DirectoryImportPayload,
     DirectoryImportResult,
@@ -41,17 +42,13 @@ import {
 import { DirectoryScheduleService } from './directory-schedule.service';
 import { DirectoryScheduleCadence, GenerateStatusType } from '@src/entities/types';
 import { normalizeGeneratorError } from './utils/error.utils';
+import { calculateDurationSeconds } from '../utils/time.utils';
 import { slugifyText } from '@src/utils/text.utils';
 import { GenerationMethod } from '@src/items-generator/dto';
 import { DirectoryGenerationHistory } from '@src/entities/directory-generation-history.entity';
 import { GeneratorFormSchemaService } from './generator-form-schema.service';
 
-type ImportTriggerContext = {
-    triggeredBy: 'user' | 'schedule' | 'api';
-    scheduleId?: string;
-};
-
-const DEFAULT_IMPORT_CONTEXT: ImportTriggerContext = { triggeredBy: 'user' };
+import { OperationTriggerContext, DEFAULT_TRIGGER_CONTEXT } from './types/trigger-context.types';
 
 @Injectable()
 export class DirectoryImportService {
@@ -196,7 +193,7 @@ export class DirectoryImportService {
     async initiateImport(
         dto: ImportDirectoryDto,
         user: User,
-        context: ImportTriggerContext = DEFAULT_IMPORT_CONTEXT,
+        context: OperationTriggerContext = DEFAULT_TRIGGER_CONTEXT,
     ): Promise<ImportDirectoryResponseDto> {
         const parsed = this.sourceRepoAnalyzer.parseGitUrl(dto.sourceUrl);
         if (!parsed) {
@@ -287,7 +284,7 @@ export class DirectoryImportService {
                 directoryId: directory.id,
                 userId: user.id,
                 status: GenerateStatusType.GENERATING,
-                generationMethod: 'import' as any,
+                generationMethod: GenerationMethod.IMPORT,
                 parameters: {
                     sourceUrl: dto.sourceUrl,
                     sourceType: dto.sourceType,
@@ -348,7 +345,7 @@ export class DirectoryImportService {
         dto: ImportDirectoryDto,
         parsed: { owner: string; repo: string },
         history: DirectoryGenerationHistory,
-        context: ImportTriggerContext,
+        context: OperationTriggerContext,
     ): Promise<void> {
         await Promise.all([
             this.directoryRepository.recordGenerationStartTime(directory.id, new Date()),
@@ -430,45 +427,23 @@ export class DirectoryImportService {
         try {
             const token = await this.getProviderToken(user, directory.gitProvider);
 
-            if (dto.sourceType === ImportSourceTypeEnum.DATA_REPO) {
-                if (!token) {
-                    throw new Error('Git provider token not available');
-                }
-                result = await this.importExecutor.importFromDataRepo({
-                    directory,
-                    user,
-                    source: parsed,
-                    token,
-                });
-            } else if (dto.sourceType === ImportSourceTypeEnum.AWESOME_README) {
-                result = await this.importExecutor.importFromAwesomeReadme({
-                    directory,
-                    user,
-                    sourceUrl: dto.sourceUrl,
-                    token,
-                    aiProviderOverride: dto.providers?.ai,
-                });
-            } else if (dto.sourceType === ImportSourceTypeEnum.LINK_EXISTING) {
-                if (!token) {
-                    throw new Error('Git provider token not available');
-                }
-                result = await this.importExecutor.linkExistingDataRepo({
-                    directory,
-                    user,
-                    source: parsed,
-                    token,
-                    createMissingRepos: dto.createMissingRepos ?? false,
-                });
-            } else {
-                throw new Error(`Unsupported source type: ${dto.sourceType}`);
-            }
+            result = await this.importExecutor.executeBySourceType({
+                directory,
+                user,
+                sourceType: dto.sourceType as ImportSourceType,
+                sourceOwner: parsed.owner,
+                sourceRepo: parsed.repo,
+                sourceUrl: dto.sourceUrl,
+                token,
+                createMissingRepos: dto.createMissingRepos,
+                aiProviderOverride: dto.providers?.ai,
+            });
 
             if (!result.success) {
                 throw new Error(result.error || 'Import failed');
             }
 
             const endTime = new Date();
-            const duration = Math.round((endTime.getTime() - startTime.getTime()) / 1000);
 
             await Promise.all([
                 this.directoryRepository.recordGenerationFinishTime(directory.id, endTime),
@@ -483,27 +458,17 @@ export class DirectoryImportService {
             await this.generationHistoryRepository.updateEntry(history.id, {
                 status: GenerateStatusType.GENERATED,
                 finishedAt: endTime,
-                durationInSeconds: duration,
-                newItemsCount: result.itemsImported ?? 0,
-                totalItemsCount: result.itemsImported ?? 0,
-                metrics: result.metrics
-                    ? {
-                          total_tokens_used: result.metrics.total_tokens_used ?? 0,
-                          total_cost: result.metrics.total_cost ?? 0,
-                          new_items_added_to_store: result.itemsImported ?? 0,
-                          total_items_in_store: result.itemsImported ?? 0,
-                      }
-                    : undefined,
+                durationInSeconds: calculateDurationSeconds(startTime, endTime),
+                ...buildImportStatsUpdate(result),
             });
 
             this.eventEmitter.emit(
-                'directory.generation.completed',
+                DirectoryGenerationCompletedEvent.EVENT_NAME,
                 new DirectoryGenerationCompletedEvent(directory),
             );
         } catch (error) {
             const endTime = new Date();
-            const duration = Math.round((endTime.getTime() - startTime.getTime()) / 1000);
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = normalizeGeneratorError(error);
 
             await Promise.all([
                 this.directoryRepository.recordGenerationFinishTime(directory.id, endTime),
@@ -516,16 +481,15 @@ export class DirectoryImportService {
             await this.generationHistoryRepository.updateEntry(history.id, {
                 status: GenerateStatusType.ERROR,
                 finishedAt: endTime,
-                durationInSeconds: duration,
+                durationInSeconds: calculateDurationSeconds(startTime, endTime),
                 errorMessage,
-                newItemsCount: result?.itemsImported ?? 0,
-                totalItemsCount: result?.itemsImported ?? 0,
+                ...buildImportStatsUpdate(result),
             });
 
             this.logger.error(`Import failed for directory ${directory.id}`, error);
 
             this.eventEmitter.emit(
-                'directory.generation.completed',
+                DirectoryGenerationCompletedEvent.EVENT_NAME,
                 new DirectoryGenerationCompletedEvent(directory),
             );
         }
@@ -539,7 +503,7 @@ export class DirectoryImportService {
         user: User,
         historyId?: string,
     ): Promise<DirectoryImportResult> {
-        const startTime = Date.now();
+        const startTime = new Date();
         const sourceRepo = directory.sourceRepository;
 
         if (!sourceRepo) {
@@ -571,25 +535,16 @@ export class DirectoryImportService {
             }
 
             if (result.success && historyId) {
+                const finishedAt = new Date();
                 await this.generationHistoryRepository.updateEntry(historyId, {
                     status: GenerateStatusType.GENERATED,
-                    finishedAt: new Date(),
-                    durationInSeconds: Math.round((Date.now() - startTime) / 1000),
-                    newItemsCount: result.stats?.newItemsCount ?? 0,
-                    updatedItemsCount: result.stats?.updatedItemsCount ?? 0,
-                    totalItemsCount: result.stats?.totalItemsCount ?? 0,
-                    metrics: result.metrics
-                        ? {
-                              total_tokens_used: result.metrics.total_tokens_used,
-                              total_cost: result.metrics.total_cost,
-                              new_items_added_to_store: result.stats?.newItemsCount ?? 0,
-                              total_items_in_store: result.stats?.totalItemsCount ?? 0,
-                          }
-                        : undefined,
+                    finishedAt,
+                    durationInSeconds: calculateDurationSeconds(startTime, finishedAt),
+                    ...buildImportStatsUpdate(result),
                 });
 
                 this.eventEmitter.emit(
-                    'directory.generation.completed',
+                    DirectoryGenerationCompletedEvent.EVENT_NAME,
                     new DirectoryGenerationCompletedEvent(directory),
                 );
             }
@@ -885,7 +840,7 @@ export class DirectoryImportService {
             directoryId: directory.id,
             userId: user.id,
             status: GenerateStatusType.GENERATED,
-            generationMethod: 'import' as any,
+            generationMethod: GenerationMethod.IMPORT,
             parameters: {
                 sourceUrl: dto.sourceUrl,
                 sourceType: dto.sourceType,
@@ -905,7 +860,7 @@ export class DirectoryImportService {
         this.logger.log(`Linked directory ${directory.id} to existing repos at ${dto.sourceUrl}`);
 
         this.eventEmitter.emit(
-            'directory.generation.completed',
+            DirectoryGenerationCompletedEvent.EVENT_NAME,
             new DirectoryGenerationCompletedEvent(directory),
         );
 

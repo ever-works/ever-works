@@ -1,6 +1,7 @@
 import type {
 	IPlugin,
 	IPipelinePlugin,
+	IFormSchemaProvider,
 	PluginContext,
 	PluginCategory,
 	JsonSchema,
@@ -17,7 +18,10 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	StepStatus,
-	FacadeOptions
+	FacadeOptions,
+	FormFieldDefinition,
+	FormFieldGroup,
+	ItemData
 } from '@ever-works/plugin';
 
 import type { ClaudeCodeStepId } from './types.js';
@@ -46,6 +50,12 @@ import {
 	buildErrorResult,
 	buildCancelledResult
 } from './utils/pipeline-helpers.js';
+import {
+	getFormFields as formFields,
+	getFormGroups as formGroups,
+	validateFormInput as formValidate,
+	getDefaultValues as formDefaults
+} from './form-schema.js';
 
 /**
  * Claude Code Generator Plugin
@@ -54,13 +64,14 @@ import {
  * Runs a single Claude Code session that handles web search,
  * content creation, and file generation autonomously.
  */
-export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
+export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider {
 	readonly id = 'claude-code';
 	readonly name = 'Claude Code Generator';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'pipeline';
-	readonly capabilities = ['pipeline'] as const;
+	readonly capabilities = ['pipeline', 'form-schema-provider'] as const;
 	readonly configurationMode = 'user-required' as const;
+	readonly handledConfigFields = ['*'] as const;
 
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
@@ -225,6 +236,24 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 		};
 	}
 
+	// ── IFormSchemaProvider ─────────────────────────────────────────────
+
+	getFormFields(): FormFieldDefinition[] {
+		return formFields();
+	}
+
+	getFormGroups(): FormFieldGroup[] {
+		return formGroups();
+	}
+
+	validateFormInput(values: Record<string, unknown>): ValidationResult {
+		return formValidate(values);
+	}
+
+	getDefaultValues(): Record<string, unknown> {
+		return formDefaults(this.getFormFields());
+	}
+
 	// ── IPipelinePlugin ─────────────────────────────────────────────────
 
 	getStepDefinitions(): readonly PipelineStepDefinition[] {
@@ -324,10 +353,13 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 				return this.handleCancel(startTime);
 			}
 
+			let generationWarning: string | undefined;
 			if (execResult.exitCode !== 0) {
-				const errorMsg =
-					(execResult.stderr || execResult.stdout).slice(0, 500) || `Exit code ${execResult.exitCode}`;
-				logger.warn(`Claude Code exited with code ${execResult.exitCode}: ${errorMsg}`);
+				const detail =
+					(execResult.stderr || execResult.stdout).slice(0, 500) || `exit code ${execResult.exitCode}`;
+
+				logger.warn(`Claude Code exited with code ${execResult.exitCode}: ${detail}`);
+				generationWarning = `Claude Code finished with an error (${detail.split('\n')[0].trim()}).`;
 			}
 
 			this.setState('generate-items', 'completed');
@@ -341,28 +373,16 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 			this.setState('collect-results', 'completed');
 
 			// ── Step 5: Capture Screenshots ────────────────────────────
-			const execContext = options?.execContext;
-			const screenshotFacade = execContext?.screenshotFacade;
-
-			if (screenshotFacade?.isAvailable() && items.length > 0 && !signal.aborted) {
-				this.setState('capture-screenshots', 'running');
-				reportProgress(onProgress, 4, 87, 'Capture Screenshots');
-
-				const facadeOptions: FacadeOptions = {
-					userId: userId!,
-					directoryId: directory.id
-				};
-
-				const status = await captureScreenshots(items, {
-					screenshotFacade,
-					facadeOptions,
-					signal,
-					logger
-				});
-				this.setState('capture-screenshots', status);
-			} else {
-				this.setState('capture-screenshots', 'skipped' as StepStatus);
-			}
+			const screenshotWarnings = await this.runScreenshotCapture(
+				request,
+				options?.execContext,
+				items,
+				userId,
+				directory.id,
+				signal,
+				onProgress,
+				logger
+			);
 
 			// ── Step 6: Cleanup ────────────────────────────────────────
 			this.setState('cleanup', 'running');
@@ -375,6 +395,8 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 			reportProgress(onProgress, 6, 100, 'Complete');
 
 			const duration = Date.now() - startTime;
+			const warnings = [...(generationWarning ? [generationWarning] : []), ...screenshotWarnings];
+
 			return {
 				success: true,
 				items,
@@ -385,7 +407,8 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 				duration,
 				stepsCompleted: this.state!.completedSteps.length,
 				totalSteps: CLAUDE_CODE_STEP_IDS.length,
-				state: this.state!
+				state: this.state!,
+				warnings: warnings.length > 0 ? warnings : undefined
 			};
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
@@ -406,6 +429,50 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin {
 	}
 
 	// ── Private helpers ────────────────────────────────────────────────
+
+	private async runScreenshotCapture(
+		request: GenerationRequest,
+		execContext: PipelineExecutionOptions['execContext'],
+		items: ItemData[],
+		userId: string,
+		directoryId: string,
+		signal: AbortSignal,
+		onProgress: PipelineProgressCallback | undefined,
+		logger: { log(...args: unknown[]): void; warn(...args: unknown[]): void }
+	): Promise<string[]> {
+		const shouldCapture = (request.config || {}).capture_screenshots !== false;
+		const screenshotFacade = execContext?.screenshotFacade;
+
+		if (!shouldCapture || items.length === 0 || signal.aborted || !screenshotFacade) {
+			this.setState('capture-screenshots', 'skipped' as StepStatus);
+			return [];
+		}
+
+		if (!screenshotFacade.isAvailable()) {
+			this.setState('capture-screenshots', 'skipped' as StepStatus);
+			return ['Screenshot provider is not configured. Enable a screenshot plugin to capture item images.'];
+		}
+
+		this.setState('capture-screenshots', 'running');
+		reportProgress(onProgress, 4, 87, 'Capture Screenshots');
+
+		const { status, errors } = await captureScreenshots(items, {
+			screenshotFacade,
+			facadeOptions: { userId, directoryId },
+			signal,
+			logger
+		});
+		this.setState('capture-screenshots', status);
+
+		if (errors.length > 0) {
+			const facadeOptions = { userId, directoryId };
+			const providerName = await screenshotFacade.getActiveProviderName?.(facadeOptions);
+			const label = providerName ? `Screenshot capture (${providerName})` : 'Screenshot capture';
+			const unique = [...new Set(errors)];
+			return [`${label} failed for ${errors.length} item(s): ${unique.join('; ')}`];
+		}
+		return [];
+	}
 
 	private setState(stepId: ClaudeCodeStepId, status: StepStatus, error?: string): void {
 		if (this.state) {

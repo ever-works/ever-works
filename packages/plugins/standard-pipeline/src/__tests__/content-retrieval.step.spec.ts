@@ -1,11 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ContentRetrievalStep } from '../steps/content-retrieval.step';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	DirectoryReference,
-	GenerationRequest
-} from '@ever-works/plugin';
+import type { StepExecutionContext, DirectoryReference, GenerationRequest } from '@ever-works/plugin';
+import type { MutableGenerationContext } from '../context/index.js';
 
 describe('ContentRetrievalStep', () => {
 	let step: ContentRetrievalStep;
@@ -55,6 +51,7 @@ describe('ContentRetrievalStep', () => {
 			processedSourceUrls: new Set<string>(),
 			webPages: [],
 			contentCache: new Map<string, string>(),
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

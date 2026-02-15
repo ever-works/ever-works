@@ -1,3 +1,4 @@
+import type { IBaseFacade } from './base-facade.interface.js';
 import type { FacadeOptions } from './facade-options.interface.js';
 
 export interface ScreenshotCaptureOptions {
@@ -62,7 +63,7 @@ export interface SmartImageResult {
  * Provides screenshot capture and smart image routing capabilities.
  * The actual implementation handles provider resolution and settings.
  */
-export interface IScreenshotFacade {
+export interface IScreenshotFacade extends IBaseFacade {
 	/**
 	 * Capture a screenshot of a URL.
 	 *

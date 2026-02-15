@@ -1,12 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DataAggregationStep } from '../steps/data-aggregation.step';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	DirectoryReference,
-	GenerationRequest,
-	MutableItemData
-} from '@ever-works/plugin';
+import type { StepExecutionContext, DirectoryReference, GenerationRequest, MutableItemData } from '@ever-works/plugin';
+import type { MutableGenerationContext } from '../context/index.js';
 
 describe('DataAggregationStep', () => {
 	let step: DataAggregationStep;
@@ -75,6 +70,7 @@ describe('DataAggregationStep', () => {
 			advancedPrompts: {},
 			aggregatedItems: [],
 			pluginConfig: {},
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;
@@ -256,6 +252,37 @@ describe('DataAggregationStep', () => {
 
 			const result = await step.run(mockContext, mockExecContext);
 			expect(result.aggregatedItems).toEqual([]);
+		});
+
+		it('should set shouldStop and warn when no items and no existing items', async () => {
+			mockContext.initialAiItems = [];
+			mockContext.extractedWebItems = [];
+			mockContext.existing = { items: [] };
+
+			const result = await step.run(mockContext, mockExecContext);
+
+			expect(result.shouldStop).toBe(true);
+			expect(result.warnings).toContain('No items were generated or found from any source.');
+		});
+
+		it('should set shouldStop with softer warning when no new items but existing items present', async () => {
+			mockContext.initialAiItems = [];
+			mockContext.extractedWebItems = [];
+			mockContext.existing = { items: [createMockItem('Existing')] };
+
+			const result = await step.run(mockContext, mockExecContext);
+
+			expect(result.shouldStop).toBe(true);
+			expect(result.warnings).toContain('No new items found. The directory already has existing items.');
+		});
+
+		it('should not set shouldStop when aggregated items exist', async () => {
+			mockContext.initialAiItems = [createMockItem('Item 1')];
+
+			const result = await step.run(mockContext, mockExecContext);
+
+			expect(result.shouldStop).toBeFalsy();
+			expect(result.warnings.length).toBe(0);
 		});
 
 		it('should apply custom deduplication prompt', async () => {

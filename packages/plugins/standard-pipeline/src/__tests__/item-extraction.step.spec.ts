@@ -1,12 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ItemExtractionStep } from '../steps/item-extraction.step';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	DirectoryReference,
-	GenerationRequest,
-	WebPageData
-} from '@ever-works/plugin';
+import type { StepExecutionContext, DirectoryReference, GenerationRequest, WebPageData } from '@ever-works/plugin';
+import type { MutableGenerationContext } from '../context/index.js';
 
 describe('ItemExtractionStep', () => {
 	let step: ItemExtractionStep;
@@ -85,6 +80,7 @@ describe('ItemExtractionStep', () => {
 			metrics: { steps: {} },
 			advancedPrompts: {},
 			extractedWebItems: [],
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;
@@ -159,7 +155,7 @@ describe('ItemExtractionStep', () => {
 			expect(result.extractedWebItems[0].slug).toBe('my-test-item');
 		});
 
-		it('should handle empty AI response', async () => {
+		it('should handle empty AI response and add warning', async () => {
 			mockExecContext.aiFacade.askJson = vi.fn().mockResolvedValue({
 				result: { items: [] },
 				usage: null,
@@ -169,6 +165,7 @@ describe('ItemExtractionStep', () => {
 			const result = await step.run(mockContext, mockExecContext);
 
 			expect(result.extractedWebItems).toEqual([]);
+			expect(result.warnings).toContain('Item extraction produced 0 items from 1 pages.');
 		});
 
 		it('should handle AI errors gracefully', async () => {

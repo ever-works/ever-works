@@ -5,6 +5,8 @@ import { GenerationMetrics } from '@src/entities/directory-generation-history.en
 import { GenerateStatusType } from '@src/entities/types';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DirectoryGenerationCompletedEvent } from '@src/events';
+import { GenerationStats } from '../generators/data-generator/data-generator.service';
+import { DirectoryImportResult } from '../tasks/directory-import.types';
 
 export type GenerationHistoryUpdateInput = {
     status?: GenerateStatusType;
@@ -19,6 +21,42 @@ export type GenerationHistoryUpdateInput = {
     parameters?: Record<string, any> | null;
 };
 
+export function buildStatsUpdate(
+    stats: GenerationStats | null | undefined,
+): Pick<
+    GenerationHistoryUpdateInput,
+    'newItemsCount' | 'updatedItemsCount' | 'totalItemsCount' | 'metrics'
+> {
+    return {
+        newItemsCount: stats?.newItemsCount ?? 0,
+        updatedItemsCount: stats?.updatedItemsCount ?? 0,
+        totalItemsCount: stats?.totalItemsCount ?? 0,
+        metrics: stats?.metrics,
+    };
+}
+
+export function buildImportStatsUpdate(
+    result: DirectoryImportResult | null | undefined,
+): Pick<
+    GenerationHistoryUpdateInput,
+    'newItemsCount' | 'updatedItemsCount' | 'totalItemsCount' | 'metrics'
+> {
+    const itemsImported = result?.itemsImported ?? 0;
+    return {
+        newItemsCount: result?.stats?.newItemsCount ?? itemsImported,
+        updatedItemsCount: result?.stats?.updatedItemsCount ?? 0,
+        totalItemsCount: result?.stats?.totalItemsCount ?? itemsImported,
+        metrics: result?.metrics
+            ? {
+                  total_tokens_used: result.metrics.total_tokens_used ?? 0,
+                  total_cost: result.metrics.total_cost ?? 0,
+                  new_items_added_to_store: result?.stats?.newItemsCount ?? itemsImported,
+                  total_items_in_store: result?.stats?.totalItemsCount ?? itemsImported,
+              }
+            : undefined,
+    };
+}
+
 @Injectable()
 export class DirectoryOperationsService {
     constructor(
@@ -31,7 +69,15 @@ export class DirectoryOperationsService {
         await this.directoryRepository.update(id, updateData);
     }
 
+    async getGenerateStatus(id: string): Promise<Directory['generateStatus'] | undefined> {
+        const directory = await this.directoryRepository.findById(id);
+        return directory?.generateStatus;
+    }
+
     async updateGenerateStatus(id: string, status: Directory['generateStatus']): Promise<void> {
+        if (status?.warnings?.length) {
+            status = { ...status, warnings: [...new Set(status.warnings)] };
+        }
         await this.directoryRepository.updateGenerateStatus(id, status);
     }
 

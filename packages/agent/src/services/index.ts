@@ -13,3 +13,5 @@ export * from './repository-management.service';
 export * from './directory-taxonomy.service';
 export * from './generator-form-schema.service';
 export * from './utils/error-classification.utils';
+export * from './utils/error.utils';
+export * from './types/trigger-context.types';

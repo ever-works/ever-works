@@ -3,6 +3,7 @@ import { DataGeneratorService } from '@src/generators/data-generator/data-genera
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { CreateCategoryDto, UpdateCategoryDto, CreateTagDto, UpdateTagDto } from '@src/dto';
 import type { Category, Tag } from '@ever-works/contracts';
+import { User } from '@src/entities/user.entity';
 import { UserRepository } from '@src/database/repositories/user.repository';
 import { slugifyText } from '@src/utils/text.utils';
 
@@ -18,16 +19,21 @@ export class DirectoryTaxonomyService {
         private readonly userRepository: UserRepository,
     ) {}
 
+    private async ensureUser(userId: string): Promise<User> {
+        const user = await this.userRepository.findById(userId);
+        if (!user) {
+            throw new NotFoundException(`User not found: ${userId}`);
+        }
+        return user;
+    }
+
     // ============================================
     // Categories
     // ============================================
 
     async getCategories(directoryId: string, userId: string): Promise<Category[]> {
         const { directory } = await this.ownershipService.ensureAccess(directoryId, userId);
-        const user = await this.userRepository.findById(userId);
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
+        const user = await this.ensureUser(userId);
 
         const data = await this.dataGenerator.getCategoriesTags(directory, user);
         return data.categories || [];
@@ -39,10 +45,7 @@ export class DirectoryTaxonomyService {
         userId: string,
     ): Promise<{ status: string; category: Category }> {
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, userId);
-        const user = await this.userRepository.findById(userId);
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
+        const user = await this.ensureUser(userId);
 
         // Get existing categories
         const { categories } = await this.dataGenerator.getCategoriesTags(directory, user);
@@ -79,10 +82,7 @@ export class DirectoryTaxonomyService {
         userId: string,
     ): Promise<{ status: string; category: Category }> {
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, userId);
-        const user = await this.userRepository.findById(userId);
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
+        const user = await this.ensureUser(userId);
 
         // Get existing categories
         const { categories } = await this.dataGenerator.getCategoriesTags(directory, user);
@@ -130,10 +130,7 @@ export class DirectoryTaxonomyService {
         userId: string,
     ): Promise<{ status: string; message: string }> {
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, userId);
-        const user = await this.userRepository.findById(userId);
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
+        const user = await this.ensureUser(userId);
 
         // Get existing categories
         const { categories } = await this.dataGenerator.getCategoriesTags(directory, user);
@@ -162,10 +159,7 @@ export class DirectoryTaxonomyService {
 
     async getTags(directoryId: string, userId: string): Promise<Tag[]> {
         const { directory } = await this.ownershipService.ensureAccess(directoryId, userId);
-        const user = await this.userRepository.findById(userId);
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
+        const user = await this.ensureUser(userId);
 
         const data = await this.dataGenerator.getCategoriesTags(directory, user);
         return data.tags || [];
@@ -177,10 +171,7 @@ export class DirectoryTaxonomyService {
         userId: string,
     ): Promise<{ status: string; tag: Tag }> {
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, userId);
-        const user = await this.userRepository.findById(userId);
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
+        const user = await this.ensureUser(userId);
 
         // Get existing tags
         const { tags } = await this.dataGenerator.getCategoriesTags(directory, user);
@@ -214,10 +205,7 @@ export class DirectoryTaxonomyService {
         userId: string,
     ): Promise<{ status: string; tag: Tag }> {
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, userId);
-        const user = await this.userRepository.findById(userId);
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
+        const user = await this.ensureUser(userId);
 
         // Get existing tags
         const { tags } = await this.dataGenerator.getCategoriesTags(directory, user);
@@ -262,10 +250,7 @@ export class DirectoryTaxonomyService {
         userId: string,
     ): Promise<{ status: string; message: string }> {
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, userId);
-        const user = await this.userRepository.findById(userId);
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
+        const user = await this.ensureUser(userId);
 
         // Get existing tags
         const { tags } = await this.dataGenerator.getCategoriesTags(directory, user);

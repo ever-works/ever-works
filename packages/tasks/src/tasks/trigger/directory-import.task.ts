@@ -1,71 +1,64 @@
 import { task } from '@trigger.dev/sdk';
-import { NestFactory } from '@nestjs/core';
-import { INestApplicationContext } from '@nestjs/common';
-import { plainToInstance } from 'class-transformer';
-import { TriggerWorkerModule } from '../../trigger/worker/modules/trigger-worker.module';
-import { TriggerInternalApiClient } from '../../trigger/worker/services/trigger-internal-api.client';
-import { TriggerImportOrchestrator } from '../../trigger/worker/orchestrators/trigger-import.orchestrator';
-import { TriggerPluginHydratorService } from '../../trigger/worker/services/trigger-plugin-hydrator.service';
 import { DirectoryImportPayload } from '@ever-works/agent/tasks';
-import { Directory, User } from '@ever-works/agent/entities';
-import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
-
-async function createContext(appContext: INestApplicationContext, payload: DirectoryImportPayload) {
-    // Initialize plugin system with remote settings
-    const hydrator = appContext.get(TriggerPluginHydratorService);
-    await hydrator.initialize();
-
-    const apiClient = appContext.get(TriggerInternalApiClient);
-    const context = await apiClient.fetchDirectoryContext(payload.directoryId, payload.userId);
-
-    const directory = plainToInstance(Directory, context.directory);
-    const user = plainToInstance(User, context.user);
-
-    directory.user = user;
-
-    const orchestrator = appContext.get(TriggerImportOrchestrator);
-
-    return {
-        user,
-        directory,
-        orchestrator,
-        gitToken: context.gitToken,
-    };
-}
+import { normalizeGeneratorError } from '@ever-works/agent/services';
+import { TriggerImportOrchestrator } from '../../trigger/worker/orchestrators/trigger-import.orchestrator';
+import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
+import { createTaskContext } from '../../trigger/worker/utils/task-context.utils';
 
 export const directoryImportTask = task({
     id: 'directory-import',
     maxDuration: 3600 * 2, // 2 hours
+    onFailure: async ({ payload, error }) => {
+        if (!payload) {
+            return;
+        }
+
+        try {
+            await withWorkerContext('DirectoryImport:Failure', async (appContext) => {
+                const { orchestrator, directory } = await createTaskContext(
+                    appContext,
+                    payload,
+                    TriggerImportOrchestrator,
+                );
+
+                const errorMessage = normalizeGeneratorError(error);
+
+                await orchestrator.handleFailure({
+                    directory,
+                    historyId: payload.historyId,
+                    historyStartedAt: payload.historyStartedAt,
+                    errorMessage,
+                });
+            });
+        } catch {
+            // Best-effort — if we can't even boot the context, nothing more we can do
+        }
+    },
     onCancel: async ({ payload }) => {
         if (!payload) {
             return;
         }
 
-        const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: createTriggerLogger('DirectoryImport:Cancel'),
-        });
-
-        try {
-            const { orchestrator, directory } = await createContext(appContext, payload);
+        await withWorkerContext('DirectoryImport:Cancel', async (appContext) => {
+            const { orchestrator, directory } = await createTaskContext(
+                appContext,
+                payload,
+                TriggerImportOrchestrator,
+            );
 
             await orchestrator.handleCancellation({
                 directory,
                 historyId: payload.historyId,
                 historyStartedAt: payload.historyStartedAt,
             });
-        } finally {
-            await appContext.close();
-        }
+        });
     },
     run: async (payload: DirectoryImportPayload) => {
-        const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: createTriggerLogger('DirectoryImport'),
-        });
-
-        try {
-            const { orchestrator, directory, user, gitToken } = await createContext(
+        return withWorkerContext('DirectoryImport', async (appContext) => {
+            const { orchestrator, directory, user, gitToken } = await createTaskContext(
                 appContext,
                 payload,
+                TriggerImportOrchestrator,
             );
 
             await orchestrator.run({
@@ -79,8 +72,6 @@ export const directoryImportTask = task({
                 status: 'completed',
                 directoryId: payload.directoryId,
             };
-        } finally {
-            await appContext.close();
-        }
+        });
     },
 });

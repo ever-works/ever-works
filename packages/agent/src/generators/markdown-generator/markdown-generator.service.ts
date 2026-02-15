@@ -9,6 +9,7 @@ import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
 import { GenerationMethod } from '../../items-generator/dto';
 import { DirectoryOperationsService } from '@src/directory-operations';
+import { getDirectoryOwner } from '../../utils/directory.utils';
 
 type InitializeOptions = {
     generation_method?: GenerationMethod;
@@ -26,7 +27,7 @@ export class MarkdownGeneratorService {
     ) {}
 
     async initialize(directory: Directory, user: User, options: InitializeOptions = {}) {
-        const directoryOwner = directory.user as User;
+        const directoryOwner = getDirectoryOwner(directory);
         const committer = user.asCommitter();
         const description = directory.description;
 
@@ -229,7 +230,7 @@ export class MarkdownGeneratorService {
     }
 
     async removeItemDetail(directory: Directory, user: User, slug: string, branch?: string) {
-        const directoryOwner = directory.user as User;
+        const directoryOwner = getDirectoryOwner(directory);
         const committer = user.asCommitter();
 
         const markdownPath = await this.gitFacade.cloneOrPull(
@@ -258,7 +259,7 @@ export class MarkdownGeneratorService {
      * Remove repository for a directory
      */
     async removeRepository(directory: Directory, user: User): Promise<void> {
-        const directoryOwner = directory.user as User;
+        const directoryOwner = getDirectoryOwner(directory);
 
         try {
             // Delete the repository

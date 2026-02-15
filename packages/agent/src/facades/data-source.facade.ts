@@ -13,15 +13,11 @@ import type {
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
+import { FacadeError } from './base.facade';
 
-export class DataSourceFacadeError extends Error {
-    constructor(
-        message: string,
-        public readonly operation: string,
-        public readonly sourceId?: string,
-        public readonly cause?: Error,
-    ) {
-        super(message);
+export class DataSourceFacadeError extends FacadeError {
+    constructor(message: string, operation: string, sourceId?: string, cause?: Error) {
+        super(message, operation, sourceId, cause);
         this.name = 'DataSourceFacadeError';
     }
 }

@@ -1,10 +1,6 @@
 import { z } from 'zod';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	PipelineMetrics,
-	FacadeOptions
-} from '@ever-works/plugin';
+import type { StepExecutionContext, FacadeOptions } from '@ever-works/plugin';
+import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
 const PROMPT_PROCESSING_PROMPT = `
@@ -123,7 +119,10 @@ export class PromptProcessingStep extends BasePipelineStep {
 	readonly stepId = 'prompt-processing' as const;
 	readonly name = 'Prompt Processing';
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const { request, existing, directory, metrics } = context;
 		const { logger, aiFacade } = execContext;
 		const config = request.config || {};
@@ -142,7 +141,7 @@ export class PromptProcessingStep extends BasePipelineStep {
 			featuredItemHints,
 			subject,
 			rewrittenPrompt: prompt
-		} = await this.processPrompt(request.prompt || '', metrics, logger, aiFacade, facadeOptions);
+		} = await this.processPrompt(context, request.prompt || '', metrics, logger, aiFacade, facadeOptions);
 
 		// Merge with request priority categories
 		const requestPriorityCategories = (config.priority_categories as string[]) || [];
@@ -209,8 +208,9 @@ export class PromptProcessingStep extends BasePipelineStep {
 	 * Process a prompt to extract URLs, categories, and other metadata
 	 */
 	private async processPrompt(
+		context: MutableGenerationContext,
 		prompt: string,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
 		facadeOptions: FacadeOptions

@@ -1,14 +1,6 @@
 import { z } from 'zod';
-import type {
-	MutableGenerationContext,
-	StepExecutionContext,
-	PipelineMetrics,
-	MutableItemData,
-	Category,
-	Tag,
-	Brand,
-	FacadeOptions
-} from '@ever-works/plugin';
+import type { StepExecutionContext, MutableItemData, Category, Tag, Brand, FacadeOptions } from '@ever-works/plugin';
+import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { slugifyText, unSlugifyText } from '../utils/text.utils.js';
 import { getErrorStack } from '../utils/error.utils.js';
@@ -120,7 +112,10 @@ export class CategoryProcessingStep extends BasePipelineStep {
 	readonly stepId = 'categories-tags-processing' as const;
 	private readonly BATCH_SIZE = 30;
 
-	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
+	async execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext> {
 		const {
 			request,
 			directory,
@@ -202,7 +197,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 		initialCategories: string[],
 		existingItems: MutableItemData[],
 		existingBrands: Brand[],
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		customPrompt: string | null | undefined,
 		generateCategories: boolean,
 		generateTags: boolean,
@@ -346,7 +341,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 		existingCategories: Set<string>,
 		existingTags: Set<string>,
 		initialCategoryMetrics: Record<string, number>,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		customPrompt: string | null | undefined,
 		execContext: StepExecutionContext
 	): Promise<MutableItemData[]> {
@@ -446,7 +441,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 		existingCategories: Set<string>,
 		existingTags: Set<string>,
 		initialCategoryMetrics: Record<string, number>,
-		metrics: PipelineMetrics,
+		metrics: StandardPipelineMetrics,
 		customPrompt: string | null | undefined,
 		execContext: StepExecutionContext
 	): Promise<MutableItemData[]> {
