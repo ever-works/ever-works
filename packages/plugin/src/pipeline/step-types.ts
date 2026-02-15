@@ -22,7 +22,8 @@ export type StepDataKey =
 	| 'allPriorityCategories'
 	| 'featuredItemHints'
 	| 'subject'
-	| 'shouldStop';
+	| 'shouldStop'
+	| 'warnings';
 
 /**
  * Type mapping for step data keys
@@ -47,6 +48,7 @@ export interface StepDataTypes {
 	featuredItemHints: string[];
 	subject?: string;
 	shouldStop?: boolean;
+	warnings: string[];
 }
 
 /**

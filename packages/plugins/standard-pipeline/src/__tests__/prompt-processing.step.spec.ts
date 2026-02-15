@@ -65,6 +65,7 @@ describe('PromptProcessingStep', () => {
 			allPriorityCategories: [],
 			featuredItemHints: [],
 			subject: '',
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

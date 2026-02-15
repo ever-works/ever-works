@@ -59,7 +59,7 @@ const CHECKPOINT_TTL_MS = 24 * 60 * 60 * 1000;
  * Current checkpoint schema version
  * Increment when checkpoint structure changes to invalidate old checkpoints
  */
-const CURRENT_CHECKPOINT_VERSION = 2;
+const CURRENT_CHECKPOINT_VERSION = 3;
 
 /**
  * Pipeline event names for lifecycle notifications.
@@ -311,6 +311,21 @@ export class StepPipelineExecutorService {
             context.recordStepMetrics(step.id, metrics);
             runner.markStepComplete(step.id, metrics);
 
+            // Engine-level circuit breaker (safety net after data-producing steps)
+            if (
+                this.shouldCircuitBreak(
+                    step,
+                    context,
+                    pipeline.steps,
+                    runner.getState().completedSteps,
+                )
+            ) {
+                context.warnings.push(
+                    `Pipeline stopped after "${step.name}": no data produced. Check provider configuration.`,
+                );
+                context.shouldStop = true;
+            }
+
             // Save checkpoint
             await this.saveCheckpoint(
                 directory,
@@ -365,6 +380,15 @@ export class StepPipelineExecutorService {
         const checkpoint = await this.loadCheckpoint(directoryId, pipelineId);
         if (!checkpoint) {
             this.logger.warn(`No checkpoint found for directory: ${directoryId}`);
+            return null;
+        }
+
+        const stepDefinitions = plugin.getStepDefinitions();
+        if (!this.isCheckpointViable(checkpoint, stepDefinitions)) {
+            this.logger.warn(
+                `Checkpoint for directory ${directoryId} has no meaningful data. Discarding.`,
+            );
+            await this.clearCheckpoint(directoryId, pipelineId);
             return null;
         }
 
@@ -563,6 +587,87 @@ export class StepPipelineExecutorService {
     }
 
     // ============================================================================
+    // Circuit Breaker & Checkpoint Validation
+    // ============================================================================
+
+    private static readonly DATA_KEYS: ReadonlySet<string> = new Set([
+        'webPages',
+        'initialAiItems',
+        'extractedWebItems',
+        'aggregatedItems',
+        'finalItems',
+    ]);
+
+    private static readonly MIN_DATA_STEPS_FOR_CIRCUIT_BREAK = 3;
+
+    private isDataProvidingStep(step: PipelineStepDefinition): boolean {
+        return (
+            step.provides?.some((key) => StepPipelineExecutorService.DATA_KEYS.has(key)) ?? false
+        );
+    }
+
+    private hasAnyData(context: TypedGenerationContext): boolean {
+        return (
+            context.webPages.length > 0 ||
+            context.initialAiItems.length > 0 ||
+            context.extractedWebItems.length > 0 ||
+            context.aggregatedItems.length > 0 ||
+            context.finalItems.length > 0
+        );
+    }
+
+    private shouldCircuitBreak(
+        step: PipelineStepDefinition,
+        context: TypedGenerationContext,
+        allSteps: readonly PipelineStepDefinition[],
+        completedStepIds: readonly string[],
+    ): boolean {
+        if (!this.isDataProvidingStep(step)) {
+            return false;
+        }
+
+        const completedDataStepCount = allSteps.filter(
+            (s) => completedStepIds.includes(s.id) && this.isDataProvidingStep(s),
+        ).length;
+
+        if (completedDataStepCount < StepPipelineExecutorService.MIN_DATA_STEPS_FOR_CIRCUIT_BREAK) {
+            return false;
+        }
+
+        return !this.hasAnyData(context);
+    }
+
+    private hasSnapshotData(ctx: GenerationContextSnapshot): boolean {
+        return (
+            ctx.webPages.length > 0 ||
+            ctx.initialAiItems.length > 0 ||
+            ctx.extractedWebItems.length > 0 ||
+            ctx.aggregatedItems.length > 0 ||
+            ctx.finalItems.length > 0
+        );
+    }
+
+    private isCheckpointViable(
+        checkpoint: CheckpointData,
+        stepDefinitions: readonly PipelineStepDefinition[],
+    ): boolean {
+        if (checkpoint.context.shouldStop) {
+            return false;
+        }
+
+        if (this.hasSnapshotData(checkpoint.context)) {
+            return true;
+        }
+
+        // Check if any completed step was supposed to produce data
+        const completedDataSteps = stepDefinitions.filter(
+            (s) => checkpoint.completedSteps.includes(s.id) && this.isDataProvidingStep(s),
+        );
+
+        return completedDataSteps.length === 0;
+    }
+
+    // ============================================================================
     // Event Emission Helpers
     // ============================================================================
 
@@ -678,8 +783,11 @@ export class StepPipelineExecutorService {
         runner: ExecutablePipelineRunner,
         startTime: number,
     ): PipelineResult {
+        const hasItems = context.finalItems.length > 0;
+        const warnings = context.warnings.length > 0 ? context.warnings : undefined;
+
         return {
-            success: true,
+            success: hasItems,
             items: context.finalItems,
             categories: context.finalCategories,
             tags: context.finalTags,
@@ -688,6 +796,8 @@ export class StepPipelineExecutorService {
             stepsCompleted: runner.getState().completedSteps.length,
             totalSteps: runner.getPipeline().steps.length,
             state: runner.getState(),
+            warnings,
+            error: hasItems ? undefined : 'Pipeline completed but generated no items.',
         };
     }
 
@@ -698,6 +808,8 @@ export class StepPipelineExecutorService {
         error: Error,
         failedStep?: string,
     ): PipelineResult {
+        const warnings = context.warnings.length > 0 ? context.warnings : undefined;
+
         return {
             success: false,
             items: context.finalItems,
@@ -710,6 +822,7 @@ export class StepPipelineExecutorService {
             error,
             failedStep,
             state: runner.getState(),
+            warnings,
         };
     }
 
@@ -719,6 +832,8 @@ export class StepPipelineExecutorService {
         startTime: number,
         cancelledAtStep: string,
     ): PipelineResult {
+        const warnings = context.warnings.length > 0 ? context.warnings : undefined;
+
         return {
             success: false,
             items: context.finalItems,
@@ -731,6 +846,7 @@ export class StepPipelineExecutorService {
             error: `Pipeline cancelled at step: ${cancelledAtStep}`,
             failedStep: cancelledAtStep,
             state: runner.getState(),
+            warnings,
         };
     }
 }

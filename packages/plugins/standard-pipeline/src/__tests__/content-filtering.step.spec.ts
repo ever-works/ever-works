@@ -66,6 +66,7 @@ describe('ContentFilteringStep', () => {
 			webPages: [createMockWebPage('A'.repeat(200))],
 			metrics: { steps: {} },
 			advancedPrompts: {},
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

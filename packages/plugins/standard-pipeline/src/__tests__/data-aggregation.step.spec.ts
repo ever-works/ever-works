@@ -75,6 +75,7 @@ describe('DataAggregationStep', () => {
 			advancedPrompts: {},
 			aggregatedItems: [],
 			pluginConfig: {},
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

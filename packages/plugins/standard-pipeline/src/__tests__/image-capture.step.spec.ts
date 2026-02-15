@@ -59,6 +59,7 @@ describe('ImageCaptureStep', () => {
 			request: createMockRequest(),
 			finalItems: [createMockItem('Test Item', 'https://example.com')],
 			domainAnalysis: { domain_type: 'software', confidence: 0.9 },
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

@@ -176,6 +176,9 @@ export interface MutableGenerationContext {
 	/** Control flag to stop pipeline */
 	shouldStop?: boolean;
 
+	/** Non-fatal warnings accumulated during pipeline execution */
+	warnings: string[];
+
 	/**
 	 * Plugin configuration from GeneratorForm.
 	 * Maps plugin ID to per-directory settings including 'enabled' flags.
@@ -221,5 +224,6 @@ export interface GenerationContextSnapshot {
 	readonly subject?: string;
 	readonly advancedPrompts?: AdvancedPromptsContext | null;
 	readonly shouldStop?: boolean;
+	readonly warnings: readonly string[];
 	readonly pluginConfig?: Record<string, Record<string, unknown>>;
 }

@@ -50,6 +50,7 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 		logger.log(`[${directory.slug}] AI-Powered Search Query Generation - Starting`);
 
 		const searchQueries = await this.generateSearchQueries(
+			context,
 			request.name || directory.name,
 			request.prompt || '',
 			(config.target_keywords as string[]) || [],
@@ -72,6 +73,7 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 	 * Generate search queries using AI
 	 */
 	private async generateSearchQueries(
+		context: MutableGenerationContext,
 		name: string,
 		description: string,
 		targetKeywords: string[],
@@ -88,6 +90,7 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 
 		if (!aiFacade.isConfigured()) {
 			logger.warn(`[${name}] AI provider not configured. Falling back to basic query generation.`);
+			this.addWarning(context, 'AI provider not configured. Using basic search queries.');
 			return this.generateFallbackQueries(name, targetKeywords, maxSearchQueries);
 		}
 
@@ -132,6 +135,7 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 				getErrorStack(error)
 			);
 			logger.warn(`[${name}] Falling back to basic query generation due to LLM error.`);
+			this.addWarning(context, 'AI-powered search query generation failed. Using basic search queries.');
 			return this.generateFallbackQueries(name, targetKeywords, maxSearchQueries);
 		}
 	}

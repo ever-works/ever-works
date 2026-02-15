@@ -281,7 +281,7 @@ describe('StepPipelineExecutorService', () => {
             expect(checkpoint.stepIndex).toBe(0);
             expect(checkpoint.stepName).toBe('Step Init');
             expect(checkpoint.pipelineId).toBe(standardPlugin.id);
-            expect(checkpoint.schemaVersion).toBe(2);
+            expect(checkpoint.schemaVersion).toBe(3);
         });
 
         it('should clear checkpoint after successful pipeline completion', async () => {
@@ -610,9 +610,10 @@ describe('StepPipelineExecutorService', () => {
                     allInitialCategories: [],
                     allPriorityCategories: [],
                     featuredItemHints: [],
+                    warnings: [],
                 },
                 completedSteps: ['step-init'],
-                schemaVersion: 2,
+                schemaVersion: 3,
             };
 
             // Serialize with superjson as the real implementation does
@@ -736,9 +737,10 @@ describe('StepPipelineExecutorService', () => {
                     allPriorityCategories: ['cat2'],
                     featuredItemHints: ['hint1'],
                     subject: 'Test Subject',
+                    warnings: [],
                 },
                 completedSteps: [],
-                schemaVersion: 2,
+                schemaVersion: 3,
             };
 
             // Serialize with superjson as the real implementation does
@@ -819,9 +821,10 @@ describe('StepPipelineExecutorService', () => {
                     allInitialCategories: [],
                     allPriorityCategories: [],
                     featuredItemHints: [],
+                    warnings: [],
                 },
                 completedSteps: [],
-                schemaVersion: 2,
+                schemaVersion: 3,
             };
 
             // Serialize with superjson as the real implementation does
@@ -882,7 +885,9 @@ describe('StepPipelineExecutorService', () => {
             const result = await service.executeWithContext(standardPlugin, context);
 
             expect(result).toBeDefined();
-            expect(result.success).toBe(true);
+            // Pipeline completes execution but reports no items → success: false
+            expect(result.success).toBe(false);
+            expect(result.error).toBe('Pipeline completed but generated no items.');
         });
     });
 });

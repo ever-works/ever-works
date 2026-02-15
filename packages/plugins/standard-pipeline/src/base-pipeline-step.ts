@@ -51,6 +51,10 @@ export abstract class BasePipelineStep implements IBuiltInStepExecutor {
 		}
 	}
 
+	protected addWarning(context: MutableGenerationContext, message: string): void {
+		context.warnings.push(message);
+	}
+
 	protected formatError(error: unknown): string {
 		return getErrorMessage(error);
 	}

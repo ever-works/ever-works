@@ -58,6 +58,7 @@ describe('DomainDetectionStep', () => {
 			request: createMockRequest(),
 			metrics: { steps: {} },
 			domainAnalysis: undefined,
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

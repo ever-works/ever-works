@@ -142,7 +142,7 @@ export class PromptProcessingStep extends BasePipelineStep {
 			featuredItemHints,
 			subject,
 			rewrittenPrompt: prompt
-		} = await this.processPrompt(request.prompt || '', metrics, logger, aiFacade, facadeOptions);
+		} = await this.processPrompt(context, request.prompt || '', metrics, logger, aiFacade, facadeOptions);
 
 		// Merge with request priority categories
 		const requestPriorityCategories = (config.priority_categories as string[]) || [];
@@ -209,6 +209,7 @@ export class PromptProcessingStep extends BasePipelineStep {
 	 * Process a prompt to extract URLs, categories, and other metadata
 	 */
 	private async processPrompt(
+		context: MutableGenerationContext,
 		prompt: string,
 		metrics: PipelineMetrics,
 		logger: StepExecutionContext['logger'],
@@ -278,6 +279,7 @@ export class PromptProcessingStep extends BasePipelineStep {
 			};
 		} catch (error) {
 			logger.error(`Error processing prompt: ${error instanceof Error ? error.message : String(error)}`);
+			this.addWarning(context, 'AI could not process your prompt. Basic text analysis was used instead.');
 
 			const fallbackUrls = this.extractUrlsWithRegex(prompt);
 			const rewrittenPrompt =

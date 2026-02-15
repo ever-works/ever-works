@@ -55,6 +55,7 @@ describe('AiItemGenerationStep', () => {
 			metrics: { steps: {} },
 			advancedPrompts: {},
 			initialAiItems: [],
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

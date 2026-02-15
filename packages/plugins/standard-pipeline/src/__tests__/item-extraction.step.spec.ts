@@ -85,6 +85,7 @@ describe('ItemExtractionStep', () => {
 			metrics: { steps: {} },
 			advancedPrompts: {},
 			extractedWebItems: [],
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

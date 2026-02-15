@@ -70,6 +70,10 @@ export class ContentRetrievalStep extends BasePipelineStep {
 			`[${directory.slug}] Content Retrieval complete. Retrieved ${retrievedPages.length} pages (total: ${context.webPages.length})`
 		);
 
+		if (retrievedPages.length === 0 && urlsToProcess.length > 0) {
+			this.addWarning(context, `Content retrieval failed for all ${urlsToProcess.length} URLs.`);
+		}
+
 		return context;
 	}
 

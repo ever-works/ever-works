@@ -54,6 +54,7 @@ describe('SearchQueryGenerationStep', () => {
 			metrics: { steps: {} },
 			advancedPrompts: {},
 			searchQueries: [],
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

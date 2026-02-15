@@ -65,6 +65,14 @@ export class WebSearchStep extends BasePipelineStep {
 			}
 		}
 
+		if (webPages.length === 0 && searchQueries.length > 0) {
+			this.addWarning(context, 'Web search produced no results. Check your search provider configuration.');
+			if ((context.initialAiItems?.length ?? 0) === 0) {
+				context.shouldStop = true;
+				this.addWarning(context, 'Pipeline stopped: no data sources available.');
+			}
+		}
+
 		return context;
 	}
 

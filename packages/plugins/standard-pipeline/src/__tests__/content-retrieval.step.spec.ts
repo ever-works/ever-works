@@ -55,6 +55,7 @@ describe('ContentRetrievalStep', () => {
 			processedSourceUrls: new Set<string>(),
 			webPages: [],
 			contentCache: new Map<string, string>(),
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

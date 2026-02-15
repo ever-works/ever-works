@@ -46,6 +46,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
 
     advancedPrompts?: MutableGenerationContext['advancedPrompts'];
     shouldStop?: boolean;
+    warnings: string[] = [];
     pluginConfig?: Record<string, Record<string, unknown>>;
 
     constructor(
@@ -147,6 +148,8 @@ export class TypedGenerationContext implements MutableGenerationContext {
                 return this.subject;
             case 'shouldStop':
                 return this.shouldStop;
+            case 'warnings':
+                return this.warnings.length > 0 ? this.warnings : undefined;
             default:
                 return undefined;
         }
@@ -215,6 +218,9 @@ export class TypedGenerationContext implements MutableGenerationContext {
             case 'shouldStop':
                 this.shouldStop = value as boolean | undefined;
                 return true;
+            case 'warnings':
+                this.warnings = value as string[];
+                return true;
             default:
                 return false;
         }
@@ -281,6 +287,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
             subject: this.subject,
             advancedPrompts: this.advancedPrompts,
             shouldStop: this.shouldStop,
+            warnings: [...this.warnings],
             pluginConfig: this.pluginConfig,
         };
     }
@@ -319,6 +326,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
         typed.subject = ctx.subject;
         typed.advancedPrompts = ctx.advancedPrompts;
         typed.shouldStop = ctx.shouldStop;
+        typed.warnings = [...ctx.warnings];
         typed.pluginConfig = ctx.pluginConfig;
 
         return typed;
@@ -359,6 +367,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
         typed.subject = snapshot.subject;
         typed.advancedPrompts = snapshot.advancedPrompts;
         typed.shouldStop = snapshot.shouldStop;
+        typed.warnings = [...snapshot.warnings];
         typed.pluginConfig = snapshot.pluginConfig;
 
         return typed;

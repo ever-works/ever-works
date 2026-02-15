@@ -77,6 +77,7 @@ describe('SourceValidationStep', () => {
 			metrics: { steps: {} },
 			advancedPrompts: {},
 			subject: 'test topic',
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

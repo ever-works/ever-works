@@ -71,6 +71,7 @@ describe('CategoryProcessingStep', () => {
 			finalCategories: [],
 			finalTags: [],
 			finalBrands: [],
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

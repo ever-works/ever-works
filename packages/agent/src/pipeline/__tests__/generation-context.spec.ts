@@ -231,6 +231,7 @@ describe('TypedGenerationContext', () => {
                 allPriorityCategories: [],
                 featuredItemHints: [],
                 subject: 'Test Subject',
+                warnings: [],
                 pluginConfig: mockPluginConfig,
             };
 

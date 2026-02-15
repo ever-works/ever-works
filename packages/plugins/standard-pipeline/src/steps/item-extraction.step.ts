@@ -111,6 +111,10 @@ export class ItemExtractionStep extends BasePipelineStep {
 
 		context.extractedWebItems = extractedWebItems;
 
+		if (extractedWebItems.length === 0 && webPages.length > 0) {
+			this.addWarning(context, `Item extraction produced 0 items from ${webPages.length} pages.`);
+		}
+
 		return context;
 	}
 

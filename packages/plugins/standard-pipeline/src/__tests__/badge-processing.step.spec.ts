@@ -68,6 +68,7 @@ describe('BadgeProcessingStep', () => {
 			finalItems: [createMockItem('Test Repo', 'https://github.com/user/repo')],
 			metrics: { steps: {} },
 			domainAnalysis: { domain_type: 'software', confidence: 0.9 },
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

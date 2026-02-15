@@ -65,6 +65,7 @@ describe('MarkdownGenerationStep', () => {
 			finalItems: [createMockItem('Test Item', 'https://example.com')],
 			contentCache: new Map<string, string>(),
 			metrics: { steps: {} },
+			warnings: [],
 			shouldStop: false,
 			...overrides
 		}) as MutableGenerationContext;

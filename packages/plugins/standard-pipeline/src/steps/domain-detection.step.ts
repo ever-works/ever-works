@@ -83,6 +83,7 @@ export class DomainDetectionStep extends BasePipelineStep {
 			logger.error(
 				`[${directory.slug}] Domain detection failed, defaulting to software. ${this.formatError(error)}`
 			);
+			this.addWarning(context, 'Could not detect the domain type. Defaulting to "software".');
 			context.domainAnalysis = {
 				domain_type: 'software' as DomainType,
 				confidence: 0
