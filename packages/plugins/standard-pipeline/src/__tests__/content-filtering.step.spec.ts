@@ -268,5 +268,46 @@ describe('ContentFilteringStep', () => {
 
 			expect(result.webPages).toEqual([]);
 		});
+
+		it('should add warning when all pages are filtered out', async () => {
+			mockExecContext.aiFacade.askJson = vi.fn().mockResolvedValue({
+				result: {
+					relevant: false,
+					relevance_score: 0.1,
+					reason: 'Not relevant'
+				},
+				usage: null,
+				cost: null
+			});
+
+			const result = await step.run(mockContext, mockExecContext);
+
+			expect(result.webPages.length).toBe(0);
+			expect(result.warnings).toContain('Content filtering removed all 1 pages as irrelevant.');
+		});
+
+		it('should not add warning when filtering reduces but does not eliminate pages', async () => {
+			mockContext.webPages = [
+				createMockWebPage('A'.repeat(200), 'https://page1.com'),
+				createMockWebPage('B'.repeat(200), 'https://page2.com')
+			];
+			mockExecContext.aiFacade.askJson = vi
+				.fn()
+				.mockResolvedValueOnce({
+					result: { relevant: true, relevance_score: 0.8, reason: 'Relevant' },
+					usage: null,
+					cost: null
+				})
+				.mockResolvedValueOnce({
+					result: { relevant: false, relevance_score: 0.1, reason: 'Not relevant' },
+					usage: null,
+					cost: null
+				});
+
+			const result = await step.run(mockContext, mockExecContext);
+
+			expect(result.webPages.length).toBe(1);
+			expect(result.warnings.length).toBe(0);
+		});
 	});
 });

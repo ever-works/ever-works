@@ -53,6 +53,11 @@ export class DataAggregationStep extends BasePipelineStep {
 
 		context.aggregatedItems = finalItems;
 
+		if (finalItems.length === 0) {
+			context.shouldStop = true;
+			this.addWarning(context, 'No items available after aggregation. The pipeline will stop.');
+		}
+
 		if (updatedMetrics) {
 			context.metrics = { ...context.metrics, ...updatedMetrics, itemsAfterDedup: finalItems.length };
 		}

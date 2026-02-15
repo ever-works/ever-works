@@ -254,6 +254,25 @@ describe('DataAggregationStep', () => {
 			expect(result.aggregatedItems).toEqual([]);
 		});
 
+		it('should set shouldStop and add warning when aggregated items are empty', async () => {
+			mockContext.initialAiItems = [];
+			mockContext.extractedWebItems = [];
+
+			const result = await step.run(mockContext, mockExecContext);
+
+			expect(result.shouldStop).toBe(true);
+			expect(result.warnings).toContain('No items available after aggregation. The pipeline will stop.');
+		});
+
+		it('should not set shouldStop when aggregated items exist', async () => {
+			mockContext.initialAiItems = [createMockItem('Item 1')];
+
+			const result = await step.run(mockContext, mockExecContext);
+
+			expect(result.shouldStop).toBeFalsy();
+			expect(result.warnings).not.toContain('No items available after aggregation. The pipeline will stop.');
+		});
+
 		it('should apply custom deduplication prompt', async () => {
 			mockContext.advancedPrompts = { deduplication: 'Custom dedup rules' };
 			mockContext.initialAiItems = [createMockItem('Item 1')];

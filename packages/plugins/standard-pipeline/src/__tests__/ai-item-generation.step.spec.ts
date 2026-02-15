@@ -134,7 +134,7 @@ describe('AiItemGenerationStep', () => {
 			expect(result.initialAiItems[0].name).toBe('Test Item 1');
 		});
 
-		it('should return empty list when AI cannot proceed', async () => {
+		it('should return empty list and add warning when AI cannot proceed', async () => {
 			mockExecContext.aiFacade.askJson = vi.fn().mockResolvedValue({
 				result: {
 					can_proceed: false,
@@ -148,6 +148,7 @@ describe('AiItemGenerationStep', () => {
 
 			expect(result.initialAiItems).toEqual([]);
 			expect(mockExecContext.logger.warn).toHaveBeenCalled();
+			expect(result.warnings).toContain('AI cannot confidently generate items: Topic is too vague');
 		});
 
 		it('should skip when AI provider is not configured', async () => {
@@ -243,7 +244,7 @@ describe('AiItemGenerationStep', () => {
 			expect(result.initialAiItems.length).toBe(1);
 		});
 
-		it('should handle AI errors gracefully during generation', async () => {
+		it('should handle AI errors gracefully during generation and add warning', async () => {
 			mockExecContext.aiFacade.askJson = vi
 				.fn()
 				.mockResolvedValueOnce({
@@ -257,6 +258,29 @@ describe('AiItemGenerationStep', () => {
 
 			expect(mockExecContext.logger.error).toHaveBeenCalled();
 			expect(result.initialAiItems).toEqual([]);
+			expect(result.warnings).toContain(
+				'AI item generation failed. The pipeline will rely on web search and data sources.'
+			);
+		});
+
+		it('should add warning when AI returns 0 items', async () => {
+			mockExecContext.aiFacade.askJson = vi
+				.fn()
+				.mockResolvedValueOnce({
+					result: { can_proceed: true },
+					usage: null,
+					cost: null
+				})
+				.mockResolvedValueOnce({
+					result: { items: [] },
+					usage: null,
+					cost: null
+				});
+
+			const result = await step.run(mockContext, mockExecContext);
+
+			expect(result.initialAiItems).toEqual([]);
+			expect(result.warnings).toContain('AI did not generate any items for this topic.');
 		});
 
 		it('should include featured hints in the prompt', async () => {
