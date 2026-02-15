@@ -37,8 +37,9 @@ import {
 	cleanupWorkspace,
 	ensureOnboardingConfig
 } from './utils/workspace-manager.js';
-import { executeClaudeCode } from './utils/process-runner.js';
+import { executeClaudeCode, type ExecuteResult } from './utils/process-runner.js';
 import { buildSystemPrompt, buildUserPrompt } from './prompt/system-prompt.js';
+import { startTaxonomyWatcher } from './utils/taxonomy-watcher.js';
 import { captureScreenshots } from './utils/screenshot-capture.js';
 import {
 	initializeState,
@@ -329,24 +330,31 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 
 			const authEnv = resolveAuthEnv(settings);
 
-			const { promise, kill } = executeClaudeCode({
-				binaryPath,
-				prompt: userPrompt,
-				systemPrompt,
-				cwd: workspacePath,
-				env: {
-					...authEnv,
-					CLAUDE_CODE_CONFIG_DIR: configDir
-				},
-				maxTurns,
-				maxBudgetUsd,
-				model,
-				signal
-			});
+			const taxonomyWatcher = startTaxonomyWatcher(workspacePath, logger);
 
-			this.killProcess = kill;
-			const execResult = await promise;
-			this.killProcess = null;
+			let execResult: ExecuteResult;
+			try {
+				const { promise, kill } = executeClaudeCode({
+					binaryPath,
+					prompt: userPrompt,
+					systemPrompt,
+					cwd: workspacePath,
+					env: {
+						...authEnv,
+						CLAUDE_CODE_CONFIG_DIR: configDir
+					},
+					maxTurns,
+					maxBudgetUsd,
+					model,
+					signal
+				});
+
+				this.killProcess = kill;
+				execResult = await promise;
+				this.killProcess = null;
+			} finally {
+				taxonomyWatcher.stop();
+			}
 
 			if (execResult.killed || signal.aborted) {
 				this.setState('generate-items', 'failed', 'Cancelled');
