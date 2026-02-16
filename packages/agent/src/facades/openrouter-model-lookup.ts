@@ -46,7 +46,7 @@ export function fuzzyMatchModel(
 ): OpenRouterModelEntry | null {
     if (!modelId || candidates.length === 0) return null;
 
-    const lowerInput = modelId.toLowerCase();
+    const lowerInput = modelId.toLowerCase().replace(/[:]+/g, '-');
 
     // Priority 1: exact match on full ID (case-insensitive)
     for (const candidate of candidates) {
