@@ -50,7 +50,15 @@ export function fuzzyMatchModel(
 
     // Priority 1: exact match on full ID (case-insensitive)
     for (const candidate of candidates) {
-        if (candidate.id.toLowerCase() === lowerInput) {
+        const lowerCandidateId = candidate.id.toLowerCase();
+        const withInstruct = lowerInput + '-instruct';
+        const withThinking = lowerInput + '-thinking';
+
+        if (
+            lowerCandidateId === lowerInput ||
+            lowerCandidateId === withInstruct ||
+            lowerCandidateId === withThinking
+        ) {
             return candidate;
         }
     }
@@ -58,7 +66,14 @@ export function fuzzyMatchModel(
     // Priority 2: base-name match
     const inputBase = extractBaseName(lowerInput);
     for (const candidate of candidates) {
-        if (extractBaseName(candidate.id.toLowerCase()) === inputBase) {
+        const candidateBase = extractBaseName(candidate.id.toLowerCase());
+        const withInstruct = inputBase + '-instruct';
+        const withThinking = inputBase + '-thinking';
+        if (
+            candidateBase === inputBase ||
+            candidateBase === withInstruct ||
+            candidateBase === withThinking
+        ) {
             return candidate;
         }
     }
