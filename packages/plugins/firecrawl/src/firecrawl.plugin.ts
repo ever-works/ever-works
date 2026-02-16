@@ -1,5 +1,6 @@
 import type {
 	IPlugin,
+	ISearchPlugin,
 	IContentExtractorPlugin,
 	PluginContext,
 	PluginCategory,
@@ -8,6 +9,10 @@ import type {
 	JsonSchema,
 	ValidationResult,
 	PluginSettings,
+	SearchOptions,
+	SearchResponse,
+	SearchResult,
+	RateLimitInfo,
 	ContentExtractionOptions,
 	ContentExtractionResult
 } from '@ever-works/plugin';
@@ -17,12 +22,12 @@ import FirecrawlApp from '@mendable/firecrawl-js';
 const API_KEY_ERROR =
 	'Firecrawl API key not configured. Set it in plugin settings or via PLUGIN_FIRECRAWL_API_KEY environment variable.';
 
-export class FirecrawlPlugin implements IPlugin, IContentExtractorPlugin {
+export class FirecrawlPlugin implements IPlugin, ISearchPlugin, IContentExtractorPlugin {
 	readonly id = 'firecrawl';
 	readonly name = 'Firecrawl';
 	readonly version = '1.0.0';
-	readonly category: PluginCategory = 'content-extractor';
-	readonly capabilities: readonly string[] = ['content-extractor'];
+	readonly category: PluginCategory = 'search';
+	readonly capabilities: readonly string[] = ['search', 'content-extractor'];
 	readonly providerName = 'Firecrawl';
 
 	readonly settingsSchema: JsonSchema = {
@@ -43,6 +48,59 @@ export class FirecrawlPlugin implements IPlugin, IContentExtractorPlugin {
 	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'hybrid';
 
 	private context?: PluginContext;
+
+	// ============================================================================
+	// ISearchPlugin Interface
+	// ============================================================================
+
+	async search(options: SearchOptions): Promise<SearchResponse> {
+		const client = this.getClient(options.settings);
+		const startTime = Date.now();
+
+		try {
+			const response = await client.search(options.query, {
+				limit: options.limit
+			});
+
+			const items = response.web || [];
+
+			const results: SearchResult[] = items.map((item, index) => {
+				const url = ('url' in item ? item.url : '') || '';
+				const title = ('title' in item ? item.title : '') || '';
+				const snippet =
+					('description' in item ? item.description : '') || ('markdown' in item ? item.markdown : '') || '';
+
+				return {
+					title,
+					url,
+					snippet,
+					position: index + 1,
+					source: url ? new URL(url).hostname : undefined
+				};
+			});
+
+			return {
+				results,
+				query: options.query,
+				totalResults: results.length,
+				hasMore: false,
+				duration: Date.now() - startTime
+			};
+		} catch (error) {
+			this.context?.logger.error(
+				`Firecrawl search failed: ${error instanceof Error ? error.message : String(error)}`
+			);
+			throw error;
+		}
+	}
+
+	async getRateLimitInfo(): Promise<RateLimitInfo> {
+		return {
+			remaining: -1,
+			limit: -1,
+			period: 'month'
+		};
+	}
 
 	// ============================================================================
 	// IContentExtractorPlugin Interface
@@ -223,7 +281,7 @@ export class FirecrawlPlugin implements IPlugin, IContentExtractorPlugin {
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Content extraction using the Firecrawl API',
+			description: 'Search the web and extract content from websites using the Firecrawl API',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -234,10 +292,11 @@ export class FirecrawlPlugin implements IPlugin, IContentExtractorPlugin {
 			readme: [
 				'## What does Firecrawl do?',
 				'',
-				'Firecrawl is a web scraping API that extracts clean, well-formatted markdown content from any web page. It handles JavaScript rendering, anti-bot bypasses, and content cleaning automatically.',
+				'Firecrawl is a web scraping and search API that can search the web for relevant results and extract clean, well-formatted markdown content from any web page. It handles JavaScript rendering, anti-bot bypasses, and content cleaning automatically.',
 				'',
 				'## Why use it?',
 				'',
+				'- **Web search** — search the web and get structured results with content snippets',
 				'- **Clean markdown output** — returns well-structured markdown from any web page',
 				'- **JavaScript rendering** — handles dynamic/SPA pages that simple HTTP fetches miss',
 				'- **Anti-bot handling** — bypasses common protections automatically',
@@ -245,14 +304,14 @@ export class FirecrawlPlugin implements IPlugin, IContentExtractorPlugin {
 				'',
 				'## How it works in Ever Works',
 				'',
-				'When enabled and set as the active content extractor, Firecrawl is used during directory generation to extract content from web pages. It provides higher quality extraction than the built-in local extractor for JavaScript-heavy sites.',
+				'When enabled, Firecrawl can be used as both a search provider and content extractor during directory generation. It searches the web for relevant information and extracts high-quality content from web pages, including JavaScript-heavy sites.',
 				'',
 				'## Getting started',
 				'',
 				'1. Create an account at [firecrawl.dev](https://firecrawl.dev)',
 				'2. Copy your API key from the Firecrawl dashboard',
 				'3. Enter the key in the **API Key** field below',
-				'4. Enable this plugin to use it for content extraction'
+				'4. Enable this plugin to use it for search and content extraction'
 			].join('\n'),
 			homepage: 'https://firecrawl.dev',
 			icon: {

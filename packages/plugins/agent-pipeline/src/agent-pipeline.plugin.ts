@@ -435,7 +435,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 					stopWhen: stepCountIs(maxSteps),
 					prepareStep,
 					abortSignal: signal,
-					experimental_repairToolCall: repairToolCall
+					experimental_repairToolCall: repairToolCall,
+					experimental_telemetry: { isEnabled: true }
 				}),
 			{
 				providerName: providerConfig.providerName ?? providerConfig.providerId,
