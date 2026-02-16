@@ -29,7 +29,7 @@ import type {
 import { collectMetadataFromItems, createItemLookupIndex, isItemDuplicate } from '@ever-works/plugin';
 
 import type { AgentPipelineStepId } from './types.js';
-import { AGENT_PIPELINE_STEP_IDS, DEFAULT_MAX_STEPS } from './types.js';
+import { AGENT_PIPELINE_STEP_IDS, DEFAULT_MAX_STEPS, DEFAULT_CONTEXT_BUDGET_RATIO } from './types.js';
 import { STEP_DEFINITIONS } from './steps.js';
 import {
 	getFormFields as formFields,
@@ -52,6 +52,7 @@ import {
 } from './utils/pipeline-helpers.js';
 import { extractSimpleKeywords, appendToJsonlIndex } from './utils/data-source-helpers.js';
 import { createToolCallRepairFn, withToolCallingRetry } from './utils/tool-call-resilience.js';
+import { createPrepareStep } from './utils/context-compaction.js';
 
 export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipelineStepId>, IFormSchemaProvider {
 	readonly id = 'agent-pipeline';
@@ -415,6 +416,15 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 
 		const repairToolCall = createToolCallRepairFn(model, logger);
 
+		const maxContextTokens = await execContext.aiFacade.resolveModelContextLength(modelName, facadeOptions);
+		logger.log(`Resolved context window for "${modelName}": ${maxContextTokens} tokens`);
+
+		const prepareStep = createPrepareStep({
+			maxContextTokens,
+			budgetRatio: DEFAULT_CONTEXT_BUDGET_RATIO,
+			logger
+		});
+
 		const result = await withToolCallingRetry(
 			() =>
 				generateText({
@@ -423,6 +433,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 					prompt: userPrompt,
 					tools: tools as Parameters<typeof generateText>[0]['tools'],
 					stopWhen: stepCountIs(maxSteps),
+					prepareStep,
 					abortSignal: signal,
 					experimental_repairToolCall: repairToolCall
 				}),

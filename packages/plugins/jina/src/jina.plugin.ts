@@ -63,12 +63,12 @@ export class JinaReaderPlugin implements IPlugin, ISearchPlugin, IContentExtract
 
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
+		required: ['apiKey'],
 		properties: {
 			apiKey: {
 				type: 'string',
 				title: 'API Key',
-				description:
-					'Your Jina API key (optional — free tier: 20 req/min, with key: 500 req/min). Get one at https://jina.ai',
+				description: 'Your Jina API key. Get one at https://jina.ai',
 				'x-secret': true,
 				'x-envVar': 'PLUGIN_JINA_API_KEY',
 				'x-scope': 'user'
@@ -82,18 +82,15 @@ export class JinaReaderPlugin implements IPlugin, ISearchPlugin, IContentExtract
 
 	async search(options: SearchOptions): Promise<SearchResponse> {
 		const startTime = Date.now();
-		const apiKey = options.settings?.apiKey as string | undefined;
+		const apiKey = options.settings?.apiKey as string;
 
 		try {
 			const headers: Record<string, string> = {
 				Accept: 'application/json',
 				'Content-Type': 'application/json',
-				'X-Respond-With': 'no-content'
+				'X-Respond-With': 'no-content',
+				Authorization: `Bearer ${apiKey}`
 			};
-
-			if (apiKey) {
-				headers['Authorization'] = `Bearer ${apiKey}`;
-			}
 
 			if (options.includeDomains && options.includeDomains.length > 0) {
 				headers['X-Site'] = options.includeDomains[0] as string;
@@ -156,8 +153,8 @@ export class JinaReaderPlugin implements IPlugin, ISearchPlugin, IContentExtract
 		}
 	}
 
-	async isAvailable(): Promise<boolean> {
-		return true;
+	async isAvailable(settings?: Record<string, unknown>): Promise<boolean> {
+		return !!settings?.apiKey;
 	}
 
 	async getRateLimitInfo(): Promise<RateLimitInfo> {
@@ -171,17 +168,14 @@ export class JinaReaderPlugin implements IPlugin, ISearchPlugin, IContentExtract
 	async extract(options: ContentExtractionOptions): Promise<ContentExtractionResult> {
 		const startTime = Date.now();
 		const { url, settings } = options;
-		const apiKey = settings?.apiKey as string | undefined;
+		const apiKey = settings?.apiKey as string;
 
 		try {
 			const headers: Record<string, string> = {
 				Accept: 'application/json',
-				'X-Respond-With': 'markdown'
+				'X-Respond-With': 'markdown',
+				Authorization: `Bearer ${apiKey}`
 			};
-
-			if (apiKey) {
-				headers['Authorization'] = `Bearer ${apiKey}`;
-			}
 
 			const response = await fetch(JINA_READER_URL, {
 				method: 'POST',
@@ -336,7 +330,6 @@ export class JinaReaderPlugin implements IPlugin, ISearchPlugin, IContentExtract
 				'',
 				'- **Web search** — search the web and get results with content already extracted',
 				'- **Content extraction** — converts pages to clean markdown, strips ads and navigation',
-				'- **Free tier available** — works without an API key at 20 requests/minute',
 				'- **Domain filtering** — restrict search to specific domains',
 				'',
 				'## How it works in Ever Works',
@@ -345,9 +338,9 @@ export class JinaReaderPlugin implements IPlugin, ISearchPlugin, IContentExtract
 				'',
 				'## Getting started',
 				'',
-				'1. Enable the plugin — it works immediately without an API key (20 req/min)',
-				'2. For higher rate limits (500 req/min), get an API key at [jina.ai](https://jina.ai)',
-				'3. Enter the key in the **API Key** field below'
+				'1. Get an API key at [jina.ai](https://jina.ai)',
+				'2. Enter the key in the **API Key** field below',
+				'3. Enable the plugin'
 			].join('\n')
 		};
 	}

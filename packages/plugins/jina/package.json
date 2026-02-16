@@ -53,9 +53,9 @@
 			"envVars": [
 				{
 					"name": "PLUGIN_JINA_API_KEY",
-					"required": false,
+					"required": true,
 					"secret": true,
-					"description": "Jina API key (optional - free tier works without key)"
+					"description": "Jina API key"
 				}
 			]
 		}
