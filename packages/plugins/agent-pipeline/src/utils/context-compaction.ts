@@ -131,9 +131,8 @@ function findRecentBoundary(messages: ModelMessage[]): number {
 }
 
 /**
- * Walk messages and compact older entries beyond recentBoundary.
- * - Tool result outputs are replaced with compact summaries.
- * - Assistant tool call args have `content` stripped from file tools (createFile/updateFile).
+ * Walk messages and compact tool result outputs older than recentBoundary.
+ * Keeps all assistant messages (tool calls) intact.
  */
 function compactOlderResults(messages: ModelMessage[], recentBoundary: number): ModelMessage[] {
 	// Build a map of toolCallId -> args from assistant messages in the compaction zone
@@ -152,33 +151,20 @@ function compactOlderResults(messages: ModelMessage[], recentBoundary: number): 
 
 	return messages.map((msg, idx) => {
 		const m = msg as { role: string; content: unknown };
+		if (idx >= recentBoundary || m.role !== 'tool') return msg;
 
-		if (idx < recentBoundary && m.role === 'tool' && Array.isArray(m.content)) {
-			const compacted = m.content.map((part: unknown) => {
-				const p = part as ToolResultPart;
-				if (p.type !== 'tool-result') return part;
-				if (FILE_TOOLS.has(p.toolName) || p.toolName === 'reportProgress') return part;
-				const args = argsMap.get(p.toolCallId);
-				return compactResultPart(p, args);
-			});
-			return { ...msg, content: compacted } as ModelMessage;
-		}
+		const content = m.content;
+		if (!Array.isArray(content)) return msg;
 
-		// Compact assistant tool call args: strip `content` from file tool calls
-		if (idx < recentBoundary && m.role === 'assistant' && Array.isArray(m.content)) {
-			const compacted = m.content.map((part: unknown) => {
-				const p = part as ToolCallPart;
-				if (p.type !== 'tool-call') return part;
-				if (FILE_TOOLS.has(p.toolName)) {
-					const { content: _content, ...rest } = p.args as Record<string, unknown>;
-					return { ...p, args: rest };
-				}
-				return part;
-			});
-			return { ...msg, content: compacted } as ModelMessage;
-		}
+		const compacted = content.map((part: unknown) => {
+			const p = part as ToolResultPart;
+			if (p.type !== 'tool-result') return part;
+			if (FILE_TOOLS.has(p.toolName) || p.toolName === 'reportProgress') return part;
+			const args = argsMap.get(p.toolCallId);
+			return compactResultPart(p, args);
+		});
 
-		return msg;
+		return { ...msg, content: compacted } as ModelMessage;
 	});
 }
 

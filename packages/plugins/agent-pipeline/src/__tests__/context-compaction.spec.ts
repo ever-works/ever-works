@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('tokenx', () => ({
-	estimateTokenCount: vi.fn((text?: string) => Math.ceil((text ?? '').length / 4))
+	estimateTokenCount: vi.fn((text: string) => Math.ceil(text.length / 4))
 }));
 
 import { estimateTokenCount } from 'tokenx';
@@ -336,131 +336,6 @@ describe('createPrepareStep', () => {
 			output: unknown;
 		};
 		expect(toolMsgResult.output).toEqual(originalOutput);
-	});
-
-	it('strips content from older createFile tool call args', () => {
-		mockEstimate.mockReturnValue(800);
-
-		const prepareStep = createPrepareStep(defaultOptions());
-
-		const messages = [
-			userMsg('generate'),
-			assistantMsg([
-				toolCall('c1', 'createFile', {
-					path: 'tool.json',
-					content: '{"name":"Tool","url":"https://example.com"}'
-				})
-			]),
-			toolMsg([
-				toolResult('c1', 'createFile', { type: 'json', value: { success: true, path: '/items/tool.json' } })
-			]),
-			...buildSearchPairs(10, 100)
-		] as never[];
-
-		const result = prepareStep({ messages });
-		expect(result).toBeDefined();
-
-		const assistantContent = (result!.messages[1] as { role: string; content: unknown[] }).content[0] as {
-			type: string;
-			toolName: string;
-			args: Record<string, unknown>;
-		};
-		expect(assistantContent.toolName).toBe('createFile');
-		expect(assistantContent.args).toEqual({ path: 'tool.json' });
-		expect(assistantContent.args).not.toHaveProperty('content');
-	});
-
-	it('strips content from older updateFile tool call args', () => {
-		mockEstimate.mockReturnValue(800);
-
-		const prepareStep = createPrepareStep(defaultOptions());
-
-		const messages = [
-			userMsg('generate'),
-			assistantMsg([toolCall('c1', 'updateFile', { path: 'tool.json', content: '{"name":"Updated"}' })]),
-			toolMsg([
-				toolResult('c1', 'updateFile', { type: 'json', value: { success: true, path: '/items/tool.json' } })
-			]),
-			...buildSearchPairs(10, 100)
-		] as never[];
-
-		const result = prepareStep({ messages });
-		expect(result).toBeDefined();
-
-		const assistantContent = (result!.messages[1] as { role: string; content: unknown[] }).content[0] as {
-			type: string;
-			toolName: string;
-			args: Record<string, unknown>;
-		};
-		expect(assistantContent.toolName).toBe('updateFile');
-		expect(assistantContent.args).toEqual({ path: 'tool.json' });
-		expect(assistantContent.args).not.toHaveProperty('content');
-	});
-
-	it('does not strip args from older search/extractContent tool calls', () => {
-		mockEstimate.mockReturnValue(800);
-
-		const prepareStep = createPrepareStep(defaultOptions());
-
-		const messages = [
-			userMsg('generate'),
-			assistantMsg([
-				toolCall('c1', 'search', { query: 'best CRM tools' }),
-				toolCall('c2', 'extractContent', { url: 'https://example.com/page' })
-			]),
-			toolMsg([
-				toolResult('c1', 'search', { type: 'json', value: [{ title: 'Result', url: 'https://example.com' }] }),
-				toolResult('c2', 'extractContent', {
-					type: 'json',
-					value: { url: 'https://example.com/page', content: 'text' }
-				})
-			]),
-			...buildSearchPairs(10, 100)
-		] as never[];
-
-		const result = prepareStep({ messages });
-		expect(result).toBeDefined();
-
-		const assistantContent = (result!.messages[1] as { role: string; content: unknown[] }).content;
-		const searchCall = assistantContent[0] as { toolName: string; args: Record<string, unknown> };
-		const extractCall = assistantContent[1] as { toolName: string; args: Record<string, unknown> };
-
-		expect(searchCall.args).toEqual({ query: 'best CRM tools' });
-		expect(extractCall.args).toEqual({ url: 'https://example.com/page' });
-	});
-
-	it('does not compact assistant tool call args in recent messages', () => {
-		mockEstimate.mockReturnValue(800);
-
-		const prepareStep = createPrepareStep(defaultOptions());
-
-		const fileContent = '{"name":"Tool","description":"A long description..."}';
-		const messages = [
-			userMsg('generate'),
-			// 9 search pairs to fill most of the recent window
-			...buildSearchPairs(9, 100),
-			// createFile as the 10th recent pair (within window)
-			assistantMsg([toolCall('c-recent', 'createFile', { path: 'recent.json', content: fileContent })]),
-			toolMsg([
-				toolResult('c-recent', 'createFile', {
-					type: 'json',
-					value: { success: true, path: '/items/recent.json' }
-				})
-			])
-		] as never[];
-
-		const result = prepareStep({ messages });
-		expect(result).toBeDefined();
-
-		// The createFile assistant message is within the recent window, args should be untouched
-		const lastAssistantIdx = result!.messages.length - 2;
-		const assistantContent = (result!.messages[lastAssistantIdx] as { role: string; content: unknown[] })
-			.content[0] as {
-			toolName: string;
-			args: Record<string, unknown>;
-		};
-		expect(assistantContent.toolName).toBe('createFile');
-		expect(assistantContent.args).toEqual({ path: 'recent.json', content: fileContent });
 	});
 
 	it('truncates unknown tool output to 200 chars', () => {
