@@ -51,6 +51,8 @@ interface ImportConfigureStepProps {
     onSyncChange: (sync: boolean) => void;
     gitProvider?: string;
     isPending: boolean;
+    owner: string;
+    onOwnerChange: (value: string, isOrganization: boolean) => void;
     onBack: () => void;
     onImport: (providers?: Record<string, string>) => void;
 }
@@ -66,11 +68,12 @@ export function ImportConfigureStep({
     onSyncChange,
     gitProvider,
     isPending,
+    owner,
+    onOwnerChange,
     onBack,
     onImport,
 }: ImportConfigureStepProps) {
     const t = useTranslations('dashboard.directoryCreation.import');
-    const [owner, setOwner] = useState('');
 
     // AI provider selection
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
@@ -298,9 +301,7 @@ export function ImportConfigureStep({
                 <OrganizationSelector
                     value={owner}
                     providerId={gitProvider!}
-                    onChange={(value) => {
-                        setOwner(value);
-                    }}
+                    onChange={onOwnerChange}
                     disabled={isPending}
                 />
             </div>

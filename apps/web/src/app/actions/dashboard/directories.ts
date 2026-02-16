@@ -557,6 +557,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
         createMissingRepos: z.boolean().optional(),
         sync: z.boolean().optional(),
         gitProvider: z.string().optional(),
+        deployProvider: z.string().optional(),
         providers: z.record(z.string()).optional(),
     });
 
@@ -602,6 +603,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
             createMissingRepos: validation.data.createMissingRepos,
             sync: validation.data.sync,
             gitProvider: providerId,
+            deployProvider: validation.data.deployProvider,
             providers: validation.data.providers,
         });
 

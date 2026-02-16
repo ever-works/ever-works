@@ -69,6 +69,8 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
     const [manualSourceType, setManualSourceType] = useState<'data_repo' | 'awesome_readme' | null>(
         null,
     );
+    const [owner, setOwner] = useState('');
+    const [organization, setOrganization] = useState(false);
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const t = useTranslations('dashboard.directoryCreation.import');
@@ -176,6 +178,8 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                 gitProvider,
                 deployProvider,
                 createMissingRepos,
+                owner: organization ? owner : undefined,
+                organization,
             });
 
             if (result.success) {
@@ -215,6 +219,8 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                 gitProvider,
                 deployProvider,
                 providers,
+                owner: organization ? owner : undefined,
+                organization,
             });
 
             if (result.success) {
@@ -327,6 +333,11 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                         onSyncChange={setSync}
                         gitProvider={gitProvider}
                         isPending={isPending}
+                        owner={owner}
+                        onOwnerChange={(value, isOrganization) => {
+                            setOwner(value);
+                            setOrganization(isOrganization);
+                        }}
                         onBack={() => {
                             setStep('source');
                             setAnalysisResult(null);
