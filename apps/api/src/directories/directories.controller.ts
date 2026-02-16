@@ -73,6 +73,7 @@ import {
 import { UpdateWebsiteRepositoryResponseDto } from '@ever-works/agent/generators';
 import { CommunityPrProcessorService } from '@ever-works/agent/community-pr';
 import { DirectoryRepository } from '@ever-works/agent/database';
+import { DirectoryPluginRepository } from '@ever-works/agent/plugins';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { GenerateDirectoryDetailDto } from './dto/generate-detail.dto';
@@ -103,6 +104,7 @@ export class DirectoriesController {
         private readonly generatorFormSchemaService: GeneratorFormSchemaService,
         private readonly communityPrProcessorService: CommunityPrProcessorService,
         private readonly directoryRepository: DirectoryRepository,
+        private readonly directoryPluginRepository: DirectoryPluginRepository,
     ) {}
 
     @Get('directories')
@@ -779,14 +781,16 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
         await this.directoryQueryService.getDirectory(id, user);
 
+        // Check if the community-pr plugin is enabled for this directory
+        const dirPlugin = await this.directoryPluginRepository.findByDirectoryAndPlugin(id, 'community-pr');
+        if (!dirPlugin?.enabled) {
+            throw new BadRequestException('Community PR processing is not enabled for this directory. Enable the "Community PR Processing" plugin first.');
+        }
+
         // Get full entity with methods for processing
         const directory = await this.directoryRepository.findById(id);
         if (!directory) {
             throw new BadRequestException('Directory not found');
-        }
-
-        if (!directory.communityPrProcessingEnabled) {
-            throw new BadRequestException('Community PR processing is not enabled for this directory');
         }
 
         const itemsAdded = await this.communityPrProcessorService.processDirectory(directory);

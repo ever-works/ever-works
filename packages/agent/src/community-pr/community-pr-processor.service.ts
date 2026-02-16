@@ -3,10 +3,11 @@ import { z } from 'zod';
 import { GitFacadeService, type GitFacadeOptions } from '../facades/git.facade';
 import { AiFacadeService } from '../facades/ai.facade';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
-import { DataRepository } from '../generators/data-generator/data-repository';
-import type { Directory, CommunityPrState } from '../entities/directory.entity';
+import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
+import type { Directory } from '../entities/directory.entity';
 import type { GitPullRequest } from '@ever-works/plugin';
 import { slugifyText } from '../utils/text.utils';
+import { DataRepository } from '../generators/data-generator/data-repository';
 
 const MAX_PROCESSED_PR_NUMBERS = 500;
 const MAX_CHANGE_CONTEXT_LENGTH = 50_000;
@@ -30,6 +31,13 @@ export interface CommunityPrProcessingResult {
 	errors: Array<{ directoryId: string; error: string }>;
 }
 
+export interface CommunityPrState {
+	processedPrNumbers: number[];
+	lastProcessedAt?: string;
+	totalItemsAdded?: number;
+	lastError?: string | null;
+}
+
 @Injectable()
 export class CommunityPrProcessorService {
 	private readonly logger = new Logger(CommunityPrProcessorService.name);
@@ -38,27 +46,52 @@ export class CommunityPrProcessorService {
 		private readonly gitFacade: GitFacadeService,
 		private readonly aiFacade: AiFacadeService,
 		private readonly directoryRepository: DirectoryRepository,
+		private readonly directoryPluginRepository: DirectoryPluginRepository,
 	) {}
 
 	async processAllDirectories(): Promise<CommunityPrProcessingResult> {
-		const directories = await this.directoryRepository.findWithCommunityPrProcessingEnabled();
+		const directoryPlugins = await this.directoryPluginRepository.findEnabledByPlugin('community-pr');
 		const result: CommunityPrProcessingResult = { processed: 0, errors: [] };
 
-		for (const directory of directories) {
+		for (const dirPlugin of directoryPlugins) {
 			try {
-				const count = await this.processDirectory(directory);
+				const directory = await this.directoryRepository.findById(dirPlugin.directoryId);
+				if (!directory) {
+					this.logger.warn(`Directory ${dirPlugin.directoryId} not found, skipping`);
+					continue;
+				}
+
+				const state: CommunityPrState = (dirPlugin.metadata as unknown as CommunityPrState) || {
+					processedPrNumbers: [],
+					totalItemsAdded: 0,
+				};
+
+				const autoClose = dirPlugin.settings?.autoClose !== false;
+
+				const count = await this.processDirectory(directory, state, autoClose);
 				result.processed += count;
+
+				// Persist updated state to plugin metadata
+				await this.directoryPluginRepository.updateByDirectoryAndPlugin(
+					dirPlugin.directoryId,
+					'community-pr',
+					{ metadata: state as unknown as Record<string, unknown> },
+				);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				this.logger.error(`Failed to process directory ${directory.id}: ${message}`);
-				result.errors.push({ directoryId: directory.id, error: message });
+				this.logger.error(`Failed to process directory ${dirPlugin.directoryId}: ${message}`);
+				result.errors.push({ directoryId: dirPlugin.directoryId, error: message });
 			}
 		}
 
 		return result;
 	}
 
-	async processDirectory(directory: Directory): Promise<number> {
+	async processDirectory(
+		directory: Directory,
+		state?: CommunityPrState,
+		autoClose?: boolean,
+	): Promise<number> {
 		const owner = directory.getRepoOwner();
 		const mainRepo = directory.getMainRepo();
 		const gitOptions: GitFacadeOptions = {
@@ -77,10 +110,24 @@ export class CommunityPrProcessorService {
 			return 0;
 		}
 
-		const state: CommunityPrState = directory.communityPrState || {
-			processedPrNumbers: [],
-			totalItemsAdded: 0,
-		};
+		// If no state provided, load from plugin metadata
+		if (!state) {
+			const dirPlugin = await this.directoryPluginRepository.findByDirectoryAndPlugin(
+				directory.id,
+				'community-pr',
+			);
+			state = (dirPlugin?.metadata as unknown as CommunityPrState) || {
+				processedPrNumbers: [],
+				totalItemsAdded: 0,
+			};
+			if (autoClose === undefined) {
+				autoClose = dirPlugin?.settings?.autoClose !== false;
+			}
+		}
+
+		if (autoClose === undefined) {
+			autoClose = true;
+		}
 
 		const processedSet = new Set(state.processedPrNumbers);
 		const unprocessedPRs = openPRs.filter((pr) => !processedSet.has(pr.number));
@@ -93,7 +140,7 @@ export class CommunityPrProcessorService {
 
 		for (const pr of unprocessedPRs) {
 			try {
-				const itemsAdded = await this.processSinglePr(directory, pr, gitOptions);
+				const itemsAdded = await this.processSinglePr(directory, pr, gitOptions, autoClose);
 				totalItemsAdded += itemsAdded;
 				state.processedPrNumbers.push(pr.number);
 			} catch (error) {
@@ -114,9 +161,12 @@ export class CommunityPrProcessorService {
 		state.lastProcessedAt = new Date().toISOString();
 		state.totalItemsAdded = (state.totalItemsAdded || 0) + totalItemsAdded;
 
-		await this.directoryRepository.update(directory.id, {
-			communityPrState: state,
-		});
+		// Persist updated state to plugin metadata
+		await this.directoryPluginRepository.updateByDirectoryAndPlugin(
+			directory.id,
+			'community-pr',
+			{ metadata: state as unknown as Record<string, unknown> },
+		);
 
 		return totalItemsAdded;
 	}
@@ -125,6 +175,7 @@ export class CommunityPrProcessorService {
 		directory: Directory,
 		pr: GitPullRequest,
 		gitOptions: GitFacadeOptions,
+		autoClose: boolean,
 	): Promise<number> {
 		const owner = directory.getRepoOwner();
 		const mainRepo = directory.getMainRepo();
@@ -240,7 +291,7 @@ export class CommunityPrProcessorService {
 		);
 
 		// Optionally close the PR
-		if (directory.communityPrAutoClose) {
+		if (autoClose) {
 			await this.gitFacade.closePullRequest(owner, mainRepo, pr.number, gitOptions);
 		}
 

@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CommunityPrProcessorService } from '../community-pr-processor.service';
+import type { CommunityPrState } from '../community-pr-processor.service';
 import { GitFacadeService } from '../../facades/git.facade';
 import { AiFacadeService } from '../../facades/ai.facade';
 import { DirectoryRepository } from '../../database/repositories/directory.repository';
+import { DirectoryPluginRepository } from '../../plugins/repositories/directory-plugin.repository';
 import type { Directory } from '../../entities/directory.entity';
 import type { GitPullRequest, GitPullRequestFile } from '@ever-works/plugin';
 
@@ -11,6 +13,7 @@ describe('CommunityPrProcessorService', () => {
 	let gitFacade: jest.Mocked<GitFacadeService>;
 	let aiFacade: jest.Mocked<AiFacadeService>;
 	let directoryRepository: jest.Mocked<DirectoryRepository>;
+	let directoryPluginRepository: jest.Mocked<DirectoryPluginRepository>;
 
 	const createMockDirectory = (overrides: Partial<Directory> = {}): Directory => {
 		const dir = {
@@ -21,9 +24,6 @@ describe('CommunityPrProcessorService', () => {
 			userId: 'user-1',
 			gitProvider: 'github',
 			owner: 'testowner',
-			communityPrProcessingEnabled: true,
-			communityPrAutoClose: true,
-			communityPrState: null,
 			user: { id: 'user-1', username: 'testowner' } as any,
 			getRepoOwner: () => overrides.owner || 'testowner',
 			getMainRepo: () => overrides.slug || 'test-directory',
@@ -32,6 +32,16 @@ describe('CommunityPrProcessorService', () => {
 		} as unknown as Directory;
 		return dir;
 	};
+
+	const createMockDirPlugin = (overrides: any = {}) => ({
+		id: 'dp-1',
+		directoryId: 'dir-1',
+		pluginId: 'community-pr',
+		enabled: true,
+		settings: { autoClose: true },
+		metadata: {} as Record<string, unknown>,
+		...overrides,
+	});
 
 	const createMockPR = (overrides: Partial<GitPullRequest> = {}): GitPullRequest => ({
 		number: 1,
@@ -85,8 +95,16 @@ describe('CommunityPrProcessorService', () => {
 				{
 					provide: DirectoryRepository,
 					useValue: {
-						findWithCommunityPrProcessingEnabled: jest.fn().mockResolvedValue([]),
+						findById: jest.fn().mockResolvedValue(null),
 						update: jest.fn().mockResolvedValue(undefined),
+					},
+				},
+				{
+					provide: DirectoryPluginRepository,
+					useValue: {
+						findEnabledByPlugin: jest.fn().mockResolvedValue([]),
+						findByDirectoryAndPlugin: jest.fn().mockResolvedValue(null),
+						updateByDirectoryAndPlugin: jest.fn().mockResolvedValue(undefined),
 					},
 				},
 			],
@@ -96,12 +114,15 @@ describe('CommunityPrProcessorService', () => {
 		gitFacade = module.get(GitFacadeService);
 		aiFacade = module.get(AiFacadeService);
 		directoryRepository = module.get(DirectoryRepository);
+		directoryPluginRepository = module.get(DirectoryPluginRepository);
 	});
 
 	describe('processAllDirectories', () => {
 		it('should skip directories with no open PRs', async () => {
 			const directory = createMockDirectory();
-			directoryRepository.findWithCommunityPrProcessingEnabled.mockResolvedValue([directory]);
+			const dirPlugin = createMockDirPlugin();
+			directoryPluginRepository.findEnabledByPlugin.mockResolvedValue([dirPlugin] as any);
+			directoryRepository.findById.mockResolvedValue(directory);
 			gitFacade.listPullRequests.mockResolvedValue([]);
 
 			const result = await service.processAllDirectories();
@@ -114,7 +135,13 @@ describe('CommunityPrProcessorService', () => {
 		it('should handle errors per directory without stopping batch', async () => {
 			const dir1 = createMockDirectory({ id: 'dir-1' });
 			const dir2 = createMockDirectory({ id: 'dir-2' });
-			directoryRepository.findWithCommunityPrProcessingEnabled.mockResolvedValue([dir1, dir2]);
+			const dirPlugin1 = createMockDirPlugin({ directoryId: 'dir-1' });
+			const dirPlugin2 = createMockDirPlugin({ directoryId: 'dir-2' });
+			directoryPluginRepository.findEnabledByPlugin.mockResolvedValue([dirPlugin1, dirPlugin2] as any);
+
+			directoryRepository.findById
+				.mockResolvedValueOnce(dir1)
+				.mockResolvedValueOnce(dir2);
 
 			gitFacade.listPullRequests
 				.mockRejectedValueOnce(new Error('API error'))
@@ -133,25 +160,26 @@ describe('CommunityPrProcessorService', () => {
 			const directory = createMockDirectory();
 			gitFacade.listPullRequests.mockResolvedValue([]);
 
-			const result = await service.processDirectory(directory);
+			const state: CommunityPrState = { processedPrNumbers: [], totalItemsAdded: 0 };
+			const result = await service.processDirectory(directory, state, true);
 
 			expect(result).toBe(0);
 		});
 
 		it('should skip already-processed PR numbers', async () => {
-			const directory = createMockDirectory({
-				communityPrState: {
-					processedPrNumbers: [1, 2],
-					lastProcessedAt: '2024-01-01T00:00:00Z',
-					totalItemsAdded: 5,
-				},
-			});
+			const directory = createMockDirectory();
+			const state: CommunityPrState = {
+				processedPrNumbers: [1, 2],
+				lastProcessedAt: '2024-01-01T00:00:00Z',
+				totalItemsAdded: 5,
+			};
+
 			gitFacade.listPullRequests.mockResolvedValue([
 				createMockPR({ number: 1 }),
 				createMockPR({ number: 2 }),
 			]);
 
-			const result = await service.processDirectory(directory);
+			const result = await service.processDirectory(directory, state, true);
 
 			expect(result).toBe(0);
 			expect(gitFacade.getPullRequestFiles).not.toHaveBeenCalled();
@@ -159,6 +187,7 @@ describe('CommunityPrProcessorService', () => {
 
 		it('should extract items via AI and write to data repo', async () => {
 			const directory = createMockDirectory();
+			const state: CommunityPrState = { processedPrNumbers: [], totalItemsAdded: 0 };
 			const pr = createMockPR({ number: 3 });
 			gitFacade.listPullRequests.mockResolvedValue([pr]);
 			gitFacade.getPullRequestFiles.mockResolvedValue([createMockFile()]);
@@ -190,7 +219,7 @@ describe('CommunityPrProcessorService', () => {
 				cost: null,
 			} as any);
 
-			const result = await service.processDirectory(directory);
+			const result = await service.processDirectory(directory, state, true);
 
 			expect(result).toBe(1);
 			expect(gitFacade.add).toHaveBeenCalled();
@@ -209,10 +238,11 @@ describe('CommunityPrProcessorService', () => {
 				3,
 				expect.any(Object),
 			);
-			expect(directoryRepository.update).toHaveBeenCalledWith(
+			expect(directoryPluginRepository.updateByDirectoryAndPlugin).toHaveBeenCalledWith(
 				'dir-1',
+				'community-pr',
 				expect.objectContaining({
-					communityPrState: expect.objectContaining({
+					metadata: expect.objectContaining({
 						processedPrNumbers: [3],
 						totalItemsAdded: 1,
 					}),
@@ -222,6 +252,7 @@ describe('CommunityPrProcessorService', () => {
 
 		it('should comment and not close PR when no items extracted', async () => {
 			const directory = createMockDirectory();
+			const state: CommunityPrState = { processedPrNumbers: [], totalItemsAdded: 0 };
 			const pr = createMockPR({ number: 4 });
 			gitFacade.listPullRequests.mockResolvedValue([pr]);
 			gitFacade.getPullRequestFiles.mockResolvedValue([createMockFile()]);
@@ -242,7 +273,7 @@ describe('CommunityPrProcessorService', () => {
 				cost: null,
 			} as any);
 
-			const result = await service.processDirectory(directory);
+			const result = await service.processDirectory(directory, state, true);
 
 			expect(result).toBe(0);
 			expect(gitFacade.createPullRequestComment).toHaveBeenCalledWith(
@@ -256,8 +287,9 @@ describe('CommunityPrProcessorService', () => {
 			expect(gitFacade.commit).not.toHaveBeenCalled();
 		});
 
-		it('should not close PR when communityPrAutoClose is false', async () => {
-			const directory = createMockDirectory({ communityPrAutoClose: false });
+		it('should not close PR when autoClose is false', async () => {
+			const directory = createMockDirectory();
+			const state: CommunityPrState = { processedPrNumbers: [], totalItemsAdded: 0 };
 			const pr = createMockPR({ number: 5 });
 			gitFacade.listPullRequests.mockResolvedValue([pr]);
 			gitFacade.getPullRequestFiles.mockResolvedValue([createMockFile()]);
@@ -288,13 +320,14 @@ describe('CommunityPrProcessorService', () => {
 				cost: null,
 			} as any);
 
-			await service.processDirectory(directory);
+			await service.processDirectory(directory, state, false);
 
 			expect(gitFacade.closePullRequest).not.toHaveBeenCalled();
 		});
 
 		it('should handle errors per PR without stopping batch', async () => {
 			const directory = createMockDirectory();
+			const state: CommunityPrState = { processedPrNumbers: [], totalItemsAdded: 0 };
 			gitFacade.listPullRequests.mockResolvedValue([
 				createMockPR({ number: 6 }),
 				createMockPR({ number: 7 }),
@@ -305,14 +338,18 @@ describe('CommunityPrProcessorService', () => {
 				.mockRejectedValueOnce(new Error('PR files error'))
 				.mockResolvedValueOnce([]);
 
-			const result = await service.processDirectory(directory);
+			const result = await service.processDirectory(directory, state, true);
 
 			expect(result).toBe(0);
-			// Both PRs should be marked as processed
-			expect(directoryRepository.update).toHaveBeenCalledWith(
+			// Both PRs should be marked as processed in state
+			expect(state.processedPrNumbers).toEqual(expect.arrayContaining([6, 7]));
+			expect(state.lastError).toBe('PR files error');
+			// State should be persisted via plugin metadata
+			expect(directoryPluginRepository.updateByDirectoryAndPlugin).toHaveBeenCalledWith(
 				'dir-1',
+				'community-pr',
 				expect.objectContaining({
-					communityPrState: expect.objectContaining({
+					metadata: expect.objectContaining({
 						processedPrNumbers: expect.arrayContaining([6, 7]),
 						lastError: 'PR files error',
 					}),
@@ -322,12 +359,11 @@ describe('CommunityPrProcessorService', () => {
 
 		it('should cap processedPrNumbers at 500', async () => {
 			const existingNumbers = Array.from({ length: 499 }, (_, i) => i + 1);
-			const directory = createMockDirectory({
-				communityPrState: {
-					processedPrNumbers: existingNumbers,
-					totalItemsAdded: 0,
-				},
-			});
+			const state: CommunityPrState = {
+				processedPrNumbers: existingNumbers,
+				totalItemsAdded: 0,
+			};
+			const directory = createMockDirectory();
 
 			gitFacade.listPullRequests.mockResolvedValue([
 				createMockPR({ number: 600 }),
@@ -337,27 +373,29 @@ describe('CommunityPrProcessorService', () => {
 			// Both PRs will have no files (empty change context triggers comment)
 			gitFacade.getPullRequestFiles.mockResolvedValue([]);
 
-			await service.processDirectory(directory);
+			await service.processDirectory(directory, state, true);
 
-			expect(directoryRepository.update).toHaveBeenCalledWith(
+			expect(directoryPluginRepository.updateByDirectoryAndPlugin).toHaveBeenCalledWith(
 				'dir-1',
+				'community-pr',
 				expect.objectContaining({
-					communityPrState: expect.objectContaining({
+					metadata: expect.objectContaining({
 						processedPrNumbers: expect.any(Array),
 					}),
 				}),
 			);
 
-			const updateCall = directoryRepository.update.mock.calls[0][1] as any;
-			expect(updateCall.communityPrState.processedPrNumbers.length).toBeLessThanOrEqual(500);
+			const updateCall = directoryPluginRepository.updateByDirectoryAndPlugin.mock.calls[0][2] as any;
+			expect(updateCall.metadata.processedPrNumbers.length).toBeLessThanOrEqual(500);
 		});
 
 		it('should comment when PR has no meaningful changes', async () => {
 			const directory = createMockDirectory();
+			const state: CommunityPrState = { processedPrNumbers: [], totalItemsAdded: 0 };
 			gitFacade.listPullRequests.mockResolvedValue([createMockPR({ number: 8 })]);
 			gitFacade.getPullRequestFiles.mockResolvedValue([]);
 
-			await service.processDirectory(directory);
+			await service.processDirectory(directory, state, true);
 
 			expect(gitFacade.createPullRequestComment).toHaveBeenCalledWith(
 				'testowner',

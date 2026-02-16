@@ -378,13 +378,4 @@ export class DirectoryRepository {
         });
     }
 
-    /**
-     * Find all directories with community PR processing enabled.
-     */
-    async findWithCommunityPrProcessingEnabled(): Promise<Directory[]> {
-        return this.repository.find({
-            where: { communityPrProcessingEnabled: true },
-            relations: ['user'],
-        });
-    }
 }

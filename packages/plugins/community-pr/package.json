@@ -1,0 +1,53 @@
+{
+	"name": "@ever-works/community-pr-plugin",
+	"version": "1.0.0",
+	"description": "Community PR Processing Plugin - Automatically processes community pull requests to extract and add new directory items",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "community-pr",
+			"name": "Community PR Processing",
+			"version": "1.0.0",
+			"category": "integration",
+			"capabilities": [
+				"community-pr"
+			],
+			"description": "Automatically processes community pull requests to extract and add new directory items.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"builtIn": true,
+			"autoEnable": false,
+			"systemPlugin": false,
+			"visibility": "public"
+		}
+	}
+}

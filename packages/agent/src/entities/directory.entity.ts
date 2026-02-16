@@ -149,16 +149,6 @@ export class Directory {
     @TimestampColumn({ nullable: true })
     websiteTemplateLastCheckedAt?: Date | null;
 
-    // Community PR Processing FIELDS
-    @Column({ type: 'boolean', default: false })
-    communityPrProcessingEnabled: boolean;
-
-    @Column({ type: 'boolean', default: true })
-    communityPrAutoClose: boolean;
-
-    @Column('simple-json', { nullable: true })
-    communityPrState?: CommunityPrState | null;
-
     // Timestamps
     @CreateDateColumn()
     createdAt: Date;
@@ -247,9 +237,3 @@ export interface RepoVisibility {
     directory: boolean;
 }
 
-export interface CommunityPrState {
-    processedPrNumbers: number[];
-    lastProcessedAt?: string;
-    totalItemsAdded?: number;
-    lastError?: string | null;
-}
