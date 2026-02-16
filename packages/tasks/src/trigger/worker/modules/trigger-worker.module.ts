@@ -10,6 +10,7 @@ import {
     AwesomeReadmeParserService,
     ImportExecutorService,
 } from '@ever-works/agent/import';
+import { CommunityPrProcessorService } from '@ever-works/agent/community-pr';
 import { TriggerPluginsModule } from './trigger-plugins.module';
 import { TriggerFacadesModule } from './trigger-facades.module';
 import { TriggerPipelineModule } from './trigger-pipeline.module';
@@ -54,9 +55,10 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
         SourceRepoAnalyzerService,
         AwesomeReadmeParserService,
         ImportExecutorService,
+        CommunityPrProcessorService,
         TriggerGenerationOrchestrator,
         TriggerImportOrchestrator,
     ],
-    exports: [TriggerGenerationOrchestrator, TriggerImportOrchestrator, TriggerInternalModule],
+    exports: [TriggerGenerationOrchestrator, TriggerImportOrchestrator, CommunityPrProcessorService, TriggerInternalModule],
 })
 export class TriggerWorkerModule {}
