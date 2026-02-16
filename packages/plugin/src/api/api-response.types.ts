@@ -235,6 +235,8 @@ export interface DirectoryPluginResponse extends UserPluginResponse {
 	directoryPluginId?: string;
 	/** Priority order for this plugin */
 	priority?: number;
+	/** Directory-specific plugin metadata (read-only state) */
+	metadata?: Record<string, unknown>;
 }
 
 /**

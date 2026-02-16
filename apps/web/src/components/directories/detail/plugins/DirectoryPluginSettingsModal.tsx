@@ -19,7 +19,7 @@ import { PluginSettingsFormFields } from '@/components/plugins/PluginSettingsFor
 import { InheritedValueHint } from './InheritedValueHint';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 import { updateDirectoryPluginSettings } from '@/app/actions/plugins';
-import { RotateCcw, Save, Check } from 'lucide-react';
+import { RotateCcw, Save, Check, Activity } from 'lucide-react';
 
 interface DirectoryPluginSettingsModalProps {
     open: boolean;
@@ -123,6 +123,7 @@ export function DirectoryPluginSettingsModal({
         }
     };
 
+    const hasMetadata = plugin.metadata && Object.keys(plugin.metadata).length > 0;
     const hasDirectoryOverrides =
         plugin.directorySettings && Object.keys(plugin.directorySettings).length > 0;
 
@@ -162,6 +163,11 @@ export function DirectoryPluginSettingsModal({
                         />
                     )}
                 />
+
+                {/* Plugin metadata status */}
+                {hasMetadata && (
+                    <PluginMetadataStatus metadata={plugin.metadata!} />
+                )}
 
                 {/* Reset confirmation */}
                 {showResetConfirm && (
@@ -227,5 +233,53 @@ export function DirectoryPluginSettingsModal({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+function formatMetadataValue(key: string, value: unknown): string {
+    if (value === null || value === undefined) return '-';
+    if (Array.isArray(value)) return String(value.length);
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
+        return new Date(value).toLocaleString();
+    }
+    return String(value);
+}
+
+function formatMetadataLabel(key: string): string {
+    return key
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/[_-]/g, ' ')
+        .replace(/^\w/, (c) => c.toUpperCase())
+        .trim();
+}
+
+function PluginMetadataStatus({ metadata }: { metadata: Record<string, unknown> }) {
+    const displayEntries = Object.entries(metadata).filter(
+        ([key]) => key !== 'processedPrNumbers',
+    );
+
+    if (displayEntries.length === 0) return null;
+
+    return (
+        <div className="rounded-lg border border-border dark:border-border-dark p-3 mt-2">
+            <div className="flex items-center gap-1.5 mb-2">
+                <Activity className="w-3.5 h-3.5 text-text-muted dark:text-text-muted-dark" />
+                <span className="text-xs font-medium text-text-muted dark:text-text-muted-dark uppercase tracking-wide">
+                    Status
+                </span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                {displayEntries.map(([key, value]) => (
+                    <div key={key} className="contents">
+                        <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {formatMetadataLabel(key)}
+                        </span>
+                        <span className="text-xs text-text dark:text-text-dark font-medium text-right">
+                            {formatMetadataValue(key, value)}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 }

@@ -1046,6 +1046,9 @@ export class PluginOperationsService {
                 : undefined,
             directoryPluginId: directoryPlugin?.id,
             priority: directoryPlugin?.priority,
+            metadata: directoryPlugin?.metadata && Object.keys(directoryPlugin.metadata).length > 0
+                ? directoryPlugin.metadata
+                : undefined,
         };
     }
 
