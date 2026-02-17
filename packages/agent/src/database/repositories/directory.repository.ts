@@ -387,5 +387,4 @@ export class DirectoryRepository {
             relations: ['user'],
         });
     }
-
 }

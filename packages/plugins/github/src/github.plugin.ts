@@ -290,12 +290,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 		return this.apiService.createPullRequestComment(owner, repo, prNumber, body, token, settings.apiBaseUrl);
 	}
 
-	async closePullRequest(
-		owner: string,
-		repo: string,
-		prNumber: number,
-		token: string
-	): Promise<GitPullRequest> {
+	async closePullRequest(owner: string, repo: string, prNumber: number, token: string): Promise<GitPullRequest> {
 		const settings = await this.getSettings();
 		return this.apiService.closePullRequest(owner, repo, prNumber, token, settings.apiBaseUrl);
 	}

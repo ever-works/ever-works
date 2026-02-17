@@ -247,4 +247,3 @@ export interface RepoVisibility {
     website: boolean;
     directory: boolean;
 }
-

@@ -4,8 +4,8 @@ import { FacadesModule } from '../facades/facades.module';
 import { CommunityPrProcessorService } from './community-pr-processor.service';
 
 @Module({
-	imports: [DatabaseModule, FacadesModule],
-	providers: [CommunityPrProcessorService],
-	exports: [CommunityPrProcessorService],
+    imports: [DatabaseModule, FacadesModule],
+    providers: [CommunityPrProcessorService],
+    exports: [CommunityPrProcessorService],
 })
 export class CommunityPrModule {}

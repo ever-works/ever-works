@@ -255,12 +255,7 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		options: ListPullRequestsOptions | undefined,
 		token: string
 	): Promise<GitPullRequest[]>;
-	getPullRequestFiles?(
-		owner: string,
-		repo: string,
-		prNumber: number,
-		token: string
-	): Promise<GitPullRequestFile[]>;
+	getPullRequestFiles?(owner: string, repo: string, prNumber: number, token: string): Promise<GitPullRequestFile[]>;
 	createPullRequestComment?(
 		owner: string,
 		repo: string,
@@ -268,12 +263,7 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		body: string,
 		token: string
 	): Promise<{ id: number; body: string }>;
-	closePullRequest?(
-		owner: string,
-		repo: string,
-		prNumber: number,
-		token: string
-	): Promise<GitPullRequest>;
+	closePullRequest?(owner: string, repo: string, prNumber: number, token: string): Promise<GitPullRequest>;
 
 	// Utility
 	repositoryExists?(owner: string, repo: string, token: string): Promise<boolean>;

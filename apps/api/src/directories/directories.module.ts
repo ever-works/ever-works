@@ -25,7 +25,12 @@ import { CommunityPrSchedulerService } from './tasks/community-pr-scheduler.serv
         WebsiteGeneratorModule,
         FacadesModule,
     ],
-    providers: [CacheEntryRepository, DirectoryCleanupService, WebsiteTemplateSchedulerService, CommunityPrSchedulerService],
+    providers: [
+        CacheEntryRepository,
+        DirectoryCleanupService,
+        WebsiteTemplateSchedulerService,
+        CommunityPrSchedulerService,
+    ],
     controllers: [DirectoriesController, MembersController],
 })
 export class DirectoriesModule {}

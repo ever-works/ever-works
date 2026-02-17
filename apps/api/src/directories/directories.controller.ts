@@ -771,10 +771,7 @@ export class DirectoriesController {
     @ApiParam({ name: 'id', description: 'Directory ID' })
     @ApiResponse({ status: 200, description: 'Community PRs processed' })
     @ApiResponse({ status: 400, description: 'Community PR processing not enabled' })
-    async processCommunityPrs(
-        @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') id: string,
-    ) {
+    async processCommunityPrs(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         // Verify user has access
         const user = await this.authService.getUser(auth.userId);
         await this.directoryQueryService.getDirectory(id, user);
@@ -785,7 +782,9 @@ export class DirectoriesController {
             throw new BadRequestException('Directory not found');
         }
         if (!directory.communityPrEnabled) {
-            throw new BadRequestException('Community PR processing is not enabled for this directory.');
+            throw new BadRequestException(
+                'Community PR processing is not enabled for this directory.',
+            );
         }
 
         const itemsAdded = await this.communityPrProcessorService.processDirectory(directory);
