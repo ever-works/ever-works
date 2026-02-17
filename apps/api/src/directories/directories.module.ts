@@ -15,6 +15,7 @@ import { MembersController } from './members.controller';
 // Tasks
 import { DirectoryCleanupService } from './tasks/directory-cleanup.service';
 import { WebsiteTemplateSchedulerService } from './tasks/website-template-scheduler.service';
+import { CommunityPrSchedulerService } from './tasks/community-pr-scheduler.service';
 
 @Module({
     imports: [
@@ -26,7 +27,7 @@ import { WebsiteTemplateSchedulerService } from './tasks/website-template-schedu
         FacadesModule,
         ScheduleModule.forRoot(),
     ],
-    providers: [CacheEntryRepository, DirectoryCleanupService, WebsiteTemplateSchedulerService],
+    providers: [CacheEntryRepository, DirectoryCleanupService, WebsiteTemplateSchedulerService, CommunityPrSchedulerService],
     controllers: [DirectoriesController, MembersController],
 })
 export class DirectoriesModule {}
