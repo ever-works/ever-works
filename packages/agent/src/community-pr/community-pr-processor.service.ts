@@ -61,9 +61,12 @@ export class CommunityPrProcessorService {
 					continue;
 				}
 
-				const state: CommunityPrState = (dirPlugin.metadata as unknown as CommunityPrState) || {
-					processedPrNumbers: [],
-					totalItemsAdded: 0,
+				const raw = dirPlugin.metadata as Record<string, unknown>;
+				const state: CommunityPrState = {
+					processedPrNumbers: Array.isArray(raw?.processedPrNumbers) ? (raw.processedPrNumbers as number[]) : [],
+					totalItemsAdded: (raw?.totalItemsAdded as number) || 0,
+					lastProcessedAt: (raw?.lastProcessedAt as string) || undefined,
+					lastError: (raw?.lastError as string) || null,
 				};
 
 				const autoClose = dirPlugin.settings?.autoClose !== false;
@@ -116,9 +119,12 @@ export class CommunityPrProcessorService {
 				directory.id,
 				'community-pr',
 			);
-			state = (dirPlugin?.metadata as unknown as CommunityPrState) || {
-				processedPrNumbers: [],
-				totalItemsAdded: 0,
+			const raw = dirPlugin?.metadata as Record<string, unknown> | undefined;
+			state = {
+				processedPrNumbers: Array.isArray(raw?.processedPrNumbers) ? (raw.processedPrNumbers as number[]) : [],
+				totalItemsAdded: (raw?.totalItemsAdded as number) || 0,
+				lastProcessedAt: (raw?.lastProcessedAt as string) || undefined,
+				lastError: (raw?.lastError as string) || null,
 			};
 			if (autoClose === undefined) {
 				autoClose = dirPlugin?.settings?.autoClose !== false;
