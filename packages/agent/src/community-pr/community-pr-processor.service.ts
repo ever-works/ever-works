@@ -82,7 +82,8 @@ export class CommunityPrProcessorService {
 				);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				this.logger.error(`Failed to process directory ${dirPlugin.directoryId}: ${message}`);
+				const stack = error instanceof Error ? error.stack : undefined;
+				this.logger.error(`Failed to process directory ${dirPlugin.directoryId}: ${message}`, stack);
 				result.errors.push({ directoryId: dirPlugin.directoryId, error: message });
 			}
 		}
@@ -148,13 +149,16 @@ export class CommunityPrProcessorService {
 			try {
 				const itemsAdded = await this.processSinglePr(directory, pr, gitOptions, autoClose);
 				totalItemsAdded += itemsAdded;
-				state.processedPrNumbers.push(pr.number);
 			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
+				const stack = error instanceof Error ? error.stack : String(error);
 				this.logger.error(
-					`Failed to process PR #${pr.number} for directory ${directory.id}: ${message}`,
+					`Failed to process PR #${pr.number} for directory ${directory.id}: ${stack}`,
 				);
-				state.lastError = message;
+				state.lastError = error instanceof Error ? error.message : String(error);
+			} finally {
+				if (!state.processedPrNumbers) {
+					state.processedPrNumbers = [];
+				}
 				state.processedPrNumbers.push(pr.number);
 			}
 		}
