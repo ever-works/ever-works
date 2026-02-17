@@ -153,8 +153,8 @@ export class JinaReaderPlugin implements IPlugin, ISearchPlugin, IContentExtract
 		}
 	}
 
-	async isAvailable(settings?: Record<string, unknown>): Promise<boolean> {
-		return !!settings?.apiKey;
+	async isAvailable(): Promise<boolean> {
+		return true;
 	}
 
 	async getRateLimitInfo(): Promise<RateLimitInfo> {

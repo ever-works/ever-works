@@ -70,12 +70,19 @@ export class FirecrawlPlugin implements IPlugin, ISearchPlugin, IContentExtracto
 				const snippet =
 					('description' in item ? item.description : '') || ('markdown' in item ? item.markdown : '') || '';
 
+				let hostname: string | undefined;
+				try {
+					hostname = url ? new URL(url).hostname : undefined;
+				} catch {
+					hostname = undefined;
+				}
+
 				return {
 					title,
 					url,
 					snippet,
 					position: index + 1,
-					source: url ? new URL(url).hostname : undefined
+					source: hostname
 				};
 			});
 
