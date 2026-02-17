@@ -18,7 +18,7 @@ const extractedItemSchema = z.object({
         z.object({
             name: z.string(),
             description: z.string(),
-            source_url: z.string().url(),
+            source_url: z.string(),
             category: z.string(),
             tags: z.array(z.string()),
         }),
