@@ -160,7 +160,7 @@
         "@nestjs/swagger": "^11.2.5",
         "@nestjs/typeorm": "^11.0.0",
         "@types/fs-extra": "^11.0.4",
-        "ajv": "^8.17.1",
+        "ajv": "^8.18.0",
         "ajv-formats": "^3.0.1",
         "axios": "^1.13.5",
         "bullmq": "^5.66.4",
