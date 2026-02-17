@@ -24,7 +24,8 @@ export async function createAgentTools(
 	facadeOptions: FacadeOptions,
 	onProgress: PipelineProgressCallback | undefined,
 	totalSteps: number,
-	logger: PluginLogger
+	logger: PluginLogger,
+	maxContentLength?: number
 ): Promise<SandboxAndTools> {
 	// Dynamic imports — bash-tool and just-bash are ESM-only
 	const [{ createBashTool }, { Bash, ReadWriteFs }] = await Promise.all([import('bash-tool'), import('just-bash')]);
@@ -47,7 +48,12 @@ export async function createAgentTools(
 		updateFile: createUpdateFileTool(wrappedSandbox, '/'),
 		validateItemJson: createValidateItemJsonTool(wrappedSandbox, '/'),
 		search: createSearchTool(facades.searchFacade, facadeOptions, toolOptions),
-		extractContent: createExtractContentTool(facades.contentExtractorFacade, facadeOptions, toolOptions),
+		extractContent: createExtractContentTool(
+			facades.contentExtractorFacade,
+			facadeOptions,
+			toolOptions,
+			maxContentLength
+		),
 		reportProgress: createReportProgressTool(onProgress, 1, totalSteps)
 	};
 

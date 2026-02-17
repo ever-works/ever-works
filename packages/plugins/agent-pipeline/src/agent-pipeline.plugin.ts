@@ -29,7 +29,12 @@ import type {
 import { collectMetadataFromItems, createItemLookupIndex, isItemDuplicate } from '@ever-works/plugin';
 
 import type { AgentPipelineStepId } from './types.js';
-import { AGENT_PIPELINE_STEP_IDS, DEFAULT_MAX_STEPS, DEFAULT_CONTEXT_BUDGET_RATIO } from './types.js';
+import {
+	AGENT_PIPELINE_STEP_IDS,
+	DEFAULT_MAX_STEPS,
+	DEFAULT_CONTEXT_BUDGET_RATIO,
+	MAX_EXTRACT_CONTENT_LENGTH
+} from './types.js';
 import { STEP_DEFINITIONS } from './steps.js';
 import {
 	getFormFields as formFields,
@@ -395,6 +400,13 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			}
 		});
 
+		const maxContextTokens = await execContext.aiFacade.resolveModelContextLength(modelName, facadeOptions);
+		logger.log(`Resolved context window for "${modelName}": ${maxContextTokens} tokens`);
+
+		// Dynamic content limit: 15% of context window as characters, capped at MAX_EXTRACT_CONTENT_LENGTH
+		const maxContentLength = Math.min(MAX_EXTRACT_CONTENT_LENGTH, Math.floor(maxContextTokens * 0.15 * 4));
+		logger.log(`Content limit for "${modelName}": ${maxContentLength} chars (context: ${maxContextTokens} tokens)`);
+
 		const { tools, breaker } = await createAgentTools(
 			workspacePath,
 			{
@@ -404,7 +416,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			facadeOptions,
 			onProgress,
 			AGENT_PIPELINE_STEP_IDS.length,
-			logger
+			logger,
+			maxContentLength
 		);
 
 		const promptOptions = { directory, request, existing };
@@ -416,12 +429,10 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 
 		const repairToolCall = createToolCallRepairFn(model, logger);
 
-		const maxContextTokens = await execContext.aiFacade.resolveModelContextLength(modelName, facadeOptions);
-		logger.log(`Resolved context window for "${modelName}": ${maxContextTokens} tokens`);
-
 		const prepareStep = createPrepareStep({
 			maxContextTokens,
 			budgetRatio: DEFAULT_CONTEXT_BUDGET_RATIO,
+			maxSingleOutputChars: Math.floor(maxContextTokens * 0.1 * 4),
 			logger
 		});
 

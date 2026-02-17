@@ -39,12 +39,14 @@ export function createSearchTool(
 			try {
 				const results = await searchFacade.search(query, { maxResults }, facadeOptions);
 				breaker.recordSuccess('search');
-				return results.map((r) => ({
+				const mapped = results.map((r) => ({
 					title: r.title,
 					url: r.url,
 					score: r.score,
 					publishedDate: r.publishedDate
 				}));
+				logger.log(`Search '${query}': ${mapped.length} results`);
+				return mapped;
 			} catch (err) {
 				const error = err instanceof Error ? err : new Error(String(err));
 				logger.warn(`Search tool error: ${error.message}`);
@@ -69,7 +71,8 @@ export function createSearchTool(
 export function createExtractContentTool(
 	contentExtractorFacade: IContentExtractorFacade,
 	facadeOptions: FacadeOptions,
-	toolOptions: FacadeToolOptions
+	toolOptions: FacadeToolOptions,
+	maxContentLength?: number
 ) {
 	const { breaker, logger } = toolOptions;
 
@@ -93,10 +96,16 @@ export function createExtractContentTool(
 				}
 
 				breaker.recordSuccess('extractContent');
-				const content =
-					result.rawContent.length > MAX_EXTRACT_CONTENT_LENGTH
-						? result.rawContent.slice(0, MAX_EXTRACT_CONTENT_LENGTH) + '\n\n[Content truncated]'
-						: result.rawContent;
+				const maxLen = maxContentLength ?? MAX_EXTRACT_CONTENT_LENGTH;
+
+				let content: string;
+				if (result.rawContent.length <= maxLen) {
+					content = result.rawContent;
+				} else {
+					content =
+						result.rawContent.slice(0, maxLen) +
+						`\n\n[Content truncated: ${result.rawContent.length} chars total]`;
+				}
 				return { url, content, images: result.images };
 			} catch (err) {
 				const error = err instanceof Error ? err : new Error(String(err));

@@ -134,8 +134,9 @@ describe('facade-tools', () => {
 				messages: []
 			} as never);
 
-			expect(result.content).toHaveLength(MAX_EXTRACT_CONTENT_LENGTH + '\n\n[Content truncated]'.length);
-			expect(result.content).toContain('[Content truncated]');
+			const expectedSuffix = `\n\n[Content truncated: ${longContent.length} chars total]`;
+			expect(result.content).toHaveLength(MAX_EXTRACT_CONTENT_LENGTH + expectedSuffix.length);
+			expect(result.content).toContain('[Content truncated:');
 		});
 
 		it('should handle null extraction without tripping breaker', async () => {
