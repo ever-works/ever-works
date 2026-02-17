@@ -30,9 +30,6 @@ export interface CommunityPrProcessingResult {
     errors: Array<{ directoryId: string; error: string }>;
 }
 
-// Re-export CommunityPrState from entities/types for backwards compatibility
-export type { CommunityPrState } from '../entities/types';
-
 @Injectable()
 export class CommunityPrProcessorService {
     private readonly logger = new Logger(CommunityPrProcessorService.name);
@@ -58,9 +55,6 @@ export class CommunityPrProcessorService {
 
                 const count = await this.processDirectory(directory, state, autoClose);
                 result.processed += count;
-
-                // Persist updated state to directory
-                await this.directoryRepository.update(directory.id, { communityPrState: state });
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
                 const stack = error instanceof Error ? error.stack : undefined;
@@ -121,9 +115,11 @@ export class CommunityPrProcessorService {
                 const itemsAdded = await this.processSinglePr(directory, pr, gitOptions, autoClose);
                 totalItemsAdded += itemsAdded;
             } catch (error) {
-                const stack = error instanceof Error ? error.stack : String(error);
+                const message = error instanceof Error ? error.message : String(error);
+                const stack = error instanceof Error ? error.stack : undefined;
                 this.logger.error(
-                    `Failed to process PR #${pr.number} for directory ${directory.id}: ${stack}`,
+                    `Failed to process PR #${pr.number} for directory ${directory.id}: ${message}`,
+                    stack,
                 );
                 state.lastError = error instanceof Error ? error.message : String(error);
             } finally {

@@ -17,7 +17,8 @@ export class CommunityPrSchedulerService {
                 `Community PR processing completed: ${result.processed} processed, ${result.errors.length} errors`,
             );
         } catch (error) {
-            this.logger.error('Error during community PR processing', error.stack);
+            const stack = error instanceof Error ? error.stack : String(error);
+            this.logger.error('Error during community PR processing', stack);
         }
     }
 }
