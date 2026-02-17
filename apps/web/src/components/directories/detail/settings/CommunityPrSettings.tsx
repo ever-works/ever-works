@@ -87,6 +87,7 @@ export function CommunityPrSettings() {
                             checked={directory.communityPrEnabled}
                             onChange={handleToggleEnabled}
                             disabled={updatingField !== null}
+                            className="mt-0"
                         />
                     </div>
                 </div>
@@ -109,6 +110,7 @@ export function CommunityPrSettings() {
                                 checked={directory.communityPrAutoClose}
                                 onChange={handleToggleAutoClose}
                                 disabled={updatingField !== null}
+                                className="mt-0"
                             />
                         </div>
                     </div>

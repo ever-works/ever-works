@@ -1164,8 +1164,8 @@
                         }
                     }
                 },
-                "communityPrProcessing": "Community PR Processing",
-                "communityPrEnableLabel": "Enable Community PR Processing",
+                "communityPrProcessing": "Community PR",
+                "communityPrEnableLabel": "Enable Community PR",
                 "communityPrEnableDescription": "Automatically process pull requests submitted by the community.",
                 "communityPrAutoCloseLabel": "Auto-close PRs after processing",
                 "communityPrAutoCloseDescription": "Automatically close community pull requests after they have been processed.",
