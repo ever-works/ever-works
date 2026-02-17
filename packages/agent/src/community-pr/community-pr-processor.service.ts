@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { GitFacadeService, type GitFacadeOptions } from '../facades/git.facade';
 import { AiFacadeService } from '../facades/ai.facade';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
-import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import type { Directory } from '../entities/directory.entity';
+import type { CommunityPrState } from '../entities/types';
 import type { GitPullRequest } from '@ever-works/plugin';
 import { slugifyText } from '../utils/text.utils';
 import { DataRepository } from '../generators/data-generator/data-repository';
@@ -31,12 +31,8 @@ export interface CommunityPrProcessingResult {
 	errors: Array<{ directoryId: string; error: string }>;
 }
 
-export interface CommunityPrState {
-	processedPrNumbers: number[];
-	lastProcessedAt?: string;
-	totalItemsAdded?: number;
-	lastError?: string | null;
-}
+// Re-export CommunityPrState from entities/types for backwards compatibility
+export type { CommunityPrState } from '../entities/types';
 
 @Injectable()
 export class CommunityPrProcessorService {
@@ -46,45 +42,31 @@ export class CommunityPrProcessorService {
 		private readonly gitFacade: GitFacadeService,
 		private readonly aiFacade: AiFacadeService,
 		private readonly directoryRepository: DirectoryRepository,
-		private readonly directoryPluginRepository: DirectoryPluginRepository,
 	) {}
 
 	async processAllDirectories(): Promise<CommunityPrProcessingResult> {
-		const directoryPlugins = await this.directoryPluginRepository.findEnabledByPlugin('community-pr');
+		const directories = await this.directoryRepository.findWithCommunityPrEnabled();
 		const result: CommunityPrProcessingResult = { processed: 0, errors: [] };
 
-		for (const dirPlugin of directoryPlugins) {
+		for (const directory of directories) {
 			try {
-				const directory = await this.directoryRepository.findById(dirPlugin.directoryId);
-				if (!directory) {
-					this.logger.warn(`Directory ${dirPlugin.directoryId} not found, skipping`);
-					continue;
-				}
-
-				const raw = dirPlugin.metadata as Record<string, unknown>;
-				const state: CommunityPrState = {
-					processedPrNumbers: Array.isArray(raw?.processedPrNumbers) ? (raw.processedPrNumbers as number[]) : [],
-					totalItemsAdded: (raw?.totalItemsAdded as number) || 0,
-					lastProcessedAt: (raw?.lastProcessedAt as string) || undefined,
-					lastError: (raw?.lastError as string) || null,
+				const state: CommunityPrState = directory.communityPrState || {
+					processedPrNumbers: [],
+					totalItemsAdded: 0,
 				};
 
-				const autoClose = dirPlugin.settings?.autoClose !== false;
+				const autoClose = directory.communityPrAutoClose;
 
 				const count = await this.processDirectory(directory, state, autoClose);
 				result.processed += count;
 
-				// Persist updated state to plugin metadata
-				await this.directoryPluginRepository.updateByDirectoryAndPlugin(
-					dirPlugin.directoryId,
-					'community-pr',
-					{ metadata: state as unknown as Record<string, unknown> },
-				);
+				// Persist updated state to directory
+				await this.directoryRepository.update(directory.id, { communityPrState: state });
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				const stack = error instanceof Error ? error.stack : undefined;
-				this.logger.error(`Failed to process directory ${dirPlugin.directoryId}: ${message}`, stack);
-				result.errors.push({ directoryId: dirPlugin.directoryId, error: message });
+				this.logger.error(`Failed to process directory ${directory.id}: ${message}`, stack);
+				result.errors.push({ directoryId: directory.id, error: message });
 			}
 		}
 
@@ -114,26 +96,16 @@ export class CommunityPrProcessorService {
 			return 0;
 		}
 
-		// If no state provided, load from plugin metadata
+		// If no state provided, load from directory entity
 		if (!state) {
-			const dirPlugin = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-				directory.id,
-				'community-pr',
-			);
-			const raw = dirPlugin?.metadata as Record<string, unknown> | undefined;
-			state = {
-				processedPrNumbers: Array.isArray(raw?.processedPrNumbers) ? (raw.processedPrNumbers as number[]) : [],
-				totalItemsAdded: (raw?.totalItemsAdded as number) || 0,
-				lastProcessedAt: (raw?.lastProcessedAt as string) || undefined,
-				lastError: (raw?.lastError as string) || null,
+			state = directory.communityPrState || {
+				processedPrNumbers: [],
+				totalItemsAdded: 0,
 			};
-			if (autoClose === undefined) {
-				autoClose = dirPlugin?.settings?.autoClose !== false;
-			}
 		}
 
 		if (autoClose === undefined) {
-			autoClose = true;
+			autoClose = directory.communityPrAutoClose;
 		}
 
 		const processedSet = new Set(state.processedPrNumbers);
@@ -171,12 +143,8 @@ export class CommunityPrProcessorService {
 		state.lastProcessedAt = new Date().toISOString();
 		state.totalItemsAdded = (state.totalItemsAdded || 0) + totalItemsAdded;
 
-		// Persist updated state to plugin metadata
-		await this.directoryPluginRepository.updateByDirectoryAndPlugin(
-			directory.id,
-			'community-pr',
-			{ metadata: state as unknown as Record<string, unknown> },
-		);
+		// Persist updated state to directory
+		await this.directoryRepository.update(directory.id, { communityPrState: state });
 
 		// Update directory itemsCount in the database
 		if (totalItemsAdded > 0) {
