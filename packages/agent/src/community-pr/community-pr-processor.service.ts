@@ -174,6 +174,14 @@ export class CommunityPrProcessorService {
 			{ metadata: state as unknown as Record<string, unknown> },
 		);
 
+		// Update directory itemsCount in the database
+		if (totalItemsAdded > 0) {
+			const currentCount = directory.itemsCount || 0;
+			await this.directoryRepository.update(directory.id, {
+				itemsCount: currentCount + totalItemsAdded,
+			});
+		}
+
 		return totalItemsAdded;
 	}
 
