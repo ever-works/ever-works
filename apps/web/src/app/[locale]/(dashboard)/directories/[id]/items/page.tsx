@@ -1,5 +1,5 @@
 import { directoryAPI } from '@/lib/api';
-import type { ItemData, Category, Tag } from '@/lib/api/types-only';
+import type { ItemData, Category, Collection, Tag } from '@/lib/api/types-only';
 import { ItemsPageClient } from '@/components/directories/detail/items/ItemsPageClient';
 import { ItemsEmptyState } from '@/components/directories/detail/items/ItemsEmptyState';
 
@@ -11,20 +11,24 @@ export default async function DirectoryItemsPage({ params }: Params) {
     let items: ItemData[] = [];
     let categories: Category[] = [];
     let tags: Tag[] = [];
+    let collections: Collection[] = [];
     let error: string | null = null;
 
     try {
         // Fetch items and taxonomy data in parallel
         const [itemsRes, taxonomyRes] = await Promise.all([
             directoryAPI.getItems(id).catch(() => ({ items: [] })),
-            directoryAPI.getCategoriesTags(id).catch(() => ({ categories: [], tags: [] })),
+            directoryAPI
+                .getCategoriesTags(id)
+                .catch(() => ({ categories: [], tags: [], collections: [] })),
         ]);
 
         items = itemsRes.items || [];
 
-        // Convert string arrays to Category/Tag objects if needed
+        // Convert string arrays to Category/Tag/Collection objects if needed
         const rawCategories = taxonomyRes.categories || [];
         const rawTags = taxonomyRes.tags || [];
+        const rawCollections = (taxonomyRes as any).collections || [];
 
         // Ensure categories have proper structure
         categories = rawCategories.map((cat: string | Category) => {
@@ -41,6 +45,14 @@ export default async function DirectoryItemsPage({ params }: Params) {
                 return { id: tag, name: tag };
             }
             return tag;
+        });
+
+        // Ensure collections have proper structure
+        collections = rawCollections.map((col: string | Collection) => {
+            if (typeof col === 'string') {
+                return { id: col, name: col };
+            }
+            return col;
         });
     } catch (err) {
         console.error('Failed to fetch items:', err);
@@ -59,5 +71,13 @@ export default async function DirectoryItemsPage({ params }: Params) {
         return <ItemsEmptyState directoryId={id} />;
     }
 
-    return <ItemsPageClient items={items} directoryId={id} categories={categories} tags={tags} />;
+    return (
+        <ItemsPageClient
+            items={items}
+            directoryId={id}
+            categories={categories}
+            tags={tags}
+            collections={collections}
+        />
+    );
 }

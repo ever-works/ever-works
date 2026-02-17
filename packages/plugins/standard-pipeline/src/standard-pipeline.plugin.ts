@@ -217,7 +217,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 				{ stepId: 'deduplication-and-data-aggregation', required: true },
 				{ stepId: 'domain-detection', required: true }
 			],
-			provides: ['finalItems', 'finalCategories', 'finalTags', 'finalBrands'],
+			provides: ['finalItems', 'finalCategories', 'finalTags', 'finalCollections', 'finalBrands'],
 			requires: ['aggregatedItems', 'domainAnalysis'],
 			optional: false,
 			parallelizable: false,
@@ -412,6 +412,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 			items: ctx.finalItems,
 			categories: ctx.finalCategories,
 			tags: ctx.finalTags,
+			collections: ctx.finalCollections,
 			brands: ctx.finalBrands,
 			duration: meta.duration,
 			stepsCompleted: meta.stepsCompleted,

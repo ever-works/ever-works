@@ -4,7 +4,7 @@ import * as yaml from 'yaml';
 import deepmerge from 'deepmerge';
 import { format } from 'date-fns';
 import semver from 'semver';
-import type { Category, ItemData, Tag } from '@ever-works/contracts';
+import type { Category, Collection, ItemData, Tag } from '@ever-works/contracts';
 import { CreateItemsGeneratorDto } from '../../items-generator/dto';
 
 export type PRUpdate = {
@@ -43,6 +43,7 @@ export interface SettingsConfig {
     categories_enabled?: boolean;
     companies_enabled?: boolean;
     tags_enabled?: boolean;
+    collections_enabled?: boolean;
     surveys_enabled?: boolean;
     header?: SettingsHeaderConfig;
     homepage?: SettingsHomepageConfig;
@@ -90,6 +91,7 @@ const DEFAULT_SETTINGS: SettingsConfig = {
     categories_enabled: true,
     companies_enabled: true,
     tags_enabled: true,
+    collections_enabled: true,
     surveys_enabled: true,
     header: {
         submit_enabled: true,
@@ -155,6 +157,7 @@ export class DataRepository {
         private readonly configPath: string,
         private categoriesPath: string,
         private readonly tagsPath: string,
+        private readonly collectionsPath: string,
         private readonly markdownTemplatePath: string,
         public readonly dataDir: string,
     ) {}
@@ -179,12 +182,14 @@ export class DataRepository {
 
         const categoriesPath = await this.getCollectionPath(dir, 'categories');
         const tagsPath = await this.getCollectionPath(dir, 'tags');
+        const collectionsPath = await this.getCollectionPath(dir, 'collections');
 
         const repo = new DataRepository(
             dir,
             path.join(dir, 'config.yml'),
             categoriesPath,
             tagsPath,
+            collectionsPath,
             path.join(dir, 'markdown'),
             path.join(dir, 'data'),
         );
@@ -192,7 +197,7 @@ export class DataRepository {
         return repo;
     }
 
-    private static async shouldeUseDir(dir: string, type: 'categories' | 'tags') {
+    private static async shouldeUseDir(dir: string, type: 'categories' | 'tags' | 'collections') {
         try {
             const dirpath = path.join(dir, type);
             const stat = await fs.stat(dirpath);
@@ -205,7 +210,7 @@ export class DataRepository {
         }
     }
 
-    private static async getCollectionPath(dir: string, type: 'categories' | 'tags') {
+    private static async getCollectionPath(dir: string, type: 'categories' | 'tags' | 'collections') {
         const useDir = await this.shouldeUseDir(dir, type);
         const collectionPath = useDir
             ? path.join(dir, type, `${type}.yml`)
@@ -418,6 +423,23 @@ export class DataRepository {
     async writeTags(tags: Tag[]) {
         const str = yaml.stringify(tags);
         await fs.writeFile(this.tagsPath, str, 'utf-8');
+    }
+
+    async getCollections(): Promise<Collection[]> {
+        try {
+            const collections = await fs.readFile(this.collectionsPath, 'utf-8');
+            return yaml.parse(collections) || [];
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return [];
+            }
+            throw err;
+        }
+    }
+
+    async writeCollections(collections: Collection[]) {
+        const str = yaml.stringify(collections);
+        await fs.writeFile(this.collectionsPath, str, 'utf-8');
     }
 
     async createItemDir(item: ItemData) {

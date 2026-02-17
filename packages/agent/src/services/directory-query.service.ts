@@ -347,7 +347,7 @@ export class DirectoryQueryService {
         const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);
 
         try {
-            const { categories, tags } = await this.dataGenerator.getCategoriesTags(
+            const { categories, tags, collections } = await this.dataGenerator.getCategoriesTags(
                 directory,
                 user,
             );
@@ -355,6 +355,7 @@ export class DirectoryQueryService {
                 status: 'success',
                 categories,
                 tags,
+                collections,
             };
         } catch (error) {
             if (error instanceof HttpException) {
@@ -368,6 +369,7 @@ export class DirectoryQueryService {
                     status: 'success',
                     categories: [],
                     tags: [],
+                    collections: [],
                 };
             }
 

@@ -4,7 +4,7 @@ import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities/user.entity';
 import { DataRepository, PRUpdate } from './data-repository';
 import { slugifyText } from '../../utils/text.utils';
-import type { Identifiable, ItemData, Category, Tag } from '@ever-works/contracts';
+import type { Identifiable, ItemData, Category, Collection, Tag } from '@ever-works/contracts';
 import {
     CreateItemsGeneratorDto,
     GenerationMethod,
@@ -100,6 +100,7 @@ export class DataGeneratorService {
             existingItems: [],
             existingCategories: [],
             existingTags: [],
+            existingCollections: [],
             existingConfig: null,
         };
 
@@ -153,11 +154,16 @@ export class DataGeneratorService {
             return { success: true, prUpdate: null, stats, warnings, hasExistingItems: existed };
         }
 
-        const { categories: newCategories, items: newItems, tags: newTags } = pipelineResult;
-        const { existingCategories, existingTags } = existingData;
+        const {
+            categories: newCategories,
+            items: newItems,
+            tags: newTags,
+            collections: newCollections,
+        } = pipelineResult;
+        const { existingCategories, existingTags, existingCollections } = existingData;
 
         this.logger.debug(
-            `Generated ${newCategories.length} categories, ${newItems.length} items, ${newTags.length} tags.`,
+            `Generated ${newCategories.length} categories, ${newItems.length} items, ${newTags.length} tags, ${newCollections.length} collections.`,
         );
 
         const description = `machine-readable data for ${directory.slug}`;
@@ -282,6 +288,7 @@ export class DataGeneratorService {
             const promises = [
                 data.writeCategories(this.merge(existingCategories, [...newCategories])),
                 data.writeTags(this.merge(existingTags, [...newTags])),
+                data.writeCollections(this.merge(existingCollections, [...newCollections])),
             ];
 
             const { title: prTitle, body: prBody } = this.getPRDetails(directory);
@@ -380,6 +387,7 @@ export class DataGeneratorService {
                     slug: slugifyText(item.slug || item.name),
                     category,
                     tags,
+                    collection: item.collection,
                     featured: item.featured,
                     order: item.order,
                     markdown: item.markdown,
@@ -637,11 +645,16 @@ export class DataGeneratorService {
     async getCategoriesTags(directory: Directory, user: User) {
         const data = await this.repositoryData(directory, user);
 
-        const [categories, tags] = await Promise.all([data.getCategories(), data.getTags()]);
+        const [categories, tags, collections] = await Promise.all([
+            data.getCategories(),
+            data.getTags(),
+            data.getCollections(),
+        ]);
 
         return {
             categories,
             tags,
+            collections,
         };
     }
 
@@ -694,6 +707,36 @@ export class DataGeneratorService {
 
         await this.gitFacade.addAll(directory.gitProvider, data.dir);
         await this.gitFacade.commit(directory.gitProvider, data.dir, 'update tags', committer);
+        await this.gitFacade.push(
+            { dir: dest },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
+        );
+    }
+
+    /**
+     * Save collections to the data repository and push changes
+     */
+    async saveCollections(directory: Directory, user: User, collections: Collection[]) {
+        const directoryOwner = this.getDirectoryOwner(directory);
+        const committer = user.asCommitter();
+        const repo = directory.getDataRepo();
+
+        const dest = await this.gitFacade.cloneOrPull(
+            { owner: directory.getRepoOwner(), repo, committer },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
+        );
+
+        const data = await DataRepository.create(dest);
+
+        await data.writeCollections(collections);
+
+        await this.gitFacade.addAll(directory.gitProvider, data.dir);
+        await this.gitFacade.commit(
+            directory.gitProvider,
+            data.dir,
+            'update collections',
+            committer,
+        );
         await this.gitFacade.push(
             { dir: dest },
             { userId: directoryOwner.id, providerId: directory.gitProvider },
@@ -879,6 +922,7 @@ export class DataGeneratorService {
             existingItems: ItemData[];
             existingCategories: Category[];
             existingTags: Tag[];
+            existingCollections: Collection[];
             existingConfig: any;
         },
         onProgress?: (progress: PipelineProgress) => void,
@@ -891,6 +935,7 @@ export class DataGeneratorService {
                 existingItems: [],
                 existingCategories: [],
                 existingTags: [],
+                existingCollections: [],
                 existingConfig: null,
             };
         }
@@ -927,6 +972,7 @@ export class DataGeneratorService {
             items: existing.existingItems ?? [],
             categories: existing.existingCategories ?? [],
             tags: existing.existingTags ?? [],
+            collections: existing.existingCollections ?? [],
             brands: [],
             existingConfig: existing.existingConfig,
         };
@@ -997,9 +1043,10 @@ export class DataGeneratorService {
             );
             const data = await DataRepository.create(dest);
 
-            const [categories, tags, existingItems, config] = await Promise.all([
+            const [categories, tags, collections, existingItems, config] = await Promise.all([
                 data.getCategories().catch(() => []),
                 data.getTags().catch(() => []),
+                data.getCollections().catch(() => []),
                 data.getItems().catch(() => []),
                 data.getConfig().catch(() => null),
             ]);
@@ -1008,6 +1055,7 @@ export class DataGeneratorService {
                 existingItems,
                 existingCategories: categories,
                 existingTags: tags,
+                existingCollections: collections,
                 existingConfig: config,
             };
         } catch {
@@ -1015,6 +1063,7 @@ export class DataGeneratorService {
                 existingItems: [],
                 existingCategories: [],
                 existingTags: [],
+                existingCollections: [],
                 existingConfig: null,
             };
         }
@@ -1091,6 +1140,7 @@ export class DataGeneratorService {
             items: ItemData[];
             categories: Identifiable[];
             tags: Identifiable[];
+            collections?: Identifiable[];
             config?: Record<string, any>;
             importRequest?: {
                 sourceUrl: string;
@@ -1128,12 +1178,15 @@ export class DataGeneratorService {
             const data = await DataRepository.create(dest);
             await data.ensureDirectoriesExist();
 
-            // Write categories and tags
+            // Write categories, tags, and collections
             if (importedData.categories.length > 0) {
                 await data.writeCategories(importedData.categories);
             }
             if (importedData.tags.length > 0) {
                 await data.writeTags(importedData.tags);
+            }
+            if (importedData.collections && importedData.collections.length > 0) {
+                await data.writeCollections(importedData.collections);
             }
 
             const initialCategories = importedData.categories.map((c) => c.id);
@@ -1244,6 +1297,7 @@ export class DataGeneratorService {
             items: ItemData[];
             categories: Identifiable[];
             tags: Identifiable[];
+            collections?: Identifiable[];
             config?: Record<string, any>;
         },
         options: {
@@ -1294,7 +1348,7 @@ export class DataGeneratorService {
                 await this.gitFacade.switchBranch(provider, dest, defaultBranch).catch(() => {});
             }
 
-            // Write categories and tags (merge)
+            // Write categories, tags, and collections (merge)
             if (importedData.categories.length > 0) {
                 const existingCategories = await data.getCategories().catch(() => []);
                 await data.writeCategories(this.merge(existingCategories, importedData.categories));
@@ -1302,6 +1356,12 @@ export class DataGeneratorService {
             if (importedData.tags.length > 0) {
                 const existingTags = await data.getTags().catch(() => []);
                 await data.writeTags(this.merge(existingTags, importedData.tags));
+            }
+            if (importedData.collections && importedData.collections.length > 0) {
+                const existingCollections = await data.getCollections().catch(() => []);
+                await data.writeCollections(
+                    this.merge(existingCollections, importedData.collections),
+                );
             }
 
             // Prepare items
