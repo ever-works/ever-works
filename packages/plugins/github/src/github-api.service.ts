@@ -524,7 +524,8 @@ export class GitHubApiService {
 		const { data } = await octokit.rest.pulls.listFiles({
 			owner,
 			repo,
-			pull_number: prNumber
+			pull_number: prNumber,
+			per_page: 100
 		});
 
 		return data.map((file) => ({

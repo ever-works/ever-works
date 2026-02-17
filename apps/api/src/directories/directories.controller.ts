@@ -7,6 +7,7 @@ import {
     HttpCode,
     HttpStatus,
     Inject,
+    NotFoundException,
     Param,
     Post,
     Put,
@@ -779,7 +780,7 @@ export class DirectoriesController {
         // Get full entity and check if community PR processing is enabled
         const directory = await this.directoryRepository.findById(id);
         if (!directory) {
-            throw new BadRequestException('Directory not found');
+            throw new NotFoundException('Directory not found');
         }
         if (!directory.communityPrEnabled) {
             throw new BadRequestException(

@@ -18,7 +18,7 @@ const extractedItemSchema = z.object({
         z.object({
             name: z.string(),
             description: z.string(),
-            source_url: z.string(),
+            source_url: z.string().url(),
             category: z.string(),
             tags: z.array(z.string()),
         }),
@@ -81,7 +81,7 @@ export class CommunityPrProcessorService {
         const openPRs = await this.gitFacade.listPullRequests(
             owner,
             mainRepo,
-            { state: 'open' },
+            { state: 'open', perPage: 100 },
             gitOptions,
         );
 
@@ -141,12 +141,9 @@ export class CommunityPrProcessorService {
         // Persist updated state to directory
         await this.directoryRepository.update(directory.id, { communityPrState: state });
 
-        // Update directory itemsCount in the database
+        // Atomically increment directory itemsCount
         if (totalItemsAdded > 0) {
-            const currentCount = directory.itemsCount || 0;
-            await this.directoryRepository.update(directory.id, {
-                itemsCount: currentCount + totalItemsAdded,
-            });
+            await this.directoryRepository.increment(directory.id, 'itemsCount', totalItemsAdded);
         }
 
         return totalItemsAdded;
