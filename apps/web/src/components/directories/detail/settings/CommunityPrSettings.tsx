@@ -15,10 +15,10 @@ export function CommunityPrSettings() {
     const { context } = useSettings();
     const { directory } = context;
     const router = useRouter();
-    const [isUpdating, setIsUpdating] = useState(false);
+    const [updatingField, setUpdatingField] = useState<'enabled' | 'autoClose' | null>(null);
 
     const handleToggleEnabled = async (enabled: boolean) => {
-        setIsUpdating(true);
+        setUpdatingField('enabled');
         try {
             const result = await updateCommunityPrSettings(directory.id, {
                 communityPrEnabled: enabled,
@@ -33,12 +33,12 @@ export function CommunityPrSettings() {
         } catch {
             toast.error(t('communityPrUpdateFailed'));
         } finally {
-            setIsUpdating(false);
+            setUpdatingField(null);
         }
     };
 
     const handleToggleAutoClose = async (autoClose: boolean) => {
-        setIsUpdating(true);
+        setUpdatingField('autoClose');
         try {
             const result = await updateCommunityPrSettings(directory.id, {
                 communityPrAutoClose: autoClose,
@@ -53,7 +53,7 @@ export function CommunityPrSettings() {
         } catch {
             toast.error(t('communityPrUpdateFailed'));
         } finally {
-            setIsUpdating(false);
+            setUpdatingField(null);
         }
     };
 
@@ -80,11 +80,13 @@ export function CommunityPrSettings() {
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        {isUpdating && <Loader2 className="h-4 w-4 animate-spin text-text-muted" />}
+                        {updatingField === 'enabled' && (
+                            <Loader2 className="h-4 w-4 animate-spin text-text-muted" />
+                        )}
                         <Switch
                             checked={directory.communityPrEnabled}
                             onChange={handleToggleEnabled}
-                            disabled={isUpdating}
+                            disabled={updatingField !== null}
                         />
                     </div>
                 </div>
@@ -100,13 +102,13 @@ export function CommunityPrSettings() {
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
-                            {isUpdating && (
+                            {updatingField === 'autoClose' && (
                                 <Loader2 className="h-4 w-4 animate-spin text-text-muted" />
                             )}
                             <Switch
                                 checked={directory.communityPrAutoClose}
                                 onChange={handleToggleAutoClose}
-                                disabled={isUpdating}
+                                disabled={updatingField !== null}
                             />
                         </div>
                     </div>

@@ -36,11 +36,11 @@ export function SettingsForm({ directory, user, initialRepositories }: SettingsF
                 {/* Repository Visibility Settings */}
                 <RepoVisibilitySettings initialRepositories={initialRepositories} />
 
-                {/* Advanced Prompts Settings */}
-                <AdvancedPromptsSettings directoryId={directory.id} />
-
                 {/* Community PR Processing Settings */}
                 <CommunityPrSettings />
+
+                {/* Advanced Prompts Settings */}
+                <AdvancedPromptsSettings directoryId={directory.id} />
 
                 {/* Website Configuration Settings */}
                 <WebsiteConfigSettings directoryId={directory.id} />
