@@ -56,6 +56,8 @@ export interface UpdateDirectoryDto {
     readmeConfig?: MarkdownReadmeConfig;
     websiteTemplateAutoUpdate?: boolean;
     websiteTemplateUseBeta?: boolean;
+    communityPrEnabled?: boolean;
+    communityPrAutoClose?: boolean;
 }
 
 export interface DeleteDirectoryDto {
@@ -144,6 +146,9 @@ export interface Directory {
     websiteTemplateLastError?: string | null;
     websiteTemplateLastUpdatedAt?: string | null;
     websiteTemplateLastCheckedAt?: string | null;
+    // Community PR Processing
+    communityPrEnabled?: boolean;
+    communityPrAutoClose?: boolean;
     // Import Source FIELDS
     sourceRepository?: SourceRepository;
     repoVisibility?: RepoVisibility;

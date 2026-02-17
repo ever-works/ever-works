@@ -6,6 +6,7 @@ import { MarkdownGeneratorModule } from '../generators/markdown-generator/markdo
 import { WebsiteGeneratorModule } from '../generators/website-generator/website-generator.module';
 import { DatabaseModule } from '../database/database.module';
 import { ImportModule } from '../import/import.module';
+import { CommunityPrModule } from '../community-pr/community-pr.module';
 import { DirectoryDetailService } from './directory-detail.service';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { DirectoryQueryService } from './directory-query.service';
@@ -41,6 +42,7 @@ import { NotificationsModule } from '@src/notifications';
         ImportModule,
         SubscriptionsModule,
         NotificationsModule,
+        CommunityPrModule,
     ],
     providers: [
         DirectoryOwnershipService,
@@ -73,6 +75,7 @@ import { NotificationsModule } from '@src/notifications';
         DirectoryTaxonomyService,
         RepositoryManagementService,
         GeneratorFormSchemaService,
+        CommunityPrModule,
     ],
 })
 export class DirectoryModule {}

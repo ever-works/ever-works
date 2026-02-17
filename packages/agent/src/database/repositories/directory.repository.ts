@@ -377,4 +377,14 @@ export class DirectoryRepository {
             relations: ['user'],
         });
     }
+
+    /**
+     * Find all directories with community PR processing enabled.
+     */
+    async findWithCommunityPrEnabled(): Promise<Directory[]> {
+        return this.repository.find({
+            where: { communityPrEnabled: true },
+            relations: ['user'],
+        });
+    }
 }

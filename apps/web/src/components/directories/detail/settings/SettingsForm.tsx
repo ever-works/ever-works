@@ -10,6 +10,7 @@ import { SettingsProvider } from './SettingsContext';
 import { ReadmeConfiguration } from './ReadmeConfiguration';
 import { RepoVisibilitySettings } from './RepoVisibilitySettings';
 import { AdvancedPromptsSettings } from './AdvancedPromptsSettings';
+import { CommunityPrSettings } from './CommunityPrSettings';
 import { WebsiteConfigSettings } from './WebsiteConfigSettings';
 interface SettingsFormProps {
     directory: Directory;
@@ -34,6 +35,9 @@ export function SettingsForm({ directory, user, initialRepositories }: SettingsF
 
                 {/* Repository Visibility Settings */}
                 <RepoVisibilitySettings initialRepositories={initialRepositories} />
+
+                {/* Community PR Processing Settings */}
+                <CommunityPrSettings />
 
                 {/* Advanced Prompts Settings */}
                 <AdvancedPromptsSettings directoryId={directory.id} />

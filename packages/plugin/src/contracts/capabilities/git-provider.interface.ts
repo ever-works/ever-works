@@ -142,6 +142,20 @@ export interface ListRepositoriesOptions {
 	type?: 'user' | 'org';
 }
 
+export interface GitPullRequestFile {
+	readonly filename: string;
+	readonly status: string;
+	readonly additions: number;
+	readonly deletions: number;
+	readonly patch?: string;
+}
+
+export interface ListPullRequestsOptions {
+	readonly state?: 'open' | 'closed' | 'all';
+	readonly perPage?: number;
+	readonly page?: number;
+}
+
 /**
  * Local git operations using isomorphic-git.
  * Implemented in BaseGitProvider - plugin developers extend that class.
@@ -233,6 +247,23 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		parentRepo: string,
 		token: string
 	): Promise<boolean>;
+
+	// Community PR operations
+	listPullRequests?(
+		owner: string,
+		repo: string,
+		options: ListPullRequestsOptions | undefined,
+		token: string
+	): Promise<GitPullRequest[]>;
+	getPullRequestFiles?(owner: string, repo: string, prNumber: number, token: string): Promise<GitPullRequestFile[]>;
+	createPullRequestComment?(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		body: string,
+		token: string
+	): Promise<{ id: number; body: string }>;
+	closePullRequest?(owner: string, repo: string, prNumber: number, token: string): Promise<GitPullRequest>;
 
 	// Utility
 	repositoryExists?(owner: string, repo: string, token: string): Promise<boolean>;

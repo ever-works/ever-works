@@ -41,4 +41,12 @@ export class UpdateDirectoryDto {
     @IsOptional()
     @IsBoolean()
     websiteTemplateUseBeta?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
+    communityPrEnabled?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
+    communityPrAutoClose?: boolean;
 }

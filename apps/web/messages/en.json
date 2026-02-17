@@ -1164,6 +1164,15 @@
                         }
                     }
                 },
+                "communityPrProcessing": "Community PR",
+                "communityPrEnableLabel": "Enable Community PR",
+                "communityPrEnableDescription": "Automatically process pull requests submitted by the community.",
+                "communityPrAutoCloseLabel": "Auto-close PRs after processing",
+                "communityPrAutoCloseDescription": "Automatically close community pull requests after they have been processed.",
+                "communityPrEnabled": "Community PR processing enabled",
+                "communityPrDisabled": "Community PR processing disabled",
+                "communityPrSettingsUpdated": "Community PR settings updated",
+                "communityPrUpdateFailed": "Failed to update community PR settings",
                 "websiteConfig": {
                     "title": "Website Configuration",
                     "subtitle": "Customize how your directory website looks and behaves",

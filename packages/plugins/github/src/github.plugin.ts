@@ -22,7 +22,9 @@ import type {
 	MergeResult,
 	ForkRepositoryOptions,
 	GitRepositoryWithPermissions,
+	GitPullRequestFile,
 	ListRepositoriesOptions,
+	ListPullRequestsOptions,
 	GitCloneOptions,
 	GitPushOptions,
 	GitCommitter,
@@ -255,6 +257,42 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 	): Promise<MergeResult> {
 		const settings = await this.getSettings();
 		return this.apiService.mergePullRequest(owner, repo, prNumber, options, token, settings.apiBaseUrl);
+	}
+
+	async listPullRequests(
+		owner: string,
+		repo: string,
+		options: ListPullRequestsOptions | undefined,
+		token: string
+	): Promise<GitPullRequest[]> {
+		const settings = await this.getSettings();
+		return this.apiService.listPullRequests(owner, repo, options, token, settings.apiBaseUrl);
+	}
+
+	async getPullRequestFiles(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string
+	): Promise<GitPullRequestFile[]> {
+		const settings = await this.getSettings();
+		return this.apiService.getPullRequestFiles(owner, repo, prNumber, token, settings.apiBaseUrl);
+	}
+
+	async createPullRequestComment(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		body: string,
+		token: string
+	): Promise<{ id: number; body: string }> {
+		const settings = await this.getSettings();
+		return this.apiService.createPullRequestComment(owner, repo, prNumber, body, token, settings.apiBaseUrl);
+	}
+
+	async closePullRequest(owner: string, repo: string, prNumber: number, token: string): Promise<GitPullRequest> {
+		const settings = await this.getSettings();
+		return this.apiService.closePullRequest(owner, repo, prNumber, token, settings.apiBaseUrl);
 	}
 
 	// Local git operations (via GitOperations)

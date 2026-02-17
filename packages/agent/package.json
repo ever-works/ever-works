@@ -83,6 +83,10 @@
         "./utils": {
             "types": "./dist/utils/index.d.ts",
             "default": "./dist/utils/index.js"
+        },
+        "./community-pr": {
+            "types": "./dist/community-pr/index.d.ts",
+            "default": "./dist/community-pr/index.js"
         }
     },
     "scripts": {
