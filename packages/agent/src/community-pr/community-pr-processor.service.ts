@@ -6,6 +6,7 @@ import { DirectoryRepository } from '../database/repositories/directory.reposito
 import type { Directory } from '../entities/directory.entity';
 import type { CommunityPrState } from '../entities/types';
 import type { GitPullRequest } from '@ever-works/plugin';
+import type { Category } from '@ever-works/contracts';
 import { slugifyText } from '../utils/text.utils';
 import { DataRepository } from '../generators/data-generator/data-repository';
 
@@ -23,8 +24,6 @@ const extractedItemSchema = z.object({
         }),
     ),
 });
-
-type ExtractedItems = z.infer<typeof extractedItemSchema>;
 
 export interface CommunityPrProcessingResult {
     processed: number;
@@ -201,7 +200,7 @@ export class CommunityPrProcessorService {
         const dest = await this.gitFacade.cloneOrPull({ owner, repo: dataRepo }, gitOptions);
 
         const data = await DataRepository.create(dest);
-        const categories = await data.getCategories().catch(() => []);
+        const categories = await data.getCategories().catch((): Category[] => []);
         const categoryNames = categories.map((c) => c.name).join(', ');
 
         // Extract items via AI
