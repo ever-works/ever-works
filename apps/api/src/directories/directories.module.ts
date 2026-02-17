@@ -1,4 +1,3 @@
-import { ScheduleModule } from '@nestjs/schedule';
 import { Module } from '@nestjs/common';
 import { DirectoryModule } from '@ever-works/agent/services';
 import { DatabaseModule } from '@ever-works/agent/database';
@@ -25,7 +24,6 @@ import { CommunityPrSchedulerService } from './tasks/community-pr-scheduler.serv
         TasksTriggerModule,
         WebsiteGeneratorModule,
         FacadesModule,
-        ScheduleModule.forRoot(),
     ],
     providers: [CacheEntryRepository, DirectoryCleanupService, WebsiteTemplateSchedulerService, CommunityPrSchedulerService],
     controllers: [DirectoriesController, MembersController],
