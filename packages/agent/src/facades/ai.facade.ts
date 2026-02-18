@@ -22,6 +22,8 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import { BaseFacadeService, FacadeError } from './base.facade';
+import { fetchOpenRouterModels, fuzzyMatchModel } from './openrouter-model-lookup';
+import type { OpenRouterModelEntry } from './openrouter-model-lookup';
 
 export class AiFacadeError extends FacadeError {
     constructor(message: string, operation: string, provider?: string, cause?: Error) {
@@ -34,6 +36,11 @@ export class AiFacadeError extends FacadeError {
 export class AiFacadeService extends BaseFacadeService implements IAiFacade {
     protected readonly logger = new Logger(AiFacadeService.name);
     protected readonly CAPABILITY = PLUGIN_CAPABILITIES.AI_PROVIDER;
+
+    private static readonly CACHE_TTL = 3_600_000; // 1 hour
+    private static readonly DEFAULT_CONTEXT = 128_000;
+    private openRouterModels: readonly OpenRouterModelEntry[] | null = null;
+    private openRouterCacheTime = 0;
 
     constructor(
         registry: PluginRegistryService,
@@ -344,6 +351,44 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                 complexModel: this.getSettingTyped<string>(settings, 'complexModel', 'string'),
             },
         };
+    }
+
+    async resolveModelContextLength(
+        modelId: string,
+        _facadeOptions: FacadeOptions,
+    ): Promise<number> {
+        try {
+            const models = await this.getCachedOpenRouterModels();
+            if (!models) return AiFacadeService.DEFAULT_CONTEXT;
+
+            const match = fuzzyMatchModel(modelId, models);
+            if (match?.context_length && match.context_length > 0) {
+                this.logger.debug(
+                    `Context length for "${modelId}": ${match.context_length} (matched "${match.id}")`,
+                );
+                return match.context_length;
+            }
+
+            return AiFacadeService.DEFAULT_CONTEXT;
+        } catch {
+            return AiFacadeService.DEFAULT_CONTEXT;
+        }
+    }
+
+    private async getCachedOpenRouterModels(): Promise<readonly OpenRouterModelEntry[] | null> {
+        const now = Date.now();
+        if (this.openRouterModels && now - this.openRouterCacheTime < AiFacadeService.CACHE_TTL) {
+            return this.openRouterModels;
+        }
+
+        const fresh = await fetchOpenRouterModels();
+        if (fresh) {
+            this.openRouterModels = fresh;
+            this.openRouterCacheTime = now;
+        }
+
+        // Stale-while-revalidate: return cached data if fresh fetch failed
+        return this.openRouterModels;
     }
 
     // Resolve model: modelOverride > complexity-based > defaultModel > plugin default

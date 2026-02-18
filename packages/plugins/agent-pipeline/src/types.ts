@@ -36,3 +36,13 @@ export const DEFAULT_MAX_STEPS = 500;
  * Maximum content length when extracting web pages (characters)
  */
 export const MAX_EXTRACT_CONTENT_LENGTH = 8000;
+
+/**
+ * Default maximum context window size in tokens for context compaction
+ */
+export const DEFAULT_MAX_CONTEXT_TOKENS = 128_000;
+
+/**
+ * Fraction of maxContextTokens at which compaction triggers (0-1)
+ */
+export const DEFAULT_CONTEXT_BUDGET_RATIO = 0.7;

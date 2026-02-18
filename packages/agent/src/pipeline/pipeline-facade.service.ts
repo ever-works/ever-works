@@ -147,6 +147,8 @@ export class PipelineFacadeService {
                 facade.getAvailableModels(boundFacadeOptions),
             getProviderConfig: (_facadeOptions: FacadeOptions) =>
                 facade.getProviderConfig(boundFacadeOptions),
+            resolveModelContextLength: (modelId: string, _facadeOptions: FacadeOptions) =>
+                facade.resolveModelContextLength(modelId, boundFacadeOptions),
         };
     }
 

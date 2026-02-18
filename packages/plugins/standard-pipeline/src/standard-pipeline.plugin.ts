@@ -300,7 +300,6 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 	// IPipelinePlugin methods
 	registerStepExecutor(stepId: BuiltInStepId, executor: IBuiltInStepExecutor): void {
 		this.stepExecutors.set(stepId, executor);
-		this.context?.logger.debug(`Registered executor for step: ${stepId}`);
 	}
 
 	registerStepExecutors(executors: Map<BuiltInStepId, IBuiltInStepExecutor>): void {

@@ -1016,8 +1016,9 @@ export class DirectoryGenerationService {
 
             generationStats = generated.stats;
             const newItemsCount = generated.stats?.newItemsCount ?? 0;
+            const updatedItemsCount = generated.stats?.updatedItemsCount ?? 0;
 
-            if (newItemsCount > 0) {
+            if (newItemsCount > 0 || updatedItemsCount > 0) {
                 await this.markdownGenerator.initialize(directory, user, {
                     generation_method: dto.generation_method,
                     pr_update: generated.prUpdate,

@@ -185,7 +185,7 @@ describe('SearchQueryGenerationStep', () => {
 
 			const call = mockExecContext.aiFacade.askJson.mock.calls[0];
 			expect(call[2].variables.date).toBeDefined();
-			expect(call[2].variables.date).toMatch(/\w+ \d{4}-\d{2}-\d{2}/);
+			expect(call[2].variables.date).toMatch(/\w+, \w+ \d{4}/);
 		});
 
 		it('should apply custom prompt when provided', async () => {

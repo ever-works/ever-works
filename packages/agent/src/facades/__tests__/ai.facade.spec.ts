@@ -807,6 +807,87 @@ describe('AiFacadeService', () => {
         });
     });
 
+    describe('resolveModelContextLength', () => {
+        const originalFetch = global.fetch;
+
+        afterEach(() => {
+            global.fetch = originalFetch;
+        });
+
+        const mockOpenRouterData = [
+            { id: 'openai/gpt-4o', context_length: 128000 },
+            { id: 'google/gemini-2.5-flash', context_length: 1048576 },
+            { id: 'qwen/qwen3-32b', context_length: 40960 },
+        ];
+
+        it('should return context length when OpenRouter match found', async () => {
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                json: () => Promise.resolve({ data: mockOpenRouterData }),
+            });
+
+            const result = await service.resolveModelContextLength('gpt-4o', defaultFacadeOptions);
+            expect(result).toBe(128000);
+        });
+
+        it('should return context length for fuzzy base-name match', async () => {
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                json: () => Promise.resolve({ data: mockOpenRouterData }),
+            });
+
+            const result = await service.resolveModelContextLength(
+                'models/gemini-2.5-flash',
+                defaultFacadeOptions,
+            );
+            expect(result).toBe(1048576);
+        });
+
+        it('should fall back to 128K when no match found', async () => {
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                json: () => Promise.resolve({ data: mockOpenRouterData }),
+            });
+
+            const result = await service.resolveModelContextLength(
+                'nonexistent-model',
+                defaultFacadeOptions,
+            );
+            expect(result).toBe(128_000);
+        });
+
+        it('should fall back to 128K when fetch fails', async () => {
+            global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
+
+            const result = await service.resolveModelContextLength('gpt-4o', defaultFacadeOptions);
+            expect(result).toBe(128_000);
+        });
+
+        it('should cache OpenRouter response (second call does not refetch)', async () => {
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                json: () => Promise.resolve({ data: mockOpenRouterData }),
+            });
+
+            await service.resolveModelContextLength('gpt-4o', defaultFacadeOptions);
+            await service.resolveModelContextLength('qwen3-32b', defaultFacadeOptions);
+
+            expect(global.fetch).toHaveBeenCalledTimes(1);
+        });
+
+        it('should never throw even on unexpected errors', async () => {
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                json: () => {
+                    throw new Error('Parse explosion');
+                },
+            });
+
+            const result = await service.resolveModelContextLength('gpt-4o', defaultFacadeOptions);
+            expect(result).toBe(128_000);
+        });
+    });
+
     describe('getAvailableModels', () => {
         it('should return models from AI provider', async () => {
             const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');

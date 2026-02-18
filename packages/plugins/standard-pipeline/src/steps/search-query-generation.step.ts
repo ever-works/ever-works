@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { StepExecutionContext, FacadeOptions } from '@ever-works/plugin';
+import { getCurrentDateString } from '@ever-works/plugin';
 import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { getErrorStack } from '../utils/error.utils.js';
@@ -93,8 +94,7 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 			return this.generateFallbackQueries(name, targetKeywords, maxSearchQueries);
 		}
 
-		const now = new Date();
-		const dateStr = `${this.getDayName(now)} ${this.formatDate(now)}`;
+		const dateStr = getCurrentDateString();
 
 		const finalPrompt = appendCustomPrompt(SEARCH_QUERY_PROMPT, customPrompt);
 
@@ -158,25 +158,5 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 			);
 		}
 		return [...new Set(fallbackQueries)].slice(0, maxSearchQueries);
-	}
-
-	/**
-	 * Get day name from date
-	 */
-	private getDayName(date: Date): string {
-		const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-		return days[date.getDay()];
-	}
-
-	/**
-	 * Format date as yyyy-MM-dd HH:mm
-	 */
-	private formatDate(date: Date): string {
-		const year = date.getFullYear();
-		const month = String(date.getMonth() + 1).padStart(2, '0');
-		const day = String(date.getDate()).padStart(2, '0');
-		const hours = String(date.getHours()).padStart(2, '0');
-		const minutes = String(date.getMinutes()).padStart(2, '0');
-		return `${year}-${month}-${day} ${hours}:${minutes}`;
 	}
 }
