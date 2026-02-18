@@ -28,7 +28,7 @@ export default async function DirectoryItemsPage({ params }: Params) {
         // Convert string arrays to Category/Tag/Collection objects if needed
         const rawCategories = taxonomyRes.categories || [];
         const rawTags = taxonomyRes.tags || [];
-        const rawCollections = (taxonomyRes as any).collections || [];
+        const rawCollections = taxonomyRes.collections || [];
 
         // Ensure categories have proper structure
         categories = rawCategories.map((cat: string | Category) => {

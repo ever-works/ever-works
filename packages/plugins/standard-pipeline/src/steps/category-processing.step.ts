@@ -160,7 +160,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 			return context;
 		}
 
-		const { categories, tags, brands, finalItems } = await this.processCategoriesAndTags(
+		const { categories, tags, collections, brands, finalItems } = await this.processCategoriesAndTags(
 			directory.slug,
 			request.prompt || '',
 			allPriorityCategories,
@@ -174,6 +174,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 			advancedPrompts?.categorization,
 			generateCategories,
 			generateTags,
+			generateCollections,
 			generateBrands,
 			execContext
 		);
@@ -183,7 +184,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 		context.finalItems = finalItems;
 		context.finalCategories = categories;
 		context.finalTags = tags;
-		context.finalCollections = generateCollections ? this.extractUniqueCollections(finalItems) : [];
+		context.finalCollections = collections;
 		context.finalBrands = brands;
 
 		return context;
@@ -206,11 +207,13 @@ export class CategoryProcessingStep extends BasePipelineStep {
 		customPrompt: string | null | undefined,
 		generateCategories: boolean,
 		generateTags: boolean,
+		generateCollections: boolean,
 		generateBrands: boolean,
 		execContext: StepExecutionContext
 	): Promise<{
 		categories: Category[];
 		tags: Tag[];
+		collections: Collection[];
 		brands: Brand[];
 		finalItems: MutableItemData[];
 	}> {
@@ -223,7 +226,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 
 		if (!extractedItems || extractedItems.length === 0) {
 			logger.log(`[${directorySlug}] No items to categorize`);
-			return { finalItems: [], categories: [], tags: [], brands: [] };
+			return { finalItems: [], categories: [], tags: [], collections: [], brands: [] };
 		}
 
 		// Convert existing categories and tags to sets for easy lookup
@@ -269,6 +272,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 			// Extract unique categories and tags based on toggle settings
 			let categories: Category[];
 			let tags: Tag[];
+			let collections: Collection[];
 			let brands: Brand[];
 
 			if (generateCategories) {
@@ -292,6 +296,16 @@ export class CategoryProcessingStep extends BasePipelineStep {
 				})) as MutableItemData[];
 			}
 
+			if (generateCollections) {
+				collections = this.extractUniqueCollections(categorized);
+			} else {
+				collections = [];
+				categorized = categorized.map((item) => ({
+					...item,
+					collection: undefined
+				})) as MutableItemData[];
+			}
+
 			if (generateBrands) {
 				brands = this.extractUniqueBrands(categorized, existingBrands);
 			} else {
@@ -309,10 +323,10 @@ export class CategoryProcessingStep extends BasePipelineStep {
 			// Calculate processing time
 			const processingTime = (Date.now() - startTime) / 1000;
 			logger.log(
-				`[${directorySlug}] Category processing complete in ${processingTime.toFixed(2)}s. Found ${categories.length} categories and ${tags.length} tags.`
+				`[${directorySlug}] Category processing complete in ${processingTime.toFixed(2)}s. Found ${categories.length} categories, ${tags.length} tags, ${collections.length} collections.`
 			);
 
-			return { finalItems, categories, tags, brands };
+			return { finalItems, categories, tags, collections, brands };
 		} catch (error) {
 			logger.error(
 				`[${directorySlug}] Error during category processing: ${this.formatError(error)}`,
@@ -332,6 +346,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 				finalItems,
 				categories: [defaultCategory],
 				tags: [],
+				collections: [],
 				brands: []
 			};
 		}
