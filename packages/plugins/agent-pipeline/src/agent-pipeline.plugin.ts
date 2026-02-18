@@ -519,11 +519,13 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 					? ` Errors: ${processUrlFailures.sampleErrors.join('; ')}`
 					: '';
 
-			warnings.push(
-				`URL processing had failures (${processUrlFailures.failedUrls}/${processUrlFailures.totalUrls} URLs failed). ` +
-					'Some relevant items may be missing.' +
-					samples
-			);
+			if (processUrlFailures.failedUrls === processUrlFailures.totalUrls) {
+				warnings.push(
+					`URL processing had failures (${processUrlFailures.failedUrls}/${processUrlFailures.totalUrls} URLs failed). ` +
+						'Some relevant items may be missing.' +
+						samples
+				);
+			}
 		}
 
 		if (warnings.length > 0) {

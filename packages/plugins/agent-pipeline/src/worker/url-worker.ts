@@ -114,19 +114,20 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 
 		const validateItemJsonTool = createValidateItemJsonTool(sandbox, '/');
 
-		const wrappedModel = wrapReasoningFilteredModel(workerModel);
+		// const wrappedModel = wrapReasoningFilteredModel(workerModel);
 
 		const systemPrompt = buildWorkerSystemPrompt(directoryContext);
-		const repairToolCall = createToolCallRepairFn(wrappedModel, logger);
+		const repairToolCall = createToolCallRepairFn(workerModel, logger);
 
 		for (const chunk of chunks) {
 			if (signal?.aborted) break;
 			try {
 				await withToolCallingRetry(
-					() =>
-						generateText({
-							model: wrappedModel,
+					() => {
+						return generateText({
+							model: workerModel,
 							system: systemPrompt,
+							timeout: 5 * 60 * 1000, // 5 min per chunk
 							prompt: buildChunkUserPrompt(
 								chunk,
 								url,
@@ -149,7 +150,8 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 							abortSignal: signal,
 							experimental_repairToolCall: repairToolCall,
 							experimental_telemetry: { isEnabled: true }
-						}),
+						});
+					},
 					{ providerName: 'worker', modelName: 'url-worker', signal, logger }
 				);
 			} catch (err) {
@@ -159,7 +161,9 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 			}
 		}
 
-		if (createdFiles.length === 0) return { url, files: [], count: 0, error: 'No items extracted' };
+		if (createdFiles.length === 0) {
+			return { url, files: [], count: 0, error: 'No items extracted' };
+		}
 
 		logger.log(`Worker: created ${createdFiles.length} items from ${url}`);
 		return { url, files: createdFiles, count: createdFiles.length };

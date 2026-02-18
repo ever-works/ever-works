@@ -64,18 +64,22 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 				signal: ctx.signal
 			};
 
-			const results = await Promise.allSettled(urls.map((url) => processUrlWorker(url, workerCtx)));
+			const mapper = async (url: string) => {
+				try {
+					return await processUrlWorker(url, workerCtx);
+				} catch (error) {
+					return {
+						url,
+						files: [],
+						count: 0,
+						error: error instanceof Error ? error.message : String(error)
+					};
+				}
+			};
 
-			return results.map((r, i) =>
-				r.status === 'fulfilled'
-					? r.value
-					: {
-							url: urls[i],
-							files: [],
-							count: 0,
-							error: r.reason instanceof Error ? r.reason.message : String(r.reason)
-						}
-			);
+			const pMap = (await import('p-map')).default;
+
+			return pMap(urls, mapper, { concurrency: 2 });
 		}
 	});
 

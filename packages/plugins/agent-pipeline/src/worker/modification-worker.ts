@@ -60,14 +60,14 @@ export async function processModification(
 		});
 		const validateItemJsonTool = createValidateItemJsonTool(sandbox, '/');
 
-		const wrappedModel = wrapReasoningFilteredModel(model);
+		// const wrappedModel = wrapReasoningFilteredModel(model);
 
-		const repairToolCall = createToolCallRepairFn(wrappedModel, logger);
+		const repairToolCall = createToolCallRepairFn(model, logger);
 
 		await withToolCallingRetry(
 			() => {
 				return generateText({
-					model: wrappedModel,
+					model,
 					system: buildModificationSystemPrompt(),
 					prompt: instructions,
 					tools: {
