@@ -246,6 +246,7 @@ export class DirectoryQueryService {
             company_name?: string;
             company_website?: string;
             categories_enabled?: boolean;
+            collections_enabled?: boolean;
             companies_enabled?: boolean;
             tags_enabled?: boolean;
             surveys_enabled?: boolean;

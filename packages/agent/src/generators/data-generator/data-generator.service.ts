@@ -792,6 +792,7 @@ export class DataGeneratorService {
         user: User,
         settings: {
             categories_enabled?: boolean;
+            collections_enabled?: boolean;
             companies_enabled?: boolean;
             tags_enabled?: boolean;
             surveys_enabled?: boolean;
