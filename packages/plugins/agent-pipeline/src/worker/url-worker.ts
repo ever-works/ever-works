@@ -58,6 +58,7 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 		const extracted = await contentExtractorFacade.extractContent(url, undefined, facadeOptions).catch((err) => {
 			const errMsg = err instanceof Error ? err.message : String(err);
 			logger.warn(`Worker: content extraction failed for ${url}: ${errMsg}`);
+			// Record failure in breaker but don't throw, allowing for graceful degradation if extraction fails
 			breaker.recordFailure('contentExtractor', errMsg);
 			return null;
 		});
@@ -65,6 +66,9 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 		if (!extracted?.rawContent) {
 			return { url, files: [], count: 0, error: 'Failed to extract content from URL' };
 		}
+
+		// Content extraction succeeded, reset breaker and proceed with processing
+		breaker.recordSuccess('contentExtractor');
 
 		logger.log(`Worker: extracted ${extracted.rawContent.length} chars from ${url}`);
 
