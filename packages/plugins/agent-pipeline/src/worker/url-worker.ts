@@ -18,6 +18,7 @@ import {
 	MIN_CHUNK_CHARS,
 	DEFAULT_CONTEXT_BUDGET_RATIO
 } from '../types.js';
+import { ToolCircuitBreaker } from '../utils/tool-circuit-breaker.js';
 
 export interface UrlWorkerContext {
 	workerModel: LanguageModelV3;
@@ -27,6 +28,7 @@ export interface UrlWorkerContext {
 	directoryContext: WorkerPromptOptions;
 	workspacePath: string;
 	logger: PluginLogger;
+	breaker: ToolCircuitBreaker;
 	signal?: AbortSignal;
 }
 
@@ -45,6 +47,7 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 		facadeOptions,
 		directoryContext,
 		workspacePath,
+		breaker,
 		logger,
 		signal
 	} = ctx;
@@ -52,7 +55,13 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 	try {
 		if (signal?.aborted) return { url, files: [], count: 0, error: 'Aborted' };
 
-		const extracted = await contentExtractorFacade.extractContent(url, undefined, facadeOptions);
+		const extracted = await contentExtractorFacade.extractContent(url, undefined, facadeOptions).catch((err) => {
+			const errMsg = err instanceof Error ? err.message : String(err);
+			logger.warn(`Worker: content extraction failed for ${url}: ${errMsg}`);
+			breaker.recordFailure('contentExtractor', errMsg);
+			return null;
+		});
+
 		if (!extracted?.rawContent) {
 			return { url, files: [], count: 0, error: 'Failed to extract content from URL' };
 		}

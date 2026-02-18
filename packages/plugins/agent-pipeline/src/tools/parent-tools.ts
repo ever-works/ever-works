@@ -60,6 +60,7 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 				facadeOptions: ctx.facadeOptions,
 				directoryContext: ctx.directoryContext,
 				workspacePath: ctx.workspacePath,
+				breaker,
 				logger: ctx.logger,
 				signal: ctx.signal
 			};
