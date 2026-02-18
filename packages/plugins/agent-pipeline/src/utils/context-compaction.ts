@@ -3,7 +3,7 @@ import type { ModelMessage } from 'ai';
 import type { PluginLogger } from '@ever-works/plugin';
 
 /** Tools whose results must never be compacted or truncated */
-const PROTECTED_TOOLS = new Set(['createFile', 'updateFile', 'reportProgress']);
+const PROTECTED_TOOLS = new Set(['createFile', 'updateFile', 'validateItemJson', 'reportProgress']);
 
 /** Number of recent assistant/tool pairs to protect from compaction */
 const RECENT_PAIRS_TO_KEEP = 10;
@@ -66,6 +66,7 @@ function getOutputValue(output: ToolResultPart['output']): unknown {
 function compactResultPart(part: ToolResultPart, args?: Record<string, unknown>): ToolResultPart {
 	let summary: string;
 
+	// Covers both parent orchestrator and modification worker tools.
 	switch (part.toolName) {
 		case 'search': {
 			const query = args?.query ?? 'unknown';
@@ -101,6 +102,37 @@ function compactResultPart(part: ToolResultPart, args?: Record<string, unknown>)
 				summary = obj.valid ? `${path}: valid` : `${path}: ${obj.error ?? 'invalid'}`;
 			} else {
 				summary = `${path}: validated`;
+			}
+			break;
+		}
+		case 'processUrls': {
+			const value = getOutputValue(part.output);
+			if (Array.isArray(value)) {
+				const totalItems = value.reduce((sum: number, r: { count?: number }) => sum + (r?.count ?? 0), 0);
+				summary = `Processed ${value.length} URLs -> ${totalItems} items`;
+			} else {
+				summary = 'Processed URLs';
+			}
+			break;
+		}
+		case 'modifyItems': {
+			const value = getOutputValue(part.output);
+			if (typeof value === 'object' && value !== null) {
+				const obj = value as Record<string, unknown>;
+				summary = `Modified ${obj.count ?? '?'} files`;
+			} else {
+				summary = 'Modified items';
+			}
+			break;
+		}
+		case 'getWorkspaceOverview': {
+			const value = getOutputValue(part.output);
+			if (typeof value === 'object' && value !== null) {
+				const obj = value as Record<string, unknown>;
+				const cats = Array.isArray(obj.categories) ? obj.categories.length : '?';
+				summary = `Workspace: ${obj.totalItems ?? '?'} items, ${cats} categories`;
+			} else {
+				summary = 'Workspace overview';
 			}
 			break;
 		}

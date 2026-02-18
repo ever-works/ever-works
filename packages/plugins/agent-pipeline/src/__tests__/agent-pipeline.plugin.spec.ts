@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AgentPipelinePlugin } from '../agent-pipeline.plugin';
-import type { PluginContext, DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
+import type {
+	PluginContext,
+	DirectoryReference,
+	GenerationRequest,
+	ExistingItems,
+	MutableItemData
+} from '@ever-works/plugin';
 
 describe('AgentPipelinePlugin', () => {
 	let plugin: AgentPipelinePlugin;
@@ -214,6 +220,62 @@ describe('AgentPipelinePlugin', () => {
 
 			expect(result.success).toBe(false);
 			expect(String(result.error)).toContain('User ID');
+		});
+	});
+
+	describe('dedup helpers', () => {
+		it('deduplicates generated items by normalized source_url', () => {
+			const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+			const items = [
+				{
+					name: 'Tool A',
+					description: 'A',
+					source_url: 'https://example.com/tool/',
+					category: 'Cat'
+				},
+				{
+					name: 'Tool A Mirror',
+					description: 'A',
+					source_url: 'https://example.com/tool',
+					category: 'Cat'
+				}
+			] as unknown as MutableItemData[];
+
+			const deduped = (plugin as any).deduplicateGeneratedItems(items, logger);
+			expect(deduped).toHaveLength(1);
+			expect(logger.log).toHaveBeenCalledWith(expect.stringContaining('Deduplicated generated items'));
+		});
+
+		it('deduplicates by normalized name when URL is missing', () => {
+			const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+			const items = [
+				{ name: '  Tool B  ', description: 'B', source_url: '', category: 'Cat' },
+				{ name: 'tool b', description: 'B', category: 'Cat' }
+			] as unknown as MutableItemData[];
+
+			const deduped = (plugin as any).deduplicateGeneratedItems(items, logger);
+			expect(deduped).toHaveLength(1);
+		});
+
+		it('collects processUrls failures from tool results', () => {
+			const steps = [
+				{
+					toolResults: [
+						{
+							toolName: 'processUrls',
+							output: [
+								{ url: 'https://a.com', files: ['a.json'], count: 1 },
+								{ url: 'https://b.com', files: [], count: 0, error: 'timeout' }
+							]
+						}
+					]
+				}
+			];
+
+			const summary = (plugin as any).collectProcessUrlFailures(steps);
+			expect(summary.totalUrls).toBe(2);
+			expect(summary.failedUrls).toBe(1);
+			expect(summary.sampleErrors).toContain('timeout');
 		});
 	});
 
