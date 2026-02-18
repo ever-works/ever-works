@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as yaml from 'yaml';
-import deepmerge from 'deepmerge';
+import mergeWith from 'lodash/mergeWith';
 import { format } from 'date-fns';
 import semver from 'semver';
 import type { Category, ItemData, Tag } from '@ever-works/contracts';
@@ -136,8 +136,50 @@ const DEFAULT_DATA_CONFIG: IDataConfig = {
     custom_menu: DEFAULT_CUSTOM_MENU,
 };
 
+const getMergeArrayItemKey = (value: unknown): string => {
+    if (value === null) return 'null';
+    const valueType = typeof value;
+    if (valueType === 'string') return `s:${value}`;
+    if (valueType === 'number') return `n:${value}`;
+    if (valueType === 'boolean') return `b:${value}`;
+    if (valueType === 'undefined') return 'u:undefined';
+    if (valueType === 'bigint') return `bi:${String(value)}`;
+    if (valueType === 'symbol') return `sym:${String(value)}`;
+    if (valueType === 'function') return `fn:${String(value)}`;
+
+    try {
+        return `o:${JSON.stringify(value)}`;
+    } catch {
+        return `o:${String(value)}`;
+    }
+};
+
+const mergeUniqueArray = (existing: unknown[], incoming: unknown[]): unknown[] => {
+    const merged = [...existing];
+    const seen = new Set(merged.map((entry) => getMergeArrayItemKey(entry)));
+
+    for (const entry of incoming) {
+        const key = getMergeArrayItemKey(entry);
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        merged.push(entry);
+    }
+
+    return merged;
+};
+
+const mergeDataConfig = (base: IDataConfig, incoming: Partial<IDataConfig>): IDataConfig =>
+    mergeWith({}, base, incoming, (objValue, srcValue) => {
+        if (Array.isArray(objValue) && Array.isArray(srcValue)) {
+            return mergeUniqueArray(objValue, srcValue);
+        }
+        return undefined;
+    });
+
 const createDefaultConfig = (overrides: Partial<IDataConfig> = {}): IDataConfig =>
-    deepmerge(
+    mergeDataConfig(
         {
             ...DEFAULT_DATA_CONFIG,
             // ensure dynamic defaults (like year) are refreshed per call
@@ -363,7 +405,7 @@ export class DataRepository {
 
     async mergeConfig(config: IDataConfig) {
         const currentConfig = await this.getConfig();
-        await this.writeConfig(deepmerge(currentConfig, config));
+        await this.writeConfig(mergeDataConfig(currentConfig, config));
     }
 
     async writeConfig(config: IDataConfig) {
