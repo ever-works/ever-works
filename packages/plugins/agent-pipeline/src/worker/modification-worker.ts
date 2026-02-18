@@ -1,12 +1,13 @@
-import { generateText, stepCountIs, tool, wrapLanguageModel } from 'ai';
+import { generateText, stepCountIs } from 'ai';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
-import { z } from 'zod';
 import type { PluginLogger } from '@ever-works/plugin';
 import { getCurrentDateString, ITEM_SCHEMA_PROMPT_TEXT } from '@ever-works/plugin';
 
 import { createUpdateFileTool } from '../tools/file-tools.js';
 import { createValidateItemJsonTool } from '../tools/validate-json-tools.js';
 import { createPrepareStep } from '../utils/context-compaction.js';
+import { wrapReasoningFilteredModel } from '../utils/model-wrapper.js';
+import { createToolCallRepairFn, withToolCallingRetry } from '../utils/tool-call-resilience.js';
 import { DEFAULT_CONTEXT_BUDGET_RATIO } from '../types.js';
 
 export interface ModificationWorkerContext {
@@ -41,8 +42,6 @@ export async function processModification(
 		const bashInstance = new Bash({ fs });
 		const { tools: bashTools } = await createBashTool({ sandbox: bashInstance, destination: '/' });
 
-		const modifiedFiles: string[] = [];
-
 		const sandbox = {
 			readFile: (p: string) => fs.readFile(p),
 			writeFiles: (files: Array<{ path: string; content: string }>) => {
@@ -50,47 +49,47 @@ export async function processModification(
 			}
 		};
 
+		const modifiedFiles: string[] = [];
+
 		const updateFileTool = createUpdateFileTool(sandbox, '/', {
 			onUpdated: async (path) => {
-				if (!modifiedFiles.includes(path)) modifiedFiles.push(path);
+				if (!modifiedFiles.includes(path)) {
+					modifiedFiles.push(path);
+				}
 			}
 		});
 		const validateItemJsonTool = createValidateItemJsonTool(sandbox, '/');
 
-		const wrappedModel = wrapLanguageModel({
-			model,
-			middleware: {
-				specificationVersion: 'v3',
-				transformParams: async ({ params }) => ({
-					...params,
-					prompt: params.prompt.map((msg) =>
-						msg.role === 'assistant'
-							? { ...msg, content: msg.content.filter((part) => part.type !== 'reasoning') }
-							: msg
-					)
-				})
-			}
-		});
+		const wrappedModel = wrapReasoningFilteredModel(model);
 
-		await generateText({
-			model: wrappedModel,
-			system: buildModificationSystemPrompt(),
-			prompt: instructions,
-			tools: {
-				bash: bashTools.bash,
-				readFile: bashTools.readFile,
-				updateFile: updateFileTool,
-				validateItemJson: validateItemJsonTool
-			} as Parameters<typeof generateText>[0]['tools'],
-			stopWhen: stepCountIs(200),
-			prepareStep: createPrepareStep({
-				maxContextTokens,
-				budgetRatio: DEFAULT_CONTEXT_BUDGET_RATIO,
-				maxSingleOutputChars: Math.floor(maxContextTokens * 0.1 * 4),
-				logger
-			}),
-			abortSignal: signal
-		});
+		const repairToolCall = createToolCallRepairFn(wrappedModel, logger);
+
+		await withToolCallingRetry(
+			() => {
+				return generateText({
+					model: wrappedModel,
+					system: buildModificationSystemPrompt(),
+					prompt: instructions,
+					tools: {
+						bash: bashTools.bash,
+						readFile: bashTools.readFile,
+						updateFile: updateFileTool,
+						validateItemJson: validateItemJsonTool
+					} as Parameters<typeof generateText>[0]['tools'],
+					stopWhen: stepCountIs(200),
+					prepareStep: createPrepareStep({
+						maxContextTokens,
+						budgetRatio: DEFAULT_CONTEXT_BUDGET_RATIO,
+						maxSingleOutputChars: Math.floor(maxContextTokens * 0.1 * 4),
+						logger
+					}),
+					abortSignal: signal,
+					experimental_repairToolCall: repairToolCall,
+					experimental_telemetry: { isEnabled: true }
+				});
+			},
+			{ providerName: 'worker', modelName: 'modification-worker', signal, logger }
+		);
 
 		logger.log(`Modification worker: ${modifiedFiles.length} files modified`);
 		return { modifiedFiles, count: modifiedFiles.length };
@@ -106,11 +105,10 @@ function buildModificationSystemPrompt(): string {
 		`You are a directory item modifier. Today is ${getCurrentDateString()}.`,
 		'',
 		'## Tools',
-		'- `bash` — Run commands to list files, search content',
+		'- `bash` — Run targeted search commands to find items. NEVER `ls *.json` — workspaces can have thousands of files.',
 		'- `readFile` — Read a workspace file',
 		'- `updateFile` — Update an existing file',
 		'- `validateItemJson` — Validate and auto-repair JSON after each update',
-		'- `reportProgress` — Report progress',
 		'',
 		`## Item JSON Schema\n\n${ITEM_SCHEMA_PROMPT_TEXT}`,
 		'',
@@ -127,13 +125,16 @@ function buildModificationSystemPrompt(): string {
 		'- Include Pricing section when applicable.',
 		'',
 		'## Workflow',
-		'1. `ls *.json` to list items',
-		'2. Read `_meta/categories.json`, `_meta/tags.json` for current taxonomy',
-		'3. `readFile` to inspect items needing changes',
-		'4. `updateFile` to apply modifications',
-		'5. Immediately run `validateItemJson` after each `updateFile`',
-		'6. If validation repaired formatting, confirm the intended semantic change still exists',
-		'7. `reportProgress` to report status',
+		'1. Read `_meta/categories.json`, `_meta/tags.json` for current taxonomy.',
+		'2. Find items to modify using case-insensitive, partial-match searches:',
+		'   - `grep -rli "keyword" --include="*.json" .` (case-insensitive, recursive, safe for large workspaces)',
+		'   - Try multiple keyword variations (partial words, synonyms, abbreviations) to catch fuzzy matches.',
+		'   - Example: searching for "machine learning" items — try `grep -rli "machine.learn" --include="*.json" .`, then `grep -rli "\\bml\\b" --include="*.json" .`',
+		'   - NEVER use bare `ls *.json` or `grep ... *.json` — glob expansion fails with thousands of files.',
+		'3. `readFile` to inspect matched items.',
+		'4. `updateFile` to apply modifications.',
+		'5. Run `validateItemJson` after each `updateFile`.',
+		'6. If validation repaired formatting, verify the intended change is still present.',
 		'',
 		'## Rules',
 		'- Only modify as instructed',

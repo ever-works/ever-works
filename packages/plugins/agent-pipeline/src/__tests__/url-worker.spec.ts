@@ -45,6 +45,11 @@ vi.mock('../utils/context-compaction', () => ({
 	createPrepareStep: vi.fn().mockReturnValue(() => undefined)
 }));
 
+vi.mock('../utils/tool-call-resilience', () => ({
+	createToolCallRepairFn: vi.fn().mockReturnValue(() => null),
+	withToolCallingRetry: vi.fn().mockImplementation((fn) => fn())
+}));
+
 vi.mock('../tools/file-tools', () => ({
 	createCreateFileTool: vi.fn().mockReturnValue({ type: 'createFile-tool' }),
 	createUpdateFileTool: vi.fn().mockReturnValue({ type: 'updateFile-tool' })

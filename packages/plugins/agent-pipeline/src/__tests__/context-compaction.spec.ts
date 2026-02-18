@@ -270,7 +270,7 @@ describe('createPrepareStep', () => {
 		expect(compactedTool.output.value).toBe('Read: /items/test.json');
 	});
 
-	it('does not compact validateItemJson results with valid status', () => {
+	it('compacts validateItemJson valid results to summary', () => {
 		mockEstimate.mockReturnValueOnce(800).mockReturnValue(600);
 
 		const prepareStep = createPrepareStep(defaultOptions());
@@ -291,12 +291,12 @@ describe('createPrepareStep', () => {
 		expect(result).toBeDefined();
 
 		const toolPart = (result!.messages[2] as { role: string; content: unknown[] }).content[0] as {
-			output: unknown;
+			output: { type: string; value: string };
 		};
-		expect(toolPart.output).toEqual({ type: 'json', value: { valid: true, message: 'JSON is valid.' } });
+		expect(toolPart.output.value).toBe('item.json: valid');
 	});
 
-	it('does not compact validateItemJson results with error status', () => {
+	it('compacts validateItemJson error results to summary', () => {
 		mockEstimate.mockReturnValueOnce(800).mockReturnValue(600);
 
 		const prepareStep = createPrepareStep(defaultOptions());
@@ -317,34 +317,51 @@ describe('createPrepareStep', () => {
 		expect(result).toBeDefined();
 
 		const toolPart = (result!.messages[2] as { role: string; content: unknown[] }).content[0] as {
-			output: unknown;
+			output: { type: string; value: string };
 		};
-		expect(toolPart.output).toEqual({
-			type: 'json',
-			value: { valid: false, error: 'JSON is invalid and could not be repaired: Unexpected token' }
-		});
+		expect(toolPart.output.value).toBe('bad.json: JSON is invalid and could not be repaired: Unexpected token');
 	});
 
-	it('does not compact reportProgress results', () => {
+	it('compacts createFile results to summary', () => {
 		mockEstimate.mockReturnValueOnce(800).mockReturnValue(600);
 
 		const prepareStep = createPrepareStep(defaultOptions());
 
-		const originalOutput = { type: 'json' as const, value: { acknowledged: true, itemsCreated: 5 } };
 		const messages = [
 			userMsg('generate'),
-			assistantMsg([toolCall('c1', 'reportProgress', { itemsCreated: 5 })]),
-			toolMsg([toolResult('c1', 'reportProgress', originalOutput)]),
+			assistantMsg([toolCall('c1', 'createFile', { path: 'item.json', content: '{}' })]),
+			toolMsg([toolResult('c1', 'createFile', { type: 'json', value: { success: true, path: 'item.json' } })]),
 			...buildSearchPairs(10, 100)
 		] as never[];
 
 		const result = prepareStep({ messages });
 		expect(result).toBeDefined();
 
-		const toolMsgResult = (result!.messages[2] as { role: string; content: unknown[] }).content[0] as {
-			output: unknown;
+		const toolPart = (result!.messages[2] as { role: string; content: unknown[] }).content[0] as {
+			output: { type: string; value: string };
 		};
-		expect(toolMsgResult.output).toEqual(originalOutput);
+		expect(toolPart.output.value).toBe('Created: item.json');
+	});
+
+	it('compacts updateFile results to summary', () => {
+		mockEstimate.mockReturnValueOnce(800).mockReturnValue(600);
+
+		const prepareStep = createPrepareStep(defaultOptions());
+
+		const messages = [
+			userMsg('generate'),
+			assistantMsg([toolCall('c1', 'updateFile', { path: 'item.json', content: '{"name":"x"}' })]),
+			toolMsg([toolResult('c1', 'updateFile', { type: 'json', value: { success: true, path: 'item.json' } })]),
+			...buildSearchPairs(10, 100)
+		] as never[];
+
+		const result = prepareStep({ messages });
+		expect(result).toBeDefined();
+
+		const toolPart = (result!.messages[2] as { role: string; content: unknown[] }).content[0] as {
+			output: { type: string; value: string };
+		};
+		expect(toolPart.output.value).toBe('Updated: item.json');
 	});
 
 	it('truncates unknown tool output to 200 chars', () => {
@@ -525,39 +542,6 @@ describe('output safety net (maxSingleOutputChars)', () => {
 			userMsg('generate'),
 			assistantMsg([toolCall('c1', 'bash', { command: 'echo hi' })]),
 			toolMsg([toolResult('c1', 'bash', { type: 'text', value: 'short output' })])
-		] as never[];
-
-		const result = prepareStep({ messages });
-		expect(result).toBeUndefined();
-	});
-
-	it('never truncates reportProgress outputs', () => {
-		mockEstimate.mockReturnValue(500);
-
-		const prepareStep = createPrepareStep(defaultOptions({ maxSingleOutputChars: 10 }));
-		const originalOutput = { type: 'json' as const, value: { acknowledged: true, itemsCreated: 5 } };
-		const messages = [
-			userMsg('generate'),
-			assistantMsg([toolCall('c1', 'reportProgress', { itemsCreated: 5 })]),
-			toolMsg([toolResult('c1', 'reportProgress', originalOutput)])
-		] as never[];
-
-		const result = prepareStep({ messages });
-		expect(result).toBeUndefined();
-	});
-
-	it('never truncates createFile/updateFile/validateItemJson outputs', () => {
-		mockEstimate.mockReturnValue(500);
-
-		const prepareStep = createPrepareStep(defaultOptions({ maxSingleOutputChars: 10 }));
-		const messages = [
-			userMsg('generate'),
-			assistantMsg([toolCall('c1', 'createFile', { path: 'item.json', content: '{}' })]),
-			toolMsg([toolResult('c1', 'createFile', { type: 'json', value: { success: true, path: 'item.json' } })]),
-			assistantMsg([toolCall('c2', 'updateFile', { path: 'item.json', content: '{"name":"x"}' })]),
-			toolMsg([toolResult('c2', 'updateFile', { type: 'json', value: { success: true, path: 'item.json' } })]),
-			assistantMsg([toolCall('c3', 'validateItemJson', { path: 'item.json' })]),
-			toolMsg([toolResult('c3', 'validateItemJson', { type: 'json', value: { valid: true, path: 'item.json' } })])
 		] as never[];
 
 		const result = prepareStep({ messages });

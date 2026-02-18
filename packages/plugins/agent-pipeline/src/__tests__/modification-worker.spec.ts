@@ -22,6 +22,11 @@ vi.mock('../utils/taxonomy-sync', () => ({
 	syncTaxonomyFromFile: vi.fn()
 }));
 
+vi.mock('../utils/tool-call-resilience', () => ({
+	createToolCallRepairFn: vi.fn().mockReturnValue(() => null),
+	withToolCallingRetry: vi.fn().mockImplementation((fn) => fn())
+}));
+
 vi.mock('tokenx', () => ({
 	estimateTokenCount: vi.fn(() => 100)
 }));
@@ -76,7 +81,6 @@ describe('processModification', () => {
 		expect(callArgs.tools).toHaveProperty('readFile');
 		expect(callArgs.tools).toHaveProperty('updateFile');
 		expect(callArgs.tools).toHaveProperty('validateItemJson');
-		expect(callArgs.tools).toHaveProperty('reportProgress');
 		expect(callArgs.prompt).toBe('Merge categories A and B');
 		expect(result.error).toBeUndefined();
 	});

@@ -1,6 +1,6 @@
 import { appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { generateText, stepCountIs, wrapLanguageModel } from 'ai';
+import { generateText, stepCountIs } from 'ai';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import type { IContentExtractorFacade, FacadeOptions, PluginLogger } from '@ever-works/plugin';
 
@@ -10,6 +10,8 @@ import type { WorkerPromptOptions } from './extraction-prompt.js';
 import { createCreateFileTool, createUpdateFileTool } from '../tools/file-tools.js';
 import { createValidateItemJsonTool } from '../tools/validate-json-tools.js';
 import { createPrepareStep } from '../utils/context-compaction.js';
+import { wrapReasoningFilteredModel } from '../utils/model-wrapper.js';
+import { createToolCallRepairFn, withToolCallingRetry } from '../utils/tool-call-resilience.js';
 import {
 	getWorkerContentBudgetRatio,
 	WORKER_PROMPT_OVERHEAD_TOKENS,
@@ -58,13 +60,17 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 		logger.log(`Worker: extracted ${extracted.rawContent.length} chars from ${url}`);
 
 		const contentRatio = getWorkerContentBudgetRatio(maxContextTokens);
+		// Calculate max chars for content chunk based on context budget,
+		// accounting for prompt overhead and leaving room for tools and reasoning.
 		const maxChunkChars = Math.max(
 			Math.floor((maxContextTokens * contentRatio - WORKER_PROMPT_OVERHEAD_TOKENS) * 4),
 			MIN_CHUNK_CHARS
 		);
 
 		const { chunks, wasSplit } = await chunkContent(extracted.rawContent, maxChunkChars);
-		if (wasSplit) logger.log(`Worker: split into ${chunks.length} chunks`);
+		if (wasSplit) {
+			logger.log(`Worker: split into ${chunks.length} chunks`);
+		}
 
 		// Set up sandbox for tool-based agent
 		const [{ createBashTool }, { Bash, ReadWriteFs }] = await Promise.all([
@@ -108,46 +114,44 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 
 		const validateItemJsonTool = createValidateItemJsonTool(sandbox, '/');
 
-		const wrappedModel = wrapLanguageModel({
-			model: workerModel,
-			middleware: {
-				specificationVersion: 'v3',
-				transformParams: async ({ params }) => ({
-					...params,
-					prompt: params.prompt.map((msg) =>
-						msg.role === 'assistant'
-							? { ...msg, content: msg.content.filter((part) => part.type !== 'reasoning') }
-							: msg
-					)
-				})
-			}
-		});
+		const wrappedModel = wrapReasoningFilteredModel(workerModel);
 
 		const systemPrompt = buildWorkerSystemPrompt(directoryContext);
+		const repairToolCall = createToolCallRepairFn(wrappedModel, logger);
 
 		for (const chunk of chunks) {
 			if (signal?.aborted) break;
 			try {
-				await generateText({
-					model: wrappedModel,
-					system: systemPrompt,
-					prompt: buildChunkUserPrompt(chunk, url, createdFiles.length > 0 ? createdFiles : undefined),
-					tools: {
-						bash: bashTools.bash,
-						readFile: bashTools.readFile,
-						createFile: createFileTool,
-						updateFile: updateFileTool,
-						validateItemJson: validateItemJsonTool
-					} as Parameters<typeof generateText>[0]['tools'],
-					stopWhen: stepCountIs(100),
-					prepareStep: createPrepareStep({
-						maxContextTokens,
-						budgetRatio: DEFAULT_CONTEXT_BUDGET_RATIO,
-						maxSingleOutputChars: Math.floor(maxContextTokens * 0.1 * 4),
-						logger
-					}),
-					abortSignal: signal
-				});
+				await withToolCallingRetry(
+					() =>
+						generateText({
+							model: wrappedModel,
+							system: systemPrompt,
+							prompt: buildChunkUserPrompt(
+								chunk,
+								url,
+								createdFiles.length > 0 ? createdFiles : undefined
+							),
+							tools: {
+								bash: bashTools.bash,
+								readFile: bashTools.readFile,
+								createFile: createFileTool,
+								updateFile: updateFileTool,
+								validateItemJson: validateItemJsonTool
+							} as Parameters<typeof generateText>[0]['tools'],
+							stopWhen: stepCountIs(100),
+							prepareStep: createPrepareStep({
+								maxContextTokens,
+								budgetRatio: DEFAULT_CONTEXT_BUDGET_RATIO,
+								maxSingleOutputChars: Math.floor(maxContextTokens * 0.1 * 4),
+								logger
+							}),
+							abortSignal: signal,
+							experimental_repairToolCall: repairToolCall,
+							experimental_telemetry: { isEnabled: true }
+						}),
+					{ providerName: 'worker', modelName: 'url-worker', signal, logger }
+				);
 			} catch (err) {
 				logger.warn(
 					`Worker: chunk ${chunk.index + 1}/${chunk.total} failed: ${err instanceof Error ? err.message : err}`

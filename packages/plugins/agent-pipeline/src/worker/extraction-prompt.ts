@@ -21,14 +21,16 @@ export function buildWorkerSystemPrompt(opts: WorkerPromptOptions): string {
 			'- `_meta/request.json` — generation request details\n' +
 			'Note: `_meta/` files are auto-updated when you create items. Do NOT modify them directly.',
 		'\n## Tools\n' +
-			'- `bash` — Run shell commands to list files, grep existing-items.jsonl for duplicates\n' +
+			'- `bash` — Run targeted search commands. NEVER run `ls *.json` — workspaces can have thousands of files.\n' +
 			'- `readFile` — Read workspace files (e.g., `_meta/categories.json`, `_meta/existing-items.jsonl`)\n' +
 			'- `createFile` — Create a new item JSON file (auto-syncs taxonomy)\n' +
 			'- `updateFile` — Update an existing file\n' +
 			'- `validateItemJson` — Validate and auto-repair a JSON file after creation',
 		'\n## Workflow\n' +
 			'1. Read `_meta/categories.json` to learn existing categories — prefer reusing them.\n' +
-			'2. Before creating each item, check `_meta/existing-items.jsonl` via `bash` (e.g., `grep -i "item name"`) to skip duplicates.\n' +
+			'2. Before creating each item, check `_meta/existing-items.jsonl` for duplicates using case-insensitive partial matching:\n' +
+			'   - `grep -i "keyword" _meta/existing-items.jsonl`\n' +
+			'   - Try multiple variations (partial name, domain, abbreviation) to catch fuzzy matches.\n' +
 			'3. Create items using `createFile` with valid JSON matching the Item JSON Schema above.\n' +
 			'4. Validate each created file with `validateItemJson`.',
 		'\n## Extraction Rules\n' +

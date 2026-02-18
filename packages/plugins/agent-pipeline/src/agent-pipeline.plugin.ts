@@ -1,4 +1,4 @@
-import { generateText, stepCountIs, wrapLanguageModel } from 'ai';
+import { generateText, stepCountIs } from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type {
 	IPlugin,
@@ -53,6 +53,7 @@ import {
 import { extractSimpleKeywords, appendToJsonlIndex } from './utils/data-source-helpers.js';
 import { createToolCallRepairFn, withToolCallingRetry } from './utils/tool-call-resilience.js';
 import { createPrepareStep } from './utils/context-compaction.js';
+import { wrapReasoningFilteredModel } from './utils/model-wrapper.js';
 
 interface ProcessUrlExecutionResult {
 	url: string;
@@ -394,23 +395,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		});
 
 		const wrapModel = (name: string) => {
-			return wrapLanguageModel({
-				model: provider(name),
-				middleware: {
-					specificationVersion: 'v3',
-					transformParams: async ({ params }) => ({
-						...params,
-						prompt: params.prompt.map((message) =>
-							message.role === 'assistant'
-								? {
-										...message,
-										content: message.content.filter((part) => part.type !== 'reasoning')
-									}
-								: message
-						)
-					})
-				}
-			});
+			return wrapReasoningFilteredModel(provider(name));
 		};
 
 		const parentModel = wrapModel(parentModelName);
@@ -425,6 +410,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			parentModelName === workerModelName
 				? parentMaxContextTokens
 				: await execContext.aiFacade.resolveModelContextLength(workerModelName, facadeOptions);
+
 		logger.log(
 			`Context windows — parent: ${parentMaxContextTokens} tokens, worker: ${workerMaxContextTokens} tokens`
 		);
@@ -470,8 +456,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		});
 
 		const result = await withToolCallingRetry(
-			() =>
-				generateText({
+			() => {
+				return generateText({
 					model: parentModel,
 					system: systemPrompt,
 					prompt: userPrompt,
@@ -481,7 +467,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 					abortSignal: signal,
 					experimental_repairToolCall: repairToolCall,
 					experimental_telemetry: { isEnabled: true }
-				}),
+				});
+			},
 			{
 				providerName: providerConfig.providerName ?? providerConfig.providerId,
 				modelName: parentModelName,
@@ -493,6 +480,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		// Log generation diagnostics
 		const totalToolCalls = result.steps.reduce((sum, step) => sum + step.toolCalls.length, 0);
 		const toolNames = [...new Set(result.steps.flatMap((step) => step.toolCalls.map((tc) => tc.toolName)))];
+
 		logger.log(
 			`Agent completed: ${result.steps.length} steps, ${totalToolCalls} tool calls` +
 				(toolNames.length > 0 ? ` (${toolNames.join(', ')})` : ' (no tools used)') +
@@ -530,6 +518,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				processUrlFailures.sampleErrors.length > 0
 					? ` Errors: ${processUrlFailures.sampleErrors.join('; ')}`
 					: '';
+
 			warnings.push(
 				`URL processing had failures (${processUrlFailures.failedUrls}/${processUrlFailures.totalUrls} URLs failed). ` +
 					'Some relevant items may be missing.' +

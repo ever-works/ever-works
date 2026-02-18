@@ -40,6 +40,7 @@ export function createCreateFileTool(sandbox: WrappedSandbox, cwd: string, optio
 			} catch {
 				// File doesn't exist — proceed
 			}
+
 			await sandbox.writeFiles([{ path: resolvedPath, content }]);
 			try {
 				await syncTaxonomyFromFile(
@@ -51,6 +52,7 @@ export function createCreateFileTool(sandbox: WrappedSandbox, cwd: string, optio
 			} catch {
 				/* best-effort */
 			}
+
 			if (options?.onCreated) {
 				try {
 					await options.onCreated(path, content);
@@ -58,6 +60,7 @@ export function createCreateFileTool(sandbox: WrappedSandbox, cwd: string, optio
 					/* best-effort */
 				}
 			}
+
 			return { success: true, path };
 		}
 	});

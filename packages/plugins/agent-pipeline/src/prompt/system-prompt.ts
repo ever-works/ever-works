@@ -64,7 +64,7 @@ export function buildSystemPrompt(options: PromptOptions): string {
 		'\n## Generation Workflow\n' +
 			'When creating NEW items:\n' +
 			'1. Use `search` to find items relevant to the directory topic.\n' +
-			'2. Select the most relevant URLs from search results — only pass REAL URLs that are directly related to the directory topic. Skip blog posts, news articles, and marketing pages.\n' +
+			'2. Select the most relevant URLs from search results — only pass REAL URLs that are directly related to the directory topic. Skip blog posts, news articles, and marketing pages if not related to the topic.\n' +
 			'3. Use `processUrls` with a batch of URLs (up to 10 at a time) for efficient parallel extraction.\n' +
 			'4. Use `reportProgress` to update the user on items created so far.\n' +
 			'5. Repeat: search with different queries, process more URLs (applying the same relevance criteria), until you reach the target.\n\n' +

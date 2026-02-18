@@ -2,10 +2,6 @@ import { estimateTokenCount } from 'tokenx';
 import type { ModelMessage } from 'ai';
 import type { PluginLogger } from '@ever-works/plugin';
 
-/** Tools whose results must never be compacted or truncated */
-const PROTECTED_TOOLS = new Set(['createFile', 'updateFile', 'validateItemJson', 'reportProgress']);
-
-/** Number of recent assistant/tool pairs to protect from compaction */
 const RECENT_PAIRS_TO_KEEP = 10;
 
 export interface ContextCompactionOptions {
@@ -37,7 +33,6 @@ function estimateMessages(messages: ModelMessage[]): number {
 	return estimateTokenCount(JSON.stringify(messages));
 }
 
-/** Extract the string representation of a tool result output */
 function getOutputString(output: ToolResultPart['output']): string {
 	if (!output) return '';
 	if (output.type === 'text') return String(output.value ?? '');
@@ -45,7 +40,6 @@ function getOutputString(output: ToolResultPart['output']): string {
 	return '';
 }
 
-/** Extract the structured value from a tool result output */
 function getOutputValue(output: ToolResultPart['output']): unknown {
 	if (!output) return undefined;
 	if (output.type === 'text') {
@@ -59,97 +53,71 @@ function getOutputValue(output: ToolResultPart['output']): unknown {
 	return undefined;
 }
 
-/**
- * Produce a compact summary for a single tool result.
- * Uses tool call arguments for identifying info (query, url, path, command).
- */
+function fileOpSummary(verb: string, args: Record<string, unknown>, value: unknown): string {
+	const path = args?.path ?? 'unknown';
+	if (typeof value === 'object' && value !== null) {
+		const obj = value as Record<string, unknown>;
+		return obj.success ? `${verb}: ${obj.path ?? path}` : `${verb} failed: ${obj.error ?? path}`;
+	}
+	return `${verb}: ${path}`;
+}
+
+type Summarizer = (args: Record<string, unknown>, value: unknown) => string;
+
+const TOOL_SUMMARIZERS: Record<string, Summarizer> = {
+	search: (args, value) =>
+		`Searched '${args.query ?? 'unknown'}' -> ${Array.isArray(value) ? value.length : '?'} results`,
+	bash: (args) => `Ran: ${args.command ?? 'unknown'}`,
+	readFile: (args) => `Read: ${args.path ?? args.filePath ?? 'unknown'}`,
+	createFile: (args, value) => fileOpSummary('Created', args, value),
+	updateFile: (args, value) => fileOpSummary('Updated', args, value),
+	validateItemJson: (args, value) => {
+		const path = args?.path ?? 'unknown';
+		if (typeof value === 'object' && value !== null) {
+			const obj = value as Record<string, unknown>;
+			return obj.valid ? `${path}: valid` : `${path}: ${obj.error ?? 'invalid'}`;
+		}
+		return `${path}: validated`;
+	},
+	processUrls: (_args, value) => {
+		if (Array.isArray(value)) {
+			const totalItems = value.reduce((sum: number, r: { count?: number }) => sum + (r?.count ?? 0), 0);
+			return `Processed ${value.length} URLs -> ${totalItems} items`;
+		}
+		return 'Processed URLs';
+	},
+	modifyItems: (_args, value) => {
+		if (typeof value === 'object' && value !== null) {
+			const obj = value as Record<string, unknown>;
+			return `Modified ${obj.count ?? '?'} files`;
+		}
+		return 'Modified items';
+	},
+	getWorkspaceOverview: (_args, value) => {
+		if (typeof value === 'object' && value !== null) {
+			const obj = value as Record<string, unknown>;
+			const cats = Array.isArray(obj.categories) ? obj.categories.length : '?';
+			return `Workspace: ${obj.totalItems ?? '?'} items, ${cats} categories`;
+		}
+		return 'Workspace overview';
+	}
+};
+
 function compactResultPart(part: ToolResultPart, args?: Record<string, unknown>): ToolResultPart {
+	const summarizer = TOOL_SUMMARIZERS[part.toolName];
 	let summary: string;
 
-	// Covers both parent orchestrator and modification worker tools.
-	switch (part.toolName) {
-		case 'search': {
-			const query = args?.query ?? 'unknown';
-			const value = getOutputValue(part.output);
-			const count = Array.isArray(value) ? value.length : '?';
-			summary = `Searched '${query}' -> ${count} results`;
-			break;
-		}
-		case 'extractContent': {
-			const value = getOutputValue(part.output);
-			const url =
-				typeof value === 'object' && value !== null && 'url' in value
-					? (value as Record<string, unknown>).url
-					: (args?.url ?? 'unknown');
-			summary = `Extracted content from ${url}`;
-			break;
-		}
-		case 'bash': {
-			const command = args?.command ?? 'unknown';
-			summary = `Ran: ${command}`;
-			break;
-		}
-		case 'readFile': {
-			const path = args?.path ?? args?.filePath ?? 'unknown';
-			summary = `Read: ${path}`;
-			break;
-		}
-		case 'validateItemJson': {
-			const path = args?.path ?? 'unknown';
-			const value = getOutputValue(part.output);
-			if (typeof value === 'object' && value !== null) {
-				const obj = value as Record<string, unknown>;
-				summary = obj.valid ? `${path}: valid` : `${path}: ${obj.error ?? 'invalid'}`;
-			} else {
-				summary = `${path}: validated`;
-			}
-			break;
-		}
-		case 'processUrls': {
-			const value = getOutputValue(part.output);
-			if (Array.isArray(value)) {
-				const totalItems = value.reduce((sum: number, r: { count?: number }) => sum + (r?.count ?? 0), 0);
-				summary = `Processed ${value.length} URLs -> ${totalItems} items`;
-			} else {
-				summary = 'Processed URLs';
-			}
-			break;
-		}
-		case 'modifyItems': {
-			const value = getOutputValue(part.output);
-			if (typeof value === 'object' && value !== null) {
-				const obj = value as Record<string, unknown>;
-				summary = `Modified ${obj.count ?? '?'} files`;
-			} else {
-				summary = 'Modified items';
-			}
-			break;
-		}
-		case 'getWorkspaceOverview': {
-			const value = getOutputValue(part.output);
-			if (typeof value === 'object' && value !== null) {
-				const obj = value as Record<string, unknown>;
-				const cats = Array.isArray(obj.categories) ? obj.categories.length : '?';
-				summary = `Workspace: ${obj.totalItems ?? '?'} items, ${cats} categories`;
-			} else {
-				summary = 'Workspace overview';
-			}
-			break;
-		}
-		default: {
-			const raw = getOutputString(part.output);
-			summary = raw.length > 200 ? raw.slice(0, 200) + '\u2026' : raw;
-			break;
-		}
+	if (summarizer) {
+		const value = getOutputValue(part.output);
+		summary = summarizer(args ?? {}, value);
+	} else {
+		const raw = getOutputString(part.output);
+		summary = raw.length > 200 ? raw.slice(0, 200) + '\u2026' : raw;
 	}
 
 	return { ...part, output: { type: 'text', value: summary } };
 }
 
-/**
- * Find the message index that marks the boundary of the recent window.
- * Messages at or after this index are "recent" and won't be compacted.
- */
 function findRecentBoundary(messages: ModelMessage[], pairsToKeep: number): number {
 	if (pairsToKeep <= 0) return messages.length;
 	let toolMsgCount = 0;
@@ -164,10 +132,6 @@ function findRecentBoundary(messages: ModelMessage[], pairsToKeep: number): numb
 	return 0;
 }
 
-/**
- * Build a map of toolCallId -> args from ALL assistant messages.
- * Scans the entire message array so progressive compaction always has access to args.
- */
 function buildArgsMap(messages: ModelMessage[]): Map<string, Record<string, unknown>> {
 	const argsMap = new Map<string, Record<string, unknown>>();
 	for (const msg of messages) {
@@ -184,10 +148,6 @@ function buildArgsMap(messages: ModelMessage[]): Map<string, Record<string, unkn
 	return argsMap;
 }
 
-/**
- * Walk messages and compact tool result outputs older than recentBoundary.
- * Keeps all assistant messages (tool calls) intact.
- */
 function compactOlderResults(
 	messages: ModelMessage[],
 	recentBoundary: number,
@@ -203,7 +163,6 @@ function compactOlderResults(
 		const compacted = content.map((part: unknown) => {
 			const p = part as ToolResultPart;
 			if (p.type !== 'tool-result') return part;
-			if (PROTECTED_TOOLS.has(p.toolName)) return part;
 			const args = argsMap.get(p.toolCallId);
 			return compactResultPart(p, args);
 		});
@@ -212,10 +171,6 @@ function compactOlderResults(
 	});
 }
 
-/**
- * Truncate any single tool result output that exceeds maxChars.
- * Walks ALL messages (including recent). Protected tools are never truncated.
- */
 function truncateOversizedOutputs(
 	messages: ModelMessage[],
 	maxChars: number
@@ -230,7 +185,6 @@ function truncateOversizedOutputs(
 		const newContent = m.content.map((part: unknown) => {
 			const p = part as ToolResultPart;
 			if (p.type !== 'tool-result') return part;
-			if (PROTECTED_TOOLS.has(p.toolName)) return part;
 
 			const outputStr = getOutputString(p.output);
 			if (outputStr.length <= maxChars) return part;
@@ -250,11 +204,6 @@ function truncateOversizedOutputs(
 	return { messages: result, changed };
 }
 
-/**
- * Drop oldest compacted message pairs (assistant + tool) until messages fit within budget.
- * Preserves: the first message (user prompt) and the recent window (boundary onward).
- * Uses per-message token estimates for O(n) performance.
- */
 function dropOldestPairs(
 	messages: ModelMessage[],
 	boundary: number,
@@ -292,15 +241,6 @@ function dropOldestPairs(
 	return [...keepFirst, ...droppable.slice(dropCount), ...recent];
 }
 
-/**
- * Factory that creates a `prepareStep` callback for context compaction.
- *
- * Four layers:
- * 1. Output safety net — truncate any single oversized tool output
- * 2. Budget check — skip compaction if under budget
- * 3. Progressive compaction — shrink recent window (10 → 5 → 2 → 1) until under budget
- * 4. Eviction — drop oldest compacted pairs until under budget (enables infinite runs)
- */
 export function createPrepareStep(options: ContextCompactionOptions) {
 	const { maxContextTokens, budgetRatio = 0.7, maxSingleOutputChars, logger } = options;
 	const budget = Math.floor(maxContextTokens * budgetRatio);
@@ -345,6 +285,7 @@ export function createPrepareStep(options: ContextCompactionOptions) {
 			rawBoundary > 1 && (bestResult[rawBoundary - 1] as { role: string }).role === 'assistant'
 				? rawBoundary - 1
 				: rawBoundary;
+
 		bestResult = dropOldestPairs(bestResult, evictBoundary, budget, logger);
 
 		const finalTokens = estimateMessages(bestResult);
