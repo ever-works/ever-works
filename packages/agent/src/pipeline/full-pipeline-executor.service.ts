@@ -119,6 +119,7 @@ export class FullPipelineExecutorService {
                 items: [],
                 categories: [],
                 tags: [],
+                collections: [],
                 brands: [],
                 duration,
                 stepsCompleted: 0,
@@ -212,6 +213,7 @@ export class FullPipelineExecutorService {
             items: result.items,
             categories: result.categories,
             tags: result.tags,
+            collections: result.collections,
             brands: result.brands,
         } as PipelineCompletedPayload);
     }

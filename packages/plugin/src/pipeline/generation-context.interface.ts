@@ -1,4 +1,4 @@
-import type { ItemData, Category, Tag, Brand } from '@ever-works/contracts';
+import type { ItemData, Category, Collection, Tag, Brand } from '@ever-works/contracts';
 
 /**
  * User reference for settings resolution and context.
@@ -103,6 +103,7 @@ export interface ExistingItems {
 	readonly items: readonly ItemData[];
 	readonly categories: readonly Category[];
 	readonly tags: readonly Tag[];
+	readonly collections?: readonly Collection[];
 	readonly brands?: readonly Brand[];
 	/** Configuration from previous generation */
 	readonly existingConfig?: ExistingConfig;

@@ -1,5 +1,5 @@
 import type { IPlugin } from '../plugin.interface.js';
-import type { ItemData, Category, Tag, Brand, DomainAnalysis } from '@ever-works/contracts';
+import type { ItemData, Category, Collection, Tag, Brand, DomainAnalysis } from '@ever-works/contracts';
 import type { PipelineStepDefinition, PipelineState } from '../../pipeline/step-definition.types.js';
 import type {
 	IPipelineContext,
@@ -74,6 +74,8 @@ export interface PipelineResult {
 	readonly categories: readonly Category[];
 	/** Generated tags */
 	readonly tags: readonly Tag[];
+	/** Generated collections */
+	readonly collections: readonly Collection[];
 	/** Generated brands */
 	readonly brands: readonly Brand[];
 	/** Domain analysis from generation */

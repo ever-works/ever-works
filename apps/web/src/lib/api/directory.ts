@@ -16,7 +16,7 @@ import {
     type DirectoryGenerationHistoryEntry,
     type DirectoryGenerationHistoryResponse,
 } from '@ever-works/contracts/api';
-import { APIResponse, ItemData, Category, Tag } from './types';
+import { APIResponse, ItemData, Category, Tag, Collection } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
 
 // Re-export directory types from contracts for convenience
@@ -240,6 +240,7 @@ export interface DirectoryCount {
 export interface DirectoryCategoriesTags {
     categories: string[];
     tags: string[];
+    collections: string[];
 }
 
 // Website Settings Types
@@ -737,6 +738,34 @@ export const directoryAPI = {
     deleteTag: async (id: string, tagId: string) => {
         return serverMutation<APIResponse<{ message: string }>>({
             endpoint: `/directories/${id}/tags/${tagId}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    // Collections
+    createCollection: async (id: string, data: Partial<Collection>) => {
+        return serverMutation<APIResponse<{ collection: Collection }>>({
+            endpoint: `/directories/${id}/collections`,
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    updateCollection: async (id: string, collectionId: string, data: Partial<Collection>) => {
+        return serverMutation<APIResponse<{ collection: Collection }>>({
+            endpoint: `/directories/${id}/collections/${collectionId}`,
+            data,
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    deleteCollection: async (id: string, collectionId: string) => {
+        return serverMutation<APIResponse<{ message: string }>>({
+            endpoint: `/directories/${id}/collections/${collectionId}`,
             data: {},
             method: 'DELETE',
             wrapInData: false,

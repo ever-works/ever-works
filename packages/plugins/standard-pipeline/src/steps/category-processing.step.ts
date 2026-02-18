@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { StepExecutionContext, MutableItemData, Category, Tag, Brand, FacadeOptions } from '@ever-works/plugin';
+import type { StepExecutionContext, MutableItemData, Category, Collection, Tag, Brand, FacadeOptions } from '@ever-works/plugin';
 import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { slugifyText, unSlugifyText } from '../utils/text.utils.js';
@@ -27,7 +27,8 @@ const CATEGORY_PROMPT =
 13. The featured field should remain the same as in the original item
 14. Preserve the original brand when provided (at most one per item) and keep any brand_logo_url if already set. Do not invent brands when the source is unclear.
 15. Preserve any item images array; do not discard valid URLs.
-16. Please give careful consideration to the rules outlined in the <additional_rules> section below (if available).
+16. Optionally assign items to at most ONE collection. Collections are curated cross-category lists (e.g., "Editor's Picks", "Best for Beginners", "Top Open Source"). Not every item needs a collection — only assign when genuinely appropriate. Set the collection field to null when not applicable.
+17. Please give careful consideration to the rules outlined in the <additional_rules> section below (if available).
 </rules>
 
 Task context:
@@ -60,7 +61,8 @@ const ENHANCED_CATEGORY_PROMPT =
 13. The featured field should remain the same as in the original item
 14. Preserve the original brand when provided (at most one per item) and keep any brand_logo_url if already set. Do not invent brands when the source is unclear.
 15. Preserve any item images array; do not discard valid URLs.
-16. Please give careful consideration to the rules outlined in the <additional_rules> section below (if available).
+16. Optionally assign items to at most ONE collection. Collections are curated cross-category lists (e.g., "Editor's Picks", "Best for Beginners", "Top Open Source"). Not every item needs a collection — only assign when genuinely appropriate. Set the collection field to null when not applicable.
+17. Please give careful consideration to the rules outlined in the <additional_rules> section below (if available).
 </rules>
 
 <additional_rules>
@@ -134,6 +136,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 		const config = request.config || {};
 		const generateCategories = config.generate_categories !== false;
 		const generateTags = config.generate_tags !== false;
+		const generateCollections = config.generate_collections !== false;
 		const generateBrands = config.generate_brands !== false;
 
 		// If all entity generation is disabled, skip AI processing entirely
@@ -151,12 +154,13 @@ export class CategoryProcessingStep extends BasePipelineStep {
 			context.finalItems = finalItems;
 			context.finalCategories = [defaultCategory];
 			context.finalTags = [];
+			context.finalCollections = [];
 			context.finalBrands = [];
 
 			return context;
 		}
 
-		const { categories, tags, brands, finalItems } = await this.processCategoriesAndTags(
+		const { categories, tags, collections, brands, finalItems } = await this.processCategoriesAndTags(
 			directory.slug,
 			request.prompt || '',
 			allPriorityCategories,
@@ -170,6 +174,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 			advancedPrompts?.categorization,
 			generateCategories,
 			generateTags,
+			generateCollections,
 			generateBrands,
 			execContext
 		);
@@ -179,6 +184,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 		context.finalItems = finalItems;
 		context.finalCategories = categories;
 		context.finalTags = tags;
+		context.finalCollections = collections;
 		context.finalBrands = brands;
 
 		return context;
@@ -201,11 +207,13 @@ export class CategoryProcessingStep extends BasePipelineStep {
 		customPrompt: string | null | undefined,
 		generateCategories: boolean,
 		generateTags: boolean,
+		generateCollections: boolean,
 		generateBrands: boolean,
 		execContext: StepExecutionContext
 	): Promise<{
 		categories: Category[];
 		tags: Tag[];
+		collections: Collection[];
 		brands: Brand[];
 		finalItems: MutableItemData[];
 	}> {
@@ -218,7 +226,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 
 		if (!extractedItems || extractedItems.length === 0) {
 			logger.log(`[${directorySlug}] No items to categorize`);
-			return { finalItems: [], categories: [], tags: [], brands: [] };
+			return { finalItems: [], categories: [], tags: [], collections: [], brands: [] };
 		}
 
 		// Convert existing categories and tags to sets for easy lookup
@@ -264,6 +272,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 			// Extract unique categories and tags based on toggle settings
 			let categories: Category[];
 			let tags: Tag[];
+			let collections: Collection[];
 			let brands: Brand[];
 
 			if (generateCategories) {
@@ -287,6 +296,16 @@ export class CategoryProcessingStep extends BasePipelineStep {
 				})) as MutableItemData[];
 			}
 
+			if (generateCollections) {
+				collections = this.extractUniqueCollections(categorized);
+			} else {
+				collections = [];
+				categorized = categorized.map((item) => ({
+					...item,
+					collection: undefined
+				})) as MutableItemData[];
+			}
+
 			if (generateBrands) {
 				brands = this.extractUniqueBrands(categorized, existingBrands);
 			} else {
@@ -304,10 +323,10 @@ export class CategoryProcessingStep extends BasePipelineStep {
 			// Calculate processing time
 			const processingTime = (Date.now() - startTime) / 1000;
 			logger.log(
-				`[${directorySlug}] Category processing complete in ${processingTime.toFixed(2)}s. Found ${categories.length} categories and ${tags.length} tags.`
+				`[${directorySlug}] Category processing complete in ${processingTime.toFixed(2)}s. Found ${categories.length} categories, ${tags.length} tags, ${collections.length} collections.`
 			);
 
-			return { finalItems, categories, tags, brands };
+			return { finalItems, categories, tags, collections, brands };
 		} catch (error) {
 			logger.error(
 				`[${directorySlug}] Error during category processing: ${this.formatError(error)}`,
@@ -327,6 +346,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 				finalItems,
 				categories: [defaultCategory],
 				tags: [],
+				collections: [],
 				brands: []
 			};
 		}
@@ -621,6 +641,16 @@ export class CategoryProcessingStep extends BasePipelineStep {
 	}
 
 	/**
+	 * Extract unique collections from categorized items
+	 */
+	private extractUniqueCollections(items: MutableItemData[]): Collection[] {
+		const collectionNames = items
+			.map((item) => item.collection)
+			.filter((c): c is string => typeof c === 'string' && c.length > 0);
+		return this.mapUnique(collectionNames);
+	}
+
+	/**
 	 * Extract unique brands from categorized items and merge with existing brands when possible
 	 */
 	private extractUniqueBrands(items: MutableItemData[], existingBrands: Brand[] = []): Brand[] {
@@ -754,6 +784,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 						slugifyText(typeof tag === 'string' ? tag : tag.name)
 					)
 				: [],
+			collection: item.collection ? slugifyText(item.collection) : undefined,
 			slug: item.slug || slugifyText(item.name || ''),
 			brand: brandSlug,
 			brand_logo_url: brandLogoUrl || null

@@ -411,6 +411,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				categories: metadata.categories,
 				tags: metadata.tags,
 				brands: metadata.brands,
+				collections: metadata.collections || [],
 				metrics: buildMetrics(startTime, duration, items.length),
 				duration,
 				stepsCompleted: this.state!.completedSteps.length,

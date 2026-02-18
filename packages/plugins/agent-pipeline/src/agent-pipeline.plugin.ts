@@ -573,6 +573,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			categories: metadata.categories,
 			tags: metadata.tags,
 			brands: metadata.brands,
+			collections: metadata.collections,
 			metrics: buildMetrics(startTime, duration, items.length),
 			duration,
 			stepsCompleted: AGENT_PIPELINE_STEP_IDS.length,

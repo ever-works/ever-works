@@ -1,6 +1,7 @@
 import type {
 	ItemData,
 	Category,
+	Collection,
 	Tag,
 	Brand,
 	MutableItemData,
@@ -40,6 +41,7 @@ export interface MutableGenerationContext extends IPipelineContext {
 	finalItems: MutableItemData[];
 	finalCategories: Category[];
 	finalTags: Tag[];
+	finalCollections: Collection[];
 	finalBrands: Brand[];
 
 	domainAnalysis?: DomainAnalysis;
@@ -71,6 +73,7 @@ export interface GenerationContextSnapshot {
 	readonly finalItems: readonly ItemData[];
 	readonly finalCategories: readonly Category[];
 	readonly finalTags: readonly Tag[];
+	readonly finalCollections: readonly Collection[];
 	readonly finalBrands: readonly Brand[];
 	readonly domainAnalysis?: DomainAnalysis;
 	readonly metrics: StandardPipelineMetrics;

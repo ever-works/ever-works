@@ -19,6 +19,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
 	finalItems: MutableGenerationContext['finalItems'] = [];
 	finalCategories: MutableGenerationContext['finalCategories'] = [];
 	finalTags: MutableGenerationContext['finalTags'] = [];
+	finalCollections: MutableGenerationContext['finalCollections'] = [];
 	finalBrands: MutableGenerationContext['finalBrands'] = [];
 
 	domainAnalysis?: MutableGenerationContext['domainAnalysis'];
@@ -90,6 +91,8 @@ export class TypedGenerationContext implements MutableGenerationContext {
 				return this.finalCategories.length > 0 ? this.finalCategories : undefined;
 			case 'finalTags':
 				return this.finalTags.length > 0 ? this.finalTags : undefined;
+			case 'finalCollections':
+				return this.finalCollections.length > 0 ? this.finalCollections : undefined;
 			case 'finalBrands':
 				return this.finalBrands.length > 0 ? this.finalBrands : undefined;
 			case 'domainAnalysis':
@@ -147,6 +150,9 @@ export class TypedGenerationContext implements MutableGenerationContext {
 				return true;
 			case 'finalTags':
 				this.finalTags = value as MutableGenerationContext['finalTags'];
+				return true;
+			case 'finalCollections':
+				this.finalCollections = value as MutableGenerationContext['finalCollections'];
 				return true;
 			case 'finalBrands':
 				this.finalBrands = value as MutableGenerationContext['finalBrands'];
@@ -217,6 +223,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
 			finalItems: [...this.finalItems],
 			finalCategories: [...this.finalCategories],
 			finalTags: [...this.finalTags],
+			finalCollections: [...this.finalCollections],
 			finalBrands: [...this.finalBrands],
 			domainAnalysis: this.domainAnalysis,
 			metrics: this.metrics,
@@ -248,6 +255,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
 		typed.finalItems = ctx.finalItems;
 		typed.finalCategories = ctx.finalCategories;
 		typed.finalTags = ctx.finalTags;
+		typed.finalCollections = ctx.finalCollections;
 		typed.finalBrands = ctx.finalBrands;
 		typed.domainAnalysis = ctx.domainAnalysis;
 		typed.metrics = ctx.metrics;
@@ -275,6 +283,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
 		typed.finalItems = [...snapshot.finalItems] as MutableGenerationContext['finalItems'];
 		typed.finalCategories = [...snapshot.finalCategories];
 		typed.finalTags = [...snapshot.finalTags];
+		typed.finalCollections = [...(snapshot.finalCollections || [])];
 		typed.finalBrands = [...snapshot.finalBrands];
 		typed.domainAnalysis = snapshot.domainAnalysis;
 		typed.allInitialCategories = [...snapshot.allInitialCategories];

@@ -68,6 +68,7 @@ describe('PipelineOrchestratorService', () => {
                 success: true,
                 items: [],
                 categories: [],
+                collections: [],
                 tags: [],
                 brands: [],
                 duration: 1000,

@@ -1,8 +1,15 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
 import { DirectoryOwnershipService } from './directory-ownership.service';
-import { CreateCategoryDto, UpdateCategoryDto, CreateTagDto, UpdateTagDto } from '@src/dto';
-import type { Category, Tag } from '@ever-works/contracts';
+import {
+    CreateCategoryDto,
+    UpdateCategoryDto,
+    CreateCollectionDto,
+    UpdateCollectionDto,
+    CreateTagDto,
+    UpdateTagDto,
+} from '@src/dto';
+import type { Category, Collection, Tag } from '@ever-works/contracts';
 import { User } from '@src/entities/user.entity';
 import { UserRepository } from '@src/database/repositories/user.repository';
 import { slugifyText } from '@src/utils/text.utils';
@@ -270,6 +277,132 @@ export class DirectoryTaxonomyService {
         return {
             status: 'success',
             message: 'Tag deleted successfully',
+        };
+    }
+
+    // ============================================
+    // Collections
+    // ============================================
+
+    async getCollections(directoryId: string, userId: string): Promise<Collection[]> {
+        const { directory } = await this.ownershipService.ensureAccess(directoryId, userId);
+        const user = await this.ensureUser(userId);
+
+        const data = await this.dataGenerator.getCategoriesTags(directory, user);
+        return data.collections || [];
+    }
+
+    async createCollection(
+        directoryId: string,
+        dto: CreateCollectionDto,
+        userId: string,
+    ): Promise<{ status: string; collection: Collection }> {
+        const { directory } = await this.ownershipService.ensureCanEdit(directoryId, userId);
+        const user = await this.ensureUser(userId);
+
+        // Get existing collections
+        const { collections } = await this.dataGenerator.getCategoriesTags(directory, user);
+
+        // Check for duplicate name
+        const normalizedName = dto.name.toLowerCase().trim();
+        if (collections.some((c) => c.name.toLowerCase() === normalizedName)) {
+            throw new BadRequestException('A collection with this name already exists');
+        }
+
+        // Create new collection with slugified ID
+        const newCollection: Collection = {
+            id: slugifyText(dto.name.trim()),
+            name: dto.name.trim(),
+            description: dto.description?.trim(),
+            icon_url: dto.icon_url?.trim(),
+            priority: dto.priority,
+        };
+
+        // Save to data repository
+        const updatedCollections = [...collections, newCollection];
+        await this.dataGenerator.saveCollections(directory, user, updatedCollections);
+
+        return {
+            status: 'success',
+            collection: newCollection,
+        };
+    }
+
+    async updateCollection(
+        directoryId: string,
+        collectionId: string,
+        dto: UpdateCollectionDto,
+        userId: string,
+    ): Promise<{ status: string; collection: Collection }> {
+        const { directory } = await this.ownershipService.ensureCanEdit(directoryId, userId);
+        const user = await this.ensureUser(userId);
+
+        // Get existing collections
+        const { collections } = await this.dataGenerator.getCategoriesTags(directory, user);
+
+        // Find the collection to update
+        const collectionIndex = collections.findIndex((c) => c.id === collectionId);
+        if (collectionIndex === -1) {
+            throw new NotFoundException('Collection not found');
+        }
+
+        // Check for duplicate name if name is being changed
+        if (dto.name) {
+            const normalizedName = dto.name.toLowerCase().trim();
+            const existingWithName = collections.find(
+                (c) => c.id !== collectionId && c.name.toLowerCase() === normalizedName,
+            );
+            if (existingWithName) {
+                throw new BadRequestException('A collection with this name already exists');
+            }
+        }
+
+        // Update collection
+        const updatedCollection: Collection = {
+            ...collections[collectionIndex],
+            ...(dto.name && { name: dto.name.trim() }),
+            ...(dto.description !== undefined && { description: dto.description?.trim() }),
+            ...(dto.icon_url !== undefined && { icon_url: dto.icon_url?.trim() }),
+            ...(dto.priority !== undefined && { priority: dto.priority }),
+        };
+
+        collections[collectionIndex] = updatedCollection;
+
+        // Save to data repository
+        await this.dataGenerator.saveCollections(directory, user, collections);
+
+        return {
+            status: 'success',
+            collection: updatedCollection,
+        };
+    }
+
+    async deleteCollection(
+        directoryId: string,
+        collectionId: string,
+        userId: string,
+    ): Promise<{ status: string; message: string }> {
+        const { directory } = await this.ownershipService.ensureCanEdit(directoryId, userId);
+        const user = await this.ensureUser(userId);
+
+        // Get existing collections
+        const { collections } = await this.dataGenerator.getCategoriesTags(directory, user);
+
+        // Find the collection
+        const collectionIndex = collections.findIndex((c) => c.id === collectionId);
+        if (collectionIndex === -1) {
+            throw new NotFoundException('Collection not found');
+        }
+
+        // Remove collection
+        collections.splice(collectionIndex, 1);
+
+        // Save to data repository
+        await this.dataGenerator.saveCollections(directory, user, collections);
+
+        return {
+            status: 'success',
+            message: 'Collection deleted successfully',
         };
     }
 }

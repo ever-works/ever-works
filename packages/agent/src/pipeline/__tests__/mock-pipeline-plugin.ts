@@ -164,6 +164,7 @@ export class MockPipelinePlugin implements IPipelinePlugin<string> {
             success: true,
             items: [],
             categories: [],
+            collections: [],
             tags: [],
             brands: [],
             duration: meta.duration,

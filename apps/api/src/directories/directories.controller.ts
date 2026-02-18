@@ -28,6 +28,8 @@ import {
     UpdateDirectoryAdvancedPromptsDto,
     CreateCategoryDto,
     UpdateCategoryDto,
+    CreateCollectionDto,
+    UpdateCollectionDto,
     CreateTagDto,
     UpdateTagDto,
     UpdateWebsiteSettingsDto,
@@ -759,6 +761,56 @@ export class DirectoriesController {
         @Param('tagId') tagId: string,
     ) {
         const result = await this.directoryTaxonomyService.deleteTag(id, tagId, auth.userId);
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
+    }
+
+    @Post('directories/:id/collections')
+    @HttpCode(HttpStatus.OK)
+    async createCollection(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: CreateCollectionDto,
+    ) {
+        const result = await this.directoryTaxonomyService.createCollection(
+            id,
+            dto,
+            auth.userId,
+        );
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
+    }
+
+    @Put('directories/:id/collections/:collectionId')
+    @HttpCode(HttpStatus.OK)
+    async updateCollection(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Param('collectionId') collectionId: string,
+        @Body() dto: UpdateCollectionDto,
+    ) {
+        const result = await this.directoryTaxonomyService.updateCollection(
+            id,
+            collectionId,
+            dto,
+            auth.userId,
+        );
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
+    }
+
+    @Delete('directories/:id/collections/:collectionId')
+    @HttpCode(HttpStatus.OK)
+    async deleteCollection(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Param('collectionId') collectionId: string,
+    ) {
+        const result = await this.directoryTaxonomyService.deleteCollection(
+            id,
+            collectionId,
+            auth.userId,
+        );
         await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
         return result;
     }
