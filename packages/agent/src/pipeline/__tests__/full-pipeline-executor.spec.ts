@@ -56,7 +56,7 @@ describe('FullPipelineExecutorService', () => {
         categories: [{ name: 'Category 1' }] as any[],
         tags: [{ name: 'Tag 1' }] as any[],
         brands: [],
-        collections: [],
+        collections: [{ id: 'col-1', name: 'Collection 1' }] as any[],
         duration: 5000,
         stepsCompleted: 5,
         totalSteps: 5,
