@@ -1248,6 +1248,8 @@
                             "title": "Global Features",
                             "categories": "Categories",
                             "categoriesHelper": "Show category filtering and navigation",
+                            "collections": "Collections",
+                            "collectionsHelper": "Show curated collections",
                             "tags": "Tags",
                             "tagsHelper": "Show tag filtering and navigation",
                             "companies": "Companies",
