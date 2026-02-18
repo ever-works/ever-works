@@ -136,6 +136,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 		const config = request.config || {};
 		const generateCategories = config.generate_categories !== false;
 		const generateTags = config.generate_tags !== false;
+		const generateCollections = config.generate_collections !== false;
 		const generateBrands = config.generate_brands !== false;
 
 		// If all entity generation is disabled, skip AI processing entirely
@@ -182,7 +183,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 		context.finalItems = finalItems;
 		context.finalCategories = categories;
 		context.finalTags = tags;
-		context.finalCollections = this.extractUniqueCollections(finalItems);
+		context.finalCollections = generateCollections ? this.extractUniqueCollections(finalItems) : [];
 		context.finalBrands = brands;
 
 		return context;

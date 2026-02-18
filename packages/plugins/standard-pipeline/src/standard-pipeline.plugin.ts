@@ -529,6 +529,14 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 				group: 'features'
 			},
 			{
+				name: 'generate_collections',
+				type: 'boolean',
+				label: 'Generate Collections',
+				description: 'Automatically generate collections for items',
+				defaultValue: true,
+				group: 'features'
+			},
+			{
 				name: 'generate_brands',
 				type: 'boolean',
 				label: 'Extract Brands',
