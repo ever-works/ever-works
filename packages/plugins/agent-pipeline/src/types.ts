@@ -17,8 +17,7 @@ export function isAgentPipelineStepId(value: string): value is AgentPipelineStep
 	return (AGENT_PIPELINE_STEP_IDS as readonly string[]).includes(value);
 }
 
-export const DEFAULT_MAX_STEPS = 500;
-export const DEFAULT_MAX_CONTEXT_TOKENS = 128_000;
+export const DEFAULT_MAX_STEPS = 50;
 export const DEFAULT_CONTEXT_BUDGET_RATIO = 0.8;
 
 export const WORKER_PROMPT_OVERHEAD_TOKENS = 2000;

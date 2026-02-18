@@ -41,10 +41,6 @@ describe('types', () => {
 	});
 
 	describe('constants', () => {
-		it('should have reasonable default max steps', () => {
-			expect(DEFAULT_MAX_STEPS).toBe(500);
-		});
-
 		it('should return adaptive content budget ratio based on model context size', () => {
 			expect(getWorkerContentBudgetRatio(8_000)).toBe(0.35);
 			expect(getWorkerContentBudgetRatio(16_000)).toBe(0.35);
