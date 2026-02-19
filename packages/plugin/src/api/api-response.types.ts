@@ -203,6 +203,8 @@ export interface PluginResponse {
 	homepage?: string;
 	/** Whether plugin is auto-enabled */
 	autoEnable?: boolean;
+	/** Whether this plugin is supplementary (auto-activated; not user-selectable as active provider) */
+	supplementary?: boolean;
 }
 
 /**

@@ -45,7 +45,7 @@ export function DirectoryPluginsList({
     const pluginsByCapability = capabilities.reduce(
         (acc, capability) => {
             acc[capability] = plugins.filter(
-                (p) => p.capabilities.includes(capability) && p.directoryEnabled,
+                (p) => p.capabilities.includes(capability) && p.directoryEnabled && !p.supplementary,
             );
             return acc;
         },
