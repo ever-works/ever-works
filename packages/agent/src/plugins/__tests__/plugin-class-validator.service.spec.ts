@@ -387,47 +387,6 @@ describe('PluginClassValidatorService', () => {
             expect(result.valid).toBe(true);
         });
 
-        it('should validate form-field capability', () => {
-            const plugin = createValidPlugin({
-                capabilities: ['form-field'],
-            }) as any;
-            plugin.fieldType = 'custom-input';
-            plugin.getRegistration = jest.fn();
-            plugin.validate = jest.fn();
-
-            const result = service.validateCapabilities(plugin);
-
-            expect(result.valid).toBe(true);
-        });
-
-        it('should validate sub-provider capability', () => {
-            const plugin = createValidPlugin({
-                capabilities: ['sub-provider'],
-            }) as any;
-            plugin.parentCapability = 'ai-provider';
-            plugin.subProviderId = 'gpt-4';
-            plugin.getRegistration = jest.fn();
-            plugin.canHandle = jest.fn();
-            plugin.getPriority = jest.fn();
-            plugin.isAvailable = jest.fn();
-
-            const result = service.validateCapabilities(plugin);
-
-            expect(result.valid).toBe(true);
-        });
-
-        it('should validate config-aware capability', () => {
-            const plugin = createValidPlugin({
-                capabilities: ['config-aware'],
-            }) as any;
-            plugin.onConfigurationChange = jest.fn();
-            plugin.getEffectiveConfig = jest.fn();
-
-            const result = service.validateCapabilities(plugin);
-
-            expect(result.valid).toBe(true);
-        });
-
         it('should validate form-schema-provider capability', () => {
             const plugin = createValidPlugin({
                 capabilities: ['form-schema-provider'],
@@ -463,20 +422,6 @@ describe('PluginClassValidatorService', () => {
 
             expect(result.valid).toBe(false);
             expect(result.errors?.some((e) => e.message.includes('targetPipelines'))).toBe(true);
-        });
-
-        it('should validate custom-capability capability', () => {
-            const plugin = createValidPlugin({
-                capabilities: ['custom-capability'],
-            }) as any;
-            plugin.getCustomCapabilities = jest.fn();
-            plugin.getCapabilityImplementation = jest.fn();
-            plugin.hasCapability = jest.fn();
-            plugin.getCapabilityVersion = jest.fn();
-
-            const result = service.validateCapabilities(plugin);
-
-            expect(result.valid).toBe(true);
         });
 
         it('should warn for unknown capability', () => {

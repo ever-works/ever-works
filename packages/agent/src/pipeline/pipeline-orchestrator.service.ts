@@ -48,7 +48,11 @@ export class PipelineOrchestratorService {
     ): Promise<PipelineResult> {
         const pipelineId = request.providers?.pipeline;
 
-        const plugin = this.resolvePipelinePlugin(pipelineId, directory.id, directory.user?.id);
+        const plugin = await this.resolvePipelinePlugin(
+            pipelineId,
+            directory.id,
+            directory.user?.id,
+        );
 
         const mode: PipelineExecutionMode = isStepOrchestratablePipeline(plugin) ? 'step' : 'full';
 
@@ -104,7 +108,11 @@ export class PipelineOrchestratorService {
         }
 
         // Step mode (or fallback from full mode)
-        const plugin = this.resolvePipelinePlugin(undefined, directory.id, directory.user?.id);
+        const plugin = await this.resolvePipelinePlugin(
+            undefined,
+            directory.id,
+            directory.user?.id,
+        );
         return this.stepExecutor.execute(plugin, directory, request, existing, options, onProgress);
     }
 
@@ -152,8 +160,8 @@ export class PipelineOrchestratorService {
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult | null> {
-        // Resume is only supported in step mode — resolve the default pipeline plugin
-        const plugin = this.resolvePipelinePlugin(undefined, directoryId);
+        // Resume is only supported in step mode — resolve the pipeline plugin that owns the checkpoint
+        const plugin = await this.resolvePipelinePlugin(pipelineId, directoryId);
         return this.stepExecutor.resumeFromCheckpoint(
             plugin,
             directoryId,
@@ -178,7 +186,7 @@ export class PipelineOrchestratorService {
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
-        const plugin = this.resolvePipelinePlugin(
+        const plugin = await this.resolvePipelinePlugin(
             request.providers?.pipeline,
             directory.id,
             directory.user?.id,
@@ -213,11 +221,11 @@ export class PipelineOrchestratorService {
      * 2. First enabled pipeline with defaultForCapabilities: ['pipeline']
      * 3. First loaded+enabled pipeline plugin
      */
-    private resolvePipelinePlugin(
+    private async resolvePipelinePlugin(
         pipelineId?: string | null,
         directoryId?: string,
         userId?: string,
-    ): IPipelinePlugin {
+    ): Promise<IPipelinePlugin> {
         if (typeof pipelineId === 'string') {
             const registered = this.registry.get(pipelineId);
             if (registered?.state === 'loaded' && isPipelinePlugin(registered.plugin)) {
@@ -232,21 +240,29 @@ export class PipelineOrchestratorService {
         // Auto-detect: find first pipeline with defaultForCapabilities
         const pipelines = this.registry.getByCapability(PLUGIN_CAPABILITIES.PIPELINE);
 
-        // First: find one with defaultForCapabilities: ['pipeline'] that is loaded
+        // First: find one with defaultForCapabilities: ['pipeline'] that is loaded and enabled for scope
         for (const registered of pipelines) {
             if (registered.state !== 'loaded') continue;
             if (!isPipelinePlugin(registered.plugin)) continue;
-            if (registered.manifest.defaultForCapabilities?.includes('pipeline')) {
-                return registered.plugin;
-            }
+            if (!registered.manifest.defaultForCapabilities?.includes('pipeline')) continue;
+            const isEnabled = await this.registry.isPluginEnabledForScope(
+                registered.plugin.id,
+                directoryId,
+                userId,
+            );
+            if (isEnabled) return registered.plugin;
         }
 
-        // Fallback: first loaded pipeline
+        // Fallback: first loaded and enabled pipeline
         for (const registered of pipelines) {
             if (registered.state !== 'loaded') continue;
-            if (isPipelinePlugin(registered.plugin)) {
-                return registered.plugin;
-            }
+            if (!isPipelinePlugin(registered.plugin)) continue;
+            const isEnabled = await this.registry.isPluginEnabledForScope(
+                registered.plugin.id,
+                directoryId,
+                userId,
+            );
+            if (isEnabled) return registered.plugin;
         }
 
         throw new Error(

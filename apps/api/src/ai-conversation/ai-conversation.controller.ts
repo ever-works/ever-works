@@ -24,6 +24,7 @@ export class AiConversationController {
 
         const stream = this.aiConversationService.streamChat(body, {
             userId: auth.userId,
+            directoryId: body.directoryId,
         });
 
         for await (const chunk of stream) {

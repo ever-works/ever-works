@@ -1,4 +1,5 @@
-import type { ItemData, Category, Tag, Brand } from '@ever-works/contracts';
+import type { ItemData } from '@ever-works/contracts';
+import type { PipelineOutputs } from '../contracts/capabilities/pipeline-plugin.interface.js';
 
 /**
  * Plugin lifecycle event names
@@ -153,10 +154,7 @@ export interface PipelineStepFailedPayload extends PipelineStepEventPayload {
 export interface PipelineCompletedPayload extends PipelineEventPayload {
 	readonly duration: number;
 	readonly stepsCompleted: number;
-	readonly items: readonly ItemData[];
-	readonly categories: readonly Category[];
-	readonly tags: readonly Tag[];
-	readonly brands: readonly Brand[];
+	readonly outputs: PipelineOutputs;
 }
 
 export interface PipelineFailedPayload extends PipelineEventPayload {

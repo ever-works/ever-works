@@ -9,6 +9,7 @@ import type {
 	PipelineMetrics,
 	StepStatus
 } from '@ever-works/plugin';
+import { buildCancelledPipelineResult, buildErrorPipelineResult, createEmptyPipelineOutputs } from '@ever-works/plugin';
 import type { AgentPipelineStepId } from '../types.js';
 import { AGENT_PIPELINE_STEP_IDS } from '../types.js';
 import { STEP_DEFINITIONS } from '../steps.js';
@@ -129,20 +130,14 @@ export function buildErrorResult(
 
 	return {
 		state: currentState,
-		result: {
-			success: false,
-			items: [],
-			categories: [],
-			tags: [],
-			collections: [],
-			brands: [],
+		result: buildErrorPipelineResult(error, {
+			outputs: createEmptyPipelineOutputs(),
 			duration: Date.now() - startTime,
 			stepsCompleted: currentState.completedSteps.length,
 			totalSteps: AGENT_PIPELINE_STEP_IDS.length,
-			error,
 			failedStep: currentState.failedSteps[currentState.failedSteps.length - 1],
 			state: currentState
-		}
+		})
 	};
 }
 
@@ -161,19 +156,13 @@ export function buildCancelledResult(
 
 	return {
 		state: currentState,
-		result: {
-			success: false,
-			items: [],
-			categories: [],
-			tags: [],
-			collections: [],
-			brands: [],
+		result: buildCancelledPipelineResult({
+			outputs: createEmptyPipelineOutputs(),
 			duration: Date.now() - startTime,
 			stepsCompleted: currentState.completedSteps.length,
 			totalSteps: AGENT_PIPELINE_STEP_IDS.length,
-			error: 'Pipeline cancelled',
 			state: currentState
-		}
+		})
 	};
 }
 

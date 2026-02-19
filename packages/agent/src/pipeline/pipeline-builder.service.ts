@@ -250,9 +250,16 @@ export class PipelineBuilderService {
         pluginId: string,
         context: BuildContext,
     ): void {
-        const stepDef = modifier.getStepDefinition?.();
-        if (stepDef) {
-            this.processStepPosition(stepDef, pluginId, context);
+        if (modifier.getStepDefinitions) {
+            const stepDefs = modifier.getStepDefinitions();
+            for (const stepDef of stepDefs) {
+                this.processStepPosition(stepDef, pluginId, context);
+            }
+        } else {
+            const stepDef = modifier.getStepDefinition?.();
+            if (stepDef) {
+                this.processStepPosition(stepDef, pluginId, context);
+            }
         }
     }
 
@@ -283,6 +290,11 @@ export class PipelineBuilderService {
                 this.logger.debug(
                     `Plugin "${pluginId}" injects step "${step.id}" ${position.type} "${position.stepId}"`,
                 );
+                break;
+
+            case 'disable':
+                this.disableStep(position.stepId, context);
+                this.logger.debug(`Plugin "${pluginId}" disables step "${position.stepId}"`);
                 break;
 
             case 'first':

@@ -143,7 +143,7 @@ export class DataGeneratorService {
         }
 
         // If no items were generated, we don't need to do anything else
-        if (!pipelineResult || pipelineResult.items.length === 0) {
+        if (!pipelineResult || pipelineResult.outputs.items.length === 0) {
             const stats: GenerationStats = {
                 newItemsCount: 0,
                 updatedItemsCount: 0,
@@ -159,7 +159,7 @@ export class DataGeneratorService {
             items: newItems,
             tags: newTags,
             collections: newCollections,
-        } = pipelineResult;
+        } = pipelineResult.outputs;
         const { existingCategories, existingTags, existingCollections } = existingData;
 
         this.logger.debug(
@@ -437,14 +437,14 @@ export class DataGeneratorService {
 
             // Update directory items count
             await this.directoryOperations.updateDirectory(directory.id, {
-                itemsCount: pipelineResult.items.length + existingData.existingItems.length,
+                itemsCount: pipelineResult.outputs.items.length + existingData.existingItems.length,
             });
 
             // Persist domain type if detected and not manually set
-            if (pipelineResult.domainAnalysis && !directory.domainTypeManuallySet) {
+            if (pipelineResult.outputs.domainAnalysis && !directory.domainTypeManuallySet) {
                 await this.directoryOperations.updateDirectory(directory.id, {
-                    domainType: pipelineResult.domainAnalysis.domain_type,
-                    domainTypeConfidence: pipelineResult.domainAnalysis.confidence,
+                    domainType: pipelineResult.outputs.domainAnalysis.domain_type,
+                    domainTypeConfidence: pipelineResult.outputs.domainAnalysis.confidence,
                 });
             }
 
@@ -1009,9 +1009,9 @@ export class DataGeneratorService {
         return {
             urls_scanned: 0,
             pages_processed: 0,
-            items_extracted_current_run: result.items.length,
-            new_items_added_to_store: result.items.length,
-            total_items_in_store: result.items.length,
+            items_extracted_current_run: result.outputs.items.length,
+            new_items_added_to_store: result.outputs.items.length,
+            total_items_in_store: result.outputs.items.length,
         };
     }
 
