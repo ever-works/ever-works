@@ -44,9 +44,11 @@ export function DirectoryPluginsList({
     // Group enabled plugins by capability for the selector
     const pluginsByCapability = capabilities.reduce(
         (acc, capability) => {
-            acc[capability] = plugins.filter(
-                (p) => p.capabilities.includes(capability) && p.directoryEnabled && !p.supplementary,
-            );
+            acc[capability] = plugins.filter((p) => {
+                return (
+                    p.capabilities.includes(capability) && p.directoryEnabled && !p.supplementary
+                );
+            });
             return acc;
         },
         {} as Record<string, DirectoryPlugin[]>,
