@@ -1,13 +1,6 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import type {
-	ISearchFacade,
-	IContentExtractorFacade,
-	FacadeOptions,
-	PipelineProgressCallback,
-	PluginLogger
-} from '@ever-works/plugin';
-import { MAX_EXTRACT_CONTENT_LENGTH } from '../types.js';
+import type { ISearchFacade, FacadeOptions, PipelineProgressCallback, PluginLogger } from '@ever-works/plugin';
 import type { ToolCircuitBreaker } from '../utils/tool-circuit-breaker.js';
 
 export interface FacadeToolOptions {
@@ -15,9 +8,6 @@ export interface FacadeToolOptions {
 	logger: PluginLogger;
 }
 
-/**
- * Create a search tool that wraps the search facade.
- */
 export function createSearchTool(
 	searchFacade: ISearchFacade,
 	facadeOptions: FacadeOptions,
@@ -64,70 +54,6 @@ export function createSearchTool(
 	});
 }
 
-/**
- * Create a content extraction tool that wraps the content extractor facade.
- * Truncates content to MAX_EXTRACT_CONTENT_LENGTH to keep context manageable.
- */
-export function createExtractContentTool(
-	contentExtractorFacade: IContentExtractorFacade,
-	facadeOptions: FacadeOptions,
-	toolOptions: FacadeToolOptions,
-	maxContentLength?: number
-) {
-	const { breaker, logger } = toolOptions;
-
-	return tool({
-		description:
-			"Extract the text content from a web page URL. Use this to read details from an item's official page.",
-		inputSchema: z.object({
-			url: z.string().url().describe('The URL to extract content from')
-		}),
-		execute: async ({ url }) => {
-			if (breaker.isTripped('extractContent')) {
-				return { url, content: '', error: breaker.getUnavailableMessage('extractContent') };
-			}
-
-			try {
-				const result = await contentExtractorFacade.extractContent(url, undefined, facadeOptions);
-
-				// Null/empty content is NOT a service failure — don't trip the breaker
-				if (!result?.rawContent) {
-					return { url, content: '', error: 'Failed to extract content from this URL' };
-				}
-
-				breaker.recordSuccess('extractContent');
-				const maxLen = maxContentLength ?? MAX_EXTRACT_CONTENT_LENGTH;
-
-				let content: string;
-				if (result.rawContent.length <= maxLen) {
-					content = result.rawContent;
-				} else {
-					content =
-						result.rawContent.slice(0, maxLen) +
-						`\n\n[Content truncated: ${result.rawContent.length} chars total]`;
-				}
-				return { url, content, images: result.images };
-			} catch (err) {
-				const error = err instanceof Error ? err : new Error(String(err));
-				logger.warn(`ExtractContent tool error: ${error.message}`);
-				breaker.recordFailure('extractContent', error);
-
-				if (breaker.isTripped('extractContent')) {
-					return { url, content: '', error: breaker.getUnavailableMessage('extractContent') };
-				}
-				return {
-					url,
-					content: '',
-					error: `Content extraction failed: ${error.message}. You may retry once with a different URL.`
-				};
-			}
-		}
-	});
-}
-
-/**
- * Create a progress reporting tool that calls the onProgress callback.
- */
 export function createReportProgressTool(
 	onProgress: PipelineProgressCallback | undefined,
 	stepIndex: number,
@@ -140,7 +66,6 @@ export function createReportProgressTool(
 			message: z.string().optional().describe('Optional progress message')
 		}),
 		execute: async ({ itemsCreated, message }) => {
-			// Map items created to a progress percentage within the generate step (30-80%)
 			const percent = Math.min(30 + Math.round(itemsCreated * 1.5), 80);
 			onProgress?.({
 				percent,

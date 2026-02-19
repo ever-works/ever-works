@@ -1,4 +1,4 @@
-import { generateText, stepCountIs, wrapLanguageModel } from 'ai';
+import { generateText, stepCountIs } from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type {
 	IPlugin,
@@ -29,12 +29,7 @@ import type {
 import { collectMetadataFromItems, createItemLookupIndex, isItemDuplicate } from '@ever-works/plugin';
 
 import type { AgentPipelineStepId } from './types.js';
-import {
-	AGENT_PIPELINE_STEP_IDS,
-	DEFAULT_MAX_STEPS,
-	DEFAULT_CONTEXT_BUDGET_RATIO,
-	MAX_EXTRACT_CONTENT_LENGTH
-} from './types.js';
+import { AGENT_PIPELINE_STEP_IDS, DEFAULT_MAX_STEPS, DEFAULT_CONTEXT_BUDGET_RATIO } from './types.js';
 import { STEP_DEFINITIONS } from './steps.js';
 import {
 	getFormFields as formFields,
@@ -43,7 +38,7 @@ import {
 	getDefaultValues as formDefaults
 } from './form-schema.js';
 import { buildSystemPrompt, buildUserPrompt } from './prompt/system-prompt.js';
-import { createAgentTools } from './tools/agent-tools.js';
+import { createParentTools } from './tools/parent-tools.js';
 import { createWorkspace, collectItemsFromWorkspace, cleanupWorkspace } from './utils/sandbox-workspace.js';
 import { captureScreenshots } from './utils/screenshot-capture.js';
 import {
@@ -58,6 +53,14 @@ import {
 import { extractSimpleKeywords, appendToJsonlIndex } from './utils/data-source-helpers.js';
 import { createToolCallRepairFn, withToolCallingRetry } from './utils/tool-call-resilience.js';
 import { createPrepareStep } from './utils/context-compaction.js';
+import { wrapReasoningFilteredModel } from './utils/model-wrapper.js';
+
+interface ProcessUrlExecutionResult {
+	url: string;
+	files: string[];
+	count: number;
+	error?: string;
+}
 
 export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipelineStepId>, IFormSchemaProvider {
 	readonly id = 'agent-pipeline';
@@ -235,7 +238,6 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 
 			const warnings = await this.runAgentGeneration(
 				providerConfig,
-				modelName,
 				workspacePath,
 				execContext,
 				facadeOptions,
@@ -363,7 +365,6 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		providerConfig: Awaited<
 			ReturnType<NonNullable<PipelineExecutionOptions['execContext']>['aiFacade']['getProviderConfig']>
 		>,
-		modelName: string,
 		workspacePath: string,
 		execContext: NonNullable<PipelineExecutionOptions['execContext']>,
 		facadeOptions: FacadeOptions,
@@ -374,7 +375,18 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		signal: AbortSignal,
 		logger: PluginLogger
 	): Promise<string[]> {
-		logger.log(`Using AI provider "${providerConfig.providerName}" with model "${modelName}"`);
+		// Two-model resolution: parent (orchestrator) and worker (extraction)
+		const parentModelName = providerConfig.routing.complexModel || providerConfig.defaultModel;
+		const workerModelName = providerConfig.defaultModel || providerConfig.routing.complexModel;
+
+		if (!parentModelName || !workerModelName) {
+			throw new Error('AI model configuration error: both parent and worker models required');
+		}
+
+		logger.log(
+			`Using AI provider "${providerConfig.providerName}" — ` +
+				`parent: "${parentModelName}", worker: "${workerModelName}"`
+		);
 
 		const provider = createOpenAICompatible({
 			name: providerConfig.providerId,
@@ -382,43 +394,50 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			apiKey: providerConfig.apiKey!
 		});
 
-		const model = wrapLanguageModel({
-			model: provider(modelName),
-			middleware: {
-				specificationVersion: 'v3',
-				transformParams: async ({ params }) => ({
-					...params,
-					prompt: params.prompt.map((message) =>
-						message.role === 'assistant'
-							? {
-									...message,
-									content: message.content.filter((part) => part.type !== 'reasoning')
-								}
-							: message
-					)
-				})
-			}
-		});
+		const wrapModel = (name: string) => {
+			return wrapReasoningFilteredModel(provider(name));
+		};
 
-		const maxContextTokens = await execContext.aiFacade.resolveModelContextLength(modelName, facadeOptions);
-		logger.log(`Resolved context window for "${modelName}": ${maxContextTokens} tokens`);
+		const parentModel = wrapModel(parentModelName);
+		const workerModel = wrapModel(workerModelName);
 
-		// Dynamic content limit: 15% of context window as characters, capped at MAX_EXTRACT_CONTENT_LENGTH
-		const maxContentLength = Math.min(MAX_EXTRACT_CONTENT_LENGTH, Math.floor(maxContextTokens * 0.15 * 4));
-		logger.log(`Content limit for "${modelName}": ${maxContentLength} chars (context: ${maxContextTokens} tokens)`);
+		// Resolve context windows — reuse result when both models are the same
+		const parentMaxContextTokens = await execContext.aiFacade.resolveModelContextLength(
+			parentModelName,
+			facadeOptions
+		);
+		const workerMaxContextTokens =
+			parentModelName === workerModelName
+				? parentMaxContextTokens
+				: await execContext.aiFacade.resolveModelContextLength(workerModelName, facadeOptions);
 
-		const { tools, breaker } = await createAgentTools(
+		logger.log(
+			`Context windows — parent: ${parentMaxContextTokens} tokens, worker: ${workerMaxContextTokens} tokens`
+		);
+
+		const directoryContext = {
+			directoryName: directory.name,
+			directoryDescription: directory.description,
+			requestPrompt: request.prompt
+		};
+
+		const { tools, breaker } = createParentTools({
 			workspacePath,
-			{
+			facades: {
 				searchFacade: execContext.searchFacade,
 				contentExtractorFacade: execContext.contentExtractorFacade
 			},
 			facadeOptions,
+			workerModel,
+			workerMaxContextTokens,
+			parentModel,
+			parentMaxContextTokens,
+			directoryContext,
 			onProgress,
-			AGENT_PIPELINE_STEP_IDS.length,
+			totalSteps: AGENT_PIPELINE_STEP_IDS.length,
 			logger,
-			maxContentLength
-		);
+			signal
+		});
 
 		const promptOptions = { directory, request, existing };
 		const systemPrompt = buildSystemPrompt(promptOptions);
@@ -427,19 +446,19 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		const settings = await resolveSettings(this.context, facadeOptions.userId, directory.id);
 		const maxSteps = (settings.maxSteps as number) || DEFAULT_MAX_STEPS;
 
-		const repairToolCall = createToolCallRepairFn(model, logger);
+		const repairToolCall = createToolCallRepairFn(parentModel, logger);
 
 		const prepareStep = createPrepareStep({
-			maxContextTokens,
+			maxContextTokens: parentMaxContextTokens,
 			budgetRatio: DEFAULT_CONTEXT_BUDGET_RATIO,
-			maxSingleOutputChars: Math.floor(maxContextTokens * 0.1 * 4),
+			maxSingleOutputChars: Math.floor(parentMaxContextTokens * 0.08 * 4),
 			logger
 		});
 
 		const result = await withToolCallingRetry(
-			() =>
-				generateText({
-					model,
+			() => {
+				return generateText({
+					model: parentModel,
 					system: systemPrompt,
 					prompt: userPrompt,
 					tools: tools as Parameters<typeof generateText>[0]['tools'],
@@ -448,10 +467,11 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 					abortSignal: signal,
 					experimental_repairToolCall: repairToolCall,
 					experimental_telemetry: { isEnabled: true }
-				}),
+				});
+			},
 			{
 				providerName: providerConfig.providerName ?? providerConfig.providerId,
-				modelName,
+				modelName: parentModelName,
 				signal,
 				logger
 			}
@@ -460,6 +480,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		// Log generation diagnostics
 		const totalToolCalls = result.steps.reduce((sum, step) => sum + step.toolCalls.length, 0);
 		const toolNames = [...new Set(result.steps.flatMap((step) => step.toolCalls.map((tc) => tc.toolName)))];
+
 		logger.log(
 			`Agent completed: ${result.steps.length} steps, ${totalToolCalls} tool calls` +
 				(toolNames.length > 0 ? ` (${toolNames.join(', ')})` : ' (no tools used)') +
@@ -469,33 +490,43 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 
 		if (totalToolCalls === 0) {
 			logger.warn(
-				`Model "${modelName}" returned without making any tool calls. ` +
+				`Model "${parentModelName}" returned without making any tool calls. ` +
 					'This usually means the model does not support tool calling or ignored the tools. ' +
 					`Response text: "${result.text.slice(0, 200)}${result.text.length > 200 ? '...' : ''}"`
 			);
 		}
 
-		// Resolve provider names for user-facing warnings
-		const [searchProviderName, extractProviderName] = await Promise.all([
-			execContext.searchFacade.getActiveProviderName?.(facadeOptions)?.catch(() => null) ?? null,
-			execContext.contentExtractorFacade.getActiveProviderName?.(facadeOptions)?.catch(() => null) ?? null
-		]);
+		// Resolve provider name for user-facing warnings
+		const searchProviderName =
+			(await execContext.searchFacade.getActiveProviderName?.(facadeOptions)?.catch(() => null)) ?? null;
 
 		const toolLabels: Record<string, { label: string; impact: string }> = {
 			search: {
 				label: searchProviderName ? `Web search (${searchProviderName})` : 'Web search',
 				impact: 'Some results may be missing.'
-			},
-			extractContent: {
-				label: extractProviderName ? `Content extraction (${extractProviderName})` : 'Content extraction',
-				impact: 'Item details may be incomplete.'
 			}
 		};
 
-		const warnings = breaker.getFailedTools().map((tool) => {
-			const info = toolLabels[tool.name] ?? { label: tool.name, impact: 'Results may be less accurate.' };
-			return `${info.label} was unavailable during generation (${tool.reason}). ${info.impact}`;
+		const warnings = breaker.getFailedTools().map((t) => {
+			const info = toolLabels[t.name] ?? { label: t.name, impact: 'Results may be less accurate.' };
+			return `${info.label} was unavailable during generation (${t.reason}). ${info.impact}`;
 		});
+
+		const processUrlFailures = this.collectProcessUrlFailures(result.steps as unknown[]);
+		if (processUrlFailures.failedUrls > 0) {
+			const samples =
+				processUrlFailures.sampleErrors.length > 0
+					? ` Errors: ${processUrlFailures.sampleErrors.join('; ')}`
+					: '';
+
+			if (processUrlFailures.failedUrls === processUrlFailures.totalUrls) {
+				warnings.push(
+					`URL processing had failures (${processUrlFailures.failedUrls}/${processUrlFailures.totalUrls} URLs failed). ` +
+						'Some relevant items may be missing.' +
+						samples
+				);
+			}
+		}
 
 		if (warnings.length > 0) {
 			logger.warn(`Generation warnings (${warnings.length}): ${warnings.join(' | ')}`);
@@ -509,14 +540,105 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		dataSourceItems: MutableItemData[],
 		logger: PluginLogger
 	): Promise<MutableItemData[]> {
-		const agentItems = await collectItemsFromWorkspace(workspacePath, logger);
-		const agentLookup = createItemLookupIndex(agentItems as MutableItemData[]);
+		const collectedAgentItems = await collectItemsFromWorkspace(workspacePath, logger);
+		const agentItems = this.deduplicateGeneratedItems(collectedAgentItems as MutableItemData[], logger);
+		const agentLookup = createItemLookupIndex(agentItems);
 		const uniqueDsItems = dataSourceItems.filter((item) => !isItemDuplicate(item, agentLookup));
 		const total = agentItems.length + uniqueDsItems.length;
 		logger.log(
 			`Collected ${total} items (${agentItems.length} from agent, ${uniqueDsItems.length} from data sources)`
 		);
-		return [...(agentItems as MutableItemData[]), ...uniqueDsItems];
+		return [...agentItems, ...uniqueDsItems];
+	}
+
+	private deduplicateGeneratedItems(items: MutableItemData[], logger: PluginLogger): MutableItemData[] {
+		const seenUrls = new Set<string>();
+		const seenNames = new Set<string>();
+		const unique: MutableItemData[] = [];
+		let dropped = 0;
+
+		for (const item of items) {
+			const urlKey = this.normalizeUrl(item.source_url);
+			const nameKey = this.normalizeName(item.name);
+
+			const isDuplicate = urlKey ? seenUrls.has(urlKey) : !!nameKey && seenNames.has(nameKey);
+			if (isDuplicate) {
+				dropped++;
+				continue;
+			}
+
+			unique.push(item);
+			if (urlKey) {
+				seenUrls.add(urlKey);
+			} else if (nameKey) {
+				seenNames.add(nameKey);
+			}
+		}
+
+		if (dropped > 0) {
+			logger.log(
+				`Deduplicated generated items: dropped ${dropped} duplicates (${items.length} -> ${unique.length})`
+			);
+		}
+
+		return unique;
+	}
+
+	private normalizeUrl(raw: unknown): string | null {
+		if (typeof raw !== 'string') return null;
+		const trimmed = raw.trim();
+		if (!trimmed) return null;
+
+		try {
+			const parsed = new URL(trimmed);
+			const pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+			const host = parsed.host.toLowerCase();
+			const protocol = parsed.protocol.toLowerCase();
+			return `${protocol}//${host}${pathname}${parsed.search}`;
+		} catch {
+			return trimmed.toLowerCase().replace(/\/+$/, '');
+		}
+	}
+
+	private normalizeName(raw: unknown): string | null {
+		if (typeof raw !== 'string') return null;
+		const normalized = raw.trim().toLowerCase().replace(/\s+/g, ' ');
+		return normalized || null;
+	}
+
+	private collectProcessUrlFailures(steps: unknown[]): {
+		totalUrls: number;
+		failedUrls: number;
+		sampleErrors: string[];
+	} {
+		let totalUrls = 0;
+		let failedUrls = 0;
+		const uniqueErrors = new Set<string>();
+
+		for (const step of steps) {
+			const toolResults = (step as { toolResults?: unknown[] }).toolResults;
+			if (!Array.isArray(toolResults)) continue;
+
+			for (const toolResult of toolResults) {
+				const tr = toolResult as { toolName?: unknown; output?: unknown };
+				if (tr.toolName !== 'processUrls') continue;
+
+				if (!Array.isArray(tr.output)) continue;
+				for (const result of tr.output as ProcessUrlExecutionResult[]) {
+					totalUrls++;
+					if (typeof result?.error === 'string' && result.error.trim()) {
+						failedUrls++;
+						uniqueErrors.add(result.error.trim());
+					}
+				}
+			}
+		}
+
+		return {
+			totalUrls,
+			failedUrls,
+			sampleErrors: [...uniqueErrors].slice(0, 3)
+		};
 	}
 
 	private async runScreenshotCapture(

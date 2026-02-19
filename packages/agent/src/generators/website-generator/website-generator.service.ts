@@ -105,7 +105,7 @@ export class WebsiteGeneratorService {
             }
 
             // Sync all branches from template after initial setup
-            await this.syncAllBranchesFromTemplate(directory, user);
+            await this.syncAllBranchesFromTemplate(directory, user, true);
         } finally {
             if (path && typeof path === 'string') {
                 // cleanup
@@ -115,8 +115,8 @@ export class WebsiteGeneratorService {
     }
 
     /** Sync all branches from template to directory's website repo */
-    async syncAllBranchesFromTemplate(directory: Directory, user: User) {
-        return this.branchSyncService.syncFromTemplate(directory, user);
+    async syncAllBranchesFromTemplate(directory: Directory, user: User, cleanupExtraBranches = false) {
+        return this.branchSyncService.syncFromTemplate(directory, user, cleanupExtraBranches);
     }
 
     /**
