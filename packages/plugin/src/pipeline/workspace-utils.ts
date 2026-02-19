@@ -1,4 +1,4 @@
-import type { ItemData, Category, Tag, Brand } from '../common/index.js';
+import type { ItemData, Category, Tag, Brand, Collection } from '../common/index.js';
 
 export { jsonrepair } from 'jsonrepair';
 
@@ -43,10 +43,12 @@ export function collectMetadataFromItems(items: readonly ItemData[]): {
 	categories: Category[];
 	tags: Tag[];
 	brands: Brand[];
+	collections: Collection[];
 } {
 	const categoryMap = new Map<string, Category>();
 	const tagMap = new Map<string, Tag>();
 	const brandMap = new Map<string, Brand>();
+	const collectionMap = new Map<string, Collection>();
 
 	for (const item of items) {
 		// category can be string or string[]
@@ -91,12 +93,23 @@ export function collectMetadataFromItems(items: readonly ItemData[]): {
 				}
 			}
 		}
+		// collection is a string
+		if (item.collection) {
+			const name = typeof item.collection === 'string' ? item.collection : '';
+			if (name) {
+				const key = name.toLowerCase().trim();
+				if (!collectionMap.has(key)) {
+					collectionMap.set(key, { id: slugify(name) || key, name: unslugify(name) });
+				}
+			}
+		}
 	}
 
 	return {
 		categories: [...categoryMap.values()],
 		tags: [...tagMap.values()],
-		brands: [...brandMap.values()]
+		brands: [...brandMap.values()],
+		collections: [...collectionMap.values()]
 	};
 }
 

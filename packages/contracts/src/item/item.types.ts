@@ -27,6 +27,18 @@ export interface Tag {
 }
 
 /**
+ * Collection for curated item lists that span across categories
+ */
+export interface Collection {
+	readonly id: string;
+	readonly name: string;
+	readonly description?: string;
+	readonly icon_url?: string;
+	/** Lower numbers = higher priority (e.g., 1 = first, 2 = second, etc.) */
+	readonly priority?: number;
+}
+
+/**
  * Brand information for items
  */
 export interface Brand {
@@ -74,6 +86,7 @@ export interface ItemData {
 	readonly category: string | readonly string[];
 	readonly slug?: string;
 	readonly tags: readonly string[] | readonly Tag[];
+	readonly collection?: string;
 	readonly markdown?: string;
 	readonly badges?: ItemBadges;
 	readonly brand?: string | Brand;
@@ -93,6 +106,7 @@ export interface MutableItemData {
 	category: string | string[];
 	slug?: string;
 	tags: string[] | Tag[];
+	collection?: string;
 	markdown?: string;
 	badges?: ItemBadges;
 	brand?: string | Brand;

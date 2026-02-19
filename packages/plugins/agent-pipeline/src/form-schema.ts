@@ -1,6 +1,7 @@
 import type { FormFieldDefinition, FormFieldGroup, ValidationResult } from '@ever-works/plugin';
 
 export const DEFAULT_TARGET_ITEMS = 50;
+export const DEFAULT_MAX_PAGES_TO_PROCESS = 10;
 
 export function getFormFields(): FormFieldDefinition[] {
 	return [
@@ -12,6 +13,15 @@ export function getFormFields(): FormFieldDefinition[] {
 			defaultValue: DEFAULT_TARGET_ITEMS,
 			validation: { min: 1, max: 500 },
 			group: 'volume'
+		},
+		{
+			name: 'max_pages_to_process',
+			type: 'number',
+			label: 'Max Pages to Process',
+			description: 'Maximum number of URLs the agent will process in total',
+			defaultValue: DEFAULT_MAX_PAGES_TO_PROCESS,
+			validation: { min: 1, max: 1000 },
+			group: 'search'
 		},
 		{
 			name: 'capture_screenshots',
@@ -33,10 +43,18 @@ export function getFormGroups(): FormFieldGroup[] {
 			order: 0
 		},
 		{
+			name: 'search',
+			title: 'Search Configuration',
+			description: 'Control how many sources the agent processes',
+			order: 1,
+			collapsible: true,
+			collapsed: true
+		},
+		{
 			name: 'features',
 			title: 'Generation Features',
 			description: 'Enable or disable generation features',
-			order: 1,
+			order: 2,
 			collapsible: true,
 			collapsed: true
 		}

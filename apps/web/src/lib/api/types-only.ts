@@ -95,6 +95,7 @@ export type {
     Tag,
     Brand,
     ItemData,
+    Collection,
 } from './types';
 
 export type {

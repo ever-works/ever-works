@@ -22,7 +22,9 @@ export type {
 	GitPullRequest,
 	GitRepositoryPermissions,
 	GitRepositoryWithPermissions,
-	ListRepositoriesOptions
+	ListRepositoriesOptions,
+	GitPullRequestFile,
+	ListPullRequestsOptions
 } from '../contracts/capabilities/git-provider.interface.js';
 
 export { isGitProviderPlugin } from '../contracts/capabilities/git-provider.interface.js';

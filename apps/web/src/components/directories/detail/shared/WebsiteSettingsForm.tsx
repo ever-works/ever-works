@@ -23,6 +23,7 @@ export interface CustomMenuItem {
 
 export interface WebsiteSettings {
     categories_enabled?: boolean;
+    collections_enabled?: boolean;
     companies_enabled?: boolean;
     tags_enabled?: boolean;
     surveys_enabled?: boolean;
@@ -65,6 +66,7 @@ export interface WebsiteSettingsFormData {
 
 export const DEFAULT_SETTINGS: WebsiteSettings = {
     categories_enabled: true,
+    collections_enabled: true,
     companies_enabled: true,
     tags_enabled: true,
     surveys_enabled: true,
@@ -500,6 +502,11 @@ function FullLayout({
                         label={tSettings('sections.global.categories')}
                     />
                     <Switch
+                        checked={formData.settings.collections_enabled ?? true}
+                        onChange={(checked) => updateSettings('collections_enabled', checked)}
+                        label={tSettings('sections.global.collections')}
+                    />
+                    <Switch
                         checked={formData.settings.tags_enabled ?? true}
                         onChange={(checked) => updateSettings('tags_enabled', checked)}
                         label={tSettings('sections.global.tags')}
@@ -731,6 +738,11 @@ function GeneralFields({
                         checked={formData.settings.categories_enabled ?? true}
                         onChange={(checked) => updateSettings('categories_enabled', checked)}
                         label={tSettings('sections.global.categories')}
+                    />
+                    <Switch
+                        checked={formData.settings.collections_enabled ?? true}
+                        onChange={(checked) => updateSettings('collections_enabled', checked)}
+                        label={tSettings('sections.global.collections')}
                     />
                     <Switch
                         checked={formData.settings.tags_enabled ?? true}

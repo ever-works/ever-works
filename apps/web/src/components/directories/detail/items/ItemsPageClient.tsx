@@ -1,27 +1,29 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { ItemData, Category, Tag } from '@/lib/api/types-only';
+import { ItemData, Category, Collection, Tag } from '@/lib/api/types-only';
 import { ItemsList } from './ItemsList';
 import { AddItemModal } from './AddItemModal';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
-import { Plus, Package, FolderTree, Tags as TagsIcon } from 'lucide-react';
+import { Plus, Package, FolderTree, Tags as TagsIcon, Bookmark } from 'lucide-react';
 import { getCategoryName } from '@/lib/utils/items';
 import { useDirectoryDetail, useDirectoryPermissions } from '../DirectoryDetailContext';
 import { CategoriesTab } from './CategoriesTab';
 import { TagsTab } from './TagsTab';
+import { CollectionsTab } from './CollectionsTab';
 import { checkScreenshotAvailability } from '@/app/actions/dashboard/items';
 import { ItemsProvider } from './ItemsContext';
 
-type TabType = 'items' | 'categories' | 'tags';
+type TabType = 'items' | 'categories' | 'tags' | 'collections';
 
 interface ItemsPageClientProps {
     items: ItemData[];
     directoryId: string;
     categories?: Category[];
     tags?: Tag[];
+    collections?: Collection[];
 }
 
 export function ItemsPageClient({
@@ -29,6 +31,7 @@ export function ItemsPageClient({
     directoryId,
     categories: initialCategories = [],
     tags: initialTags = [],
+    collections: initialCollections = [],
 }: ItemsPageClientProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const permissions = useDirectoryPermissions();
@@ -81,6 +84,7 @@ export function ItemsPageClient({
         { id: 'items' as const, label: t('tabs.browseItems'), icon: Package },
         { id: 'categories' as const, label: t('tabs.categories'), icon: FolderTree },
         { id: 'tags' as const, label: t('tabs.tags'), icon: TagsIcon },
+        { id: 'collections' as const, label: t('tabs.collections'), icon: Bookmark },
     ];
 
     return (
@@ -148,6 +152,15 @@ export function ItemsPageClient({
                 <TagsTab
                     directoryId={directoryId}
                     initialTags={initialTags}
+                    items={items}
+                    canEdit={permissions.canEdit}
+                />
+            )}
+
+            {activeTab === 'collections' && (
+                <CollectionsTab
+                    directoryId={directoryId}
+                    initialCollections={initialCollections}
                     items={items}
                     canEdit={permissions.canEdit}
                 />

@@ -51,6 +51,55 @@ export class UpdateCategoryDto {
     priority?: number;
 }
 
+// Collection DTOs
+
+export class CreateCollectionDto {
+    @IsString()
+    @MaxLength(100)
+    @Transform(({ value }) => (typeof value === 'string' ? sanitizeName(value, 100) : value))
+    name: string;
+
+    @IsString()
+    @IsOptional()
+    @MaxLength(500)
+    @Transform(({ value }) => (typeof value === 'string' ? sanitizeDescription(value, 500) : value))
+    description?: string;
+
+    @IsString()
+    @IsOptional()
+    @MaxLength(500)
+    icon_url?: string;
+
+    @IsNumber()
+    @IsOptional()
+    @Min(0)
+    priority?: number;
+}
+
+export class UpdateCollectionDto {
+    @IsString()
+    @IsOptional()
+    @MaxLength(100)
+    @Transform(({ value }) => (typeof value === 'string' ? sanitizeName(value, 100) : value))
+    name?: string;
+
+    @IsString()
+    @IsOptional()
+    @MaxLength(500)
+    @Transform(({ value }) => (typeof value === 'string' ? sanitizeDescription(value, 500) : value))
+    description?: string;
+
+    @IsString()
+    @IsOptional()
+    @MaxLength(500)
+    icon_url?: string;
+
+    @IsNumber()
+    @IsOptional()
+    @Min(0)
+    priority?: number;
+}
+
 // Tag DTOs
 
 export class CreateTagDto {

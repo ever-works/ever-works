@@ -151,6 +151,10 @@ export class UpdateWebsiteSettingsDto {
 
     @IsOptional()
     @IsBoolean()
+    collections_enabled?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
     companies_enabled?: boolean;
 
     @IsOptional()
@@ -191,6 +195,7 @@ export interface WebsiteSettingsResponseDto {
     company_website: string;
     settings: {
         categories_enabled?: boolean;
+        collections_enabled?: boolean;
         companies_enabled?: boolean;
         tags_enabled?: boolean;
         surveys_enabled?: boolean;

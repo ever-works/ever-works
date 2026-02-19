@@ -12,6 +12,7 @@ export type {
 	ItemData,
 	MutableItemData,
 	Category,
+	Collection,
 	Tag,
 	Brand,
 	DomainAnalysis,

@@ -822,7 +822,8 @@
                 "tabs": {
                     "browseItems": "Browse Items",
                     "categories": "Categories",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "collections": "Collections"
                 },
                 "taxonomy": {
                     "categories": {
@@ -903,6 +904,51 @@
                             "errors": {
                                 "nameRequired": "Tag name is required",
                                 "nameExists": "A tag with this name already exists"
+                            }
+                        }
+                    },
+                    "collections": {
+                        "searchPlaceholder": "Search collections...",
+                        "add": "Add Collection",
+                        "addFirst": "Add First Collection",
+                        "showing": "Showing {current} of {total} collections",
+                        "empty": "No collections yet",
+                        "noMatch": "No collections match your search",
+                        "columns": {
+                            "name": "Name",
+                            "description": "Description",
+                            "items": "Items",
+                            "priority": "Priority",
+                            "actions": "Actions"
+                        },
+                        "createSuccess": "Collection created successfully",
+                        "createFailed": "Failed to create collection",
+                        "updateSuccess": "Collection updated successfully",
+                        "updateFailed": "Failed to update collection",
+                        "deleteSuccess": "Collection deleted successfully",
+                        "deleteFailed": "Failed to delete collection",
+                        "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
+                        "deleteHasItems": "Cannot delete collection with {count} items assigned",
+                        "modal": {
+                            "createTitle": "Create Collection",
+                            "editTitle": "Edit Collection",
+                            "name": "Name",
+                            "namePlaceholder": "e.g., Editor's Picks",
+                            "description": "Description",
+                            "descriptionPlaceholder": "Brief description of this collection",
+                            "iconUrl": "Icon URL",
+                            "iconUrlPlaceholder": "https://example.com/icon.png",
+                            "iconUrlHelp": "Optional URL to an icon image",
+                            "priority": "Priority",
+                            "priorityPlaceholder": "e.g., 1",
+                            "priorityHelp": "Lower numbers appear first in lists",
+                            "cancel": "Cancel",
+                            "save": "Save",
+                            "create": "Create",
+                            "saving": "Saving...",
+                            "errors": {
+                                "nameRequired": "Collection name is required",
+                                "nameExists": "A collection with this name already exists"
                             }
                         }
                     }
@@ -1164,6 +1210,15 @@
                         }
                     }
                 },
+                "communityPrProcessing": "Community PR",
+                "communityPrEnableLabel": "Enable Community PR",
+                "communityPrEnableDescription": "Automatically process pull requests submitted by the community.",
+                "communityPrAutoCloseLabel": "Auto-close PRs after processing",
+                "communityPrAutoCloseDescription": "Automatically close community pull requests after they have been processed.",
+                "communityPrEnabled": "Community PR processing enabled",
+                "communityPrDisabled": "Community PR processing disabled",
+                "communityPrSettingsUpdated": "Community PR settings updated",
+                "communityPrUpdateFailed": "Failed to update community PR settings",
                 "websiteConfig": {
                     "title": "Website Configuration",
                     "subtitle": "Customize how your directory website looks and behaves",
@@ -1193,6 +1248,8 @@
                             "title": "Global Features",
                             "categories": "Categories",
                             "categoriesHelper": "Show category filtering and navigation",
+                            "collections": "Collections",
+                            "collectionsHelper": "Show curated collections",
                             "tags": "Tags",
                             "tagsHelper": "Show tag filtering and navigation",
                             "companies": "Companies",

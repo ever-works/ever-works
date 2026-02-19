@@ -3,16 +3,26 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { syncTaxonomyFromFile } from '../utils/taxonomy-sync.js';
 
-interface WrappedSandbox {
+export interface WrappedSandbox {
 	readFile(path: string): Promise<string>;
 	writeFiles(files: Array<{ path: string; content: string }>): Promise<void>;
+}
+
+export interface CreateFileToolOptions {
+	/** Called after a file is successfully created. Receives the resolved path and content. */
+	onCreated?: (path: string, content: string) => Promise<void>;
+}
+
+export interface UpdateFileToolOptions {
+	/** Called after a file is successfully updated. Receives the resolved path and content. */
+	onUpdated?: (path: string, content: string) => Promise<void>;
 }
 
 /**
  * Create a `createFile` tool that writes a new file.
  * Returns an error if the file already exists, directing the agent to use `updateFile` instead.
  */
-export function createCreateFileTool(sandbox: WrappedSandbox, cwd: string) {
+export function createCreateFileTool(sandbox: WrappedSandbox, cwd: string, options?: CreateFileToolOptions) {
 	return tool({
 		description: 'Create a new file. Fails if the file already exists — use updateFile to modify existing files.',
 		inputSchema: z.object({
@@ -30,6 +40,7 @@ export function createCreateFileTool(sandbox: WrappedSandbox, cwd: string) {
 			} catch {
 				// File doesn't exist — proceed
 			}
+
 			await sandbox.writeFiles([{ path: resolvedPath, content }]);
 			try {
 				await syncTaxonomyFromFile(
@@ -41,6 +52,15 @@ export function createCreateFileTool(sandbox: WrappedSandbox, cwd: string) {
 			} catch {
 				/* best-effort */
 			}
+
+			if (options?.onCreated) {
+				try {
+					await options.onCreated(path, content);
+				} catch {
+					/* best-effort */
+				}
+			}
+
 			return { success: true, path };
 		}
 	});
@@ -50,7 +70,7 @@ export function createCreateFileTool(sandbox: WrappedSandbox, cwd: string) {
  * Create an `updateFile` tool that overwrites an existing file.
  * Returns an error if the file does not exist, directing the agent to use `createFile` instead.
  */
-export function createUpdateFileTool(sandbox: WrappedSandbox, cwd: string) {
+export function createUpdateFileTool(sandbox: WrappedSandbox, cwd: string, options?: UpdateFileToolOptions) {
 	return tool({
 		description: 'Update an existing file. Fails if the file does not exist — use createFile to create new files.',
 		inputSchema: z.object({
@@ -77,6 +97,13 @@ export function createUpdateFileTool(sandbox: WrappedSandbox, cwd: string) {
 				);
 			} catch {
 				/* best-effort */
+			}
+			if (options?.onUpdated) {
+				try {
+					await options.onUpdated(path, content);
+				} catch {
+					/* best-effort */
+				}
 			}
 			return { success: true, path };
 		}

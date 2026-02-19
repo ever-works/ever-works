@@ -7,6 +7,7 @@ export type {
     ItemBadges,
     BadgeEvaluationResult,
     ItemData,
+    Collection,
 } from '@ever-works/contracts';
 
 // Web-specific types

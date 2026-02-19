@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
-import { ScheduleModule } from '@nestjs/schedule';
 import { HttpModule } from '@nestjs/axios';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -24,7 +23,6 @@ import { jwtConstants } from '../config/constants';
     imports: [
         PassportModule,
         DatabaseModule,
-        ScheduleModule.forRoot(),
         HttpModule,
         JwtModule.registerAsync({
             useFactory: () => ({
