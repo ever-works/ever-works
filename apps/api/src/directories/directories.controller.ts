@@ -7,6 +7,7 @@ import {
     HttpCode,
     HttpStatus,
     Inject,
+    NotFoundException,
     Param,
     Post,
     Put,
@@ -27,6 +28,8 @@ import {
     UpdateDirectoryAdvancedPromptsDto,
     CreateCategoryDto,
     UpdateCategoryDto,
+    CreateCollectionDto,
+    UpdateCollectionDto,
     CreateTagDto,
     UpdateTagDto,
     UpdateWebsiteSettingsDto,
@@ -71,6 +74,8 @@ import {
     GetUserRepositoriesResponseDto,
 } from '@ever-works/agent/dto';
 import { UpdateWebsiteRepositoryResponseDto } from '@ever-works/agent/generators';
+import { CommunityPrProcessorService } from '@ever-works/agent/community-pr';
+import { DirectoryRepository } from '@ever-works/agent/database';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { GenerateDirectoryDetailDto } from './dto/generate-detail.dto';
@@ -99,6 +104,8 @@ export class DirectoriesController {
         private readonly directoryAdvancedPromptsService: DirectoryAdvancedPromptsService,
         private readonly directoryTaxonomyService: DirectoryTaxonomyService,
         private readonly generatorFormSchemaService: GeneratorFormSchemaService,
+        private readonly communityPrProcessorService: CommunityPrProcessorService,
+        private readonly directoryRepository: DirectoryRepository,
     ) {}
 
     @Get('directories')
@@ -756,5 +763,84 @@ export class DirectoriesController {
         const result = await this.directoryTaxonomyService.deleteTag(id, tagId, auth.userId);
         await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
         return result;
+    }
+
+    @Post('directories/:id/collections')
+    @HttpCode(HttpStatus.OK)
+    async createCollection(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: CreateCollectionDto,
+    ) {
+        const result = await this.directoryTaxonomyService.createCollection(
+            id,
+            dto,
+            auth.userId,
+        );
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
+    }
+
+    @Put('directories/:id/collections/:collectionId')
+    @HttpCode(HttpStatus.OK)
+    async updateCollection(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Param('collectionId') collectionId: string,
+        @Body() dto: UpdateCollectionDto,
+    ) {
+        const result = await this.directoryTaxonomyService.updateCollection(
+            id,
+            collectionId,
+            dto,
+            auth.userId,
+        );
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
+    }
+
+    @Delete('directories/:id/collections/:collectionId')
+    @HttpCode(HttpStatus.OK)
+    async deleteCollection(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Param('collectionId') collectionId: string,
+    ) {
+        const result = await this.directoryTaxonomyService.deleteCollection(
+            id,
+            collectionId,
+            auth.userId,
+        );
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
+    }
+
+    @Post('directories/:id/process-community-prs')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Process community PRs',
+        description: 'Manually trigger processing of community pull requests for a directory',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Community PRs processed' })
+    @ApiResponse({ status: 400, description: 'Community PR processing not enabled' })
+    async processCommunityPrs(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        // Verify user has access
+        const user = await this.authService.getUser(auth.userId);
+        await this.directoryQueryService.getDirectory(id, user);
+
+        // Get full entity and check if community PR processing is enabled
+        const directory = await this.directoryRepository.findById(id);
+        if (!directory) {
+            throw new NotFoundException('Directory not found');
+        }
+        if (!directory.communityPrEnabled) {
+            throw new BadRequestException(
+                'Community PR processing is not enabled for this directory.',
+            );
+        }
+
+        const itemsAdded = await this.communityPrProcessorService.processDirectory(directory);
+        return { itemsAdded };
     }
 }

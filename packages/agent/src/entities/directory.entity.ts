@@ -11,6 +11,7 @@ import {
 import { User } from './user.entity';
 import type {
     ClassToObject,
+    CommunityPrState,
     DirectoryScheduleCadence,
     DirectoryScheduleStatus,
     GenerateStatus,
@@ -129,6 +130,16 @@ export class Directory {
     // Import Source FIELDS
     @Column('simple-json', { nullable: true })
     sourceRepository?: SourceRepository;
+
+    // Community PR Processing FIELDS
+    @Column({ type: 'boolean', default: false })
+    communityPrEnabled: boolean;
+
+    @Column({ type: 'boolean', default: true })
+    communityPrAutoClose: boolean;
+
+    @Column('simple-json', { nullable: true })
+    communityPrState?: CommunityPrState;
 
     // Website Template Auto-Update FIELDS
     @Column({ type: 'boolean', default: false })

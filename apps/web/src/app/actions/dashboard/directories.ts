@@ -557,6 +557,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
         createMissingRepos: z.boolean().optional(),
         sync: z.boolean().optional(),
         gitProvider: z.string().optional(),
+        deployProvider: z.string().optional(),
         providers: z.record(z.string()).optional(),
     });
 
@@ -602,6 +603,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
             createMissingRepos: validation.data.createMissingRepos,
             sync: validation.data.sync,
             gitProvider: providerId,
+            deployProvider: validation.data.deployProvider,
             providers: validation.data.providers,
         });
 
@@ -935,6 +937,35 @@ export async function updateWebsiteSettings(
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to update website settings',
+        };
+    }
+}
+
+export async function updateCommunityPrSettings(
+    directoryId: string,
+    settings: {
+        communityPrEnabled?: boolean;
+        communityPrAutoClose?: boolean;
+    },
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await directoryAPI.update(directoryId, settings);
+        revalidatePath(`/directories/${directoryId}/settings`);
+
+        return {
+            success: response.status === 'success',
+        };
+    } catch (error) {
+        console.error('Failed to update community PR settings:', error);
+        return {
+            success: false,
+            error:
+                error instanceof Error ? error.message : 'Failed to update community PR settings',
         };
     }
 }

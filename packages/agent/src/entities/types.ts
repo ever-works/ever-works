@@ -67,3 +67,10 @@ export const ASSIGNABLE_MEMBER_ROLES = [
 ] as const;
 
 export type AssignableMemberRole = (typeof ASSIGNABLE_MEMBER_ROLES)[number];
+
+export interface CommunityPrState {
+    processedPrNumbers: number[];
+    lastProcessedAt?: string;
+    totalItemsAdded?: number;
+    lastError?: string | null;
+}

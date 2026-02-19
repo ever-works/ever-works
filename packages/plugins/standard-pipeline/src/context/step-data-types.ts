@@ -1,6 +1,7 @@
 import type {
 	MutableItemData,
 	Category,
+	Collection,
 	Tag,
 	Brand,
 	DomainAnalysis,
@@ -20,6 +21,7 @@ export type StepDataKey =
 	| 'finalItems'
 	| 'finalCategories'
 	| 'finalTags'
+	| 'finalCollections'
 	| 'finalBrands'
 	| 'domainAnalysis'
 	| 'metrics'
@@ -42,6 +44,7 @@ export interface StepDataTypes {
 	finalItems: MutableItemData[];
 	finalCategories: Category[];
 	finalTags: Tag[];
+	finalCollections: Collection[];
 	finalBrands: Brand[];
 	domainAnalysis?: DomainAnalysis;
 	metrics: StandardPipelineMetrics;

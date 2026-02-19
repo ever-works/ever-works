@@ -1,4 +1,4 @@
-import stringSimilarity from 'string-similarity-js';
+import { stringSimilarity } from 'string-similarity-js';
 import type { MutableItemData, StepExecutionContext } from '@ever-works/plugin';
 import { extractKeywords } from '@ever-works/plugin/keywords';
 

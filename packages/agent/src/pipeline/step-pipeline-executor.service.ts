@@ -513,6 +513,7 @@ export class StepPipelineExecutorService {
             items: [],
             categories: [],
             tags: [],
+            collections: [],
             brands: [],
             duration: meta.duration,
             stepsCompleted: meta.stepsCompleted,
@@ -609,6 +610,7 @@ export class StepPipelineExecutorService {
             items: [],
             categories: [],
             tags: [],
+            collections: [],
             brands: [],
         } as PipelineCompletedPayload);
     }

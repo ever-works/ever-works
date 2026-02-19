@@ -7,6 +7,7 @@ import type {
     GitBranch,
     GitCommit,
     GitPullRequest,
+    GitPullRequestFile,
     CreateRepoOptions,
     CreatePROptions,
     MergeOptions,
@@ -14,6 +15,7 @@ import type {
     ForkRepositoryOptions,
     GitRepositoryWithPermissions,
     ListRepositoriesOptions,
+    ListPullRequestsOptions,
     GitCommitter,
     GitFileChange,
     IGitFacade,
@@ -531,6 +533,67 @@ export class GitFacadeService implements IGitFacade {
     ): Promise<MergeResult> {
         const { plugin, token } = await this.resolvePluginAndToken(options);
         return plugin.mergePullRequest(owner, repo, prNumber, mergeOptions, token);
+    }
+
+    async listPullRequests(
+        owner: string,
+        repo: string,
+        listOptions: ListPullRequestsOptions | undefined,
+        options: GitFacadeOptions,
+    ): Promise<GitPullRequest[]> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        if (plugin.listPullRequests) {
+            return plugin.listPullRequests(owner, repo, listOptions, token);
+        }
+        return [];
+    }
+
+    async getPullRequestFiles(
+        owner: string,
+        repo: string,
+        prNumber: number,
+        options: GitFacadeOptions,
+    ): Promise<GitPullRequestFile[]> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        if (plugin.getPullRequestFiles) {
+            return plugin.getPullRequestFiles(owner, repo, prNumber, token);
+        }
+        return [];
+    }
+
+    async createPullRequestComment(
+        owner: string,
+        repo: string,
+        prNumber: number,
+        body: string,
+        options: GitFacadeOptions,
+    ): Promise<{ id: number; body: string }> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        if (plugin.createPullRequestComment) {
+            return plugin.createPullRequestComment(owner, repo, prNumber, body, token);
+        }
+        throw new GitFacadeError(
+            'Create pull request comment not supported by this provider',
+            'createPullRequestComment',
+            plugin.id,
+        );
+    }
+
+    async closePullRequest(
+        owner: string,
+        repo: string,
+        prNumber: number,
+        options: GitFacadeOptions,
+    ): Promise<GitPullRequest> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        if (plugin.closePullRequest) {
+            return plugin.closePullRequest(owner, repo, prNumber, token);
+        }
+        throw new GitFacadeError(
+            'Close pull request not supported by this provider',
+            'closePullRequest',
+            plugin.id,
+        );
     }
 
     async cloneOrPull(

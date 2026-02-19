@@ -1,6 +1,6 @@
 'use server';
 
-import { directoryAPI, Category, Tag } from '@/lib/api';
+import { directoryAPI, Category, Tag, Collection } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -194,6 +194,104 @@ export async function deleteTag(directoryId: string, tagId: string) {
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to delete tag',
+        };
+    }
+}
+
+// Collection CRUD operations
+
+export async function createCollection(directoryId: string, data: Partial<Collection>) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await directoryAPI.createCollection(directoryId, data);
+
+        if (response.status === 'success' && response.collection) {
+            revalidatePath(`/directories/${directoryId}/items`);
+            revalidatePath(`/directories/${directoryId}`);
+            return {
+                success: true,
+                collection: response.collection,
+            };
+        }
+
+        return {
+            success: false,
+            error: 'Failed to create collection',
+        };
+    } catch (error) {
+        console.error('Create collection error:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to create collection',
+        };
+    }
+}
+
+export async function updateCollection(
+    directoryId: string,
+    collectionId: string,
+    data: Partial<Collection>,
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await directoryAPI.updateCollection(directoryId, collectionId, data);
+
+        if (response.status === 'success' && response.collection) {
+            revalidatePath(`/directories/${directoryId}/items`);
+            revalidatePath(`/directories/${directoryId}`);
+            return {
+                success: true,
+                collection: response.collection,
+            };
+        }
+
+        return {
+            success: false,
+            error: 'Failed to update collection',
+        };
+    } catch (error) {
+        console.error('Update collection error:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to update collection',
+        };
+    }
+}
+
+export async function deleteCollection(directoryId: string, collectionId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await directoryAPI.deleteCollection(directoryId, collectionId);
+
+        if (response.status === 'success') {
+            revalidatePath(`/directories/${directoryId}/items`);
+            revalidatePath(`/directories/${directoryId}`);
+            return {
+                success: true,
+            };
+        }
+
+        return {
+            success: false,
+            error: 'Failed to delete collection',
+        };
+    } catch (error) {
+        console.error('Delete collection error:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to delete collection',
         };
     }
 }

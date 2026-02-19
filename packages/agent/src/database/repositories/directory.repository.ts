@@ -166,6 +166,10 @@ export class DirectoryRepository {
         return await this.findById(id);
     }
 
+    async increment(id: string, column: keyof Directory, value: number): Promise<void> {
+        await this.repository.increment({ id }, column as string, value);
+    }
+
     async delete(id: string): Promise<boolean> {
         const result = await this.repository.delete(id);
         return result.affected > 0;
@@ -374,6 +378,16 @@ export class DirectoryRepository {
     async findWithWebsiteAutoUpdateEnabled(): Promise<Directory[]> {
         return this.repository.find({
             where: { websiteTemplateAutoUpdate: true },
+            relations: ['user'],
+        });
+    }
+
+    /**
+     * Find all directories with community PR processing enabled.
+     */
+    async findWithCommunityPrEnabled(): Promise<Directory[]> {
+        return this.repository.find({
+            where: { communityPrEnabled: true },
             relations: ['user'],
         });
     }

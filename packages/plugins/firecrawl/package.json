@@ -1,7 +1,7 @@
 {
 	"name": "@ever-works/firecrawl-plugin",
 	"version": "1.0.0",
-	"description": "Firecrawl Plugin - Content extraction using the Firecrawl API",
+	"description": "Firecrawl Plugin - Web search and content extraction using the Firecrawl API",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -40,11 +40,12 @@
 			"id": "firecrawl",
 			"name": "Firecrawl",
 			"version": "1.0.0",
-			"category": "content-extractor",
+			"category": "search",
 			"capabilities": [
+				"search",
 				"content-extractor"
 			],
-			"description": "Content extraction using the Firecrawl API. Scrapes web pages and returns clean markdown content.",
+			"description": "Web search and content extraction using the Firecrawl API. Search the web and scrape pages for clean markdown content.",
 			"author": {
 				"name": "Ever Works Team"
 			},

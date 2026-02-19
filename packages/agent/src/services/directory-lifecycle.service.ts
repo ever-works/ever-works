@@ -122,6 +122,14 @@ export class DirectoryLifecycleService {
                 }
             }
 
+            // Handle community PR processing settings
+            if (updateDto.communityPrEnabled !== undefined) {
+                updateData.communityPrEnabled = updateDto.communityPrEnabled;
+            }
+            if (updateDto.communityPrAutoClose !== undefined) {
+                updateData.communityPrAutoClose = updateDto.communityPrAutoClose;
+            }
+
             const updatedDirectory = await this.directoryRepository.update(id, updateData);
 
             if (!updatedDirectory) {

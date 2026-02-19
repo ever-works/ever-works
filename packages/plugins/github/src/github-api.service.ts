@@ -6,13 +6,15 @@ import type {
 	GitBranch,
 	GitCommit,
 	GitPullRequest,
+	GitPullRequestFile,
 	CreateRepoOptions,
 	CreatePROptions,
 	MergeOptions,
 	MergeResult,
 	ForkRepositoryOptions,
 	GitRepositoryWithPermissions,
-	ListRepositoriesOptions
+	ListRepositoriesOptions,
+	ListPullRequestsOptions
 } from '@ever-works/plugin/git';
 
 function sanitizeDescription(description?: string): string {
@@ -477,6 +479,110 @@ export class GitHubApiService {
 			sha: data.sha,
 			merged: data.merged,
 			message: data.message
+		};
+	}
+
+	async listPullRequests(
+		owner: string,
+		repo: string,
+		options: ListPullRequestsOptions | undefined,
+		token: string,
+		baseUrl?: string
+	): Promise<GitPullRequest[]> {
+		const octokit = this.createOctokit(token, baseUrl);
+
+		const { data } = await octokit.rest.pulls.list({
+			owner,
+			repo,
+			state: options?.state || 'open',
+			per_page: options?.perPage || 30,
+			page: options?.page || 1
+		});
+
+		return data.map((pr) => ({
+			number: pr.number,
+			title: pr.title,
+			state: pr.merged_at ? 'merged' : (pr.state as 'open' | 'closed'),
+			head: pr.head.ref,
+			base: pr.base.ref,
+			url: pr.html_url,
+			createdAt: pr.created_at,
+			updatedAt: pr.updated_at,
+			body: pr.body ?? undefined
+		}));
+	}
+
+	async getPullRequestFiles(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string,
+		baseUrl?: string
+	): Promise<GitPullRequestFile[]> {
+		const octokit = this.createOctokit(token, baseUrl);
+
+		const { data } = await octokit.rest.pulls.listFiles({
+			owner,
+			repo,
+			pull_number: prNumber,
+			per_page: 100
+		});
+
+		return data.map((file) => ({
+			filename: file.filename,
+			status: file.status,
+			additions: file.additions,
+			deletions: file.deletions,
+			patch: file.patch
+		}));
+	}
+
+	async createPullRequestComment(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		body: string,
+		token: string,
+		baseUrl?: string
+	): Promise<{ id: number; body: string }> {
+		const octokit = this.createOctokit(token, baseUrl);
+
+		const { data } = await octokit.rest.issues.createComment({
+			owner,
+			repo,
+			issue_number: prNumber,
+			body
+		});
+
+		return { id: data.id, body: data.body || '' };
+	}
+
+	async closePullRequest(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string,
+		baseUrl?: string
+	): Promise<GitPullRequest> {
+		const octokit = this.createOctokit(token, baseUrl);
+
+		const { data } = await octokit.rest.pulls.update({
+			owner,
+			repo,
+			pull_number: prNumber,
+			state: 'closed'
+		});
+
+		return {
+			number: data.number,
+			title: data.title,
+			state: data.merged_at ? 'merged' : (data.state as 'open' | 'closed'),
+			head: data.head.ref,
+			base: data.base.ref,
+			url: data.html_url,
+			createdAt: data.created_at,
+			updatedAt: data.updated_at,
+			body: data.body ?? undefined
 		};
 	}
 

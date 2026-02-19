@@ -217,7 +217,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 				{ stepId: 'deduplication-and-data-aggregation', required: true },
 				{ stepId: 'domain-detection', required: true }
 			],
-			provides: ['finalItems', 'finalCategories', 'finalTags', 'finalBrands'],
+			provides: ['finalItems', 'finalCategories', 'finalTags', 'finalCollections', 'finalBrands'],
 			requires: ['aggregatedItems', 'domainAnalysis'],
 			optional: false,
 			parallelizable: false,
@@ -300,7 +300,6 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 	// IPipelinePlugin methods
 	registerStepExecutor(stepId: BuiltInStepId, executor: IBuiltInStepExecutor): void {
 		this.stepExecutors.set(stepId, executor);
-		this.context?.logger.debug(`Registered executor for step: ${stepId}`);
 	}
 
 	registerStepExecutors(executors: Map<BuiltInStepId, IBuiltInStepExecutor>): void {
@@ -412,6 +411,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 			items: ctx.finalItems,
 			categories: ctx.finalCategories,
 			tags: ctx.finalTags,
+			collections: ctx.finalCollections,
 			brands: ctx.finalBrands,
 			duration: meta.duration,
 			stepsCompleted: meta.stepsCompleted,
@@ -524,6 +524,14 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 				type: 'boolean',
 				label: 'Generate Tags',
 				description: 'Automatically generate tags for items',
+				defaultValue: true,
+				group: 'features'
+			},
+			{
+				name: 'generate_collections',
+				type: 'boolean',
+				label: 'Generate Collections',
+				description: 'Automatically generate collections for items',
 				defaultValue: true,
 				group: 'features'
 			},

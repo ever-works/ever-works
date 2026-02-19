@@ -51,6 +51,13 @@ export const itemDataWithCategoriesAndTagsSchema = itemDataSchema.extend({
 		.array(z.string())
 		.describe(
 			"Specific keywords, technologies, or features associated with the item (e.g., 'real-time', 'open-source', 'golang')."
+		),
+	collection: z
+		.string()
+		.nullable()
+		.optional()
+		.describe(
+			"Optional curated collection this item belongs to (e.g., 'editors-picks', 'best-for-beginners'). At most one collection per item."
 		)
 });
 

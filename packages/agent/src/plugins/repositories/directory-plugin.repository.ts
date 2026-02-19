@@ -91,6 +91,15 @@ export class DirectoryPluginRepository {
     }
 
     /**
+     * Find all enabled directory-plugin records for a specific plugin
+     */
+    async findEnabledByPlugin(pluginId: string): Promise<DirectoryPluginEntity[]> {
+        return this.repository.find({
+            where: { pluginId, enabled: true },
+        });
+    }
+
+    /**
      * Update directory plugin settings
      */
     async update(

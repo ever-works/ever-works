@@ -1,10 +1,10 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as yaml from 'yaml';
-import deepmerge from 'deepmerge';
+import mergeWith from 'lodash/mergeWith';
 import { format } from 'date-fns';
 import semver from 'semver';
-import type { Category, ItemData, Tag } from '@ever-works/contracts';
+import type { Category, Collection, ItemData, Tag } from '@ever-works/contracts';
 import { CreateItemsGeneratorDto } from '../../items-generator/dto';
 
 export type PRUpdate = {
@@ -43,6 +43,7 @@ export interface SettingsConfig {
     categories_enabled?: boolean;
     companies_enabled?: boolean;
     tags_enabled?: boolean;
+    collections_enabled?: boolean;
     surveys_enabled?: boolean;
     header?: SettingsHeaderConfig;
     homepage?: SettingsHomepageConfig;
@@ -90,6 +91,7 @@ const DEFAULT_SETTINGS: SettingsConfig = {
     categories_enabled: true,
     companies_enabled: true,
     tags_enabled: true,
+    collections_enabled: true,
     surveys_enabled: true,
     header: {
         submit_enabled: true,
@@ -136,8 +138,50 @@ const DEFAULT_DATA_CONFIG: IDataConfig = {
     custom_menu: DEFAULT_CUSTOM_MENU,
 };
 
+const getMergeArrayItemKey = (value: unknown): string => {
+    if (value === null) return 'null';
+    const valueType = typeof value;
+    if (valueType === 'string') return `s:${value}`;
+    if (valueType === 'number') return `n:${value}`;
+    if (valueType === 'boolean') return `b:${value}`;
+    if (valueType === 'undefined') return 'u:undefined';
+    if (valueType === 'bigint') return `bi:${String(value)}`;
+    if (valueType === 'symbol') return `sym:${String(value)}`;
+    if (valueType === 'function') return `fn:${String(value)}`;
+
+    try {
+        return `o:${JSON.stringify(value)}`;
+    } catch {
+        return `o:${String(value)}`;
+    }
+};
+
+const mergeUniqueArray = (existing: unknown[], incoming: unknown[]): unknown[] => {
+    const merged: unknown[] = [];
+    const seen = new Set<string>();
+
+    for (const entry of [...existing, ...incoming]) {
+        const key = getMergeArrayItemKey(entry);
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        merged.push(entry);
+    }
+
+    return merged;
+};
+
+const mergeDataConfig = (base: IDataConfig, incoming: Partial<IDataConfig>): IDataConfig =>
+    mergeWith({}, base, incoming, (objValue, srcValue) => {
+        if (Array.isArray(objValue) && Array.isArray(srcValue)) {
+            return mergeUniqueArray(objValue, srcValue);
+        }
+        return undefined;
+    });
+
 const createDefaultConfig = (overrides: Partial<IDataConfig> = {}): IDataConfig =>
-    deepmerge(
+    mergeDataConfig(
         {
             ...DEFAULT_DATA_CONFIG,
             // ensure dynamic defaults (like year) are refreshed per call
@@ -155,6 +199,7 @@ export class DataRepository {
         private readonly configPath: string,
         private categoriesPath: string,
         private readonly tagsPath: string,
+        private readonly collectionsPath: string,
         private readonly markdownTemplatePath: string,
         public readonly dataDir: string,
     ) {}
@@ -179,12 +224,14 @@ export class DataRepository {
 
         const categoriesPath = await this.getCollectionPath(dir, 'categories');
         const tagsPath = await this.getCollectionPath(dir, 'tags');
+        const collectionsPath = await this.getCollectionPath(dir, 'collections');
 
         const repo = new DataRepository(
             dir,
             path.join(dir, 'config.yml'),
             categoriesPath,
             tagsPath,
+            collectionsPath,
             path.join(dir, 'markdown'),
             path.join(dir, 'data'),
         );
@@ -192,7 +239,7 @@ export class DataRepository {
         return repo;
     }
 
-    private static async shouldeUseDir(dir: string, type: 'categories' | 'tags') {
+    private static async shouldeUseDir(dir: string, type: 'categories' | 'tags' | 'collections') {
         try {
             const dirpath = path.join(dir, type);
             const stat = await fs.stat(dirpath);
@@ -205,7 +252,7 @@ export class DataRepository {
         }
     }
 
-    private static async getCollectionPath(dir: string, type: 'categories' | 'tags') {
+    private static async getCollectionPath(dir: string, type: 'categories' | 'tags' | 'collections') {
         const useDir = await this.shouldeUseDir(dir, type);
         const collectionPath = useDir
             ? path.join(dir, type, `${type}.yml`)
@@ -363,7 +410,7 @@ export class DataRepository {
 
     async mergeConfig(config: IDataConfig) {
         const currentConfig = await this.getConfig();
-        await this.writeConfig(deepmerge(currentConfig, config));
+        await this.writeConfig(mergeDataConfig(currentConfig, config));
     }
 
     async writeConfig(config: IDataConfig) {
@@ -418,6 +465,23 @@ export class DataRepository {
     async writeTags(tags: Tag[]) {
         const str = yaml.stringify(tags);
         await fs.writeFile(this.tagsPath, str, 'utf-8');
+    }
+
+    async getCollections(): Promise<Collection[]> {
+        try {
+            const collections = await fs.readFile(this.collectionsPath, 'utf-8');
+            return yaml.parse(collections) || [];
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return [];
+            }
+            throw err;
+        }
+    }
+
+    async writeCollections(collections: Collection[]) {
+        const str = yaml.stringify(collections);
+        await fs.writeFile(this.collectionsPath, str, 'utf-8');
     }
 
     async createItemDir(item: ItemData) {

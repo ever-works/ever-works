@@ -225,6 +225,9 @@ export class DirectoryPluginResponseDto
 
     @ApiPropertyOptional({ description: 'Priority order for this plugin' })
     priority?: number;
+
+    @ApiPropertyOptional({ description: 'Directory-specific plugin metadata (read-only state)' })
+    metadata?: Record<string, unknown>;
 }
 
 /**

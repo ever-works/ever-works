@@ -1,4 +1,3 @@
-import { ScheduleModule } from '@nestjs/schedule';
 import { Module } from '@nestjs/common';
 import { DirectoryModule } from '@ever-works/agent/services';
 import { DatabaseModule } from '@ever-works/agent/database';
@@ -15,6 +14,7 @@ import { MembersController } from './members.controller';
 // Tasks
 import { DirectoryCleanupService } from './tasks/directory-cleanup.service';
 import { WebsiteTemplateSchedulerService } from './tasks/website-template-scheduler.service';
+import { CommunityPrSchedulerService } from './tasks/community-pr-scheduler.service';
 
 @Module({
     imports: [
@@ -24,9 +24,13 @@ import { WebsiteTemplateSchedulerService } from './tasks/website-template-schedu
         TasksTriggerModule,
         WebsiteGeneratorModule,
         FacadesModule,
-        ScheduleModule.forRoot(),
     ],
-    providers: [CacheEntryRepository, DirectoryCleanupService, WebsiteTemplateSchedulerService],
+    providers: [
+        CacheEntryRepository,
+        DirectoryCleanupService,
+        WebsiteTemplateSchedulerService,
+        CommunityPrSchedulerService,
+    ],
     controllers: [DirectoriesController, MembersController],
 })
 export class DirectoriesModule {}

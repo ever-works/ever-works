@@ -46,7 +46,7 @@ export class OllamaPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'llama3.3',
+				default: 'ministral-3:8b',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -54,7 +54,7 @@ export class OllamaPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Handles tags, short descriptions, and quick classifications',
-				default: 'llama3.2',
+				default: 'ministral-3:8b',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -62,7 +62,7 @@ export class OllamaPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Handles listings, summaries, and content reformatting',
-				default: 'llama3.3',
+				default: 'ministral-3:8b',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -70,7 +70,7 @@ export class OllamaPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'llama3.3',
+				default: 'ministral-3:8b',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -104,7 +104,7 @@ export class OllamaPlugin extends BaseAiProvider {
 		await super.onLoad(context);
 		this.aiOps = new AiOperations({
 			apiKey: 'ollama',
-			model: 'llama3.3',
+			model: 'ministral-3:8b',
 			baseURL: 'http://localhost:11434/v1',
 			temperature: 0.7,
 			maxTokens: 4096,
@@ -167,7 +167,7 @@ export class OllamaPlugin extends BaseAiProvider {
 	}
 
 	protected getDefaultModelId(): string {
-		return 'llama3.3';
+		return 'ministral-3:8b';
 	}
 
 	async validateSettings(_settings: PluginSettings): Promise<ValidationResult> {
@@ -217,7 +217,7 @@ export class OllamaPlugin extends BaseAiProvider {
 				'## Getting started',
 				'',
 				'1. Install and run Ollama ([ollama.com](https://ollama.com)) or connect to an existing instance',
-				'2. Ensure at least one model is available (e.g. `ollama pull llama3.3`)',
+				'2. Ensure at least one model is available (e.g. `ollama pull ministral-3:8b`)',
 				'3. Enable the Ollama plugin and set the **Base URL** to your Ollama server address',
 				'4. Select your preferred models for each task complexity level'
 			].join('\n'),
