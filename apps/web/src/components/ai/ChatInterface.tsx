@@ -7,6 +7,8 @@ import { useAIStream } from '@/lib/hooks/use-ai-stream';
 import { useChatContext } from '@/components/ai/ChatProvider';
 import { ChatMessage, generateMessageId } from '@/lib/hooks/use-chat-history';
 import { ROUTES } from '@/lib/constants';
+import { PluginIcon } from '@/components/plugins/PluginIcon';
+import { Tooltip } from '@/components/ui/tooltip';
 
 export function ChatInterface() {
     const t = useTranslations('dashboard.aiChat');
@@ -17,6 +19,9 @@ export function ChatInterface() {
         setMessages,
         loadHistory,
         resetHistory,
+        providers,
+        selectedProvider,
+        setSelectedProvider,
     } = useChatContext();
 
     const [input, setInput] = useState('');
@@ -134,6 +139,7 @@ export function ChatInterface() {
         try {
             await streamMessage(ROUTES.API_AI_CONVERSATIONS_CHAT_STREAM, {
                 messages: chatHistory,
+                providerOverride: selectedProvider ?? undefined,
             });
         } catch (error) {
             const message = error instanceof Error ? error.message : t('errors.unableToSend');
@@ -169,27 +175,83 @@ export function ChatInterface() {
 
     return (
         <div className="flex flex-col h-full min-h-0">
-            <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-border dark:border-border-dark">
-                <div>
-                    <h2 className="text-base font-semibold text-text dark:text-text-dark">
-                        {t('title')}
-                    </h2>
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                        {t('subtitle')}
-                    </p>
+            <div className="px-4 py-3 border-b border-border dark:border-border-dark space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <h2 className="text-base font-semibold text-text dark:text-text-dark">
+                            {t('title')}
+                        </h2>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('subtitle')}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleResetConversation}
+                        disabled={isStreaming}
+                        className={cn(
+                            'text-xs font-medium text-primary',
+                            'hover:text-primary-hover',
+                            'disabled:opacity-50 disabled:cursor-not-allowed',
+                        )}
+                    >
+                        {t('newChat')}
+                    </button>
                 </div>
-                <button
-                    type="button"
-                    onClick={handleResetConversation}
-                    disabled={isStreaming}
-                    className={cn(
-                        'text-xs font-medium text-primary',
-                        'hover:text-primary-hover',
-                        'disabled:opacity-50 disabled:cursor-not-allowed',
-                    )}
-                >
-                    {t('newChat')}
-                </button>
+
+                {providers.length > 1 && (
+                    <div className="flex flex-wrap gap-1.5">
+                        {providers.map((provider) => {
+                            const isActive = selectedProvider === provider.id;
+                            const button = (
+                                <button
+                                    key={provider.id}
+                                    type="button"
+                                    onClick={() => setSelectedProvider(provider.id)}
+                                    disabled={!provider.configured || isStreaming}
+                                    className={cn(
+                                        'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors border',
+                                        isActive
+                                            ? 'border-primary bg-primary/10 text-primary'
+                                            : 'border-border dark:border-border-dark hover:border-primary/50 text-text-secondary dark:text-text-secondary-dark',
+                                        !provider.configured && 'opacity-40 cursor-not-allowed',
+                                        isStreaming && 'opacity-50 cursor-not-allowed',
+                                    )}
+                                >
+                                    {provider.icon && (
+                                        <PluginIcon
+                                            icon={provider.icon}
+                                            name={provider.name}
+                                            size={16}
+                                        />
+                                    )}
+                                    <span>{provider.name}</span>
+                                    {isActive && (
+                                        <svg
+                                            className="w-3 h-3 text-primary"
+                                            fill="currentColor"
+                                            viewBox="0 0 20 20"
+                                        >
+                                            <path
+                                                fillRule="evenodd"
+                                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                                clipRule="evenodd"
+                                            />
+                                        </svg>
+                                    )}
+                                </button>
+                            );
+
+                            return !provider.configured ? (
+                                <Tooltip key={provider.id} content={t('providerNotConfigured')}>
+                                    {button}
+                                </Tooltip>
+                            ) : (
+                                <span key={provider.id}>{button}</span>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">

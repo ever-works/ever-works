@@ -1871,6 +1871,7 @@
             "loadingConversation": "Loading conversation…",
             "inputPlaceholder": "Describe the directory you want to create...",
             "sendButton": "Send",
+            "providerNotConfigured": "This provider is not configured. Set it up in Plugins.",
             "errors": {
                 "unableToSend": "Unable to send message"
             }
