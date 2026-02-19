@@ -1,0 +1,60 @@
+{
+	"name": "@ever-works/pdf-extractor-plugin",
+	"version": "1.0.0",
+	"description": "PDF Content Extractor - Extract text from PDFs with OCR fallback via Mistral AI",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"pdf-parse": "^2.4.5",
+		"axios": "^1.13.5"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.5.1",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.18"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "pdf-extractor",
+			"name": "PDF Content Extractor",
+			"version": "1.0.0",
+			"category": "content-extractor",
+			"capabilities": [
+				"content-extractor"
+			],
+			"description": "Extract text from PDF files with optional OCR fallback via Mistral AI for scanned documents.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"systemPlugin": false,
+			"builtIn": true,
+			"isDefault": false,
+			"autoEnable": false
+		}
+	}
+}
