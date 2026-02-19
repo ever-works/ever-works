@@ -175,6 +175,7 @@ describe('PipelineOrchestratorService', () => {
             category: 'pipeline',
             capabilities: ['pipeline'],
             defaultForCapabilities: ['pipeline'],
+            autoEnable: true,
         });
         registry.updateState('standard-pipeline', 'loaded');
 

@@ -139,22 +139,42 @@ export class StepPipelineExecutorService {
 
                 if (groupSteps.length === 0) continue;
 
-                const stepPromises = groupSteps.map((step) =>
-                    this.processStep(
-                        step,
-                        pipeline,
-                        plugin,
-                        runner,
-                        context,
-                        currentStepIndex + groupSteps.indexOf(step),
-                        pipeline.steps.length,
-                        plugin.id,
-                        options,
-                        onProgress,
-                    ),
-                );
-
-                await Promise.all(stepPromises);
+                const concurrency = group.maxConcurrent;
+                if (!concurrency || concurrency >= groupSteps.length) {
+                    await Promise.all(
+                        groupSteps.map((step, idx) =>
+                            this.processStep(
+                                step,
+                                pipeline,
+                                plugin,
+                                runner,
+                                context,
+                                currentStepIndex + idx,
+                                pipeline.steps.length,
+                                plugin.id,
+                                options,
+                                onProgress,
+                            ),
+                        ),
+                    );
+                } else {
+                    const stepThunks = groupSteps.map(
+                        (step, idx) => () =>
+                            this.processStep(
+                                step,
+                                pipeline,
+                                plugin,
+                                runner,
+                                context,
+                                currentStepIndex + idx,
+                                pipeline.steps.length,
+                                plugin.id,
+                                options,
+                                onProgress,
+                            ),
+                    );
+                    await this.runWithConcurrencyLimit(stepThunks, concurrency);
+                }
 
                 currentStepIndex += groupSteps.length;
                 lastCompletedStepIndex = currentStepIndex - 1;
@@ -403,6 +423,21 @@ export class StepPipelineExecutorService {
             success,
             error,
         };
+    }
+
+    private async runWithConcurrencyLimit(
+        tasks: Array<() => Promise<void>>,
+        limit: number,
+    ): Promise<void> {
+        const executing = new Set<Promise<void>>();
+        for (const task of tasks) {
+            const p = task().finally(() => executing.delete(p));
+            executing.add(p);
+            if (executing.size >= limit) {
+                await Promise.race(executing);
+            }
+        }
+        await Promise.all(executing);
     }
 
     // ============================================================================
