@@ -200,7 +200,9 @@ export function ChatInterface() {
                 </div>
 
                 {providers.length > 1 && (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div
+                        className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    >
                         {providers.map((provider) => {
                             const isActive = selectedProvider === provider.id;
                             const button = (
@@ -210,7 +212,7 @@ export function ChatInterface() {
                                     onClick={() => setSelectedProvider(provider.id)}
                                     disabled={!provider.configured || isStreaming}
                                     className={cn(
-                                        'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors border',
+                                        'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors border shrink-0',
                                         isActive
                                             ? 'border-primary bg-primary/10 text-primary'
                                             : 'border-border dark:border-border-dark hover:border-primary/50 text-text-secondary dark:text-text-secondary-dark',
