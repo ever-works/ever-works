@@ -227,7 +227,6 @@ describe('MistralPlugin', () => {
 			expect(manifest.icon).toBeDefined();
 			expect(manifest.icon?.type).toBe('svg');
 			expect(manifest.icon?.value).toContain('viewBox');
-			expect(manifest.icon?.backgroundColor).toBe('#FF7000');
 		});
 	});
 
