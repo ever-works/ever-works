@@ -176,7 +176,8 @@ export class ContentExtractorFacadeService
             const plugin = defaultExtractor.plugin as IContentExtractorPlugin;
             if (typeof plugin.canExtract === 'function') {
                 try {
-                    if (!(await plugin.canExtract(url))) throw new NoContentExtractorProviderError();
+                    if (!(await plugin.canExtract(url)))
+                        throw new NoContentExtractorProviderError();
                 } catch (err) {
                     if (err instanceof NoContentExtractorProviderError) throw err;
                     // canExtract itself threw — log and still attempt extraction
@@ -235,7 +236,9 @@ export class ContentExtractorFacadeService
             }
         } catch (err) {
             if (err instanceof ContentExtractorProviderNotFoundError) throw err;
-            this.logger.warn(`canExtract error for override ${pluginId}: ${(err as Error).message}`);
+            this.logger.warn(
+                `canExtract error for override ${pluginId}: ${(err as Error).message}`,
+            );
         }
     }
 }

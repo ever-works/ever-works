@@ -108,10 +108,6 @@ export class CustomCapabilityRegistryService {
         return Array.from(this.capabilities.values());
     }
 
-    getNames(): string[] {
-        return Array.from(this.capabilities.keys());
-    }
-
     getByProvider(pluginId: string): RegisteredCapability[] {
         const names = this.byProvider.get(pluginId);
         if (!names) return [];
@@ -125,23 +121,9 @@ export class CustomCapabilityRegistryService {
         return this.capabilities.get(name)?.providerPluginId;
     }
 
-    count(): number {
-        return this.capabilities.size;
-    }
-
     clear(): void {
         this.capabilities.clear();
         this.byProvider.clear();
         this.logger.warn('Custom capability registry cleared');
-    }
-
-    find(filter: { providerPluginId?: string }): RegisteredCapability[] {
-        let results = Array.from(this.capabilities.values());
-
-        if (filter.providerPluginId) {
-            results = results.filter((r) => r.providerPluginId === filter.providerPluginId);
-        }
-
-        return results;
     }
 }

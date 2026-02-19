@@ -148,9 +148,9 @@ describe('ContentExtractorFacadeService', () => {
     describe('extractContent - supplementary plugins (tier 0)', () => {
         it('should use supplementary plugin before provider override when canExtract matches', async () => {
             const pdfExtractor = createMockExtractorPlugin('pdf-extractor', 'PDF', {
-                canExtractImpl: jest.fn().mockImplementation((url: string) =>
-                    Promise.resolve(url.endsWith('.pdf')),
-                ),
+                canExtractImpl: jest
+                    .fn()
+                    .mockImplementation((url: string) => Promise.resolve(url.endsWith('.pdf'))),
             });
             const tavilyExtractor = createMockExtractorPlugin('tavily', 'Tavily', {
                 canExtractImpl: jest.fn().mockResolvedValue(true),
