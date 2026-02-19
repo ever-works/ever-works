@@ -35,7 +35,8 @@
 		"test": "turbo test",
 		"type-check": "turbo type-check",
 		"clean": "turbo clean",
-		"format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\""
+		"format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\"",
+		"format:check": "prettier --check \"**/*.{ts,tsx,jsx,json,css,md}\""
 	},
 	"keywords": [],
 	"devDependencies": {

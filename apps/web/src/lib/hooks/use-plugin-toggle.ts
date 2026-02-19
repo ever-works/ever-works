@@ -16,7 +16,7 @@ export function usePluginToggle({ pluginId, enabled, visibility }: UsePluginTogg
     const [optimisticEnabled, setOptimisticEnabled] = useState(enabled);
     const [showDisableWarning, setShowDisableWarning] = useState(false);
     const [showEnablePanel, setShowEnablePanel] = useState(false);
-    const [autoEnableForDirs, setAutoEnableForDirs] = useState(false);
+    const [autoEnableForDirs, setAutoEnableForDirs] = useState(true);
 
     const supportsDirectoryScope = visibility !== 'user-only' && visibility !== 'hidden';
 

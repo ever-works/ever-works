@@ -772,11 +772,7 @@ export class DirectoriesController {
         @Param('id') id: string,
         @Body() dto: CreateCollectionDto,
     ) {
-        const result = await this.directoryTaxonomyService.createCollection(
-            id,
-            dto,
-            auth.userId,
-        );
+        const result = await this.directoryTaxonomyService.createCollection(id, dto, auth.userId);
         await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
         return result;
     }

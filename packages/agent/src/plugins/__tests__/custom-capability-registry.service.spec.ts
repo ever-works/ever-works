@@ -156,19 +156,6 @@ describe('CustomCapabilityRegistryService', () => {
         });
     });
 
-    describe('getNames', () => {
-        it('should return all capability names', () => {
-            service.register(createCapabilityDefinition('cap-1'), {}, 'provider');
-            service.register(createCapabilityDefinition('cap-2'), {}, 'provider');
-
-            const names = service.getNames();
-
-            expect(names).toHaveLength(2);
-            expect(names).toContain('cap-1');
-            expect(names).toContain('cap-2');
-        });
-    });
-
     describe('getByProvider', () => {
         it('should get capabilities by provider', () => {
             service.register(createCapabilityDefinition('cap-1'), {}, 'provider-a');
@@ -202,33 +189,6 @@ describe('CustomCapabilityRegistryService', () => {
         });
     });
 
-    describe('count', () => {
-        it('should return correct count', () => {
-            expect(service.count()).toBe(0);
-
-            service.register(createCapabilityDefinition('cap-1'), {}, 'provider');
-            expect(service.count()).toBe(1);
-
-            service.register(createCapabilityDefinition('cap-2'), {}, 'provider');
-            expect(service.count()).toBe(2);
-
-            service.unregister('cap-1');
-            expect(service.count()).toBe(1);
-        });
-    });
-
-    describe('find', () => {
-        it('should find capabilities by provider', () => {
-            service.register(createCapabilityDefinition('cap-1'), {}, 'provider-a');
-            service.register(createCapabilityDefinition('cap-2'), {}, 'provider-b');
-
-            const capabilities = service.find({ providerPluginId: 'provider-a' });
-
-            expect(capabilities).toHaveLength(1);
-            expect(capabilities[0].providerPluginId).toBe('provider-a');
-        });
-    });
-
     describe('clear', () => {
         it('should remove all capabilities', () => {
             service.register(createCapabilityDefinition('cap-1'), {}, 'provider');
@@ -236,7 +196,6 @@ describe('CustomCapabilityRegistryService', () => {
 
             service.clear();
 
-            expect(service.count()).toBe(0);
             expect(service.list()).toHaveLength(0);
         });
     });

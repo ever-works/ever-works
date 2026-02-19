@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { IPlugin, PluginState, PluginContext } from '@ever-works/plugin';
 import { PluginRegistryService, RegisteredPlugin } from './plugin-registry.service';
 import { PluginRepository } from '../repositories/plugin.repository';
+import { CustomCapabilityRegistryService } from './custom-capability-registry.service';
 import { PluginEvents, VALID_STATE_TRANSITIONS, PluginStates } from '../plugins.constants';
 
 export interface LifecycleResult {
@@ -29,6 +30,7 @@ export class PluginLifecycleManagerService {
         private readonly registry: PluginRegistryService,
         private readonly pluginRepository: PluginRepository,
         private readonly eventEmitter: EventEmitter2,
+        private readonly customCapabilityRegistry: CustomCapabilityRegistryService,
     ) {}
 
     setContextFactory(factory: { createContext(pluginId: string): PluginContext }): void {
@@ -130,6 +132,7 @@ export class PluginLifecycleManagerService {
         try {
             this.registry.updateState(pluginId, 'unloading');
             await registered.plugin.onUnload();
+            this.customCapabilityRegistry.unregisterByProvider(pluginId);
             this.registry.unregister(pluginId);
             await this.pluginRepository.updateState(pluginId, 'unloaded');
 

@@ -23,7 +23,12 @@ import type {
     PipelineFailedPayload,
     ExecutablePipeline,
 } from '@ever-works/plugin';
-import { isPipelineModifierPlugin } from '@ever-works/plugin';
+import {
+    buildErrorPipelineResult,
+    buildSuccessPipelineResult,
+    createEmptyPipelineOutputs,
+    isPipelineModifierPlugin,
+} from '@ever-works/plugin';
 import { PipelineBuilderService } from './pipeline-builder.service';
 import { PipelineFacadeService } from './pipeline-facade.service';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -134,22 +139,42 @@ export class StepPipelineExecutorService {
 
                 if (groupSteps.length === 0) continue;
 
-                const stepPromises = groupSteps.map((step) =>
-                    this.processStep(
-                        step,
-                        pipeline,
-                        plugin,
-                        runner,
-                        context,
-                        currentStepIndex + groupSteps.indexOf(step),
-                        pipeline.steps.length,
-                        plugin.id,
-                        options,
-                        onProgress,
-                    ),
-                );
-
-                await Promise.all(stepPromises);
+                const concurrency = group.maxConcurrent;
+                if (!concurrency || concurrency >= groupSteps.length) {
+                    await Promise.all(
+                        groupSteps.map((step, idx) =>
+                            this.processStep(
+                                step,
+                                pipeline,
+                                plugin,
+                                runner,
+                                context,
+                                currentStepIndex + idx,
+                                pipeline.steps.length,
+                                plugin.id,
+                                options,
+                                onProgress,
+                            ),
+                        ),
+                    );
+                } else {
+                    const stepThunks = groupSteps.map(
+                        (step, idx) => () =>
+                            this.processStep(
+                                step,
+                                pipeline,
+                                plugin,
+                                runner,
+                                context,
+                                currentStepIndex + idx,
+                                pipeline.steps.length,
+                                plugin.id,
+                                options,
+                                onProgress,
+                            ),
+                    );
+                    await this.runWithConcurrencyLimit(stepThunks, concurrency);
+                }
 
                 currentStepIndex += groupSteps.length;
                 lastCompletedStepIndex = currentStepIndex - 1;
@@ -161,11 +186,13 @@ export class StepPipelineExecutorService {
             }
 
             runner.completeExecution();
+            const result = this.buildResult(plugin, context, runner, startTime);
 
             this.emitPipelineCompleted(
                 directory.id,
                 Date.now() - startTime,
                 runner.getState().completedSteps.length,
+                result,
                 plugin.id,
             );
 
@@ -175,7 +202,7 @@ export class StepPipelineExecutorService {
 
             await this.clearCheckpoint(directory.id, plugin.id);
 
-            return this.buildResult(plugin, context, runner, startTime);
+            return result;
         } catch (error) {
             runner.completeExecution();
             const failedStep = pipeline.steps[currentStepIndex]?.id;
@@ -398,6 +425,21 @@ export class StepPipelineExecutorService {
         };
     }
 
+    private async runWithConcurrencyLimit(
+        tasks: Array<() => Promise<void>>,
+        limit: number,
+    ): Promise<void> {
+        const executing = new Set<Promise<void>>();
+        for (const task of tasks) {
+            const p = task().finally(() => executing.delete(p));
+            executing.add(p);
+            if (executing.size >= limit) {
+                await Promise.race(executing);
+            }
+        }
+        await Promise.all(executing);
+    }
+
     // ============================================================================
     // Checkpoint Management
     // ============================================================================
@@ -508,21 +550,25 @@ export class StepPipelineExecutorService {
 
         // Fallback for plugins that don't implement extractResult
         const warnings = context.warnings.length > 0 ? context.warnings : undefined;
-        return {
-            success: !failure,
-            items: [],
-            categories: [],
-            tags: [],
-            collections: [],
-            brands: [],
+        const base = {
             duration: meta.duration,
             stepsCompleted: meta.stepsCompleted,
             totalSteps: meta.totalSteps,
             state: meta.state,
             warnings,
-            error: failure?.error,
-            failedStep: failure?.failedStep,
         };
+
+        if (failure) {
+            return buildErrorPipelineResult(failure.error ?? 'Pipeline failed', {
+                ...base,
+                outputs: createEmptyPipelineOutputs(),
+                failedStep: failure.failedStep,
+            });
+        }
+
+        return buildSuccessPipelineResult(createEmptyPipelineOutputs(), {
+            ...base,
+        });
     }
 
     // ============================================================================
@@ -599,6 +645,7 @@ export class StepPipelineExecutorService {
         directoryId: string,
         duration: number,
         stepsCompleted: number,
+        result: PipelineResult,
         source: string,
     ): void {
         this.eventEmitter.emit(PipelineEvents.COMPLETED, {
@@ -607,11 +654,7 @@ export class StepPipelineExecutorService {
             pipelineId: source,
             duration,
             stepsCompleted,
-            items: [],
-            categories: [],
-            tags: [],
-            collections: [],
-            brands: [],
+            outputs: result.outputs,
         } as PipelineCompletedPayload);
     }
 

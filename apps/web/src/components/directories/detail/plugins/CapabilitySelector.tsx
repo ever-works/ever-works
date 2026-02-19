@@ -1,7 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import { useOptimistic, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { DirectoryPlugin } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
@@ -23,19 +22,18 @@ export function CapabilitySelector({
     activePluginId,
 }: CapabilitySelectorProps) {
     const t = useTranslations('dashboard.directoryPlugins');
-    const router = useRouter();
     const [isPending, startTransition] = useTransition();
+    const [optimisticActiveId, setOptimisticActiveId] = useOptimistic(activePluginId);
 
-    const handleSelect = async (pluginId: string) => {
-        if (pluginId === activePluginId) return;
+    const handleSelect = (pluginId: string) => {
+        if (pluginId === optimisticActiveId) return;
 
         startTransition(async () => {
+            setOptimisticActiveId(pluginId);
             try {
                 const result = await setActiveCapability(directoryId, pluginId, capability);
                 if (!result.success) {
                     console.error('Failed to set active capability:', result.error);
-                } else {
-                    router.refresh();
                 }
             } catch (error) {
                 console.error('Failed to set active capability:', error);
@@ -57,7 +55,7 @@ export function CapabilitySelector({
 
             <div className="flex-1 flex flex-wrap gap-2">
                 {plugins.map((plugin) => {
-                    const isActive = plugin.pluginId === activePluginId;
+                    const isActive = plugin.pluginId === optimisticActiveId;
                     return (
                         <button
                             key={plugin.pluginId}

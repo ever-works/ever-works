@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import type { StepExecutionContext, MutableItemData, Category, Collection, Tag, Brand, FacadeOptions } from '@ever-works/plugin';
+import type {
+	StepExecutionContext,
+	MutableItemData,
+	Category,
+	Collection,
+	Tag,
+	Brand,
+	FacadeOptions
+} from '@ever-works/plugin';
 import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { slugifyText, unSlugifyText } from '../utils/text.utils.js';

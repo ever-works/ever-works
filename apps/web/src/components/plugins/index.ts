@@ -4,3 +4,6 @@ export { PluginIcon } from './PluginIcon';
 export { PluginSettings } from './PluginSettings';
 export { PluginSettingsField } from './form/PluginSettingsField';
 export { PluginSettingsFormFields } from './PluginSettingsFormFields';
+export { PluginSearchBar } from './PluginSearchBar';
+export { PluginCategoryFilter } from './PluginCategoryFilter';
+export { PluginGrid } from './PluginGrid';

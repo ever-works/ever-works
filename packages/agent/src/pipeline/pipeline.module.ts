@@ -8,33 +8,21 @@ import { StepPipelineExecutorService } from './step-pipeline-executor.service';
 import { FullPipelineExecutorService } from './full-pipeline-executor.service';
 import { PipelineOrchestratorService } from './pipeline-orchestrator.service';
 import { PipelineFacadeService } from './pipeline-facade.service';
-import { ProviderOverrideService } from './provider-override.service';
 
-/**
- * All pipeline providers.
- *
- * Pipeline plugins (standard-pipeline, claude-code, etc.) are loaded via the
- * plugin system (PluginBootstrapService.bootstrap()), not as NestJS providers.
- */
 const PROVIDERS = [
     PipelineBuilderService,
     StepPipelineExecutorService,
     FullPipelineExecutorService,
     PipelineOrchestratorService,
     PipelineFacadeService,
-    ProviderOverrideService,
 ];
 
-/**
- * Exported services for consumers
- */
 const EXPORTS = [
     PipelineBuilderService,
     StepPipelineExecutorService,
     FullPipelineExecutorService,
     PipelineOrchestratorService,
     PipelineFacadeService,
-    ProviderOverrideService,
 ];
 
 /**

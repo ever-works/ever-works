@@ -8,8 +8,4 @@ export * from './data-source.interface.js';
 export * from './ai-provider.interface.js';
 export * from './pipeline-plugin.interface.js';
 export * from './pipeline-modifier.interface.js';
-export * from './form-field.interface.js';
 export * from './form-schema-provider.interface.js';
-export * from './sub-provider.interface.js';
-export * from './config-aware.interface.js';
-export * from './custom-capability.interface.js';

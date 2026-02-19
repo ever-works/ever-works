@@ -18,11 +18,11 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	StepStatus,
-	FacadeOptions,
 	FormFieldDefinition,
 	FormFieldGroup,
 	ItemData
 } from '@ever-works/plugin';
+import { buildSuccessPipelineResult } from '@ever-works/plugin';
 
 import type { ClaudeCodeStepId } from './types.js';
 import { CLAUDE_CODE_STEP_IDS, DEFAULT_CLI_VERSION, DEFAULT_MAX_TURNS, BASE_TEMP_DIR } from './types.js';
@@ -405,20 +405,23 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			const duration = Date.now() - startTime;
 			const warnings = [...(generationWarning ? [generationWarning] : []), ...screenshotWarnings];
 
-			return {
-				success: true,
-				items,
-				categories: metadata.categories,
-				tags: metadata.tags,
-				brands: metadata.brands,
-				collections: metadata.collections || [],
-				metrics: buildMetrics(startTime, duration, items.length),
-				duration,
-				stepsCompleted: this.state!.completedSteps.length,
-				totalSteps: CLAUDE_CODE_STEP_IDS.length,
-				state: this.state!,
-				warnings: warnings.length > 0 ? warnings : undefined
-			};
+			return buildSuccessPipelineResult(
+				{
+					items,
+					categories: metadata.categories,
+					tags: metadata.tags,
+					brands: metadata.brands,
+					collections: metadata.collections || []
+				},
+				{
+					metrics: buildMetrics(startTime, duration, items.length),
+					duration,
+					stepsCompleted: this.state!.completedSteps.length,
+					totalSteps: CLAUDE_CODE_STEP_IDS.length,
+					state: this.state!,
+					warnings: warnings.length > 0 ? warnings : undefined
+				}
+			);
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
 			logger.error(`Claude Code pipeline failed: ${err.message}`);

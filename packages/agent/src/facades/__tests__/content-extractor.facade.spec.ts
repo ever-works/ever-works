@@ -145,6 +145,100 @@ describe('ContentExtractorFacadeService', () => {
         });
     });
 
+    describe('extractContent - supplementary plugins (tier 0)', () => {
+        it('should use supplementary plugin before provider override when canExtract matches', async () => {
+            const pdfExtractor = createMockExtractorPlugin('pdf-extractor', 'PDF', {
+                canExtractImpl: jest
+                    .fn()
+                    .mockImplementation((url: string) => Promise.resolve(url.endsWith('.pdf'))),
+            });
+            const tavilyExtractor = createMockExtractorPlugin('tavily', 'Tavily', {
+                canExtractImpl: jest.fn().mockResolvedValue(true),
+            });
+
+            const pdfRegistered = createRegisteredPlugin(pdfExtractor, {
+                capabilities: ['content-extractor'],
+                supplementary: true,
+            });
+            const tavilyRegistered = createRegisteredPlugin(tavilyExtractor, {
+                capabilities: ['content-extractor'],
+            });
+
+            registry.getByCapability.mockReturnValue([pdfRegistered, tavilyRegistered]);
+            registry.get.mockReturnValue(tavilyRegistered);
+
+            await service.extractContent('https://example.com/doc.pdf', undefined, {
+                userId: 'test-user',
+                providerOverride: 'tavily',
+            });
+
+            // PDF extractor should win even though Tavily was the override
+            expect(pdfExtractor.extract).toHaveBeenCalled();
+            expect(tavilyExtractor.extract).not.toHaveBeenCalled();
+        });
+
+        it('should fall through to override when supplementary canExtract returns false', async () => {
+            const pdfExtractor = createMockExtractorPlugin('pdf-extractor', 'PDF', {
+                canExtractImpl: jest.fn().mockResolvedValue(false),
+            });
+            const tavilyExtractor = createMockExtractorPlugin('tavily', 'Tavily', {
+                canExtractImpl: jest.fn().mockResolvedValue(true),
+            });
+
+            const pdfRegistered = createRegisteredPlugin(pdfExtractor, {
+                capabilities: ['content-extractor'],
+                supplementary: true,
+            });
+            const tavilyRegistered = createRegisteredPlugin(tavilyExtractor, {
+                capabilities: ['content-extractor'],
+            });
+
+            registry.getByCapability.mockReturnValue([pdfRegistered, tavilyRegistered]);
+            registry.get.mockReturnValue(tavilyRegistered);
+
+            await service.extractContent('https://example.com/page', undefined, {
+                userId: 'test-user',
+                providerOverride: 'tavily',
+            });
+
+            expect(pdfExtractor.extract).not.toHaveBeenCalled();
+            expect(tavilyExtractor.extract).toHaveBeenCalled();
+        });
+
+        it('should skip supplementary plugin when disabled for scope', async () => {
+            const pdfExtractor = createMockExtractorPlugin('pdf-extractor', 'PDF', {
+                canExtractImpl: jest.fn().mockResolvedValue(true),
+            });
+            const tavilyExtractor = createMockExtractorPlugin('tavily', 'Tavily', {
+                canExtractImpl: jest.fn().mockResolvedValue(true),
+            });
+
+            const pdfRegistered = createRegisteredPlugin(pdfExtractor, {
+                capabilities: ['content-extractor'],
+                supplementary: true,
+            });
+            const tavilyRegistered = createRegisteredPlugin(tavilyExtractor, {
+                capabilities: ['content-extractor'],
+            });
+
+            registry.getByCapability.mockReturnValue([pdfRegistered, tavilyRegistered]);
+            registry.get.mockReturnValue(tavilyRegistered);
+            // PDF extractor disabled for this directory
+            registry.isPluginEnabledForScope.mockImplementation((id) =>
+                Promise.resolve(id !== 'pdf-extractor'),
+            );
+
+            await service.extractContent('https://example.com/doc.pdf', undefined, {
+                userId: 'test-user',
+                directoryId: 'dir-1',
+                providerOverride: 'tavily',
+            });
+
+            expect(pdfExtractor.extract).not.toHaveBeenCalled();
+            expect(tavilyExtractor.extract).toHaveBeenCalled();
+        });
+    });
+
     describe('extractContent - resolvePlugin', () => {
         it('should use explicit provider override when specified', async () => {
             const notionExtractor = createMockExtractorPlugin('notion-extractor', 'Notion');

@@ -193,10 +193,10 @@ describe('ClaudeCodePlugin', () => {
 			const result = await plugin.execute(directory, request, existing);
 
 			expect(result.success).toBe(true);
-			expect(result.items).toHaveLength(1);
-			expect(result.items[0].name).toBe('Test Item');
-			expect(result.categories).toHaveLength(1);
-			expect(result.tags).toHaveLength(1);
+			expect(result.outputs.items).toHaveLength(1);
+			expect(result.outputs.items[0].name).toBe('Test Item');
+			expect(result.outputs.categories).toHaveLength(1);
+			expect(result.outputs.tags).toHaveLength(1);
 			expect(result.metrics!.itemsProcessed).toBe(1);
 			expect(result.warnings).toBeUndefined();
 		});
@@ -290,7 +290,7 @@ describe('ClaudeCodePlugin', () => {
 			});
 
 			expect(result2.success).toBe(true);
-			expect(result2.items).toHaveLength(1);
+			expect(result2.outputs.items).toHaveLength(1);
 			await plugin2.onUnload();
 		});
 

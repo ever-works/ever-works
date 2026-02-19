@@ -24,6 +24,7 @@ import type {
     JsonSchema,
     PipelineState,
 } from '@ever-works/plugin';
+import { createEmptyPipelineOutputs } from '@ever-works/plugin';
 
 /**
  * Simple mock pipeline context for tests.
@@ -162,11 +163,7 @@ export class MockPipelinePlugin implements IPipelinePlugin<string> {
     ): PipelineResult {
         return {
             success: true,
-            items: [],
-            categories: [],
-            collections: [],
-            tags: [],
-            brands: [],
+            outputs: createEmptyPipelineOutputs(),
             duration: meta.duration,
             stepsCompleted: meta.stepsCompleted,
             totalSteps: meta.totalSteps,

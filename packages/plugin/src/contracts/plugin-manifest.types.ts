@@ -169,6 +169,12 @@ export interface PluginManifest {
 	/** Deprecation message */
 	readonly deprecationMessage?: string;
 	/**
+	 * When true, this plugin is excluded from manual provider selection UI (e.g., GeneratorForm
+	 * dropdowns). It still declares its capability and auto-activates via canExtract() URL routing
+	 * in the facade. Use for narrow-scope extractors like notion-extractor or pdf-extractor.
+	 */
+	readonly supplementary?: boolean;
+	/**
 	 * Which provider categories this pipeline wants shown in the generator form.
 	 * e.g. ['ai-provider', 'search', 'screenshot', 'content-extractor']
 	 * If omitted, shows all individual provider selectors (backward compatible).
