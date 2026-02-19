@@ -41,13 +41,6 @@ export {
     type PipelineExecutionMode,
 } from './pipeline-orchestrator.service';
 
-// Provider override service
-export {
-    ProviderOverrideService,
-    type ProviderOverrideContext,
-    type ProviderOverrideResult,
-} from './provider-override.service';
-
 // Pipeline module
 export { PipelineModule } from './pipeline.module';
 

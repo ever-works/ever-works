@@ -7,7 +7,6 @@ import type { FormSchemaProvidersType } from '../provider-categories.js';
 /**
  * Interface for plugins that provide form fields for the generator form.
  *
- * This is different from IFormFieldPlugin which provides custom field types.
  * IFormSchemaProvider provides the actual form schema/fields for configuration.
  *
  * Capability: 'form-schema-provider'
