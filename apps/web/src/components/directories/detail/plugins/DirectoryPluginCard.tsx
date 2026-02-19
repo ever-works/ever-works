@@ -9,7 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Power, PowerOff, Settings, Shield } from 'lucide-react';
 import { enableDirectoryPlugin, disableDirectoryPlugin } from '@/app/actions/plugins';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
-import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
+import {
+    getCategoryLabel,
+    getCapabilityLabel,
+    HIDDEN_CAPABILITIES,
+} from '@/lib/utils/plugin-category-icons';
 import { DirectoryPluginSettingsModal } from './DirectoryPluginSettingsModal';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -199,30 +203,34 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                     <span className="text-xs px-2 py-0.5 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
                         {getCategoryLabel(plugin.category)}
                     </span>
-                    {plugin.capabilities
-                        .filter((cap) => cap !== plugin.category)
-                        .slice(0, 2)
-                        .map((cap) => (
-                            <span
-                                key={cap}
-                                className={cn(
-                                    'text-xs px-2 py-0.5 rounded-full',
-                                    plugin.activeCapability === cap
-                                        ? 'bg-primary/20 text-primary'
-                                        : 'bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark',
+                    {(() => {
+                        const visible = plugin.capabilities.filter(
+                            (cap) => cap !== plugin.category && !HIDDEN_CAPABILITIES.has(cap),
+                        );
+                        return (
+                            <>
+                                {visible.slice(0, 2).map((cap) => (
+                                    <span
+                                        key={cap}
+                                        className={cn(
+                                            'text-xs px-2 py-0.5 rounded-full',
+                                            plugin.activeCapability === cap
+                                                ? 'bg-primary/20 text-primary'
+                                                : 'bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark',
+                                        )}
+                                    >
+                                        {getCapabilityLabel(cap)}
+                                        {plugin.activeCapability === cap && ' ✓'}
+                                    </span>
+                                ))}
+                                {visible.length > 2 && (
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
+                                        +{visible.length - 2}
+                                    </span>
                                 )}
-                            >
-                                {getCapabilityLabel(cap)}
-                                {plugin.activeCapability === cap && ' ✓'}
-                            </span>
-                        ))}
-                    {plugin.capabilities.filter((cap) => cap !== plugin.category).length > 2 && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
-                            +
-                            {plugin.capabilities.filter((cap) => cap !== plugin.category).length -
-                                2}
-                        </span>
-                    )}
+                            </>
+                        );
+                    })()}
                 </div>
 
                 {isClickable && (

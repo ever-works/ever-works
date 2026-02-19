@@ -10,7 +10,11 @@ import { Settings, Power, PowerOff, ExternalLink } from 'lucide-react';
 import { PluginIcon } from './PluginIcon';
 import { PluginEnablePanel } from './PluginEnablePanel';
 import { PluginDisableWarning } from './PluginDisableWarning';
-import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
+import {
+    getCategoryLabel,
+    getCapabilityLabel,
+    HIDDEN_CAPABILITIES,
+} from '@/lib/utils/plugin-category-icons';
 import { usePluginToggle } from '@/lib/hooks/use-plugin-toggle';
 
 interface PluginCardProps {
@@ -111,24 +115,28 @@ export function PluginCard({ plugin }: PluginCardProps) {
                     <span className="text-xs px-2 py-0.5 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
                         {getCategoryLabel(plugin.category)}
                     </span>
-                    {plugin.capabilities
-                        .filter((cap) => cap !== plugin.category)
-                        .slice(0, 2)
-                        .map((cap) => (
-                            <span
-                                key={cap}
-                                className="text-xs px-2 py-0.5 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark"
-                            >
-                                {getCapabilityLabel(cap)}
-                            </span>
-                        ))}
-                    {plugin.capabilities.filter((cap) => cap !== plugin.category).length > 2 && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
-                            +
-                            {plugin.capabilities.filter((cap) => cap !== plugin.category).length -
-                                2}
-                        </span>
-                    )}
+                    {(() => {
+                        const visible = plugin.capabilities.filter(
+                            (cap) => cap !== plugin.category && !HIDDEN_CAPABILITIES.has(cap),
+                        );
+                        return (
+                            <>
+                                {visible.slice(0, 2).map((cap) => (
+                                    <span
+                                        key={cap}
+                                        className="text-xs px-2 py-0.5 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark"
+                                    >
+                                        {getCapabilityLabel(cap)}
+                                    </span>
+                                ))}
+                                {visible.length > 2 && (
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
+                                        +{visible.length - 2}
+                                    </span>
+                                )}
+                            </>
+                        );
+                    })()}
                 </div>
 
                 <div className="flex items-center gap-2 mt-auto pt-3 border-t border-border dark:border-border-dark">
