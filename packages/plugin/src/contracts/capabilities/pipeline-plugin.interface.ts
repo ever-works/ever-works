@@ -63,11 +63,9 @@ export interface PipelineProgress {
 }
 
 /**
- * Pipeline execution result
+ * Canonical output payload produced by pipelines.
  */
-export interface PipelineResult {
-	/** Whether execution was successful */
-	readonly success: boolean;
+export interface PipelineOutputs {
 	/** Generated items */
 	readonly items: readonly ItemData[];
 	/** Generated categories */
@@ -80,6 +78,18 @@ export interface PipelineResult {
 	readonly brands: readonly Brand[];
 	/** Domain analysis from generation */
 	readonly domainAnalysis?: DomainAnalysis;
+	/** Additional pipeline-specific outputs */
+	readonly extra?: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * Pipeline execution result
+ */
+export interface PipelineResult {
+	/** Whether execution was successful */
+	readonly success: boolean;
+	/** Generated outputs */
+	readonly outputs: PipelineOutputs;
 	/** Pipeline execution metrics */
 	readonly metrics?: PipelineMetrics;
 	/** Execution duration in ms */

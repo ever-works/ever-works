@@ -1,4 +1,10 @@
-import type { DirectoryReference, GenerationRequest, ExistingItems, StepMetrics } from '@ever-works/plugin';
+import type {
+	DirectoryReference,
+	GenerationRequest,
+	ExistingItems,
+	StepMetrics,
+	PipelineOutputs
+} from '@ever-works/plugin';
 import type { MutableGenerationContext, GenerationContextSnapshot } from './mutable-generation-context.js';
 import type { StepDataKey, StepDataTypes, StandardPipelineMetrics } from './step-data-types.js';
 
@@ -240,6 +246,17 @@ export class TypedGenerationContext implements MutableGenerationContext {
 
 	clearContentCache(): void {
 		this.contentCache.clear();
+	}
+
+	toPipelineOutputs(): PipelineOutputs {
+		return {
+			items: this.finalItems,
+			categories: this.finalCategories,
+			tags: this.finalTags,
+			collections: this.finalCollections,
+			brands: this.finalBrands,
+			domainAnalysis: this.domainAnalysis
+		};
 	}
 
 	static fromMutableContext(ctx: MutableGenerationContext): TypedGenerationContext {

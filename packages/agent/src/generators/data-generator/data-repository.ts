@@ -252,7 +252,10 @@ export class DataRepository {
         }
     }
 
-    private static async getCollectionPath(dir: string, type: 'categories' | 'tags' | 'collections') {
+    private static async getCollectionPath(
+        dir: string,
+        type: 'categories' | 'tags' | 'collections',
+    ) {
         const useDir = await this.shouldeUseDir(dir, type);
         const collectionPath = useDir
             ? path.join(dir, type, `${type}.yml`)

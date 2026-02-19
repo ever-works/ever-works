@@ -22,6 +22,7 @@ import type {
     PipelineExecutionOptions,
     PipelineProgressCallback,
 } from '@ever-works/plugin';
+import { makePipelineOutputs, makePipelineResult } from './fixtures';
 
 describe('FullPipelineExecutorService', () => {
     let service: FullPipelineExecutorService;
@@ -44,30 +45,33 @@ describe('FullPipelineExecutorService', () => {
         tags: [],
     };
 
-    const mockSuccessResult: PipelineResult = {
-        success: true,
-        items: [
-            {
-                name: 'Test Item',
-                slug: 'test-item',
-                source_url: 'https://example.com',
-            } as any,
-        ],
-        categories: [{ name: 'Category 1' }] as any[],
-        tags: [{ name: 'Tag 1' }] as any[],
-        brands: [],
-        collections: [{ id: 'col-1', name: 'Collection 1' }] as any[],
-        duration: 5000,
-        stepsCompleted: 5,
-        totalSteps: 5,
-        state: {
-            steps: new Map(),
-            completedSteps: ['step-1', 'step-2', 'step-3', 'step-4', 'step-5'],
-            failedSteps: [],
-            isRunning: false,
-            isCancelled: false,
+    const mockSuccessResult: PipelineResult = makePipelineResult(
+        {
+            success: true,
+            duration: 5000,
+            stepsCompleted: 5,
+            totalSteps: 5,
+            state: {
+                steps: new Map(),
+                completedSteps: ['step-1', 'step-2', 'step-3', 'step-4', 'step-5'],
+                failedSteps: [],
+                isRunning: false,
+                isCancelled: false,
+            },
         },
-    };
+        {
+            items: [
+                {
+                    name: 'Test Item',
+                    slug: 'test-item',
+                    source_url: 'https://example.com',
+                } as any,
+            ],
+            categories: [{ name: 'Category 1' }] as any[],
+            tags: [{ name: 'Tag 1' }] as any[],
+            collections: [{ id: 'col-1', name: 'Collection 1' }] as any[],
+        },
+    );
 
     /**
      * Creates a mock full pipeline plugin
@@ -209,7 +213,7 @@ describe('FullPipelineExecutorService', () => {
                 undefined,
             );
             expect(result.success).toBe(true);
-            expect(result.items).toHaveLength(1);
+            expect(result.outputs.items).toHaveLength(1);
         });
 
         it('should emit pipeline:started event', async () => {
@@ -237,10 +241,13 @@ describe('FullPipelineExecutorService', () => {
                     directoryId: mockDirectory.id,
                     pipelineId: plugin.id,
                     stepsCompleted: 5,
-                    items: expect.any(Array),
-                    categories: expect.any(Array),
-                    tags: expect.any(Array),
-                    brands: expect.any(Array),
+                    outputs: expect.objectContaining({
+                        items: expect.any(Array),
+                        categories: expect.any(Array),
+                        tags: expect.any(Array),
+                        brands: expect.any(Array),
+                        collections: expect.any(Array),
+                    }),
                 }),
             );
         });
@@ -270,8 +277,8 @@ describe('FullPipelineExecutorService', () => {
             const result = await service.execute(plugin, mockDirectory, mockRequest, mockExisting);
 
             expect(result.success).toBe(false);
-            expect(result.items).toEqual([]);
-            expect(result.categories).toEqual([]);
+            expect(result.outputs.items).toEqual([]);
+            expect(result.outputs.categories).toEqual([]);
             expect(result.stepsCompleted).toBe(0);
             expect(result.totalSteps).toBe(5); // From getStepDefinitions
             expect(result.state.isRunning).toBe(false);
@@ -509,10 +516,13 @@ describe('FullPipelineExecutorService', () => {
                     pipelineId: plugin.id,
                     duration: expect.any(Number),
                     stepsCompleted: expect.any(Number),
-                    items: expect.any(Array),
-                    categories: expect.any(Array),
-                    tags: expect.any(Array),
-                    brands: expect.any(Array),
+                    outputs: expect.objectContaining({
+                        items: expect.any(Array),
+                        categories: expect.any(Array),
+                        tags: expect.any(Array),
+                        brands: expect.any(Array),
+                        collections: expect.any(Array),
+                    }),
                 }),
             );
         });
@@ -538,24 +548,22 @@ describe('FullPipelineExecutorService', () => {
 
     describe('integration scenarios', () => {
         it('should handle plugin with partial result', async () => {
-            const partialResult: PipelineResult = {
-                success: true,
-                items: [],
-                categories: [],
-                tags: [],
-                brands: [],
-                collections: [],
-                duration: 1000,
-                stepsCompleted: 3,
-                totalSteps: 5,
-                state: {
-                    steps: new Map(),
-                    completedSteps: ['step-1', 'step-2', 'step-3'],
-                    failedSteps: [],
-                    isRunning: false,
-                    isCancelled: false,
+            const partialResult: PipelineResult = makePipelineResult(
+                {
+                    success: true,
+                    duration: 1000,
+                    stepsCompleted: 3,
+                    totalSteps: 5,
+                    state: {
+                        steps: new Map(),
+                        completedSteps: ['step-1', 'step-2', 'step-3'],
+                        failedSteps: [],
+                        isRunning: false,
+                        isCancelled: false,
+                    },
                 },
-            };
+                makePipelineOutputs(),
+            );
 
             const plugin = createMockFullPipelinePlugin('exa-websets', {
                 executeResult: partialResult,
@@ -569,24 +577,22 @@ describe('FullPipelineExecutorService', () => {
         });
 
         it('should handle plugin with cancelled state', async () => {
-            const cancelledResult: PipelineResult = {
-                success: false,
-                items: [],
-                categories: [],
-                tags: [],
-                brands: [],
-                collections: [],
-                duration: 500,
-                stepsCompleted: 2,
-                totalSteps: 5,
-                state: {
-                    steps: new Map(),
-                    completedSteps: ['step-1', 'step-2'],
-                    failedSteps: [],
-                    isRunning: false,
-                    isCancelled: true,
+            const cancelledResult: PipelineResult = makePipelineResult(
+                {
+                    success: false,
+                    duration: 500,
+                    stepsCompleted: 2,
+                    totalSteps: 5,
+                    state: {
+                        steps: new Map(),
+                        completedSteps: ['step-1', 'step-2'],
+                        failedSteps: [],
+                        isRunning: false,
+                        isCancelled: true,
+                    },
                 },
-            };
+                makePipelineOutputs(),
+            );
 
             const plugin = createMockFullPipelinePlugin('exa-websets', {
                 executeResult: cancelledResult,

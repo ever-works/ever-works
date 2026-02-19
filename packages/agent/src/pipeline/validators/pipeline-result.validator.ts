@@ -34,20 +34,25 @@ export function validatePipelineResult(result: unknown): PipelineResultValidatio
         errors.push('Missing or invalid "success" field (expected boolean)');
     }
 
-    if (!Array.isArray(r.items)) {
-        errors.push('Missing or invalid "items" field (expected array)');
-    }
-
-    if (!Array.isArray(r.categories)) {
-        errors.push('Missing or invalid "categories" field (expected array)');
-    }
-
-    if (!Array.isArray(r.tags)) {
-        errors.push('Missing or invalid "tags" field (expected array)');
-    }
-
-    if (!Array.isArray(r.brands)) {
-        errors.push('Missing or invalid "brands" field (expected array)');
+    if (typeof r.outputs !== 'object' || r.outputs === null) {
+        errors.push('Missing or invalid "outputs" field (expected object)');
+    } else {
+        const outputs = r.outputs as Record<string, unknown>;
+        if (!Array.isArray(outputs.items)) {
+            errors.push('Missing or invalid "outputs.items" field (expected array)');
+        }
+        if (!Array.isArray(outputs.categories)) {
+            errors.push('Missing or invalid "outputs.categories" field (expected array)');
+        }
+        if (!Array.isArray(outputs.tags)) {
+            errors.push('Missing or invalid "outputs.tags" field (expected array)');
+        }
+        if (!Array.isArray(outputs.collections)) {
+            errors.push('Missing or invalid "outputs.collections" field (expected array)');
+        }
+        if (!Array.isArray(outputs.brands)) {
+            errors.push('Missing or invalid "outputs.brands" field (expected array)');
+        }
     }
 
     if (typeof r.stepsCompleted !== 'number') {
@@ -59,9 +64,9 @@ export function validatePipelineResult(result: unknown): PipelineResultValidatio
     }
 
     // Validate state object
-    if (typeof r.state !== 'object' || r.state === null) {
-        errors.push('Missing or invalid "state" field (expected object)');
-    } else {
+    if (r.state !== undefined && (typeof r.state !== 'object' || r.state === null)) {
+        errors.push('Invalid "state" field (expected object)');
+    } else if (typeof r.state === 'object' && r.state !== null) {
         const state = r.state as Record<string, unknown>;
         if (typeof state.isRunning !== 'boolean') {
             errors.push('Missing or invalid "state.isRunning" field (expected boolean)');
@@ -78,8 +83,8 @@ export function validatePipelineResult(result: unknown): PipelineResultValidatio
     }
 
     // Optional fields validation
-    if (r.duration !== undefined && typeof r.duration !== 'number') {
-        errors.push('Invalid "duration" field (expected number)');
+    if (typeof r.duration !== 'number') {
+        errors.push('Missing or invalid "duration" field (expected number)');
     }
 
     if (r.error !== undefined && typeof r.error !== 'string' && !(r.error instanceof Error)) {

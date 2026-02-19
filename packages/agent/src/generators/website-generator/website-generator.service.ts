@@ -115,7 +115,11 @@ export class WebsiteGeneratorService {
     }
 
     /** Sync all branches from template to directory's website repo */
-    async syncAllBranchesFromTemplate(directory: Directory, user: User, cleanupExtraBranches = false) {
+    async syncAllBranchesFromTemplate(
+        directory: Directory,
+        user: User,
+        cleanupExtraBranches = false,
+    ) {
         return this.branchSyncService.syncFromTemplate(directory, user, cleanupExtraBranches);
     }
 
