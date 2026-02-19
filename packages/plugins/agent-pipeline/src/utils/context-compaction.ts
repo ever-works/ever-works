@@ -79,6 +79,14 @@ const TOOL_SUMMARIZERS: Record<string, Summarizer> = {
 		}
 		return `${path}: validated`;
 	},
+	findItems: (args, value) => {
+		if (typeof value === 'object' && value !== null) {
+			const obj = value as Record<string, unknown>;
+			const count = Array.isArray(obj.matches) ? obj.matches.length : 0;
+			return `findItems('${args.query ?? ''}') -> ${count} match(es)`;
+		}
+		return `findItems('${args.query ?? ''}')`;
+	},
 	processUrls: (_args, value) => {
 		if (Array.isArray(value)) {
 			const totalItems = value.reduce((sum: number, r: { count?: number }) => sum + (r?.count ?? 0), 0);

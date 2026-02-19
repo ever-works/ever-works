@@ -9,6 +9,7 @@ import { buildWorkerSystemPrompt, buildChunkUserPrompt } from './extraction-prom
 import type { WorkerPromptOptions } from './extraction-prompt.js';
 import { createCreateFileTool, createUpdateFileTool } from '../tools/file-tools.js';
 import { createValidateItemJsonTool } from '../tools/validate-json-tools.js';
+import { createFindItemsTool } from '../tools/find-items-tool.js';
 import { createPrepareStep } from '../utils/context-compaction.js';
 import { wrapReasoningFilteredModel } from '../utils/model-wrapper.js';
 import { createToolCallRepairFn, withToolCallingRetry } from '../utils/tool-call-resilience.js';
@@ -149,6 +150,7 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 							tools: {
 								bash: bashTools.bash,
 								readFile: bashTools.readFile,
+								findItems: createFindItemsTool(workspacePath),
 								createFile: createFileTool,
 								updateFile: updateFileTool,
 								validateItemJson: validateItemJsonTool

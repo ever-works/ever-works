@@ -4,6 +4,7 @@ import type { PluginLogger } from '@ever-works/plugin';
 import { getCurrentDateString, ITEM_SCHEMA_PROMPT_TEXT } from '@ever-works/plugin';
 
 import { createUpdateFileTool } from '../tools/file-tools.js';
+import { createFindItemsTool } from '../tools/find-items-tool.js';
 import { createValidateItemJsonTool } from '../tools/validate-json-tools.js';
 import { createPrepareStep } from '../utils/context-compaction.js';
 import { wrapReasoningFilteredModel } from '../utils/model-wrapper.js';
@@ -73,6 +74,7 @@ export async function processModification(
 					tools: {
 						bash: bashTools.bash,
 						readFile: bashTools.readFile,
+						findItems: createFindItemsTool(workspacePath),
 						updateFile: updateFileTool,
 						validateItemJson: validateItemJsonTool
 					} as Parameters<typeof generateText>[0]['tools'],
@@ -107,6 +109,7 @@ function buildModificationSystemPrompt(): string {
 		'## Tools',
 		'- `bash` — Run targeted search commands to find items. NEVER `ls *.json` — workspaces can have thousands of files.',
 		'- `readFile` — Read a workspace file',
+		'- `findItems` — Fuzzy-search items by name, slug, or URL. Returns up to 5 best matches.',
 		'- `updateFile` — Update an existing file',
 		'- `validateItemJson` — Validate and auto-repair JSON after each update',
 		'',
@@ -126,11 +129,8 @@ function buildModificationSystemPrompt(): string {
 		'',
 		'## Workflow',
 		'1. Read `_meta/categories.json`, `_meta/tags.json` for current taxonomy.',
-		'2. Find items to modify using case-insensitive, partial-match searches:',
-		'   - `grep -rli "keyword" --include="*.json" .` (case-insensitive, recursive, safe for large workspaces)',
-		'   - Try multiple keyword variations (partial words, synonyms, abbreviations) to catch fuzzy matches.',
-		'   - Example: searching for "machine learning" items — try `grep -rli "machine.learn" --include="*.json" .`, then `grep -rli "\\bml\\b" --include="*.json" .`',
-		'   - NEVER use bare `ls *.json` or `grep ... *.json` — glob expansion fails with thousands of files.',
+		'2. Use `findItems(name)` to check if the target item exists and get its slug (slug = filename, e.g. slug "gauzy" → file "gauzy.json").',
+		'   For broader content-based searches (e.g., all items in a category), use: `grep -rli "keyword" --include="*.json" .`',
 		'3. `readFile` to inspect matched items.',
 		'4. `updateFile` to apply modifications.',
 		'5. Run `validateItemJson` after each `updateFile`.',

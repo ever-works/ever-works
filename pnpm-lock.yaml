@@ -805,6 +805,9 @@ importers:
       bash-tool:
         specifier: ^1.3.14
         version: 1.3.14(ai@6.0.85(zod@3.25.76))(just-bash@2.9.8)
+      fuse.js:
+        specifier: ^7.1.0
+        version: 7.1.0
       just-bash:
         specifier: ^2.9.8
         version: 2.9.8
@@ -6354,6 +6357,10 @@ packages:
 
   function-bind@1.1.2:
     resolution: {integrity: sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==}
+
+  fuse.js@7.1.0:
+    resolution: {integrity: sha512-trLf4SzuuUxfusZADLINj+dE8clK1frKdmqiJNb1Es75fmI5oY6X2mxLVUciLLjxqw/xr72Dhy+lER6dGd02FQ==}
+    engines: {node: '>=10'}
 
   generate-function@2.3.1:
     resolution: {integrity: sha512-eeB5GfMNeevm/GRYq20ShmsaGcmI81kIX2K9XQx5miC8KdHaC6Jm0qQ8ZNeGOi7wYB8OsdxKs+Y2oVuTFuVwKQ==}
@@ -15437,6 +15444,8 @@ snapshots:
     optional: true
 
   function-bind@1.1.2: {}
+
+  fuse.js@7.1.0: {}
 
   generate-function@2.3.1:
     dependencies:

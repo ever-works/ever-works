@@ -23,14 +23,13 @@ export function buildWorkerSystemPrompt(opts: WorkerPromptOptions): string {
 		'\n## Tools\n' +
 			'- `bash` — Run targeted search commands. NEVER run `ls *.json` — workspaces can have thousands of files.\n' +
 			'- `readFile` — Read workspace files (e.g., `_meta/categories.json`, `_meta/existing-items.jsonl`)\n' +
+			'- `findItems` — Fuzzy-search existing items by name, slug, or URL (up to 5 matches)\n' +
 			'- `createFile` — Create a new item JSON file (auto-syncs taxonomy)\n' +
 			'- `updateFile` — Update a file **you created in this session only**. Do NOT use this to modify pre-existing items.\n' +
 			'- `validateItemJson` — Validate and auto-repair a JSON file after creation',
 		'\n## Workflow\n' +
 			'1. Read `_meta/categories.json` to learn existing categories — prefer reusing them.\n' +
-			'2. Before creating each item, check `_meta/existing-items.jsonl` for duplicates using case-insensitive partial matching:\n' +
-			'   - `grep -i "keyword" _meta/existing-items.jsonl`\n' +
-			'   - Try multiple variations (partial name, domain, abbreviation) to catch fuzzy matches.\n' +
+			'2. Before creating each item, use `findItems(name)` to check for duplicates. Skip if a match is found.\n' +
 			'3. Create items using `createFile` with valid JSON matching the Item JSON Schema above.\n' +
 			'4. Validate each created file with `validateItemJson`.\n' +
 			'5. You may use `updateFile` to correct or enrich a file you just created in this session, but never to modify pre-existing items.',

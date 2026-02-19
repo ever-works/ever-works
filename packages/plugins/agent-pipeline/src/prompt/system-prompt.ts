@@ -50,14 +50,16 @@ export function buildSystemPrompt(options: PromptOptions): string {
 	sections.push(
 		'\n## Your Tools\n' +
 			'1. **search** — Search the web for items relevant to the directory topic. Returns titles, URLs, and scores.\n' +
-			'2. **processUrls** — Send 1-10 URLs for parallel processing. Each URL is independently: ' +
+			'2. **findItems** — Fuzzy-search existing items by name, slug, or URL (up to 5 matches). ' +
+			'Use before modifyItems to check if a specific item already exists.\n' +
+			'3. **processUrls** — Send 1-10 URLs for parallel processing. Each URL is independently: ' +
 			'content-extracted (full page, no truncation), chunked if needed, analyzed by AI, best-effort deduplicated against existing items, ' +
 			'and written as JSON files. Returns per-URL results with file counts.\n' +
-			'3. **modifyItems** — Send clear, specific plain-language instructions (e.g., "Merge categories X and Y into Z", ' +
+			'4. **modifyItems** — Send clear, specific plain-language instructions (e.g., "Merge categories X and Y into Z", ' +
 			'"Add tag \'open-source\' to all items in category A"). A worker with file access will execute the changes.\n' +
-			'4. **getWorkspaceOverview** — Get current workspace state: total items, categories, tags, brands. ' +
+			'5. **getWorkspaceOverview** — Get current workspace state: total items, categories, tags, brands. ' +
 			'Lightweight — does not read individual items.\n' +
-			'5. **reportProgress** — Report progress to the user. Call periodically.'
+			'6. **reportProgress** — Report progress to the user. Call periodically.'
 	);
 
 	// Generation workflow
@@ -69,7 +71,9 @@ export function buildSystemPrompt(options: PromptOptions): string {
 			'3. Use `processUrls` with a batch of URLs (up to 10 at a time) for efficient parallel extraction.\n' +
 			'4. Use `reportProgress` to update the user on items created so far.\n' +
 			'5. Repeat: search with different queries, process more URLs (applying the same relevance criteria), until you reach the target.\n\n' +
-			'**URL budget:** Do not exceed **' + maxPages + ' total URLs** across all processUrls calls. ' +
+			'**URL budget:** Do not exceed **' +
+			maxPages +
+			' total URLs** across all processUrls calls. ' +
 			'When a URL returns count=0, treat it as exhausted — do not retry it or send very similar URLs. ' +
 			'Use getWorkspaceOverview to check progress and diversify search queries if results are sparse.\n\n' +
 			'**Deduplication is enforced by the pipeline** — workers perform best-effort checks and a final pass removes duplicates by source URL (with name fallback). ' +
@@ -83,7 +87,9 @@ export function buildSystemPrompt(options: PromptOptions): string {
 		sections.push(
 			'\n## Modification Workflow\n' +
 				'When the user asks to reorganize, merge categories, update fields, or otherwise modify existing items:\n' +
-				'1. Use `getWorkspaceOverview` to understand the current state.\n' +
+				'1. Use `findItems` to check if the target item exists.\n' +
+				'   - Found → use `modifyItems` with the slug for precision (e.g., "update gauzy.json: set featured=true").\n' +
+				'   - Not found → use `search` + `processUrls` to create it, then `modifyItems`.\n' +
 				'2. Use `modifyItems` with clear instructions describing what to change.\n' +
 				'3. Use `reportProgress` to update on your progress.\n\n' +
 				'Do NOT search the web or create new items when the prompt is about reorganizing existing data.'

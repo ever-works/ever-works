@@ -155,10 +155,10 @@ const getMergeArrayItemKey = (value: unknown): string => {
 };
 
 const mergeUniqueArray = (existing: unknown[], incoming: unknown[]): unknown[] => {
-    const merged = [...existing];
-    const seen = new Set(merged.map((entry) => getMergeArrayItemKey(entry)));
+    const merged: unknown[] = [];
+    const seen = new Set<string>();
 
-    for (const entry of incoming) {
+    for (const entry of [...existing, ...incoming]) {
         const key = getMergeArrayItemKey(entry);
         if (seen.has(key)) {
             continue;

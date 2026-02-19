@@ -12,6 +12,7 @@ import type {
 import { createSearchTool, createReportProgressTool } from './facade-tools.js';
 import type { FacadeToolOptions } from './facade-tools.js';
 import { readWorkspaceOverview } from './workspace-overview.js';
+import { createFindItemsTool } from './find-items-tool.js';
 import { processUrlWorker } from '../worker/url-worker.js';
 import type { WorkerPromptOptions } from '../worker/extraction-prompt.js';
 import { processModification } from '../worker/modification-worker.js';
@@ -109,6 +110,7 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 	return {
 		tools: {
 			search: createSearchTool(ctx.facades.searchFacade, ctx.facadeOptions, toolOptions),
+			findItems: createFindItemsTool(ctx.workspacePath),
 			processUrls: processUrlsTool,
 			modifyItems: modifyItemsTool,
 			getWorkspaceOverview: getWorkspaceOverviewTool,
