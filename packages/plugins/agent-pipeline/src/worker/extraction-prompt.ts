@@ -24,7 +24,7 @@ export function buildWorkerSystemPrompt(opts: WorkerPromptOptions): string {
 			'- `bash` — Run targeted search commands. NEVER run `ls *.json` — workspaces can have thousands of files.\n' +
 			'- `readFile` — Read workspace files (e.g., `_meta/categories.json`, `_meta/existing-items.jsonl`)\n' +
 			'- `createFile` — Create a new item JSON file (auto-syncs taxonomy)\n' +
-			'- `updateFile` — Update an existing file\n' +
+			'- `updateFile` — Update a file **you created in this session only**. Do NOT use this to modify pre-existing items.\n' +
 			'- `validateItemJson` — Validate and auto-repair a JSON file after creation',
 		'\n## Workflow\n' +
 			'1. Read `_meta/categories.json` to learn existing categories — prefer reusing them.\n' +
@@ -32,7 +32,8 @@ export function buildWorkerSystemPrompt(opts: WorkerPromptOptions): string {
 			'   - `grep -i "keyword" _meta/existing-items.jsonl`\n' +
 			'   - Try multiple variations (partial name, domain, abbreviation) to catch fuzzy matches.\n' +
 			'3. Create items using `createFile` with valid JSON matching the Item JSON Schema above.\n' +
-			'4. Validate each created file with `validateItemJson`.',
+			'4. Validate each created file with `validateItemJson`.\n' +
+			'5. You may use `updateFile` to correct or enrich a file you just created in this session, but never to modify pre-existing items.',
 		'\n## Extraction Rules\n' +
 			'1. Only extract items DIRECTLY relevant to the directory topic.\n' +
 			'2. Every item must have a valid source_url.\n' +

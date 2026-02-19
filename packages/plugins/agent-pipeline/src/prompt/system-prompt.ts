@@ -1,6 +1,6 @@
 import type { DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
 import { getCurrentDateString } from '@ever-works/plugin';
-import { DEFAULT_TARGET_ITEMS } from '../form-schema.js';
+import { DEFAULT_TARGET_ITEMS, DEFAULT_MAX_PAGES_TO_PROCESS } from '../form-schema.js';
 
 export interface PromptOptions {
 	readonly directory: DirectoryReference;
@@ -18,6 +18,7 @@ export function buildSystemPrompt(options: PromptOptions): string {
 	const existingCount = existing.items.length;
 	const hasExisting = existingCount > 0;
 	const targetItems = ((request.config || {}).target_items as number) || DEFAULT_TARGET_ITEMS;
+	const maxPages = ((request.config || {}).max_pages_to_process as number) || DEFAULT_MAX_PAGES_TO_PROCESS;
 
 	const sections: string[] = [];
 
@@ -68,6 +69,9 @@ export function buildSystemPrompt(options: PromptOptions): string {
 			'3. Use `processUrls` with a batch of URLs (up to 10 at a time) for efficient parallel extraction.\n' +
 			'4. Use `reportProgress` to update the user on items created so far.\n' +
 			'5. Repeat: search with different queries, process more URLs (applying the same relevance criteria), until you reach the target.\n\n' +
+			'**URL budget:** Do not exceed **' + maxPages + ' total URLs** across all processUrls calls. ' +
+			'When a URL returns count=0, treat it as exhausted — do not retry it or send very similar URLs. ' +
+			'Use getWorkspaceOverview to check progress and diversify search queries if results are sparse.\n\n' +
 			'**Deduplication is enforced by the pipeline** — workers perform best-effort checks and a final pass removes duplicates by source URL (with name fallback). ' +
 			'You do not need to manually check duplicates yourself.\n\n' +
 			'**CRITICAL: Never invent fictitious items.** Every item must be backed by tool-retrieved data from this session. ' +

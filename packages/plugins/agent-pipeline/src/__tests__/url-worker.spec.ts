@@ -61,6 +61,7 @@ vi.mock('../tools/validate-json-tools', () => ({
 
 import { generateText } from 'ai';
 import { createCreateFileTool } from '../tools/file-tools';
+import { ToolCircuitBreaker } from '../utils/tool-circuit-breaker';
 
 const mockGenerateText = vi.mocked(generateText);
 const mockCreateCreateFileTool = vi.mocked(createCreateFileTool);
@@ -82,6 +83,7 @@ function createMockContext(overrides?: Partial<UrlWorkerContext>): UrlWorkerCont
 		},
 		workspacePath: '/tmp/workspace',
 		logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as PluginLogger,
+		breaker: new ToolCircuitBreaker(),
 		...overrides
 	};
 }
