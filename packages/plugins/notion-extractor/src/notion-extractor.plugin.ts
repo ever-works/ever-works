@@ -336,6 +336,7 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 			license: 'MIT',
 			builtIn: false,
 			systemPlugin: false,
+			supplementary: true,
 			homepage: 'https://developers.notion.com',
 			icon: {
 				type: 'svg',

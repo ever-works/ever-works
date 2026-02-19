@@ -7,13 +7,9 @@ export const PLUGIN_CAPABILITIES = {
 	PIPELINE: 'pipeline',
 	PIPELINE_MODIFIER: 'pipeline-modifier',
 	FORM_SCHEMA_PROVIDER: 'form-schema-provider',
-	FORM_FIELD: 'form-field',
 	DEPLOYMENT: 'deployment',
 	GIT_PROVIDER: 'git-provider',
-	OAUTH: 'oauth',
-	SUB_PROVIDER: 'sub-provider',
-	CONFIG_AWARE: 'config-aware',
-	CUSTOM_CAPABILITY: 'custom-capability'
+	OAUTH: 'oauth'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

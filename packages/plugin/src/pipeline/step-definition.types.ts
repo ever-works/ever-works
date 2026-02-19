@@ -19,6 +19,7 @@ export type StepPosition<TStepId extends string = string> =
 	| { readonly type: 'before'; readonly stepId: TStepId }
 	| { readonly type: 'after'; readonly stepId: TStepId }
 	| { readonly type: 'replace'; readonly stepId: TStepId }
+	| { readonly type: 'disable'; readonly stepId: TStepId }
 	| { readonly type: 'first' }
 	| { readonly type: 'last' };
 

@@ -4,6 +4,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PluginLifecycleManagerService } from '../services/plugin-lifecycle-manager.service';
 import { PluginRegistryService, RegisteredPlugin } from '../services/plugin-registry.service';
 import { PluginRepository } from '../repositories/plugin.repository';
+import { CustomCapabilityRegistryService } from '../services/custom-capability-registry.service';
 import { PluginEvents } from '../plugins.constants';
 import type { IPlugin, PluginContext, PluginManifest } from '@ever-works/plugin';
 
@@ -17,6 +18,7 @@ describe('PluginLifecycleManagerService', () => {
     let registry: PluginRegistryService;
     let pluginRepository: PluginRepository;
     let eventEmitter: EventEmitter2;
+    let customCapabilityRegistry: jest.Mocked<CustomCapabilityRegistryService>;
 
     const createMockPlugin = (): IPlugin =>
         ({
@@ -124,6 +126,12 @@ describe('PluginLifecycleManagerService', () => {
                         emit: jest.fn(),
                     },
                 },
+                {
+                    provide: CustomCapabilityRegistryService,
+                    useValue: {
+                        unregisterByProvider: jest.fn().mockReturnValue([]),
+                    },
+                },
             ],
         }).compile();
 
@@ -131,6 +139,7 @@ describe('PluginLifecycleManagerService', () => {
         registry = module.get<PluginRegistryService>(PluginRegistryService);
         pluginRepository = module.get<PluginRepository>(PluginRepository);
         eventEmitter = module.get<EventEmitter2>(EventEmitter2);
+        customCapabilityRegistry = module.get(CustomCapabilityRegistryService);
 
         // Set up mock context factory
         service.setContextFactory({
@@ -236,6 +245,9 @@ describe('PluginLifecycleManagerService', () => {
             expect(result.success).toBe(true);
             expect(result.newState).toBe('unloaded');
             expect(plugin.onUnload).toHaveBeenCalled();
+            expect(customCapabilityRegistry.unregisterByProvider).toHaveBeenCalledWith(
+                'test-plugin',
+            );
             expect(registry.unregister).toHaveBeenCalledWith('test-plugin');
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PluginEvents.UNLOADED,

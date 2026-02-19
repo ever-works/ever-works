@@ -298,6 +298,10 @@ export class GeneratorFormSchemaService {
         }
 
         for (const registered of enabledPlugins) {
+            // Supplementary plugins (e.g., notion-extractor, pdf-extractor) auto-activate via
+            // canExtract() URL matching in the facade — they are not user-selectable providers.
+            if (registered.manifest.supplementary) continue;
+
             // Check if plugin is enabled for this context
             if (options?.directoryId || options?.userId) {
                 const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(

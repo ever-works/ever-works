@@ -5,7 +5,6 @@ import {
     FullPipelineExecutorService,
     PipelineOrchestratorService,
     PipelineFacadeService,
-    ProviderOverrideService,
 } from '@ever-works/agent/pipeline';
 import { TriggerFacadesModule } from './trigger-facades.module';
 
@@ -15,7 +14,6 @@ const PROVIDERS = [
     FullPipelineExecutorService,
     PipelineOrchestratorService,
     PipelineFacadeService,
-    ProviderOverrideService,
 ];
 
 /**

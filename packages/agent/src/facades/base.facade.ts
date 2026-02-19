@@ -126,8 +126,8 @@ export abstract class BaseFacadeService {
 
     protected async isPluginEnabled(
         pluginId: string,
-        directoryId?: string,
-        userId?: string,
+        directoryId: string,
+        userId: string,
     ): Promise<boolean> {
         return this.registry.isPluginEnabledForScope(pluginId, directoryId, userId);
     }
@@ -237,8 +237,8 @@ export abstract class BaseFacadeService {
     }
 
     protected async getEnabledPlugins(
-        directoryId?: string,
-        userId?: string,
+        directoryId: string,
+        userId: string,
     ): Promise<RegisteredPlugin[]> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         const result: RegisteredPlugin[] = [];

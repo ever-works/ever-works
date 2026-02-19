@@ -537,12 +537,15 @@ export class PluginOperationsService {
         });
         const directoryPluginMap = new Map(directoryPlugins.map((dp) => [dp.pluginId, dp]));
 
-        // Build capability providers mapping
+        // Build registry map for quick supplementary lookups
+        const registryMap = new Map(allPlugins.map((p) => [p.plugin.id, p]));
+
+        // Build capability providers mapping (exclude supplementary plugins)
         const capabilityProviders: Record<string, string> = {};
         for (const dp of directoryPlugins) {
-            if (dp.enabled && dp.activeCapability) {
-                capabilityProviders[dp.activeCapability] = dp.pluginId;
-            }
+            if (!dp.enabled || !dp.activeCapability) continue;
+            if (registryMap.get(dp.pluginId)?.manifest.supplementary) continue;
+            capabilityProviders[dp.activeCapability] = dp.pluginId;
         }
 
         // Map to response
@@ -584,11 +587,6 @@ export class PluginOperationsService {
 
         const schema = registered.plugin.settingsSchema;
 
-        // Validate settings against schema if provided
-        if (options?.settings) {
-            this.validateSettingsOrThrow(options.settings, schema, 'directory');
-        }
-
         // Check if user has the plugin enabled (or plugin is autoEnabled)
         const userPlugin = await this.userPluginRepository.findOne({
             where: { userId, pluginId },
@@ -602,6 +600,16 @@ export class PluginOperationsService {
         }
 
         this.validateUserLevelRequiredFields(userPlugin, registered.plugin.settingsSchema);
+
+        // Validate settings against schema if provided, using merged (user + new) settings
+        if (options?.settings) {
+            const allSettings = {
+                ...(userPlugin?.settings || {}),
+                ...(userPlugin?.secretSettings || {}),
+                ...options.settings,
+            };
+            this.validateSettingsOrThrow(allSettings, schema, 'directory');
+        }
 
         // Get the plugin entity
         const pluginEntity = await this.pluginRepository.findOne({
@@ -828,6 +836,12 @@ export class PluginOperationsService {
             );
         }
 
+        if (registered.manifest.supplementary) {
+            throw new BadRequestException(
+                `Plugin "${pluginId}" is a supplementary plugin and cannot be set as an active capability provider`,
+            );
+        }
+
         const userPlugin = await this.userPluginRepository.findOne({
             where: { userId, pluginId },
         });
@@ -839,11 +853,14 @@ export class PluginOperationsService {
             registered.manifest,
         );
 
-        // Clear this capability from other plugins in this directory
+        // Clear this capability from other plugins in this directory.
+        // Must use () => 'NULL' — passing undefined is silently swallowed by TypeORM
+        // (UpdateDateColumn fills the SET clause) so activeCapability is never cleared,
+        // leaving stale rows that corrupt the capabilityProviders map on the next read.
         await this.directoryPluginRepository
             .createQueryBuilder()
             .update()
-            .set({ activeCapability: undefined })
+            .set({ activeCapability: () => 'NULL' })
             .where('directoryId = :directoryId', { directoryId })
             .andWhere('activeCapability = :capability', { capability })
             .andWhere('pluginId != :pluginId', { pluginId })
@@ -984,6 +1001,7 @@ export class PluginOperationsService {
             icon: this.extractIcon(manifest),
             settingsSchema: this.extractSettingsSchema(registered.plugin.settingsSchema),
             autoEnable: manifest.autoEnable ?? false,
+            supplementary: manifest.supplementary ?? false,
         };
     }
 

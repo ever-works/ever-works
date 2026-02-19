@@ -93,21 +93,7 @@ const CAPABILITY_METHOD_REQUIREMENTS: Record<string, string[]> = {
     ],
     [PLUGIN_CAPABILITIES.PIPELINE]: ['getStepDefinitions', 'execute'],
     [PLUGIN_CAPABILITIES.PIPELINE_MODIFIER]: ['execute'],
-    [PLUGIN_CAPABILITIES.FORM_FIELD]: ['getRegistration', 'validate'],
-    [PLUGIN_CAPABILITIES.SUB_PROVIDER]: [
-        'getRegistration',
-        'canHandle',
-        'getPriority',
-        'isAvailable',
-    ],
-    [PLUGIN_CAPABILITIES.CONFIG_AWARE]: ['onConfigurationChange', 'getEffectiveConfig'],
     [PLUGIN_CAPABILITIES.FORM_SCHEMA_PROVIDER]: ['getFormFields', 'validateFormInput'],
-    [PLUGIN_CAPABILITIES.CUSTOM_CAPABILITY]: [
-        'getCustomCapabilities',
-        'getCapabilityImplementation',
-        'hasCapability',
-        'getCapabilityVersion',
-    ],
 };
 
 /**
@@ -122,8 +108,6 @@ const CAPABILITY_PROPERTY_REQUIREMENTS: Record<string, string[]> = {
     [PLUGIN_CAPABILITIES.DEPLOYMENT]: ['providerName'],
     [PLUGIN_CAPABILITIES.DATA_SOURCE]: ['sourceName'],
     [PLUGIN_CAPABILITIES.AI_PROVIDER]: ['providerType', 'providerName'],
-    [PLUGIN_CAPABILITIES.FORM_FIELD]: ['fieldType'],
-    [PLUGIN_CAPABILITIES.SUB_PROVIDER]: ['parentCapability', 'subProviderId'],
     [PLUGIN_CAPABILITIES.PIPELINE_MODIFIER]: ['targetPipelines'],
 };
 

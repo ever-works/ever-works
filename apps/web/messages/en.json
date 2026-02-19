@@ -1899,8 +1899,11 @@
             "backToPlugins": "Back to Plugins",
             "filters": {
                 "all": "All",
-                "enabledOnly": "Enabled only"
+                "enabledOnly": "Enabled only",
+                "search": "Search plugins...",
+                "clearSearch": "Clear search"
             },
+            "searchEmpty": "No plugins match \"{query}\"",
             "categories": {
                 "git": "Git",
                 "deployment": "Deployment",

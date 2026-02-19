@@ -21,7 +21,7 @@ export function ActiveProvidersBar({ providers }: { providers: ResolvedProvider[
             <div className="flex flex-wrap gap-2">
                 {providers.map((p) => (
                     <span
-                        key={p.id}
+                        key={`${p.category}-${p.id}`}
                         className={cn(
                             'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs',
                             p.source === 'override'

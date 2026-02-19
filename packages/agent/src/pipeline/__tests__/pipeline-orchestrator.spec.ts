@@ -23,6 +23,7 @@ import type {
     IPipelineContext,
     PipelineStepDefinition,
 } from '@ever-works/plugin';
+import { makePipelineOutputs, makePipelineResult } from './fixtures';
 
 /** Simple 3-step linear chain for orchestrator tests */
 const ORCHESTRATOR_STEPS = createLinearChain(['step-init', 'step-process', 'step-finalize']);
@@ -64,24 +65,24 @@ describe('PipelineOrchestratorService', () => {
             onUnload: jest.fn(),
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             getStepDefinitions: jest.fn().mockReturnValue([]),
-            execute: jest.fn().mockResolvedValue({
-                success: true,
-                items: [],
-                categories: [],
-                collections: [],
-                tags: [],
-                brands: [],
-                duration: 1000,
-                stepsCompleted: 5,
-                totalSteps: 5,
-                state: {
-                    steps: new Map(),
-                    completedSteps: [],
-                    failedSteps: [],
-                    isRunning: false,
-                    isCancelled: false,
-                },
-            }),
+            execute: jest.fn().mockResolvedValue(
+                makePipelineResult(
+                    {
+                        success: true,
+                        duration: 1000,
+                        stepsCompleted: 5,
+                        totalSteps: 5,
+                        state: {
+                            steps: new Map(),
+                            completedSteps: [],
+                            failedSteps: [],
+                            isRunning: false,
+                            isCancelled: false,
+                        },
+                    },
+                    makePipelineOutputs(),
+                ),
+            ),
         }) as unknown as IPipelinePlugin;
 
     const createMockManifest = (
@@ -174,6 +175,7 @@ describe('PipelineOrchestratorService', () => {
             category: 'pipeline',
             capabilities: ['pipeline'],
             defaultForCapabilities: ['pipeline'],
+            autoEnable: true,
         });
         registry.updateState('standard-pipeline', 'loaded');
 
@@ -529,23 +531,22 @@ describe('PipelineOrchestratorService', () => {
         });
 
         it('should return resumed result when checkpoint exists', async () => {
-            const mockResult = {
-                success: true,
-                items: [],
-                categories: [],
-                tags: [],
-                brands: [],
-                duration: 500,
-                stepsCompleted: 3,
-                totalSteps: 3,
-                state: {
-                    steps: new Map(),
-                    completedSteps: ['step-init', 'step-process', 'step-finalize'],
-                    failedSteps: [],
-                    isRunning: false,
-                    isCancelled: false,
+            const mockResult = makePipelineResult(
+                {
+                    success: true,
+                    duration: 500,
+                    stepsCompleted: 3,
+                    totalSteps: 3,
+                    state: {
+                        steps: new Map(),
+                        completedSteps: ['step-init', 'step-process', 'step-finalize'],
+                        failedSteps: [],
+                        isRunning: false,
+                        isCancelled: false,
+                    },
                 },
-            };
+                makePipelineOutputs(),
+            );
 
             const resumeSpy = jest.spyOn(stepExecutor, 'resumeFromCheckpoint');
             resumeSpy.mockResolvedValue(mockResult as any);

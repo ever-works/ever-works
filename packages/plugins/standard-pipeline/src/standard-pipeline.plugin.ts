@@ -408,11 +408,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 
 		return {
 			success: hasNewItems || hasExistingItems,
-			items: ctx.finalItems,
-			categories: ctx.finalCategories,
-			tags: ctx.finalTags,
-			collections: ctx.finalCollections,
-			brands: ctx.finalBrands,
+			outputs: ctx.toPipelineOutputs(),
 			duration: meta.duration,
 			stepsCompleted: meta.stepsCompleted,
 			totalSteps: meta.totalSteps,

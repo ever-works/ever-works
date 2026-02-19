@@ -26,6 +26,7 @@ import type {
 	FormFieldGroup,
 	MutableItemData
 } from '@ever-works/plugin';
+import { buildSuccessPipelineResult } from '@ever-works/plugin';
 import { collectMetadataFromItems, createItemLookupIndex, isItemDuplicate } from '@ever-works/plugin';
 
 import type { AgentPipelineStepId } from './types.js';
@@ -689,20 +690,23 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		warnings?: string[]
 	): PipelineResult {
 		const duration = Date.now() - startTime;
-		return {
-			success: true,
-			items,
-			categories: metadata.categories,
-			tags: metadata.tags,
-			brands: metadata.brands,
-			collections: metadata.collections,
-			metrics: buildMetrics(startTime, duration, items.length),
-			duration,
-			stepsCompleted: AGENT_PIPELINE_STEP_IDS.length,
-			totalSteps: AGENT_PIPELINE_STEP_IDS.length,
-			state: this.state!,
-			warnings
-		};
+		return buildSuccessPipelineResult(
+			{
+				items,
+				categories: metadata.categories,
+				tags: metadata.tags,
+				brands: metadata.brands,
+				collections: metadata.collections
+			},
+			{
+				metrics: buildMetrics(startTime, duration, items.length),
+				duration,
+				stepsCompleted: AGENT_PIPELINE_STEP_IDS.length,
+				totalSteps: AGENT_PIPELINE_STEP_IDS.length,
+				state: this.state!,
+				warnings
+			}
+		);
 	}
 
 	private setState(stepId: AgentPipelineStepId, status: StepStatus, error?: string): void {

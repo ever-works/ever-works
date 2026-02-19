@@ -12,6 +12,7 @@ import type {
     PipelineCompletedPayload,
     PipelineFailedPayload,
 } from '@ever-works/plugin';
+import { buildErrorPipelineResult, createEmptyPipelineOutputs } from '@ever-works/plugin';
 import { PipelineEvents } from './step-pipeline-executor.service';
 import { PipelineFacadeService } from './pipeline-facade.service';
 import { validatePipelineResult } from './validators';
@@ -114,17 +115,11 @@ export class FullPipelineExecutorService {
             this.logger.error(`Full pipeline failed via plugin "${plugin.id}": ${err.message}`);
 
             // Return a failed result
-            return {
-                success: false,
-                items: [],
-                categories: [],
-                tags: [],
-                collections: [],
-                brands: [],
+            return buildErrorPipelineResult(err, {
+                outputs: createEmptyPipelineOutputs(),
                 duration,
                 stepsCompleted: 0,
                 totalSteps: plugin.getStepDefinitions().length,
-                error: err,
                 state: {
                     steps: new Map(),
                     completedSteps: [],
@@ -132,7 +127,7 @@ export class FullPipelineExecutorService {
                     isRunning: false,
                     isCancelled: false,
                 },
-            };
+            });
         }
     }
 
@@ -210,11 +205,7 @@ export class FullPipelineExecutorService {
             pipelineId: source,
             duration,
             stepsCompleted,
-            items: result.items,
-            categories: result.categories,
-            tags: result.tags,
-            collections: result.collections,
-            brands: result.brands,
+            outputs: result.outputs,
         } as PipelineCompletedPayload);
     }
 
