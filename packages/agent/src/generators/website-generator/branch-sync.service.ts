@@ -32,11 +32,11 @@ export class BranchSyncService {
 
     constructor(private readonly gitFacade: GitFacadeService) {}
 
-    /**
-     * Sync all template branches to a directory's website repo.
-     * Swallows errors so that a branch sync failure does not fail the caller.
-     */
-    async syncFromTemplate(directory: Directory, user: User): Promise<BranchSyncSummary | null> {
+    async syncFromTemplate(
+        directory: Directory,
+        user: User,
+        cleanupExtraBranches = false,
+    ): Promise<BranchSyncSummary | null> {
         const directoryOwner = getDirectoryOwner(directory);
 
         const branchMapping = directory.websiteTemplateUseBeta
@@ -57,6 +57,7 @@ export class BranchSyncService {
                 forcePush: true,
                 branchMapping,
                 providerId: directory.gitProvider,
+                cleanupExtraBranches,
             });
 
             this.logger.log(
@@ -83,6 +84,8 @@ export class BranchSyncService {
         forcePush?: boolean;
         branchMapping?: { [sourceBranch: string]: string };
         providerId?: string;
+        /** Delete target branches not in syncBranches; needed after CREATE_USING_TEMPLATE copies all template branches */
+        cleanupExtraBranches?: boolean;
     }): Promise<BranchSyncSummary> {
         const {
             targetOwner,
@@ -92,6 +95,7 @@ export class BranchSyncService {
             forcePush = true,
             branchMapping = {},
             providerId,
+            cleanupExtraBranches = false,
         } = params;
 
         const branchesToSync = [...WEBSITE_TEMPLATE_CONFIG.syncBranches];
@@ -175,7 +179,47 @@ export class BranchSyncService {
             `Branch sync completed for ${targetOwner}/${targetRepo}: ${summary.synced} synced, ${summary.skipped} skipped, ${summary.errors} errors`,
         );
 
+        if (cleanupExtraBranches) {
+            await this.deleteExtraBranches({ targetOwner, targetRepo, userId, providerId });
+        }
+
         return summary;
+    }
+
+    private async deleteExtraBranches(params: {
+        targetOwner: string;
+        targetRepo: string;
+        userId: string;
+        providerId?: string;
+    }): Promise<void> {
+        const { targetOwner, targetRepo, userId, providerId } = params;
+        const allowed = new Set<string>(WEBSITE_TEMPLATE_CONFIG.syncBranches);
+
+        let remoteBranches: { name: string }[];
+        try {
+            remoteBranches = await this.gitFacade.listBranches(targetOwner, targetRepo, {
+                userId,
+                providerId,
+            });
+        } catch (error) {
+            this.logger.warn(`Could not list branches for cleanup: ${error.message}`);
+            return;
+        }
+
+        for (const branch of remoteBranches) {
+            if (!allowed.has(branch.name)) {
+                this.logger.log(
+                    `Deleting extra branch '${branch.name}' from ${targetOwner}/${targetRepo}`,
+                );
+                await this.gitFacade
+                    .deleteBranch(targetOwner, targetRepo, branch.name, { userId, providerId })
+                    .catch((err) => {
+                        this.logger.warn(
+                            `Failed to delete extra branch '${branch.name}': ${err.message}`,
+                        );
+                    });
+            }
+        }
     }
 
     /** Sync a single branch from template to target repository */
