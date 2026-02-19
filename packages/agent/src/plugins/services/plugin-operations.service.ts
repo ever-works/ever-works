@@ -853,11 +853,14 @@ export class PluginOperationsService {
             registered.manifest,
         );
 
-        // Clear this capability from other plugins in this directory
+        // Clear this capability from other plugins in this directory.
+        // Must use () => 'NULL' — passing undefined is silently swallowed by TypeORM
+        // (UpdateDateColumn fills the SET clause) so activeCapability is never cleared,
+        // leaving stale rows that corrupt the capabilityProviders map on the next read.
         await this.directoryPluginRepository
             .createQueryBuilder()
             .update()
-            .set({ activeCapability: undefined })
+            .set({ activeCapability: () => 'NULL' })
             .where('directoryId = :directoryId', { directoryId })
             .andWhere('activeCapability = :capability', { capability })
             .andWhere('pluginId != :pluginId', { pluginId })
