@@ -1,9 +1,16 @@
+import type { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
 import { directoryAPI } from '@/lib/api';
 import { GeneratorForm } from '@/components/directories/detail/generator/GeneratorForm';
 import { GenerationProgress } from '@/components/directories/detail/generator/GenerationProgress';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { canGenerate } from '@/lib/permissions';
 import { notFound } from 'next/navigation';
+
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations('metadata.pages');
+    return { title: t('generator') };
+}
 
 type Params = { params: Promise<{ id: string }> };
 

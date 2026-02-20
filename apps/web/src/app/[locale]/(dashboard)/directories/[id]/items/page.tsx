@@ -1,7 +1,14 @@
+import type { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
 import { directoryAPI } from '@/lib/api';
 import type { ItemData, Category, Collection, Tag } from '@/lib/api/types-only';
 import { ItemsPageClient } from '@/components/directories/detail/items/ItemsPageClient';
 import { ItemsEmptyState } from '@/components/directories/detail/items/ItemsEmptyState';
+
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations('metadata.pages');
+    return { title: t('items') };
+}
 
 type Params = { params: Promise<{ id: string }> };
 

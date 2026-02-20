@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
 import { deployAPI, Directory, directoryAPI } from '@/lib/api';
 import { notFound, redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -7,6 +9,11 @@ import { DeployProviderSelector } from '@/components/directories/detail/deploy/D
 import { SharedDirectoryNoTokenAlert } from '@/components/directories/detail/deploy/SharedDirectoryNoTokenAlert';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { canDeploy } from '@/lib/permissions';
+
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations('metadata.pages');
+    return { title: t('deploy') };
+}
 
 type DeployPageParams = {
     params: Promise<{ id: string }>;

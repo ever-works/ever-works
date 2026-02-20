@@ -1,9 +1,16 @@
+import type { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
 import { directoryAPI } from '@/lib/api';
 import { DirectoryStatusCard } from '@/components/directories/detail/DirectoryStatusCard';
 import { DirectoryInfo } from '@/components/directories/detail/overview/DirectoryInfo';
 import { DirectoryStats } from '@/components/directories/detail/overview/DirectoryStats';
 import { DirectoryConfig } from '@/components/directories/detail/overview/DirectoryConfig';
 import { GenerateStatusType } from '@/lib/api/enums';
+
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations('metadata.pages');
+    return { title: t('overview') };
+}
 
 type Params = { params: Promise<{ id: string }> };
 
