@@ -8,6 +8,7 @@ import { Toaster } from 'sonner';
 import './globals.css';
 import { themeInitScript } from '@/lib/theme-init';
 import { TopLoader } from '@/components/ui/top-loader';
+import { APP_NAME } from '@/lib/constants';
 
 const geistSans = Geist({
     variable: '--font-geist-sans',
@@ -20,7 +21,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-    title: `${process.env.NEXT_PUBLIC_APP_NAME || process.env.APP_NAME || 'Ever Works'} - Directory Builder`,
+    title: {
+        template: `%s | ${APP_NAME}`,
+        default: `${APP_NAME} - Directory Builder`,
+    },
     description:
         process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
         process.env.APP_DESCRIPTION ||

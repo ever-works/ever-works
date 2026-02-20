@@ -1,26 +1,32 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const mockGetText = vi.fn();
-const mockGetInfo = vi.fn();
-const mockDestroy = vi.fn();
+const { mockExtractText, mockGetDocumentProxy, mockGetMeta } = vi.hoisted(() => ({
+	mockExtractText: vi.fn(),
+	mockGetDocumentProxy: vi.fn(),
+	mockGetMeta: vi.fn()
+}));
 
-vi.mock('pdf-parse', () => ({
-	PDFParse: class MockPDFParse {
-		constructor() {}
-		getText = mockGetText;
-		getInfo = mockGetInfo;
-		destroy = mockDestroy;
-	}
+vi.mock('unpdf', () => ({
+	extractText: mockExtractText,
+	getDocumentProxy: mockGetDocumentProxy,
+	getMeta: mockGetMeta
 }));
 
 import { PdfTextExtractor } from '../pdf-text-extractor.js';
 
 describe('PdfTextExtractor', () => {
 	let extractor: PdfTextExtractor;
+	const mockDestroy = vi.fn();
 
 	beforeEach(() => {
 		extractor = new PdfTextExtractor();
 		vi.clearAllMocks();
+
+		mockGetDocumentProxy.mockResolvedValue({
+			numPages: 3,
+			destroy: mockDestroy
+		});
+		mockGetMeta.mockResolvedValue({ info: {} });
 	});
 
 	afterEach(() => {
@@ -29,51 +35,78 @@ describe('PdfTextExtractor', () => {
 
 	describe('extractText', () => {
 		it('should extract text from a valid PDF buffer', async () => {
-			mockGetInfo.mockResolvedValue({ total: 3, info: { Title: 'Test PDF' } });
-			mockGetText.mockResolvedValue({
-				text: '  Hello world from PDF  ',
-				pages: [{ text: 'Hello world from PDF', num: 1 }],
-				total: 3
+			mockGetDocumentProxy.mockResolvedValue({
+				numPages: 3,
+				destroy: mockDestroy
 			});
+			mockExtractText.mockResolvedValue({
+				totalPages: 3,
+				text: ['Hello world', 'from PDF', 'page three']
+			});
+			mockGetMeta.mockResolvedValue({ info: { Title: 'Test PDF' } });
 
 			const result = await extractor.extractText(Buffer.from('fake-pdf-data'));
 
-			expect(result.text).toBe('Hello world from PDF');
+			expect(result.text).toBe('Hello world\nfrom PDF\npage three');
 			expect(result.numPages).toBe(3);
 			expect(result.info).toEqual({ Title: 'Test PDF' });
 			expect(mockDestroy).toHaveBeenCalled();
 		});
 
 		it('should respect maxPages parameter', async () => {
-			mockGetInfo.mockResolvedValue({ total: 100, info: {} });
-			mockGetText.mockResolvedValue({ text: 'Page content', pages: [], total: 100 });
+			mockGetDocumentProxy.mockResolvedValue({
+				numPages: 100,
+				destroy: mockDestroy
+			});
+			const pageTexts = Array.from({ length: 100 }, (_, i) => `Page ${i + 1}`);
+			mockExtractText.mockResolvedValue({ totalPages: 100, text: pageTexts });
 
-			await extractor.extractText(Buffer.from('data'), 5);
+			const result = await extractor.extractText(Buffer.from('data'), 5);
 
-			expect(mockGetText).toHaveBeenCalledWith({ first: 5 });
+			expect(result.text).toBe('Page 1\nPage 2\nPage 3\nPage 4\nPage 5');
+			expect(result.numPages).toBe(100);
 		});
 
 		it('should process all pages when maxPages is 0', async () => {
-			mockGetInfo.mockResolvedValue({ total: 10, info: {} });
-			mockGetText.mockResolvedValue({ text: 'All pages', pages: [], total: 10 });
+			mockGetDocumentProxy.mockResolvedValue({
+				numPages: 3,
+				destroy: mockDestroy
+			});
+			mockExtractText.mockResolvedValue({
+				totalPages: 3,
+				text: ['Page 1', 'Page 2', 'Page 3']
+			});
 
-			await extractor.extractText(Buffer.from('data'), 0);
+			const result = await extractor.extractText(Buffer.from('data'), 0);
 
-			expect(mockGetText).toHaveBeenCalledWith({ first: 10 });
+			expect(result.text).toBe('Page 1\nPage 2\nPage 3');
 		});
 
 		it('should cap maxPages to actual page count', async () => {
-			mockGetInfo.mockResolvedValue({ total: 3, info: {} });
-			mockGetText.mockResolvedValue({ text: 'Short doc', pages: [], total: 3 });
+			mockGetDocumentProxy.mockResolvedValue({
+				numPages: 3,
+				destroy: mockDestroy
+			});
+			mockExtractText.mockResolvedValue({
+				totalPages: 3,
+				text: ['Page 1', 'Page 2', 'Page 3']
+			});
 
-			await extractor.extractText(Buffer.from('data'), 50);
+			const result = await extractor.extractText(Buffer.from('data'), 50);
 
-			expect(mockGetText).toHaveBeenCalledWith({ first: 3 });
+			expect(result.text).toBe('Page 1\nPage 2\nPage 3');
+			expect(result.numPages).toBe(3);
 		});
 
 		it('should handle empty PDF text', async () => {
-			mockGetInfo.mockResolvedValue({ total: 1, info: {} });
-			mockGetText.mockResolvedValue({ text: '   ', pages: [], total: 1 });
+			mockGetDocumentProxy.mockResolvedValue({
+				numPages: 1,
+				destroy: mockDestroy
+			});
+			mockExtractText.mockResolvedValue({
+				totalPages: 1,
+				text: ['   ']
+			});
 
 			const result = await extractor.extractText(Buffer.from('data'));
 
@@ -81,8 +114,8 @@ describe('PdfTextExtractor', () => {
 			expect(result.numPages).toBe(1);
 		});
 
-		it('should propagate pdf-parse errors', async () => {
-			mockGetInfo.mockRejectedValue(new Error('Corrupted PDF'));
+		it('should propagate unpdf errors', async () => {
+			mockGetDocumentProxy.mockRejectedValue(new Error('Corrupted PDF'));
 
 			await expect(extractor.extractText(Buffer.from('bad-data'))).rejects.toThrow('Corrupted PDF');
 		});

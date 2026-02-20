@@ -1,16 +1,14 @@
 import type {
 	PluginContext,
 	PluginSettings,
-	PipelineStepDefinition,
 	PipelineState,
 	StepState,
 	PipelineProgressCallback,
 	PipelineResult,
-	PipelineMetrics,
 	StepStatus
 } from '@ever-works/plugin';
 import { buildCancelledPipelineResult, buildErrorPipelineResult, createEmptyPipelineOutputs } from '@ever-works/plugin';
-import type { AgentPipelineStepId } from '../types.js';
+import type { AgentPipelineStepId, AgentPipelineMetrics, TokenUsageBreakdown } from '../types.js';
 import { AGENT_PIPELINE_STEP_IDS } from '../types.js';
 import { STEP_DEFINITIONS } from '../steps.js';
 
@@ -103,13 +101,17 @@ export async function resolveSettings(
 	}
 }
 
-export function buildMetrics(startTime: number, duration: number, itemCount: number): PipelineMetrics {
-	return {
-		startTime,
-		duration,
-		itemsProcessed: itemCount,
-		steps: {}
-	};
+export function buildMetrics(
+	startTime: number,
+	duration: number,
+	itemCount: number,
+	tokenUsage?: TokenUsageBreakdown
+): AgentPipelineMetrics {
+	const metrics: AgentPipelineMetrics = { startTime, duration, itemsProcessed: itemCount, steps: {} };
+	if (tokenUsage) {
+		metrics.tokenUsage = tokenUsage;
+	}
+	return metrics;
 }
 
 export function buildErrorResult(

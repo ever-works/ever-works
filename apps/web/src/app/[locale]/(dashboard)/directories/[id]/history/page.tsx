@@ -1,7 +1,14 @@
+import type { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
 import { directoryAPI } from '@/lib/api';
 import { DirectoryGenerationHistoryResponse } from '@/lib/api/directory';
 import { DirectoryHistoryPageClient } from '@/components/directories/detail/history/DirectoryHistoryPageClient';
 import { notFound } from 'next/navigation';
+
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations('metadata.pages');
+    return { title: t('history') };
+}
 
 type Params = { params: Promise<{ id: string }> };
 

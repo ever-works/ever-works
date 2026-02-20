@@ -1,8 +1,14 @@
+import type { Metadata } from 'next';
 import { directoryAPI, pluginsAPI } from '@/lib/api';
 import { DirectoryPluginsList } from '@/components/directories/detail/plugins/DirectoryPluginsList';
 import { canAccessSettings } from '@/lib/permissions';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
+
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations('metadata.pages');
+    return { title: t('plugins') };
+}
 
 type Params = { params: Promise<{ id: string }> };
 

@@ -12,6 +12,7 @@ export interface ChatStreamRequestDto {
     messages: ChatMessage[];
     model?: string;
     temperature?: number;
+    providerOverride?: string;
 }
 
 export interface StreamChunk {

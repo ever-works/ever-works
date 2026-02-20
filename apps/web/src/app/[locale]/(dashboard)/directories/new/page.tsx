@@ -1,7 +1,14 @@
+import type { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
 import { getAuthFromCookie } from '@/lib/auth';
 import { gitProvidersAPI, deployAPI, GitProviderConnectionInfo, GitProviderInfo } from '@/lib/api';
 import NewDirectoryClient from './new-directory-client';
 import type { DeployProvider } from './deploy-provider-selector';
+
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations('metadata.pages');
+    return { title: t('newDirectory') };
+}
 
 export interface ProviderWithConnection {
     provider: GitProviderInfo;

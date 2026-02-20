@@ -1,9 +1,16 @@
+import type { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
 import { directoryAPI } from '@/lib/api';
 import { SettingsForm } from '@/components/directories/detail/settings/SettingsForm';
 import { getAuthFromCookie } from '@/lib/auth';
 import { canAccessSettings } from '@/lib/permissions';
 import { notFound } from 'next/navigation';
 import { getRepositoryVisibility } from '@/app/actions/dashboard/directories';
+
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations('metadata.pages');
+    return { title: t('settings') };
+}
 
 type Params = { params: Promise<{ id: string }> };
 

@@ -1,30 +1,26 @@
-import { PDFParse } from 'pdf-parse';
+import { extractText, getDocumentProxy, getMeta } from 'unpdf';
 import type { PdfTextResult } from './types.js';
 
 /**
- * Text-layer extraction from PDF buffers via pdf-parse.
+ * Text-layer extraction from PDF buffers via unpdf.
  */
 export class PdfTextExtractor {
 	async extractText(buffer: Buffer, maxPages: number = 0): Promise<PdfTextResult> {
-		const parser = new PDFParse({
-			data: new Uint8Array(buffer)
-		});
+		const pdf = await getDocumentProxy(new Uint8Array(buffer));
+		const totalPages = pdf.numPages;
 
-		const info = await parser.getInfo();
-		const numPages = info.total;
+		const { text } = await extractText(pdf, { mergePages: false });
+		const { info } = await getMeta(pdf);
 
-		const pagesToParse = maxPages > 0 ? Math.min(maxPages, numPages) : numPages;
+		const pages = maxPages > 0 ? text.slice(0, Math.min(maxPages, totalPages)) : text;
+		const combined = pages.join('\n');
 
-		const textResult = await parser.getText({
-			first: pagesToParse
-		});
-
-		await parser.destroy();
+		await pdf.destroy();
 
 		return {
-			text: textResult.text.trim(),
-			numPages,
-			info: info.info ?? {}
+			text: combined.trim(),
+			numPages: totalPages,
+			info: info ?? {}
 		};
 	}
 

@@ -1,4 +1,4 @@
-import { generateText, stepCountIs } from 'ai';
+import { generateText, stepCountIs, ToolSet } from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type {
 	IPlugin,
@@ -29,8 +29,13 @@ import type {
 import { buildSuccessPipelineResult } from '@ever-works/plugin';
 import { collectMetadataFromItems, createItemLookupIndex, isItemDuplicate } from '@ever-works/plugin';
 
-import type { AgentPipelineStepId } from './types.js';
-import { AGENT_PIPELINE_STEP_IDS, DEFAULT_MAX_STEPS, DEFAULT_CONTEXT_BUDGET_RATIO } from './types.js';
+import type { AgentPipelineStepId, TokenUsageBreakdown } from './types.js';
+import {
+	AGENT_PIPELINE_STEP_IDS,
+	DEFAULT_MAX_STEPS,
+	DEFAULT_CONTEXT_BUDGET_RATIO,
+	TokenUsageAccumulator
+} from './types.js';
 import { STEP_DEFINITIONS } from './steps.js';
 import {
 	getFormFields as formFields,
@@ -103,8 +108,19 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		this.context = null;
 	}
 
-	async validateSettings(_settings: PluginSettings): Promise<ValidationResult> {
-		return { valid: true };
+	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
+		const errors: Array<{ path: string; message: string }> = [];
+
+		if (settings.maxSteps !== undefined && settings.maxSteps !== null) {
+			const num = Number(settings.maxSteps);
+			if (isNaN(num) || !Number.isInteger(num)) {
+				errors.push({ path: 'maxSteps', message: 'maxSteps must be an integer' });
+			} else if (num < 10 || num > 2000) {
+				errors.push({ path: 'maxSteps', message: 'maxSteps must be between 10 and 2000' });
+			}
+		}
+
+		return errors.length > 0 ? { valid: false, errors } : { valid: true };
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {
@@ -201,6 +217,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 
 		const facadeOptions: FacadeOptions = { userId, directoryId: directory.id };
 
+		const tokenAccumulator = new TokenUsageAccumulator();
+
 		try {
 			// ── Step 1: Prepare Context ────────────────────────────────
 			this.setState('prepare-context', 'running');
@@ -237,7 +255,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			this.setState('generate-items', 'running');
 			reportProgress(onProgress, 1, 20, 'Generate Items');
 
-			const warnings = await this.runAgentGeneration(
+			const { warnings, tokenUsage } = await this.runAgentGeneration(
 				providerConfig,
 				workspacePath,
 				execContext,
@@ -247,7 +265,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				existing,
 				onProgress,
 				signal,
-				logger
+				logger,
+				tokenAccumulator
 			);
 
 			if (signal.aborted) {
@@ -288,7 +307,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			// ── Build result ───────────────────────────────────────────
 			reportProgress(onProgress, 5, 100, 'Complete');
 
-			return this.buildSuccessResult(items, metadata, startTime, warnings);
+			return this.buildSuccessResult(items, metadata, startTime, warnings, tokenUsage);
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
 			logger.error(`Agent pipeline failed: ${err.message}`);
@@ -374,8 +393,9 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		existing: ExistingItems,
 		onProgress: PipelineProgressCallback | undefined,
 		signal: AbortSignal,
-		logger: PluginLogger
-	): Promise<string[]> {
+		logger: PluginLogger,
+		tokenAccumulator: TokenUsageAccumulator
+	): Promise<{ warnings: string[]; tokenUsage: TokenUsageBreakdown }> {
 		// Two-model resolution: parent (orchestrator) and worker (extraction)
 		const parentModelName = providerConfig.routing.complexModel || providerConfig.defaultModel;
 		const workerModelName = providerConfig.defaultModel || providerConfig.routing.complexModel;
@@ -437,6 +457,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			onProgress,
 			totalSteps: AGENT_PIPELINE_STEP_IDS.length,
 			logger,
+			tokenAccumulator,
 			signal
 		});
 
@@ -462,7 +483,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 					model: parentModel,
 					system: systemPrompt,
 					prompt: userPrompt,
-					tools: tools as Parameters<typeof generateText>[0]['tools'],
+					tools: tools as ToolSet,
 					stopWhen: stepCountIs(maxSteps),
 					prepareStep,
 					abortSignal: signal,
@@ -478,15 +499,20 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			}
 		);
 
+		tokenAccumulator.addParent(result.totalUsage);
+
 		// Log generation diagnostics
 		const totalToolCalls = result.steps.reduce((sum, step) => sum + step.toolCalls.length, 0);
 		const toolNames = [...new Set(result.steps.flatMap((step) => step.toolCalls.map((tc) => tc.toolName)))];
+		const tokenUsage = tokenAccumulator.toBreakdown();
 
 		logger.log(
 			`Agent completed: ${result.steps.length} steps, ${totalToolCalls} tool calls` +
 				(toolNames.length > 0 ? ` (${toolNames.join(', ')})` : ' (no tools used)') +
 				`, finish=${result.finishReason}` +
-				`, tokens=${result.totalUsage.totalTokens ?? 'unknown'}`
+				`, tokens: parent=${tokenUsage.parent.totalTokens}` +
+				`, workers=${tokenUsage.workers.totalTokens}` +
+				`, total=${tokenUsage.total.totalTokens}`
 		);
 
 		if (totalToolCalls === 0) {
@@ -533,7 +559,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			logger.warn(`Generation warnings (${warnings.length}): ${warnings.join(' | ')}`);
 		}
 
-		return warnings;
+		return { warnings, tokenUsage };
 	}
 
 	private async collectAndMergeResults(
@@ -654,12 +680,12 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		const shouldCapture = (request.config || {}).capture_screenshots !== false;
 
 		if (!shouldCapture || items.length === 0 || signal.aborted) {
-			this.setState('capture-screenshots', 'skipped' as StepStatus);
+			this.setState('capture-screenshots', 'skipped');
 			return [];
 		}
 
 		if (!execContext.screenshotFacade.isAvailable()) {
-			this.setState('capture-screenshots', 'skipped' as StepStatus);
+			this.setState('capture-screenshots', 'skipped');
 			return ['Screenshot provider is not configured. Enable a screenshot plugin to capture item images.'];
 		}
 
@@ -687,7 +713,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		items: MutableItemData[],
 		metadata: ReturnType<typeof collectMetadataFromItems>,
 		startTime: number,
-		warnings?: string[]
+		warnings?: string[],
+		tokenUsage?: TokenUsageBreakdown
 	): PipelineResult {
 		const duration = Date.now() - startTime;
 		return buildSuccessPipelineResult(
@@ -699,7 +726,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				collections: metadata.collections
 			},
 			{
-				metrics: buildMetrics(startTime, duration, items.length),
+				metrics: buildMetrics(startTime, duration, items.length, tokenUsage),
 				duration,
 				stepsCompleted: AGENT_PIPELINE_STEP_IDS.length,
 				totalSteps: AGENT_PIPELINE_STEP_IDS.length,
