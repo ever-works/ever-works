@@ -200,9 +200,7 @@ export function ChatInterface() {
                 </div>
 
                 {providers.length > 1 && (
-                    <div
-                        className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                    >
+                    <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                         {providers.map((provider) => {
                             const isActive = selectedProvider === provider.id;
                             const button = (
