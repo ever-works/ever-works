@@ -1,6 +1,6 @@
 import { appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { generateText, stepCountIs } from 'ai';
+import { generateText, stepCountIs, ToolSet } from 'ai';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import type { IContentExtractorFacade, FacadeOptions, PluginLogger } from '@ever-works/plugin';
 
@@ -153,7 +153,7 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 								createFile: createFileTool,
 								updateFile: updateFileTool,
 								validateItemJson: validateItemJsonTool
-							} as Parameters<typeof generateText>[0]['tools'],
+							} as ToolSet,
 							stopWhen: stepCountIs(100),
 							prepareStep: createPrepareStep({
 								maxContextTokens,

@@ -1,4 +1,4 @@
-import { generateText, stepCountIs } from 'ai';
+import { generateText, stepCountIs, ToolSet } from 'ai';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import type { PluginLogger } from '@ever-works/plugin';
 import { getCurrentDateString, ITEM_SCHEMA_PROMPT_TEXT } from '@ever-works/plugin';
@@ -76,7 +76,7 @@ export async function processModification(
 						findItems: createFindItemsTool(workspacePath),
 						updateFile: updateFileTool,
 						validateItemJson: validateItemJsonTool
-					} as Parameters<typeof generateText>[0]['tools'],
+					} as ToolSet,
 					stopWhen: stepCountIs(200),
 					prepareStep: createPrepareStep({
 						maxContextTokens,

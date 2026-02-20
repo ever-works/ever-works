@@ -1,4 +1,4 @@
-import { generateText, stepCountIs } from 'ai';
+import { generateText, stepCountIs, ToolSet } from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type {
 	IPlugin,
@@ -483,7 +483,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 					model: parentModel,
 					system: systemPrompt,
 					prompt: userPrompt,
-					tools: tools as Parameters<typeof generateText>[0]['tools'],
+					tools: tools as ToolSet,
 					stopWhen: stepCountIs(maxSteps),
 					prepareStep,
 					abortSignal: signal,
