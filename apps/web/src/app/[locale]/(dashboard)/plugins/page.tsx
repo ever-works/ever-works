@@ -1,6 +1,12 @@
+import type { Metadata } from 'next';
 import { pluginsAPI } from '@/lib/api/plugins';
 import { PluginsList } from '@/components/plugins/PluginsList';
 import { getTranslations } from 'next-intl/server';
+
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations('metadata.pages');
+    return { title: t('plugins') };
+}
 
 export default async function PluginsPage() {
     const t = await getTranslations('dashboard.plugins');

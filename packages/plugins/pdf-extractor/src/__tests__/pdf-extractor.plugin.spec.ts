@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const mockGetText = vi.fn().mockResolvedValue({ text: '', pages: [], total: 0 });
-const mockGetInfo = vi.fn().mockResolvedValue({ total: 0, info: {} });
-const mockDestroy = vi.fn();
+const { mockExtractText, mockGetDocumentProxy, mockGetMeta, mockDestroy } = vi.hoisted(() => ({
+	mockExtractText: vi.fn().mockResolvedValue({ totalPages: 0, text: [] }),
+	mockGetDocumentProxy: vi.fn().mockResolvedValue({ numPages: 0, destroy: vi.fn() }),
+	mockGetMeta: vi.fn().mockResolvedValue({ info: {} }),
+	mockDestroy: vi.fn()
+}));
 
-vi.mock('pdf-parse', () => ({
-	PDFParse: class MockPDFParse {
-		constructor() {}
-		getText = mockGetText;
-		getInfo = mockGetInfo;
-		destroy = mockDestroy;
-	}
+vi.mock('unpdf', () => ({
+	extractText: mockExtractText,
+	getDocumentProxy: mockGetDocumentProxy,
+	getMeta: mockGetMeta
 }));
 
 vi.mock('axios');
@@ -125,10 +125,10 @@ describe('PdfExtractorPlugin', () => {
 		});
 
 		it('should return success for a text-rich PDF', async () => {
-			const pdfContent = 'A'.repeat(500);
 			vi.mocked(axios.get).mockResolvedValue({ data: Buffer.from('fake-pdf') });
-			mockGetInfo.mockResolvedValue({ total: 2, info: { Title: 'Test' } });
-			mockGetText.mockResolvedValue({ text: pdfContent, pages: [], total: 2 });
+			mockGetDocumentProxy.mockResolvedValue({ numPages: 2, destroy: mockDestroy });
+			mockExtractText.mockResolvedValue({ totalPages: 2, text: ['A'.repeat(250), 'A'.repeat(250)] });
+			mockGetMeta.mockResolvedValue({ info: { Title: 'Test' } });
 
 			const result = await plugin.extract({ url: 'https://example.com/doc.pdf' });
 
@@ -161,8 +161,9 @@ describe('PdfExtractorPlugin', () => {
 
 		it('should trigger OCR when text density is low and API key is present', async () => {
 			vi.mocked(axios.get).mockResolvedValue({ data: Buffer.from('fake-pdf') });
-			mockGetInfo.mockResolvedValue({ total: 5, info: {} });
-			mockGetText.mockResolvedValue({ text: 'sparse', pages: [], total: 5 });
+			mockGetDocumentProxy.mockResolvedValue({ numPages: 5, destroy: mockDestroy });
+			mockExtractText.mockResolvedValue({ totalPages: 5, text: ['sparse'] });
+			mockGetMeta.mockResolvedValue({ info: {} });
 
 			vi.mocked(axios.post).mockResolvedValue({
 				data: {
@@ -191,8 +192,9 @@ describe('PdfExtractorPlugin', () => {
 
 		it('should fall back to text-layer when OCR fails', async () => {
 			vi.mocked(axios.get).mockResolvedValue({ data: Buffer.from('fake-pdf') });
-			mockGetInfo.mockResolvedValue({ total: 5, info: {} });
-			mockGetText.mockResolvedValue({ text: 'sparse text', pages: [], total: 5 });
+			mockGetDocumentProxy.mockResolvedValue({ numPages: 5, destroy: mockDestroy });
+			mockExtractText.mockResolvedValue({ totalPages: 5, text: ['sparse text'] });
+			mockGetMeta.mockResolvedValue({ info: {} });
 
 			vi.mocked(axios.post).mockRejectedValue(new Error('OCR service unavailable'));
 
@@ -208,8 +210,9 @@ describe('PdfExtractorPlugin', () => {
 
 		it('should warn when density is low but no API key', async () => {
 			vi.mocked(axios.get).mockResolvedValue({ data: Buffer.from('fake-pdf') });
-			mockGetInfo.mockResolvedValue({ total: 5, info: {} });
-			mockGetText.mockResolvedValue({ text: 'sparse', pages: [], total: 5 });
+			mockGetDocumentProxy.mockResolvedValue({ numPages: 5, destroy: mockDestroy });
+			mockExtractText.mockResolvedValue({ totalPages: 5, text: ['sparse'] });
+			mockGetMeta.mockResolvedValue({ info: {} });
 
 			const result = await plugin.extract({
 				url: 'https://example.com/scanned.pdf',
@@ -285,8 +288,9 @@ describe('PdfExtractorPlugin', () => {
 		it('should process multiple URLs', async () => {
 			await plugin.onLoad(mockContext);
 			vi.mocked(axios.get).mockResolvedValue({ data: Buffer.from('fake-pdf') });
-			mockGetInfo.mockResolvedValue({ total: 1, info: {} });
-			mockGetText.mockResolvedValue({ text: 'A'.repeat(500), pages: [], total: 1 });
+			mockGetDocumentProxy.mockResolvedValue({ numPages: 1, destroy: mockDestroy });
+			mockExtractText.mockResolvedValue({ totalPages: 1, text: ['A'.repeat(500)] });
+			mockGetMeta.mockResolvedValue({ info: {} });
 
 			const results = await plugin.extractBatch(['https://example.com/a.pdf', 'https://example.com/b.pdf']);
 

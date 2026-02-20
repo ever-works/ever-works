@@ -18,6 +18,7 @@ import type { WorkerPromptOptions } from '../worker/extraction-prompt.js';
 import { processModification } from '../worker/modification-worker.js';
 import { ToolCircuitBreaker } from '../utils/tool-circuit-breaker.js';
 import { MAX_URLS_PER_BATCH } from '../types.js';
+import type { TokenUsageAccumulator } from '../types.js';
 
 export interface ParentToolContext {
 	workspacePath: string;
@@ -34,6 +35,7 @@ export interface ParentToolContext {
 	onProgress: PipelineProgressCallback | undefined;
 	totalSteps: number;
 	logger: PluginLogger;
+	tokenAccumulator?: TokenUsageAccumulator;
 	signal?: AbortSignal;
 }
 
@@ -63,6 +65,7 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 				workspacePath: ctx.workspacePath,
 				breaker,
 				logger: ctx.logger,
+				tokenAccumulator: ctx.tokenAccumulator,
 				signal: ctx.signal
 			};
 
@@ -96,6 +99,7 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 				maxContextTokens: ctx.parentMaxContextTokens,
 				workspacePath: ctx.workspacePath,
 				logger: ctx.logger,
+				tokenAccumulator: ctx.tokenAccumulator,
 				signal: ctx.signal
 			});
 		}

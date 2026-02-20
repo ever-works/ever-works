@@ -2053,7 +2053,30 @@
     },
     "metadata": {
         "title": "{companyName} - Directory Builder",
-        "description": "A SaaS platform for building and managing directories"
+        "description": "A SaaS platform for building and managing directories",
+        "pages": {
+            "signIn": "Sign In",
+            "createAccount": "Create Account",
+            "forgotPassword": "Forgot Password",
+            "resetPassword": "Reset Password",
+            "authError": "Authentication Error",
+            "dashboard": "Dashboard",
+            "directories": "Directories",
+            "newDirectory": "New Directory",
+            "directory": "Directory",
+            "overview": "Overview",
+            "items": "Items",
+            "generator": "Generator",
+            "settings": "Settings",
+            "deploy": "Deploy",
+            "members": "Members",
+            "history": "History",
+            "plugins": "Plugins",
+            "profile": "Profile",
+            "security": "Security",
+            "dangerZone": "Danger Zone",
+            "pluginSettings": "Plugin Settings"
+        }
     },
     "api": {
         "errors": {

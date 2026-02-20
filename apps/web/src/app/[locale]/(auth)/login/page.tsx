@@ -1,9 +1,15 @@
+import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { LoginClient } from './login-client';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from '@/i18n/navigation';
-import { getLocale } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { ROUTES } from '@/lib/constants';
+
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations('metadata.pages');
+    return { title: t('signIn') };
+}
 
 export default async function LoginPage() {
     const locale = await getLocale();
