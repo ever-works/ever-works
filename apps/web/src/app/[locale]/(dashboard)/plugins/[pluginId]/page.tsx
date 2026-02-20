@@ -1,7 +1,14 @@
+import type { Metadata } from 'next';
 import { pluginsAPI } from '@/lib/api/plugins';
 import { oauthAPI, OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import { PluginSettings } from '@/components/plugins/PluginSettings';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
+
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations('metadata.pages');
+    return { title: t('pluginSettings') };
+}
 
 interface PluginDetailPageProps {
     params: Promise<{ pluginId: string }>;

@@ -49,9 +49,38 @@ describe('AgentPipelinePlugin', () => {
 	});
 
 	describe('validateSettings', () => {
-		it('should always return valid', async () => {
+		it('should return valid for empty settings', async () => {
 			const result = await plugin.validateSettings({});
 			expect(result.valid).toBe(true);
+		});
+
+		it('should return valid for correct maxSteps', async () => {
+			const result = await plugin.validateSettings({ maxSteps: 100 });
+			expect(result.valid).toBe(true);
+		});
+
+		it('should reject non-integer maxSteps', async () => {
+			const result = await plugin.validateSettings({ maxSteps: 'abc' });
+			expect(result.valid).toBe(false);
+			expect(result.errors).toHaveLength(1);
+			expect(result.errors![0].path).toBe('maxSteps');
+		});
+
+		it('should reject maxSteps below minimum', async () => {
+			const result = await plugin.validateSettings({ maxSteps: 5 });
+			expect(result.valid).toBe(false);
+			expect(result.errors![0].message).toContain('between 10 and 2000');
+		});
+
+		it('should reject maxSteps above maximum', async () => {
+			const result = await plugin.validateSettings({ maxSteps: 5000 });
+			expect(result.valid).toBe(false);
+			expect(result.errors![0].message).toContain('between 10 and 2000');
+		});
+
+		it('should accept boundary values', async () => {
+			expect((await plugin.validateSettings({ maxSteps: 10 })).valid).toBe(true);
+			expect((await plugin.validateSettings({ maxSteps: 2000 })).valid).toBe(true);
 		});
 	});
 
@@ -147,9 +176,37 @@ describe('AgentPipelinePlugin', () => {
 	});
 
 	describe('validateFormInput', () => {
-		it('should validate valid input', () => {
+		it('should return valid for empty input', () => {
 			const result = plugin.validateFormInput({});
 			expect(result.valid).toBe(true);
+		});
+
+		it('should return valid for correct values', () => {
+			const result = plugin.validateFormInput({ target_items: 50, max_pages_to_process: 10 });
+			expect(result.valid).toBe(true);
+		});
+
+		it('should reject target_items out of range', () => {
+			const result = plugin.validateFormInput({ target_items: 0 });
+			expect(result.valid).toBe(false);
+			expect(result.errors![0].path).toBe('target_items');
+		});
+
+		it('should reject max_pages_to_process out of range', () => {
+			const result = plugin.validateFormInput({ max_pages_to_process: 1001 });
+			expect(result.valid).toBe(false);
+			expect(result.errors![0].path).toBe('max_pages_to_process');
+		});
+
+		it('should reject non-numeric values', () => {
+			const result = plugin.validateFormInput({ target_items: 'abc' });
+			expect(result.valid).toBe(false);
+			expect(result.errors![0].message).toContain('must be a number');
+		});
+
+		it('should accept boundary values', () => {
+			expect(plugin.validateFormInput({ target_items: 1, max_pages_to_process: 1 }).valid).toBe(true);
+			expect(plugin.validateFormInput({ target_items: 500, max_pages_to_process: 1000 }).valid).toBe(true);
 		});
 	});
 

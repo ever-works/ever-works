@@ -1,11 +1,34 @@
+import type { Metadata } from 'next';
 import { Directory, directoryAPI, gitProvidersAPI, GitProviderConnectionInfo } from '@/lib/api';
 import { notFound } from 'next/navigation';
 import { DirectoryLayoutClient } from '@/components/directories/detail/DirectoryLayoutClient';
+import { getTranslations } from 'next-intl/server';
+import { APP_NAME } from '@/lib/constants';
 
 type LayoutParams = {
     params: Promise<{ id: string }>;
     children: React.ReactNode;
 };
+
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+    const { id } = await params;
+    const t = await getTranslations('metadata.pages');
+    try {
+        const { directory } = await directoryAPI.get(id);
+        return {
+            title: {
+                template: `%s - ${directory.name} | ${APP_NAME}`,
+                default: directory.name,
+            },
+        };
+    } catch {
+        return { title: t('directory') };
+    }
+}
 
 export default async function DirectoryLayout({ params, children }: LayoutParams) {
     const { id } = await params;

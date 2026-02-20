@@ -61,8 +61,27 @@ export function getFormGroups(): FormFieldGroup[] {
 	];
 }
 
-export function validateFormInput(_values: Record<string, unknown>): ValidationResult {
-	return { valid: true };
+export function validateFormInput(values: Record<string, unknown>): ValidationResult {
+	const errors: Array<{ path: string; message: string }> = [];
+
+	const rules = [
+		{ name: 'target_items', min: 1, max: 500 },
+		{ name: 'max_pages_to_process', min: 1, max: 1000 }
+	];
+
+	for (const rule of rules) {
+		const value = values[rule.name];
+		if (value !== undefined && value !== null) {
+			const num = Number(value);
+			if (isNaN(num)) {
+				errors.push({ path: rule.name, message: `${rule.name} must be a number` });
+			} else if (num < rule.min || num > rule.max) {
+				errors.push({ path: rule.name, message: `${rule.name} must be between ${rule.min} and ${rule.max}` });
+			}
+		}
+	}
+
+	return errors.length > 0 ? { valid: false, errors } : { valid: true };
 }
 
 export function getDefaultValues(fields: FormFieldDefinition[]): Record<string, unknown> {

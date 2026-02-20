@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { pluginsAPI } from '@/lib/api/plugins';
 import { oauthAPI, OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import { notFound } from 'next/navigation';
@@ -5,6 +6,11 @@ import { getTranslations } from 'next-intl/server';
 import { getCategoryLabel } from '@/lib/utils/plugin-category-icons';
 import { isPluginCategory } from '@ever-works/plugin';
 import { PluginSettingsInline } from '@/components/settings/PluginSettingsInline';
+
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations('metadata.pages');
+    return { title: t('pluginSettings') };
+}
 
 interface PageProps {
     params: Promise<{

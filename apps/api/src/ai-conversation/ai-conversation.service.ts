@@ -8,6 +8,7 @@ export interface ChatRequestDto {
     model?: string;
     temperature?: number;
     directoryId?: string;
+    providerOverride?: string;
 }
 
 export interface StreamChunk {

@@ -24,7 +24,7 @@
 		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
-		"pdf-parse": "^2.4.5",
+		"unpdf": "^1.4.0",
 		"axios": "^1.13.5"
 	},
 	"peerDependencies": {
