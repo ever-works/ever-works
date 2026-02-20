@@ -24,7 +24,10 @@ vi.mock('../utils/taxonomy-sync', () => ({
 
 vi.mock('../utils/tool-call-resilience', () => ({
 	createToolCallRepairFn: vi.fn().mockReturnValue(() => null),
-	withToolCallingRetry: vi.fn().mockImplementation((fn) => fn())
+	withToolCallingRetry: vi.fn().mockImplementation(async (fn) => {
+		const result = await fn();
+		return result ?? { steps: [], text: '', totalUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } };
+	})
 }));
 
 vi.mock('tokenx', () => ({
@@ -46,6 +49,7 @@ vi.mock('just-bash', () => ({
 }));
 
 import { generateText } from 'ai';
+import { TokenUsageAccumulator } from '../types';
 
 const mockGenerateText = vi.mocked(generateText);
 
@@ -120,5 +124,23 @@ describe('processModification', () => {
 
 		expect(result.count).toBe(0);
 		expect(result.error).toBe('Model error');
+	});
+
+	it('accumulates token usage when tokenAccumulator is provided', async () => {
+		mockGenerateText.mockResolvedValue({
+			steps: [],
+			text: '',
+			finishReason: 'stop',
+			totalUsage: { inputTokens: 300, outputTokens: 150, totalTokens: 450 }
+		} as never);
+
+		const accumulator = new TokenUsageAccumulator();
+		const ctx = createMockContext({ tokenAccumulator: accumulator });
+		await processModification('Update categories', ctx);
+
+		const breakdown = accumulator.toBreakdown();
+		expect(breakdown.workers.inputTokens).toBe(300);
+		expect(breakdown.workers.outputTokens).toBe(150);
+		expect(breakdown.workers.totalTokens).toBe(450);
 	});
 });

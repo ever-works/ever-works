@@ -2,11 +2,7 @@ import nodePath from 'node:path';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { syncTaxonomyFromFile } from '../utils/taxonomy-sync.js';
-
-export interface WrappedSandbox {
-	readFile(path: string): Promise<string>;
-	writeFiles(files: Array<{ path: string; content: string }>): Promise<void>;
-}
+import type { WrappedSandbox } from '../types.js';
 
 export interface CreateFileToolOptions {
 	/** Called after a file is successfully created. Receives the resolved path and content. */

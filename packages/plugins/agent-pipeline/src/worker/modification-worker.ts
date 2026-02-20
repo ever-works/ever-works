@@ -7,15 +7,16 @@ import { createUpdateFileTool } from '../tools/file-tools.js';
 import { createFindItemsTool } from '../tools/find-items-tool.js';
 import { createValidateItemJsonTool } from '../tools/validate-json-tools.js';
 import { createPrepareStep } from '../utils/context-compaction.js';
-import { wrapReasoningFilteredModel } from '../utils/model-wrapper.js';
 import { createToolCallRepairFn, withToolCallingRetry } from '../utils/tool-call-resilience.js';
 import { DEFAULT_CONTEXT_BUDGET_RATIO } from '../types.js';
+import type { TokenUsageAccumulator } from '../types.js';
 
 export interface ModificationWorkerContext {
 	model: LanguageModelV3;
 	maxContextTokens: number;
 	workspacePath: string;
 	logger: PluginLogger;
+	tokenAccumulator?: TokenUsageAccumulator;
 	signal?: AbortSignal;
 }
 
@@ -61,11 +62,9 @@ export async function processModification(
 		});
 		const validateItemJsonTool = createValidateItemJsonTool(sandbox, '/');
 
-		// const wrappedModel = wrapReasoningFilteredModel(model);
-
 		const repairToolCall = createToolCallRepairFn(model, logger);
 
-		await withToolCallingRetry(
+		const result = await withToolCallingRetry(
 			() => {
 				return generateText({
 					model,
@@ -92,6 +91,7 @@ export async function processModification(
 			},
 			{ providerName: 'worker', modelName: 'modification-worker', signal, logger }
 		);
+		ctx.tokenAccumulator?.addWorker(result.totalUsage);
 
 		logger.log(`Modification worker: ${modifiedFiles.length} files modified`);
 		return { modifiedFiles, count: modifiedFiles.length };

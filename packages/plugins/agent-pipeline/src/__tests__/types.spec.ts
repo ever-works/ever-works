@@ -4,7 +4,8 @@ import {
 	isAgentPipelineStepId,
 	DEFAULT_MAX_STEPS,
 	getWorkerContentBudgetRatio,
-	MAX_URLS_PER_BATCH
+	MAX_URLS_PER_BATCH,
+	TokenUsageAccumulator
 } from '../types';
 
 describe('types', () => {
@@ -52,6 +53,71 @@ describe('types', () => {
 
 		it('should have max URLs per batch', () => {
 			expect(MAX_URLS_PER_BATCH).toBe(10);
+		});
+	});
+
+	describe('TokenUsageAccumulator', () => {
+		it('should start with zero usage', () => {
+			const acc = new TokenUsageAccumulator();
+			const breakdown = acc.toBreakdown();
+
+			expect(breakdown.parent).toEqual({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
+			expect(breakdown.workers).toEqual({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
+			expect(breakdown.total).toEqual({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
+		});
+
+		it('should accumulate parent usage', () => {
+			const acc = new TokenUsageAccumulator();
+			acc.addParent({ inputTokens: 100, outputTokens: 50, totalTokens: 150 });
+			acc.addParent({ inputTokens: 200, outputTokens: 100, totalTokens: 300 });
+
+			const breakdown = acc.toBreakdown();
+			expect(breakdown.parent).toEqual({ inputTokens: 300, outputTokens: 150, totalTokens: 450 });
+			expect(breakdown.workers).toEqual({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
+			expect(breakdown.total).toEqual({ inputTokens: 300, outputTokens: 150, totalTokens: 450 });
+		});
+
+		it('should accumulate worker usage', () => {
+			const acc = new TokenUsageAccumulator();
+			acc.addWorker({ inputTokens: 500, outputTokens: 200, totalTokens: 700 });
+			acc.addWorker({ inputTokens: 300, outputTokens: 100, totalTokens: 400 });
+
+			const breakdown = acc.toBreakdown();
+			expect(breakdown.parent).toEqual({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
+			expect(breakdown.workers).toEqual({ inputTokens: 800, outputTokens: 300, totalTokens: 1100 });
+			expect(breakdown.total).toEqual({ inputTokens: 800, outputTokens: 300, totalTokens: 1100 });
+		});
+
+		it('should combine parent and worker usage in total', () => {
+			const acc = new TokenUsageAccumulator();
+			acc.addParent({ inputTokens: 100, outputTokens: 50, totalTokens: 150 });
+			acc.addWorker({ inputTokens: 500, outputTokens: 200, totalTokens: 700 });
+
+			const breakdown = acc.toBreakdown();
+			expect(breakdown.total).toEqual({ inputTokens: 600, outputTokens: 250, totalTokens: 850 });
+		});
+
+		it('should handle undefined fields gracefully', () => {
+			const acc = new TokenUsageAccumulator();
+			acc.addParent({ inputTokens: 100 });
+			acc.addWorker({ outputTokens: 50 });
+
+			const breakdown = acc.toBreakdown();
+			expect(breakdown.parent).toEqual({ inputTokens: 100, outputTokens: 0, totalTokens: 0 });
+			expect(breakdown.workers).toEqual({ inputTokens: 0, outputTokens: 50, totalTokens: 0 });
+			expect(breakdown.total).toEqual({ inputTokens: 100, outputTokens: 50, totalTokens: 0 });
+		});
+
+		it('should return immutable snapshots from toBreakdown', () => {
+			const acc = new TokenUsageAccumulator();
+			acc.addParent({ inputTokens: 100, outputTokens: 50, totalTokens: 150 });
+
+			const first = acc.toBreakdown();
+			acc.addParent({ inputTokens: 200, outputTokens: 100, totalTokens: 300 });
+			const second = acc.toBreakdown();
+
+			expect(first.parent.inputTokens).toBe(100);
+			expect(second.parent.inputTokens).toBe(300);
 		});
 	});
 });

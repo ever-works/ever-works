@@ -47,7 +47,10 @@ vi.mock('../utils/context-compaction', () => ({
 
 vi.mock('../utils/tool-call-resilience', () => ({
 	createToolCallRepairFn: vi.fn().mockReturnValue(() => null),
-	withToolCallingRetry: vi.fn().mockImplementation((fn) => fn())
+	withToolCallingRetry: vi.fn().mockImplementation(async (fn) => {
+		const result = await fn();
+		return result ?? { steps: [], text: '', totalUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } };
+	})
 }));
 
 vi.mock('../tools/file-tools', () => ({
@@ -62,6 +65,7 @@ vi.mock('../tools/validate-json-tools', () => ({
 import { generateText } from 'ai';
 import { createCreateFileTool } from '../tools/file-tools';
 import { ToolCircuitBreaker } from '../utils/tool-circuit-breaker';
+import { TokenUsageAccumulator } from '../types';
 
 const mockGenerateText = vi.mocked(generateText);
 const mockCreateCreateFileTool = vi.mocked(createCreateFileTool);
@@ -108,7 +112,11 @@ describe('processUrlWorker', () => {
 			if (capturedOnCreated) {
 				await capturedOnCreated('supertool.json', '{"slug":"supertool","name":"SuperTool"}');
 			}
-			return { steps: [], text: '' } as never;
+			return {
+				steps: [],
+				text: '',
+				totalUsage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 }
+			} as never;
 		});
 
 		const ctx = createMockContext();
@@ -142,7 +150,11 @@ describe('processUrlWorker', () => {
 	});
 
 	it('returns error when no items are created by agent', async () => {
-		mockGenerateText.mockResolvedValue({ steps: [], text: '' } as never);
+		mockGenerateText.mockResolvedValue({
+			steps: [],
+			text: '',
+			totalUsage: { inputTokens: 50, outputTokens: 20, totalTokens: 70 }
+		} as never);
 
 		const ctx = createMockContext();
 		const result = await processUrlWorker('https://example.com', ctx);
@@ -185,7 +197,11 @@ describe('processUrlWorker', () => {
 			if (capturedOnCreated) {
 				await capturedOnCreated('tool-a.json', '{"slug":"tool-a","name":"Tool A"}');
 			}
-			return { steps: [], text: '' } as never;
+			return {
+				steps: [],
+				text: '',
+				totalUsage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 }
+			} as never;
 		});
 
 		const ctx = createMockContext();
@@ -194,5 +210,22 @@ describe('processUrlWorker', () => {
 		expect(result.count).toBe(1);
 		expect(result.files).toEqual(['tool-a.json']);
 		expect(mockGenerateText).toHaveBeenCalled();
+	});
+
+	it('accumulates token usage when tokenAccumulator is provided', async () => {
+		mockGenerateText.mockResolvedValue({
+			steps: [],
+			text: '',
+			totalUsage: { inputTokens: 200, outputTokens: 100, totalTokens: 300 }
+		} as never);
+
+		const accumulator = new TokenUsageAccumulator();
+		const ctx = createMockContext({ tokenAccumulator: accumulator });
+		await processUrlWorker('https://example.com', ctx);
+
+		const breakdown = accumulator.toBreakdown();
+		expect(breakdown.workers.inputTokens).toBe(200);
+		expect(breakdown.workers.outputTokens).toBe(100);
+		expect(breakdown.workers.totalTokens).toBe(300);
 	});
 });

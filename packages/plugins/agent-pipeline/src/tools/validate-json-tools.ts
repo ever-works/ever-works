@@ -2,11 +2,7 @@ import nodePath from 'node:path';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { jsonrepair } from '@ever-works/plugin';
-
-interface WrappedSandbox {
-	readFile(path: string): Promise<string>;
-	writeFiles(files: Array<{ path: string; content: string }>): Promise<void>;
-}
+import type { WrappedSandbox } from '../types.js';
 
 /**
  * Create a `validateItemJson` tool that validates a JSON file and attempts

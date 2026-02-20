@@ -11,7 +11,6 @@ import { createCreateFileTool, createUpdateFileTool } from '../tools/file-tools.
 import { createValidateItemJsonTool } from '../tools/validate-json-tools.js';
 import { createFindItemsTool } from '../tools/find-items-tool.js';
 import { createPrepareStep } from '../utils/context-compaction.js';
-import { wrapReasoningFilteredModel } from '../utils/model-wrapper.js';
 import { createToolCallRepairFn, withToolCallingRetry } from '../utils/tool-call-resilience.js';
 import {
 	getWorkerContentBudgetRatio,
@@ -19,6 +18,7 @@ import {
 	MIN_CHUNK_CHARS,
 	DEFAULT_CONTEXT_BUDGET_RATIO
 } from '../types.js';
+import type { TokenUsageAccumulator } from '../types.js';
 import { ToolCircuitBreaker } from '../utils/tool-circuit-breaker.js';
 
 export interface UrlWorkerContext {
@@ -30,6 +30,7 @@ export interface UrlWorkerContext {
 	workspacePath: string;
 	logger: PluginLogger;
 	breaker: ToolCircuitBreaker;
+	tokenAccumulator?: TokenUsageAccumulator;
 	signal?: AbortSignal;
 }
 
@@ -128,15 +129,13 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 
 		const validateItemJsonTool = createValidateItemJsonTool(sandbox, '/');
 
-		// const wrappedModel = wrapReasoningFilteredModel(workerModel);
-
 		const systemPrompt = buildWorkerSystemPrompt(directoryContext);
 		const repairToolCall = createToolCallRepairFn(workerModel, logger);
 
 		for (const chunk of chunks) {
 			if (signal?.aborted) break;
 			try {
-				await withToolCallingRetry(
+				const result = await withToolCallingRetry(
 					() => {
 						return generateText({
 							model: workerModel,
@@ -169,6 +168,7 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 					},
 					{ providerName: 'worker', modelName: 'url-worker', signal, logger }
 				);
+				ctx.tokenAccumulator?.addWorker(result.totalUsage);
 			} catch (err) {
 				logger.warn(
 					`Worker: chunk ${chunk.index + 1}/${chunk.total} failed: ${err instanceof Error ? err.message : err}`
