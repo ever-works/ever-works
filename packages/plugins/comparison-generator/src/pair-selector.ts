@@ -107,11 +107,7 @@ export function selectNextPair(options: PairSelectionOptions): ComparisonPair | 
 /**
  * Find a specific pair of items by slug, regardless of category constraints.
  */
-export function findManualPair(
-	items: ItemData[],
-	itemASlug: string,
-	itemBSlug: string
-): ComparisonPair | null {
+export function findManualPair(items: ItemData[], itemASlug: string, itemBSlug: string): ComparisonPair | null {
 	const itemA = items.find((i) => i.slug === itemASlug);
 	const itemB = items.find((i) => i.slug === itemBSlug);
 

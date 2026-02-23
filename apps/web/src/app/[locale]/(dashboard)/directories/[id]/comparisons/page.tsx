@@ -5,42 +5,38 @@ import type { ComparisonData } from '@/lib/api/directory';
 import { ComparisonsPageClient } from '@/components/directories/detail/comparisons/ComparisonsPageClient';
 
 export async function generateMetadata(): Promise<Metadata> {
-	const t = await getTranslations('metadata.pages');
-	return { title: t('comparisons') };
+    const t = await getTranslations('metadata.pages');
+    return { title: t('comparisons') };
 }
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function DirectoryComparisonsPage({ params }: Params) {
-	const { id } = await params;
+    const { id } = await params;
 
-	let comparisons: ComparisonData[] = [];
-	let items: Array<{ slug: string; name: string; category: string | string[] }> = [];
+    let comparisons: ComparisonData[] = [];
+    let items: Array<{ slug: string; name: string; category: string | string[] }> = [];
 
-	try {
-		const [comparisonsRes, itemsRes] = await Promise.all([
-			directoryAPI.getComparisons(id).catch(() => []),
-			directoryAPI.getItems(id).catch(() => null),
-		]);
+    try {
+        const [comparisonsRes, itemsRes] = await Promise.all([
+            directoryAPI.getComparisons(id).catch(() => []),
+            directoryAPI.getItems(id).catch(() => null),
+        ]);
 
-		comparisons = comparisonsRes ?? [];
+        comparisons = comparisonsRes ?? [];
 
-		if (itemsRes?.items) {
-			items = itemsRes.items.map((item) => ({
-				slug: item.slug ?? '',
-				name: item.name,
-				category: item.category,
-			}));
-		}
-	} catch (error) {
-		console.error('Failed to fetch comparisons:', error);
-	}
+        if (itemsRes?.items) {
+            items = itemsRes.items.map((item) => ({
+                slug: item.slug ?? '',
+                name: item.name,
+                category: item.category,
+            }));
+        }
+    } catch (error) {
+        console.error('Failed to fetch comparisons:', error);
+    }
 
-	return (
-		<ComparisonsPageClient
-			directoryId={id}
-			initialComparisons={comparisons}
-			items={items}
-		/>
-	);
+    return (
+        <ComparisonsPageClient directoryId={id} initialComparisons={comparisons} items={items} />
+    );
 }

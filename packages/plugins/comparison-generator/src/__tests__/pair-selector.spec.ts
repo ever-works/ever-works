@@ -80,10 +80,7 @@ describe('selectNextPair', () => {
 	});
 
 	it('should skip categories with fewer items than minimum', () => {
-		const fewItems = [
-			makeItem('react', 'framework'),
-			makeItem('vue', 'framework')
-		];
+		const fewItems = [makeItem('react', 'framework'), makeItem('vue', 'framework')];
 
 		const result = selectNextPair({
 			items: fewItems,
@@ -96,17 +93,9 @@ describe('selectNextPair', () => {
 	});
 
 	it('should return null when all pairs exhausted', () => {
-		const smallSet = [
-			makeItem('a', 'cat'),
-			makeItem('b', 'cat'),
-			makeItem('c', 'cat')
-		];
+		const smallSet = [makeItem('a', 'cat'), makeItem('b', 'cat'), makeItem('c', 'cat')];
 
-		const allPairs = [
-			buildPairKey('a', 'b'),
-			buildPairKey('a', 'c'),
-			buildPairKey('b', 'c')
-		];
+		const allPairs = [buildPairKey('a', 'b'), buildPairKey('a', 'c'), buildPairKey('b', 'c')];
 
 		const result = selectNextPair({
 			items: smallSet,
@@ -162,11 +151,7 @@ describe('selectNextPair', () => {
 });
 
 describe('findManualPair', () => {
-	const items = [
-		makeItem('vercel', 'hosting'),
-		makeItem('netlify', 'hosting'),
-		makeItem('react', 'framework')
-	];
+	const items = [makeItem('vercel', 'hosting'), makeItem('netlify', 'hosting'), makeItem('react', 'framework')];
 
 	it('should find a pair by slugs', () => {
 		const result = findManualPair(items, 'vercel', 'netlify');

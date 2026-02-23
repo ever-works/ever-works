@@ -846,7 +846,10 @@ export class DirectoriesController {
 
     @Get('directories/:id/comparisons')
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'List comparisons', description: 'List all generated comparisons for a directory' })
+    @ApiOperation({
+        summary: 'List comparisons',
+        description: 'List all generated comparisons for a directory',
+    })
     @ApiParam({ name: 'id', description: 'Directory ID' })
     async listComparisons(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const user = await this.authService.getUser(auth.userId);
