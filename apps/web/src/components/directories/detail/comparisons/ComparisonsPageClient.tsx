@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import type { ComparisonData } from '@/lib/api/directory';
+import { ROUTES } from '@/lib/constants';
 import {
     generateNextComparison,
     generateManualComparison,
@@ -196,9 +198,10 @@ export function ComparisonsPageClient({
             ) : (
                 <div className="space-y-3">
                     {comparisons.map((comparison) => (
-                        <div
+                        <Link
                             key={comparison.slug}
-                            className="rounded-lg border border-border dark:border-border-dark p-4 hover:bg-surface-hover dark:hover:bg-surface-hover-dark transition-colors"
+                            href={ROUTES.DASHBOARD_DIRECTORY_COMPARISON(directoryId, comparison.slug)}
+                            className="block rounded-lg border border-border dark:border-border-dark p-4 hover:bg-surface-hover dark:hover:bg-surface-hover-dark transition-colors cursor-pointer"
                         >
                             <div className="flex items-start justify-between">
                                 <div className="flex-1 min-w-0">
@@ -235,7 +238,11 @@ export function ComparisonsPageClient({
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => handleDelete(comparison.slug)}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleDelete(comparison.slug);
+                                    }}
                                     disabled={isPending}
                                     className="text-text-secondary hover:text-red-600 dark:text-text-secondary-dark dark:hover:text-red-400 ml-4 shrink-0"
                                 >
@@ -254,7 +261,7 @@ export function ComparisonsPageClient({
                                     </svg>
                                 </Button>
                             </div>
-                        </div>
+                        </Link>
                     ))}
                 </div>
             )}

@@ -74,6 +74,9 @@ export const ROUTES = {
     DASHBOARD_DIRECTORY_MEMBERS: (id: string) => `/directories/${id}/members`,
     DASHBOARD_DIRECTORY_SETTINGS: (id: string) => `/directories/${id}/settings`,
     DASHBOARD_DIRECTORY_PLUGINS: (id: string) => `/directories/${id}/plugins`,
+    DASHBOARD_DIRECTORY_COMPARISONS: (id: string) => `/directories/${id}/comparisons`,
+    DASHBOARD_DIRECTORY_COMPARISON: (id: string, slug: string) =>
+        `/directories/${id}/comparisons/${slug}`,
     // Plugins
     DASHBOARD_PLUGINS: '/plugins',
     DASHBOARD_PLUGIN_DETAIL: (pluginId: string) => `/plugins/${pluginId}`,
