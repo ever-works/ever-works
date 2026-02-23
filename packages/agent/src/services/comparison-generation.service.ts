@@ -30,9 +30,9 @@ const comparisonStructureSchema = z.object({
             name: z.string(),
             item_a_summary: z.string(),
             item_b_summary: z.string(),
-            item_a_score: z.number().min(1).max(10).optional(),
-            item_b_score: z.number().min(1).max(10).optional(),
-            winner: z.enum(['item_a', 'item_b', 'tie']).optional(),
+            item_a_score: z.number().min(1).max(10),
+            item_b_score: z.number().min(1).max(10),
+            winner: z.enum(['item_a', 'item_b', 'tie']),
         }),
     ),
 });
