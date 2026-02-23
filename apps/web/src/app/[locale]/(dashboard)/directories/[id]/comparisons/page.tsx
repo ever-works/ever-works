@@ -29,7 +29,7 @@ export default async function DirectoryComparisonsPage({ params }: Params) {
             items = itemsRes.items.map((item) => ({
                 slug: item.slug ?? '',
                 name: item.name,
-                category: item.category,
+                category: item.category as string | string[],
             }));
         }
     } catch (error) {
