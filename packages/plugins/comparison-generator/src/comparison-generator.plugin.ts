@@ -1,5 +1,6 @@
 import type {
 	IPlugin,
+	IFormSchemaProvider,
 	PluginCategory,
 	PluginContext,
 	PluginSettings,
@@ -7,7 +8,6 @@ import type {
 	ValidationResult,
 	PluginHealthCheck
 } from '@ever-works/plugin';
-import type { IFormSchemaProvider } from '@ever-works/plugin/capabilities';
 import type { FormFieldDefinition, FormFieldGroup } from '@ever-works/contracts';
 import { DEFAULT_COMPARISON_SETTINGS } from './types.js';
 
@@ -145,11 +145,11 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 	getFormGroups(): FormFieldGroup[] {
 		return [
 			{
-				id: 'comparisons',
-				label: 'Comparison Pages',
+				name: 'comparisons',
+				title: 'Comparison Pages',
 				description: 'Configure automatic A vs B comparison page generation',
 				collapsible: true,
-				defaultCollapsed: true
+				collapsed: true
 			}
 		];
 	}
