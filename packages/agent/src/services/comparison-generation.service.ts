@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { AiFacadeService } from '../facades/ai.facade';
 import { SearchFacadeService } from '../facades/search.facade';
@@ -14,9 +14,8 @@ import {
     findManualPair,
     buildPairKey,
     type ComparisonPair,
-} from '@ever-works/comparison-generator-plugin';
-import { researchPair, type ResearchDependencies } from '@ever-works/comparison-generator-plugin';
-import {
+    researchPair,
+    type ResearchDependencies,
     generateComparison,
     type ComparisonAiDependencies,
 } from '@ever-works/comparison-generator-plugin';
@@ -56,12 +55,20 @@ export class ComparisonGenerationService {
         private readonly directoryRepository: DirectoryRepository,
     ) {}
 
+    private async findDirectoryOrFail(directoryId: string): Promise<Directory> {
+        const directory = await this.directoryRepository.findById(directoryId);
+        if (!directory) {
+            throw new NotFoundException(`Directory not found: ${directoryId}`);
+        }
+        return directory;
+    }
+
     /**
      * Generate the next automatic comparison for a directory.
      * Picks the best un-compared pair and generates a full comparison page.
      */
     async generateNextComparison(directoryId: string, userId: string): Promise<ComparisonResult> {
-        const directory = await this.directoryRepository.findOneOrFail(directoryId);
+        const directory = await this.findDirectoryOrFail(directoryId);
 
         const gitOptions: GitFacadeOptions = {
             userId,
@@ -114,7 +121,7 @@ export class ComparisonGenerationService {
         itemASlug: string,
         itemBSlug: string,
     ): Promise<ComparisonResult> {
-        const directory = await this.directoryRepository.findOneOrFail(directoryId);
+        const directory = await this.findDirectoryOrFail(directoryId);
 
         const gitOptions: GitFacadeOptions = {
             userId,
@@ -168,7 +175,7 @@ export class ComparisonGenerationService {
      * List all comparisons for a directory.
      */
     async listComparisons(directoryId: string, userId: string): Promise<ComparisonData[]> {
-        const directory = await this.directoryRepository.findOneOrFail(directoryId);
+        const directory = await this.findDirectoryOrFail(directoryId);
 
         const gitOptions: GitFacadeOptions = {
             userId,
@@ -191,7 +198,7 @@ export class ComparisonGenerationService {
         userId: string,
         slug: string,
     ): Promise<{ comparison: ComparisonData | null; markdown?: string }> {
-        const directory = await this.directoryRepository.findOneOrFail(directoryId);
+        const directory = await this.findDirectoryOrFail(directoryId);
 
         const gitOptions: GitFacadeOptions = {
             userId,
@@ -217,7 +224,7 @@ export class ComparisonGenerationService {
         userId: string,
         slug: string,
     ): Promise<ComparisonResult> {
-        const directory = await this.directoryRepository.findOneOrFail(directoryId);
+        const directory = await this.findDirectoryOrFail(directoryId);
 
         const gitOptions: GitFacadeOptions = {
             userId,
@@ -281,8 +288,12 @@ export class ComparisonGenerationService {
         // 1. Research the pair
         const researchDeps: ResearchDependencies = {
             search: async (query: string, limit: number) => {
-                const results = await this.searchFacade.search(query, { limit }, facadeOptions);
-                return results.map((r) => ({ url: r.url, snippet: r.snippet || '' }));
+                const results = await this.searchFacade.search(
+                    query,
+                    { maxResults: limit },
+                    facadeOptions,
+                );
+                return results.map((r) => ({ url: r.url, snippet: r.title || '' }));
             },
             extractContent: async (url: string) => {
                 const result = await this.contentExtractorFacade.extractContent(
@@ -290,7 +301,7 @@ export class ComparisonGenerationService {
                     undefined,
                     facadeOptions,
                 );
-                return result?.content ?? null;
+                return result?.rawContent ?? null;
             },
         };
 
@@ -313,7 +324,8 @@ export class ComparisonGenerationService {
                     { messages: [{ role: 'user', content: prompt }] },
                     facadeOptions,
                 );
-                return response.content;
+                const content = response.choices[0]?.message?.content;
+                return typeof content === 'string' ? content : '';
             },
         };
 
