@@ -200,7 +200,10 @@ export function ComparisonsPageClient({
                     {comparisons.map((comparison) => (
                         <Link
                             key={comparison.slug}
-                            href={ROUTES.DASHBOARD_DIRECTORY_COMPARISON(directoryId, comparison.slug)}
+                            href={ROUTES.DASHBOARD_DIRECTORY_COMPARISON(
+                                directoryId,
+                                comparison.slug,
+                            )}
                             className="block rounded-lg border border-border dark:border-border-dark p-4 hover:bg-surface-hover dark:hover:bg-surface-hover-dark transition-colors cursor-pointer"
                         >
                             <div className="flex items-start justify-between">
