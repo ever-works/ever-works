@@ -508,7 +508,11 @@ export class DataRepository {
                 .filter((entry) => entry.isDirectory())
                 .map((entry) => this.getComparison(entry.name));
             const results = await Promise.all(promises);
-            return results.filter(Boolean) as ComparisonData[];
+            const comparisons = results.filter(Boolean) as ComparisonData[];
+            comparisons.sort(
+                (a, b) => new Date(b.generated_at).getTime() - new Date(a.generated_at).getTime(),
+            );
+            return comparisons;
         } catch (err) {
             if (err?.code === 'ENOENT') {
                 return [];
