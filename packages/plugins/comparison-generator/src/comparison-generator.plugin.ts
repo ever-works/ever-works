@@ -122,7 +122,7 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 				'',
 				'## How it works',
 				'',
-				'1. **Pair selection** — the plugin analyzes items within each category and picks the most relevant pairs that haven\'t been compared yet',
+				"1. **Pair selection** — the plugin analyzes items within each category and picks the most relevant pairs that haven't been compared yet",
 				'2. **Research** — gathers information about both items using configured search and content-extraction plugins',
 				'3. **Comparison generation** — uses your AI provider to produce a structured comparison with dimensions, scores, and a verdict',
 				'4. **Article writing** — generates a full markdown article suitable for publishing as a standalone comparison page',
