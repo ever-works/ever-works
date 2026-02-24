@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, Grid, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -38,6 +38,7 @@ export function ComparisonsPageClient({
     const [selectedItemB, setSelectedItemB] = useState('');
     const [showManualForm, setShowManualForm] = useState(false);
     const [deleteSlug, setDeleteSlug] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
     const [currentPage, setCurrentPage] = useState(1);
 
     const pageSize = 5;
@@ -200,6 +201,30 @@ export function ComparisonsPageClient({
                 </div>
             )}
 
+            {/* View toggle */}
+            {comparisons.length > 0 && (
+                <div className="flex justify-end">
+                    <div className="flex rounded-lg border border-border dark:border-border-dark">
+                        <Button
+                            variant={viewMode === 'list' ? 'primary' : 'ghost'}
+                            size="sm"
+                            onClick={() => setViewMode('list')}
+                            className="rounded-r-none"
+                        >
+                            <List className="w-4 h-4" />
+                        </Button>
+                        <Button
+                            variant={viewMode === 'grid' ? 'primary' : 'ghost'}
+                            size="sm"
+                            onClick={() => setViewMode('grid')}
+                            className="rounded-l-none"
+                        >
+                            <Grid className="w-4 h-4" />
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             {/* Comparisons list */}
             {comparisons.length === 0 ? (
                 <div className="text-center py-12 rounded-lg border border-dashed border-border dark:border-border-dark">
@@ -225,11 +250,17 @@ export function ComparisonsPageClient({
                     </p>
                 </div>
             ) : (
-                <div className="space-y-3">
+                <div
+                    className={
+                        viewMode === 'grid'
+                            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'
+                            : 'space-y-3'
+                    }
+                >
                     {paginatedComparisons.map((comparison) => (
                         <div
                             key={comparison.slug}
-                            className="relative rounded-lg border border-border dark:border-border-dark p-4 hover:bg-surface-hover dark:hover:bg-surface-hover-dark transition-colors"
+                            className={`relative rounded-lg border border-border dark:border-border-dark p-4 hover:bg-surface-hover dark:hover:bg-surface-hover-dark transition-colors ${viewMode === 'grid' ? 'flex flex-col' : ''}`}
                         >
                             <Link
                                 href={ROUTES.DASHBOARD_DIRECTORY_COMPARISON(
@@ -238,12 +269,41 @@ export function ComparisonsPageClient({
                                 )}
                                 className="absolute inset-0 rounded-lg"
                             />
-                            <div className="flex items-start justify-between">
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-medium text-text dark:text-text-dark truncate">
-                                        {comparison.title}
-                                    </h3>
-                                    <div className="mt-1 flex items-center gap-3 text-sm text-text-secondary dark:text-text-secondary-dark">
+                            <div
+                                className={
+                                    viewMode === 'grid'
+                                        ? 'flex flex-col flex-1'
+                                        : 'flex items-start justify-between'
+                                }
+                            >
+                                <div className={viewMode === 'grid' ? '' : 'flex-1 min-w-0'}>
+                                    <div className="flex items-start justify-between">
+                                        <h3 className="font-medium text-text dark:text-text-dark truncate">
+                                            {comparison.title}
+                                        </h3>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setDeleteSlug(comparison.slug)}
+                                            disabled={isPending}
+                                            className="relative z-10 text-text-secondary hover:text-red-600 dark:text-text-secondary-dark dark:hover:text-red-400 ml-2 shrink-0"
+                                        >
+                                            <svg
+                                                className="w-4 h-4"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                />
+                                            </svg>
+                                        </Button>
+                                    </div>
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-secondary dark:text-text-secondary-dark">
                                         <span>
                                             {comparison.item_a_name} vs {comparison.item_b_name}
                                         </span>
@@ -270,27 +330,6 @@ export function ComparisonsPageClient({
                                         </div>
                                     )}
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setDeleteSlug(comparison.slug)}
-                                    disabled={isPending}
-                                    className="relative z-10 text-text-secondary hover:text-red-600 dark:text-text-secondary-dark dark:hover:text-red-400 ml-4 shrink-0"
-                                >
-                                    <svg
-                                        className="w-4 h-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                        />
-                                    </svg>
-                                </Button>
                             </div>
                         </div>
                     ))}
