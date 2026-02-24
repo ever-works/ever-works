@@ -235,6 +235,7 @@ export interface DirectoryCount {
     items: number;
     categories: number;
     tags: number;
+    comparisons: number;
 }
 
 export interface DirectoryCategoriesTags {

@@ -4,13 +4,14 @@ import { Directory } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
 import { useTranslations } from 'next-intl';
-import { Package, Tag, Clock } from 'lucide-react';
+import { Package, Tag, Clock, Scale } from 'lucide-react';
 
 interface DirectoryStatsProps {
     directory: Directory;
     itemsCount: number;
     categoriesCount: number;
     tagsCount: number;
+    comparisonsCount: number;
 }
 
 interface StatCardProps {
@@ -82,7 +83,12 @@ function getGenerationStatusStat(
     };
 }
 
-export function DirectoryStats({ categoriesCount, itemsCount, directory }: DirectoryStatsProps) {
+export function DirectoryStats({
+    categoriesCount,
+    itemsCount,
+    comparisonsCount,
+    directory,
+}: DirectoryStatsProps) {
     const t = useTranslations('dashboard.directoryDetail.stats');
     const tStatus = useTranslations('dashboard.directoryDetail.status');
 
@@ -99,6 +105,12 @@ export function DirectoryStats({ categoriesCount, itemsCount, directory }: Direc
             icon: <Tag className="w-5 h-5 text-purple-600 dark:text-purple-400" />,
             color: 'bg-purple-100 dark:bg-purple-900',
         },
+        {
+            title: t('comparisons'),
+            value: comparisonsCount,
+            icon: <Scale className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />,
+            color: 'bg-emerald-100 dark:bg-emerald-900',
+        },
         getGenerationStatusStat(directory, t, tStatus),
         {
             title: t('daysActive'),
@@ -112,7 +124,7 @@ export function DirectoryStats({ categoriesCount, itemsCount, directory }: Direc
     ];
 
     return (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             {stats.map((stat) => (
                 <StatCard
                     key={stat.title}

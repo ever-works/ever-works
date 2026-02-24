@@ -628,6 +628,7 @@
             "stats": {
                 "totalItems": "Total Items",
                 "categories": "Categories",
+                "comparisons": "Comparisons",
                 "generationStatus": "Generation Status",
                 "daysActive": "Days Active"
             },
