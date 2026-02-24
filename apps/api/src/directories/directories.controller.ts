@@ -890,7 +890,9 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
         await this.directoryOwnershipService.ensureCanEdit(id, user.id);
 
-        return this.comparisonGenerationService.generateNextComparison(id, user.id);
+        const result = await this.comparisonGenerationService.generateNextComparison(id, user.id);
+        await this.cacheManager.del(`directory-count-${id}-${auth.userId}`);
+        return result;
     }
 
     @Post('directories/:id/comparisons/generate-manual')
@@ -916,12 +918,14 @@ export class DirectoriesController {
             throw new BadRequestException('Cannot compare an item with itself');
         }
 
-        return this.comparisonGenerationService.generateManualComparison(
+        const result = await this.comparisonGenerationService.generateManualComparison(
             id,
             user.id,
             body.itemASlug,
             body.itemBSlug,
         );
+        await this.cacheManager.del(`directory-count-${id}-${auth.userId}`);
+        return result;
     }
 
     @Delete('directories/:id/comparisons/:slug')
@@ -937,6 +941,8 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
         await this.directoryOwnershipService.ensureCanEdit(id, user.id);
 
-        return this.comparisonGenerationService.deleteComparison(id, user.id, slug);
+        const result = await this.comparisonGenerationService.deleteComparison(id, user.id, slug);
+        await this.cacheManager.del(`directory-count-${id}-${auth.userId}`);
+        return result;
     }
 }
