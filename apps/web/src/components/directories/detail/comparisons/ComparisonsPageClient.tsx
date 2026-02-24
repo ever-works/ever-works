@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -38,6 +38,14 @@ export function ComparisonsPageClient({
     const [selectedItemB, setSelectedItemB] = useState('');
     const [showManualForm, setShowManualForm] = useState(false);
     const [deleteSlug, setDeleteSlug] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+
+    const pageSize = 5;
+    const totalPages = Math.max(1, Math.ceil(comparisons.length / pageSize));
+    const paginatedComparisons = useMemo(
+        () => comparisons.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+        [comparisons, currentPage],
+    );
 
     const handleGenerateNext = () => {
         startTransition(async () => {
@@ -94,7 +102,14 @@ export function ComparisonsPageClient({
 
             if (result.status === 'success') {
                 toast.success('Comparison deleted');
-                setComparisons((prev) => prev.filter((c) => c.slug !== slug));
+                setComparisons((prev) => {
+                    const updated = prev.filter((c) => c.slug !== slug);
+                    const newTotalPages = Math.max(1, Math.ceil(updated.length / pageSize));
+                    if (currentPage > newTotalPages) {
+                        setCurrentPage(newTotalPages);
+                    }
+                    return updated;
+                });
             } else {
                 toast.error(result.message);
             }
@@ -211,7 +226,7 @@ export function ComparisonsPageClient({
                 </div>
             ) : (
                 <div className="space-y-3">
-                    {comparisons.map((comparison) => (
+                    {paginatedComparisons.map((comparison) => (
                         <div
                             key={comparison.slug}
                             className="relative rounded-lg border border-border dark:border-border-dark p-4 hover:bg-surface-hover dark:hover:bg-surface-hover-dark transition-colors"
@@ -279,6 +294,38 @@ export function ComparisonsPageClient({
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* Pagination */}
+            {comparisons.length > pageSize && (
+                <div className="flex items-center justify-between">
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        Showing {(currentPage - 1) * pageSize + 1}–
+                        {Math.min(currentPage * pageSize, comparisons.length)} of{' '}
+                        {comparisons.length}
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setCurrentPage((p) => p - 1)}
+                            disabled={currentPage <= 1}
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                            {currentPage} / {totalPages}
+                        </span>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setCurrentPage((p) => p + 1)}
+                            disabled={currentPage >= totalPages}
+                        >
+                            <ChevronRight className="w-4 h-4" />
+                        </Button>
+                    </div>
                 </div>
             )}
 
