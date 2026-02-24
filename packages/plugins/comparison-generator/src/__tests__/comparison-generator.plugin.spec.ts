@@ -48,10 +48,9 @@ describe('ComparisonGeneratorPlugin', () => {
 			expect(plugin.settingsSchema.type).toBe('object');
 		});
 
-		it('should have 4 properties', () => {
+		it('should have 3 properties', () => {
 			const props = plugin.settingsSchema.properties!;
-			expect(Object.keys(props)).toHaveLength(4);
-			expect(props).toHaveProperty('enabled');
+			expect(Object.keys(props)).toHaveLength(3);
 			expect(props).toHaveProperty('cadence_override');
 			expect(props).toHaveProperty('max_comparisons');
 			expect(props).toHaveProperty('min_items_for_comparison');
@@ -196,7 +195,7 @@ describe('ComparisonGeneratorPlugin', () => {
 	describe('getDefaultValues', () => {
 		it('should match DEFAULT_COMPARISON_SETTINGS', () => {
 			const defaults = plugin.getDefaultValues();
-			expect(defaults.comparison_enabled).toBe(DEFAULT_COMPARISON_SETTINGS.enabled);
+			expect(defaults.comparison_enabled).toBe(false);
 			expect(defaults.comparison_cadence).toBe(DEFAULT_COMPARISON_SETTINGS.cadence_override);
 			expect(defaults.comparison_max).toBe(DEFAULT_COMPARISON_SETTINGS.max_comparisons);
 		});

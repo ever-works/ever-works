@@ -22,12 +22,6 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {
-			enabled: {
-				type: 'boolean',
-				title: 'Enable Comparison Generation',
-				description: 'Enable or disable automatic comparison page generation',
-				default: false
-			},
 			cadence_override: {
 				type: 'string',
 				title: 'Generation Cadence',
@@ -169,7 +163,7 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 
 	getDefaultValues(): Record<string, unknown> {
 		return {
-			comparison_enabled: DEFAULT_COMPARISON_SETTINGS.enabled,
+			comparison_enabled: false,
 			comparison_cadence: DEFAULT_COMPARISON_SETTINGS.cadence_override,
 			comparison_max: DEFAULT_COMPARISON_SETTINGS.max_comparisons
 		};

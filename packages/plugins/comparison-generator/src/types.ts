@@ -18,14 +18,12 @@ export interface ComparisonGenerationResult {
 }
 
 export interface ComparisonPluginSettings {
-	readonly enabled: boolean;
 	readonly cadence_override: 'use_directory' | 'daily' | 'weekly' | 'monthly';
 	readonly max_comparisons: number;
 	readonly min_items_for_comparison: number;
 }
 
 export const DEFAULT_COMPARISON_SETTINGS: ComparisonPluginSettings = {
-	enabled: false,
 	cadence_override: 'use_directory',
 	max_comparisons: 50,
 	min_items_for_comparison: 3

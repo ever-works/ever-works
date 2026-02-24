@@ -47,7 +47,7 @@ export function PluginCard({ plugin }: PluginCardProps) {
                     'bg-surface dark:bg-surface-dark rounded-lg border border-border dark:border-border-dark p-4',
                     'transition-all hover:shadow-md',
                     'flex flex-col h-full',
-                    optimisticEnabled && 'ring-2 ring-primary/20',
+                    (optimisticEnabled || plugin.systemPlugin) && 'ring-2 ring-primary/20',
                 )}
             >
                 <div className="flex items-start gap-3">
