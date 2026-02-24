@@ -2,7 +2,16 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
+import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+    DialogClose,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import type { ComparisonData } from '@/lib/api/directory';
 import { ROUTES } from '@/lib/constants';
@@ -28,6 +37,7 @@ export function ComparisonsPageClient({
     const [selectedItemA, setSelectedItemA] = useState('');
     const [selectedItemB, setSelectedItemB] = useState('');
     const [showManualForm, setShowManualForm] = useState(false);
+    const [deleteSlug, setDeleteSlug] = useState<string | null>(null);
 
     const handleGenerateNext = () => {
         startTransition(async () => {
@@ -74,7 +84,11 @@ export function ComparisonsPageClient({
         });
     };
 
-    const handleDelete = (slug: string) => {
+    const handleDeleteConfirm = () => {
+        if (!deleteSlug) return;
+        const slug = deleteSlug;
+        setDeleteSlug(null);
+
         startTransition(async () => {
             const result = await deleteComparison(directoryId, slug);
 
@@ -198,14 +212,17 @@ export function ComparisonsPageClient({
             ) : (
                 <div className="space-y-3">
                     {comparisons.map((comparison) => (
-                        <Link
+                        <div
                             key={comparison.slug}
-                            href={ROUTES.DASHBOARD_DIRECTORY_COMPARISON(
-                                directoryId,
-                                comparison.slug,
-                            )}
-                            className="block rounded-lg border border-border dark:border-border-dark p-4 hover:bg-surface-hover dark:hover:bg-surface-hover-dark transition-colors cursor-pointer"
+                            className="relative rounded-lg border border-border dark:border-border-dark p-4 hover:bg-surface-hover dark:hover:bg-surface-hover-dark transition-colors"
                         >
+                            <Link
+                                href={ROUTES.DASHBOARD_DIRECTORY_COMPARISON(
+                                    directoryId,
+                                    comparison.slug,
+                                )}
+                                className="absolute inset-0 rounded-lg"
+                            />
                             <div className="flex items-start justify-between">
                                 <div className="flex-1 min-w-0">
                                     <h3 className="font-medium text-text dark:text-text-dark truncate">
@@ -241,13 +258,9 @@ export function ComparisonsPageClient({
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        handleDelete(comparison.slug);
-                                    }}
+                                    onClick={() => setDeleteSlug(comparison.slug)}
                                     disabled={isPending}
-                                    className="text-text-secondary hover:text-red-600 dark:text-text-secondary-dark dark:hover:text-red-400 ml-4 shrink-0"
+                                    className="relative z-10 text-text-secondary hover:text-red-600 dark:text-text-secondary-dark dark:hover:text-red-400 ml-4 shrink-0"
                                 >
                                     <svg
                                         className="w-4 h-4"
@@ -264,10 +277,47 @@ export function ComparisonsPageClient({
                                     </svg>
                                 </Button>
                             </div>
-                        </Link>
+                        </div>
                     ))}
                 </div>
             )}
+
+            {/* Delete confirmation dialog */}
+            <Dialog open={deleteSlug !== null} onOpenChange={(o) => !o && setDeleteSlug(null)}>
+                <DialogContent>
+                    <DialogClose onClose={() => setDeleteSlug(null)} />
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-semibold text-text dark:text-text-dark flex items-center gap-2">
+                            <AlertTriangle className="w-5 h-5 text-danger" />
+                            Delete Comparison
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        Are you sure you want to delete{' '}
+                        <span className="font-medium text-text dark:text-text-dark">
+                            {comparisons.find((c) => c.slug === deleteSlug)?.title ?? deleteSlug}
+                        </span>
+                        ? This action cannot be undone.
+                    </p>
+
+                    <DialogFooter>
+                        <Button size="sm" variant="ghost" onClick={() => setDeleteSlug(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={handleDeleteConfirm}
+                            disabled={isPending}
+                            loading={isPending}
+                            className="text-danger hover:text-danger hover:bg-danger/10"
+                        >
+                            Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
