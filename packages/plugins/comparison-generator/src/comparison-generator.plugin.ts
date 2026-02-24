@@ -4,6 +4,7 @@ import type {
 	PluginCategory,
 	PluginContext,
 	PluginSettings,
+	PluginManifest,
 	JsonSchema,
 	ValidationResult,
 	PluginHealthCheck
@@ -97,6 +98,51 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 			status: 'healthy',
 			message: 'Comparison Generator plugin is ready',
 			checkedAt: Date.now()
+		};
+	}
+
+	getManifest(): PluginManifest {
+		return {
+			id: this.id,
+			name: this.name,
+			version: this.version,
+			description: 'Auto-generates SEO-optimized A vs B comparison pages between directory items',
+			category: this.category,
+			capabilities: [...this.capabilities],
+			author: { name: 'Ever Works Team' },
+			license: 'MIT',
+			builtIn: true,
+			systemPlugin: true,
+			autoEnable: false,
+			visibility: 'public',
+			readme: [
+				'## What is the Comparison Generator?',
+				'',
+				'The Comparison Generator is a system plugin that automatically creates detailed A vs B comparison pages between items in your directories. Each comparison includes structured dimensions with scores, a verdict, and a full SEO-optimized markdown article.',
+				'',
+				'## How it works',
+				'',
+				'1. **Pair selection** — the plugin analyzes items within each category and picks the most relevant pairs that haven\'t been compared yet',
+				'2. **Research** — gathers information about both items using configured search and content-extraction plugins',
+				'3. **Comparison generation** — uses your AI provider to produce a structured comparison with dimensions, scores, and a verdict',
+				'4. **Article writing** — generates a full markdown article suitable for publishing as a standalone comparison page',
+				'',
+				'## Features',
+				'',
+				'- **Scheduled generation** — runs automatically based on your directory schedule or a custom cadence (daily, weekly, monthly)',
+				'- **Manual comparisons** — pick any two items and generate a comparison on demand from the Comparisons tab',
+				'- **Dimension scoring** — each comparison breaks down into multiple dimensions with per-item scores and summaries',
+				'- **Duplicate prevention** — tracks previously generated pairs so no comparison is repeated',
+				'- **Source attribution** — includes references to the sources used during research',
+				'',
+				'## Configuration',
+				'',
+				'Enable comparison generation per directory from the directory Generator settings. You can configure:',
+				'',
+				'- **Cadence** — how often to auto-generate a new comparison (or follow the directory schedule)',
+				'- **Max comparisons** — cap the total number of comparisons per directory (1–500)',
+				'- **Min items** — minimum items required in a category before comparisons are generated'
+			].join('\n')
 		};
 	}
 
