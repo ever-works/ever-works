@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import {
     AlertTriangle,
@@ -31,24 +31,31 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import type { ComparisonData } from '@/lib/api/directory';
+import type { ProviderOption } from '@/lib/api/types-only';
 import { ROUTES } from '@/lib/constants';
 import {
     generateNextComparison,
     generateManualComparison,
     deleteComparison,
     getRemainingComparisonCount,
+    saveComparisonAiConfig,
+    getAiProviderModels,
 } from '@/app/actions/dashboard/comparisons';
 
 interface ComparisonsPageClientProps {
     directoryId: string;
     initialComparisons: ComparisonData[];
     items: Array<{ slug: string; name: string; category: string | string[] }>;
+    availableProviders: ProviderOption[];
+    initialAiConfig: { provider: string | null; model: string | null };
 }
 
 export function ComparisonsPageClient({
     directoryId,
     initialComparisons,
     items,
+    availableProviders,
+    initialAiConfig,
 }: ComparisonsPageClientProps) {
     const [comparisons, setComparisons] = useState<ComparisonData[]>(initialComparisons);
     const [isPending, startTransition] = useTransition();
@@ -60,6 +67,14 @@ export function ComparisonsPageClient({
     const [deleteSlug, setDeleteSlug] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
     const [currentPage, setCurrentPage] = useState(1);
+
+    // AI Model settings state
+    const [showAiSettings, setShowAiSettings] = useState(false);
+    const [aiProvider, setAiProvider] = useState(initialAiConfig.provider ?? '');
+    const [aiModel, setAiModel] = useState(initialAiConfig.model ?? '');
+    const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string }>>([]);
+    const [isLoadingModels, setIsLoadingModels] = useState(false);
+    const [isSavingAiConfig, setIsSavingAiConfig] = useState(false);
 
     // Generate All state
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
@@ -78,6 +93,32 @@ export function ComparisonsPageClient({
         () => comparisons.slice((currentPage - 1) * pageSize, currentPage * pageSize),
         [comparisons, currentPage],
     );
+
+    // Load models for the initially-configured provider
+    useEffect(() => {
+        if (!initialAiConfig.provider) return;
+        let cancelled = false;
+        setIsLoadingModels(true);
+        getAiProviderModels(initialAiConfig.provider)
+            .then((models) => {
+                if (cancelled) return;
+                setAvailableModels(
+                    models.map((m: any) => ({
+                        id: m.id ?? m.modelId ?? m,
+                        name: m.name ?? m.id ?? m,
+                    })),
+                );
+            })
+            .catch(() => {
+                if (!cancelled) setAvailableModels([]);
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoadingModels(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [initialAiConfig.provider]);
 
     const selectedItemAObj = items.find((item) => item.slug === selectedItemA) ?? null;
     const selectedItemBObj = items.find((item) => item.slug === selectedItemB) ?? null;
@@ -218,6 +259,45 @@ export function ComparisonsPageClient({
         cancelRef.current = true;
     };
 
+    const handleProviderChange = async (providerId: string) => {
+        setAiProvider(providerId);
+        setAiModel('');
+        setAvailableModels([]);
+
+        if (!providerId) return;
+
+        setIsLoadingModels(true);
+        try {
+            const models = await getAiProviderModels(providerId);
+            setAvailableModels(
+                models.map((m: any) => ({ id: m.id ?? m.modelId ?? m, name: m.name ?? m.id ?? m })),
+            );
+        } catch {
+            setAvailableModels([]);
+        } finally {
+            setIsLoadingModels(false);
+        }
+    };
+
+    const handleSaveAiConfig = async () => {
+        setIsSavingAiConfig(true);
+        try {
+            const result = await saveComparisonAiConfig(directoryId, {
+                provider: aiProvider || null,
+                model: aiModel || null,
+            });
+            if (result.success) {
+                toast.success('AI model settings saved');
+            } else {
+                toast.error(result.error ?? 'Failed to save AI config');
+            }
+        } catch {
+            toast.error('Failed to save AI config');
+        } finally {
+            setIsSavingAiConfig(false);
+        }
+    };
+
     const isBusy = isPending || isGeneratingAll;
 
     return (
@@ -254,6 +334,92 @@ export function ComparisonsPageClient({
                     </Button>
                 </div>
             </div>
+
+            {/* AI Model settings */}
+            {availableProviders.length > 0 && (
+                <div className="rounded-lg border border-border dark:border-border-dark">
+                    <button
+                        type="button"
+                        onClick={() => setShowAiSettings(!showAiSettings)}
+                        className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-text dark:text-text-dark hover:bg-surface-hover dark:hover:bg-surface-hover-dark transition-colors rounded-lg"
+                    >
+                        <span>AI Model</span>
+                        <ChevronDown
+                            className={cn(
+                                'h-4 w-4 text-text-muted transition-transform duration-200',
+                                showAiSettings && 'rotate-180',
+                            )}
+                        />
+                    </button>
+                    {showAiSettings && (
+                        <div className="border-t border-border dark:border-border-dark px-4 py-4">
+                            <div className="flex gap-4 items-end">
+                                <div className="flex-1">
+                                    <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
+                                        Provider
+                                    </label>
+                                    <select
+                                        value={aiProvider}
+                                        onChange={(e) => handleProviderChange(e.target.value)}
+                                        className={cn(
+                                            'w-full rounded-lg border border-border dark:border-border-dark',
+                                            'bg-surface dark:bg-surface-dark',
+                                            'px-3 py-2 text-sm text-text dark:text-text-dark',
+                                            'focus:border-primary dark:focus:border-primary-dark',
+                                            'focus:ring-2 focus:ring-primary/20 focus:outline-none',
+                                        )}
+                                    >
+                                        <option value="">Default</option>
+                                        {availableProviders.map((p) => (
+                                            <option key={p.id} value={p.id}>
+                                                {p.name}
+                                                {p.isDefault ? ' (Default)' : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
+                                        Model
+                                    </label>
+                                    <select
+                                        value={aiModel}
+                                        onChange={(e) => setAiModel(e.target.value)}
+                                        disabled={!aiProvider || isLoadingModels}
+                                        className={cn(
+                                            'w-full rounded-lg border border-border dark:border-border-dark',
+                                            'bg-surface dark:bg-surface-dark',
+                                            'px-3 py-2 text-sm text-text dark:text-text-dark',
+                                            'focus:border-primary dark:focus:border-primary-dark',
+                                            'focus:ring-2 focus:ring-primary/20 focus:outline-none',
+                                            'disabled:opacity-50 disabled:cursor-not-allowed',
+                                        )}
+                                    >
+                                        <option value="">
+                                            {isLoadingModels
+                                                ? 'Loading models...'
+                                                : 'Provider default'}
+                                        </option>
+                                        {availableModels.map((m) => (
+                                            <option key={m.id} value={m.id}>
+                                                {m.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    onClick={handleSaveAiConfig}
+                                    disabled={isSavingAiConfig}
+                                    loading={isSavingAiConfig}
+                                >
+                                    Save
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Generate All progress bar */}
             {isGeneratingAll && (

@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { directoryAPI } from '@/lib/api';
 import type { ComparisonData } from '@/lib/api/directory';
 import { ComparisonsPageClient } from '@/components/directories/detail/comparisons/ComparisonsPageClient';
+import { getComparisonAiConfig } from '@/app/actions/dashboard/comparisons';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -36,7 +37,15 @@ export default async function DirectoryComparisonsPage({ params }: Params) {
         console.error('Failed to fetch comparisons:', error);
     }
 
+    const aiConfig = await getComparisonAiConfig(id);
+
     return (
-        <ComparisonsPageClient directoryId={id} initialComparisons={comparisons} items={items} />
+        <ComparisonsPageClient
+            directoryId={id}
+            initialComparisons={comparisons}
+            items={items}
+            availableProviders={aiConfig.availableProviders}
+            initialAiConfig={aiConfig.currentConfig}
+        />
     );
 }

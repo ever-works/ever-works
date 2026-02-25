@@ -82,6 +82,8 @@ export class ComparisonGenerationService {
             min_items_for_comparison:
                 Number(settings.min_items_for_comparison) ||
                 DEFAULT_COMPARISON_SETTINGS.min_items_for_comparison,
+            ai_provider: (settings.ai_provider as string) || undefined,
+            ai_model: (settings.ai_model as string) || undefined,
         };
     }
 
@@ -344,9 +346,11 @@ export class ComparisonGenerationService {
         },
         gitOptions: GitFacadeOptions,
     ): Promise<ComparisonResult> {
+        const pluginSettings = await this.getComparisonPluginSettings(directory.id);
         const facadeOptions: FacadeOptions = {
             userId: gitOptions.userId!,
             directoryId: directory.id,
+            providerOverride: pluginSettings.ai_provider,
         };
 
         // 1. Research the pair
@@ -378,14 +382,19 @@ export class ComparisonGenerationService {
                 const response = await this.aiFacade.askJson(
                     prompt,
                     comparisonStructureSchema,
-                    undefined,
+                    pluginSettings.ai_model
+                        ? { routing: { modelOverride: pluginSettings.ai_model } }
+                        : undefined,
                     facadeOptions,
                 );
                 return response.result as T;
             },
             askText: async (prompt: string) => {
                 const response = await this.aiFacade.createChatCompletion(
-                    { messages: [{ role: 'user', content: prompt }] },
+                    {
+                        messages: [{ role: 'user', content: prompt }],
+                        model: pluginSettings.ai_model,
+                    },
                     facadeOptions,
                 );
                 const content = response.choices[0]?.message?.content;
