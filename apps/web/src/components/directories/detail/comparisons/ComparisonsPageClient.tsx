@@ -2,7 +2,16 @@
 
 import { useCallback, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, Grid, List, Square } from 'lucide-react';
+import {
+    AlertTriangle,
+    Check,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Grid,
+    List,
+    Square,
+} from 'lucide-react';
 import {
     Combobox,
     ComboboxInput,
