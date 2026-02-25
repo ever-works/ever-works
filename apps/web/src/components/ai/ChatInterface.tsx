@@ -7,6 +7,7 @@ import { useAIStream } from '@/lib/hooks/use-ai-stream';
 import { useChatContext } from '@/components/ai/ChatProvider';
 import { ChatMessage, generateMessageId } from '@/lib/hooks/use-chat-history';
 import { ROUTES } from '@/lib/constants';
+import { SendHorizonal } from 'lucide-react';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { Tooltip } from '@/components/ui/tooltip';
 
@@ -29,6 +30,14 @@ export function ChatInterface() {
 
     const pendingMessageRef = useRef<string | null>(null);
     const endRef = useRef<HTMLDivElement | null>(null);
+    const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+    const autoResize = () => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+    };
 
     useEffect(() => {
         loadHistory();
@@ -177,7 +186,7 @@ export function ChatInterface() {
         <div className="flex flex-col h-full min-h-0">
             <div className="px-4 py-3 border-b border-border dark:border-border-dark space-y-2">
                 <div className="flex items-start justify-between gap-3">
-                    <div>
+                    <div className='w-2/3'>
                         <h2 className="text-base font-semibold text-text dark:text-text-dark">
                             {t('title')}
                         </h2>
@@ -190,12 +199,12 @@ export function ChatInterface() {
                         onClick={handleResetConversation}
                         disabled={isStreaming}
                         className={cn(
-                            'text-xs font-medium text-primary',
+                            'text-xs cursor-pointer font-medium text-primary w-1/3',
                             'hover:text-primary-hover',
                             'disabled:opacity-50 disabled:cursor-not-allowed',
                         )}
                     >
-                        {t('newChat')}
+                       + {t('newChat')}
                     </button>
                 </div>
 
@@ -256,7 +265,7 @@ export function ChatInterface() {
 
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">
                 {isLoading && messages.length === 0 ? (
-                    <div className="flex h-full min-h-[120px] items-center justify-center text-xs text-text-muted dark:text-text-muted-dark">
+                    <div className="flex h-full min-h-30 items-center justify-center text-xs text-text-muted dark:text-text-muted-dark">
                         {t('loadingConversation')}
                     </div>
                 ) : (
@@ -271,8 +280,8 @@ export function ChatInterface() {
                                     className={cn(
                                         'max-w-[90%] rounded-lg px-3 py-2 motion-safe:animate-fade-in',
                                         isUser
-                                            ? 'bg-primary text-white'
-                                            : 'bg-surface-tertiary dark:bg-surface-tertiary-dark text-text dark:text-text-dark',
+                                            ? 'bg-[#6209bb] dark:bg-[#6209bb]/10 text-white'
+                                            : 'bg-surface-tertiary dark:bg-surface-tertiary-dark/50 text-text dark:text-text-dark',
                                         message.error &&
                                             'border border-danger/60 text-danger dark:text-danger',
                                     )}
@@ -324,47 +333,60 @@ export function ChatInterface() {
             {errorMessage && <div className="px-4 pb-1 text-xs text-danger">{errorMessage}</div>}
 
             <form onSubmit={handleSubmit} className="px-4 pb-4 pt-2 shrink-0">
-                <div className="flex gap-2">
-                    <input
-                        type="text"
+                <div
+                    className={cn(
+                        'relative flex flex-col rounded-xl border transition-colors',
+                        'bg-white dark:bg-surface-dark',
+                        'border-border dark:border-white/10',
+                        'focus-within:border-primary/40 dark:focus-within:border-white/20',
+                        'shadow-sm',
+                    )}
+                >
+                    <textarea
+                        ref={textareaRef}
                         value={input}
-                        onChange={(event) => setInput(event.target.value)}
+                        rows={1}
+                        onChange={(e) => {
+                            setInput(e.target.value);
+                            autoResize();
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                if (input.trim() && !isStreaming) {
+                                    e.currentTarget.form?.requestSubmit();
+                                }
+                            }
+                        }}
                         placeholder={t('inputPlaceholder')}
                         className={cn(
-                            'flex-1 px-3 py-2 text-sm rounded-lg transition-colors',
-                            'bg-surface-tertiary dark:bg-surface-tertiary-dark',
-                            'border border-border dark:border-border-dark',
-                            'text-text dark:text-text-dark',
-                            'placeholder-text-muted dark:placeholder-text-muted-dark',
-                            'focus:outline-none focus:border-primary',
+                            'w-full resize-none bg-transparent px-4 pt-3 pb-1 text-sm',
+                            'text-text dark:text-white',
+                            'placeholder:text-xs placeholder:text-text-muted dark:placeholder:text-white/30',
+                            'focus:outline-none',
+                            'max-h-40 overflow-y-auto',
                         )}
                         disabled={isStreaming}
                         autoComplete="off"
                     />
-                    <button
-                        type="submit"
-                        disabled={!input.trim() || isStreaming}
-                        className={cn(
-                            'px-3 py-2 rounded-lg transition-colors',
-                            'bg-primary hover:bg-primary-hover text-white',
-                            'disabled:opacity-50 disabled:cursor-not-allowed',
-                        )}
-                    >
-                        <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                    <div className="flex items-center justify-end px-3 pb-2.5 pt-1">
+                        <button
+                            type="submit"
+                            disabled={!input.trim() || isStreaming}
+                            className={cn(
+                                'flex cursor-pointer items-center justify-center w-7 h-7 rounded-lg transition-all duration-200',
+                                input.trim() && !isStreaming
+                                    ? 'bg-primary-hover dark:bg-white/15 text-white hover:bg-primary-hover/80 dark:hover:bg-white/25'
+                                    : 'bg-surface-tertiary dark:bg-white/5 text-text-muted dark:text-white/20 cursor-not-allowed',
+                            )}
                         >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                            />
-                        </svg>
-                    </button>
+                            <SendHorizonal className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
                 </div>
+                <p className="mt-1.5 text-center text-[10px] text-text-muted dark:text-white/25 select-none">
+                    Enter to send · Shift+Enter for new line
+                </p>
             </form>
         </div>
     );
