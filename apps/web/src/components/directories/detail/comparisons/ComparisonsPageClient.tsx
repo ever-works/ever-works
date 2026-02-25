@@ -44,7 +44,11 @@ export function ComparisonsPageClient({
 
     // Generate All state
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
-    const [generateAllProgress, setGenerateAllProgress] = useState({ completed: 0, total: 0, errors: 0 });
+    const [generateAllProgress, setGenerateAllProgress] = useState({
+        completed: 0,
+        total: 0,
+        errors: 0,
+    });
     const [showGenerateAllConfirm, setShowGenerateAllConfirm] = useState(false);
     const [remainingCount, setRemainingCount] = useState(0);
     const cancelRef = useRef(false);
@@ -168,9 +172,13 @@ export function ComparisonsPageClient({
         setIsGeneratingAll(false);
 
         if (cancelRef.current) {
-            toast.info(`Stopped. Generated ${completed} comparison${completed !== 1 ? 's' : ''}${errors > 0 ? `, ${errors} error${errors !== 1 ? 's' : ''}` : ''}.`);
+            toast.info(
+                `Stopped. Generated ${completed} comparison${completed !== 1 ? 's' : ''}${errors > 0 ? `, ${errors} error${errors !== 1 ? 's' : ''}` : ''}.`,
+            );
         } else {
-            toast.success(`Done! Generated ${completed} comparison${completed !== 1 ? 's' : ''}${errors > 0 ? `, ${errors} error${errors !== 1 ? 's' : ''}` : ''}.`);
+            toast.success(
+                `Done! Generated ${completed} comparison${completed !== 1 ? 's' : ''}${errors > 0 ? `, ${errors} error${errors !== 1 ? 's' : ''}` : ''}.`,
+            );
         }
 
         window.location.reload();
@@ -206,7 +214,12 @@ export function ComparisonsPageClient({
                     <Button size="sm" onClick={handleGenerateNext} disabled={isBusy}>
                         {isPending ? 'Generating...' : 'Generate Next'}
                     </Button>
-                    <Button size="sm" variant="secondary" onClick={handleGenerateAllClick} disabled={isBusy}>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={handleGenerateAllClick}
+                        disabled={isBusy}
+                    >
                         Generate All
                     </Button>
                 </div>
@@ -217,10 +230,12 @@ export function ComparisonsPageClient({
                 <div className="rounded-lg border border-border dark:border-border-dark p-4 space-y-3">
                     <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-text dark:text-text-dark">
-                            Generating comparisons: {generateAllProgress.completed} / {generateAllProgress.total} complete
+                            Generating comparisons: {generateAllProgress.completed} /{' '}
+                            {generateAllProgress.total} complete
                             {generateAllProgress.errors > 0 && (
                                 <span className="text-danger ml-2">
-                                    ({generateAllProgress.errors} error{generateAllProgress.errors !== 1 ? 's' : ''})
+                                    ({generateAllProgress.errors} error
+                                    {generateAllProgress.errors !== 1 ? 's' : ''})
                                 </span>
                             )}
                         </p>

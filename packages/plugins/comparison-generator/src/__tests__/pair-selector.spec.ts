@@ -176,11 +176,7 @@ describe('findManualPair', () => {
 });
 
 describe('countRemainingPairs', () => {
-	const items = [
-		makeItem('a', 'cat'),
-		makeItem('b', 'cat'),
-		makeItem('c', 'cat')
-	];
+	const items = [makeItem('a', 'cat'), makeItem('b', 'cat'), makeItem('c', 'cat')];
 
 	it('should return 0 when all pairs have been generated', () => {
 		const allPairs = [buildPairKey('a', 'b'), buildPairKey('a', 'c'), buildPairKey('b', 'c')];
