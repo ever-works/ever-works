@@ -31,7 +31,7 @@ export function Toggler({
     return (
         <div
             className={cn(
-                'flex flex-row items-start bg-surface-secondary dark:bg-surface-secondary-dark py-1 px-2 rounded-[60px] gap-[10px]',
+                'flex flex-row items-center bg-surface-secondary dark:bg-surface-secondary-dark py-0.5 px-1.5 rounded-full gap-2',
                 'border border-border dark:border-border-dark',
                 className,
             )}
@@ -39,8 +39,8 @@ export function Toggler({
             <button
                 onClick={onClickOne}
                 className={cn(
-                    'flex flex-row justify-center items-center p-2 w-8 h-8 rounded-[60px] ml-[-2px]',
-                    'bg-white shadow-md dark:bg-transparent dark:shadow-none',
+                    'flex flex-row justify-center items-center p-1 w-6 h-6 rounded-full ml-[-2px]',
+                    'bg-white shadow-sm dark:bg-transparent dark:shadow-none',
                     firstBtnClassName,
                 )}
             >
@@ -50,7 +50,7 @@ export function Toggler({
             <button
                 onClick={onClickTwo}
                 className={cn(
-                    'flex flex-row justify-center items-center p-2 w-8 h-8 rounded-[60px] mr-[-2px]',
+                    'flex flex-row justify-center items-center p-1 w-6 h-6 rounded-full mr-[-2px]',
                     'dark:bg-[#3B4454]',
                     secondBtnClassName,
                 )}
@@ -65,21 +65,21 @@ export function ThemeToggle({ className }: IClassName) {
     const { toggleTheme, mounted } = useTheme();
 
     // Prevent hydration mismatch
-    if (!mounted) {
+        if (!mounted) {
         return (
             <div
                 className={cn(
-                    'flex flex-row items-start bg-surface-secondary dark:bg-surface-secondary-dark py-1 px-2 rounded-[60px] gap-[10px]',
+                    'flex flex-row items-center bg-surface-secondary dark:bg-surface-secondary-dark py-0.5 px-1.5 rounded-full gap-2',
                     'border border-border dark:border-border-dark',
                     className,
                 )}
                 aria-hidden="true"
             >
-                <div className="flex flex-row justify-center items-center p-2 w-8 h-8 rounded-[60px] ml-[-2px] bg-white shadow-md dark:bg-transparent dark:shadow-none">
-                    <Sun className="h-[18px] w-[18px] text-[#382686]" />
+                <div className="flex flex-row justify-center items-center p-1 w-6 h-6 rounded-full ml-[-2px] bg-white shadow-sm dark:bg-transparent dark:shadow-none">
+                    <Sun className="h-4 w-4 text-[#382686]" />
                 </div>
-                <div className="flex flex-row justify-center items-center p-2 w-8 h-8 rounded-[60px] mr-[-2px] dark:bg-[#3B4454]">
-                    <Moon className="h-[18px] w-[18px]" />
+                <div className="flex flex-row justify-center items-center p-1 w-6 h-6 rounded-full mr-[-2px] dark:bg-[#3B4454]">
+                    <Moon className="h-4 w-4" />
                 </div>
             </div>
         );
@@ -93,21 +93,21 @@ export function ThemeToggle({ className }: IClassName) {
         >
             <>
                 {/* Sun outline for dark mode */}
-                <Sun className="hidden dark:inline-block h-[18px] w-[18px] dark:text-white cursor-pointer" />
+                <Sun className="hidden dark:inline-block h-4 w-4 dark:text-white cursor-pointer" />
                 {/* Sun filled for light mode */}
                 <Sun
-                    className="dark:hidden inline-block h-[18px] w-[18px] text-[#382686] cursor-pointer"
+                    className="dark:hidden inline-block h-4 w-4 text-[#382686] cursor-pointer"
                     fill="currentColor"
                 />
             </>
             <>
                 {/* Moon filled for dark mode */}
                 <Moon
-                    className="h-[18px] w-[18px] hidden text-white dark:inline-block cursor-pointer"
+                    className="h-4 w-4 hidden text-white dark:inline-block cursor-pointer"
                     fill="currentColor"
                 />
                 {/* Moon outline for light mode */}
-                <Moon className="dark:hidden inline-block h-[18px] w-[18px] cursor-pointer" />
+                <Moon className="dark:hidden inline-block h-4 w-4 cursor-pointer" />
             </>
         </Toggler>
     );
