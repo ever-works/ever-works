@@ -18,7 +18,7 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'utility';
 	readonly capabilities = ['form-schema-provider'] as const;
-	readonly configurationMode = 'admin-only' as const;
+	readonly configurationMode = 'hybrid' as const;
 
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',

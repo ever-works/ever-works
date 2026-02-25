@@ -38,8 +38,8 @@ describe('ComparisonGeneratorPlugin', () => {
 			expect(plugin.capabilities).toContain('form-schema-provider');
 		});
 
-		it('should have admin-only configuration mode', () => {
-			expect(plugin.configurationMode).toBe('admin-only');
+		it('should have hybrid configuration mode', () => {
+			expect(plugin.configurationMode).toBe('hybrid');
 		});
 	});
 
