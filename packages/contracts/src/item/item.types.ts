@@ -113,3 +113,35 @@ export interface MutableItemData {
 	brand_logo_url?: string | null;
 	images?: string[];
 }
+
+/**
+ * A single dimension/axis used to compare two items (e.g. "Performance", "Pricing")
+ */
+export interface ComparisonDimension {
+	readonly name: string;
+	readonly item_a_summary: string;
+	readonly item_b_summary: string;
+	readonly item_a_score?: number;
+	readonly item_b_score?: number;
+	readonly winner?: 'item_a' | 'item_b' | 'tie';
+}
+
+/**
+ * Full comparison data for an "A vs B" comparison page
+ */
+export interface ComparisonData {
+	readonly id: string;
+	readonly slug: string;
+	readonly title: string;
+	readonly item_a_slug: string;
+	readonly item_b_slug: string;
+	readonly item_a_name: string;
+	readonly item_b_name: string;
+	readonly category: string;
+	readonly summary: string;
+	readonly verdict: string;
+	readonly verdict_winner?: 'item_a' | 'item_b' | 'tie';
+	readonly dimensions: readonly ComparisonDimension[];
+	readonly sources: readonly string[];
+	readonly generated_at: string;
+}

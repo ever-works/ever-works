@@ -19,6 +19,7 @@ import { DirectoryImportService } from './directory-import.service';
 import { DirectoryAdvancedPromptsService } from './directory-advanced-prompts.service';
 import { DirectoryTaxonomyService } from './directory-taxonomy.service';
 import { GeneratorFormSchemaService } from './generator-form-schema.service';
+import { ComparisonGenerationService } from './comparison-generation.service';
 import { PluginOperationsService } from '../plugins/services/plugin-operations.service';
 import { SettingsSchemaValidatorService } from '../plugins/services/settings-schema-validator.service';
 import { SubscriptionsModule } from '@src/subscriptions';
@@ -58,6 +59,7 @@ import { NotificationsModule } from '@src/notifications';
         DirectoryTaxonomyService,
         RepositoryManagementService,
         GeneratorFormSchemaService,
+        ComparisonGenerationService,
         PluginOperationsService,
         SettingsSchemaValidatorService,
     ],
@@ -75,6 +77,7 @@ import { NotificationsModule } from '@src/notifications';
         DirectoryTaxonomyService,
         RepositoryManagementService,
         GeneratorFormSchemaService,
+        ComparisonGenerationService,
         CommunityPrModule,
     ],
 })

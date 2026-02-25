@@ -235,6 +235,7 @@ export interface DirectoryCount {
     items: number;
     categories: number;
     tags: number;
+    comparisons: number;
 }
 
 export interface DirectoryCategoriesTags {
@@ -441,6 +442,38 @@ export interface UpdateDirectoryAdvancedPromptsDto {
     categorization?: string | null;
     deduplication?: string | null;
     sourceValidation?: string | null;
+}
+
+export interface ComparisonDimension {
+    name: string;
+    item_a_summary: string;
+    item_b_summary: string;
+    item_a_score?: number;
+    item_b_score?: number;
+    winner?: 'item_a' | 'item_b' | 'tie';
+}
+
+export interface ComparisonData {
+    id: string;
+    slug: string;
+    title: string;
+    item_a_slug: string;
+    item_b_slug: string;
+    item_a_name: string;
+    item_b_name: string;
+    category: string;
+    summary: string;
+    verdict: string;
+    verdict_winner?: 'item_a' | 'item_b' | 'tie';
+    dimensions: ComparisonDimension[];
+    sources: string[];
+    generated_at: string;
+}
+
+export interface ComparisonResult {
+    status: 'success' | 'skipped' | 'error';
+    slug?: string;
+    message: string;
 }
 
 export const directoryAPI = {
@@ -766,6 +799,45 @@ export const directoryAPI = {
     deleteCollection: async (id: string, collectionId: string) => {
         return serverMutation<APIResponse<{ message: string }>>({
             endpoint: `/directories/${id}/collections/${collectionId}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    // ─── Comparisons ────────────────────────────────────────────────
+
+    getComparisons: async (id: string) => {
+        return serverFetch<ComparisonData[]>(`/directories/${id}/comparisons`);
+    },
+
+    getComparison: async (id: string, slug: string) => {
+        return serverFetch<{ comparison: ComparisonData; markdown?: string }>(
+            `/directories/${id}/comparisons/${slug}`,
+        );
+    },
+
+    generateNextComparison: async (id: string) => {
+        return serverMutation<ComparisonResult>({
+            endpoint: `/directories/${id}/comparisons/generate`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    generateManualComparison: async (id: string, itemASlug: string, itemBSlug: string) => {
+        return serverMutation<ComparisonResult>({
+            endpoint: `/directories/${id}/comparisons/generate-manual`,
+            data: { itemASlug, itemBSlug },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    deleteComparison: async (id: string, slug: string) => {
+        return serverMutation<ComparisonResult>({
+            endpoint: `/directories/${id}/comparisons/${slug}`,
             data: {},
             method: 'DELETE',
             wrapInData: false,

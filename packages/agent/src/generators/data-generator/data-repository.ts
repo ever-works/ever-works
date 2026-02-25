@@ -4,7 +4,7 @@ import * as yaml from 'yaml';
 import mergeWith from 'lodash/mergeWith';
 import { format } from 'date-fns';
 import semver from 'semver';
-import type { Category, Collection, ItemData, Tag } from '@ever-works/contracts';
+import type { Category, Collection, ComparisonData, ItemData, Tag } from '@ever-works/contracts';
 import { CreateItemsGeneratorDto } from '../../items-generator/dto';
 
 export type PRUpdate = {
@@ -45,6 +45,7 @@ export interface SettingsConfig {
     tags_enabled?: boolean;
     collections_enabled?: boolean;
     surveys_enabled?: boolean;
+    comparisons_enabled?: boolean;
     header?: SettingsHeaderConfig;
     homepage?: SettingsHomepageConfig;
     footer?: SettingsFooterConfig;
@@ -84,6 +85,11 @@ export interface IDataConfig {
         initial_prompt?: string;
         pr_update?: PRUpdate | null;
         last_request_data?: CreateItemsGeneratorDto;
+        comparison_state?: {
+            generated_pairs: string[];
+            last_generated_at?: string;
+            total_generated: number;
+        };
     } & (Record<string, any> & {});
 }
 
@@ -485,6 +491,101 @@ export class DataRepository {
     async writeCollections(collections: Collection[]) {
         const str = yaml.stringify(collections);
         await fs.writeFile(this.collectionsPath, str, 'utf-8');
+    }
+
+    private get comparisonsDir(): string {
+        return path.join(this.dir, 'comparisons');
+    }
+
+    private getComparisonPath(slug: string): string {
+        return path.join(this.comparisonsDir, slug);
+    }
+
+    async getComparisons(): Promise<ComparisonData[]> {
+        try {
+            const entries = await fs.readdir(this.comparisonsDir, { withFileTypes: true });
+            const promises = entries
+                .filter((entry) => entry.isDirectory())
+                .map((entry) => this.getComparison(entry.name));
+            const results = await Promise.all(promises);
+            const comparisons = results.filter(Boolean) as ComparisonData[];
+            comparisons.sort(
+                (a, b) => new Date(b.generated_at).getTime() - new Date(a.generated_at).getTime(),
+            );
+            return comparisons;
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return [];
+            }
+            throw err;
+        }
+    }
+
+    async getComparison(slug: string): Promise<ComparisonData | null> {
+        const ymlPath = path.join(this.getComparisonPath(slug), `${slug}.yml`);
+        try {
+            const content = await fs.readFile(ymlPath, 'utf-8');
+            return yaml.parse(content) as ComparisonData;
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return null;
+            }
+            throw err;
+        }
+    }
+
+    async getComparisonMarkdown(slug: string): Promise<string | undefined> {
+        const mdPath = path.join(this.getComparisonPath(slug), `${slug}.md`);
+        try {
+            return await fs.readFile(mdPath, 'utf-8');
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return undefined;
+            }
+            throw err;
+        }
+    }
+
+    async writeComparison(comparison: ComparisonData): Promise<void> {
+        const compDir = this.getComparisonPath(comparison.slug);
+        await fs.mkdir(compDir, { recursive: true });
+        const filepath = path.join(compDir, `${comparison.slug}.yml`);
+        const str = yaml.stringify(comparison);
+        await fs.writeFile(filepath, str, 'utf-8');
+    }
+
+    async writeComparisonMarkdown(slug: string, markdown: string): Promise<void> {
+        const compDir = this.getComparisonPath(slug);
+        await fs.mkdir(compDir, { recursive: true });
+        const filepath = path.join(compDir, `${slug}.md`);
+        await fs.writeFile(filepath, markdown, 'utf-8');
+    }
+
+    async comparisonExists(slug: string): Promise<boolean> {
+        const compDir = this.getComparisonPath(slug);
+        try {
+            await fs.access(compDir);
+            return true;
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return false;
+            }
+            throw err;
+        }
+    }
+
+    async removeComparison(slug: string): Promise<boolean> {
+        const compDir = this.getComparisonPath(slug);
+        try {
+            await fs.access(compDir);
+            await fs.rm(compDir, { recursive: true, force: true });
+            return true;
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return false;
+            }
+            throw err;
+        }
     }
 
     async createItemDir(item: ItemData) {
