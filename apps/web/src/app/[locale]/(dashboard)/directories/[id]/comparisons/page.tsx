@@ -18,13 +18,24 @@ export default async function DirectoryComparisonsPage({ params }: Params) {
     let comparisons: ComparisonData[] = [];
     let items: Array<{ slug: string; name: string; category: string | string[] }> = [];
 
+    const defaultAiConfig = {
+        currentConfig: { provider: null as string | null, model: null as string | null },
+        availableProviders: [] as Awaited<
+            ReturnType<typeof getComparisonAiConfig>
+        >['availableProviders'],
+    };
+
+    let aiConfig = defaultAiConfig;
+
     try {
-        const [comparisonsRes, itemsRes] = await Promise.all([
+        const [comparisonsRes, itemsRes, aiConfigRes] = await Promise.all([
             directoryAPI.getComparisons(id).catch(() => []),
             directoryAPI.getItems(id).catch(() => null),
+            getComparisonAiConfig(id),
         ]);
 
         comparisons = comparisonsRes ?? [];
+        aiConfig = aiConfigRes;
 
         if (itemsRes?.items) {
             items = itemsRes.items.map((item) => ({
@@ -36,8 +47,6 @@ export default async function DirectoryComparisonsPage({ params }: Params) {
     } catch (error) {
         console.error('Failed to fetch comparisons:', error);
     }
-
-    const aiConfig = await getComparisonAiConfig(id);
 
     return (
         <ComparisonsPageClient
