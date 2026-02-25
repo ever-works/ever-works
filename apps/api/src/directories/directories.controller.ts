@@ -858,6 +858,24 @@ export class DirectoriesController {
         return this.comparisonGenerationService.listComparisons(id, user.id);
     }
 
+    @Get('directories/:id/comparisons/remaining-count')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get remaining comparison count',
+        description: 'Count how many un-generated comparison pairs remain',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    async getRemainingComparisonCount(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+        await this.directoryQueryService.getDirectory(id, user);
+
+        const count = await this.comparisonGenerationService.getRemainingCount(id, user.id);
+        return { count };
+    }
+
     @Get('directories/:id/comparisons/:slug')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Get comparison', description: 'Get a single comparison by slug' })

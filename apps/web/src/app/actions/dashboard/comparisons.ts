@@ -20,6 +20,20 @@ export async function listComparisons(directoryId: string) {
     }
 }
 
+export async function getRemainingComparisonCount(directoryId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        return await directoryAPI.getRemainingComparisonCount(directoryId);
+    } catch (error) {
+        console.error('Get remaining comparison count error:', error);
+        return { count: 0 };
+    }
+}
+
 export async function generateNextComparison(directoryId: string) {
     const user = await getAuthFromCookie();
     if (!user) {

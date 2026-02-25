@@ -1,5 +1,5 @@
 export { ComparisonGeneratorPlugin, ComparisonGeneratorPlugin as default } from './comparison-generator.plugin.js';
-export { selectNextPair, findManualPair, buildPairKey } from './pair-selector.js';
+export { selectNextPair, findManualPair, buildPairKey, countRemainingPairs } from './pair-selector.js';
 export { buildSearchQueries, researchPair } from './comparison-researcher.js';
 export type { ResearchDependencies } from './comparison-researcher.js';
 export { generateComparison } from './comparison-writer.js';

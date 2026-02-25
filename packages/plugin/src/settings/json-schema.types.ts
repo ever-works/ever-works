@@ -141,6 +141,8 @@ export interface JsonSchema {
 	readonly 'x-adminOnly'?: boolean;
 	/** Whether field should be hidden from the settings UI entirely */
 	readonly 'x-hidden'?: boolean;
+	/** Conditional visibility: show this field only when the referenced field matches the given value */
+	readonly 'x-showIf'?: { readonly field: string; readonly value: unknown };
 
 	/** Groups of fields where at least one must be set. Each group is independent. */
 	readonly 'x-requiredGroups'?: readonly {

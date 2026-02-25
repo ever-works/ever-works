@@ -1,8 +1,25 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useCallback, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ChevronLeft, ChevronRight, Grid, List } from 'lucide-react';
+import {
+    AlertTriangle,
+    Check,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Grid,
+    List,
+    Square,
+} from 'lucide-react';
+import {
+    Combobox,
+    ComboboxInput,
+    ComboboxButton,
+    ComboboxOptions,
+    ComboboxOption,
+} from '@headlessui/react';
+import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -19,6 +36,7 @@ import {
     generateNextComparison,
     generateManualComparison,
     deleteComparison,
+    getRemainingComparisonCount,
 } from '@/app/actions/dashboard/comparisons';
 
 interface ComparisonsPageClientProps {
@@ -36,10 +54,23 @@ export function ComparisonsPageClient({
     const [isPending, startTransition] = useTransition();
     const [selectedItemA, setSelectedItemA] = useState('');
     const [selectedItemB, setSelectedItemB] = useState('');
+    const [queryA, setQueryA] = useState('');
+    const [queryB, setQueryB] = useState('');
     const [showManualForm, setShowManualForm] = useState(false);
     const [deleteSlug, setDeleteSlug] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
     const [currentPage, setCurrentPage] = useState(1);
+
+    // Generate All state
+    const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+    const [generateAllProgress, setGenerateAllProgress] = useState({
+        completed: 0,
+        total: 0,
+        errors: 0,
+    });
+    const [showGenerateAllConfirm, setShowGenerateAllConfirm] = useState(false);
+    const [remainingCount, setRemainingCount] = useState(0);
+    const cancelRef = useRef(false);
 
     const pageSize = 5;
     const totalPages = Math.max(1, Math.ceil(comparisons.length / pageSize));
@@ -47,6 +78,17 @@ export function ComparisonsPageClient({
         () => comparisons.slice((currentPage - 1) * pageSize, currentPage * pageSize),
         [comparisons, currentPage],
     );
+
+    const selectedItemAObj = items.find((item) => item.slug === selectedItemA) ?? null;
+    const selectedItemBObj = items.find((item) => item.slug === selectedItemB) ?? null;
+
+    const filteredItemsA = items
+        .filter((item) => item.slug !== selectedItemB)
+        .filter((item) => queryA === '' || item.name.toLowerCase().includes(queryA.toLowerCase()));
+
+    const filteredItemsB = items
+        .filter((item) => item.slug !== selectedItemA)
+        .filter((item) => queryB === '' || item.name.toLowerCase().includes(queryB.toLowerCase()));
 
     const handleGenerateNext = () => {
         startTransition(async () => {
@@ -117,6 +159,67 @@ export function ComparisonsPageClient({
         });
     };
 
+    const handleGenerateAllClick = async () => {
+        const { count } = await getRemainingComparisonCount(directoryId);
+        if (count === 0) {
+            toast.info('No remaining pairs to generate');
+            return;
+        }
+        setRemainingCount(count);
+        setShowGenerateAllConfirm(true);
+    };
+
+    const handleGenerateAllConfirm = useCallback(async () => {
+        setShowGenerateAllConfirm(false);
+        setIsGeneratingAll(true);
+        cancelRef.current = false;
+        setGenerateAllProgress({ completed: 0, total: remainingCount, errors: 0 });
+
+        let completed = 0;
+        let errors = 0;
+        let consecutiveErrors = 0;
+
+        while (!cancelRef.current) {
+            const result = await generateNextComparison(directoryId);
+
+            if (result.status === 'success') {
+                completed++;
+                consecutiveErrors = 0;
+                setGenerateAllProgress({ completed, total: remainingCount, errors });
+            } else if (result.status === 'skipped') {
+                break;
+            } else {
+                errors++;
+                consecutiveErrors++;
+                setGenerateAllProgress({ completed, total: remainingCount, errors });
+                if (consecutiveErrors >= 3) {
+                    toast.error('Stopped after 3 consecutive errors');
+                    break;
+                }
+            }
+        }
+
+        setIsGeneratingAll(false);
+
+        if (cancelRef.current) {
+            toast.info(
+                `Stopped. Generated ${completed} comparison${completed !== 1 ? 's' : ''}${errors > 0 ? `, ${errors} error${errors !== 1 ? 's' : ''}` : ''}.`,
+            );
+        } else {
+            toast.success(
+                `Done! Generated ${completed} comparison${completed !== 1 ? 's' : ''}${errors > 0 ? `, ${errors} error${errors !== 1 ? 's' : ''}` : ''}.`,
+            );
+        }
+
+        window.location.reload();
+    }, [directoryId, remainingCount]);
+
+    const handleStopGenerateAll = () => {
+        cancelRef.current = true;
+    };
+
+    const isBusy = isPending || isGeneratingAll;
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -132,16 +235,55 @@ export function ComparisonsPageClient({
                 <div className="flex gap-2">
                     <Button
                         variant="secondary"
+                        size="sm"
                         onClick={() => setShowManualForm(!showManualForm)}
-                        disabled={isPending || items.length < 2}
+                        disabled={isBusy || items.length < 2}
                     >
                         Compare Items
                     </Button>
-                    <Button onClick={handleGenerateNext} disabled={isPending}>
+                    <Button size="sm" onClick={handleGenerateNext} disabled={isBusy}>
                         {isPending ? 'Generating...' : 'Generate Next'}
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={handleGenerateAllClick}
+                        disabled={isBusy}
+                    >
+                        Generate All
                     </Button>
                 </div>
             </div>
+
+            {/* Generate All progress bar */}
+            {isGeneratingAll && (
+                <div className="rounded-lg border border-border dark:border-border-dark p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-text dark:text-text-dark">
+                            Generating comparisons: {generateAllProgress.completed} /{' '}
+                            {generateAllProgress.total} complete
+                            {generateAllProgress.errors > 0 && (
+                                <span className="text-danger ml-2">
+                                    ({generateAllProgress.errors} error
+                                    {generateAllProgress.errors !== 1 ? 's' : ''})
+                                </span>
+                            )}
+                        </p>
+                        <Button size="sm" variant="secondary" onClick={handleStopGenerateAll}>
+                            <Square className="w-3 h-3 mr-1 fill-current" />
+                            Stop
+                        </Button>
+                    </div>
+                    <div className="w-full bg-surface-hover dark:bg-surface-hover-dark rounded-full h-2">
+                        <div
+                            className="bg-primary h-2 rounded-full transition-all duration-300"
+                            style={{
+                                width: `${generateAllProgress.total > 0 ? (generateAllProgress.completed / generateAllProgress.total) * 100 : 0}%`,
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Manual comparison form */}
             {showManualForm && (
@@ -154,20 +296,108 @@ export function ComparisonsPageClient({
                             <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
                                 Item A
                             </label>
-                            <select
-                                value={selectedItemA}
-                                onChange={(e) => setSelectedItemA(e.target.value)}
-                                className="w-full rounded-md border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm text-text dark:text-text-dark"
+                            <Combobox
+                                value={selectedItemAObj}
+                                onChange={(item) => {
+                                    setSelectedItemA(item?.slug ?? '');
+                                    setQueryA('');
+                                }}
+                                onClose={() => setQueryA('')}
+                                by="slug"
                             >
-                                <option value="">Select item...</option>
-                                {items
-                                    .filter((item) => item.slug !== selectedItemB)
-                                    .map((item) => (
-                                        <option key={item.slug} value={item.slug}>
-                                            {item.name}
-                                        </option>
-                                    ))}
-                            </select>
+                                <div className="relative">
+                                    <div
+                                        className={cn(
+                                            'relative rounded-lg border border-border dark:border-border-dark',
+                                            'bg-surface dark:bg-surface-dark',
+                                            'focus-within:border-primary dark:focus-within:border-primary-dark',
+                                            'focus-within:ring-2 focus-within:ring-primary/20',
+                                        )}
+                                    >
+                                        <ComboboxInput
+                                            className={cn(
+                                                'w-full bg-transparent border-none outline-none px-3 py-2 pr-8',
+                                                'text-sm text-text dark:text-text-dark',
+                                                'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
+                                            )}
+                                            displayValue={(item: typeof selectedItemAObj) =>
+                                                item?.name ?? ''
+                                            }
+                                            onChange={(e) => setQueryA(e.target.value)}
+                                            placeholder="Search items..."
+                                        />
+                                        <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-3">
+                                            {({ open }) => (
+                                                <ChevronDown
+                                                    className={cn(
+                                                        'h-4 w-4 text-text-muted transition-transform duration-200',
+                                                        open && 'rotate-180',
+                                                    )}
+                                                />
+                                            )}
+                                        </ComboboxButton>
+                                    </div>
+                                    <ComboboxOptions
+                                        className={cn(
+                                            'absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg',
+                                            'bg-surface dark:bg-surface-dark',
+                                            'border border-border dark:border-border-dark',
+                                            'shadow-lg focus:outline-none',
+                                            'py-1',
+                                        )}
+                                    >
+                                        {filteredItemsA.length === 0 ? (
+                                            <div className="py-2 px-4 text-sm text-text-muted dark:text-text-muted-dark">
+                                                No items found
+                                            </div>
+                                        ) : (
+                                            filteredItemsA.map((item) => (
+                                                <ComboboxOption
+                                                    key={item.slug}
+                                                    value={item}
+                                                    className={({ active, selected }) =>
+                                                        cn(
+                                                            'relative cursor-pointer select-none py-2 pl-10 pr-4',
+                                                            'text-text dark:text-text-dark',
+                                                            active &&
+                                                                'bg-surface-hover dark:bg-surface-hover-dark',
+                                                            selected &&
+                                                                'bg-primary/5 dark:bg-primary-dark/5',
+                                                        )
+                                                    }
+                                                >
+                                                    {({ selected }) => (
+                                                        <>
+                                                            <span
+                                                                className={cn(
+                                                                    'block truncate',
+                                                                    selected && 'font-medium',
+                                                                )}
+                                                            >
+                                                                {item.name}
+                                                            </span>
+                                                            {(Array.isArray(item.category)
+                                                                ? item.category.length > 0
+                                                                : item.category) && (
+                                                                <span className="block truncate text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                                    {Array.isArray(item.category)
+                                                                        ? item.category.join(', ')
+                                                                        : item.category}
+                                                                </span>
+                                                            )}
+                                                            {selected && (
+                                                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-primary dark:text-primary-dark">
+                                                                    <Check className="h-4 w-4" />
+                                                                </span>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </ComboboxOption>
+                                            ))
+                                        )}
+                                    </ComboboxOptions>
+                                </div>
+                            </Combobox>
                         </div>
                         <span className="pb-2 text-text-secondary dark:text-text-secondary-dark font-medium">
                             vs
@@ -176,24 +406,113 @@ export function ComparisonsPageClient({
                             <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
                                 Item B
                             </label>
-                            <select
-                                value={selectedItemB}
-                                onChange={(e) => setSelectedItemB(e.target.value)}
-                                className="w-full rounded-md border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm text-text dark:text-text-dark"
+                            <Combobox
+                                value={selectedItemBObj}
+                                onChange={(item) => {
+                                    setSelectedItemB(item?.slug ?? '');
+                                    setQueryB('');
+                                }}
+                                onClose={() => setQueryB('')}
+                                by="slug"
                             >
-                                <option value="">Select item...</option>
-                                {items
-                                    .filter((item) => item.slug !== selectedItemA)
-                                    .map((item) => (
-                                        <option key={item.slug} value={item.slug}>
-                                            {item.name}
-                                        </option>
-                                    ))}
-                            </select>
+                                <div className="relative">
+                                    <div
+                                        className={cn(
+                                            'relative rounded-lg border border-border dark:border-border-dark',
+                                            'bg-surface dark:bg-surface-dark',
+                                            'focus-within:border-primary dark:focus-within:border-primary-dark',
+                                            'focus-within:ring-2 focus-within:ring-primary/20',
+                                        )}
+                                    >
+                                        <ComboboxInput
+                                            className={cn(
+                                                'w-full bg-transparent border-none outline-none px-3 py-2 pr-8',
+                                                'text-sm text-text dark:text-text-dark',
+                                                'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
+                                            )}
+                                            displayValue={(item: typeof selectedItemBObj) =>
+                                                item?.name ?? ''
+                                            }
+                                            onChange={(e) => setQueryB(e.target.value)}
+                                            placeholder="Search items..."
+                                        />
+                                        <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-3">
+                                            {({ open }) => (
+                                                <ChevronDown
+                                                    className={cn(
+                                                        'h-4 w-4 text-text-muted transition-transform duration-200',
+                                                        open && 'rotate-180',
+                                                    )}
+                                                />
+                                            )}
+                                        </ComboboxButton>
+                                    </div>
+                                    <ComboboxOptions
+                                        className={cn(
+                                            'absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg',
+                                            'bg-surface dark:bg-surface-dark',
+                                            'border border-border dark:border-border-dark',
+                                            'shadow-lg focus:outline-none',
+                                            'py-1',
+                                        )}
+                                    >
+                                        {filteredItemsB.length === 0 ? (
+                                            <div className="py-2 px-4 text-sm text-text-muted dark:text-text-muted-dark">
+                                                No items found
+                                            </div>
+                                        ) : (
+                                            filteredItemsB.map((item) => (
+                                                <ComboboxOption
+                                                    key={item.slug}
+                                                    value={item}
+                                                    className={({ active, selected }) =>
+                                                        cn(
+                                                            'relative cursor-pointer select-none py-2 pl-10 pr-4',
+                                                            'text-text dark:text-text-dark',
+                                                            active &&
+                                                                'bg-surface-hover dark:bg-surface-hover-dark',
+                                                            selected &&
+                                                                'bg-primary/5 dark:bg-primary-dark/5',
+                                                        )
+                                                    }
+                                                >
+                                                    {({ selected }) => (
+                                                        <>
+                                                            <span
+                                                                className={cn(
+                                                                    'block truncate',
+                                                                    selected && 'font-medium',
+                                                                )}
+                                                            >
+                                                                {item.name}
+                                                            </span>
+                                                            {(Array.isArray(item.category)
+                                                                ? item.category.length > 0
+                                                                : item.category) && (
+                                                                <span className="block truncate text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                                    {Array.isArray(item.category)
+                                                                        ? item.category.join(', ')
+                                                                        : item.category}
+                                                                </span>
+                                                            )}
+                                                            {selected && (
+                                                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-primary dark:text-primary-dark">
+                                                                    <Check className="h-4 w-4" />
+                                                                </span>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </ComboboxOption>
+                                            ))
+                                        )}
+                                    </ComboboxOptions>
+                                </div>
+                            </Combobox>
                         </div>
                         <Button
+                            size="sm"
                             onClick={handleManualGenerate}
-                            disabled={isPending || !selectedItemA || !selectedItemB}
+                            disabled={isBusy || !selectedItemA || !selectedItemB}
                         >
                             {isPending ? 'Generating...' : 'Generate'}
                         </Button>
@@ -285,7 +604,7 @@ export function ComparisonsPageClient({
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => setDeleteSlug(comparison.slug)}
-                                            disabled={isPending}
+                                            disabled={isBusy}
                                             className="relative z-10 text-text-secondary hover:text-red-600 dark:text-text-secondary-dark dark:hover:text-red-400 ml-2 shrink-0"
                                         >
                                             <svg
@@ -400,6 +719,42 @@ export function ComparisonsPageClient({
                             className="text-danger hover:text-danger hover:bg-danger/10"
                         >
                             Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            {/* Generate All confirmation dialog */}
+            <Dialog
+                open={showGenerateAllConfirm}
+                onOpenChange={(o) => !o && setShowGenerateAllConfirm(false)}
+            >
+                <DialogContent>
+                    <DialogClose onClose={() => setShowGenerateAllConfirm(false)} />
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-semibold text-text dark:text-text-dark">
+                            Generate All Comparisons
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        Generate{' '}
+                        <span className="font-medium text-text dark:text-text-dark">
+                            {remainingCount}
+                        </span>{' '}
+                        remaining comparison{remainingCount !== 1 ? 's' : ''}? This may take several
+                        minutes. You can stop at any time.
+                    </p>
+
+                    <DialogFooter>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setShowGenerateAllConfirm(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button size="sm" onClick={handleGenerateAllConfirm}>
+                            Generate All
                         </Button>
                     </DialogFooter>
                 </DialogContent>

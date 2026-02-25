@@ -38,8 +38,8 @@ describe('ComparisonGeneratorPlugin', () => {
 			expect(plugin.capabilities).toContain('form-schema-provider');
 		});
 
-		it('should have admin-only configuration mode', () => {
-			expect(plugin.configurationMode).toBe('admin-only');
+		it('should have hybrid configuration mode', () => {
+			expect(plugin.configurationMode).toBe('hybrid');
 		});
 	});
 
@@ -48,10 +48,11 @@ describe('ComparisonGeneratorPlugin', () => {
 			expect(plugin.settingsSchema.type).toBe('object');
 		});
 
-		it('should have 3 properties', () => {
+		it('should have 4 properties', () => {
 			const props = plugin.settingsSchema.properties!;
-			expect(Object.keys(props)).toHaveLength(3);
+			expect(Object.keys(props)).toHaveLength(4);
 			expect(props).toHaveProperty('cadence_override');
+			expect(props).toHaveProperty('max_comparisons_mode');
 			expect(props).toHaveProperty('max_comparisons');
 			expect(props).toHaveProperty('min_items_for_comparison');
 		});
@@ -128,6 +129,24 @@ describe('ComparisonGeneratorPlugin', () => {
 				expect(result.valid).toBe(true);
 			}
 		});
+
+		it('should reject invalid max_comparisons_mode', async () => {
+			const result = await plugin.validateSettings({ max_comparisons_mode: 'invalid' });
+			expect(result.valid).toBe(false);
+			expect(result.errors![0].path).toBe('max_comparisons_mode');
+		});
+
+		it('should accept valid max_comparisons_mode values', async () => {
+			for (const mode of ['custom', 'unlimited']) {
+				const result = await plugin.validateSettings({ max_comparisons_mode: mode });
+				expect(result.valid).toBe(true);
+			}
+		});
+
+		it('should skip max_comparisons validation when mode is unlimited', async () => {
+			const result = await plugin.validateSettings({ max_comparisons_mode: 'unlimited', max_comparisons: 0 });
+			expect(result.valid).toBe(true);
+		});
 	});
 
 	describe('healthCheck', () => {
@@ -140,16 +159,17 @@ describe('ComparisonGeneratorPlugin', () => {
 	});
 
 	describe('getFormFields', () => {
-		it('should return 3 fields', () => {
+		it('should return 4 fields', () => {
 			const fields = plugin.getFormFields();
-			expect(fields).toHaveLength(3);
+			expect(fields).toHaveLength(4);
 		});
 
-		it('should return comparison_enabled, comparison_cadence, comparison_max', () => {
+		it('should return comparison_enabled, comparison_cadence, comparison_max_mode, comparison_max', () => {
 			const fields = plugin.getFormFields();
 			const names = fields.map((f) => f.name);
 			expect(names).toContain('comparison_enabled');
 			expect(names).toContain('comparison_cadence');
+			expect(names).toContain('comparison_max_mode');
 			expect(names).toContain('comparison_max');
 		});
 
@@ -190,6 +210,11 @@ describe('ComparisonGeneratorPlugin', () => {
 			const result = plugin.validateFormInput({ comparison_max: 100 });
 			expect(result.valid).toBe(true);
 		});
+
+		it('should skip comparison_max validation when mode is unlimited', () => {
+			const result = plugin.validateFormInput({ comparison_max_mode: 'unlimited', comparison_max: 0 });
+			expect(result.valid).toBe(true);
+		});
 	});
 
 	describe('getDefaultValues', () => {
@@ -197,6 +222,7 @@ describe('ComparisonGeneratorPlugin', () => {
 			const defaults = plugin.getDefaultValues();
 			expect(defaults.comparison_enabled).toBe(false);
 			expect(defaults.comparison_cadence).toBe(DEFAULT_COMPARISON_SETTINGS.cadence_override);
+			expect(defaults.comparison_max_mode).toBe(DEFAULT_COMPARISON_SETTINGS.max_comparisons_mode);
 			expect(defaults.comparison_max).toBe(DEFAULT_COMPARISON_SETTINGS.max_comparisons);
 		});
 	});

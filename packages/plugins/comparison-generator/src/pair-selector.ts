@@ -105,6 +105,29 @@ export function selectNextPair(options: PairSelectionOptions): ComparisonPair | 
 }
 
 /**
+ * Count how many un-generated pairs remain, respecting category constraints and max cap.
+ */
+export function countRemainingPairs(options: PairSelectionOptions): number {
+	const { items, generatedPairs, minItemsForComparison, maxComparisons } = options;
+	const generatedSet = new Set(generatedPairs);
+	const categoryGroups = groupByCategory(items);
+	let remaining = 0;
+
+	for (const [, categoryItems] of categoryGroups) {
+		if (categoryItems.length < minItemsForComparison) continue;
+		const sorted = sortItemsForPriority(categoryItems);
+		const pairs = generateAllPairs(sorted, '');
+		for (const pair of pairs) {
+			if (!generatedSet.has(pair.pairKey)) remaining++;
+		}
+	}
+
+	const usedSlots = generatedPairs.length;
+	const availableSlots = Math.max(0, maxComparisons - usedSlots);
+	return Math.min(remaining, availableSlots);
+}
+
+/**
  * Find a specific pair of items by slug, regardless of category constraints.
  */
 export function findManualPair(items: ItemData[], itemASlug: string, itemBSlug: string): ComparisonPair | null {
