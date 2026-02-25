@@ -2,7 +2,15 @@
 
 import { useCallback, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ChevronLeft, ChevronRight, Grid, List, Square } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, Grid, List, Square } from 'lucide-react';
+import {
+    Combobox,
+    ComboboxInput,
+    ComboboxButton,
+    ComboboxOptions,
+    ComboboxOption,
+} from '@headlessui/react';
+import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -37,6 +45,8 @@ export function ComparisonsPageClient({
     const [isPending, startTransition] = useTransition();
     const [selectedItemA, setSelectedItemA] = useState('');
     const [selectedItemB, setSelectedItemB] = useState('');
+    const [queryA, setQueryA] = useState('');
+    const [queryB, setQueryB] = useState('');
     const [showManualForm, setShowManualForm] = useState(false);
     const [deleteSlug, setDeleteSlug] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
@@ -59,6 +69,17 @@ export function ComparisonsPageClient({
         () => comparisons.slice((currentPage - 1) * pageSize, currentPage * pageSize),
         [comparisons, currentPage],
     );
+
+    const selectedItemAObj = items.find((item) => item.slug === selectedItemA) ?? null;
+    const selectedItemBObj = items.find((item) => item.slug === selectedItemB) ?? null;
+
+    const filteredItemsA = items
+        .filter((item) => item.slug !== selectedItemB)
+        .filter((item) => queryA === '' || item.name.toLowerCase().includes(queryA.toLowerCase()));
+
+    const filteredItemsB = items
+        .filter((item) => item.slug !== selectedItemA)
+        .filter((item) => queryB === '' || item.name.toLowerCase().includes(queryB.toLowerCase()));
 
     const handleGenerateNext = () => {
         startTransition(async () => {
@@ -266,20 +287,108 @@ export function ComparisonsPageClient({
                             <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
                                 Item A
                             </label>
-                            <select
-                                value={selectedItemA}
-                                onChange={(e) => setSelectedItemA(e.target.value)}
-                                className="w-full rounded-md border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm text-text dark:text-text-dark"
+                            <Combobox
+                                value={selectedItemAObj}
+                                onChange={(item) => {
+                                    setSelectedItemA(item?.slug ?? '');
+                                    setQueryA('');
+                                }}
+                                onClose={() => setQueryA('')}
+                                by="slug"
                             >
-                                <option value="">Select item...</option>
-                                {items
-                                    .filter((item) => item.slug !== selectedItemB)
-                                    .map((item) => (
-                                        <option key={item.slug} value={item.slug}>
-                                            {item.name}
-                                        </option>
-                                    ))}
-                            </select>
+                                <div className="relative">
+                                    <div
+                                        className={cn(
+                                            'relative rounded-lg border border-border dark:border-border-dark',
+                                            'bg-surface dark:bg-surface-dark',
+                                            'focus-within:border-primary dark:focus-within:border-primary-dark',
+                                            'focus-within:ring-2 focus-within:ring-primary/20',
+                                        )}
+                                    >
+                                        <ComboboxInput
+                                            className={cn(
+                                                'w-full bg-transparent border-none outline-none px-3 py-2 pr-8',
+                                                'text-sm text-text dark:text-text-dark',
+                                                'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
+                                            )}
+                                            displayValue={(item: typeof selectedItemAObj) =>
+                                                item?.name ?? ''
+                                            }
+                                            onChange={(e) => setQueryA(e.target.value)}
+                                            placeholder="Search items..."
+                                        />
+                                        <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-3">
+                                            {({ open }) => (
+                                                <ChevronDown
+                                                    className={cn(
+                                                        'h-4 w-4 text-text-muted transition-transform duration-200',
+                                                        open && 'rotate-180',
+                                                    )}
+                                                />
+                                            )}
+                                        </ComboboxButton>
+                                    </div>
+                                    <ComboboxOptions
+                                        className={cn(
+                                            'absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg',
+                                            'bg-surface dark:bg-surface-dark',
+                                            'border border-border dark:border-border-dark',
+                                            'shadow-lg focus:outline-none',
+                                            'py-1',
+                                        )}
+                                    >
+                                        {filteredItemsA.length === 0 ? (
+                                            <div className="py-2 px-4 text-sm text-text-muted dark:text-text-muted-dark">
+                                                No items found
+                                            </div>
+                                        ) : (
+                                            filteredItemsA.map((item) => (
+                                                <ComboboxOption
+                                                    key={item.slug}
+                                                    value={item}
+                                                    className={({ active, selected }) =>
+                                                        cn(
+                                                            'relative cursor-pointer select-none py-2 pl-10 pr-4',
+                                                            'text-text dark:text-text-dark',
+                                                            active &&
+                                                                'bg-surface-hover dark:bg-surface-hover-dark',
+                                                            selected &&
+                                                                'bg-primary/5 dark:bg-primary-dark/5',
+                                                        )
+                                                    }
+                                                >
+                                                    {({ selected }) => (
+                                                        <>
+                                                            <span
+                                                                className={cn(
+                                                                    'block truncate',
+                                                                    selected && 'font-medium',
+                                                                )}
+                                                            >
+                                                                {item.name}
+                                                            </span>
+                                                            {(Array.isArray(item.category)
+                                                                ? item.category.length > 0
+                                                                : item.category) && (
+                                                                <span className="block truncate text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                                    {Array.isArray(item.category)
+                                                                        ? item.category.join(', ')
+                                                                        : item.category}
+                                                                </span>
+                                                            )}
+                                                            {selected && (
+                                                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-primary dark:text-primary-dark">
+                                                                    <Check className="h-4 w-4" />
+                                                                </span>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </ComboboxOption>
+                                            ))
+                                        )}
+                                    </ComboboxOptions>
+                                </div>
+                            </Combobox>
                         </div>
                         <span className="pb-2 text-text-secondary dark:text-text-secondary-dark font-medium">
                             vs
@@ -288,20 +397,108 @@ export function ComparisonsPageClient({
                             <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
                                 Item B
                             </label>
-                            <select
-                                value={selectedItemB}
-                                onChange={(e) => setSelectedItemB(e.target.value)}
-                                className="w-full rounded-md border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm text-text dark:text-text-dark"
+                            <Combobox
+                                value={selectedItemBObj}
+                                onChange={(item) => {
+                                    setSelectedItemB(item?.slug ?? '');
+                                    setQueryB('');
+                                }}
+                                onClose={() => setQueryB('')}
+                                by="slug"
                             >
-                                <option value="">Select item...</option>
-                                {items
-                                    .filter((item) => item.slug !== selectedItemA)
-                                    .map((item) => (
-                                        <option key={item.slug} value={item.slug}>
-                                            {item.name}
-                                        </option>
-                                    ))}
-                            </select>
+                                <div className="relative">
+                                    <div
+                                        className={cn(
+                                            'relative rounded-lg border border-border dark:border-border-dark',
+                                            'bg-surface dark:bg-surface-dark',
+                                            'focus-within:border-primary dark:focus-within:border-primary-dark',
+                                            'focus-within:ring-2 focus-within:ring-primary/20',
+                                        )}
+                                    >
+                                        <ComboboxInput
+                                            className={cn(
+                                                'w-full bg-transparent border-none outline-none px-3 py-2 pr-8',
+                                                'text-sm text-text dark:text-text-dark',
+                                                'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
+                                            )}
+                                            displayValue={(item: typeof selectedItemBObj) =>
+                                                item?.name ?? ''
+                                            }
+                                            onChange={(e) => setQueryB(e.target.value)}
+                                            placeholder="Search items..."
+                                        />
+                                        <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-3">
+                                            {({ open }) => (
+                                                <ChevronDown
+                                                    className={cn(
+                                                        'h-4 w-4 text-text-muted transition-transform duration-200',
+                                                        open && 'rotate-180',
+                                                    )}
+                                                />
+                                            )}
+                                        </ComboboxButton>
+                                    </div>
+                                    <ComboboxOptions
+                                        className={cn(
+                                            'absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg',
+                                            'bg-surface dark:bg-surface-dark',
+                                            'border border-border dark:border-border-dark',
+                                            'shadow-lg focus:outline-none',
+                                            'py-1',
+                                        )}
+                                    >
+                                        {filteredItemsB.length === 0 ? (
+                                            <div className="py-2 px-4 text-sm text-text-muted dark:text-text-muted-dark">
+                                                No items found
+                                            </div>
+                                        ) : (
+                                            filteredItemsB.map((item) => (
+                                                <ComboboxOption
+                                                    key={item.slug}
+                                                    value={item}
+                                                    className={({ active, selected }) =>
+                                                        cn(
+                                                            'relative cursor-pointer select-none py-2 pl-10 pr-4',
+                                                            'text-text dark:text-text-dark',
+                                                            active &&
+                                                                'bg-surface-hover dark:bg-surface-hover-dark',
+                                                            selected &&
+                                                                'bg-primary/5 dark:bg-primary-dark/5',
+                                                        )
+                                                    }
+                                                >
+                                                    {({ selected }) => (
+                                                        <>
+                                                            <span
+                                                                className={cn(
+                                                                    'block truncate',
+                                                                    selected && 'font-medium',
+                                                                )}
+                                                            >
+                                                                {item.name}
+                                                            </span>
+                                                            {(Array.isArray(item.category)
+                                                                ? item.category.length > 0
+                                                                : item.category) && (
+                                                                <span className="block truncate text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                                    {Array.isArray(item.category)
+                                                                        ? item.category.join(', ')
+                                                                        : item.category}
+                                                                </span>
+                                                            )}
+                                                            {selected && (
+                                                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-primary dark:text-primary-dark">
+                                                                    <Check className="h-4 w-4" />
+                                                                </span>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </ComboboxOption>
+                                            ))
+                                        )}
+                                    </ComboboxOptions>
+                                </div>
+                            </Combobox>
                         </div>
                         <Button
                             size="sm"
