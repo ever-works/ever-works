@@ -15,6 +15,7 @@ import {
     selectNextPair,
     findManualPair,
     buildPairKey,
+    countRemainingPairs,
     type ComparisonPair,
     researchPair,
     type ResearchDependencies,
@@ -135,6 +136,44 @@ export class ComparisonGenerationService {
             comparisonState,
             gitOptions,
         );
+    }
+
+    /**
+     * Count how many un-generated comparison pairs remain.
+     */
+    async getRemainingCount(directoryId: string, userId: string): Promise<number> {
+        const directory = await this.findDirectoryOrFail(directoryId);
+
+        const gitOptions: GitFacadeOptions = {
+            userId,
+            providerId: directory.gitProvider,
+        };
+
+        const dest = await this.gitFacade.cloneOrPull(
+            { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
+            gitOptions,
+        );
+        const dataRepo = await DataRepository.create(dest);
+        const config = await dataRepo.getConfig();
+        const items = await dataRepo.getItems();
+
+        const comparisonState = config.metadata?.comparison_state ?? {
+            generated_pairs: [],
+            total_generated: 0,
+        };
+
+        const pluginSettings = await this.getComparisonPluginSettings(directoryId);
+        const maxComparisons =
+            pluginSettings.max_comparisons_mode === 'unlimited'
+                ? Number.MAX_SAFE_INTEGER
+                : pluginSettings.max_comparisons;
+
+        return countRemainingPairs({
+            items,
+            generatedPairs: comparisonState.generated_pairs,
+            minItemsForComparison: pluginSettings.min_items_for_comparison,
+            maxComparisons,
+        });
     }
 
     /**

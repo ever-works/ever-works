@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { selectNextPair, findManualPair, buildPairKey } from '../pair-selector.js';
+import { selectNextPair, findManualPair, buildPairKey, countRemainingPairs } from '../pair-selector.js';
 import type { ItemData } from '@ever-works/contracts';
 
 function makeItem(slug: string, category: string, opts: Partial<ItemData> = {}): ItemData {
@@ -172,5 +172,107 @@ describe('findManualPair', () => {
 
 		expect(result).not.toBeNull();
 		expect(result!.category).toBeDefined();
+	});
+});
+
+describe('countRemainingPairs', () => {
+	const items = [
+		makeItem('a', 'cat'),
+		makeItem('b', 'cat'),
+		makeItem('c', 'cat')
+	];
+
+	it('should return 0 when all pairs have been generated', () => {
+		const allPairs = [buildPairKey('a', 'b'), buildPairKey('a', 'c'), buildPairKey('b', 'c')];
+
+		const result = countRemainingPairs({
+			items,
+			generatedPairs: allPairs,
+			minItemsForComparison: 3,
+			maxComparisons: 50
+		});
+
+		expect(result).toBe(0);
+	});
+
+	it('should return correct count with partial generation', () => {
+		const result = countRemainingPairs({
+			items,
+			generatedPairs: [buildPairKey('a', 'b')],
+			minItemsForComparison: 3,
+			maxComparisons: 50
+		});
+
+		// 3 items = 3 pairs total, 1 generated => 2 remaining
+		expect(result).toBe(2);
+	});
+
+	it('should return all pairs when none generated', () => {
+		const result = countRemainingPairs({
+			items,
+			generatedPairs: [],
+			minItemsForComparison: 3,
+			maxComparisons: 50
+		});
+
+		expect(result).toBe(3);
+	});
+
+	it('should respect maxComparisons cap', () => {
+		const result = countRemainingPairs({
+			items,
+			generatedPairs: [],
+			minItemsForComparison: 3,
+			maxComparisons: 2
+		});
+
+		// 3 pairs available but max is 2 and 0 used, so 2 remaining
+		expect(result).toBe(2);
+	});
+
+	it('should respect maxComparisons cap with existing pairs', () => {
+		const result = countRemainingPairs({
+			items,
+			generatedPairs: [buildPairKey('a', 'b')],
+			minItemsForComparison: 3,
+			maxComparisons: 2
+		});
+
+		// 2 un-generated pairs but only 1 slot left (max 2, used 1)
+		expect(result).toBe(1);
+	});
+
+	it('should respect minItemsForComparison', () => {
+		const twoItems = [makeItem('x', 'small'), makeItem('y', 'small')];
+
+		const result = countRemainingPairs({
+			items: twoItems,
+			generatedPairs: [],
+			minItemsForComparison: 3,
+			maxComparisons: 50
+		});
+
+		expect(result).toBe(0);
+	});
+
+	it('should count across multiple categories', () => {
+		const multiCatItems = [
+			makeItem('a', 'cat1'),
+			makeItem('b', 'cat1'),
+			makeItem('c', 'cat1'),
+			makeItem('x', 'cat2'),
+			makeItem('y', 'cat2'),
+			makeItem('z', 'cat2')
+		];
+
+		const result = countRemainingPairs({
+			items: multiCatItems,
+			generatedPairs: [],
+			minItemsForComparison: 3,
+			maxComparisons: 50
+		});
+
+		// 3 pairs in cat1 + 3 pairs in cat2 = 6
+		expect(result).toBe(6);
 	});
 });

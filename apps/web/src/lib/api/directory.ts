@@ -817,6 +817,10 @@ export const directoryAPI = {
         );
     },
 
+    getRemainingComparisonCount: async (id: string) => {
+        return serverFetch<{ count: number }>(`/directories/${id}/comparisons/remaining-count`);
+    },
+
     generateNextComparison: async (id: string) => {
         return serverMutation<ComparisonResult>({
             endpoint: `/directories/${id}/comparisons/generate`,

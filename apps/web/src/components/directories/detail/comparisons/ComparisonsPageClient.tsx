@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useCallback, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ChevronLeft, ChevronRight, Grid, List } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, Grid, List, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -19,6 +19,7 @@ import {
     generateNextComparison,
     generateManualComparison,
     deleteComparison,
+    getRemainingComparisonCount,
 } from '@/app/actions/dashboard/comparisons';
 
 interface ComparisonsPageClientProps {
@@ -40,6 +41,13 @@ export function ComparisonsPageClient({
     const [deleteSlug, setDeleteSlug] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
     const [currentPage, setCurrentPage] = useState(1);
+
+    // Generate All state
+    const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+    const [generateAllProgress, setGenerateAllProgress] = useState({ completed: 0, total: 0, errors: 0 });
+    const [showGenerateAllConfirm, setShowGenerateAllConfirm] = useState(false);
+    const [remainingCount, setRemainingCount] = useState(0);
+    const cancelRef = useRef(false);
 
     const pageSize = 5;
     const totalPages = Math.max(1, Math.ceil(comparisons.length / pageSize));
@@ -117,6 +125,63 @@ export function ComparisonsPageClient({
         });
     };
 
+    const handleGenerateAllClick = async () => {
+        const { count } = await getRemainingComparisonCount(directoryId);
+        if (count === 0) {
+            toast.info('No remaining pairs to generate');
+            return;
+        }
+        setRemainingCount(count);
+        setShowGenerateAllConfirm(true);
+    };
+
+    const handleGenerateAllConfirm = useCallback(async () => {
+        setShowGenerateAllConfirm(false);
+        setIsGeneratingAll(true);
+        cancelRef.current = false;
+        setGenerateAllProgress({ completed: 0, total: remainingCount, errors: 0 });
+
+        let completed = 0;
+        let errors = 0;
+        let consecutiveErrors = 0;
+
+        while (!cancelRef.current) {
+            const result = await generateNextComparison(directoryId);
+
+            if (result.status === 'success') {
+                completed++;
+                consecutiveErrors = 0;
+                setGenerateAllProgress({ completed, total: remainingCount, errors });
+            } else if (result.status === 'skipped') {
+                break;
+            } else {
+                errors++;
+                consecutiveErrors++;
+                setGenerateAllProgress({ completed, total: remainingCount, errors });
+                if (consecutiveErrors >= 3) {
+                    toast.error('Stopped after 3 consecutive errors');
+                    break;
+                }
+            }
+        }
+
+        setIsGeneratingAll(false);
+
+        if (cancelRef.current) {
+            toast.info(`Stopped. Generated ${completed} comparison${completed !== 1 ? 's' : ''}${errors > 0 ? `, ${errors} error${errors !== 1 ? 's' : ''}` : ''}.`);
+        } else {
+            toast.success(`Done! Generated ${completed} comparison${completed !== 1 ? 's' : ''}${errors > 0 ? `, ${errors} error${errors !== 1 ? 's' : ''}` : ''}.`);
+        }
+
+        window.location.reload();
+    }, [directoryId, remainingCount]);
+
+    const handleStopGenerateAll = () => {
+        cancelRef.current = true;
+    };
+
+    const isBusy = isPending || isGeneratingAll;
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -134,15 +199,46 @@ export function ComparisonsPageClient({
                         variant="secondary"
                         size="sm"
                         onClick={() => setShowManualForm(!showManualForm)}
-                        disabled={isPending || items.length < 2}
+                        disabled={isBusy || items.length < 2}
                     >
                         Compare Items
                     </Button>
-                    <Button size="sm" onClick={handleGenerateNext} disabled={isPending}>
+                    <Button size="sm" onClick={handleGenerateNext} disabled={isBusy}>
                         {isPending ? 'Generating...' : 'Generate Next'}
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={handleGenerateAllClick} disabled={isBusy}>
+                        Generate All
                     </Button>
                 </div>
             </div>
+
+            {/* Generate All progress bar */}
+            {isGeneratingAll && (
+                <div className="rounded-lg border border-border dark:border-border-dark p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-text dark:text-text-dark">
+                            Generating comparisons: {generateAllProgress.completed} / {generateAllProgress.total} complete
+                            {generateAllProgress.errors > 0 && (
+                                <span className="text-danger ml-2">
+                                    ({generateAllProgress.errors} error{generateAllProgress.errors !== 1 ? 's' : ''})
+                                </span>
+                            )}
+                        </p>
+                        <Button size="sm" variant="secondary" onClick={handleStopGenerateAll}>
+                            <Square className="w-3 h-3 mr-1 fill-current" />
+                            Stop
+                        </Button>
+                    </div>
+                    <div className="w-full bg-surface-hover dark:bg-surface-hover-dark rounded-full h-2">
+                        <div
+                            className="bg-primary h-2 rounded-full transition-all duration-300"
+                            style={{
+                                width: `${generateAllProgress.total > 0 ? (generateAllProgress.completed / generateAllProgress.total) * 100 : 0}%`,
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Manual comparison form */}
             {showManualForm && (
@@ -195,7 +291,7 @@ export function ComparisonsPageClient({
                         <Button
                             size="sm"
                             onClick={handleManualGenerate}
-                            disabled={isPending || !selectedItemA || !selectedItemB}
+                            disabled={isBusy || !selectedItemA || !selectedItemB}
                         >
                             {isPending ? 'Generating...' : 'Generate'}
                         </Button>
@@ -287,7 +383,7 @@ export function ComparisonsPageClient({
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => setDeleteSlug(comparison.slug)}
-                                            disabled={isPending}
+                                            disabled={isBusy}
                                             className="relative z-10 text-text-secondary hover:text-red-600 dark:text-text-secondary-dark dark:hover:text-red-400 ml-2 shrink-0"
                                         >
                                             <svg
@@ -402,6 +498,42 @@ export function ComparisonsPageClient({
                             className="text-danger hover:text-danger hover:bg-danger/10"
                         >
                             Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            {/* Generate All confirmation dialog */}
+            <Dialog
+                open={showGenerateAllConfirm}
+                onOpenChange={(o) => !o && setShowGenerateAllConfirm(false)}
+            >
+                <DialogContent>
+                    <DialogClose onClose={() => setShowGenerateAllConfirm(false)} />
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-semibold text-text dark:text-text-dark">
+                            Generate All Comparisons
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        Generate{' '}
+                        <span className="font-medium text-text dark:text-text-dark">
+                            {remainingCount}
+                        </span>{' '}
+                        remaining comparison{remainingCount !== 1 ? 's' : ''}? This may take several
+                        minutes. You can stop at any time.
+                    </p>
+
+                    <DialogFooter>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setShowGenerateAllConfirm(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button size="sm" onClick={handleGenerateAllConfirm}>
+                            Generate All
                         </Button>
                     </DialogFooter>
                 </DialogContent>
