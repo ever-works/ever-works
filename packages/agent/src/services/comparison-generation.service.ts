@@ -5,6 +5,8 @@ import { SearchFacadeService } from '../facades/search.facade';
 import { ContentExtractorFacadeService } from '../facades/content-extractor.facade';
 import { GitFacadeService, type GitFacadeOptions } from '../facades/git.facade';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
+import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
+import { DEFAULT_COMPARISON_SETTINGS } from '@ever-works/comparison-generator-plugin';
 import type { Directory } from '../entities/directory.entity';
 import type { ComparisonData } from '@ever-works/contracts';
 import type { FacadeOptions } from '@ever-works/plugin';
@@ -53,6 +55,7 @@ export class ComparisonGenerationService {
         private readonly contentExtractorFacade: ContentExtractorFacadeService,
         private readonly gitFacade: GitFacadeService,
         private readonly directoryRepository: DirectoryRepository,
+        private readonly directoryPluginRepository: DirectoryPluginRepository,
     ) {}
 
     private async findDirectoryOrFail(directoryId: string): Promise<Directory> {
@@ -61,6 +64,24 @@ export class ComparisonGenerationService {
             throw new NotFoundException(`Directory not found: ${directoryId}`);
         }
         return directory;
+    }
+
+    private async getComparisonPluginSettings(directoryId: string) {
+        const dirPlugin = await this.directoryPluginRepository.findByDirectoryAndPlugin(
+            directoryId,
+            'comparison-generator',
+        );
+        const settings = dirPlugin?.settings ?? {};
+        return {
+            max_comparisons_mode:
+                (settings.max_comparisons_mode as string) ??
+                DEFAULT_COMPARISON_SETTINGS.max_comparisons_mode,
+            max_comparisons:
+                Number(settings.max_comparisons) || DEFAULT_COMPARISON_SETTINGS.max_comparisons,
+            min_items_for_comparison:
+                Number(settings.min_items_for_comparison) ||
+                DEFAULT_COMPARISON_SETTINGS.min_items_for_comparison,
+        };
     }
 
     /**
@@ -88,8 +109,12 @@ export class ComparisonGenerationService {
             total_generated: 0,
         };
 
-        const maxComparisons = 50;
-        const minItems = 3;
+        const pluginSettings = await this.getComparisonPluginSettings(directoryId);
+        const maxComparisons =
+            pluginSettings.max_comparisons_mode === 'unlimited'
+                ? Number.MAX_SAFE_INTEGER
+                : pluginSettings.max_comparisons;
+        const minItems = pluginSettings.min_items_for_comparison;
 
         const pair = selectNextPair({
             items,

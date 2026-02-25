@@ -30,13 +30,21 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 				enum: ['use_directory', 'daily', 'weekly', 'monthly'],
 				default: 'use_directory'
 			},
+			max_comparisons_mode: {
+				type: 'string',
+				title: 'Max Comparisons Mode',
+				description: 'Whether to cap comparisons at a custom limit or generate all possible pairs',
+				enum: ['custom', 'unlimited'],
+				default: 'custom'
+			},
 			max_comparisons: {
 				type: 'number',
 				title: 'Max Comparisons',
-				description: 'Maximum total comparisons to generate for this directory',
+				description: 'Maximum total comparisons to generate (only used in Custom mode)',
 				default: 50,
 				minimum: 1,
-				maximum: 500
+				maximum: 500,
+				'x-showIf': { field: 'max_comparisons_mode', value: 'custom' }
 			},
 			min_items_for_comparison: {
 				type: 'number',
@@ -63,7 +71,14 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
 		const errors: Array<{ path: string; message: string }> = [];
 
-		if (settings.max_comparisons !== undefined) {
+		if (
+			settings.max_comparisons_mode !== undefined &&
+			!['custom', 'unlimited'].includes(settings.max_comparisons_mode as string)
+		) {
+			errors.push({ path: 'max_comparisons_mode', message: 'Must be "custom" or "unlimited"' });
+		}
+
+		if (settings.max_comparisons !== undefined && settings.max_comparisons_mode !== 'unlimited') {
 			const max = Number(settings.max_comparisons);
 			if (isNaN(max) || max < 1 || max > 500) {
 				errors.push({ path: 'max_comparisons', message: 'Max comparisons must be between 1 and 500' });
@@ -140,7 +155,7 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 				'Enable comparison generation per directory from the directory Generator settings. You can configure:',
 				'',
 				'- **Cadence** — how often to auto-generate a new comparison (or follow the directory schedule)',
-				'- **Max comparisons** — cap the total number of comparisons per directory (1–500)',
+				'- **Max comparisons** — cap at a custom limit (1–500) or set to "All" to generate every possible pair',
 				'- **Min items** — minimum items required in a category before comparisons are generated'
 			].join('\n')
 		};
@@ -171,12 +186,25 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 				group: 'comparisons'
 			},
 			{
+				name: 'comparison_max_mode',
+				type: 'select',
+				label: 'Max Comparisons',
+				description: 'Limit the number of comparisons or generate all possible pairs',
+				options: [
+					{ label: 'Custom', value: 'custom' },
+					{ label: 'Unlimited', value: 'unlimited' }
+				],
+				defaultValue: 'custom',
+				group: 'comparisons'
+			},
+			{
 				name: 'comparison_max',
 				type: 'number',
-				label: 'Max Comparisons',
+				label: 'Max Comparisons Limit',
 				description: 'Maximum number of comparisons to generate',
 				defaultValue: 50,
 				validation: { min: 1, max: 500 },
+				showIf: { field: 'comparison_max_mode', operator: 'eq', value: 'custom' },
 				group: 'comparisons'
 			}
 		];
@@ -197,7 +225,7 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 	validateFormInput(values: Record<string, unknown>): ValidationResult {
 		const errors: Array<{ path: string; message: string }> = [];
 
-		if (values.comparison_max !== undefined) {
+		if (values.comparison_max !== undefined && values.comparison_max_mode !== 'unlimited') {
 			const max = Number(values.comparison_max);
 			if (isNaN(max) || max < 1 || max > 500) {
 				errors.push({ path: 'comparison_max', message: 'Must be between 1 and 500' });
@@ -211,6 +239,7 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 		return {
 			comparison_enabled: false,
 			comparison_cadence: DEFAULT_COMPARISON_SETTINGS.cadence_override,
+			comparison_max_mode: DEFAULT_COMPARISON_SETTINGS.max_comparisons_mode,
 			comparison_max: DEFAULT_COMPARISON_SETTINGS.max_comparisons
 		};
 	}

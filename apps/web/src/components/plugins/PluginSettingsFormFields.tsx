@@ -37,21 +37,29 @@ export function PluginSettingsFormFields({
     return (
         <>
             <div className="space-y-4">
-                {Object.entries(visibleProperties).map(([key, propSchema]) => (
-                    <div key={key}>
-                        <PluginSettingsField
-                            name={key}
-                            schema={propSchema}
-                            value={getFieldValue(key, propSchema)}
-                            required={settingsSchema?.required?.includes(key)}
-                            onChange={(value) =>
-                                handleFieldChange(key, value, propSchema.secret || false)
-                            }
-                            pluginId={pluginId}
-                        />
-                        {renderFieldExtra?.(key, propSchema)}
-                    </div>
-                ))}
+                {Object.entries(visibleProperties).map(([key, propSchema]) => {
+                    if (propSchema.showIf) {
+                        const depKey = propSchema.showIf.field;
+                        const depSchema = visibleProperties[depKey];
+                        const depValue = depSchema ? getFieldValue(depKey, depSchema) : undefined;
+                        if (depValue !== propSchema.showIf.value) return null;
+                    }
+                    return (
+                        <div key={key}>
+                            <PluginSettingsField
+                                name={key}
+                                schema={propSchema}
+                                value={getFieldValue(key, propSchema)}
+                                required={settingsSchema?.required?.includes(key)}
+                                onChange={(value) =>
+                                    handleFieldChange(key, value, propSchema.secret || false)
+                                }
+                                pluginId={pluginId}
+                            />
+                            {renderFieldExtra?.(key, propSchema)}
+                        </div>
+                    );
+                })}
             </div>
 
             {validationError && (

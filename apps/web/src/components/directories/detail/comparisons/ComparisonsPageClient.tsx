@@ -132,12 +132,13 @@ export function ComparisonsPageClient({
                 <div className="flex gap-2">
                     <Button
                         variant="secondary"
+                        size="sm"
                         onClick={() => setShowManualForm(!showManualForm)}
                         disabled={isPending || items.length < 2}
                     >
                         Compare Items
                     </Button>
-                    <Button onClick={handleGenerateNext} disabled={isPending}>
+                    <Button size="sm" onClick={handleGenerateNext} disabled={isPending}>
                         {isPending ? 'Generating...' : 'Generate Next'}
                     </Button>
                 </div>
@@ -192,6 +193,7 @@ export function ComparisonsPageClient({
                             </select>
                         </div>
                         <Button
+                            size="sm"
                             onClick={handleManualGenerate}
                             disabled={isPending || !selectedItemA || !selectedItemB}
                         >
