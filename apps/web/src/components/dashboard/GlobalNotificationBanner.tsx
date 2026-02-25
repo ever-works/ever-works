@@ -34,7 +34,7 @@ function NotificationBanner({
         <div className={cn('px-4 py-3 border-b', styles.banner.bg, styles.banner.border)}>
             <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
-                    <TypeIcon className={cn('w-5 h-5 flex-shrink-0', styles.iconColor)} />
+                    <TypeIcon className={cn('w-5 h-5 shrink-0', styles.iconColor)} />
                     <div className="min-w-0">
                         <p className={cn('text-sm font-medium', styles.banner.text)}>
                             {notification.title}
@@ -44,7 +44,7 @@ function NotificationBanner({
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex items-center gap-3 shrink-0">
                     {notification.actionUrl && notification.actionLabel && (
                         <button
                             onClick={() => onAction(notification.actionUrl!)}
