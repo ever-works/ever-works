@@ -1,7 +1,7 @@
 'use client';
 
 import { AuthUser } from '@/lib/auth';
-import { Suspense, useState, useCallback } from 'react';
+import { Suspense, useState, useCallback, useEffect } from 'react';
 import DashboardToasts from './toasts';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
@@ -18,6 +18,31 @@ interface DashboardLayoutClientProps {
 export function DashboardLayoutClient({ user, children }: DashboardLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [helpOpen, setHelpOpen] = useState(false);
+    const [sidebarWidth, setSidebarWidth] = useState<number>(320);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+    // Load persisted sidebar width from localStorage
+    useEffect(() => {
+        const saved = typeof window !== 'undefined' ? localStorage.getItem('sidebar-width') : null;
+        if (saved) {
+            const parsed = parseInt(saved, 10);
+            if (!isNaN(parsed) && parsed >= 220 && parsed <= 520) {
+                setSidebarWidth(parsed);
+            }
+        }
+        const collapsed = typeof window !== 'undefined' ? localStorage.getItem('sidebar-collapsed') : null;
+        if (collapsed === '1') setSidebarCollapsed(true);
+    }, []);
+
+    const handleSidebarWidthChange = useCallback((w: number) => {
+        setSidebarWidth(w);
+        localStorage.setItem('sidebar-width', String(w));
+    }, []);
+
+    const handleSidebarCollapsedChange = useCallback((v: boolean) => {
+        setSidebarCollapsed(v);
+        localStorage.setItem('sidebar-collapsed', v ? '1' : '0');
+    }, []);
 
     const openHelp = useCallback(() => setHelpOpen(true), []);
     const closeHelp = useCallback(() => setHelpOpen(false), []);
@@ -44,6 +69,10 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
                     user={user}
                     isOpen={sidebarOpen}
                     onToggle={() => setSidebarOpen(!sidebarOpen)}
+                    width={sidebarCollapsed ? 64 : sidebarWidth}
+                    onWidthChange={handleSidebarWidthChange}
+                    isCollapsed={sidebarCollapsed}
+                    onCollapsedChange={handleSidebarCollapsedChange}
                 />
 
                 <div className="flex-1 flex flex-col overflow-hidden">
@@ -75,3 +104,4 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
         </>
     );
 }
+// #0b111f

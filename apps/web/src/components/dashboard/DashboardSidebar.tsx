@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useRef } from 'react';
 import Image from 'next/image';
 import { AuthUser } from '@/lib/auth';
 import { logout } from '@/app/actions/auth';
@@ -9,9 +9,10 @@ import { ChatInterface } from '@/components/ai/ChatInterface';
 import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ROUTES } from '@/lib/constants';
 import { Link, usePathname } from '@/i18n/navigation';
-import { Home, Folder, Settings, LogOut, Plus, X, Plug } from 'lucide-react';
+import { Home, Folder, Settings, LogOut, Plus, X, Plug, Bot, LayoutList, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
+import { Tooltip } from '@/components/ui/tooltip';
 import { LogoEverWork } from '../logos';
 import { useDirectoryDetail } from '../directories/detail/DirectoryDetailContext';
 
@@ -19,15 +20,56 @@ interface DashboardSidebarProps {
     user: AuthUser;
     isOpen: boolean;
     onToggle: () => void;
+    width?: number;
+    onWidthChange?: (w: number) => void;
+    isCollapsed?: boolean;
+    onCollapsedChange?: (v: boolean) => void;
 }
 
-export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarProps) {
+// Only shows tooltip when collapsed — transparent passthrough when expanded
+function ConditionalTooltip({ show, content, children }: { show: boolean; content: string; children: React.ReactNode }) {
+    if (!show) return <>{children}</>;
+    return <Tooltip content={content} position="right">{children}</Tooltip>;
+}
+
+export function DashboardSidebar({ user, isOpen, onToggle, width, onWidthChange, isCollapsed = false, onCollapsedChange }: DashboardSidebarProps) {
     const pathname = usePathname();
     const [activeMode, setActiveMode] = useState<'menu' | 'chat'>('menu');
+    const [chatPanelOpen, setChatPanelOpen] = useState(false);
     const [isPending, startTransition] = useTransition();
     const [avatarError, setAvatarError] = useState(false);
     const t = useTranslations('dashboard.sidebar');
     const { config } = useDirectoryDetail();
+    const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+    // When collapsing, close the floating chat panel
+    const handleCollapsedChange = (v: boolean) => {
+        if (!v) setChatPanelOpen(false);
+        onCollapsedChange?.(v);
+    };
+
+    const handleDragStart = (e: React.MouseEvent) => {
+        e.preventDefault();
+        const aside = e.currentTarget.closest('aside') as HTMLElement | null;
+        dragRef.current = { startX: e.clientX, startWidth: aside?.offsetWidth ?? (width ?? 320) };
+        const onMouseMove = (ev: MouseEvent) => {
+            if (!dragRef.current) return;
+            const delta = ev.clientX - dragRef.current.startX;
+            const newWidth = Math.min(440, Math.max(320, dragRef.current.startWidth + delta));
+            onWidthChange?.(newWidth);
+        };
+        const onMouseUp = () => {
+            dragRef.current = null;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    };
 
     const handleLogout = async () => {
         startTransition(async () => {
@@ -46,173 +88,275 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
     return (
         <ChatProvider>
             <aside
+                style={isCollapsed ? { width: 64 } : width ? { width } : undefined}
                 className={cn(
                     'fixed lg:relative top-0 h-full z-50',
-                    'transition-all duration-300 ease-in-out',
-                    'bg-surface-secondary dark:bg-surface-secondary-dark',
-                    'border-r border-border dark:border-border-dark',
-                    'w-80 shrink-0',
+                    'transition-[left,margin,width] duration-300 ease-in-out',
+                    'bg-surface-secondary dark:bg-surface-dark',
+                    'border-r border-border dark:border-gray-700/30',
+                    !width && !isCollapsed && 'w-80',
+                    'shrink-0',
                     isOpen ? 'left-0' : '-left-80 lg:-ml-80',
-                    'xl:left-0! xl:ml-0!', // Always visible on XL screens
+                    'xl:left-0! xl:ml-0!',
                 )}
             >
+                {/* Drag-to-resize handle — only in chat mode when expanded */}
+                {onWidthChange && !isCollapsed && activeMode === 'chat' && (
+                    <div
+                        onMouseDown={handleDragStart}
+                        className={cn(
+                            'absolute right-0 top-0 h-full w-1 z-10',
+                            'cursor-col-resize',
+                            'hover:bg-primary/40 active:bg-primary/60',
+                            'transition-colors duration-150',
+                            'group/drag',
+                        )}
+                        title="Drag to resize"
+                    />
+                )}
                 <div className="flex flex-col h-full">
-                    <div className={cn('h-16 flex items-center px-6')}>
-                        <div className="flex items-center justify-between w-full">
-                            <LogoEverWork config={config} />
-                            <Button
-                                onClick={onToggle}
-                                variant="ghost"
-                                size="icon"
-                                className={cn(
-                                    'xl:hidden',
-                                    'text-text-muted dark:text-text-muted-dark',
-                                    'hover:text-text dark:hover:text-text-dark',
-                                    'hover:bg-surface dark:hover:bg-surface-dark',
+                    <div className={cn('h-16 flex items-center shrink-0', !isCollapsed && 'max-w-80', isCollapsed ? 'justify-center px-2' : 'px-6')}>
+                        <div className="flex items-center justify-between w-full duration-300 ease-in-out">
+                            {!isCollapsed && <LogoEverWork config={config} />}
+                            <div className={cn('flex items-center gap-1', isCollapsed && 'w-full justify-center')}>
+                                {/* Collapse / expand toggle */}
+                                {onCollapsedChange && (
+                                    <Tooltip content={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} position="right">
+                                        <button
+                                            onClick={() => handleCollapsedChange(!isCollapsed)}
+                                            className={cn(
+                                                'flex items-center justify-center w-8 h-8 rounded-lg transition-colors',
+                                                'text-text-muted dark:text-text-muted-dark',
+                                                'hover:text-text dark:hover:text-white hover:bg-surface dark:hover:bg-white/5',
+                                            )}
+                                        >
+                                            {isCollapsed
+                                                ? <PanelLeftOpen className="w-4 h-4" />
+                                                : <PanelLeftClose className="w-4 h-4" />}
+                                        </button>
+                                    </Tooltip>
                                 )}
-                            >
-                                <X className="w-5 h-5" />
-                            </Button>
+                                {!isCollapsed && (
+                                    <Button
+                                        onClick={onToggle}
+                                        variant="ghost"
+                                        size="icon"
+                                        className={cn(
+                                            'xl:hidden',
+                                            'text-text-muted dark:text-text-muted-dark',
+                                            'hover:text-text dark:hover:text-text-dark',
+                                            'hover:bg-surface dark:hover:bg-surface-dark',
+                                        )}
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    <div className="px-6 py-3">
-                        <div className="flex bg-surface-tertiary/50 dark:bg-surface-dark rounded-lg p-1 gap-1">
-                            <Button
-                                onClick={() => setActiveMode('menu')}
-                                variant="ghost"
-                                size="sm"
-                                className={cn(
-                                    'flex-1 text-sm font-medium transition-all rounded-md',
-                                    activeMode === 'menu'
-                                        ? 'bg-white dark:bg-surface-tertiary-dark text-text dark:text-text-dark shadow-sm'
-                                        : 'text-text-secondary dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark',
-                                )}
-                            >
-                                {t('menu')}
-                            </Button>
-                            <Button
-                                onClick={() => setActiveMode('chat')}
-                                variant="ghost"
-                                size="sm"
-                                className={cn(
-                                    'flex-1 text-sm font-medium transition-all rounded-md',
-                                    activeMode === 'chat'
-                                        ? 'bg-white dark:bg-surface-tertiary-dark text-text dark:text-text-dark shadow-sm'
-                                        : 'text-text-secondary dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark',
-                                )}
-                            >
-                                {t('aiChat')}
-                            </Button>
+                    <div className={cn('pb-3 shrink-0 duration-300 ease-in-out', !isCollapsed && 'max-w-80 duration-300 ease-in-out', isCollapsed ? 'px-2' : 'px-4')}>
+                        <div className={cn(
+                            'flex items-center rounded-xl duration-300 ease-in-out p-1 gap-0.5 border border-border/70 bg-white dark:bg-surface-dark dark:border-white/5',
+                            isCollapsed && 'flex-col',
+                        )}>
+                            <ConditionalTooltip show={isCollapsed} content={t('menu')}>
+                                <button
+                                    onClick={() => { setActiveMode('menu'); setChatPanelOpen(false); onWidthChange?.(320); }}
+                                    className={cn(
+                                        'flex items-center cursor-pointer justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200',
+                                        isCollapsed ? 'w-8 h-8 px-0' : 'flex-1',
+                                        (isCollapsed ? (!chatPanelOpen) : activeMode === 'menu')
+                                            ? 'bg-surface-dark text-white shadow-sm ring-1 ring-white/8 dark:bg-white/10 dark:text-white'
+                                            : 'text-text-secondary hover:text-text hover:bg-surface-tertiary/50 dark:text-white/60 dark:hover:text-white dark:hover:bg-white/5',
+                                    )}
+                                >
+                                    <LayoutList className="w-4 h-4 shrink-0" />
+                                    {!isCollapsed && <span>{t('menu')}</span>}
+                                </button>
+                            </ConditionalTooltip>
+                            <ConditionalTooltip show={isCollapsed} content={t('aiChat')}>
+                                <button
+                                    onClick={() => {
+                                        if (isCollapsed) {
+                                            setChatPanelOpen((o) => !o);
+                                        } else {
+                                            setActiveMode('chat');
+                                        }
+                                    }}
+                                    className={cn(
+                                        'flex items-center justify-center cursor-pointer gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200',
+                                        isCollapsed ? 'w-8 h-8 px-0' : 'flex-1',
+                                        (isCollapsed ? chatPanelOpen : activeMode === 'chat')
+                                            ? 'bg-surface-dark text-white shadow-sm ring-1 ring-white/8 dark:bg-white/10 dark:text-white'
+                                            : 'text-text-secondary hover:text-text hover:bg-surface-tertiary/50 dark:text-white/60 dark:hover:text-white dark:hover:bg-white/5',
+                                    )}
+                                >
+                                    <Bot className="w-4 h-4 shrink-0" />
+                                    {!isCollapsed && <span>{t('aiChat')}</span>}
+                                </button>
+                            </ConditionalTooltip>
                         </div>
                     </div>
 
-                    {activeMode === 'chat' ? (
-                        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                    {!isCollapsed && activeMode === 'chat' ? (
+                        <div className="flex-1 flex flex-col min-h-0 overflow-hidden w-full">
                             <ChatInterface />
                         </div>
                     ) : (
-                        <>
-                            <div className="px-6 pb-4">
-                                <Button
-                                    href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
-                                    variant="primary"
-                                    size="lg"
-                                    fullWidth
-                                >
-                                    <Plus className="w-5 h-5" />
-                                    <span className="font-medium">{t('newDirectory')}</span>
-                                </Button>
+                        <div className={cn('flex flex-col flex-1 min-h-0', !isCollapsed && 'max-w-80')}>
+                            <div className={cn(isCollapsed ? 'px-2 py-4 flex justify-center' : 'px-6 py-8')}>
+                                {isCollapsed ? (
+                                    <ConditionalTooltip show content={t('newDirectory')}>
+                                        <Button
+                                            href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
+                                            variant="primary"
+                                            size="icon"
+                                            className="w-9 h-9 text-white bg-primary-hover hover:bg-primary-hover/80 shadow-sm"
+                                        >
+                                            <Plus className="w-5 h-5" />
+                                        </Button>
+                                    </ConditionalTooltip>
+                                ) : (
+                                    <Button
+                                        href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
+                                        variant="primary"
+                                        size="lg"
+                                        fullWidth
+                                        className="text-white !bg-primary-hover !hover:bg-primary-hover/80 shadow-sm ring-1 dark:ring-white/6 dark:bg-surface-dark dark:hover:bg-[#0f1729] dark:border dark:border-white/6 dark:hover:border-white/12"
+                                    >
+                                        <Plus className="w-5 h-5" />
+                                        <span className="font-medium">{t('newDirectory')}</span>
+                                    </Button>
+                                )}
                             </div>
 
-                            <nav className="flex-1 px-6 overflow-y-auto min-h-0">
-                                <ul className="space-y-1 pb-4">
+                            <nav className={cn('flex-1 min-h-0', isCollapsed ? 'px-2' : 'px-6 overflow-y-auto')}>
+                                <ul className={cn('pb-4', isCollapsed ? 'space-y-1 flex flex-col items-center' : 'space-y-1')}>
                                     {navigation.map((item) => {
                                         const isActive =
                                             pathname === item.href ||
                                             pathname?.startsWith(item.href + '/');
                                         return (
-                                            <li key={item.name}>
-                                                <Link
-                                                    href={item.href}
-                                                    className={cn(
-                                                        'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
-                                                        isActive
-                                                            ? 'bg-surface-tertiary dark:bg-surface-tertiary-dark text-primary'
-                                                            : 'text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark hover:text-text dark:hover:text-text-dark',
-                                                    )}
-                                                >
-                                                    <item.icon className="w-5 h-5" />
-                                                    <span className="text-sm">{item.name}</span>
-                                                </Link>
+                                            <li key={item.name} className={isCollapsed ? 'w-full flex justify-center' : ''}>
+                                                <ConditionalTooltip show={isCollapsed} content={item.name}>
+                                                    <Link
+                                                        href={item.href}
+                                                        onClick={() => setChatPanelOpen(false)}
+                                                        className={cn(
+                                                            'flex items-center rounded-lg transition-colors',
+                                                            isCollapsed
+                                                                ? 'justify-center w-9 h-9 px-0'
+                                                                : 'gap-3 px-4 py-3',
+                                                            isActive
+                                                                ? 'bg-surface-tertiary dark:bg-surface-secondary-dark/50 text-primary'
+                                                                : 'text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-secondary-dark/30 hover:text-text dark:hover:text-text-dark',
+                                                        )}
+                                                    >
+                                                        <item.icon className="w-5 h-5 shrink-0" />
+                                                        {!isCollapsed && <span className="text-sm">{item.name}</span>}
+                                                    </Link>
+                                                </ConditionalTooltip>
                                             </li>
                                         );
                                     })}
                                 </ul>
                             </nav>
-
-                            <div
-                                className={cn(
-                                    'px-6 py-4',
-                                    'border-t border-border dark:border-border-dark',
-                                )}
-                            >
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div
-                                        className={cn(
-                                            'relative w-10 h-10 rounded-full flex items-center justify-center overflow-hidden',
-                                            'bg-surface-tertiary dark:bg-surface-tertiary-dark',
-                                        )}
-                                    >
-                                        {user.avatar && !avatarError ? (
-                                            <Image
-                                                src={user.avatar}
-                                                alt={user.username}
-                                                fill
-                                                className="object-cover"
-                                                onError={() => setAvatarError(true)}
-                                                sizes="40px"
-                                            />
-                                        ) : (
-                                            <span className="text-sm font-medium text-text dark:text-text-dark">
-                                                {user.username.charAt(0).toUpperCase()}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="text-sm font-medium text-text dark:text-text-dark">
-                                            {user.username}
-                                        </p>
-                                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                            {user.email}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </>
+                        </div>
                     )}
 
-                    <div className="px-6 pb-6 mt-auto">
-                        <Button
-                            onClick={handleLogout}
-                            disabled={isPending}
-                            loading={isPending}
-                            variant="ghost"
-                            fullWidth
-                            className={cn(
-                                'justify-start items-center gap-3 px-4 py-3',
-                                'text-danger dark:text-danger hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
-                                'hover:text-danger',
+                    <div className={cn('mt-auto py-3 shrink-0 border-t border-border dark:border-gray-700/30', !isCollapsed && 'max-w-80', isCollapsed ? 'px-2' : 'px-4')}>
+                        <div className={cn('flex items-center gap-3', isCollapsed && 'flex-col gap-2')}>
+                            <ConditionalTooltip show={isCollapsed} content={user.username}>
+                                <div
+                                    className={cn(
+                                        'relative w-8 h-8 rounded-full shrink-0 flex items-center justify-center overflow-hidden cursor-default',
+                                        'bg-surface-tertiary dark:bg-surface-tertiary-dark',
+                                    )}
+                                >
+                                    {user.avatar && !avatarError ? (
+                                        <Image
+                                            src={user.avatar}
+                                            alt={user.username}
+                                            fill
+                                            className="object-cover"
+                                            onError={() => setAvatarError(true)}
+                                            sizes="32px"
+                                        />
+                                    ) : (
+                                        <span className="text-xs font-semibold text-text dark:text-text-dark">
+                                            {user.username.charAt(0).toUpperCase()}
+                                        </span>
+                                    )}
+                                </div>
+                            </ConditionalTooltip>
+                            {!isCollapsed && (
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-text dark:text-text-dark truncate">
+                                        {user.username}
+                                    </p>
+                                    <p className="text-xs text-text-muted dark:text-text-muted-dark truncate">
+                                        {user.email}
+                                    </p>
+                                </div>
                             )}
-                        >
-                            <LogOut className="w-5 h-5" />
-                            <span className="text-sm">
-                                {isPending ? t('signingOut') : t('signOut')}
-                            </span>
-                        </Button>
+                            <ConditionalTooltip show={isCollapsed} content={isPending ? t('signingOut') : t('signOut')}>
+                                <button
+                                    onClick={handleLogout}
+                                    disabled={isPending}
+                                    className={cn(
+                                        'shrink-0 flex items-center justify-center w-8 h-8 rounded-lg transition-colors',
+                                        'text-danger dark:hover:text-danger',
+                                        'hover:bg-danger/8 dark:hover:bg-danger/10',
+                                        'disabled:opacity-50 disabled:cursor-not-allowed',
+                                    )}
+                                >
+                                    <LogOut className="w-4 h-4" />
+                                </button>
+                            </ConditionalTooltip>
+                        </div>
                     </div>
                 </div>
             </aside>
+
+            {/* Floating AI chat panel — only when sidebar is collapsed */}
+            {isCollapsed && chatPanelOpen && (
+                <div
+                    className={cn(
+                        'fixed top-0 left-16 h-full z-40 flex flex-col',
+                        'w-80',
+                        'bg-surface-secondary dark:bg-surface-dark',
+                        'border-r border-border dark:border-gray-700/30',
+                        'shadow-xl',
+                        'animate-in slide-in-from-left-2 duration-200',
+                    )}
+                >
+                    {/* Panel header */}
+                    <div className="h-12 flex items-center justify-between px-4 border-b border-border dark:border-gray-700/30 shrink-0">
+                        <div className="flex items-center gap-2 text-sm font-medium text-text dark:text-text-dark">
+                            <Bot className="w-4 h-4" />
+                            <span>{t('aiChat')}</span>
+                        </div>
+                        <button
+                            onClick={() => setChatPanelOpen(false)}
+                            className="flex items-center justify-center w-7 h-7 rounded-lg text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white hover:bg-surface dark:hover:bg-white/5 transition-colors"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                        <ChatInterface />
+                    </div>
+                </div>
+            )}
+
+            {/* Backdrop to close floating panel on outside click */}
+            {isCollapsed && chatPanelOpen && (
+                <div
+                    className="fixed inset-0 z-39"
+                    onClick={() => setChatPanelOpen(false)}
+                />
+            )}
         </ChatProvider>
     );
 }
