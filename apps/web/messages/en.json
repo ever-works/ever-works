@@ -1170,10 +1170,15 @@
                 "visibilityConfirmPrivate": "Yes, Make Private",
                 "advancedPrompts": {
                     "title": "Advanced Prompts",
-                    "subtitle": "Customize AI prompts for directory generation. Leave empty to use defaults.",
+                    "subtitle": "Customize AI prompts for item generation and comparison generation. Leave empty to use defaults.",
                     "save": "Save Prompts",
                     "saveSuccess": "Advanced prompts saved successfully",
                     "saveFailed": "Failed to save advanced prompts",
+                    "saveComparisonSuccess": "Comparison prompt saved successfully",
+                    "sections": {
+                        "itemGeneration": "Item Generation",
+                        "comparisonGeneration": "Comparison Generation"
+                    },
                     "prompts": {
                         "relevanceAssessment": {
                             "title": "Relevance Assessment",
@@ -1209,6 +1214,11 @@
                             "title": "Source Validation",
                             "description": "Additional instructions for validating item source URLs.",
                             "placeholder": "e.g., Prefer official project websites over third-party reviews..."
+                        },
+                        "comparisonCustomPrompt": {
+                            "title": "Custom Prompt",
+                            "description": "Additional instructions appended to comparison generation prompts.",
+                            "placeholder": "e.g., \"Focus on pricing differences\", \"Write in a casual tone\""
                         }
                     }
                 },

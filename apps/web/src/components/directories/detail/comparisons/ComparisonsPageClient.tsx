@@ -335,7 +335,7 @@ export function ComparisonsPageClient({
                 </div>
             </div>
 
-            {/* AI Model settings */}
+            {/* AI Model */}
             {availableProviders.length > 0 && (
                 <div className="rounded-lg border border-border dark:border-border-dark">
                     <button
@@ -352,7 +352,7 @@ export function ComparisonsPageClient({
                         />
                     </button>
                     {showAiSettings && (
-                        <div className="border-t border-border dark:border-border-dark px-4 py-4">
+                        <div className="border-t border-border dark:border-border-dark px-4 py-4 space-y-4">
                             <div className="flex gap-4 items-end">
                                 <div className="flex-1">
                                     <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">

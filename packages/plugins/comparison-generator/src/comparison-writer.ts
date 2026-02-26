@@ -59,7 +59,7 @@ const COMPARISON_JSON_SCHEMA = {
 function buildStructurePrompt(
 	pair: ComparisonPair,
 	research: ComparisonResearch,
-	directoryContext?: { name?: string; description?: string }
+	directoryContext?: { name?: string; description?: string; customPrompt?: string }
 ): string {
 	const itemADescription = pair.itemA.description || 'No description available';
 	const itemBDescription = pair.itemB.description || 'No description available';
@@ -87,6 +87,10 @@ function buildStructurePrompt(
 		prompt += `\n\n## Web Research\n${research.content}`;
 	}
 
+	if (directoryContext?.customPrompt?.trim()) {
+		prompt += `\n\n## Additional User Instructions:\n${directoryContext.customPrompt.trim()}`;
+	}
+
 	prompt += `\n\nGenerate a comprehensive, fair, and balanced comparison. Analyze both items across 4-6 relevant dimensions. Score each dimension 1-10. Provide an honest verdict with clear reasoning. The title should be SEO-optimized.`;
 
 	return prompt;
@@ -95,9 +99,10 @@ function buildStructurePrompt(
 function buildMarkdownPrompt(
 	pair: ComparisonPair,
 	structure: AiComparisonStructure,
-	research: ComparisonResearch
+	research: ComparisonResearch,
+	customPrompt?: string
 ): string {
-	return `Write a detailed comparison article in markdown format. Use the structured data below as the foundation.
+	let prompt = `Write a detailed comparison article in markdown format. Use the structured data below as the foundation.
 
 ## Title: ${structure.title}
 
@@ -116,7 +121,13 @@ ${structure.dimensions.map((d) => `### ${d.name}\n- ${pair.itemA.name}: ${d.item
 ${structure.verdict}
 
 ## Sources
-${research.sources.map((s) => `- ${s}`).join('\n')}
+${research.sources.map((s) => `- ${s}`).join('\n')}`;
+
+	if (customPrompt?.trim()) {
+		prompt += `\n\n## Additional User Instructions:\n${customPrompt.trim()}`;
+	}
+
+	prompt += `
 
 Write a comprehensive, well-structured markdown article with:
 1. An engaging introduction
@@ -127,6 +138,8 @@ Write a comprehensive, well-structured markdown article with:
 6. Sources cited at the end
 
 Do NOT include a top-level heading (the title will be rendered separately). Start with the introduction paragraph directly.`;
+
+	return prompt;
 }
 
 /**
@@ -136,12 +149,12 @@ export async function generateComparison(
 	pair: ComparisonPair,
 	research: ComparisonResearch,
 	ai: ComparisonAiDependencies,
-	directoryContext?: { name?: string; description?: string }
+	directoryContext?: { name?: string; description?: string; customPrompt?: string }
 ): Promise<ComparisonGenerationResult> {
 	const structurePrompt = buildStructurePrompt(pair, research, directoryContext);
 	const structure = await ai.askJson<AiComparisonStructure>(structurePrompt, COMPARISON_JSON_SCHEMA);
 
-	const markdownPrompt = buildMarkdownPrompt(pair, structure, research);
+	const markdownPrompt = buildMarkdownPrompt(pair, structure, research, directoryContext?.customPrompt);
 	const markdown = await ai.askText(markdownPrompt);
 
 	const slug = buildPairKey(pair.itemA.slug!, pair.itemB.slug!);

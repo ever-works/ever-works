@@ -66,6 +66,12 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 				title: 'AI Model',
 				description: 'Override the AI model used for comparison generation (leave empty for provider default)',
 				'x-hidden': true
+			},
+			custom_prompt: {
+				type: 'string',
+				title: 'Custom Prompt',
+				description: 'Additional instructions to append to comparison generation prompts',
+				'x-hidden': true
 			}
 		}
 	};

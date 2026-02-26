@@ -84,6 +84,7 @@ export class ComparisonGenerationService {
                 DEFAULT_COMPARISON_SETTINGS.min_items_for_comparison,
             ai_provider: (settings.ai_provider as string) || undefined,
             ai_model: (settings.ai_model as string) || undefined,
+            custom_prompt: (settings.custom_prompt as string) || undefined,
         };
     }
 
@@ -406,6 +407,7 @@ export class ComparisonGenerationService {
         const result = await generateComparison(pair, research, aiDeps, {
             name: directory.name,
             description: directory.description,
+            customPrompt: pluginSettings.custom_prompt,
         });
 
         // 3. Write to data repo

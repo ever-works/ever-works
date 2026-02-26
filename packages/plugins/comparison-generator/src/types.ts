@@ -24,6 +24,7 @@ export interface ComparisonPluginSettings {
 	readonly min_items_for_comparison: number;
 	readonly ai_provider?: string;
 	readonly ai_model?: string;
+	readonly custom_prompt?: string;
 }
 
 export const DEFAULT_COMPARISON_SETTINGS: ComparisonPluginSettings = {
