@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useTranslations } from 'next-intl';
 import type { ComparisonData } from '@/lib/api/directory';
 import { ROUTES } from '@/lib/constants';
 
@@ -23,10 +24,11 @@ function WinnerBadge({
     itemAName: string;
     itemBName: string;
 }) {
-    const label = winner === 'item_a' ? itemAName : winner === 'item_b' ? itemBName : 'Tie';
+    const t = useTranslations('dashboard.directoryDetail.comparisons');
+    const name = winner === 'item_a' ? itemAName : winner === 'item_b' ? itemBName : t('tie');
     return (
         <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-            Winner: {label}
+            {t('winner', { name })}
         </span>
     );
 }
@@ -51,6 +53,7 @@ export function ComparisonDetailClient({
     markdown,
     extendedAnalysisMarkdown,
 }: ComparisonDetailClientProps) {
+    const t = useTranslations('dashboard.directoryDetail.comparisons');
     const [isExtendedOpen, setIsExtendedOpen] = useState(false);
 
     return (
@@ -68,7 +71,7 @@ export function ComparisonDetailClient({
                         d="M15 19l-7-7 7-7"
                     />
                 </svg>
-                Back to comparisons
+                {t('detail.backToComparisons')}
             </Link>
 
             {/* Title & meta */}
@@ -78,7 +81,7 @@ export function ComparisonDetailClient({
                 </h1>
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-text-secondary dark:text-text-secondary-dark">
                     <span>
-                        {comparison.item_a_name} vs {comparison.item_b_name}
+                        {comparison.item_a_name} {t('vs')} {comparison.item_b_name}
                     </span>
                     <span className="text-border dark:text-border-dark">|</span>
                     <span>{comparison.category}</span>
@@ -89,7 +92,9 @@ export function ComparisonDetailClient({
 
             {/* Summary */}
             <section className="rounded-lg border border-border dark:border-border-dark p-4">
-                <h2 className="text-lg font-medium text-text dark:text-text-dark mb-2">Summary</h2>
+                <h2 className="text-lg font-medium text-text dark:text-text-dark mb-2">
+                    {t('detail.summary')}
+                </h2>
                 <p className="text-text-secondary dark:text-text-secondary-dark">
                     {comparison.summary}
                 </p>
@@ -99,7 +104,7 @@ export function ComparisonDetailClient({
             {comparison.dimensions && comparison.dimensions.length > 0 && (
                 <section>
                     <h2 className="text-lg font-medium text-text dark:text-text-dark mb-4">
-                        Dimensions
+                        {t('detail.dimensions')}
                     </h2>
                     <div className="space-y-4">
                         {comparison.dimensions.map((dim) => (
@@ -151,7 +156,9 @@ export function ComparisonDetailClient({
 
             {/* Verdict */}
             <section className="rounded-lg border border-border dark:border-border-dark p-4">
-                <h2 className="text-lg font-medium text-text dark:text-text-dark mb-2">Verdict</h2>
+                <h2 className="text-lg font-medium text-text dark:text-text-dark mb-2">
+                    {t('detail.verdict')}
+                </h2>
                 {comparison.verdict_winner && (
                     <div className="mb-3">
                         <WinnerBadge
@@ -170,7 +177,7 @@ export function ComparisonDetailClient({
             {markdown && (
                 <section>
                     <h2 className="text-lg font-medium text-text dark:text-text-dark mb-4">
-                        Article
+                        {t('detail.article')}
                     </h2>
                     <div className="prose prose-sm dark:prose-invert prose-a:text-primary hover:prose-a:text-primary-hover max-w-none">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
@@ -186,7 +193,7 @@ export function ComparisonDetailClient({
                         onClick={() => setIsExtendedOpen(!isExtendedOpen)}
                         className="flex w-full items-center justify-between px-4 py-3 text-lg font-medium text-text dark:text-text-dark hover:bg-surface-hover dark:hover:bg-surface-hover-dark transition-colors rounded-lg"
                     >
-                        <span>Extended Analysis</span>
+                        <span>{t('detail.extendedAnalysis')}</span>
                         <svg
                             className={`h-5 w-5 text-text-muted transition-transform duration-200 ${isExtendedOpen ? 'rotate-180' : ''}`}
                             fill="none"
@@ -217,7 +224,7 @@ export function ComparisonDetailClient({
             {comparison.sources && comparison.sources.length > 0 && (
                 <section className="rounded-lg border border-border dark:border-border-dark p-4">
                     <h2 className="text-lg font-medium text-text dark:text-text-dark mb-2">
-                        Sources
+                        {t('detail.sources')}
                     </h2>
                     <ul className="space-y-1">
                         {comparison.sources.map((source, i) => (
