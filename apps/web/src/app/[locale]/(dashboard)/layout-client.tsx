@@ -1,7 +1,7 @@
 'use client';
 
 import { AuthUser } from '@/lib/auth';
-import { Suspense, useState, useCallback, useEffect } from 'react';
+import { Suspense, useState, useCallback } from 'react';
 import DashboardToasts from './toasts';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
@@ -9,6 +9,7 @@ import { GlobalNotificationBanner } from '@/components/dashboard/GlobalNotificat
 import { Footer } from '@/components/footer';
 import { HelpDrawer } from '@/components/dashboard/HelpDrawer';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
+import { useSidebarPersistence } from '@/lib/hooks/use-sidebar-persistence';
 
 interface DashboardLayoutClientProps {
     user: AuthUser;
@@ -18,31 +19,9 @@ interface DashboardLayoutClientProps {
 export function DashboardLayoutClient({ user, children }: DashboardLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [helpOpen, setHelpOpen] = useState(false);
-    const [sidebarWidth, setSidebarWidth] = useState<number>(320);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-    // Load persisted sidebar width from localStorage
-    useEffect(() => {
-        const saved = typeof window !== 'undefined' ? localStorage.getItem('sidebar-width') : null;
-        if (saved) {
-            const parsed = parseInt(saved, 10);
-            if (!isNaN(parsed) && parsed >= 220 && parsed <= 520) {
-                setSidebarWidth(parsed);
-            }
-        }
-        const collapsed = typeof window !== 'undefined' ? localStorage.getItem('sidebar-collapsed') : null;
-        if (collapsed === '1') setSidebarCollapsed(true);
-    }, []);
-
-    const handleSidebarWidthChange = useCallback((w: number) => {
-        setSidebarWidth(w);
-        localStorage.setItem('sidebar-width', String(w));
-    }, []);
-
-    const handleSidebarCollapsedChange = useCallback((v: boolean) => {
-        setSidebarCollapsed(v);
-        localStorage.setItem('sidebar-collapsed', v ? '1' : '0');
-    }, []);
+    const { sidebarWidth, sidebarCollapsed, handleSidebarWidthChange, handleSidebarCollapsedChange } =
+        useSidebarPersistence();
 
     const openHelp = useCallback(() => setHelpOpen(true), []);
     const closeHelp = useCallback(() => setHelpOpen(false), []);
@@ -104,4 +83,3 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
         </>
     );
 }
-// #0b111f
