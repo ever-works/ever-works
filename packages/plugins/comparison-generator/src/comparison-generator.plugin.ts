@@ -53,6 +53,19 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 				default: 3,
 				minimum: 2,
 				maximum: 20
+			},
+			ai_provider: {
+				type: 'string',
+				title: 'AI Provider',
+				description:
+					'Override the AI provider used for comparison generation (leave empty for directory default)',
+				'x-hidden': true
+			},
+			ai_model: {
+				type: 'string',
+				title: 'AI Model',
+				description: 'Override the AI model used for comparison generation (leave empty for provider default)',
+				'x-hidden': true
 			}
 		}
 	};
