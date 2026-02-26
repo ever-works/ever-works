@@ -20,7 +20,9 @@ export default async function DirectoryOverviewPage({ params }: Params) {
     const [directoryRes, configRes, countRes] = await Promise.all([
         directoryAPI.get(id),
         directoryAPI.getConfig(id).catch(() => ({ config: null })),
-        directoryAPI.getCount(id).catch(() => ({ items: 0, categories: 0, tags: 0 })),
+        directoryAPI
+            .getCount(id)
+            .catch(() => ({ items: 0, categories: 0, tags: 0, comparisons: 0 })),
     ]);
 
     const directory = directoryRes.directory;
@@ -42,6 +44,7 @@ export default async function DirectoryOverviewPage({ params }: Params) {
                 itemsCount={directory.itemsCount || countRes.items}
                 categoriesCount={countRes.categories}
                 tagsCount={countRes.tags}
+                comparisonsCount={countRes.comparisons}
                 directory={directory}
             />
 

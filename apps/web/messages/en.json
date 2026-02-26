@@ -442,6 +442,7 @@
                 "generator": "Generator",
                 "schedule": "Schedule",
                 "history": "History",
+                "comparisons": "Comparisons",
                 "plugins": "Plugins",
                 "deploy": "Deploy",
                 "members": "Members",
@@ -627,6 +628,7 @@
             "stats": {
                 "totalItems": "Total Items",
                 "categories": "Categories",
+                "comparisons": "Comparisons",
                 "generationStatus": "Generation Status",
                 "daysActive": "Days Active"
             },
@@ -2071,6 +2073,7 @@
             "deploy": "Deploy",
             "members": "Members",
             "history": "History",
+            "comparisons": "Comparisons",
             "plugins": "Plugins",
             "profile": "Profile",
             "security": "Security",

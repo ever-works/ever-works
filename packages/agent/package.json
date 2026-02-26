@@ -152,6 +152,7 @@
         "typescript-eslint": "^8.51.0"
     },
     "dependencies": {
+        "@ever-works/comparison-generator-plugin": "workspace:*",
         "@ever-works/contracts": "workspace:*",
         "@ever-works/plugin": "workspace:*",
         "@langchain/textsplitters": "^0.1.0",

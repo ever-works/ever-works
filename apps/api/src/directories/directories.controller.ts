@@ -63,6 +63,7 @@ import {
     DirectoryAdvancedPromptsService,
     DirectoryTaxonomyService,
     GeneratorFormSchemaService,
+    ComparisonGenerationService,
 } from '@ever-works/agent/services';
 import {
     AnalyzeRepositoryDto,
@@ -105,6 +106,7 @@ export class DirectoriesController {
         private readonly directoryTaxonomyService: DirectoryTaxonomyService,
         private readonly generatorFormSchemaService: GeneratorFormSchemaService,
         private readonly communityPrProcessorService: CommunityPrProcessorService,
+        private readonly comparisonGenerationService: ComparisonGenerationService,
         private readonly directoryRepository: DirectoryRepository,
     ) {}
 
@@ -838,5 +840,127 @@ export class DirectoriesController {
 
         const itemsAdded = await this.communityPrProcessorService.processDirectory(directory);
         return { itemsAdded };
+    }
+
+    // ─── Comparisons ────────────────────────────────────────────────
+
+    @Get('directories/:id/comparisons')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'List comparisons',
+        description: 'List all generated comparisons for a directory',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    async listComparisons(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const user = await this.authService.getUser(auth.userId);
+        await this.directoryQueryService.getDirectory(id, user);
+
+        return this.comparisonGenerationService.listComparisons(id, user.id);
+    }
+
+    @Get('directories/:id/comparisons/remaining-count')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get remaining comparison count',
+        description: 'Count how many un-generated comparison pairs remain',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    async getRemainingComparisonCount(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+        await this.directoryQueryService.getDirectory(id, user);
+
+        const count = await this.comparisonGenerationService.getRemainingCount(id, user.id);
+        return { count };
+    }
+
+    @Get('directories/:id/comparisons/:slug')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Get comparison', description: 'Get a single comparison by slug' })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiParam({ name: 'slug', description: 'Comparison slug' })
+    async getComparison(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Param('slug') slug: string,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+        await this.directoryQueryService.getDirectory(id, user);
+
+        const result = await this.comparisonGenerationService.getComparison(id, user.id, slug);
+        if (!result.comparison) {
+            throw new NotFoundException('Comparison not found');
+        }
+
+        return result;
+    }
+
+    @Post('directories/:id/comparisons/generate')
+    @HttpCode(HttpStatus.ACCEPTED)
+    @ApiOperation({
+        summary: 'Generate next comparison',
+        description: 'Auto-pick the next best pair and generate a comparison',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    async generateNextComparison(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const user = await this.authService.getUser(auth.userId);
+        await this.directoryOwnershipService.ensureCanEdit(id, user.id);
+
+        const result = await this.comparisonGenerationService.generateNextComparison(id, user.id);
+        await this.cacheManager.del(`directory-count-${id}-${auth.userId}`);
+        return result;
+    }
+
+    @Post('directories/:id/comparisons/generate-manual')
+    @HttpCode(HttpStatus.ACCEPTED)
+    @ApiOperation({
+        summary: 'Generate manual comparison',
+        description: 'Generate a comparison between two specific items',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    async generateManualComparison(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() body: { itemASlug: string; itemBSlug: string },
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+        await this.directoryOwnershipService.ensureCanEdit(id, user.id);
+
+        if (!body.itemASlug || !body.itemBSlug) {
+            throw new BadRequestException('Both itemASlug and itemBSlug are required');
+        }
+
+        if (body.itemASlug === body.itemBSlug) {
+            throw new BadRequestException('Cannot compare an item with itself');
+        }
+
+        const result = await this.comparisonGenerationService.generateManualComparison(
+            id,
+            user.id,
+            body.itemASlug,
+            body.itemBSlug,
+        );
+        await this.cacheManager.del(`directory-count-${id}-${auth.userId}`);
+        return result;
+    }
+
+    @Delete('directories/:id/comparisons/:slug')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Delete comparison', description: 'Remove a generated comparison' })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiParam({ name: 'slug', description: 'Comparison slug' })
+    async deleteComparison(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Param('slug') slug: string,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+        await this.directoryOwnershipService.ensureCanEdit(id, user.id);
+
+        const result = await this.comparisonGenerationService.deleteComparison(id, user.id, slug);
+        await this.cacheManager.del(`directory-count-${id}-${auth.userId}`);
+        return result;
     }
 }
