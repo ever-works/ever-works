@@ -209,10 +209,7 @@ export async function saveComparisonAiConfig(
     }
 }
 
-export async function saveComparisonCustomPrompt(
-    directoryId: string,
-    customPrompt: string | null,
-) {
+export async function saveComparisonCustomPrompt(directoryId: string, customPrompt: string | null) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);

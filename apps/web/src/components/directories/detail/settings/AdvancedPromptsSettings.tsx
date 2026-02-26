@@ -9,7 +9,10 @@ import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { getAdvancedPrompts, updateAdvancedPrompts } from '@/app/actions/dashboard/directories';
 import { DirectoryAdvancedPrompts } from '@/lib/api/directory';
-import { getComparisonAiConfig, saveComparisonCustomPrompt } from '@/app/actions/dashboard/comparisons';
+import {
+    getComparisonAiConfig,
+    saveComparisonCustomPrompt,
+} from '@/app/actions/dashboard/comparisons';
 
 interface AdvancedPromptsSettingsProps {
     directoryId: string;
