@@ -80,42 +80,44 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
                         'border border-card-border dark:border-white/8',
                     )}
                 >
-                        {/* Decorative short top border accent with fading edges */}
-                        <div className="card-top-accent pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 opacity-70 rounded-full" />
+                    {/* Decorative short top border accent with fading edges */}
+                    <div className="card-top-accent pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 opacity-70 rounded-full" />
 
-                        {/* Decorative blurred circles background */}
-                        <div className="pointer-events-none absolute inset-0 z-0 opacity-50">
-                            <div className="absolute w-40 h-40 bg-brand-purple/20 opacity-50 rounded-full blur-3xl left-2 top-0"></div>
-                            <div className="absolute w-32 h-32 bg-blue-200/20 opacity-50 rounded-full blur-3xl right-1 top-20"></div>
-                            <div className="absolute w-28 h-28 bg-brand-purple/20 opacity-50 rounded-full blur-2xl left-1/2 -translate-x-1/2 bottom-4"></div>
-                        </div>
+                    {/* Decorative blurred circles background */}
+                    <div className="pointer-events-none absolute inset-0 z-0 opacity-50">
+                        <div className="absolute w-40 h-40 bg-brand-purple/20 opacity-50 rounded-full blur-3xl left-2 top-0"></div>
+                        <div className="absolute w-32 h-32 bg-blue-200/20 opacity-50 rounded-full blur-3xl right-1 top-20"></div>
+                        <div className="absolute w-28 h-28 bg-brand-purple/20 opacity-50 rounded-full blur-2xl left-1/2 -translate-x-1/2 bottom-4"></div>
+                    </div>
 
-                        {/* Hover image at top, reversed horizontally, only visible on hover */}
-                        <div className="pointer-events-none absolute left-0 right-0 top-0 z-20">
-                            <Image
-                                src="/bg-cards.png"
-                                alt="Decorative pattern"
-                                className="w-full filter brightness-0 dark:brightness-200 -rotate-180"
-                                width={200}
-                                height={100}
-                                unoptimized
-                            />
-                        </div>
+                    {/* Hover image at top, reversed horizontally, only visible on hover */}
+                    <div className="pointer-events-none absolute left-0 right-0 top-0 z-20">
+                        <Image
+                            src="/bg-cards.png"
+                            alt="Decorative pattern"
+                            className="w-full filter brightness-0 dark:brightness-200 -rotate-180"
+                            width={200}
+                            height={100}
+                            unoptimized
+                        />
+                    </div>
 
+                    <div>
                         <div>
-                            <div>
-                                <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                    {stat.title}
-                                </p>
-                                <p className="text-2xl font-bold text-text dark:text-text-dark mt-2">
-                                    {stat.value}
-                                </p>
-                            </div>
+                            <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                                {stat.title}
+                            </p>
+                            <p className="text-2xl font-bold text-text dark:text-text-dark mt-2">
+                                {stat.value}
+                            </p>
                         </div>
+                    </div>
 
                     <div className="absolute top-3 right-3">
                         <div className={cn('p-3 rounded-lg', 'bg-surface dark:bg-surface-dark/50')}>
-                            <stat.icon className={cn('w-6 h-6', stat.iconColor ?? 'text-primary')} />
+                            <stat.icon
+                                className={cn('w-6 h-6', stat.iconColor ?? 'text-primary')}
+                            />
                         </div>
                     </div>
                     <div className="mt-4  items-center hidden">

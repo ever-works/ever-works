@@ -9,7 +9,19 @@ import { ChatInterface } from '@/components/ai/ChatInterface';
 import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ROUTES } from '@/lib/constants';
 import { Link, usePathname } from '@/i18n/navigation';
-import { Home, Folder, Settings, LogOut, Plus, X, Plug, Bot, LayoutList, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import {
+    Home,
+    Folder,
+    Settings,
+    LogOut,
+    Plus,
+    X,
+    Plug,
+    Bot,
+    LayoutList,
+    PanelLeftClose,
+    PanelLeftOpen,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -27,12 +39,32 @@ interface DashboardSidebarProps {
 }
 
 // Only shows tooltip when collapsed — transparent passthrough when expanded
-function ConditionalTooltip({ show, content, children }: { show: boolean; content: string; children: React.ReactNode }) {
+function ConditionalTooltip({
+    show,
+    content,
+    children,
+}: {
+    show: boolean;
+    content: string;
+    children: React.ReactNode;
+}) {
     if (!show) return <>{children}</>;
-    return <Tooltip content={content} position="right">{children}</Tooltip>;
+    return (
+        <Tooltip content={content} position="right">
+            {children}
+        </Tooltip>
+    );
 }
 
-export function DashboardSidebar({ user, isOpen, onToggle, width, onWidthChange, isCollapsed = false, onCollapsedChange }: DashboardSidebarProps) {
+export function DashboardSidebar({
+    user,
+    isOpen,
+    onToggle,
+    width,
+    onWidthChange,
+    isCollapsed = false,
+    onCollapsedChange,
+}: DashboardSidebarProps) {
     const pathname = usePathname();
     const [activeMode, setActiveMode] = useState<'menu' | 'chat'>('menu');
     const [chatPanelOpen, setChatPanelOpen] = useState(false);
@@ -51,7 +83,7 @@ export function DashboardSidebar({ user, isOpen, onToggle, width, onWidthChange,
     const handleDragStart = (e: React.MouseEvent) => {
         e.preventDefault();
         const aside = e.currentTarget.closest('aside') as HTMLElement | null;
-        dragRef.current = { startX: e.clientX, startWidth: aside?.offsetWidth ?? (width ?? 320) };
+        dragRef.current = { startX: e.clientX, startWidth: aside?.offsetWidth ?? width ?? 320 };
         const onMouseMove = (ev: MouseEvent) => {
             if (!dragRef.current) return;
             const delta = ev.clientX - dragRef.current.startX;
@@ -115,13 +147,29 @@ export function DashboardSidebar({ user, isOpen, onToggle, width, onWidthChange,
                     />
                 )}
                 <div className="flex flex-col h-full">
-                    <div className={cn('h-16 flex items-center shrink-0', !isCollapsed && 'max-w-80', isCollapsed ? 'justify-center px-2' : 'px-6')}>
+                    <div
+                        className={cn(
+                            'h-16 flex items-center shrink-0',
+                            !isCollapsed && 'max-w-80',
+                            isCollapsed ? 'justify-center px-2' : 'px-6',
+                        )}
+                    >
                         <div className="flex items-center justify-between w-full duration-300 ease-in-out">
                             {!isCollapsed && <LogoEverWork config={config} />}
-                            <div className={cn('flex items-center gap-1', isCollapsed && 'w-full justify-center')}>
+                            <div
+                                className={cn(
+                                    'flex items-center gap-1',
+                                    isCollapsed && 'w-full justify-center',
+                                )}
+                            >
                                 {/* Collapse / expand toggle */}
                                 {onCollapsedChange && (
-                                    <Tooltip content={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} position="right">
+                                    <Tooltip
+                                        content={
+                                            isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+                                        }
+                                        position="right"
+                                    >
                                         <button
                                             onClick={() => handleCollapsedChange(!isCollapsed)}
                                             className={cn(
@@ -130,9 +178,11 @@ export function DashboardSidebar({ user, isOpen, onToggle, width, onWidthChange,
                                                 'hover:text-text dark:hover:text-white hover:bg-surface dark:hover:bg-white/5',
                                             )}
                                         >
-                                            {isCollapsed
-                                                ? <PanelLeftOpen className="w-4 h-4" />
-                                                : <PanelLeftClose className="w-4 h-4" />}
+                                            {isCollapsed ? (
+                                                <PanelLeftOpen className="w-4 h-4" />
+                                            ) : (
+                                                <PanelLeftClose className="w-4 h-4" />
+                                            )}
                                         </button>
                                     </Tooltip>
                                 )}
@@ -155,18 +205,30 @@ export function DashboardSidebar({ user, isOpen, onToggle, width, onWidthChange,
                         </div>
                     </div>
 
-                    <div className={cn('pb-3 shrink-0 duration-300 ease-in-out', !isCollapsed && 'max-w-80 duration-300 ease-in-out', isCollapsed ? 'px-2' : 'px-4')}>
-                        <div className={cn(
-                            'flex items-center rounded-xl duration-300 ease-in-out p-1 gap-0.5 border border-border/70 bg-white dark:bg-surface-dark dark:border-white/5',
-                            isCollapsed && 'flex-col',
-                        )}>
+                    <div
+                        className={cn(
+                            'pb-3 shrink-0 duration-300 ease-in-out',
+                            !isCollapsed && 'max-w-80 duration-300 ease-in-out',
+                            isCollapsed ? 'px-2' : 'px-4',
+                        )}
+                    >
+                        <div
+                            className={cn(
+                                'flex items-center rounded-xl duration-300 ease-in-out p-1 gap-0.5 border border-border/70 bg-white dark:bg-surface-dark dark:border-white/5',
+                                isCollapsed && 'flex-col',
+                            )}
+                        >
                             <ConditionalTooltip show={isCollapsed} content={t('menu')}>
                                 <button
-                                    onClick={() => { setActiveMode('menu'); setChatPanelOpen(false); onWidthChange?.(320); }}
+                                    onClick={() => {
+                                        setActiveMode('menu');
+                                        setChatPanelOpen(false);
+                                        onWidthChange?.(320);
+                                    }}
                                     className={cn(
                                         'flex items-center cursor-pointer justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200',
                                         isCollapsed ? 'w-8 h-8 px-0' : 'flex-1',
-                                        (isCollapsed ? (!chatPanelOpen) : activeMode === 'menu')
+                                        (isCollapsed ? !chatPanelOpen : activeMode === 'menu')
                                             ? 'bg-surface-dark text-white shadow-sm ring-1 ring-white/8 dark:bg-white/10 dark:text-white'
                                             : 'text-text-secondary hover:text-text hover:bg-surface-tertiary/50 dark:text-white/60 dark:hover:text-white dark:hover:bg-white/5',
                                     )}
@@ -204,8 +266,17 @@ export function DashboardSidebar({ user, isOpen, onToggle, width, onWidthChange,
                             <ChatInterface />
                         </div>
                     ) : (
-                        <div className={cn('flex flex-col flex-1 min-h-0', !isCollapsed && 'max-w-80')}>
-                            <div className={cn(isCollapsed ? 'px-2 py-4 flex justify-center' : 'px-6 py-8')}>
+                        <div
+                            className={cn(
+                                'flex flex-col flex-1 min-h-0',
+                                !isCollapsed && 'max-w-80',
+                            )}
+                        >
+                            <div
+                                className={cn(
+                                    isCollapsed ? 'px-2 py-4 flex justify-center' : 'px-6 py-8',
+                                )}
+                            >
                                 {isCollapsed ? (
                                     <ConditionalTooltip show content={t('newDirectory')}>
                                         <Button
@@ -231,15 +302,35 @@ export function DashboardSidebar({ user, isOpen, onToggle, width, onWidthChange,
                                 )}
                             </div>
 
-                            <nav className={cn('flex-1 min-h-0', isCollapsed ? 'px-2' : 'px-6 overflow-y-auto')}>
-                                <ul className={cn('pb-4', isCollapsed ? 'space-y-1 flex flex-col items-center' : 'space-y-1')}>
+                            <nav
+                                className={cn(
+                                    'flex-1 min-h-0',
+                                    isCollapsed ? 'px-2' : 'px-6 overflow-y-auto',
+                                )}
+                            >
+                                <ul
+                                    className={cn(
+                                        'pb-4',
+                                        isCollapsed
+                                            ? 'space-y-1 flex flex-col items-center'
+                                            : 'space-y-1',
+                                    )}
+                                >
                                     {navigation.map((item) => {
                                         const isActive =
                                             pathname === item.href ||
                                             pathname?.startsWith(item.href + '/');
                                         return (
-                                            <li key={item.name} className={isCollapsed ? 'w-full flex justify-center' : ''}>
-                                                <ConditionalTooltip show={isCollapsed} content={item.name}>
+                                            <li
+                                                key={item.name}
+                                                className={
+                                                    isCollapsed ? 'w-full flex justify-center' : ''
+                                                }
+                                            >
+                                                <ConditionalTooltip
+                                                    show={isCollapsed}
+                                                    content={item.name}
+                                                >
                                                     <Link
                                                         href={item.href}
                                                         onClick={() => setChatPanelOpen(false)}
@@ -254,7 +345,11 @@ export function DashboardSidebar({ user, isOpen, onToggle, width, onWidthChange,
                                                         )}
                                                     >
                                                         <item.icon className="w-5 h-5 shrink-0" />
-                                                        {!isCollapsed && <span className="text-sm">{item.name}</span>}
+                                                        {!isCollapsed && (
+                                                            <span className="text-sm">
+                                                                {item.name}
+                                                            </span>
+                                                        )}
                                                     </Link>
                                                 </ConditionalTooltip>
                                             </li>
@@ -265,8 +360,19 @@ export function DashboardSidebar({ user, isOpen, onToggle, width, onWidthChange,
                         </div>
                     )}
 
-                    <div className={cn('mt-auto py-3 shrink-0 border-t border-border dark:border-gray-700/30', !isCollapsed && 'max-w-80', isCollapsed ? 'px-2' : 'px-4')}>
-                        <div className={cn('flex items-center gap-3', isCollapsed && 'flex-col gap-2')}>
+                    <div
+                        className={cn(
+                            'mt-auto py-3 shrink-0 border-t border-border dark:border-gray-700/30',
+                            !isCollapsed && 'max-w-80',
+                            isCollapsed ? 'px-2' : 'px-4',
+                        )}
+                    >
+                        <div
+                            className={cn(
+                                'flex items-center gap-3',
+                                isCollapsed && 'flex-col gap-2',
+                            )}
+                        >
                             <ConditionalTooltip show={isCollapsed} content={user.username}>
                                 <div
                                     className={cn(
@@ -300,7 +406,10 @@ export function DashboardSidebar({ user, isOpen, onToggle, width, onWidthChange,
                                     </p>
                                 </div>
                             )}
-                            <ConditionalTooltip show={isCollapsed} content={isPending ? t('signingOut') : t('signOut')}>
+                            <ConditionalTooltip
+                                show={isCollapsed}
+                                content={isPending ? t('signingOut') : t('signOut')}
+                            >
                                 <button
                                     onClick={handleLogout}
                                     disabled={isPending}
@@ -352,10 +461,7 @@ export function DashboardSidebar({ user, isOpen, onToggle, width, onWidthChange,
 
             {/* Backdrop to close floating panel on outside click */}
             {isCollapsed && chatPanelOpen && (
-                <div
-                    className="fixed inset-0 z-30"
-                    onClick={() => setChatPanelOpen(false)}
-                />
+                <div className="fixed inset-0 z-30" onClick={() => setChatPanelOpen(false)} />
             )}
         </ChatProvider>
     );

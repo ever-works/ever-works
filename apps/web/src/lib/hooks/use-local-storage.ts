@@ -49,7 +49,7 @@ export function useLocalStorage<T>(
         };
         window.addEventListener('storage', handler);
         return () => window.removeEventListener('storage', handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [key]);
 
     const setValue = useCallback(

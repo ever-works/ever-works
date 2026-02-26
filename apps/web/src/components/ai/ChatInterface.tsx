@@ -186,7 +186,7 @@ export function ChatInterface() {
         <div className="flex flex-col h-full min-h-0">
             <div className="px-4 py-3 border-b border-border dark:border-border-dark space-y-2">
                 <div className="flex items-start justify-between gap-3">
-                    <div className='w-2/3'>
+                    <div className="w-2/3">
                         <h2 className="text-base font-semibold text-text dark:text-text-dark">
                             {t('title')}
                         </h2>

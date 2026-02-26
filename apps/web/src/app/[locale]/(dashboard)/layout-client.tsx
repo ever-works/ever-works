@@ -20,8 +20,12 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [helpOpen, setHelpOpen] = useState(false);
 
-    const { sidebarWidth, sidebarCollapsed, handleSidebarWidthChange, handleSidebarCollapsedChange } =
-        useSidebarPersistence();
+    const {
+        sidebarWidth,
+        sidebarCollapsed,
+        handleSidebarWidthChange,
+        handleSidebarCollapsedChange,
+    } = useSidebarPersistence();
 
     const openHelp = useCallback(() => setHelpOpen(true), []);
     const closeHelp = useCallback(() => setHelpOpen(false), []);
