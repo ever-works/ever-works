@@ -51,7 +51,7 @@ export function Toggler({
                 onClick={onClickTwo}
                 className={cn(
                     'flex flex-row justify-center items-center p-1 w-6 h-6 rounded-full mr-[-2px]',
-                    'dark:bg-[#3B4454]',
+                    'dark:bg-toggle-dark',
                     secondBtnClassName,
                 )}
             >
@@ -76,9 +76,9 @@ export function ThemeToggle({ className }: IClassName) {
                 aria-hidden="true"
             >
                 <div className="flex flex-row justify-center items-center p-1 w-6 h-6 rounded-full ml-[-2px] bg-white shadow-sm dark:bg-transparent dark:shadow-none">
-                    <Sun className="h-4 w-4 text-[#382686]" />
+                    <Sun className="h-4 w-4 text-brand-indigo" />
                 </div>
-                <div className="flex flex-row justify-center items-center p-1 w-6 h-6 rounded-full mr-[-2px] dark:bg-[#3B4454]">
+                <div className="flex flex-row justify-center items-center p-1 w-6 h-6 rounded-full mr-[-2px] dark:bg-toggle-dark">
                     <Moon className="h-4 w-4" />
                 </div>
             </div>
@@ -96,7 +96,7 @@ export function ThemeToggle({ className }: IClassName) {
                 <Sun className="hidden dark:inline-block h-4 w-4 dark:text-white cursor-pointer" />
                 {/* Sun filled for light mode */}
                 <Sun
-                    className="dark:hidden inline-block h-4 w-4 text-[#382686] cursor-pointer"
+                    className="dark:hidden inline-block h-4 w-4 text-brand-indigo cursor-pointer"
                     fill="currentColor"
                 />
             </>

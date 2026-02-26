@@ -223,7 +223,7 @@ export function DashboardSidebar({ user, isOpen, onToggle, width, onWidthChange,
                                         variant="primary"
                                         size="lg"
                                         fullWidth
-                                        className="text-white !bg-primary-hover !hover:bg-primary-hover/80 shadow-sm ring-1 dark:ring-white/6 dark:bg-surface-dark dark:hover:bg-[#0f1729] dark:border dark:border-white/6 dark:hover:border-white/12"
+                                        className="text-white !bg-primary-hover !hover:bg-primary-hover/80 shadow-sm ring-1 dark:ring-white/6 dark:bg-surface-dark dark:hover:bg-surface-deeper-dark dark:border dark:border-white/6 dark:hover:border-white/12"
                                     >
                                         <Plus className="w-5 h-5" />
                                         <span className="font-medium">{t('newDirectory')}</span>

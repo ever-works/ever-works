@@ -51,6 +51,20 @@
 
     --color-border-dark: #334155;
     --color-border-secondary-dark: #475569;
+
+    /* Brand colors */
+    --color-brand-purple: #6209bb;
+    --color-brand-indigo: #382686;
+
+    /* UI element colors */
+    --color-toggle-dark: #3b4454;
+    --color-surface-deeper-dark: #0f1729;
+
+    /* Git provider brand colors */
+    --color-github: #24292e;
+    --color-gitlab: #fc6d26;
+    --color-bitbucket: #0052cc;
+    --color-bitbucket-light: #4c9aff;
 }
 
 html,

@@ -92,9 +92,9 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
 
                         {/* Decorative blurred circles background */}
                         <div className="pointer-events-none absolute inset-0 z-0 opacity-50">
-                            <div className="absolute w-40 h-40 bg-[#6209bb]/20 opacity-50 rounded-full blur-3xl left-2 top-0"></div>
+                            <div className="absolute w-40 h-40 bg-brand-purple/20 opacity-50 rounded-full blur-3xl left-2 top-0"></div>
                             <div className="absolute w-32 h-32 bg-blue-200/20 opacity-50 rounded-full blur-3xl right-1 top-20"></div>
-                            <div className="absolute w-28 h-28 bg-[#6209bb]/20 opacity-50 rounded-full blur-2xl left-1/2 -translate-x-1/2 bottom-4"></div>
+                            <div className="absolute w-28 h-28 bg-brand-purple/20 opacity-50 rounded-full blur-2xl left-1/2 -translate-x-1/2 bottom-4"></div>
                         </div>
 
                         {/* Hover image at top, reversed horizontally, only visible on hover */}

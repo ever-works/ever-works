@@ -280,7 +280,7 @@ export function ChatInterface() {
                                     className={cn(
                                         'max-w-[90%] rounded-lg px-3 py-2 motion-safe:animate-fade-in',
                                         isUser
-                                            ? 'bg-[#6209bb] dark:bg-[#6209bb]/10 text-white'
+                                            ? 'bg-brand-purple dark:bg-brand-purple/10 text-white'
                                             : 'bg-surface-tertiary dark:bg-surface-tertiary-dark/50 text-text dark:text-text-dark',
                                         message.error &&
                                             'border border-danger/60 text-danger dark:text-danger',
