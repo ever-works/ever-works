@@ -204,7 +204,7 @@ export function ChatInterface() {
                             'disabled:opacity-50 disabled:cursor-not-allowed',
                         )}
                     >
-                       + {t('newChat')}
+                        {`+ ${t('newChat')}`}
                     </button>
                 </div>
 
@@ -353,7 +353,7 @@ export function ChatInterface() {
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault();
-                                if (input.trim() && !isStreaming) {
+                                if (input.trim() && !isStreaming && !e.currentTarget.disabled) {
                                     e.currentTarget.form?.requestSubmit();
                                 }
                             }

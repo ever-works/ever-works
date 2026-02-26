@@ -65,7 +65,7 @@ export function ThemeToggle({ className }: IClassName) {
     const { toggleTheme, mounted } = useTheme();
 
     // Prevent hydration mismatch
-        if (!mounted) {
+    if (!mounted) {
         return (
             <div
                 className={cn(

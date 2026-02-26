@@ -58,7 +58,7 @@ export function DashboardHeader({
                             <div>
                                 <ThemeToggle
                                     variant="inline"
-                                    className="p-2! rounded-md! text-text-secondary! dark:text-text-secondary-dark! hover:!text-text! dark:hover:!text-text-dark! hover:!bg-surface! dark:hover:!bg-surface-secondary-dark!"
+                                    className="p-2 rounded-md text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark hover:bg-surface dark:hover:bg-surface-secondary-dark"
                                 />
                             </div>
                         </Tooltip>

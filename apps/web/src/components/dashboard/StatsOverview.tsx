@@ -81,14 +81,7 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
                     )}
                 >
                         {/* Decorative short top border accent with fading edges */}
-                        <div
-                            className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 opacity-70"
-                            style={{
-                                background:
-                                    'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.6) 50%, rgba(255,255,255,0) 100%)',
-                                borderRadius: '9999px',
-                            }}
-                        />
+                        <div className="card-top-accent pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 opacity-70 rounded-full" />
 
                         {/* Decorative blurred circles background */}
                         <div className="pointer-events-none absolute inset-0 z-0 opacity-50">
@@ -105,7 +98,7 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
                                 className="w-full filter brightness-0 dark:brightness-200 -rotate-180"
                                 width={200}
                                 height={100}
-                                 unoptimized
+                                unoptimized
                             />
                         </div>
 
