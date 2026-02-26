@@ -72,6 +72,13 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 				title: 'Custom Prompt',
 				description: 'Additional instructions to append to comparison generation prompts',
 				'x-hidden': true
+			},
+			extended_analysis: {
+				type: 'boolean',
+				title: 'Extended Analysis',
+				description: 'When enabled, generates a deeper analysis alongside the standard comparison',
+				default: false,
+				'x-hidden': true
 			}
 		}
 	};

@@ -632,6 +632,10 @@
                 "generationStatus": "Generation Status",
                 "daysActive": "Days Active"
             },
+            "comparisons": {
+                "extendedAnalysisLabel": "Extended Analysis",
+                "extendedAnalysisDescription": "Generate an in-depth deep-dive analysis alongside each comparison"
+            },
             "history": {
                 "title": "Generation History",
                 "subtitle": "Track past generation runs, items created, and execution details.",

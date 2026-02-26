@@ -15,6 +15,7 @@ export interface ComparisonResearch {
 export interface ComparisonGenerationResult {
 	readonly comparison: ComparisonData;
 	readonly markdown: string;
+	readonly extendedAnalysisMarkdown?: string;
 }
 
 export interface ComparisonPluginSettings {
@@ -25,6 +26,7 @@ export interface ComparisonPluginSettings {
 	readonly ai_provider?: string;
 	readonly ai_model?: string;
 	readonly custom_prompt?: string;
+	readonly extended_analysis?: boolean;
 }
 
 export const DEFAULT_COMPARISON_SETTINGS: ComparisonPluginSettings = {

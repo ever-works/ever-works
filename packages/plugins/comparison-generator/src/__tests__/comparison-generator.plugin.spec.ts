@@ -48,9 +48,9 @@ describe('ComparisonGeneratorPlugin', () => {
 			expect(plugin.settingsSchema.type).toBe('object');
 		});
 
-		it('should have 7 properties', () => {
+		it('should have 8 properties', () => {
 			const props = plugin.settingsSchema.properties!;
-			expect(Object.keys(props)).toHaveLength(7);
+			expect(Object.keys(props)).toHaveLength(8);
 			expect(props).toHaveProperty('cadence_override');
 			expect(props).toHaveProperty('max_comparisons_mode');
 			expect(props).toHaveProperty('max_comparisons');
@@ -58,6 +58,7 @@ describe('ComparisonGeneratorPlugin', () => {
 			expect(props).toHaveProperty('ai_provider');
 			expect(props).toHaveProperty('ai_model');
 			expect(props).toHaveProperty('custom_prompt');
+			expect(props).toHaveProperty('extended_analysis');
 		});
 
 		it('should have title and description on every property', () => {

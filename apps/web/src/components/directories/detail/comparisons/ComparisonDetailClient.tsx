@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -10,6 +11,7 @@ interface ComparisonDetailClientProps {
     directoryId: string;
     comparison: ComparisonData;
     markdown?: string;
+    extendedAnalysisMarkdown?: string;
 }
 
 function WinnerBadge({
@@ -47,7 +49,10 @@ export function ComparisonDetailClient({
     directoryId,
     comparison,
     markdown,
+    extendedAnalysisMarkdown,
 }: ComparisonDetailClientProps) {
+    const [isExtendedOpen, setIsExtendedOpen] = useState(false);
+
     return (
         <div className="space-y-8">
             {/* Back link */}
@@ -170,6 +175,41 @@ export function ComparisonDetailClient({
                     <div className="prose prose-sm dark:prose-invert prose-a:text-primary hover:prose-a:text-primary-hover max-w-none">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
                     </div>
+                </section>
+            )}
+
+            {/* Extended Analysis */}
+            {extendedAnalysisMarkdown && (
+                <section className="rounded-lg border border-border dark:border-border-dark">
+                    <button
+                        type="button"
+                        onClick={() => setIsExtendedOpen(!isExtendedOpen)}
+                        className="flex w-full items-center justify-between px-4 py-3 text-lg font-medium text-text dark:text-text-dark hover:bg-surface-hover dark:hover:bg-surface-hover-dark transition-colors rounded-lg"
+                    >
+                        <span>Extended Analysis</span>
+                        <svg
+                            className={`h-5 w-5 text-text-muted transition-transform duration-200 ${isExtendedOpen ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 9l-7 7-7-7"
+                            />
+                        </svg>
+                    </button>
+                    {isExtendedOpen && (
+                        <div className="border-t border-border dark:border-border-dark px-4 py-4">
+                            <div className="prose prose-sm dark:prose-invert prose-a:text-primary hover:prose-a:text-primary-hover max-w-none">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {extendedAnalysisMarkdown}
+                                </ReactMarkdown>
+                            </div>
+                        </div>
+                    )}
                 </section>
             )}
 

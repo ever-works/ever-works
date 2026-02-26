@@ -561,6 +561,25 @@ export class DataRepository {
         await fs.writeFile(filepath, markdown, 'utf-8');
     }
 
+    async writeComparisonExtendedMarkdown(slug: string, markdown: string): Promise<void> {
+        const compDir = this.getComparisonPath(slug);
+        await fs.mkdir(compDir, { recursive: true });
+        const filepath = path.join(compDir, `${slug}-extended.md`);
+        await fs.writeFile(filepath, markdown, 'utf-8');
+    }
+
+    async getComparisonExtendedMarkdown(slug: string): Promise<string | undefined> {
+        const mdPath = path.join(this.getComparisonPath(slug), `${slug}-extended.md`);
+        try {
+            return await fs.readFile(mdPath, 'utf-8');
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return undefined;
+            }
+            throw err;
+        }
+    }
+
     async comparisonExists(slug: string): Promise<boolean> {
         const compDir = this.getComparisonPath(slug);
         try {

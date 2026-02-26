@@ -22,6 +22,7 @@ export default async function DirectoryComparisonsPage({ params }: Params) {
         currentConfig: {
             provider: null as string | null,
             model: null as string | null,
+            extendedAnalysis: false,
         },
         availableProviders: [] as Awaited<
             ReturnType<typeof getComparisonAiConfig>

@@ -140,13 +140,19 @@ export async function getComparisonAiConfig(directoryId: string) {
                 provider: (settings.ai_provider as string) || null,
                 model: (settings.ai_model as string) || null,
                 customPrompt: (settings.custom_prompt as string) || null,
+                extendedAnalysis: !!settings.extended_analysis,
             },
             availableProviders,
         };
     } catch (error) {
         console.error('Get comparison AI config error:', error);
         return {
-            currentConfig: { provider: null, model: null, customPrompt: null },
+            currentConfig: {
+                provider: null,
+                model: null,
+                customPrompt: null,
+                extendedAnalysis: false,
+            },
             availableProviders: [],
         };
     }
@@ -154,7 +160,7 @@ export async function getComparisonAiConfig(directoryId: string) {
 
 export async function saveComparisonAiConfig(
     directoryId: string,
-    config: { provider: string | null; model: string | null },
+    config: { provider: string | null; model: string | null; extendedAnalysis?: boolean },
 ) {
     const user = await getAuthFromCookie();
     if (!user) {
@@ -172,6 +178,7 @@ export async function saveComparisonAiConfig(
                 ...existing,
                 ai_provider: config.provider || null,
                 ai_model: config.model || null,
+                extended_analysis: config.extendedAnalysis ?? false,
             },
         });
 
@@ -185,6 +192,7 @@ export async function saveComparisonAiConfig(
                     settings: {
                         ai_provider: config.provider || null,
                         ai_model: config.model || null,
+                        extended_analysis: config.extendedAnalysis ?? false,
                     },
                 });
                 revalidatePath(`/directories/${directoryId}/comparisons`);

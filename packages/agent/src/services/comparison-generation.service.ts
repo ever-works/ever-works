@@ -85,6 +85,7 @@ export class ComparisonGenerationService {
             ai_provider: (settings.ai_provider as string) || undefined,
             ai_model: (settings.ai_model as string) || undefined,
             custom_prompt: (settings.custom_prompt as string) || undefined,
+            extended_analysis: !!settings.extended_analysis,
         };
     }
 
@@ -264,7 +265,11 @@ export class ComparisonGenerationService {
         directoryId: string,
         userId: string,
         slug: string,
-    ): Promise<{ comparison: ComparisonData | null; markdown?: string }> {
+    ): Promise<{
+        comparison: ComparisonData | null;
+        markdown?: string;
+        extendedAnalysisMarkdown?: string;
+    }> {
         const directory = await this.findDirectoryOrFail(directoryId);
 
         const gitOptions: GitFacadeOptions = {
@@ -279,8 +284,11 @@ export class ComparisonGenerationService {
         const dataRepo = await DataRepository.create(dest);
         const comparison = await dataRepo.getComparison(slug);
         const markdown = comparison ? await dataRepo.getComparisonMarkdown(slug) : undefined;
+        const extendedAnalysisMarkdown = comparison
+            ? await dataRepo.getComparisonExtendedMarkdown(slug)
+            : undefined;
 
-        return { comparison, markdown };
+        return { comparison, markdown, extendedAnalysisMarkdown };
     }
 
     /**
@@ -408,11 +416,18 @@ export class ComparisonGenerationService {
             name: directory.name,
             description: directory.description,
             customPrompt: pluginSettings.custom_prompt,
+            extendedAnalysis: pluginSettings.extended_analysis,
         });
 
         // 3. Write to data repo
         await dataRepo.writeComparison(result.comparison);
         await dataRepo.writeComparisonMarkdown(result.comparison.slug, result.markdown);
+        if (result.extendedAnalysisMarkdown) {
+            await dataRepo.writeComparisonExtendedMarkdown(
+                result.comparison.slug,
+                result.extendedAnalysisMarkdown,
+            );
+        }
 
         // 4. Update comparison state
         comparisonState.generated_pairs.push(result.comparison.slug);

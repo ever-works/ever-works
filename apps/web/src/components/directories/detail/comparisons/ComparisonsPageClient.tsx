@@ -47,7 +47,7 @@ interface ComparisonsPageClientProps {
     initialComparisons: ComparisonData[];
     items: Array<{ slug: string; name: string; category: string | string[] }>;
     availableProviders: ProviderOption[];
-    initialAiConfig: { provider: string | null; model: string | null };
+    initialAiConfig: { provider: string | null; model: string | null; extendedAnalysis?: boolean };
 }
 
 export function ComparisonsPageClient({
@@ -75,6 +75,9 @@ export function ComparisonsPageClient({
     const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string }>>([]);
     const [isLoadingModels, setIsLoadingModels] = useState(false);
     const [isSavingAiConfig, setIsSavingAiConfig] = useState(false);
+    const [extendedAnalysis, setExtendedAnalysis] = useState(
+        initialAiConfig.extendedAnalysis ?? false,
+    );
 
     // Generate All state
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
@@ -285,6 +288,7 @@ export function ComparisonsPageClient({
             const result = await saveComparisonAiConfig(directoryId, {
                 provider: aiProvider || null,
                 model: aiModel || null,
+                extendedAnalysis,
             });
             if (result.success) {
                 toast.success('AI model settings saved');
@@ -415,6 +419,35 @@ export function ComparisonsPageClient({
                                 >
                                     Save
                                 </Button>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-text dark:text-text-dark">
+                                        Extended Analysis
+                                    </p>
+                                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                        Generate an in-depth deep-dive alongside each comparison
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={extendedAnalysis}
+                                    onClick={() => setExtendedAnalysis(!extendedAnalysis)}
+                                    className={cn(
+                                        'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary/20',
+                                        extendedAnalysis
+                                            ? 'bg-primary'
+                                            : 'bg-surface-hover dark:bg-surface-hover-dark',
+                                    )}
+                                >
+                                    <span
+                                        className={cn(
+                                            'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                                            extendedAnalysis ? 'translate-x-4' : 'translate-x-0',
+                                        )}
+                                    />
+                                </button>
                             </div>
                         </div>
                     )}

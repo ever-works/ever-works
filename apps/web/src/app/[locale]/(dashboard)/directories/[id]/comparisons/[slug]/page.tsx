@@ -30,6 +30,7 @@ export default async function ComparisonDetailPage({ params }: Params) {
                 directoryId={id}
                 comparison={result.comparison}
                 markdown={result.markdown}
+                extendedAnalysisMarkdown={result.extendedAnalysisMarkdown}
             />
         );
     } catch {
