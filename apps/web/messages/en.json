@@ -1254,16 +1254,14 @@
                 "visibilityWarningNotRestored": "Stars and watchers will NOT be restored if you make the repository public again",
                 "visibilityConfirmPrivate": "Yes, Make Private",
                 "advancedPrompts": {
-                    "title": "Advanced Prompts",
-                    "subtitle": "Customize AI prompts for item generation and comparison generation. Leave empty to use defaults.",
+                    "title": "Standard Pipeline",
+                    "subtitle": "Custom prompt",
+                    "comparisonTitle": "Comparison",
+                    "comparisonSubtitle": "Custom prompt",
                     "save": "Save Prompts",
                     "saveSuccess": "Advanced prompts saved successfully",
                     "saveFailed": "Failed to save advanced prompts",
                     "saveComparisonSuccess": "Comparison prompt saved successfully",
-                    "sections": {
-                        "itemGeneration": "Item Generation",
-                        "comparisonGeneration": "Comparison Generation"
-                    },
                     "prompts": {
                         "relevanceAssessment": {
                             "title": "Relevance Assessment",

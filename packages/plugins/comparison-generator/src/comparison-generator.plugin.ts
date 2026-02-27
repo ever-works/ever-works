@@ -10,7 +10,6 @@ import type {
 	PluginHealthCheck
 } from '@ever-works/plugin';
 import type { FormFieldDefinition, FormFieldGroup } from '@ever-works/contracts';
-import { DEFAULT_COMPARISON_SETTINGS } from './types.js';
 
 export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 	readonly id = 'comparison-generator';
@@ -188,86 +187,19 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 	}
 
 	getFormFields(): FormFieldDefinition[] {
-		return [
-			{
-				name: 'comparison_enabled',
-				type: 'boolean',
-				label: 'Generate Comparisons',
-				description: 'Enable A vs B comparison page generation for this directory',
-				defaultValue: false,
-				group: 'comparisons'
-			},
-			{
-				name: 'comparison_cadence',
-				type: 'select',
-				label: 'Comparison Cadence',
-				description: 'How often to auto-generate a new comparison',
-				options: [
-					{ label: 'Use Directory Schedule', value: 'use_directory' },
-					{ label: 'Daily', value: 'daily' },
-					{ label: 'Weekly', value: 'weekly' },
-					{ label: 'Monthly', value: 'monthly' }
-				],
-				defaultValue: 'use_directory',
-				group: 'comparisons'
-			},
-			{
-				name: 'comparison_max_mode',
-				type: 'select',
-				label: 'Max Comparisons',
-				description: 'Limit the number of comparisons or generate all possible pairs',
-				options: [
-					{ label: 'Custom', value: 'custom' },
-					{ label: 'Unlimited', value: 'unlimited' }
-				],
-				defaultValue: 'custom',
-				group: 'comparisons'
-			},
-			{
-				name: 'comparison_max',
-				type: 'number',
-				label: 'Max Comparisons Limit',
-				description: 'Maximum number of comparisons to generate',
-				defaultValue: 50,
-				validation: { min: 1, max: 500 },
-				showIf: { field: 'comparison_max_mode', operator: 'eq', value: 'custom' },
-				group: 'comparisons'
-			}
-		];
+		return [];
 	}
 
 	getFormGroups(): FormFieldGroup[] {
-		return [
-			{
-				name: 'comparisons',
-				title: 'Comparison Pages',
-				description: 'Configure automatic A vs B comparison page generation',
-				collapsible: true,
-				collapsed: true
-			}
-		];
+		return [];
 	}
 
-	validateFormInput(values: Record<string, unknown>): ValidationResult {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (values.comparison_max !== undefined && values.comparison_max_mode !== 'unlimited') {
-			const max = Number(values.comparison_max);
-			if (isNaN(max) || max < 1 || max > 500) {
-				errors.push({ path: 'comparison_max', message: 'Must be between 1 and 500' });
-			}
-		}
-
-		return errors.length > 0 ? { valid: false, errors } : { valid: true };
+	validateFormInput(_values: Record<string, unknown>): ValidationResult {
+		return { valid: true };
 	}
 
 	getDefaultValues(): Record<string, unknown> {
-		return {
-			comparison_enabled: false,
-			comparison_cadence: DEFAULT_COMPARISON_SETTINGS.cadence_override,
-			comparison_max_mode: DEFAULT_COMPARISON_SETTINGS.max_comparisons_mode,
-			comparison_max: DEFAULT_COMPARISON_SETTINGS.max_comparisons
-		};
+		return {};
 	}
 }
 
