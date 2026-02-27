@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import Handlebars from 'handlebars';
@@ -14,9 +14,9 @@ export class MailerService {
     private readonly logger = new Logger(MailerService.name);
 
     constructor(
-        @Inject('RESEND_CLIENT') private readonly resend: Resend,
         private readonly smtpMailerService: SmtpMailerService,
         private readonly fakerMailerService: FakerMailerService,
+        @Optional() @Inject('RESEND_CLIENT') private readonly resend?: Resend,
     ) {
         this.logger.log(`Mailer service initialized with provider: ${config.mail.provider()}`);
     }
@@ -27,14 +27,17 @@ export class MailerService {
                 await this.smtpMailerService.sendMail(data);
                 break;
 
-            case 'resend':
-                await this.resend.emails.send({
-                    to: this.getDestination(data.to),
-                    from: config.mail.resend.emailFrom(),
-                    subject: data.subject,
-                    html: await this.readHtmlTemplate(data),
-                });
-                break;
+            case 'resend': {
+                if (this.resend) {
+                    await this.resend.emails.send({
+                        to: this.getDestination(data.to),
+                        from: config.mail.resend.emailFrom(),
+                        subject: data.subject,
+                        html: await this.readHtmlTemplate(data),
+                    });
+                    break;
+                }
+            }
 
             default:
                 await this.fakerMailerService.sendMail(data);

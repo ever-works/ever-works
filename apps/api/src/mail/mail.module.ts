@@ -44,7 +44,13 @@ import { MailerService } from './providers/mailer.service';
     providers: [
         {
             provide: 'RESEND_CLIENT',
-            useFactory: () => new Resend(config.mail.resend.apiKey() || ''),
+            useFactory: () => {
+                const apiKey = config.mail.resend.apiKey();
+                if (apiKey) {
+                    return new Resend(apiKey || '');
+                }
+                return undefined;
+            },
         },
         MailService,
         MailerService,
