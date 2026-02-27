@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
+import { APP_NAME } from '@/lib/constants';
 
 export default function DashboardToasts() {
     const searchParams = useSearchParams();
@@ -16,7 +17,7 @@ export default function DashboardToasts() {
     useEffect(() => {
         if (isNewUser) {
             // Show welcome toast for new users
-            toast.success(t('newUser.title'), {
+            toast.success(t('newUser.title', { companyName: APP_NAME }), {
                 description: t('newUser.description'),
                 duration: 6000,
                 icon: (
