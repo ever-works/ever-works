@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { config } from '../config/constants';
-import { MailerService } from './mailer.service';
+import { MailerService } from './providers/mailer.service';
 import {
     UserAccountDeletionEvent,
     UserForgotPasswordEvent,
@@ -99,7 +99,7 @@ export class MailService {
      */
     @OnEvent(UserConfirmedEvent.EVENT_NAME)
     async sendWelcomeEmail(data: UserConfirmedEvent): Promise<void> {
-        const dashboardUrl = data.dashboardUrl;
+        const dashboardUrl = data.dashboardUrl || `${config.webAppUrl()}/directories/new`;
         const appName = config.branding.appName();
 
         await this.mailerService.sendMail({
