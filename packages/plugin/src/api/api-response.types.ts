@@ -45,6 +45,8 @@ export interface PluginSettingsSchemaProperty {
 	widget?: string;
 	/** Whether field should be hidden from the settings UI (from JsonSchema x-hidden) */
 	hidden?: boolean;
+	/** Conditional visibility: show only when the referenced field matches the given value (from JsonSchema x-showIf) */
+	showIf?: { field: string; value: unknown };
 	/** Minimum value for number fields */
 	minimum?: number;
 	/** Maximum value for number fields */
@@ -114,6 +116,7 @@ export function toPluginSettingsSchemaProperty(schema: JsonSchema): PluginSettin
 		const: schema.const,
 		widget: schema['x-widget'],
 		hidden: schema['x-hidden'],
+		showIf: schema['x-showIf'],
 		minimum: schema.minimum,
 		maximum: schema.maximum,
 		minLength: schema.minLength,

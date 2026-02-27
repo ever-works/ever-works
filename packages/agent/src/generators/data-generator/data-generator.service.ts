@@ -746,16 +746,18 @@ export class DataGeneratorService {
     async count(directory: Directory, user: User) {
         const data = await this.repositoryData(directory, user);
 
-        const [categories, tags, items] = await Promise.all([
+        const [categories, tags, items, comparisons] = await Promise.all([
             data.getCategories(),
             data.getTags(),
             data.getItems(),
+            data.getComparisons().catch(() => []),
         ]);
 
         return {
             items: items.length,
             categories: categories.length,
             tags: tags.length,
+            comparisons: comparisons.length,
         };
     }
 

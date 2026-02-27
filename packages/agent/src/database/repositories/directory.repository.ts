@@ -391,4 +391,14 @@ export class DirectoryRepository {
             relations: ['user'],
         });
     }
+
+    /**
+     * Find all directories with comparison generation enabled.
+     */
+    async findWithComparisonsEnabled(): Promise<Directory[]> {
+        return this.repository.find({
+            where: { comparisonsEnabled: true },
+            relations: ['user'],
+        });
+    }
 }
