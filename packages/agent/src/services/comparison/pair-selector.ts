@@ -1,5 +1,5 @@
 import type { ItemData } from '@ever-works/contracts';
-import type { ComparisonPair } from './types.js';
+import type { ComparisonPair } from './types';
 
 /**
  * Build a canonical pair key that is order-independent.

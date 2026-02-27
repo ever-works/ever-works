@@ -1,7 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generateComparison } from '../comparison-writer.js';
-import type { ComparisonAiDependencies } from '../comparison-writer.js';
-import type { ComparisonPair, ComparisonResearch } from '../types.js';
+import { generateComparison } from '../comparison-writer';
+import type { ComparisonAiDependencies } from '../comparison-writer';
+import type { ComparisonPair, ComparisonResearch } from '../types';
 import type { ItemData } from '@ever-works/contracts';
 
 function makeItem(slug: string, category: string, opts: Partial<ItemData> = {}): ItemData {
@@ -69,8 +68,8 @@ function makeResearch(): ComparisonResearch {
 
 function makeAi(overrides: Partial<ComparisonAiDependencies> = {}): ComparisonAiDependencies {
 	return {
-		askJson: vi.fn().mockResolvedValue(MOCK_STRUCTURE),
-		askText: vi.fn().mockResolvedValue(MOCK_MARKDOWN),
+		askJson: jest.fn().mockResolvedValue(MOCK_STRUCTURE),
+		askText: jest.fn().mockResolvedValue(MOCK_MARKDOWN),
 		...overrides
 	};
 }
@@ -80,7 +79,7 @@ describe('generateComparison', () => {
 	const research = makeResearch();
 
 	beforeEach(() => {
-		vi.clearAllMocks();
+		jest.clearAllMocks();
 	});
 
 	it('should call askJson then askText (two-pass generation)', async () => {
@@ -92,8 +91,8 @@ describe('generateComparison', () => {
 		expect(ai.askText).toHaveBeenCalledTimes(1);
 
 		// askJson should be called before askText
-		const askJsonOrder = (ai.askJson as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
-		const askTextOrder = (ai.askText as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+		const askJsonOrder = (ai.askJson as jest.Mock).mock.invocationCallOrder[0];
+		const askTextOrder = (ai.askText as jest.Mock).mock.invocationCallOrder[0];
 		expect(askJsonOrder).toBeLessThan(askTextOrder);
 	});
 
@@ -182,7 +181,7 @@ describe('generateComparison', () => {
 	});
 
 	it('should pass directory context in prompt when provided', async () => {
-		const askJson = vi.fn().mockResolvedValue(MOCK_STRUCTURE);
+		const askJson = jest.fn().mockResolvedValue(MOCK_STRUCTURE);
 		const ai = makeAi({ askJson });
 
 		await generateComparison(pair, research, ai, {
@@ -196,7 +195,7 @@ describe('generateComparison', () => {
 	});
 
 	it('should not include directory context when not provided', async () => {
-		const askJson = vi.fn().mockResolvedValue(MOCK_STRUCTURE);
+		const askJson = jest.fn().mockResolvedValue(MOCK_STRUCTURE);
 		const ai = makeAi({ askJson });
 
 		await generateComparison(pair, research, ai);
@@ -231,7 +230,7 @@ describe('generateComparison', () => {
 	});
 
 	it('should include item names in extended analysis prompt', async () => {
-		const askText = vi.fn().mockResolvedValue(MOCK_MARKDOWN);
+		const askText = jest.fn().mockResolvedValue(MOCK_MARKDOWN);
 		const ai = makeAi({ askText });
 
 		await generateComparison(pair, research, ai, {

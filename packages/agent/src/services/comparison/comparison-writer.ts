@@ -1,6 +1,6 @@
 import type { ComparisonDimension } from '@ever-works/contracts';
-import type { ComparisonPair, ComparisonResearch, ComparisonGenerationResult } from './types.js';
-import { buildPairKey } from './pair-selector.js';
+import type { ComparisonPair, ComparisonResearch, ComparisonGenerationResult } from './types';
+import { buildPairKey } from './pair-selector';
 
 export interface ComparisonAiDependencies {
 	readonly askJson: <T>(prompt: string, schema: Record<string, unknown>) => Promise<T>;

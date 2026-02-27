@@ -1,4 +1,4 @@
-import type { ComparisonPair, ComparisonResearch } from './types.js';
+import type { ComparisonPair, ComparisonResearch } from './types';
 
 /**
  * Generate search queries for a comparison pair.

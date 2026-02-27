@@ -1,5 +1,4 @@
-import { describe, it, expect } from 'vitest';
-import { selectNextPair, findManualPair, buildPairKey, countRemainingPairs } from '../pair-selector.js';
+import { selectNextPair, findManualPair, buildPairKey, countRemainingPairs } from '../pair-selector';
 import type { ItemData } from '@ever-works/contracts';
 
 function makeItem(slug: string, category: string, opts: Partial<ItemData> = {}): ItemData {

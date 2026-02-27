@@ -1,7 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { buildSearchQueries, researchPair } from '../comparison-researcher.js';
-import type { ResearchDependencies } from '../comparison-researcher.js';
-import type { ComparisonPair } from '../types.js';
+import { buildSearchQueries, researchPair } from '../comparison-researcher';
+import type { ResearchDependencies } from '../comparison-researcher';
+import type { ComparisonPair } from '../types';
 import type { ItemData } from '@ever-works/contracts';
 
 function makeItem(slug: string, category: string, opts: Partial<ItemData> = {}): ItemData {
@@ -27,8 +26,8 @@ function makePair(slugA: string, slugB: string, category = 'hosting'): Compariso
 
 function makeDeps(overrides: Partial<ResearchDependencies> = {}): ResearchDependencies {
 	return {
-		search: vi.fn().mockResolvedValue([]),
-		extractContent: vi.fn().mockResolvedValue(null),
+		search: jest.fn().mockResolvedValue([]),
+		extractContent: jest.fn().mockResolvedValue(null),
 		...overrides
 	};
 }
@@ -74,11 +73,11 @@ describe('researchPair', () => {
 	const pair = makePair('vercel', 'netlify');
 
 	beforeEach(() => {
-		vi.clearAllMocks();
+		jest.clearAllMocks();
 	});
 
 	it('should call search with each query', async () => {
-		const search = vi.fn().mockResolvedValue([]);
+		const search = jest.fn().mockResolvedValue([]);
 		const deps = makeDeps({ search });
 
 		await researchPair(pair, deps);
@@ -89,8 +88,8 @@ describe('researchPair', () => {
 
 	it('should deduplicate URLs across queries', async () => {
 		const sharedResult = { url: 'https://example.com/shared', snippet: 'shared result' };
-		const search = vi.fn().mockResolvedValue([sharedResult]);
-		const extractContent = vi.fn().mockResolvedValue('content');
+		const search = jest.fn().mockResolvedValue([sharedResult]);
+		const extractContent = jest.fn().mockResolvedValue('content');
 		const deps = makeDeps({ search, extractContent });
 
 		const result = await researchPair(pair, deps);
@@ -105,8 +104,8 @@ describe('researchPair', () => {
 			{ url: 'https://a.com', snippet: 'A' },
 			{ url: 'https://b.com', snippet: 'B' }
 		];
-		const search = vi.fn().mockResolvedValue(results);
-		const extractContent = vi.fn().mockResolvedValue('extracted');
+		const search = jest.fn().mockResolvedValue(results);
+		const extractContent = jest.fn().mockResolvedValue('extracted');
 		const deps = makeDeps({ search, extractContent });
 
 		await researchPair(pair, deps);
@@ -117,7 +116,7 @@ describe('researchPair', () => {
 
 	it('should handle search failure gracefully and continue', async () => {
 		let callCount = 0;
-		const search = vi.fn().mockImplementation(() => {
+		const search = jest.fn().mockImplementation(() => {
 			callCount++;
 			if (callCount === 1) return Promise.reject(new Error('Network error'));
 			return Promise.resolve([{ url: 'https://ok.com', snippet: 'ok' }]);
@@ -131,8 +130,8 @@ describe('researchPair', () => {
 	});
 
 	it('should fall back to snippet when extraction fails', async () => {
-		const search = vi.fn().mockResolvedValue([{ url: 'https://fail.com', snippet: 'fallback snippet' }]);
-		const extractContent = vi.fn().mockRejectedValue(new Error('Extraction error'));
+		const search = jest.fn().mockResolvedValue([{ url: 'https://fail.com', snippet: 'fallback snippet' }]);
+		const extractContent = jest.fn().mockRejectedValue(new Error('Extraction error'));
 		const deps = makeDeps({ search, extractContent });
 
 		const result = await researchPair(pair, deps);
@@ -142,8 +141,8 @@ describe('researchPair', () => {
 
 	it('should trim content longer than 2000 chars', async () => {
 		const longContent = 'x'.repeat(3000);
-		const search = vi.fn().mockResolvedValue([{ url: 'https://long.com', snippet: '' }]);
-		const extractContent = vi.fn().mockResolvedValue(longContent);
+		const search = jest.fn().mockResolvedValue([{ url: 'https://long.com', snippet: '' }]);
+		const extractContent = jest.fn().mockResolvedValue(longContent);
 		const deps = makeDeps({ search, extractContent });
 
 		const result = await researchPair(pair, deps);
@@ -154,7 +153,7 @@ describe('researchPair', () => {
 	});
 
 	it('should respect maxQueries option', async () => {
-		const search = vi.fn().mockResolvedValue([]);
+		const search = jest.fn().mockResolvedValue([]);
 		const deps = makeDeps({ search });
 
 		await researchPair(pair, deps, { maxQueries: 2 });
@@ -163,7 +162,7 @@ describe('researchPair', () => {
 	});
 
 	it('should respect maxResultsPerQuery option', async () => {
-		const search = vi.fn().mockResolvedValue([]);
+		const search = jest.fn().mockResolvedValue([]);
 		const deps = makeDeps({ search });
 
 		await researchPair(pair, deps, { maxResultsPerQuery: 10 });
@@ -176,8 +175,8 @@ describe('researchPair', () => {
 			url: `https://r${i}.com`,
 			snippet: `snippet ${i}`
 		}));
-		const search = vi.fn().mockResolvedValue(manyResults);
-		const extractContent = vi.fn().mockResolvedValue('content');
+		const search = jest.fn().mockResolvedValue(manyResults);
+		const extractContent = jest.fn().mockResolvedValue('content');
 		const deps = makeDeps({ search, extractContent });
 
 		await researchPair(pair, deps, { maxQueries: 1, maxExtractions: 3 });
@@ -191,7 +190,7 @@ describe('researchPair', () => {
 			{ url: 'https://b.com', snippet: 'B' },
 			{ url: 'https://c.com', snippet: 'C' }
 		];
-		const search = vi.fn().mockResolvedValue(results);
+		const search = jest.fn().mockResolvedValue(results);
 		const deps = makeDeps({ search });
 
 		const result = await researchPair(pair, deps, { maxQueries: 1, maxExtractions: 3 });
