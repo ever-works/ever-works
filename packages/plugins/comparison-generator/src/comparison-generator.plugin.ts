@@ -187,19 +187,90 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 	}
 
 	getFormFields(): FormFieldDefinition[] {
-		return [];
+		return [
+			{
+				name: 'comparison_enabled',
+				type: 'boolean',
+				label: 'Enable Comparisons',
+				description: 'Automatically generate A vs B comparison pages between directory items',
+				defaultValue: false,
+				group: 'comparisons',
+				order: 1
+			},
+			{
+				name: 'comparison_cadence',
+				type: 'select',
+				label: 'Generation Cadence',
+				description: 'How often to auto-generate comparisons',
+				defaultValue: 'use_directory',
+				options: [
+					{ value: 'use_directory', label: 'Use Directory Schedule' },
+					{ value: 'daily', label: 'Daily' },
+					{ value: 'weekly', label: 'Weekly' },
+					{ value: 'monthly', label: 'Monthly' }
+				],
+				group: 'comparisons',
+				order: 2
+			},
+			{
+				name: 'comparison_max_mode',
+				type: 'select',
+				label: 'Max Comparisons Mode',
+				description: 'Whether to cap comparisons at a custom limit or generate all possible pairs',
+				defaultValue: 'custom',
+				options: [
+					{ value: 'custom', label: 'Custom Limit' },
+					{ value: 'unlimited', label: 'All Pairs' }
+				],
+				group: 'comparisons',
+				order: 3
+			},
+			{
+				name: 'comparison_max',
+				type: 'number',
+				label: 'Max Comparisons',
+				description: 'Maximum total comparisons to generate (only used in Custom mode)',
+				defaultValue: 50,
+				validation: { min: 1, max: 500 },
+				showIf: { field: 'comparison_max_mode', value: 'custom' },
+				group: 'comparisons',
+				order: 4
+			}
+		];
 	}
 
 	getFormGroups(): FormFieldGroup[] {
-		return [];
+		return [
+			{
+				name: 'comparisons',
+				title: 'Comparisons',
+				description: 'Configure automatic A vs B comparison page generation',
+				collapsible: true,
+				collapsed: true
+			}
+		];
 	}
 
-	validateFormInput(_values: Record<string, unknown>): ValidationResult {
-		return { valid: true };
+	validateFormInput(values: Record<string, unknown>): ValidationResult {
+		const errors: Array<{ path: string; message: string }> = [];
+
+		if (values.comparison_max !== undefined && values.comparison_max_mode !== 'unlimited') {
+			const max = Number(values.comparison_max);
+			if (isNaN(max) || max < 1 || max > 500) {
+				errors.push({ path: 'comparison_max', message: 'Max comparisons must be between 1 and 500' });
+			}
+		}
+
+		return errors.length > 0 ? { valid: false, errors } : { valid: true };
 	}
 
 	getDefaultValues(): Record<string, unknown> {
-		return {};
+		return {
+			comparison_enabled: false,
+			comparison_cadence: 'use_directory',
+			comparison_max_mode: 'custom',
+			comparison_max: 50
+		};
 	}
 }
 
