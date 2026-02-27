@@ -99,7 +99,7 @@ export class MailService {
      */
     @OnEvent(UserConfirmedEvent.EVENT_NAME)
     async sendWelcomeEmail(data: UserConfirmedEvent): Promise<void> {
-        const dashboardUrl = data.dashboardUrl;
+        const dashboardUrl = data.dashboardUrl || `${config.webAppUrl()}/directories/new`;
         const appName = config.branding.appName();
 
         await this.mailerService.sendMail({
