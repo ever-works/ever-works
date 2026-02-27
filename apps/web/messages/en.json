@@ -316,6 +316,13 @@
                     "usernameRequired": "Username is required",
                     "error": "Failed to update profile",
                     "unexpectedError": "An unexpected error occurred"
+                },
+                "emailVerification": {
+                    "title": "Email not verified",
+                    "description": "Please verify your email address. Check your inbox for the verification link.",
+                    "resend": "Resend",
+                    "sent": "Verification email sent. Check your inbox.",
+                    "sendFailed": "Failed to send verification email. Please try again."
                 }
             },
             "security": {
@@ -638,7 +645,6 @@
                 "vs": "vs",
                 "winner": "Winner: {name}",
                 "tie": "Tie",
-
                 "actions": {
                     "compareItems": "Compare Items",
                     "generateNext": "Generate Next",
@@ -650,7 +656,6 @@
                     "cancel": "Cancel",
                     "delete": "Delete"
                 },
-
                 "aiModel": {
                     "title": "AI Model",
                     "provider": "Provider",
@@ -662,7 +667,6 @@
                     "extendedAnalysisLabel": "Extended Analysis",
                     "extendedAnalysisDescription": "Generate an in-depth deep-dive analysis alongside each comparison"
                 },
-
                 "manualForm": {
                     "title": "Compare Two Items",
                     "itemA": "Item A",
@@ -670,33 +674,27 @@
                     "searchPlaceholder": "Search items...",
                     "noItems": "No items found"
                 },
-
                 "progress": {
                     "generating": "Generating comparisons: {completed} / {total} complete",
                     "error": "{count, plural, one {# error} other {# errors}}",
                     "stopped": "Stopped. Generated {count, plural, one {# comparison} other {# comparisons}} with {errors, plural, one {# error} other {# errors}}.",
                     "done": "Done! Generated {count, plural, one {# comparison} other {# comparisons}}."
                 },
-
                 "pagination": {
-                    "showing": "Showing {from}\u2013{to} of {total}"
+                    "showing": "Showing {from}–{to} of {total}"
                 },
-
                 "empty": {
                     "title": "No comparisons yet",
                     "description": "Click \"Generate Next\" to auto-pick items, or \"Compare Items\" to choose a specific pair."
                 },
-
                 "deleteDialog": {
                     "title": "Delete Comparison",
                     "confirmation": "Are you sure you want to delete \"{title}\"? This action cannot be undone."
                 },
-
                 "generateAllDialog": {
                     "title": "Generate All Comparisons",
                     "confirmation": "Generate {count} remaining {count, plural, one {comparison} other {comparisons}}? This may take several minutes. You can stop at any time."
                 },
-
                 "toast": {
                     "selectTwo": "Please select two items to compare",
                     "cannotCompareSelf": "Cannot compare an item with itself",
@@ -706,7 +704,6 @@
                     "aiConfigSaved": "AI model settings saved",
                     "aiConfigFailed": "Failed to save AI config"
                 },
-
                 "detail": {
                     "backToComparisons": "Back to comparisons",
                     "summary": "Summary",
@@ -2283,6 +2280,11 @@
                 "notAuthenticated": "Not authenticated",
                 "deleteFailed": "Failed to delete account",
                 "deleteDisabled": "Account deletion is disabled in demo"
+            },
+            "emailVerification": {
+                "notAuthenticated": "Not authenticated",
+                "sent": "Verification email sent",
+                "sendFailed": "Failed to send verification email"
             }
         },
         "deploy": {
