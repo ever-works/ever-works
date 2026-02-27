@@ -10,6 +10,21 @@ import { VALIDATION_RULES } from './validation';
 
 // Note: Validation schemas are now created inside each function with translations
 
+// Email Verification Actions
+export async function resendVerificationEmail() {
+	const t = await getTranslations('actions.settings.emailVerification');
+	try {
+		const user = await getAuthFromCookie();
+		if (!user) {
+			return { success: false, error: t('notAuthenticated') };
+		}
+		await authAPI.sendVerification();
+		return { success: true, message: t('sent') };
+	} catch (error: any) {
+		return { success: false, error: error?.message || t('sendFailed') };
+	}
+}
+
 // Profile Actions
 export async function updateProfile(data: { username: string }) {
     const t = await getTranslations('actions.settings.profile');
