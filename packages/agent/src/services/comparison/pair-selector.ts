@@ -135,6 +135,10 @@ export function findManualPair(
     itemASlug: string,
     itemBSlug: string,
 ): ComparisonPair | null {
+    if (itemASlug === itemBSlug) {
+        return null;
+    }
+
     const itemA = items.find((i) => i.slug === itemASlug);
     const itemB = items.find((i) => i.slug === itemBSlug);
 

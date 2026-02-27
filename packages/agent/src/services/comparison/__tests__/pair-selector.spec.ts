@@ -175,6 +175,10 @@ describe('findManualPair', () => {
         expect(findManualPair(items, 'nonexistent', 'netlify')).toBeNull();
     });
 
+    it('should return null for self-comparison', () => {
+        expect(findManualPair(items, 'vercel', 'vercel')).toBeNull();
+    });
+
     it('should find shared category for cross-category pairs', () => {
         const result = findManualPair(items, 'vercel', 'react');
 
