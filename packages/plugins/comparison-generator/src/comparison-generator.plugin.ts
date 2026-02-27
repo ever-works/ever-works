@@ -232,7 +232,7 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 				description: 'Maximum total comparisons to generate (only used in Custom mode)',
 				defaultValue: 50,
 				validation: { min: 1, max: 500 },
-				showIf: { field: 'comparison_max_mode', value: 'custom' },
+				showIf: { field: 'comparison_max_mode', operator: 'eq', value: 'custom' },
 				group: 'comparisons',
 				order: 4
 			}
