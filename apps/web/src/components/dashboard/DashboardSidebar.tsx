@@ -276,7 +276,9 @@ export function DashboardSidebar({
                         >
                             <div
                                 className={cn(
-                                    isCollapsed ? 'px-2 py-4 flex justify-center' : 'px-6 pt-4 pb-10',
+                                    isCollapsed
+                                        ? 'px-2 py-4 flex justify-center'
+                                        : 'px-6 pt-4 pb-10',
                                 )}
                             >
                                 {isCollapsed ? (
