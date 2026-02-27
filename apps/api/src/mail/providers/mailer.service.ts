@@ -7,6 +7,7 @@ import { MailerService as SmtpMailerService } from '@nestjs-modules/mailer';
 import { FakerMailerService } from './faker-mailer.service';
 import { config } from '@src/config/constants';
 import { SendMailOptions } from '../types';
+import type { Address } from '@nestjs-modules/mailer/dist/interfaces/send-mail-options.interface';
 
 @Injectable()
 export class MailerService {
@@ -28,7 +29,7 @@ export class MailerService {
 
             case 'resend':
                 await this.resend.emails.send({
-                    to: this.getDestination(data),
+                    to: this.getDestination(data.to),
                     from: config.mail.resend.emailFrom(),
                     subject: data.subject,
                     html: await this.readHtmlTemplate(data),
@@ -41,7 +42,7 @@ export class MailerService {
         }
     }
 
-    private getDestination(destination: any) {
+    private getDestination(destination: string | Address | (string | Address)[]) {
         const dest = Array.isArray(destination) ? destination : [destination];
         return dest.map((to) => (typeof to === 'string' ? to : 'address' in to ? to.address : to));
     }
@@ -64,5 +65,7 @@ export class MailerService {
         } else if (data.text) {
             return data.text instanceof Buffer ? data.text.toString() : (data.text as string);
         }
+
+        return '';
     }
 }

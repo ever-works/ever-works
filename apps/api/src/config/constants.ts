@@ -49,7 +49,9 @@ export const config = {
     mail: {
         provider: (): 'smtp' | 'resend' | 'faker' => {
             const provider = process.env.MAILER_PROVIDER;
-            return !provider || provider === 'none' ? 'faker' : 'smtp';
+            if (!provider || provider === 'none') return 'faker';
+            if (provider === 'resend') return 'resend';
+            return 'smtp';
         },
         from: () => {
             const appName = config.branding.appName();
