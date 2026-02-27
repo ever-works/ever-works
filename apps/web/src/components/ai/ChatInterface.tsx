@@ -199,9 +199,11 @@ export function ChatInterface() {
                         onClick={handleResetConversation}
                         disabled={isStreaming}
                         className={cn(
-                            'text-xs cursor-pointer font-medium text-primary w-1/3',
+                            'text-xs cursor-pointer font-medium text-primary',
                             'hover:text-primary-hover',
                             'disabled:opacity-50 disabled:cursor-not-allowed',
+                            'border border-primary-hover rounded-full px-1.5 py-0.5 transition-colors',
+                            'bg-primary-hover/10',
                         )}
                     >
                         {`+ ${t('newChat')}`}

@@ -128,7 +128,7 @@ export function DashboardSidebar({
                 className={cn(
                     'fixed lg:relative top-0 h-full z-50',
                     'transition-[left,margin,width] duration-300 ease-in-out',
-                    'bg-surface-secondary dark:bg-surface-dark',
+                    'bg-white dark:bg-surface-dark',
                     'border-r border-border dark:border-gray-700/30',
                     !width && !isCollapsed && 'w-80',
                     'shrink-0',
@@ -216,7 +216,7 @@ export function DashboardSidebar({
                     >
                         <div
                             className={cn(
-                                'flex items-center rounded-xl duration-300 ease-in-out p-1 gap-0.5 border border-border/70 bg-white dark:bg-surface-dark dark:border-white/5',
+                                'flex items-center rounded-xl duration-300 ease-in-out p-1 gap-0.5 border border-border bg-surface-secondary dark:bg-surface-dark dark:border-surface-tertiary/10',
                                 isCollapsed && 'flex-col',
                             )}
                         >
@@ -229,9 +229,9 @@ export function DashboardSidebar({
                                     }}
                                     className={cn(
                                         'flex items-center cursor-pointer justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200',
-                                        isCollapsed ? 'w-8 h-8 px-0' : 'flex-1',
+                                        isCollapsed ? 'w-8 h-8 px-0 ' : 'flex-1',
                                         (isCollapsed ? !chatPanelOpen : activeMode === 'menu')
-                                            ? 'bg-surface-dark text-white shadow-sm ring-1 ring-white/8 dark:bg-white/10 dark:text-white'
+                                            ? 'bg-surface-dark/90 text-white shadow-sm ring-1 ring-white/8 dark:bg-white/10 dark:text-white'
                                             : 'text-text-secondary hover:text-text hover:bg-surface-tertiary/50 dark:text-white/60 dark:hover:text-white dark:hover:bg-white/5',
                                     )}
                                 >
@@ -252,7 +252,7 @@ export function DashboardSidebar({
                                         'flex items-center justify-center cursor-pointer gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200',
                                         isCollapsed ? 'w-8 h-8 px-0' : 'flex-1',
                                         (isCollapsed ? chatPanelOpen : activeMode === 'chat')
-                                            ? 'bg-surface-dark text-white shadow-sm ring-1 ring-white/8 dark:bg-white/10 dark:text-white'
+                                            ? 'bg-surface-dark/90 text-white shadow-sm ring-1 ring-white/8 dark:bg-white/10 dark:text-white'
                                             : 'text-text-secondary hover:text-text hover:bg-surface-tertiary/50 dark:text-white/60 dark:hover:text-white dark:hover:bg-white/5',
                                     )}
                                 >
@@ -276,7 +276,7 @@ export function DashboardSidebar({
                         >
                             <div
                                 className={cn(
-                                    isCollapsed ? 'px-2 py-4 flex justify-center' : 'px-6 py-8',
+                                    isCollapsed ? 'px-2 py-4 flex justify-center' : 'px-6 pt-4 pb-10',
                                 )}
                             >
                                 {isCollapsed ? (
@@ -285,7 +285,7 @@ export function DashboardSidebar({
                                             href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
                                             variant="primary"
                                             size="icon"
-                                            className="w-9 h-9 text-white bg-primary-hover hover:bg-primary-hover/80 shadow-sm"
+                                            className="w-9 h-9 text-white bg-primary-hover hover:bg-primary-hover/80 shadow-sm rounded-xl"
                                         >
                                             <Plus className="w-5 h-5" />
                                         </Button>
@@ -296,7 +296,7 @@ export function DashboardSidebar({
                                         variant="primary"
                                         size="lg"
                                         fullWidth
-                                        className="text-white dark:bg-primary-hover bg-primary-hover hover:bg-primary-hover/80 shadow-sm ring-1 dark:ring-white/6 dark:border dark:border-white/6 dark:hover:border-white/12"
+                                        className="dark:text-white hover:text-white text-primary-hover rounded-xl dark:bg-primary-hover/20 text-sm bg-primary-hover/10 hover:bg-primary-hover/80 shadow-sm ring-1 dark:ring-white/6 dark:border dark:border-primary-hover dark:hover:border-white/12"
                                     >
                                         <Plus className="w-5 h-5" />
                                         <span className="font-medium">{t('newDirectory')}</span>
@@ -337,13 +337,13 @@ export function DashboardSidebar({
                                                         href={item.href}
                                                         onClick={() => setChatPanelOpen(false)}
                                                         className={cn(
-                                                            'flex items-center rounded-lg transition-colors',
+                                                            'flex items-center rounded-lg transition-colors border border-transparent',
                                                             isCollapsed
-                                                                ? 'justify-center w-9 h-9 px-0'
-                                                                : 'gap-3 px-4 py-3',
+                                                                ? 'justify-center w-8 h-8 px-0'
+                                                                : 'gap-3 px-4 py-2',
                                                             isActive
-                                                                ? 'bg-surface-tertiary dark:bg-surface-secondary-dark/50 text-primary'
-                                                                : 'text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-secondary-dark/30 hover:text-text dark:hover:text-text-dark',
+                                                                ? 'border bg-surface-secondary border-surface-tertiary dark:border-primary/10 dark:bg-surface-secondary-dark/50 text-text dark:text-primary'
+                                                                : 'text-text dark:text-text-secondary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark/30 hover:text-text dark:hover:text-text-dark',
                                                         )}
                                                     >
                                                         <item.icon className="w-5 h-5 shrink-0" />
@@ -436,7 +436,7 @@ export function DashboardSidebar({
                     className={cn(
                         'fixed top-0 left-16 h-full z-40 flex flex-col',
                         'w-80',
-                        'bg-surface-secondary dark:bg-surface-dark',
+                        'bg-white dark:bg-surface-dark',
                         'border-r border-border dark:border-gray-700/30',
                         'shadow-xl',
                         'animate-in slide-in-from-left-2 duration-200',
