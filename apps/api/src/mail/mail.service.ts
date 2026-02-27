@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { config } from '../config/constants';
-import { MailerService } from './mailer.service';
+import { MailerService } from './providers/mailer.service';
 import {
     UserAccountDeletionEvent,
     UserForgotPasswordEvent,
