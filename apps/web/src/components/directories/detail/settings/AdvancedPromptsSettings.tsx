@@ -9,6 +9,10 @@ import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { getAdvancedPrompts, updateAdvancedPrompts } from '@/app/actions/dashboard/directories';
 import { DirectoryAdvancedPrompts } from '@/lib/api/directory';
+import {
+    getComparisonAiConfig,
+    saveComparisonCustomPrompt,
+} from '@/app/actions/dashboard/comparisons';
 
 interface AdvancedPromptsSettingsProps {
     directoryId: string;
@@ -37,6 +41,8 @@ export function AdvancedPromptsSettings({ directoryId }: AdvancedPromptsSettings
     const [isExpanded, setIsExpanded] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [isSavingComparison, setIsSavingComparison] = useState(false);
+    const [comparisonPrompt, setComparisonPrompt] = useState('');
     const [formData, setFormData] = useState<FormData>({
         relevanceAssessment: '',
         itemGeneration: '',
@@ -58,7 +64,11 @@ export function AdvancedPromptsSettings({ directoryId }: AdvancedPromptsSettings
     const loadAdvancedPrompts = async () => {
         setIsLoading(true);
         try {
-            const result = await getAdvancedPrompts(directoryId);
+            const [result, comparisonConfig] = await Promise.all([
+                getAdvancedPrompts(directoryId),
+                getComparisonAiConfig(directoryId),
+            ]);
+
             if (result.success && result.data) {
                 const data = result.data as DirectoryAdvancedPrompts;
                 setFormData({
@@ -71,6 +81,8 @@ export function AdvancedPromptsSettings({ directoryId }: AdvancedPromptsSettings
                     sourceValidation: data.sourceValidation || '',
                 });
             }
+
+            setComparisonPrompt(comparisonConfig.currentConfig.customPrompt || '');
         } catch (error) {
             console.error('Failed to load advanced prompts:', error);
         } finally {
@@ -101,6 +113,27 @@ export function AdvancedPromptsSettings({ directoryId }: AdvancedPromptsSettings
             toast.error(t('saveFailed'));
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleSaveComparison = async () => {
+        setIsSavingComparison(true);
+        try {
+            const result = await saveComparisonCustomPrompt(
+                directoryId,
+                comparisonPrompt.trim() || null,
+            );
+
+            if (result.success) {
+                toast.success(t('saveComparisonSuccess'));
+            } else {
+                toast.error(result.error || t('saveFailed'));
+            }
+        } catch (error) {
+            console.error('Failed to save comparison prompt:', error);
+            toast.error(t('saveFailed'));
+        } finally {
+            setIsSavingComparison(false);
         }
     };
 
@@ -149,6 +182,11 @@ export function AdvancedPromptsSettings({ directoryId }: AdvancedPromptsSettings
                         </div>
                     ) : (
                         <>
+                            {/* Item Generation Section */}
+                            <h4 className="text-base font-medium text-text dark:text-text-dark">
+                                {t('sections.itemGeneration')}
+                            </h4>
+
                             {PROMPT_FIELDS.map((field) => (
                                 <div key={field} className="space-y-2">
                                     <AutoResizeTextarea
@@ -173,6 +211,40 @@ export function AdvancedPromptsSettings({ directoryId }: AdvancedPromptsSettings
                                 onClick={handleSave}
                                 disabled={isSaving}
                                 loading={isSaving}
+                                variant="secondary"
+                            >
+                                {t('save')}
+                            </Button>
+
+                            {/* Comparison Generation Section */}
+                            <hr className="border-border dark:border-border-dark" />
+
+                            <h4 className="text-base font-medium text-text dark:text-text-dark">
+                                {t('sections.comparisonGeneration')}
+                            </h4>
+
+                            <div className="space-y-2">
+                                <AutoResizeTextarea
+                                    label={t('prompts.comparisonCustomPrompt.title')}
+                                    value={comparisonPrompt}
+                                    onChange={(e) => setComparisonPrompt(e.target.value)}
+                                    placeholder={t('prompts.comparisonCustomPrompt.placeholder')}
+                                    rows={3}
+                                    variant="form"
+                                    minRows={2}
+                                    maxHeight={200}
+                                    maxLength={2000}
+                                />
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('prompts.comparisonCustomPrompt.description')}
+                                </p>
+                            </div>
+
+                            <Button
+                                type="button"
+                                onClick={handleSaveComparison}
+                                disabled={isSavingComparison}
+                                loading={isSavingComparison}
                                 variant="secondary"
                             >
                                 {t('save')}

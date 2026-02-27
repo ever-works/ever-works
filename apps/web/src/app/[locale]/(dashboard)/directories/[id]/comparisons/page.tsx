@@ -19,7 +19,11 @@ export default async function DirectoryComparisonsPage({ params }: Params) {
     let items: Array<{ slug: string; name: string; category: string | string[] }> = [];
 
     const defaultAiConfig = {
-        currentConfig: { provider: null as string | null, model: null as string | null },
+        currentConfig: {
+            provider: null as string | null,
+            model: null as string | null,
+            extendedAnalysis: false,
+        },
         availableProviders: [] as Awaited<
             ReturnType<typeof getComparisonAiConfig>
         >['availableProviders'],

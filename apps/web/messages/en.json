@@ -632,6 +632,91 @@
                 "generationStatus": "Generation Status",
                 "daysActive": "Days Active"
             },
+            "comparisons": {
+                "title": "Comparisons",
+                "subtitle": "A vs B comparison pages between directory items",
+                "vs": "vs",
+                "winner": "Winner: {name}",
+                "tie": "Tie",
+
+                "actions": {
+                    "compareItems": "Compare Items",
+                    "generateNext": "Generate Next",
+                    "generating": "Generating...",
+                    "generateAll": "Generate All",
+                    "save": "Save",
+                    "stop": "Stop",
+                    "generate": "Generate",
+                    "cancel": "Cancel",
+                    "delete": "Delete"
+                },
+
+                "aiModel": {
+                    "title": "AI Model",
+                    "provider": "Provider",
+                    "model": "Model",
+                    "default": "Default",
+                    "defaultSuffix": "(Default)",
+                    "loadingModels": "Loading models...",
+                    "providerDefault": "Provider default",
+                    "extendedAnalysisLabel": "Extended Analysis",
+                    "extendedAnalysisDescription": "Generate an in-depth deep-dive analysis alongside each comparison"
+                },
+
+                "manualForm": {
+                    "title": "Compare Two Items",
+                    "itemA": "Item A",
+                    "itemB": "Item B",
+                    "searchPlaceholder": "Search items...",
+                    "noItems": "No items found"
+                },
+
+                "progress": {
+                    "generating": "Generating comparisons: {completed} / {total} complete",
+                    "error": "{count, plural, one {# error} other {# errors}}",
+                    "stopped": "Stopped. Generated {count, plural, one {# comparison} other {# comparisons}} with {errors, plural, one {# error} other {# errors}}.",
+                    "done": "Done! Generated {count, plural, one {# comparison} other {# comparisons}}."
+                },
+
+                "pagination": {
+                    "showing": "Showing {from}\u2013{to} of {total}"
+                },
+
+                "empty": {
+                    "title": "No comparisons yet",
+                    "description": "Click \"Generate Next\" to auto-pick items, or \"Compare Items\" to choose a specific pair."
+                },
+
+                "deleteDialog": {
+                    "title": "Delete Comparison",
+                    "confirmation": "Are you sure you want to delete \"{title}\"? This action cannot be undone."
+                },
+
+                "generateAllDialog": {
+                    "title": "Generate All Comparisons",
+                    "confirmation": "Generate {count} remaining {count, plural, one {comparison} other {comparisons}}? This may take several minutes. You can stop at any time."
+                },
+
+                "toast": {
+                    "selectTwo": "Please select two items to compare",
+                    "cannotCompareSelf": "Cannot compare an item with itself",
+                    "noRemaining": "No remaining pairs to generate",
+                    "consecutiveErrors": "Stopped after 3 consecutive errors",
+                    "deleted": "Comparison deleted",
+                    "aiConfigSaved": "AI model settings saved",
+                    "aiConfigFailed": "Failed to save AI config"
+                },
+
+                "detail": {
+                    "backToComparisons": "Back to comparisons",
+                    "summary": "Summary",
+                    "dimensions": "Dimensions",
+                    "verdict": "Verdict",
+                    "article": "Article",
+                    "extendedAnalysis": "Extended Analysis",
+                    "sources": "Sources"
+                }
+            },
             "history": {
                 "title": "Generation History",
                 "subtitle": "Track past generation runs, items created, and execution details.",
@@ -1170,10 +1255,15 @@
                 "visibilityConfirmPrivate": "Yes, Make Private",
                 "advancedPrompts": {
                     "title": "Advanced Prompts",
-                    "subtitle": "Customize AI prompts for directory generation. Leave empty to use defaults.",
+                    "subtitle": "Customize AI prompts for item generation and comparison generation. Leave empty to use defaults.",
                     "save": "Save Prompts",
                     "saveSuccess": "Advanced prompts saved successfully",
                     "saveFailed": "Failed to save advanced prompts",
+                    "saveComparisonSuccess": "Comparison prompt saved successfully",
+                    "sections": {
+                        "itemGeneration": "Item Generation",
+                        "comparisonGeneration": "Comparison Generation"
+                    },
                     "prompts": {
                         "relevanceAssessment": {
                             "title": "Relevance Assessment",
@@ -1209,6 +1299,11 @@
                             "title": "Source Validation",
                             "description": "Additional instructions for validating item source URLs.",
                             "placeholder": "e.g., Prefer official project websites over third-party reviews..."
+                        },
+                        "comparisonCustomPrompt": {
+                            "title": "Custom Prompt",
+                            "description": "Additional instructions appended to comparison generation prompts.",
+                            "placeholder": "e.g., \"Focus on pricing differences\", \"Write in a casual tone\""
                         }
                     }
                 },

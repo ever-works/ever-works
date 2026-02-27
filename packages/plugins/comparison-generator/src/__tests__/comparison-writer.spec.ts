@@ -204,4 +204,43 @@ describe('generateComparison', () => {
 		const prompt = askJson.mock.calls[0][0] as string;
 		expect(prompt).not.toContain('Directory Context');
 	});
+
+	it('should call askText twice when extendedAnalysis is true', async () => {
+		const ai = makeAi();
+
+		const result = await generateComparison(pair, research, ai, {
+			name: 'Test',
+			extendedAnalysis: true
+		});
+
+		expect(ai.askJson).toHaveBeenCalledTimes(1);
+		expect(ai.askText).toHaveBeenCalledTimes(2);
+		expect(result.extendedAnalysisMarkdown).toBe(MOCK_MARKDOWN);
+	});
+
+	it('should call askText once when extendedAnalysis is false', async () => {
+		const ai = makeAi();
+
+		const result = await generateComparison(pair, research, ai, {
+			name: 'Test',
+			extendedAnalysis: false
+		});
+
+		expect(ai.askText).toHaveBeenCalledTimes(1);
+		expect(result.extendedAnalysisMarkdown).toBeUndefined();
+	});
+
+	it('should include item names in extended analysis prompt', async () => {
+		const askText = vi.fn().mockResolvedValue(MOCK_MARKDOWN);
+		const ai = makeAi({ askText });
+
+		await generateComparison(pair, research, ai, {
+			name: 'Test',
+			extendedAnalysis: true
+		});
+
+		const extendedPrompt = askText.mock.calls[1][0] as string;
+		expect(extendedPrompt).toContain('Vercel');
+		expect(extendedPrompt).toContain('Netlify');
+	});
 });
