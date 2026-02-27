@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ComparisonGeneratorPlugin } from '../comparison-generator.plugin.js';
-import { DEFAULT_COMPARISON_SETTINGS } from '../types.js';
 import type { PluginContext } from '@ever-works/plugin';
 
 describe('ComparisonGeneratorPlugin', () => {
@@ -222,12 +221,12 @@ describe('ComparisonGeneratorPlugin', () => {
 	});
 
 	describe('getDefaultValues', () => {
-		it('should match DEFAULT_COMPARISON_SETTINGS', () => {
+		it('should match default comparison settings', () => {
 			const defaults = plugin.getDefaultValues();
 			expect(defaults.comparison_enabled).toBe(false);
-			expect(defaults.comparison_cadence).toBe(DEFAULT_COMPARISON_SETTINGS.cadence_override);
-			expect(defaults.comparison_max_mode).toBe(DEFAULT_COMPARISON_SETTINGS.max_comparisons_mode);
-			expect(defaults.comparison_max).toBe(DEFAULT_COMPARISON_SETTINGS.max_comparisons);
+			expect(defaults.comparison_cadence).toBe('use_directory');
+			expect(defaults.comparison_max_mode).toBe('custom');
+			expect(defaults.comparison_max).toBe(50);
 		});
 	});
 });

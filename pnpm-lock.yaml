@@ -447,9 +447,6 @@ importers:
 
   packages/agent:
     dependencies:
-      '@ever-works/comparison-generator-plugin':
-        specifier: workspace:*
-        version: link:../plugins/comparison-generator
       '@ever-works/contracts':
         specifier: workspace:*
         version: link:../contracts

@@ -23,7 +23,6 @@ module.exports = {
         '^@ever-works/plugin/(.*)$': '<rootDir>/../../plugin/src/$1/index.ts',
         '^@ever-works/contracts$': '<rootDir>/../../contracts/src/index.ts',
         '^@ever-works/contracts/(.*)$': '<rootDir>/../../contracts/src/$1/index.ts',
-        '^@ever-works/comparison-generator-plugin$': '<rootDir>/../../plugins/comparison-generator/src/index.ts',
         // Handle .js extension in ESM-style imports (resolve to .ts)
         '^(\\.{1,2}/.*)\\.js$': '$1',
     },

@@ -10,7 +10,6 @@ import type {
 	PluginHealthCheck
 } from '@ever-works/plugin';
 import type { FormFieldDefinition, FormFieldGroup } from '@ever-works/contracts';
-import { DEFAULT_COMPARISON_SETTINGS } from './types.js';
 
 export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 	readonly id = 'comparison-generator';
@@ -192,46 +191,50 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 			{
 				name: 'comparison_enabled',
 				type: 'boolean',
-				label: 'Generate Comparisons',
-				description: 'Enable A vs B comparison page generation for this directory',
+				label: 'Enable Comparisons',
+				description: 'Automatically generate A vs B comparison pages between directory items',
 				defaultValue: false,
-				group: 'comparisons'
+				group: 'comparisons',
+				order: 1
 			},
 			{
 				name: 'comparison_cadence',
 				type: 'select',
-				label: 'Comparison Cadence',
-				description: 'How often to auto-generate a new comparison',
-				options: [
-					{ label: 'Use Directory Schedule', value: 'use_directory' },
-					{ label: 'Daily', value: 'daily' },
-					{ label: 'Weekly', value: 'weekly' },
-					{ label: 'Monthly', value: 'monthly' }
-				],
+				label: 'Generation Cadence',
+				description: 'How often to auto-generate comparisons',
 				defaultValue: 'use_directory',
-				group: 'comparisons'
+				options: [
+					{ value: 'use_directory', label: 'Use Directory Schedule' },
+					{ value: 'daily', label: 'Daily' },
+					{ value: 'weekly', label: 'Weekly' },
+					{ value: 'monthly', label: 'Monthly' }
+				],
+				group: 'comparisons',
+				order: 2
 			},
 			{
 				name: 'comparison_max_mode',
 				type: 'select',
-				label: 'Max Comparisons',
-				description: 'Limit the number of comparisons or generate all possible pairs',
-				options: [
-					{ label: 'Custom', value: 'custom' },
-					{ label: 'Unlimited', value: 'unlimited' }
-				],
+				label: 'Max Comparisons Mode',
+				description: 'Whether to cap comparisons at a custom limit or generate all possible pairs',
 				defaultValue: 'custom',
-				group: 'comparisons'
+				options: [
+					{ value: 'custom', label: 'Custom Limit' },
+					{ value: 'unlimited', label: 'All Pairs' }
+				],
+				group: 'comparisons',
+				order: 3
 			},
 			{
 				name: 'comparison_max',
 				type: 'number',
-				label: 'Max Comparisons Limit',
-				description: 'Maximum number of comparisons to generate',
+				label: 'Max Comparisons',
+				description: 'Maximum total comparisons to generate (only used in Custom mode)',
 				defaultValue: 50,
 				validation: { min: 1, max: 500 },
 				showIf: { field: 'comparison_max_mode', operator: 'eq', value: 'custom' },
-				group: 'comparisons'
+				group: 'comparisons',
+				order: 4
 			}
 		];
 	}
@@ -240,7 +243,7 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 		return [
 			{
 				name: 'comparisons',
-				title: 'Comparison Pages',
+				title: 'Comparisons',
 				description: 'Configure automatic A vs B comparison page generation',
 				collapsible: true,
 				collapsed: true
@@ -254,7 +257,7 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 		if (values.comparison_max !== undefined && values.comparison_max_mode !== 'unlimited') {
 			const max = Number(values.comparison_max);
 			if (isNaN(max) || max < 1 || max > 500) {
-				errors.push({ path: 'comparison_max', message: 'Must be between 1 and 500' });
+				errors.push({ path: 'comparison_max', message: 'Max comparisons must be between 1 and 500' });
 			}
 		}
 
@@ -264,9 +267,9 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 	getDefaultValues(): Record<string, unknown> {
 		return {
 			comparison_enabled: false,
-			comparison_cadence: DEFAULT_COMPARISON_SETTINGS.cadence_override,
-			comparison_max_mode: DEFAULT_COMPARISON_SETTINGS.max_comparisons_mode,
-			comparison_max: DEFAULT_COMPARISON_SETTINGS.max_comparisons
+			comparison_cadence: 'use_directory',
+			comparison_max_mode: 'custom',
+			comparison_max: 50
 		};
 	}
 }

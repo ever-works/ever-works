@@ -6,22 +6,22 @@ import { ContentExtractorFacadeService } from '../facades/content-extractor.faca
 import { GitFacadeService, type GitFacadeOptions } from '../facades/git.facade';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
-import { DEFAULT_COMPARISON_SETTINGS } from '@ever-works/comparison-generator-plugin';
 import type { Directory } from '../entities/directory.entity';
 import type { ComparisonData } from '@ever-works/contracts';
 import type { FacadeOptions } from '@ever-works/plugin';
 import { DataRepository, type IDataConfig } from '../generators/data-generator/data-repository';
 import {
+    DEFAULT_COMPARISON_SETTINGS,
     selectNextPair,
     findManualPair,
     buildPairKey,
     countRemainingPairs,
-    type ComparisonPair,
     researchPair,
-    type ResearchDependencies,
     generateComparison,
+    type ComparisonPair,
+    type ResearchDependencies,
     type ComparisonAiDependencies,
-} from '@ever-works/comparison-generator-plugin';
+} from './comparison';
 
 const comparisonStructureSchema = z.object({
     title: z.string(),
