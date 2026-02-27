@@ -87,6 +87,10 @@
         "./community-pr": {
             "types": "./dist/community-pr/index.d.ts",
             "default": "./dist/community-pr/index.js"
+        },
+        "./comparison-generator": {
+            "types": "./dist/comparison-generator/index.d.ts",
+            "default": "./dist/comparison-generator/index.js"
         }
     },
     "scripts": {

@@ -15,6 +15,7 @@ import { MembersController } from './members.controller';
 import { DirectoryCleanupService } from './tasks/directory-cleanup.service';
 import { WebsiteTemplateSchedulerService } from './tasks/website-template-scheduler.service';
 import { CommunityPrSchedulerService } from './tasks/community-pr-scheduler.service';
+import { ComparisonSchedulerService } from './tasks/comparison-scheduler.service';
 
 @Module({
     imports: [
@@ -30,6 +31,7 @@ import { CommunityPrSchedulerService } from './tasks/community-pr-scheduler.serv
         DirectoryCleanupService,
         WebsiteTemplateSchedulerService,
         CommunityPrSchedulerService,
+        ComparisonSchedulerService,
     ],
     controllers: [DirectoriesController, MembersController],
 })

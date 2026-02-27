@@ -7,6 +7,7 @@ import { WebsiteGeneratorModule } from '../generators/website-generator/website-
 import { DatabaseModule } from '../database/database.module';
 import { ImportModule } from '../import/import.module';
 import { CommunityPrModule } from '../community-pr/community-pr.module';
+import { ComparisonGeneratorModule } from '../comparison-generator/comparison-generator.module';
 import { DirectoryDetailService } from './directory-detail.service';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { DirectoryQueryService } from './directory-query.service';
@@ -43,6 +44,7 @@ import { NotificationsModule } from '@src/notifications';
         SubscriptionsModule,
         NotificationsModule,
         CommunityPrModule,
+        ComparisonGeneratorModule,
     ],
     providers: [
         DirectoryOwnershipService,
@@ -76,6 +78,7 @@ import { NotificationsModule } from '@src/notifications';
         RepositoryManagementService,
         GeneratorFormSchemaService,
         CommunityPrModule,
+        ComparisonGeneratorModule,
     ],
 })
 export class DirectoryModule {}

@@ -3,22 +3,40 @@
 import { useState, useTransition } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { updateProfile } from '@/app/actions/settings';
+import { updateProfile, resendVerificationEmail } from '@/app/actions/settings';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
+import { Mail } from 'lucide-react';
 
 interface ProfileSettingsProps {
     user: {
         id: string;
         username: string;
         email: string;
+        emailVerified?: boolean;
     };
 }
 
 export function ProfileSettings({ user }: ProfileSettingsProps) {
     const [isPending, startTransition] = useTransition();
+    const [isResending, startResendTransition] = useTransition();
     const [username, setUsername] = useState(user.username);
     const t = useTranslations('dashboard.settings.profile');
+
+    const handleResendVerification = () => {
+        startResendTransition(async () => {
+            try {
+                const result = await resendVerificationEmail();
+                if (result.success) {
+                    toast.success(t('emailVerification.sent'));
+                } else {
+                    toast.error(result.error || t('emailVerification.sendFailed'));
+                }
+            } catch (error) {
+                toast.error(t('emailVerification.sendFailed'));
+            }
+        });
+    };
 
     const handleSaveProfile = () => {
         if (!username.trim()) {
@@ -51,6 +69,28 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
                 </h2>
                 <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
             </div>
+
+            {!user.emailVerified && (
+                <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 p-4">
+                    <Mail className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+                    <div className="flex-1">
+                        <p className="text-sm font-medium text-text dark:text-text-dark">
+                            {t('emailVerification.title')}
+                        </p>
+                        <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark">
+                            {t('emailVerification.description')}
+                        </p>
+                    </div>
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleResendVerification}
+                        loading={isResending}
+                    >
+                        {t('emailVerification.resend')}
+                    </Button>
+                </div>
+            )}
 
             <div className="space-y-4">
                 {/* Username Field */}

@@ -1,0 +1,55 @@
+{
+	"name": "@ever-works/comparison-generator-plugin",
+	"version": "1.0.0",
+	"description": "Auto-generates SEO-optimized A vs B comparison pages between directory items",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@ever-works/contracts": "workspace:*",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "comparison-generator",
+			"name": "Comparison Generator",
+			"version": "1.0.0",
+			"category": "utility",
+			"capabilities": [
+				"form-schema-provider"
+			],
+			"description": "Auto-generates SEO-optimized A vs B comparison pages between directory items. Runs on a schedule, generating one high-quality comparison per pass. Also supports manual item-to-item comparison.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"builtIn": true,
+			"autoEnable": false,
+			"systemPlugin": true
+		}
+	}
+}

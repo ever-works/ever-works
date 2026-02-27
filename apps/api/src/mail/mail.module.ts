@@ -1,13 +1,14 @@
 import path from 'node:path';
 import { Module } from '@nestjs/common';
-import { MailService } from './mail.service';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
+import { Resend } from 'resend';
+import { MailService } from './mail.service';
 
 // Providers
 import { FakerMailerService } from './providers/faker-mailer.service';
 import { config } from '@src/config/constants';
-import { MailerService } from './mailer.service';
+import { MailerService } from './providers/mailer.service';
 
 @Module({
     imports: [
@@ -40,6 +41,20 @@ import { MailerService } from './mailer.service';
         }),
     ],
 
-    providers: [MailService, MailerService, FakerMailerService],
+    providers: [
+        {
+            provide: 'RESEND_CLIENT',
+            useFactory: () => {
+                const apiKey = config.mail.resend.apiKey();
+                if (apiKey) {
+                    return new Resend(apiKey || '');
+                }
+                return undefined;
+            },
+        },
+        MailService,
+        MailerService,
+        FakerMailerService,
+    ],
 })
 export class MailModule {}

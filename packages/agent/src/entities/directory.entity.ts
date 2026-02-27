@@ -141,6 +141,10 @@ export class Directory {
     @Column('simple-json', { nullable: true })
     communityPrState?: CommunityPrState;
 
+    // Comparison Generation FIELDS
+    @Column({ type: 'boolean', default: false })
+    comparisonsEnabled: boolean;
+
     // Website Template Auto-Update FIELDS
     @Column({ type: 'boolean', default: false })
     websiteTemplateAutoUpdate: boolean;

@@ -166,6 +166,10 @@ export class UpdateWebsiteSettingsDto {
     surveys_enabled?: boolean;
 
     @IsOptional()
+    @IsBoolean()
+    comparisons_enabled?: boolean;
+
+    @IsOptional()
     @ValidateNested()
     @Type(() => SettingsHeaderDto)
     header?: SettingsHeaderDto;
@@ -199,6 +203,7 @@ export interface WebsiteSettingsResponseDto {
         companies_enabled?: boolean;
         tags_enabled?: boolean;
         surveys_enabled?: boolean;
+        comparisons_enabled?: boolean;
         header?: {
             submit_enabled?: boolean;
             pricing_enabled?: boolean;
