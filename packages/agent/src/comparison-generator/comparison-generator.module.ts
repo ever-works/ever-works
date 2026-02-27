@@ -4,8 +4,8 @@ import { FacadesModule } from '../facades/facades.module';
 import { ComparisonGenerationService } from './comparison-generation.service';
 
 @Module({
-	imports: [DatabaseModule, FacadesModule],
-	providers: [ComparisonGenerationService],
-	exports: [ComparisonGenerationService],
+    imports: [DatabaseModule, FacadesModule],
+    providers: [ComparisonGenerationService],
+    exports: [ComparisonGenerationService],
 })
 export class ComparisonGeneratorModule {}
