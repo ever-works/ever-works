@@ -22,24 +22,43 @@ export class MailerService {
     }
 
     async sendMail(data: SendMailOptions): Promise<void> {
-        switch (config.mail.provider()) {
+        const provider = config.mail.provider();
+        const recipient = data.to ? this.getDestination(data.to).join(', ') : 'unknown';
+
+        switch (provider) {
             case 'smtp':
+                this.logger.log(`Sending email via SMTP to=${recipient} subject="${data.subject}"`);
                 await this.smtpMailerService.sendMail(data);
+                this.logger.log(`Email sent via SMTP to=${recipient}`);
                 break;
 
             case 'resend': {
-                if (this.resend) {
-                    await this.resend.emails.send({
-                        to: this.getDestination(data.to),
-                        from: config.mail.resend.emailFrom(),
-                        subject: data.subject,
-                        html: await this.readHtmlTemplate(data),
-                    });
+                if (!this.resend) {
+                    this.logger.warn(
+                        `Resend client not initialized (missing RESEND_APIKEY?), falling back to faker for to=${recipient}`,
+                    );
+                    await this.fakerMailerService.sendMail(data);
                     break;
                 }
+
+                const from = config.mail.resend.emailFrom();
+                this.logger.log(
+                    `Sending email via Resend to=${recipient} from="${from}" subject="${data.subject}"`,
+                );
+                const result = await this.resend.emails.send({
+                    to: this.getDestination(data.to),
+                    from,
+                    subject: data.subject,
+                    html: await this.readHtmlTemplate(data),
+                });
+                this.logger.log(
+                    `Email sent via Resend to=${recipient} id=${result.data?.id ?? 'unknown'}`,
+                );
+                break;
             }
 
             default:
+                this.logger.debug(`No mail provider configured, using faker for to=${recipient}`);
                 await this.fakerMailerService.sendMail(data);
                 break;
         }
