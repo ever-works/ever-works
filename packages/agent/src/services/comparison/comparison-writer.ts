@@ -108,7 +108,7 @@ function buildStructurePrompt(
         prompt += `\n\n## Additional User Instructions:\n${directoryContext.customPrompt.trim()}`;
     }
 
-    prompt += `\n\nGenerate a comprehensive, fair, and balanced comparison. Analyze both items across 4-6 relevant dimensions. Score each dimension 1-10. Provide an honest verdict with clear reasoning. The title should be SEO-optimized.`;
+    prompt += `\n\nGenerate a comprehensive, fair, and balanced comparison. Analyze both items across 3-8 relevant dimensions. Score each dimension 1-10. Provide an honest verdict with clear reasoning. The title should be SEO-optimized.`;
 
     return prompt;
 }
@@ -239,15 +239,23 @@ export async function generateComparison(
         extendedAnalysisMarkdown = await ai.askText(extendedPrompt);
     }
 
-    const slug = buildPairKey(pair.itemA.slug!, pair.itemB.slug!);
+    const slugA = pair.itemA.slug;
+    const slugB = pair.itemB.slug;
+    if (!slugA || !slugB) {
+        throw new Error(
+            `Cannot generate comparison: missing slug for ${!slugA ? pair.itemA.name : pair.itemB.name}`,
+        );
+    }
+
+    const slug = buildPairKey(slugA, slugB);
 
     return {
         comparison: {
             id: slug,
             slug,
             title: structure.title,
-            item_a_slug: pair.itemA.slug!,
-            item_b_slug: pair.itemB.slug!,
+            item_a_slug: slugA,
+            item_b_slug: slugB,
             item_a_name: pair.itemA.name,
             item_b_name: pair.itemB.name,
             category: pair.category,

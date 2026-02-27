@@ -65,6 +65,8 @@ export async function researchPair(
                 // Limit each extraction to ~2000 chars to control token cost
                 const trimmed = content.length > 2000 ? content.slice(0, 2000) + '...' : content;
                 contentParts.push(`Source: ${result.url}\n${trimmed}`);
+            } else if (result.snippet) {
+                contentParts.push(`Source: ${result.url}\n${result.snippet}`);
             }
         } catch {
             // Extraction failed for this URL, still keep the snippet

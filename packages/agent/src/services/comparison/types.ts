@@ -36,4 +36,4 @@ export const DEFAULT_COMPARISON_SETTINGS: ComparisonPluginSettings = {
     min_items_for_comparison: 3,
 };
 
-export { ComparisonData, ComparisonDimension };
+export type { ComparisonData, ComparisonDimension };
