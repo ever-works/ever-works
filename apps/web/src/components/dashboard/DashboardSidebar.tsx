@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { LogoEverWork } from '../logos';
 import { useDirectoryDetail } from '../directories/detail/DirectoryDetailContext';
+import { SIDEBAR_WIDTH_MIN, SIDEBAR_WIDTH_MAX } from '@/lib/hooks/use-sidebar-persistence';
 
 interface DashboardSidebarProps {
     user: AuthUser;
@@ -87,7 +88,7 @@ export function DashboardSidebar({
         const onMouseMove = (ev: MouseEvent) => {
             if (!dragRef.current) return;
             const delta = ev.clientX - dragRef.current.startX;
-            const newWidth = Math.min(440, Math.max(320, dragRef.current.startWidth + delta));
+            const newWidth = Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, dragRef.current.startWidth + delta));
             onWidthChange?.(newWidth);
         };
         const onMouseUp = () => {
@@ -139,11 +140,9 @@ export function DashboardSidebar({
                         className={cn(
                             'absolute right-0 top-0 h-full w-1 z-10',
                             'cursor-col-resize',
-                            'hover:bg-primary/40 active:bg-primary/60',
                             'transition-colors duration-150',
                             'group/drag',
                         )}
-                        title="Drag to resize"
                     />
                 )}
                 <div className="flex flex-col h-full">

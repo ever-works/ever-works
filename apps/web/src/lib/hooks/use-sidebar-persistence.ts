@@ -7,8 +7,8 @@ const SIDEBAR_WIDTH_KEY = 'sidebar-width';
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 
 const SIDEBAR_WIDTH_DEFAULT = 320;
-const SIDEBAR_WIDTH_MIN = 220;
-const SIDEBAR_WIDTH_MAX = 520;
+export const SIDEBAR_WIDTH_MIN = 320;
+export const SIDEBAR_WIDTH_MAX = 440;
 
 interface UseSidebarPersistenceReturn {
     sidebarWidth: number;
