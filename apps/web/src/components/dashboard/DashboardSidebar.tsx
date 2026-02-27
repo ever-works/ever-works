@@ -88,7 +88,10 @@ export function DashboardSidebar({
         const onMouseMove = (ev: MouseEvent) => {
             if (!dragRef.current) return;
             const delta = ev.clientX - dragRef.current.startX;
-            const newWidth = Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, dragRef.current.startWidth + delta));
+            const newWidth = Math.min(
+                SIDEBAR_WIDTH_MAX,
+                Math.max(SIDEBAR_WIDTH_MIN, dragRef.current.startWidth + delta),
+            );
             onWidthChange?.(newWidth);
         };
         const onMouseUp = () => {

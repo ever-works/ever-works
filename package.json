@@ -62,7 +62,6 @@
 		"arrowParens": "always",
 		"trailingComma": "none",
 		"quoteProps": "as-needed",
-		"trimTrailingWhitespace": true,
 		"overrides": [
 			{
 				"files": "*.scss",
