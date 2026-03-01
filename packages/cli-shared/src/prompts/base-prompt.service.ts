@@ -121,13 +121,18 @@ export abstract class BasePromptService {
 	/**
 	 * Prompts for a password input
 	 */
-	protected async promptPasswordRequired(message: string, required: boolean = true): Promise<string> {
+	protected async promptPasswordRequired(
+		message: string,
+		required: boolean = true,
+		defaultValue?: string
+	): Promise<string> {
 		const { value } = await inquirer.prompt([
 			{
 				type: 'password',
 				name: 'value',
 				message,
 				mask: '*',
+				default: defaultValue,
 				validate: required
 					? (input: string) => {
 							if (!input || input.trim().length === 0) {

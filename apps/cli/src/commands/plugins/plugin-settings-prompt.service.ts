@@ -53,7 +53,6 @@ export class PluginSettingsPromptService extends BasePromptService {
 
         const settings: Record<string, unknown> = { ...currentSettings };
         const secretSettings: Record<string, unknown> = { ...currentSecretSettings };
-
         for (const [key, prop] of Object.entries(visibleProps)) {
             // Evaluate showIf conditions
             if (prop.showIf) {
@@ -67,11 +66,16 @@ export class PluginSettingsPromptService extends BasePromptService {
             const inheritedValue = fallbackSettings?.[key];
             const displayDefault = currentValue ?? inheritedValue ?? prop.default;
 
-            const label = this.buildLabel(key, prop, scope, inheritedValue);
+            console.log('');
+            this.printFieldHint(prop, scope, inheritedValue);
+            const label = `${prop.title || key}:`;
             const value = await this.promptField(pluginId, prop, label, displayDefault);
 
             if (prop.secret) {
-                secretSettings[key] = value;
+                // Skip empty secrets to preserve existing values
+                if (value && String(value).trim().length > 0) {
+                    secretSettings[key] = value;
+                }
             } else {
                 settings[key] = value;
             }
@@ -124,22 +128,19 @@ export class PluginSettingsPromptService extends BasePromptService {
         };
     }
 
-    private buildLabel(
-        key: string,
+    private printFieldHint(
         prop: PluginSettingsSchemaProperty,
         scope: 'user' | 'directory',
         inheritedValue: unknown,
-    ): string {
-        let label = prop.title || key;
+    ): void {
         if (prop.description) {
-            label += chalk.gray(` — ${prop.description}`);
+            console.log(chalk.gray(`  ${prop.description}`));
         }
         if (scope === 'directory' && inheritedValue !== undefined && inheritedValue !== null) {
             const preview =
                 typeof inheritedValue === 'string' && prop.secret ? '••••' : String(inheritedValue);
-            label += chalk.blue(` [inherited: ${preview}]`);
+            console.log(chalk.blue(`  Inherited: ${preview}`));
         }
-        return label;
     }
 
     private async promptField(
@@ -149,7 +150,11 @@ export class PluginSettingsPromptService extends BasePromptService {
         defaultValue: unknown,
     ): Promise<unknown> {
         if (prop.secret) {
-            return this.promptPasswordRequired(label, false);
+            const maskedDefault = defaultValue ? String(defaultValue) : undefined;
+            const secretLabel = maskedDefault
+                ? `${label} ${chalk.gray(`(${maskedDefault.slice(0, 6)}${'•'.repeat(Math.min(maskedDefault.length - 6, 12))})`)}`
+                : label;
+            return this.promptPasswordRequired(secretLabel, false);
         }
 
         // Model-select widget: fetch models from API and present as select
@@ -195,7 +200,8 @@ export class PluginSettingsPromptService extends BasePromptService {
             return this.promptOptionalText(label, defaultValue);
         }
 
-        const choices: { name: string; value: string }[] = models.map((m) => {
+        const sorted = [...models].sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
+        const choices: { name: string; value: string }[] = sorted.map((m) => {
             const ctx = m.capabilities?.maxContextLength
                 ? chalk.gray(` (${formatContext(m.capabilities.maxContextLength)})`)
                 : '';

@@ -6,7 +6,12 @@ import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
 import { handleCliError } from '../../utils/error';
 import { PluginSettingsPromptService } from './plugin-settings-prompt.service';
-import { getVisibleProperties, getRequiredFields } from '@ever-works/plugin/api';
+import {
+    getVisibleProperties,
+    getRequiredFields,
+    validateRequiredSettings,
+    splitSettingsBySecret,
+} from '@ever-works/plugin/api';
 import type { UserPluginResponse, SettingScopeApi } from '@ever-works/plugin/api';
 
 export const pluginsCommand = new Command('plugins')
@@ -39,7 +44,9 @@ export const pluginsCommand = new Command('plugins')
         }
     });
 
-async function showPluginList(plugins: UserPluginResponse[]): Promise<void> {
+async function showPluginList(plugins: UserPluginResponse[], clear = false): Promise<void> {
+    if (clear) console.clear();
+
     const grouped = groupByCategory(plugins);
     const choices: { name: string; value: string }[] = [];
 
@@ -73,10 +80,12 @@ async function showPluginList(plugins: UserPluginResponse[]): Promise<void> {
     if (selectedPlugin === '__exit__') return;
 
     const plugin = plugins.find((p) => p.pluginId === selectedPlugin)!;
-    await showPluginActions(plugin);
+    await showPluginActions(plugin, true);
 }
 
-async function showPluginActions(plugin: UserPluginResponse): Promise<void> {
+async function showPluginActions(plugin: UserPluginResponse, clear = false): Promise<void> {
+    if (clear) console.clear();
+
     const apiService = getApiService();
 
     // Display plugin info
@@ -85,9 +94,12 @@ async function showPluginActions(plugin: UserPluginResponse): Promise<void> {
     console.log(`  ${chalk.gray('ID:')}       ${plugin.pluginId}`);
     console.log(`  ${chalk.gray('Version:')}  ${plugin.version}`);
     console.log(`  ${chalk.gray('Category:')} ${plugin.category}`);
-    console.log(
-        `  ${chalk.gray('Status:')}   ${plugin.enabled ? chalk.green('Enabled') : chalk.gray('Disabled')}`,
-    );
+    const statusLabel = plugin.systemPlugin
+        ? chalk.blue('System')
+        : plugin.enabled
+          ? chalk.green('Enabled')
+          : chalk.gray('Disabled');
+    console.log(`  ${chalk.gray('Status:')}   ${statusLabel}`);
     if (plugin.description) {
         console.log(`  ${chalk.gray('About:')}    ${plugin.description}`);
     }
@@ -106,10 +118,12 @@ async function showPluginActions(plugin: UserPluginResponse): Promise<void> {
     // Build action choices based on current state
     const actions: { name: string; value: string }[] = [];
 
-    if (plugin.enabled) {
-        actions.push({ name: 'Disable', value: 'disable' });
-    } else {
-        actions.push({ name: 'Enable', value: 'enable' });
+    if (!plugin.systemPlugin) {
+        if (plugin.enabled) {
+            actions.push({ name: 'Disable', value: 'disable' });
+        } else {
+            actions.push({ name: 'Enable', value: 'enable' });
+        }
     }
 
     if (plugin.settingsSchema) {
@@ -153,14 +167,21 @@ async function showPluginActions(plugin: UserPluginResponse): Promise<void> {
             break;
     }
 
-    // Return to list after action (reload to reflect changes)
-    if (action !== 'back') {
-        console.log('');
-    }
+    // Reload and navigate
     const spinner = ora('Refreshing...').start();
     const response = await apiService.getPlugins();
     spinner.stop();
-    await showPluginList(response.plugins);
+
+    if (action === 'back') {
+        await showPluginList(response.plugins, true);
+    } else {
+        const updatedPlugin = response.plugins.find((p) => p.pluginId === plugin.pluginId);
+        if (updatedPlugin) {
+            await showPluginActions(updatedPlugin, true);
+        } else {
+            await showPluginList(response.plugins, true);
+        }
+    }
 }
 
 async function handleEnable(plugin: UserPluginResponse): Promise<void> {
@@ -179,27 +200,45 @@ async function handleEnable(plugin: UserPluginResponse): Promise<void> {
         const visibleProps = getVisibleProperties(plugin.settingsSchema, scopes);
 
         if (requiredFields.length > 0 && Object.keys(visibleProps).length > 0) {
-            console.log(chalk.cyan('\nThis plugin requires configuration before enabling:'));
-            const promptService = new PluginSettingsPromptService();
-            const result = await promptService.promptSettings({
-                pluginId: plugin.pluginId,
-                schema: plugin.settingsSchema,
-                scope: 'user',
+            // Check if existing settings already satisfy requirements
+            const { regular, secret } = splitSettingsBySecret(
+                plugin.settings || {},
+                plugin.settingsSchema,
                 scopes,
-            });
+            );
+            const missing = validateRequiredSettings(
+                regular,
+                secret,
+                plugin.settingsSchema,
+                scopes,
+                'user',
+            );
 
-            if (!result) {
-                console.log(chalk.yellow('Cancelled.'));
-                return;
+            if (missing.length > 0) {
+                console.log(chalk.cyan('\nThis plugin requires configuration before enabling:'));
+                const promptService = new PluginSettingsPromptService();
+                const result = await promptService.promptSettings({
+                    pluginId: plugin.pluginId,
+                    schema: plugin.settingsSchema,
+                    currentSettings: regular,
+                    currentSecretSettings: secret,
+                    scope: 'user',
+                    scopes,
+                });
+
+                if (!result) {
+                    console.log(chalk.yellow('Cancelled.'));
+                    return;
+                }
+
+                enableData = {
+                    settings: Object.keys(result.settings).length > 0 ? result.settings : undefined,
+                    secretSettings:
+                        Object.keys(result.secretSettings).length > 0
+                            ? result.secretSettings
+                            : undefined,
+                };
             }
-
-            enableData = {
-                settings: Object.keys(result.settings).length > 0 ? result.settings : undefined,
-                secretSettings:
-                    Object.keys(result.secretSettings).length > 0
-                        ? result.secretSettings
-                        : undefined,
-            };
         }
     }
 
@@ -255,14 +294,26 @@ async function handleDisable(plugin: UserPluginResponse): Promise<void> {
 async function handleSettings(plugin: UserPluginResponse): Promise<void> {
     const apiService = getApiService();
 
+    // Fetch full plugin details to ensure we have settings
+    const loadSpinner = ora('Loading settings...').start();
+    const fullPlugin = await apiService.getPlugin(plugin.pluginId);
+    loadSpinner.stop();
+
     console.log(chalk.cyan(`\nConfigure settings for "${plugin.name}":\n`));
+    const scopes: SettingScopeApi[] = ['global', 'user'];
+    const { regular, secret } = splitSettingsBySecret(
+        fullPlugin.settings || {},
+        fullPlugin.settingsSchema || plugin.settingsSchema!,
+        scopes,
+    );
     const promptService = new PluginSettingsPromptService();
     const result = await promptService.promptSettings({
         pluginId: plugin.pluginId,
         schema: plugin.settingsSchema!,
-        currentSettings: plugin.settings,
+        currentSettings: regular,
+        currentSecretSettings: secret,
         scope: 'user',
-        scopes: ['global', 'user'],
+        scopes,
     });
 
     if (!result) {

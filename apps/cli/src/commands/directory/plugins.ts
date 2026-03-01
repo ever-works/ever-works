@@ -7,7 +7,7 @@ import { getApiService } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 import { PluginSettingsPromptService } from '../plugins/plugin-settings-prompt.service';
-import { getVisibleProperties } from '@ever-works/plugin/api';
+import { getVisibleProperties, splitSettingsBySecret } from '@ever-works/plugin/api';
 import type { DirectoryPluginResponse, SettingScopeApi } from '@ever-works/plugin/api';
 
 export const pluginsCommand = new Command('plugins')
@@ -70,7 +70,10 @@ export const pluginsCommand = new Command('plugins')
 async function showDirectoryPluginList(
     directoryId: string,
     plugins: DirectoryPluginResponse[],
+    clear = false,
 ): Promise<void> {
+    if (clear) console.clear();
+
     const choices: { name: string; value: string }[] = [];
 
     for (const plugin of plugins) {
@@ -100,13 +103,16 @@ async function showDirectoryPluginList(
     if (selectedPlugin === '__exit__') return;
 
     const plugin = plugins.find((p) => p.pluginId === selectedPlugin)!;
-    await showDirectoryPluginActions(directoryId, plugin);
+    await showDirectoryPluginActions(directoryId, plugin, true);
 }
 
 async function showDirectoryPluginActions(
     directoryId: string,
     plugin: DirectoryPluginResponse,
+    clear = false,
 ): Promise<void> {
+    if (clear) console.clear();
+
     const apiService = getApiService();
 
     // Display plugin info
@@ -128,10 +134,12 @@ async function showDirectoryPluginActions(
     // Build action choices
     const actions: { name: string; value: string }[] = [];
 
-    if (plugin.directoryEnabled) {
-        actions.push({ name: 'Disable for directory', value: 'disable' });
-    } else {
-        actions.push({ name: 'Enable for directory', value: 'enable' });
+    if (!plugin.systemPlugin) {
+        if (plugin.directoryEnabled) {
+            actions.push({ name: 'Disable for directory', value: 'disable' });
+        } else {
+            actions.push({ name: 'Enable for directory', value: 'enable' });
+        }
     }
 
     if (plugin.capabilities?.length > 1) {
@@ -139,7 +147,7 @@ async function showDirectoryPluginActions(
     }
 
     if (plugin.settingsSchema) {
-        const scopes: SettingScopeApi[] = ['global', 'user', 'directory'];
+        const scopes: SettingScopeApi[] = ['global', 'directory'];
         const visibleProps = getVisibleProperties(plugin.settingsSchema, scopes);
         if (Object.keys(visibleProps).length > 0) {
             if (plugin.directoryEnabled) {
@@ -186,14 +194,21 @@ async function showDirectoryPluginActions(
             break;
     }
 
-    // Return to list after action (reload to reflect changes)
-    if (action !== 'back') {
-        console.log('');
-    }
+    // Reload and navigate
     const spinner = ora('Refreshing...').start();
     const response = await apiService.getDirectoryPlugins(directoryId);
     spinner.stop();
-    await showDirectoryPluginList(directoryId, response.plugins);
+
+    if (action === 'back') {
+        await showDirectoryPluginList(directoryId, response.plugins, true);
+    } else {
+        const updatedPlugin = response.plugins.find((p) => p.pluginId === plugin.pluginId);
+        if (updatedPlugin) {
+            await showDirectoryPluginActions(directoryId, updatedPlugin, true);
+        } else {
+            await showDirectoryPluginList(directoryId, response.plugins, true);
+        }
+    }
 }
 
 async function handleDirectoryEnable(
@@ -299,13 +314,20 @@ async function handleDirectorySettings(
     console.log(chalk.cyan(`\nConfigure directory settings for "${plugin.name}":`));
     console.log(chalk.gray('Leave blank to inherit from user-level settings.\n'));
 
+    const scopes: SettingScopeApi[] = ['global', 'directory'];
+    const { regular, secret } = splitSettingsBySecret(
+        plugin.directorySettings || {},
+        plugin.settingsSchema!,
+        scopes,
+    );
     const promptService = new PluginSettingsPromptService();
     const result = await promptService.promptSettings({
         pluginId: plugin.pluginId,
         schema: plugin.settingsSchema!,
-        currentSettings: plugin.directorySettings,
+        currentSettings: regular,
+        currentSecretSettings: secret,
         scope: 'directory',
-        scopes: ['global', 'user', 'directory'],
+        scopes,
         fallbackSettings: userPlugin.settings,
     });
 
