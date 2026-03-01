@@ -8,6 +8,7 @@ import type {
     PluginSettingsSchemaProperty,
     SettingScopeApi,
 } from '@/lib/api/plugins';
+import { validateSettingsConstraints } from '@ever-works/plugin/api';
 
 interface UsePluginSettingsOptions {
     schema: PluginSettingsSchema | undefined;
@@ -254,48 +255,8 @@ export function usePluginSettings({
     }, []);
 
     const validateConstraints = useCallback((): string[] => {
-        const errors: string[] = [];
         const allValues = { ...settings, ...secretSettings };
-        for (const [key, propSchema] of Object.entries(visibleProperties)) {
-            const prop = propSchema as PluginSettingsSchemaProperty;
-            const val = allValues[key];
-            if (val === undefined || val === null || val === '') continue;
-
-            if (prop.type === 'number' && typeof val === 'number') {
-                const label = prop.title || key;
-                if (prop.minimum !== undefined && val < prop.minimum) {
-                    errors.push(`${label} must be at least ${prop.minimum}`);
-                }
-                if (prop.maximum !== undefined && val > prop.maximum) {
-                    errors.push(`${label} must be at most ${prop.maximum}`);
-                }
-            }
-            if (prop.type === 'string' && typeof val === 'string') {
-                const label = prop.title || key;
-                if (prop.minLength !== undefined && val.length < prop.minLength) {
-                    errors.push(`${label} must be at least ${prop.minLength} characters`);
-                }
-                if (prop.maxLength !== undefined && val.length > prop.maxLength) {
-                    errors.push(`${label} must be at most ${prop.maxLength} characters`);
-                }
-                if (prop.pattern) {
-                    try {
-                        if (!new RegExp(prop.pattern).test(val)) {
-                            errors.push(`${label} has an invalid format`);
-                        }
-                    } catch {
-                        // ignore invalid regex from schema
-                    }
-                }
-            }
-            if (prop.enum && prop.enum.length > 0) {
-                if (!prop.enum.includes(val)) {
-                    const label = prop.title || key;
-                    errors.push(`${label} must be one of: ${prop.enum.join(', ')}`);
-                }
-            }
-        }
-        return errors;
+        return validateSettingsConstraints(allValues, visibleProperties).map((e) => e.message);
     }, [settings, secretSettings, visibleProperties]);
 
     const handleSave = useCallback(async () => {

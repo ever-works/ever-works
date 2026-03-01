@@ -23,7 +23,6 @@ describe('SearchFacadeService', () => {
         providerName,
         onLoad: jest.fn(),
         onUnload: jest.fn(),
-        validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         search: jest.fn().mockResolvedValue({ results: [], query: '', totalResults: 0 }),
         isAvailable: jest.fn().mockResolvedValue(true),
         getRateLimitInfo: jest.fn().mockResolvedValue({ remaining: -1, limit: -1 }),

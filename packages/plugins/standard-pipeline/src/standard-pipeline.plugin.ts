@@ -7,7 +7,6 @@ import type {
 	PluginHealthCheck,
 	JsonSchema,
 	ValidationResult,
-	PluginSettings,
 	PipelineStepDefinition,
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
@@ -780,6 +779,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 	}
 
 	// IPlugin lifecycle
+
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
 		this.registerBuiltInStepExecutors();
@@ -813,10 +813,6 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 	async onUnload(): Promise<void> {
 		this.stepExecutors.clear();
 		this.context = undefined;
-	}
-
-	async validateSettings(_settings: PluginSettings): Promise<ValidationResult> {
-		return { valid: true };
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

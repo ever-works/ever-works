@@ -86,34 +86,6 @@ describe('VercelPlugin', () => {
 		});
 	});
 
-	describe('validateSettings', () => {
-		it('should return valid when apiToken is provided', async () => {
-			const result = await plugin.validateSettings({ apiToken: 'valid-token' });
-			expect(result.valid).toBe(true);
-			expect(result.errors).toBeUndefined();
-		});
-
-		it('should return invalid when apiToken is missing', async () => {
-			const result = await plugin.validateSettings({});
-			expect(result.valid).toBe(false);
-			expect(result.errors).toBeDefined();
-			expect(result.errors?.[0]?.path).toBe('apiToken');
-		});
-
-		it('should return invalid when apiToken is empty string', async () => {
-			const result = await plugin.validateSettings({ apiToken: '' });
-			expect(result.valid).toBe(false);
-		});
-
-		it('should accept optional defaultTeamScope', async () => {
-			const result = await plugin.validateSettings({
-				apiToken: 'valid-token',
-				defaultTeamScope: 'my-team'
-			});
-			expect(result.valid).toBe(true);
-		});
-	});
-
 	describe('healthCheck', () => {
 		it('should return healthy status', async () => {
 			const health = await plugin.healthCheck();

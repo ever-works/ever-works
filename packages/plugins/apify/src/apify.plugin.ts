@@ -8,7 +8,6 @@ import type {
 	PluginHealthCheck,
 	JsonSchema,
 	ValidationResult,
-	PluginSettings,
 	DataSourceQueryOptions,
 	DataSourceQueryResult,
 	DataSourceMetadata
@@ -385,11 +384,6 @@ export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvi
 
 	async onUnload(): Promise<void> {
 		this.context = undefined;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		// API token is optional at settings level (can be configured per-directory)
-		return { valid: true };
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

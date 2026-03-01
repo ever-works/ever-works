@@ -6,8 +6,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
-	PluginSettings,
 	ContentExtractionOptions,
 	ContentExtractionResult
 } from '@ever-works/plugin';
@@ -36,6 +34,7 @@ export class PdfExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 				title: 'Mistral API Key',
 				description:
 					'Optional - Your Mistral AI API key. Required only for OCR fallback on scanned/image-based PDFs. Text-layer extraction works without it.',
+				minLength: 10,
 				'x-secret': true,
 				'x-scope': 'user',
 				'x-envVar': 'PLUGIN_PDF_EXTRACTOR_API_KEY'
@@ -245,39 +244,6 @@ export class PdfExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 		this.context = undefined;
 		this.pdfTextExtractor = undefined;
 		this.mistralOcrService = undefined;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		if (settings.mistralApiKey && typeof settings.mistralApiKey === 'string') {
-			if (settings.mistralApiKey.length < 10) {
-				return {
-					valid: false,
-					errors: [
-						{
-							path: 'mistralApiKey',
-							message: 'Mistral API key seems too short. Please check your key.'
-						}
-					]
-				};
-			}
-		}
-
-		if (settings.textDensityThreshold !== undefined) {
-			const threshold = settings.textDensityThreshold as number;
-			if (typeof threshold !== 'number' || threshold < 0 || threshold > 10000) {
-				return {
-					valid: false,
-					errors: [
-						{
-							path: 'textDensityThreshold',
-							message: 'Text density threshold must be a number between 0 and 10000.'
-						}
-					]
-				};
-			}
-		}
-
-		return { valid: true };
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

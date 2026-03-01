@@ -350,13 +350,6 @@ export class PluginSettingsService {
             throw new Error(`Scope violation: ${scopeValidation.violations.join(', ')}`);
         }
 
-        const validation = await registered.plugin.validateSettings(filteredSettings);
-        if (!validation.valid) {
-            throw new Error(
-                `Invalid settings: ${validation.errors?.map((e) => e.message).join(', ')}`,
-            );
-        }
-
         const regularSettings: Record<string, unknown> = {};
         const secretSettings: Record<string, unknown> = {};
         const secretKeys = new Set(options?.secretKeys || []);
@@ -427,12 +420,6 @@ export class PluginSettingsService {
             if (!scopeValidation.valid) {
                 errors.push(...scopeValidation.violations);
             }
-        }
-
-        // Validate settings against schema
-        const result = await registered.plugin.validateSettings(settings);
-        if (!result.valid && result.errors) {
-            errors.push(...result.errors.map((e) => e.message));
         }
 
         return {

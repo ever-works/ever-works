@@ -3,7 +3,6 @@ import type {
 	IFormSchemaProvider,
 	PluginCategory,
 	PluginContext,
-	PluginSettings,
 	PluginManifest,
 	JsonSchema,
 	ValidationResult,
@@ -91,46 +90,6 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 
 	async onUnload(): Promise<void> {
 		this.context = undefined;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (
-			settings.max_comparisons_mode !== undefined &&
-			!['custom', 'unlimited'].includes(settings.max_comparisons_mode as string)
-		) {
-			errors.push({ path: 'max_comparisons_mode', message: 'Must be "custom" or "unlimited"' });
-		}
-
-		if (settings.max_comparisons !== undefined && settings.max_comparisons_mode !== 'unlimited') {
-			const max = Number(settings.max_comparisons);
-			if (isNaN(max) || max < 1 || max > 500) {
-				errors.push({ path: 'max_comparisons', message: 'Max comparisons must be between 1 and 500' });
-			}
-		}
-
-		if (settings.min_items_for_comparison !== undefined) {
-			const min = Number(settings.min_items_for_comparison);
-			if (isNaN(min) || min < 2 || min > 20) {
-				errors.push({
-					path: 'min_items_for_comparison',
-					message: 'Min items must be between 2 and 20'
-				});
-			}
-		}
-
-		if (
-			settings.cadence_override !== undefined &&
-			!['use_directory', 'daily', 'weekly', 'monthly'].includes(settings.cadence_override as string)
-		) {
-			errors.push({
-				path: 'cadence_override',
-				message: 'Invalid cadence value'
-			});
-		}
-
-		return errors.length > 0 ? { valid: false, errors } : { valid: true };
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

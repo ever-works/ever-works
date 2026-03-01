@@ -297,63 +297,6 @@ describe('UrlboxPlugin', () => {
 		});
 	});
 
-	describe('validateSettings', () => {
-		it('should fail when apiKey is missing', async () => {
-			const result = await plugin.validateSettings({});
-
-			expect(result.valid).toBe(false);
-			expect(result.errors?.[0].path).toBe('apiKey');
-		});
-
-		it('should pass with valid settings', async () => {
-			const result = await plugin.validateSettings({
-				apiKey: 'test-key'
-			});
-
-			expect(result.valid).toBe(true);
-		});
-
-		it('should fail when viewport width is out of range', async () => {
-			const result = await plugin.validateSettings({
-				apiKey: 'test-key',
-				viewportWidth: 100 // Too small
-			});
-
-			expect(result.valid).toBe(false);
-			expect(result.errors?.[0].path).toBe('viewportWidth');
-		});
-
-		it('should fail when viewport height is out of range', async () => {
-			const result = await plugin.validateSettings({
-				apiKey: 'test-key',
-				viewportHeight: 5000 // Too large
-			});
-
-			expect(result.valid).toBe(false);
-			expect(result.errors?.[0].path).toBe('viewportHeight');
-		});
-
-		it('should fail with invalid format', async () => {
-			const result = await plugin.validateSettings({
-				apiKey: 'test-key',
-				format: 'gif' // Not supported
-			});
-
-			expect(result.valid).toBe(false);
-			expect(result.errors?.[0].path).toBe('format');
-		});
-
-		it('should fail with invalid quality', async () => {
-			const result = await plugin.validateSettings({
-				apiKey: 'test-key',
-				quality: 150 // Too high
-			});
-
-			expect(result.valid).toBe(false);
-			expect(result.errors?.[0].path).toBe('quality');
-		});
-	});
-
 	describe('Lifecycle', () => {
 		it('should log on load', async () => {
 			await plugin.onLoad(mockContext);

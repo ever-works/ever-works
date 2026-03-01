@@ -6,8 +6,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
-	PluginSettings,
 	ContentExtractionOptions,
 	ContentExtractionResult
 } from '@ever-works/plugin';
@@ -275,27 +273,6 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 	async onUnload(): Promise<void> {
 		this.context = undefined;
 		this.notionService = undefined;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		// API key is optional - validate format if provided
-		if (settings.apiKey && typeof settings.apiKey === 'string') {
-			// Notion API keys start with 'secret_' or 'ntn_'
-			const apiKey = settings.apiKey as string;
-			if (!apiKey.startsWith('secret_') && !apiKey.startsWith('ntn_')) {
-				return {
-					valid: false,
-					errors: [
-						{
-							path: 'apiKey',
-							message: 'Invalid Notion API key format. Keys should start with "secret_" or "ntn_"'
-						}
-					]
-				};
-			}
-		}
-
-		return { valid: true };
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

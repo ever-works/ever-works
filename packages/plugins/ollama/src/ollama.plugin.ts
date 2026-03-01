@@ -5,7 +5,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
 	PluginSettings,
 	ChatCompletionOptions,
 	ChatCompletionResponse,
@@ -168,13 +167,6 @@ export class OllamaPlugin extends BaseAiProvider {
 
 	protected getDefaultModelId(): string {
 		return 'ministral-3:8b';
-	}
-
-	async validateSettings(_settings: PluginSettings): Promise<ValidationResult> {
-		// Ollama has no required fields - defaults work out of the box
-		return {
-			valid: true
-		};
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

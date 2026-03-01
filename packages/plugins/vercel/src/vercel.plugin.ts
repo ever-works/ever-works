@@ -6,8 +6,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
-	PluginSettings,
 	DeploymentConfig,
 	DeploymentResult,
 	DeploymentProject
@@ -166,23 +164,6 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 
 	async onUnload(): Promise<void> {
 		this.context = undefined;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		// apiToken is required for user-required mode
-		if (!settings.apiToken || typeof settings.apiToken !== 'string') {
-			errors.push({
-				path: 'apiToken',
-				message: 'Vercel API token is required'
-			});
-		}
-
-		return {
-			valid: errors.length === 0,
-			errors: errors.length > 0 ? errors : undefined
-		};
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

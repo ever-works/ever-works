@@ -65,7 +65,6 @@ describe('PluginSettingsService', () => {
             configurationMode: 'hybrid',
             onLoad: jest.fn().mockResolvedValue(undefined),
             onUnload: jest.fn().mockResolvedValue(undefined),
-            validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         }) as unknown as IPlugin;
 
     const createRegisteredPlugin = (plugin?: IPlugin): RegisteredPlugin => ({
@@ -323,19 +322,6 @@ describe('PluginSettingsService', () => {
             await expect(service.updateAdminSettings('non-existent', {})).rejects.toThrow(
                 'Plugin "non-existent" not found',
             );
-        });
-
-        it('should throw error for invalid settings', async () => {
-            const plugin = createMockPlugin();
-            (plugin.validateSettings as jest.Mock).mockResolvedValue({
-                valid: false,
-                errors: [{ path: 'enabled', message: 'Must be boolean' }],
-            });
-            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
-
-            await expect(
-                service.updateAdminSettings('test-plugin', { enabled: 'not-boolean' }),
-            ).rejects.toThrow('Invalid settings');
         });
 
         it('should update admin settings', async () => {
@@ -631,22 +617,6 @@ describe('PluginSettingsService', () => {
 
             expect(result.valid).toBe(true);
             expect(result.errors).toBeUndefined();
-        });
-
-        it('should return invalid for invalid settings', async () => {
-            const plugin = createMockPlugin();
-            (plugin.validateSettings as jest.Mock).mockResolvedValue({
-                valid: false,
-                errors: [{ path: 'enabled', message: 'Must be boolean' }],
-            });
-            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
-
-            const result = await service.validateSettings('test-plugin', {
-                enabled: 'not-boolean',
-            });
-
-            expect(result.valid).toBe(false);
-            expect(result.errors).toContain('Must be boolean');
         });
 
         it('should return invalid for non-existent plugin', async () => {
@@ -1088,25 +1058,6 @@ describe('PluginSettingsService', () => {
             );
 
             expect(result.valid).toBe(true);
-        });
-
-        it('should validate both scope and schema', async () => {
-            const plugin = createMockPlugin();
-            (plugin.validateSettings as jest.Mock).mockResolvedValue({
-                valid: false,
-                errors: [{ path: 'maxItems', message: 'Must be a number' }],
-            });
-            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
-
-            const result = await service.validateSettings(
-                'test-plugin',
-                { maxItems: 'not-a-number' },
-                { scope: 'global' },
-            );
-
-            expect(result.valid).toBe(false);
-            // Should have both scope violation and schema validation error
-            expect(result.errors).toHaveLength(2);
         });
 
         it('should skip scope validation when no scope option provided', async () => {

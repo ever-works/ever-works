@@ -108,7 +108,6 @@ describe('PipelineBuilderService', () => {
             configurationMode: 'hybrid',
             onLoad: jest.fn(),
             onUnload: jest.fn(),
-            validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             getStepDefinition: () => stepDef,
             execute: jest.fn().mockImplementation((ctx) => Promise.resolve(ctx)),
         }) as unknown as IPipelineModifierPlugin;

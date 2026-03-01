@@ -185,9 +185,6 @@ export class MockPipelinePlugin implements IPipelinePlugin<string> {
 
     async onLoad(): Promise<void> {}
     async onUnload(): Promise<void> {}
-    async validateSettings(): Promise<{ valid: boolean }> {
-        return { valid: true };
-    }
     getState(): PipelineState | null {
         return null;
     }

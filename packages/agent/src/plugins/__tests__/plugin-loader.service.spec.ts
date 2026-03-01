@@ -34,7 +34,6 @@ describe('PluginLoaderService', () => {
             configurationMode: 'hybrid',
             onLoad: jest.fn().mockResolvedValue(undefined),
             onUnload: jest.fn().mockResolvedValue(undefined),
-            validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         }) as unknown as IPlugin;
 
     const createMockManifest = (id: string = 'test-plugin'): PluginManifest => ({
@@ -400,7 +399,6 @@ describe('PluginLoaderService', () => {
                 settingsSchema = { type: 'object', properties: {} };
                 onLoad = jest.fn();
                 onUnload = jest.fn();
-                validateSettings = jest.fn().mockResolvedValue({ valid: true });
             }
 
             const pluginModule = {

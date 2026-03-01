@@ -133,21 +133,6 @@ describe('OllamaPlugin', () => {
 		});
 	});
 
-	describe('validateSettings', () => {
-		it('should return valid with no settings', async () => {
-			const result = await plugin.validateSettings({});
-			expect(result.valid).toBe(true);
-		});
-
-		it('should return valid with custom settings', async () => {
-			const result = await plugin.validateSettings({
-				apiKey: 'custom-key',
-				baseUrl: 'http://remote:11434/v1'
-			});
-			expect(result.valid).toBe(true);
-		});
-	});
-
 	describe('healthCheck', () => {
 		it('should return healthy status', async () => {
 			const health = await plugin.healthCheck();

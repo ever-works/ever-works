@@ -141,32 +141,6 @@ export function toPluginSettingsSchemaProperty(schema: JsonSchema): PluginSettin
 }
 
 /**
- * Transform a JsonSchema into a PluginSettingsSchema.
- */
-export function toPluginSettingsSchema(schema: JsonSchema): PluginSettingsSchema | undefined {
-	if (schema.type !== 'object' || !schema.properties) {
-		return undefined;
-	}
-
-	const properties: Record<string, PluginSettingsSchemaProperty> = {};
-	for (const [key, propSchema] of Object.entries(schema.properties)) {
-		properties[key] = toPluginSettingsSchemaProperty(propSchema);
-	}
-
-	return {
-		type: 'object',
-		title: schema.title,
-		description: schema.description,
-		properties,
-		required: schema.required as string[] | undefined,
-		requiredGroups: schema['x-requiredGroups']?.map((g) => ({
-			fields: [...g.fields],
-			message: g.message
-		}))
-	};
-}
-
-/**
  * Base plugin response from API
  */
 export interface PluginResponse {

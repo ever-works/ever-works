@@ -132,19 +132,6 @@ describe('ClaudeCodePlugin', () => {
 		expect(groups![0].fields).toContain('apiKey');
 	});
 
-	describe('validateSettings', () => {
-		it('should pass when oauthToken or apiKey is provided', async () => {
-			expect((await plugin.validateSettings({ oauthToken: 'token' })).valid).toBe(true);
-			expect((await plugin.validateSettings({ apiKey: 'key' })).valid).toBe(true);
-		});
-
-		it('should fail when neither auth credential is provided', async () => {
-			const result = await plugin.validateSettings({});
-			expect(result.valid).toBe(false);
-			expect(result.errors![0].code).toBe('auth-required');
-		});
-	});
-
 	it('should return 6 step definitions in correct order', () => {
 		const steps = plugin.getStepDefinitions();
 		expect(steps.map((s) => s.id)).toEqual([

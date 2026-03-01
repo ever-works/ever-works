@@ -29,7 +29,6 @@ describe('ScreenshotFacadeService', () => {
         providerName,
         onLoad: jest.fn(),
         onUnload: jest.fn(),
-        validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         capture: jest.fn().mockResolvedValue({
             success: true,
             imageUrl: 'https://screenshots.example.com/abc123.png',
