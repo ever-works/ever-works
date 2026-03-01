@@ -90,20 +90,21 @@ jobs:
           DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
           DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
           DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
-
           # Enable SSL/TLS for database connections (true/false)
           DATABASE_SSL_MODE: ${{ secrets.DATABASE_SSL_MODE }}
           DATABASE_CA_CERT: ${{ secrets.DATABASE_CA_CERT }}
 
           # Mail
           MAILER_PROVIDER: ${{ secrets.MAILER_PROVIDER }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+
+          # SMTP
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
           SMTP_IGNORE_TLS: ${{ secrets.SMTP_IGNORE_TLS }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
 
           # Resend
           RESEND_APIKEY: ${{ secrets.RESEND_APIKEY }}
