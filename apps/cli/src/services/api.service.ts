@@ -8,7 +8,13 @@ import type {
     GitOrganization,
     FormFieldDefinition,
     FormFieldGroup,
+    AiModel,
 } from '@ever-works/plugin';
+import type {
+    PluginListResponse,
+    UserPluginResponse,
+    DirectoryPluginListResponse,
+} from '@ever-works/plugin/api';
 
 // Re-export types used by other CLI modules
 export type {
@@ -20,6 +26,10 @@ export type {
     GitOrganization,
     FormFieldDefinition,
     FormFieldGroup,
+    AiModel,
+    PluginListResponse,
+    UserPluginResponse,
+    DirectoryPluginListResponse,
 };
 
 // Types for API responses
@@ -328,6 +338,123 @@ export class ApiService {
 
         const response = await this.httpClient.get<GeneratorFormSchema>(url);
         return response.data;
+    }
+
+    // Plugin operations (user-level)
+
+    async getPlugins(options?: { category?: string }): Promise<PluginListResponse> {
+        const queryParams = new URLSearchParams();
+        if (options?.category) queryParams.append('category', options.category);
+        const query = queryParams.toString();
+        const response = await this.httpClient.get<PluginListResponse>(
+            `/plugins${query ? `?${query}` : ''}`,
+        );
+        return response.data;
+    }
+
+    async getPlugin(pluginId: string): Promise<UserPluginResponse> {
+        const response = await this.httpClient.get<UserPluginResponse>(`/plugins/${pluginId}`);
+        return response.data;
+    }
+
+    async listPluginModels(pluginId: string): Promise<readonly AiModel[]> {
+        try {
+            const response = await this.httpClient.get<readonly AiModel[]>(
+                `/plugins/${pluginId}/models`,
+            );
+            return response.data;
+        } catch {
+            return [];
+        }
+    }
+
+    async enablePlugin(
+        pluginId: string,
+        data?: {
+            settings?: Record<string, unknown>;
+            secretSettings?: Record<string, unknown>;
+            autoEnableForDirectories?: boolean;
+        },
+    ): Promise<UserPluginResponse> {
+        const response = await this.httpClient.post<UserPluginResponse>(
+            `/plugins/${pluginId}/enable`,
+            data || {},
+        );
+        return response.data;
+    }
+
+    async disablePlugin(pluginId: string): Promise<UserPluginResponse> {
+        const response = await this.httpClient.post<UserPluginResponse>(
+            `/plugins/${pluginId}/disable`,
+            {},
+        );
+        return response.data;
+    }
+
+    async updatePluginSettings(
+        pluginId: string,
+        data: {
+            settings?: Record<string, unknown>;
+            secretSettings?: Record<string, unknown>;
+        },
+    ): Promise<UserPluginResponse> {
+        const response = await this.httpClient.patch<UserPluginResponse>(
+            `/plugins/${pluginId}/settings`,
+            data,
+        );
+        return response.data;
+    }
+
+    // Plugin operations (directory-level)
+
+    async getDirectoryPlugins(directoryId: string): Promise<DirectoryPluginListResponse> {
+        const response = await this.httpClient.get<DirectoryPluginListResponse>(
+            `/directories/${directoryId}/plugins`,
+        );
+        return response.data;
+    }
+
+    async enableDirectoryPlugin(
+        directoryId: string,
+        pluginId: string,
+        data?: {
+            settings?: Record<string, unknown>;
+            activeCapability?: string;
+            priority?: number;
+        },
+    ): Promise<void> {
+        await this.httpClient.post(
+            `/directories/${directoryId}/plugins/${pluginId}/enable`,
+            data || {},
+        );
+    }
+
+    async disableDirectoryPlugin(directoryId: string, pluginId: string): Promise<void> {
+        await this.httpClient.post(`/directories/${directoryId}/plugins/${pluginId}/disable`, {});
+    }
+
+    async updateDirectoryPluginSettings(
+        directoryId: string,
+        pluginId: string,
+        data: {
+            settings?: Record<string, unknown>;
+            secretSettings?: Record<string, unknown>;
+        },
+    ): Promise<void> {
+        await this.httpClient.patch(
+            `/directories/${directoryId}/plugins/${pluginId}/settings`,
+            data,
+        );
+    }
+
+    async setDirectoryPluginCapability(
+        directoryId: string,
+        pluginId: string,
+        capability: string,
+    ): Promise<void> {
+        await this.httpClient.post(`/directories/${directoryId}/plugins/${pluginId}/capability`, {
+            capability,
+        });
     }
 }
 

@@ -8,7 +8,13 @@ import type {
     PluginSettingsSchemaProperty,
     SettingScopeApi,
 } from '@/lib/api/plugins';
-import { validateSettingsConstraints } from '@ever-works/plugin/api';
+import {
+    validateSettingsConstraints,
+    splitSettingsBySecret as splitBySecret,
+    getVisibleProperties as getVisible,
+    validateRequiredSettings,
+    sanitizeSettingsForSave,
+} from '@ever-works/plugin/api';
 
 interface UsePluginSettingsOptions {
     schema: PluginSettingsSchema | undefined;
@@ -54,42 +60,8 @@ export function usePluginSettings({
     const t = useTranslations('dashboard.plugins');
     const router = useRouter();
 
-    // Helper to split settings into regular and secret based on schema,
-    // and populate schema defaults for visible fields that have no saved value.
-    // This ensures defaults are included in the save payload so the backend
-    // receives them and validation passes at both frontend and backend.
     const splitSettingsBySecret = useCallback(
-        (allSettings: Record<string, unknown>) => {
-            const regular: Record<string, unknown> = {};
-            const secret: Record<string, unknown> = {};
-
-            for (const [key, value] of Object.entries(allSettings)) {
-                const propSchema = schema?.properties?.[key] as
-                    | PluginSettingsSchemaProperty
-                    | undefined;
-                if (propSchema?.secret) {
-                    secret[key] = value;
-                } else {
-                    regular[key] = value;
-                }
-            }
-
-            if (schema?.properties) {
-                for (const [key, propSchema] of Object.entries(schema.properties)) {
-                    const prop = propSchema as PluginSettingsSchemaProperty;
-                    if (prop.hidden || prop.default === undefined) continue;
-                    const propScope = (prop.scope || 'global') as SettingScopeApi;
-                    if (!scopes.includes(propScope)) continue;
-
-                    const target = prop.secret ? secret : regular;
-                    if (!(key in target)) {
-                        target[key] = prop.default;
-                    }
-                }
-            }
-
-            return { regular, secret };
-        },
+        (allSettings: Record<string, unknown>) => splitBySecret(allSettings, schema, scopes),
         [schema, scopes],
     );
 
@@ -136,111 +108,22 @@ export function usePluginSettings({
         };
     }, []);
 
-    // Filter properties by scope and exclude hidden fields
-    const visibleProperties = useMemo(() => {
-        if (!schema?.properties) return {};
-        return Object.fromEntries(
-            Object.entries(schema.properties).filter(([_, propSchema]) => {
-                const prop = propSchema as PluginSettingsSchemaProperty;
-                if (prop.hidden) return false;
-                const scope = prop.scope || 'global';
-                return scopes.includes(scope as SettingScopeApi);
-            }),
-        );
-    }, [schema, scopes]);
+    const visibleProperties = useMemo(() => getVisible(schema, scopes), [schema, scopes]);
 
     const hasSettings = Object.keys(visibleProperties).length > 0;
 
-    // Get required fields for the given scopes
-    const requiredFields = useMemo(() => {
-        if (!schema?.required || !schema.properties) return [];
-        return schema.required.filter((field) => {
-            const propSchema = schema.properties?.[field] as
-                | PluginSettingsSchemaProperty
-                | undefined;
-            if (!propSchema) return false;
-            const scope = propSchema.scope || 'global';
-            return scopes.includes(scope as SettingScopeApi);
-        });
-    }, [schema, scopes]);
-
-    const requiredGroups = useMemo(() => {
-        if (!schema?.requiredGroups || !schema.properties) return [];
-        return schema.requiredGroups
-            .map((group) => ({
-                ...group,
-                fields: group.fields.filter((field) => {
-                    const propSchema = schema.properties?.[field] as
-                        | PluginSettingsSchemaProperty
-                        | undefined;
-                    if (!propSchema) return false;
-                    const scope = propSchema.scope || 'global';
-                    return scopes.includes(scope as SettingScopeApi);
-                }),
-            }))
-            .filter((group) => group.fields.length > 0);
-    }, [schema, scopes]);
-
-    const validateRequiredFields = useCallback((): string[] => {
-        const errors: string[] = [];
-
-        for (const field of requiredFields) {
-            const value = settings[field] ?? secretSettings[field];
-
-            // Check if field is empty
-            const isEmpty = value === undefined || value === null || value === '';
-
-            if (isEmpty) {
-                // At directory scope, check if inherited value exists
-                if (scope === 'directory' && fallbackSettings) {
-                    const inheritedValue = fallbackSettings[field];
-                    const hasInheritance =
-                        inheritedValue !== undefined &&
-                        inheritedValue !== null &&
-                        inheritedValue !== '';
-
-                    if (hasInheritance) {
-                        // Field will inherit - validation passes
-                        continue;
-                    }
-                }
-
-                // No local value and no inheritance - field is required
-                const propSchema = schema?.properties?.[field] as
-                    | PluginSettingsSchemaProperty
-                    | undefined;
-                errors.push(propSchema?.title || field);
-            }
-        }
-
-        for (const group of requiredGroups) {
-            // Check local settings
-            const hasAnyLocal = group.fields.some((field) => {
-                const value = settings[field] ?? secretSettings[field];
-                return value !== undefined && value !== null && value !== '';
-            });
-
-            // At directory scope, also check inherited values
-            let hasAnyInherited = false;
-            if (scope === 'directory' && fallbackSettings) {
-                hasAnyInherited = group.fields.some((field) => {
-                    const value = fallbackSettings[field];
-                    return value !== undefined && value !== null && value !== '';
-                });
-            }
-
-            // Group satisfied if ANY field has value (local or inherited)
-            if (!hasAnyLocal && !hasAnyInherited) {
-                const labels = group.fields.map((f) => {
-                    const ps = schema?.properties?.[f] as PluginSettingsSchemaProperty | undefined;
-                    return ps?.title || f;
-                });
-                errors.push(group.message || `At least one of: ${labels.join(', ')}`);
-            }
-        }
-
-        return errors;
-    }, [requiredFields, requiredGroups, settings, secretSettings, schema, scope, fallbackSettings]);
+    const validateRequiredFields = useCallback(
+        (): string[] =>
+            validateRequiredSettings(
+                settings,
+                secretSettings,
+                schema,
+                scopes,
+                scope,
+                fallbackSettings,
+            ),
+        [settings, secretSettings, schema, scopes, scope, fallbackSettings],
+    );
 
     const handleFieldChange = useCallback((key: string, value: unknown, isSecret: boolean) => {
         if (isSecret) {
@@ -272,29 +155,17 @@ export function usePluginSettings({
             return;
         }
 
-        // Sanitize: convert undefined values to null so they survive JSON serialization
-        const sanitize = (obj: Record<string, unknown>): Record<string, unknown> => {
-            const result: Record<string, unknown> = {};
-            for (const [key, value] of Object.entries(obj)) {
-                if (value === undefined) {
-                    result[key] = null;
-                } else if (scope === 'directory' && value === '') {
-                    // At directory scope, empty string means "clear override, use inherited"
-                    result[key] = null;
-                } else {
-                    result[key] = value;
-                }
-            }
-            return result;
-        };
-
         setIsSaving(true);
         setValidationError(null);
         try {
             const sanitizedSettings =
-                Object.keys(settings).length > 0 ? sanitize(settings) : undefined;
+                Object.keys(settings).length > 0
+                    ? sanitizeSettingsForSave(settings, scope)
+                    : undefined;
             const sanitizedSecretSettings =
-                Object.keys(secretSettings).length > 0 ? sanitize(secretSettings) : undefined;
+                Object.keys(secretSettings).length > 0
+                    ? sanitizeSettingsForSave(secretSettings, scope)
+                    : undefined;
 
             await onSave({
                 settings: sanitizedSettings,
@@ -359,7 +230,16 @@ export function usePluginSettings({
         } finally {
             setIsSaving(false);
         }
-    }, [validateRequiredFields, validateConstraints, settings, secretSettings, onSave, router, t]);
+    }, [
+        validateRequiredFields,
+        validateConstraints,
+        settings,
+        secretSettings,
+        onSave,
+        router,
+        t,
+        scope,
+    ]);
 
     const getFieldValue = useCallback(
         (key: string, propSchema: PluginSettingsSchemaProperty): unknown => {
