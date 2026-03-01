@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ComparisonGeneratorPlugin } from '../comparison-generator.plugin.js';
-import { DEFAULT_COMPARISON_SETTINGS } from '../types.js';
 import type { PluginContext } from '@ever-works/plugin';
 
 describe('ComparisonGeneratorPlugin', () => {
@@ -48,15 +47,17 @@ describe('ComparisonGeneratorPlugin', () => {
 			expect(plugin.settingsSchema.type).toBe('object');
 		});
 
-		it('should have 6 properties', () => {
+		it('should have 8 properties', () => {
 			const props = plugin.settingsSchema.properties!;
-			expect(Object.keys(props)).toHaveLength(6);
+			expect(Object.keys(props)).toHaveLength(8);
 			expect(props).toHaveProperty('cadence_override');
 			expect(props).toHaveProperty('max_comparisons_mode');
 			expect(props).toHaveProperty('max_comparisons');
 			expect(props).toHaveProperty('min_items_for_comparison');
 			expect(props).toHaveProperty('ai_provider');
 			expect(props).toHaveProperty('ai_model');
+			expect(props).toHaveProperty('custom_prompt');
+			expect(props).toHaveProperty('extended_analysis');
 		});
 
 		it('should have title and description on every property', () => {
@@ -220,12 +221,12 @@ describe('ComparisonGeneratorPlugin', () => {
 	});
 
 	describe('getDefaultValues', () => {
-		it('should match DEFAULT_COMPARISON_SETTINGS', () => {
+		it('should match default comparison settings', () => {
 			const defaults = plugin.getDefaultValues();
 			expect(defaults.comparison_enabled).toBe(false);
-			expect(defaults.comparison_cadence).toBe(DEFAULT_COMPARISON_SETTINGS.cadence_override);
-			expect(defaults.comparison_max_mode).toBe(DEFAULT_COMPARISON_SETTINGS.max_comparisons_mode);
-			expect(defaults.comparison_max).toBe(DEFAULT_COMPARISON_SETTINGS.max_comparisons);
+			expect(defaults.comparison_cadence).toBe('use_directory');
+			expect(defaults.comparison_max_mode).toBe('custom');
+			expect(defaults.comparison_max).toBe(50);
 		});
 	});
 });

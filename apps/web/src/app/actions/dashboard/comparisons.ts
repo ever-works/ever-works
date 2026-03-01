@@ -139,13 +139,20 @@ export async function getComparisonAiConfig(directoryId: string) {
             currentConfig: {
                 provider: (settings.ai_provider as string) || null,
                 model: (settings.ai_model as string) || null,
+                customPrompt: (settings.custom_prompt as string) || null,
+                extendedAnalysis: !!settings.extended_analysis,
             },
             availableProviders,
         };
     } catch (error) {
         console.error('Get comparison AI config error:', error);
         return {
-            currentConfig: { provider: null, model: null },
+            currentConfig: {
+                provider: null,
+                model: null,
+                customPrompt: null,
+                extendedAnalysis: false,
+            },
             availableProviders: [],
         };
     }
@@ -153,7 +160,7 @@ export async function getComparisonAiConfig(directoryId: string) {
 
 export async function saveComparisonAiConfig(
     directoryId: string,
-    config: { provider: string | null; model: string | null },
+    config: { provider: string | null; model: string | null; extendedAnalysis?: boolean },
 ) {
     const user = await getAuthFromCookie();
     if (!user) {
@@ -161,10 +168,17 @@ export async function saveComparisonAiConfig(
     }
 
     try {
+        // Read existing settings to preserve custom_prompt
+        const dirPlugins = await pluginsAPI.listForDirectory(directoryId);
+        const compPlugin = dirPlugins.plugins.find((p) => p.id === 'comparison-generator');
+        const existing = compPlugin?.directorySettings ?? {};
+
         await pluginsAPI.updateDirectorySettings(directoryId, 'comparison-generator', {
             settings: {
+                ...existing,
                 ai_provider: config.provider || null,
                 ai_model: config.model || null,
+                extended_analysis: config.extendedAnalysis ?? false,
             },
         });
 
@@ -178,6 +192,7 @@ export async function saveComparisonAiConfig(
                     settings: {
                         ai_provider: config.provider || null,
                         ai_model: config.model || null,
+                        extended_analysis: config.extendedAnalysis ?? false,
                     },
                 });
                 revalidatePath(`/directories/${directoryId}/comparisons`);
@@ -198,6 +213,57 @@ export async function saveComparisonAiConfig(
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to save AI config',
+        };
+    }
+}
+
+export async function saveComparisonCustomPrompt(directoryId: string, customPrompt: string | null) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        // Read existing settings to preserve ai_provider/ai_model
+        const dirPlugins = await pluginsAPI.listForDirectory(directoryId);
+        const compPlugin = dirPlugins.plugins.find((p) => p.id === 'comparison-generator');
+        const existing = compPlugin?.directorySettings ?? {};
+
+        await pluginsAPI.updateDirectorySettings(directoryId, 'comparison-generator', {
+            settings: {
+                ...existing,
+                custom_prompt: customPrompt || null,
+            },
+        });
+
+        revalidatePath(`/directories/${directoryId}/settings`);
+        return { success: true };
+    } catch (error: any) {
+        if (error?.status === 404 || error?.statusCode === 404) {
+            try {
+                await pluginsAPI.enableForDirectory(directoryId, 'comparison-generator', {
+                    settings: {
+                        custom_prompt: customPrompt || null,
+                    },
+                });
+                revalidatePath(`/directories/${directoryId}/settings`);
+                return { success: true };
+            } catch (retryError) {
+                console.error('Enable + save comparison custom prompt error:', retryError);
+                return {
+                    success: false,
+                    error:
+                        retryError instanceof Error
+                            ? retryError.message
+                            : 'Failed to save comparison prompt',
+                };
+            }
+        }
+
+        console.error('Save comparison custom prompt error:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to save comparison prompt',
         };
     }
 }

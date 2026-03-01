@@ -47,9 +47,11 @@ export const config = {
     },
 
     mail: {
-        provider: (): 'smtp' | 'faker' => {
+        provider: (): 'smtp' | 'resend' | 'faker' => {
             const provider = process.env.MAILER_PROVIDER;
-            return !provider || provider === 'none' ? 'faker' : 'smtp';
+            if (!provider || provider === 'none') return 'faker';
+            if (provider === 'resend') return 'resend';
+            return 'smtp';
         },
         from: () => {
             const appName = config.branding.appName();
@@ -58,7 +60,7 @@ export const config = {
                 return emailFrom;
             }
             // Extract email from EMAIL_FROM or use default
-            const defaultEmail = process.env.EMAIL_FROM_EMAIL || 'no-reply@ever.works';
+            const defaultEmail = process.env.EMAIL_FROM_EMAIL || 'ever@ever.works';
             return `${appName} <${defaultEmail}>`;
         },
         smtpHost: () => process.env.SMTP_HOST || '127.0.0.1',
@@ -67,6 +69,12 @@ export const config = {
         smtpPassword: () => process.env.SMTP_PASSWORD,
         smtpSecure: () => process.env.SMTP_SECURE === 'true',
         smtpIgnoreTLS: () => process.env.SMTP_IGNORE_TLS === 'true',
+        resend: {
+            apiKey: () => process.env.RESEND_APIKEY,
+            emailFrom: () => {
+                return process.env.RESEND_EMAIL_FROM || config.mail.from();
+            },
+        },
     },
 
     google: {

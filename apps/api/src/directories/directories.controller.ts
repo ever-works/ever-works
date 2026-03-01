@@ -63,8 +63,8 @@ import {
     DirectoryAdvancedPromptsService,
     DirectoryTaxonomyService,
     GeneratorFormSchemaService,
-    ComparisonGenerationService,
 } from '@ever-works/agent/services';
+import { ComparisonGenerationService } from '@ever-works/agent/comparison-generator';
 import {
     AnalyzeRepositoryDto,
     AnalyzeRepositoryResponseDto,

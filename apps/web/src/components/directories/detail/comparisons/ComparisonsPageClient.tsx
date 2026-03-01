@@ -19,6 +19,7 @@ import {
     ComboboxOptions,
     ComboboxOption,
 } from '@headlessui/react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import {
@@ -47,7 +48,7 @@ interface ComparisonsPageClientProps {
     initialComparisons: ComparisonData[];
     items: Array<{ slug: string; name: string; category: string | string[] }>;
     availableProviders: ProviderOption[];
-    initialAiConfig: { provider: string | null; model: string | null };
+    initialAiConfig: { provider: string | null; model: string | null; extendedAnalysis?: boolean };
 }
 
 export function ComparisonsPageClient({
@@ -57,6 +58,7 @@ export function ComparisonsPageClient({
     availableProviders,
     initialAiConfig,
 }: ComparisonsPageClientProps) {
+    const t = useTranslations('dashboard.directoryDetail.comparisons');
     const [comparisons, setComparisons] = useState<ComparisonData[]>(initialComparisons);
     const [isPending, startTransition] = useTransition();
     const [selectedItemA, setSelectedItemA] = useState('');
@@ -75,6 +77,9 @@ export function ComparisonsPageClient({
     const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string }>>([]);
     const [isLoadingModels, setIsLoadingModels] = useState(false);
     const [isSavingAiConfig, setIsSavingAiConfig] = useState(false);
+    const [extendedAnalysis, setExtendedAnalysis] = useState(
+        initialAiConfig.extendedAnalysis ?? false,
+    );
 
     // Generate All state
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
@@ -149,12 +154,12 @@ export function ComparisonsPageClient({
 
     const handleManualGenerate = () => {
         if (!selectedItemA || !selectedItemB) {
-            toast.error('Please select two items to compare');
+            toast.error(t('toast.selectTwo'));
             return;
         }
 
         if (selectedItemA === selectedItemB) {
-            toast.error('Cannot compare an item with itself');
+            toast.error(t('toast.cannotCompareSelf'));
             return;
         }
 
@@ -185,7 +190,7 @@ export function ComparisonsPageClient({
             const result = await deleteComparison(directoryId, slug);
 
             if (result.status === 'success') {
-                toast.success('Comparison deleted');
+                toast.success(t('toast.deleted'));
                 setComparisons((prev) => {
                     const updated = prev.filter((c) => c.slug !== slug);
                     const newTotalPages = Math.max(1, Math.ceil(updated.length / pageSize));
@@ -203,7 +208,7 @@ export function ComparisonsPageClient({
     const handleGenerateAllClick = async () => {
         const { count } = await getRemainingComparisonCount(directoryId);
         if (count === 0) {
-            toast.info('No remaining pairs to generate');
+            toast.info(t('toast.noRemaining'));
             return;
         }
         setRemainingCount(count);
@@ -234,7 +239,7 @@ export function ComparisonsPageClient({
                 consecutiveErrors++;
                 setGenerateAllProgress({ completed, total: remainingCount, errors });
                 if (consecutiveErrors >= 3) {
-                    toast.error('Stopped after 3 consecutive errors');
+                    toast.error(t('toast.consecutiveErrors'));
                     break;
                 }
             }
@@ -243,13 +248,9 @@ export function ComparisonsPageClient({
         setIsGeneratingAll(false);
 
         if (cancelRef.current) {
-            toast.info(
-                `Stopped. Generated ${completed} comparison${completed !== 1 ? 's' : ''}${errors > 0 ? `, ${errors} error${errors !== 1 ? 's' : ''}` : ''}.`,
-            );
+            toast.info(t('progress.stopped', { count: completed, errors }));
         } else {
-            toast.success(
-                `Done! Generated ${completed} comparison${completed !== 1 ? 's' : ''}${errors > 0 ? `, ${errors} error${errors !== 1 ? 's' : ''}` : ''}.`,
-            );
+            toast.success(t('progress.done', { count: completed }));
         }
 
         window.location.reload();
@@ -285,14 +286,15 @@ export function ComparisonsPageClient({
             const result = await saveComparisonAiConfig(directoryId, {
                 provider: aiProvider || null,
                 model: aiModel || null,
+                extendedAnalysis,
             });
             if (result.success) {
-                toast.success('AI model settings saved');
+                toast.success(t('toast.aiConfigSaved'));
             } else {
-                toast.error(result.error ?? 'Failed to save AI config');
+                toast.error(result.error ?? t('toast.aiConfigFailed'));
             }
         } catch {
-            toast.error('Failed to save AI config');
+            toast.error(t('toast.aiConfigFailed'));
         } finally {
             setIsSavingAiConfig(false);
         }
@@ -306,10 +308,10 @@ export function ComparisonsPageClient({
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-2xl font-semibold text-text dark:text-text-dark">
-                        Comparisons
+                        {t('title')}
                     </h2>
                     <p className="mt-1 text-text-secondary dark:text-text-secondary-dark">
-                        A vs B comparison pages between directory items
+                        {t('subtitle')}
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -319,10 +321,10 @@ export function ComparisonsPageClient({
                         onClick={() => setShowManualForm(!showManualForm)}
                         disabled={isBusy || items.length < 2}
                     >
-                        Compare Items
+                        {t('actions.compareItems')}
                     </Button>
                     <Button size="sm" onClick={handleGenerateNext} disabled={isBusy}>
-                        {isPending ? 'Generating...' : 'Generate Next'}
+                        {isPending ? t('actions.generating') : t('actions.generateNext')}
                     </Button>
                     <Button
                         size="sm"
@@ -330,12 +332,12 @@ export function ComparisonsPageClient({
                         onClick={handleGenerateAllClick}
                         disabled={isBusy}
                     >
-                        Generate All
+                        {t('actions.generateAll')}
                     </Button>
                 </div>
             </div>
 
-            {/* AI Model settings */}
+            {/* AI Model */}
             {availableProviders.length > 0 && (
                 <div className="rounded-lg border border-border dark:border-border-dark">
                     <button
@@ -343,7 +345,7 @@ export function ComparisonsPageClient({
                         onClick={() => setShowAiSettings(!showAiSettings)}
                         className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-text dark:text-text-dark hover:bg-surface-hover dark:hover:bg-surface-hover-dark transition-colors rounded-lg"
                     >
-                        <span>AI Model</span>
+                        <span>{t('aiModel.title')}</span>
                         <ChevronDown
                             className={cn(
                                 'h-4 w-4 text-text-muted transition-transform duration-200',
@@ -352,11 +354,11 @@ export function ComparisonsPageClient({
                         />
                     </button>
                     {showAiSettings && (
-                        <div className="border-t border-border dark:border-border-dark px-4 py-4">
+                        <div className="border-t border-border dark:border-border-dark px-4 py-4 space-y-4">
                             <div className="flex gap-4 items-end">
                                 <div className="flex-1">
                                     <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
-                                        Provider
+                                        {t('aiModel.provider')}
                                     </label>
                                     <select
                                         value={aiProvider}
@@ -369,18 +371,20 @@ export function ComparisonsPageClient({
                                             'focus:ring-2 focus:ring-primary/20 focus:outline-none',
                                         )}
                                     >
-                                        <option value="">Default</option>
+                                        <option value="">{t('aiModel.default')}</option>
                                         {availableProviders.map((p) => (
                                             <option key={p.id} value={p.id}>
                                                 {p.name}
-                                                {p.isDefault ? ' (Default)' : ''}
+                                                {p.isDefault
+                                                    ? ` ${t('aiModel.defaultSuffix')}`
+                                                    : ''}
                                             </option>
                                         ))}
                                     </select>
                                 </div>
                                 <div className="flex-1">
                                     <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
-                                        Model
+                                        {t('aiModel.model')}
                                     </label>
                                     <select
                                         value={aiModel}
@@ -397,8 +401,8 @@ export function ComparisonsPageClient({
                                     >
                                         <option value="">
                                             {isLoadingModels
-                                                ? 'Loading models...'
-                                                : 'Provider default'}
+                                                ? t('aiModel.loadingModels')
+                                                : t('aiModel.providerDefault')}
                                         </option>
                                         {availableModels.map((m) => (
                                             <option key={m.id} value={m.id}>
@@ -413,8 +417,37 @@ export function ComparisonsPageClient({
                                     disabled={isSavingAiConfig}
                                     loading={isSavingAiConfig}
                                 >
-                                    Save
+                                    {t('actions.save')}
                                 </Button>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-text dark:text-text-dark">
+                                        {t('aiModel.extendedAnalysisLabel')}
+                                    </p>
+                                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                        {t('aiModel.extendedAnalysisDescription')}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={extendedAnalysis}
+                                    onClick={() => setExtendedAnalysis(!extendedAnalysis)}
+                                    className={cn(
+                                        'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary/20',
+                                        extendedAnalysis
+                                            ? 'bg-primary'
+                                            : 'bg-surface-hover dark:bg-surface-hover-dark',
+                                    )}
+                                >
+                                    <span
+                                        className={cn(
+                                            'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                                            extendedAnalysis ? 'translate-x-4' : 'translate-x-0',
+                                        )}
+                                    />
+                                </button>
                             </div>
                         </div>
                     )}
@@ -426,18 +459,19 @@ export function ComparisonsPageClient({
                 <div className="rounded-lg border border-border dark:border-border-dark p-4 space-y-3">
                     <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-text dark:text-text-dark">
-                            Generating comparisons: {generateAllProgress.completed} /{' '}
-                            {generateAllProgress.total} complete
+                            {t('progress.generating', {
+                                completed: generateAllProgress.completed,
+                                total: generateAllProgress.total,
+                            })}
                             {generateAllProgress.errors > 0 && (
                                 <span className="text-danger ml-2">
-                                    ({generateAllProgress.errors} error
-                                    {generateAllProgress.errors !== 1 ? 's' : ''})
+                                    ({t('progress.error', { count: generateAllProgress.errors })})
                                 </span>
                             )}
                         </p>
                         <Button size="sm" variant="secondary" onClick={handleStopGenerateAll}>
                             <Square className="w-3 h-3 mr-1 fill-current" />
-                            Stop
+                            {t('actions.stop')}
                         </Button>
                     </div>
                     <div className="w-full bg-surface-hover dark:bg-surface-hover-dark rounded-full h-2">
@@ -455,12 +489,12 @@ export function ComparisonsPageClient({
             {showManualForm && (
                 <div className="rounded-lg border border-border dark:border-border-dark p-4 space-y-4">
                     <h3 className="text-lg font-medium text-text dark:text-text-dark">
-                        Compare Two Items
+                        {t('manualForm.title')}
                     </h3>
                     <div className="flex gap-4 items-end">
                         <div className="flex-1">
                             <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
-                                Item A
+                                {t('manualForm.itemA')}
                             </label>
                             <Combobox
                                 value={selectedItemAObj}
@@ -490,7 +524,7 @@ export function ComparisonsPageClient({
                                                 item?.name ?? ''
                                             }
                                             onChange={(e) => setQueryA(e.target.value)}
-                                            placeholder="Search items..."
+                                            placeholder={t('manualForm.searchPlaceholder')}
                                         />
                                         <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-3">
                                             {({ open }) => (
@@ -514,7 +548,7 @@ export function ComparisonsPageClient({
                                     >
                                         {filteredItemsA.length === 0 ? (
                                             <div className="py-2 px-4 text-sm text-text-muted dark:text-text-muted-dark">
-                                                No items found
+                                                {t('manualForm.noItems')}
                                             </div>
                                         ) : (
                                             filteredItemsA.map((item) => (
@@ -566,11 +600,11 @@ export function ComparisonsPageClient({
                             </Combobox>
                         </div>
                         <span className="pb-2 text-text-secondary dark:text-text-secondary-dark font-medium">
-                            vs
+                            {t('vs')}
                         </span>
                         <div className="flex-1">
                             <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
-                                Item B
+                                {t('manualForm.itemB')}
                             </label>
                             <Combobox
                                 value={selectedItemBObj}
@@ -600,7 +634,7 @@ export function ComparisonsPageClient({
                                                 item?.name ?? ''
                                             }
                                             onChange={(e) => setQueryB(e.target.value)}
-                                            placeholder="Search items..."
+                                            placeholder={t('manualForm.searchPlaceholder')}
                                         />
                                         <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-3">
                                             {({ open }) => (
@@ -624,7 +658,7 @@ export function ComparisonsPageClient({
                                     >
                                         {filteredItemsB.length === 0 ? (
                                             <div className="py-2 px-4 text-sm text-text-muted dark:text-text-muted-dark">
-                                                No items found
+                                                {t('manualForm.noItems')}
                                             </div>
                                         ) : (
                                             filteredItemsB.map((item) => (
@@ -680,7 +714,7 @@ export function ComparisonsPageClient({
                             onClick={handleManualGenerate}
                             disabled={isBusy || !selectedItemA || !selectedItemB}
                         >
-                            {isPending ? 'Generating...' : 'Generate'}
+                            {isPending ? t('actions.generating') : t('actions.generate')}
                         </Button>
                     </div>
                 </div>
@@ -727,11 +761,10 @@ export function ComparisonsPageClient({
                         />
                     </svg>
                     <h3 className="mt-4 text-lg font-medium text-text dark:text-text-dark">
-                        No comparisons yet
+                        {t('empty.title')}
                     </h3>
                     <p className="mt-2 text-text-secondary dark:text-text-secondary-dark">
-                        Click &quot;Generate Next&quot; to auto-pick items, or &quot;Compare
-                        Items&quot; to choose a specific pair.
+                        {t('empty.description')}
                     </p>
                 </div>
             ) : (
@@ -790,7 +823,8 @@ export function ComparisonsPageClient({
                                     </div>
                                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-secondary dark:text-text-secondary-dark">
                                         <span>
-                                            {comparison.item_a_name} vs {comparison.item_b_name}
+                                            {comparison.item_a_name} {t('vs')}{' '}
+                                            {comparison.item_b_name}
                                         </span>
                                         <span className="text-border dark:text-border-dark">|</span>
                                         <span>{comparison.category}</span>
@@ -805,12 +839,14 @@ export function ComparisonsPageClient({
                                     {comparison.verdict_winner && (
                                         <div className="mt-2">
                                             <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                                                Winner:{' '}
-                                                {comparison.verdict_winner === 'item_a'
-                                                    ? comparison.item_a_name
-                                                    : comparison.verdict_winner === 'item_b'
-                                                      ? comparison.item_b_name
-                                                      : 'Tie'}
+                                                {t('winner', {
+                                                    name:
+                                                        comparison.verdict_winner === 'item_a'
+                                                            ? comparison.item_a_name
+                                                            : comparison.verdict_winner === 'item_b'
+                                                              ? comparison.item_b_name
+                                                              : t('tie'),
+                                                })}
                                             </span>
                                         </div>
                                     )}
@@ -825,9 +861,11 @@ export function ComparisonsPageClient({
             {comparisons.length > pageSize && (
                 <div className="flex items-center justify-between">
                     <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                        Showing {(currentPage - 1) * pageSize + 1}–
-                        {Math.min(currentPage * pageSize, comparisons.length)} of{' '}
-                        {comparisons.length}
+                        {t('pagination.showing', {
+                            from: (currentPage - 1) * pageSize + 1,
+                            to: Math.min(currentPage * pageSize, comparisons.length),
+                            total: comparisons.length,
+                        })}
                     </p>
                     <div className="flex items-center gap-2">
                         <Button
@@ -860,21 +898,22 @@ export function ComparisonsPageClient({
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-text dark:text-text-dark flex items-center gap-2">
                             <AlertTriangle className="w-5 h-5 text-danger" />
-                            Delete Comparison
+                            {t('deleteDialog.title')}
                         </DialogTitle>
                     </DialogHeader>
 
                     <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                        Are you sure you want to delete{' '}
-                        <span className="font-medium text-text dark:text-text-dark">
-                            {comparisons.find((c) => c.slug === deleteSlug)?.title ?? deleteSlug}
-                        </span>
-                        ? This action cannot be undone.
+                        {t('deleteDialog.confirmation', {
+                            title:
+                                comparisons.find((c) => c.slug === deleteSlug)?.title ??
+                                deleteSlug ??
+                                '',
+                        })}
                     </p>
 
                     <DialogFooter>
                         <Button size="sm" variant="ghost" onClick={() => setDeleteSlug(null)}>
-                            Cancel
+                            {t('actions.cancel')}
                         </Button>
                         <Button
                             size="sm"
@@ -884,7 +923,7 @@ export function ComparisonsPageClient({
                             loading={isPending}
                             className="text-danger hover:text-danger hover:bg-danger/10"
                         >
-                            Delete
+                            {t('actions.delete')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -898,17 +937,12 @@ export function ComparisonsPageClient({
                     <DialogClose onClose={() => setShowGenerateAllConfirm(false)} />
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-text dark:text-text-dark">
-                            Generate All Comparisons
+                            {t('generateAllDialog.title')}
                         </DialogTitle>
                     </DialogHeader>
 
                     <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                        Generate{' '}
-                        <span className="font-medium text-text dark:text-text-dark">
-                            {remainingCount}
-                        </span>{' '}
-                        remaining comparison{remainingCount !== 1 ? 's' : ''}? This may take several
-                        minutes. You can stop at any time.
+                        {t('generateAllDialog.confirmation', { count: remainingCount })}
                     </p>
 
                     <DialogFooter>
@@ -917,10 +951,10 @@ export function ComparisonsPageClient({
                             variant="ghost"
                             onClick={() => setShowGenerateAllConfirm(false)}
                         >
-                            Cancel
+                            {t('actions.cancel')}
                         </Button>
                         <Button size="sm" onClick={handleGenerateAllConfirm}>
-                            Generate All
+                            {t('actions.generateAll')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

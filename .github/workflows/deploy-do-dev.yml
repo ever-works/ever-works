@@ -2,7 +2,7 @@ name: Deploy to DO Dev
 
 on:
   workflow_run:
-    workflows: ["Build and Publish Docker Images Dev"]
+    workflows: ['Build and Publish Docker Images Dev']
     branches: [develop]
     types:
       - completed
@@ -31,7 +31,7 @@ jobs:
         run: |
           echo "$DB_CA_CERT" | base64 --decode > ${HOME}/ca-certificate.crt
         env:
-          DB_CA_CERT: "${{ secrets.DATABASE_CA_CERT }}"
+          DB_CA_CERT: '${{ secrets.DATABASE_CA_CERT }}'
 
       - name: Generate TLS Secrets
         run: |
@@ -90,20 +90,25 @@ jobs:
           DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
           DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
           DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
-
           # Enable SSL/TLS for database connections (true/false)
           DATABASE_SSL_MODE: ${{ secrets.DATABASE_SSL_MODE }}
           DATABASE_CA_CERT: ${{ secrets.DATABASE_CA_CERT }}
 
           # Mail
           MAILER_PROVIDER: ${{ secrets.MAILER_PROVIDER }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+
+          # SMTP
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
           SMTP_IGNORE_TLS: ${{ secrets.SMTP_IGNORE_TLS }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+
+          # Resend
+          RESEND_APIKEY: ${{ secrets.RESEND_APIKEY }}
+          RESEND_EMAIL_FROM: ${{ secrets.RESEND_EMAIL_FROM }}
 
       # we need this step because for now we just use :latest tag
       # note: for production we will use different strategy later

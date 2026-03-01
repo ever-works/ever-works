@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { ComparisonGenerationService } from '@ever-works/agent/services';
+import { ComparisonGenerationService } from '@ever-works/agent/comparison-generator';
 import { DirectoryRepository } from '@ever-works/agent/database';
 
 @Injectable()

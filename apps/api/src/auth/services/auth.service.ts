@@ -18,7 +18,7 @@ import { jwtConstants, authConstants, AuthProvider, config } from '../../config/
 import { User } from '@ever-works/agent/entities';
 import { JwtPayload, TokenResponse } from '../types/jwt.types';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { UserCreatedEvent, UserForgotPasswordEvent } from '../../events';
+import { UserCreatedEvent, UserConfirmedEvent, UserForgotPasswordEvent } from '../../events';
 import { ForgotPasswordDto } from '../dto/email-verification.dto';
 import { GITHUB_SCOPES } from '../config/github-scopes.config';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
@@ -174,6 +174,12 @@ export class AuthService {
                 emailVerified: true, // GitHub emails are pre-verified
                 isActive: true,
             });
+
+            // Send welcome email for new GitHub users
+            this.eventEmitter.emit(
+                UserConfirmedEvent.EVENT_NAME,
+                new UserConfirmedEvent(user, `${this.webAppUrl}/directories/new`),
+            );
         } else {
             // Check if user is active
             this.ensureUserIsActive(user);
@@ -228,6 +234,12 @@ export class AuthService {
                 emailVerified: true, // Google emails are pre-verified
                 isActive: true,
             });
+
+            // Send welcome email for new Google users
+            this.eventEmitter.emit(
+                UserConfirmedEvent.EVENT_NAME,
+                new UserConfirmedEvent(user, `${this.webAppUrl}/directories/new`),
+            );
         } else {
             // Check if user is active
             this.ensureUserIsActive(user);
@@ -341,6 +353,12 @@ export class AuthService {
         if (!updatedUser) {
             throw new BadRequestException('User not found after verification');
         }
+
+        // Send welcome email after email verification
+        this.eventEmitter.emit(
+            UserConfirmedEvent.EVENT_NAME,
+            new UserConfirmedEvent(updatedUser, `${this.webAppUrl}/directories/new`),
+        );
 
         const { password, ...userWithoutPassword } = updatedUser;
 

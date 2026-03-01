@@ -812,9 +812,11 @@ export const directoryAPI = {
     },
 
     getComparison: async (id: string, slug: string) => {
-        return serverFetch<{ comparison: ComparisonData; markdown?: string }>(
-            `/directories/${id}/comparisons/${slug}`,
-        );
+        return serverFetch<{
+            comparison: ComparisonData;
+            markdown?: string;
+            extendedAnalysisMarkdown?: string;
+        }>(`/directories/${id}/comparisons/${slug}`);
     },
 
     getRemainingComparisonCount: async (id: string) => {
