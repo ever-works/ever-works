@@ -61,17 +61,17 @@ function ProjectList({ projects }: { projects: Project[] }) {
 let isLoggedInCache: boolean | null = null;
 
 function isLoggedIn(): boolean {
-    if (isLoggedInCache !== null) {
-        return isLoggedInCache;
-    }
+	if (isLoggedInCache !== null) {
+		return isLoggedInCache;
+	}
 
-    isLoggedInCache = document.cookie.includes('auth=');
-    return isLoggedInCache;
+	isLoggedInCache = document.cookie.includes('auth=');
+	return isLoggedInCache;
 }
 
 // Clear cache when auth changes
 function onAuthChange() {
-    isLoggedInCache = null;
+	isLoggedInCache = null;
 }
 ```
 

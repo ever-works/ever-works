@@ -25,8 +25,8 @@ const testers: User[] = [];
 const inactive: User[] = [];
 
 for (const user of users) {
-    if (user.isAdmin) admins.push(user);
-    if (user.isTester) testers.push(user);
-    if (!user.isActive) inactive.push(user);
+	if (user.isAdmin) admins.push(user);
+	if (user.isTester) testers.push(user);
+	if (!user.isActive) inactive.push(user);
 }
 ```
