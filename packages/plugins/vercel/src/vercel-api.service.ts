@@ -17,6 +17,9 @@ export class VercelApiService {
 	 * Validate an API token
 	 */
 	async validateToken(token: string): Promise<VercelUser | null> {
+		if (!token) {
+			return null;
+		}
 		try {
 			const vercel = await this.createSDK(token);
 			const response = await vercel.user.getAuthUser();
@@ -39,6 +42,9 @@ export class VercelApiService {
 	 * Get teams for the authenticated user
 	 */
 	async getTeams(token: string): Promise<VercelTeam[]> {
+		if (!token) {
+			return [];
+		}
 		try {
 			const vercel = await this.createSDK(token);
 			const response = await vercel.teams.getTeams({});
@@ -60,6 +66,9 @@ export class VercelApiService {
 		token: string,
 		options?: { search?: string; teamScope?: string; limit?: number }
 	): Promise<VercelProject[]> {
+		if (!token) {
+			return [];
+		}
 		try {
 			const vercel = await this.createSDK(token);
 			const response = await vercel.projects.getProjects({
@@ -92,6 +101,9 @@ export class VercelApiService {
 		token: string,
 		teamScope?: string
 	): Promise<Array<{ name: string; verified: boolean }>> {
+		if (!token) {
+			return [];
+		}
 		try {
 			const vercel = await this.createSDK(token);
 			const response = await vercel.projects.getProjectDomains({
@@ -115,6 +127,9 @@ export class VercelApiService {
 		token: string,
 		options?: { teamScope?: string; limit?: number }
 	): Promise<VercelDeployment[]> {
+		if (!token) {
+			return [];
+		}
 		try {
 			const vercel = await this.createSDK(token);
 			const response = await vercel.deployments.getDeployments({
