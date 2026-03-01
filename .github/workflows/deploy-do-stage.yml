@@ -103,7 +103,7 @@ jobs:
           SMTP_IGNORE_TLS: ${{ secrets.SMTP_IGNORE_TLS }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
 
           # Resend
           RESEND_APIKEY: ${{ secrets.RESEND_APIKEY }}
