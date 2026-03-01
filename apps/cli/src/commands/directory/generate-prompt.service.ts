@@ -196,7 +196,7 @@ export class GeneratePromptService extends BasePromptService {
                     continue;
                 }
             } else {
-                console.log(chalk.cyan(`\n--- ${group.title} ---`));
+                console.log(chalk.cyan.bold(`\n  ${group.title}`));
                 if (group.description) {
                     console.log(chalk.gray(group.description));
                 }

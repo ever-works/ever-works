@@ -22,7 +22,7 @@ export const deployCommand = new Command('deploy')
             // Select directory
             const selection = await directoryPrompt.promptDirectorySelection();
             if (selection.cancelled || !selection.directory) {
-                console.log(chalk.yellow('\n⚠ Operation cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -97,7 +97,7 @@ export const deployCommand = new Command('deploy')
             }
 
             if (deploymentTeams.length > 0) {
-                console.log(chalk.cyan('\n--- Deployment Team Selection ---'));
+                console.log('');
                 const choices = deploymentTeams.map((team) => ({
                     name: team.name ? `${team.name} (${team.slug})` : team.slug,
                     value: team.slug,
@@ -123,7 +123,7 @@ export const deployCommand = new Command('deploy')
             }
 
             // Show information about what will happen
-            console.log(chalk.cyan('\n--- Deployment Process ---'));
+            console.log('');
             console.log(chalk.gray('This will:'));
             console.log(chalk.gray('  • Trigger the deployment workflow'));
             console.log(chalk.gray('  • Deploy the website'));
@@ -144,7 +144,7 @@ export const deployCommand = new Command('deploy')
             ]);
 
             if (!confirmed.proceed) {
-                console.log(chalk.yellow('\n⚠ Deployment cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 

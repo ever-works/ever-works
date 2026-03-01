@@ -26,7 +26,7 @@ export const generateCommand = new Command('generate')
             // Select directory
             const selection = await directoryPrompt.promptDirectorySelection();
             if (selection.cancelled || !selection.directory) {
-                console.log(chalk.yellow('\n⚠ Operation cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -152,7 +152,7 @@ export const generateCommand = new Command('generate')
             ]);
 
             if (!confirmed.proceed) {
-                console.log(chalk.yellow('\n⚠ Generation cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -173,7 +173,7 @@ export const generateCommand = new Command('generate')
                 }
 
                 // Tell user to use ever-works status to check status
-                console.log(chalk.cyan('\n--- Next Steps ---'));
+                console.log('');
                 console.log(
                     chalk.gray('  • Use ') +
                         chalk.cyan('ever-works directory status') +

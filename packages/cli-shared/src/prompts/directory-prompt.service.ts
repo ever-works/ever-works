@@ -162,13 +162,10 @@ export class DirectoryPromptService extends BasePromptService {
 	 */
 	async promptDirectorySelection(directories?: Directory[]): Promise<DirectorySelection> {
 		if (!directories || directories.length === 0) {
-			console.log(chalk.yellow('\n⚠ No directories found.'));
+			console.log(chalk.yellow('\nNo directories found.'));
 			console.log(chalk.gray('Create your first directory with: ') + chalk.cyan('directory create'));
 			return { directory: null, cancelled: true };
 		}
-
-		this.displaySectionHeader('Directory Selection');
-		this.displayInfo(`Found ${directories.length} directories. Please select one:`);
 
 		type Choice = { name: string; value: Directory | null; short: string };
 
@@ -178,14 +175,15 @@ export class DirectoryPromptService extends BasePromptService {
 			const roleLabel = this.formatRoleLabel(role, isShared);
 
 			return {
-				name: `${chalk.cyan(dir.slug)} - ${dir.name} ${roleLabel} ${chalk.gray(`(${dir.owner})`)}`,
+				name: `${dir.name} ${chalk.gray(dir.slug)} ${roleLabel}`,
 				value: dir,
 				short: dir.slug
 			};
 		});
 
+		choices.push(new inquirer.Separator('') as any);
 		choices.push({
-			name: chalk.gray('Cancel'),
+			name: chalk.gray('← Cancel'),
 			value: null,
 			short: 'cancel'
 		});
@@ -196,7 +194,7 @@ export class DirectoryPromptService extends BasePromptService {
 				name: 'selectedDirectory',
 				message: 'Select a directory:',
 				choices,
-				pageSize: 10
+				pageSize: 15
 			}
 		]);
 

@@ -7,7 +7,7 @@ export abstract class BasePromptService {
 	 * Displays a section header
 	 */
 	protected displaySectionHeader(title: string): void {
-		console.log('\n' + chalk.cyan.bold(`=== ${title} ===`));
+		console.log(chalk.cyan.bold(`\n  ${title}`));
 	}
 
 	/**

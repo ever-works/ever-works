@@ -22,7 +22,7 @@ export const updateCommand = new Command('update')
             // Select directory
             const selection = await directoryPrompt.promptDirectorySelection();
             if (selection.cancelled || !selection.directory) {
-                console.log(chalk.yellow('\n⚠ Operation cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -57,7 +57,7 @@ export const updateCommand = new Command('update')
             ]);
 
             // Show summary and confirm
-            console.log(chalk.cyan('\n--- Update Summary ---'));
+            console.log('');
             console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
             console.log(chalk.gray('Generation Method:'), chalk.white(answers.generation_method));
             console.log(
@@ -75,7 +75,7 @@ export const updateCommand = new Command('update')
             ]);
 
             if (!confirmed.proceed) {
-                console.log(chalk.yellow('\n⚠ Update cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -90,12 +90,10 @@ export const updateCommand = new Command('update')
 
                 const response = await apiService.updateDirectory(directory.id, updateDto);
 
-                spinner.stop();
-
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Update failed'));
+                    spinner.fail('Update failed');
                 } else {
-                    console.log(chalk.green('\n✓ Update process started!'));
+                    spinner.succeed('Update process started!');
                 }
 
                 console.log(chalk.gray('Status:'), chalk.white(response.status));

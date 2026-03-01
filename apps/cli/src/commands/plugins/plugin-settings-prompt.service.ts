@@ -211,6 +211,14 @@ export class PluginSettingsPromptService extends BasePromptService {
             };
         });
 
+        // If default value is a custom model not in the list, add it as first choice
+        if (defaultValue && !sorted.some((m) => m.id === defaultValue)) {
+            choices.unshift({
+                name: `${defaultValue} ${chalk.gray('(current)')}`,
+                value: defaultValue,
+            });
+        }
+
         choices.push(new inquirer.Separator('') as any);
         choices.push({ name: chalk.blue('Enter custom model ID'), value: '__custom__' });
 

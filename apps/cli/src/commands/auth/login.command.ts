@@ -22,7 +22,7 @@ async function checkExistingLogin(): Promise<boolean> {
         ]);
 
         if (!proceed) {
-            console.log(chalk.gray('Login cancelled.'));
+            console.log(chalk.yellow('\nOperation cancelled.'));
             return false;
         }
     }
@@ -107,7 +107,7 @@ export const loginCommand = new Command('login')
     .option('--manual', 'Manual token entry (skip OAuth flow)')
     .action(async (options) => {
         try {
-            console.log(chalk.cyan.bold('\n🔐 Ever Works Login\n'));
+            console.log(chalk.cyan.bold('\nEver Works Login\n'));
 
             // Check if user is already logged in
             const shouldProceed = await checkExistingLogin();
