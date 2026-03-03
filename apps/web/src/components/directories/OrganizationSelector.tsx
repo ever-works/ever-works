@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { GitOrganization } from '@/lib/api';
 import { getGitProviderOrganizations } from '@/app/actions/dashboard/organizations';
 import { cn } from '@/lib/utils/cn';
@@ -12,6 +12,7 @@ interface OrganizationSelectorProps {
     onChange: (value: string, isOrganization: boolean) => void;
     disabled?: boolean;
     providerId: string;
+    suggestedOwner?: string;
 }
 
 const LOADED_ORGS = new Map<string, GitOrganization[]>();
@@ -21,6 +22,7 @@ export function OrganizationSelector({
     onChange,
     disabled,
     providerId,
+    suggestedOwner,
 }: OrganizationSelectorProps) {
     const t = useTranslations('dashboard.directoryCreation');
     const cacheKey = providerId;
@@ -28,6 +30,9 @@ export function OrganizationSelector({
         LOADED_ORGS.get(cacheKey) || [],
     );
     const [isPending, startTransition] = useTransition();
+    const onChangeRef = useRef(onChange);
+    onChangeRef.current = onChange;
+    const reconciledRef = useRef<string | undefined>(undefined);
 
     useEffect(() => {
         startTransition(async () => {
@@ -43,6 +48,25 @@ export function OrganizationSelector({
             }
         });
     }, [providerId]);
+
+    // Reconcile suggestedOwner against the loaded organizations list
+    useEffect(() => {
+        if (!suggestedOwner || organizations.length === 0) return;
+        if (reconciledRef.current === suggestedOwner) return;
+
+        reconciledRef.current = suggestedOwner;
+
+        const match = organizations.find(
+            (org) => org.login.toLowerCase() === suggestedOwner.toLowerCase(),
+        );
+
+        if (match) {
+            onChangeRef.current(match.login, true);
+        } else if (value === suggestedOwner) {
+            // User doesn't belong to this org — reset to personal
+            onChangeRef.current('', false);
+        }
+    }, [suggestedOwner, organizations, value]);
 
     const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const selectedValue = e.target.value;

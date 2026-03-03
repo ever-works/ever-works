@@ -115,6 +115,12 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
 
                     setManualSourceType(null);
 
+                    // Auto-populate owner from source repository
+                    if (result.data.owner) {
+                        setOwner(result.data.owner);
+                        setOrganization(true);
+                    }
+
                     if (result.data.relatedDataRepo) {
                         setStep('choose_mode');
                     } else if (!result.data.detectedType) {
@@ -301,6 +307,8 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                                 onClick={() => {
                                     setStep('source');
                                     setAnalysisResult(null);
+                                    setOwner('');
+                                    setOrganization(false);
                                 }}
                                 disabled={isPending}
                                 variant="ghost"
@@ -342,6 +350,8 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                             setStep('source');
                             setAnalysisResult(null);
                             setManualSourceType(null);
+                            setOwner('');
+                            setOrganization(false);
                         }}
                         onImport={handleImport}
                     />
