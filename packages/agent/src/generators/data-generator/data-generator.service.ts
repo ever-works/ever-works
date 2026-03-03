@@ -1028,6 +1028,7 @@ export class DataGeneratorService {
             stepIndex: progress.currentStepIndex,
             totalSteps: progress.totalSteps,
             progress: progress.percent,
+            itemsProcessed: progress.itemsProcessed,
         });
     }
 

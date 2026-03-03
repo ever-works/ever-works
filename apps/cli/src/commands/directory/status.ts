@@ -5,7 +5,11 @@ import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
 import { DirectoryPromptService, Directory, GenerateStatusType } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
-import { getStepProgress, getStepText, ItemsGeneratorStep } from '@ever-works/cli-shared';
+import {
+    getDynamicStepText,
+    getDynamicStepProgress,
+    getItemsProcessedText,
+} from '@ever-works/cli-shared';
 
 export const statusCommand = new Command('status')
     .description('Check the status of a directory')
@@ -113,11 +117,12 @@ export const statusCommand = new Command('status')
                         const timeStr = `[${Math.floor(elapsed / 60)}m ${elapsed % 60}s]`;
 
                         if (freshDirectory.generateStatus?.step) {
-                            const step = freshDirectory.generateStatus.step as ItemsGeneratorStep;
-                            const stepText = getStepText(step);
-                            const progress = getStepProgress(step);
+                            const stepText = getDynamicStepText(freshDirectory.generateStatus);
+                            const progress = getDynamicStepProgress(freshDirectory.generateStatus);
+                            const itemsText = getItemsProcessedText(freshDirectory.generateStatus);
+                            const itemsSuffix = itemsText ? ` (${itemsText})` : '';
 
-                            spinner.text = `Generating ${timeStr}: ${stepText} - ${progress}%`;
+                            spinner.text = `Generating ${timeStr}: ${stepText}${itemsSuffix} - ${progress}%`;
                         } else {
                             spinner.text = `Generating ${timeStr}...`;
                         }
@@ -175,8 +180,7 @@ function printDirectorySummary(directory: Directory) {
     }
 
     if (directory.generateStatus?.step) {
-        const step = directory.generateStatus.step as ItemsGeneratorStep;
-        console.log(chalk.gray('Last step:'), chalk.white(getStepText(step)));
+        console.log(chalk.gray('Last step:'), chalk.white(getDynamicStepText(directory.generateStatus)));
     }
 
     if (directory.deployProvider) {

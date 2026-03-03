@@ -96,7 +96,7 @@ export function reportItemProgress(
 		currentStepIndex: stepIndex,
 		totalSteps: CLAUDE_CODE_STEP_IDS.length,
 		currentStepName: 'Generate Items',
-		message: `Generated ${newItemCount} of ${targetItems} items`,
+		message: `${newItemCount} items generated`,
 		itemsProcessed: newItemCount
 	});
 }

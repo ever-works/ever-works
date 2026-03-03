@@ -4,7 +4,7 @@ import { Directory } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { getStepProgress, getStepText } from '@/lib/utils/generator-steps';
+import { getStepProgress, getStepText, getItemsProcessedText } from '@/lib/utils/generator-steps';
 
 interface GenerationProgressProps {
     directory: Directory;
@@ -26,6 +26,7 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
     const generateStatus = directory.generateStatus;
     const progressPercentage = getStepProgress(generateStatus);
     const stepText = getStepText(generateStatus, t('steps.processing'));
+    const itemsText = getItemsProcessedText(generateStatus);
 
     return (
         <div className="max-w-2xl mx-auto py-12">
@@ -67,6 +68,11 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
                     <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                         {stepText}
                     </p>
+                    {itemsText && (
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
+                            {itemsText}
+                        </p>
+                    )}
                 </div>
 
                 {/* Progress Section */}

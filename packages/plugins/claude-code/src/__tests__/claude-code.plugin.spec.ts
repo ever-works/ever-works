@@ -240,15 +240,15 @@ describe('ClaudeCodePlugin', () => {
 			expect(itemUpdates).toHaveLength(3);
 
 			expect(itemUpdates[0].itemsProcessed).toBe(1);
-			expect(itemUpdates[0].message).toBe('Generated 1 of 10 items');
+			expect(itemUpdates[0].message).toBe('1 items generated');
 			expect(itemUpdates[0].percent).toBe(35); // 30 + round(1/10 * 53) = 35
 
 			expect(itemUpdates[1].itemsProcessed).toBe(2);
-			expect(itemUpdates[1].message).toBe('Generated 2 of 10 items');
+			expect(itemUpdates[1].message).toBe('2 items generated');
 			expect(itemUpdates[1].percent).toBe(41); // 30 + round(2/10 * 53) = 41
 
 			expect(itemUpdates[2].itemsProcessed).toBe(3);
-			expect(itemUpdates[2].message).toBe('Generated 3 of 10 items');
+			expect(itemUpdates[2].message).toBe('3 items generated');
 			expect(itemUpdates[2].percent).toBe(46); // 30 + round(3/10 * 53) = 46
 		});
 

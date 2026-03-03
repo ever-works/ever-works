@@ -45,3 +45,53 @@ export function getStepProgress(step: ItemsGeneratorStep): number {
 	// Calculate percentage based on step position
 	return Math.round(((currentIndex + 1) / steps.length) * 100);
 }
+
+/**
+ * Generation status shape expected by dynamic helpers.
+ * Matches the fields available on both API and agent GenerateStatus types.
+ */
+export interface GenerateStatusFields {
+	step?: string;
+	stepName?: string;
+	progress?: number;
+	itemsProcessed?: number;
+}
+
+/**
+ * Get human-readable step text from dynamic pipeline status.
+ * Uses `stepName` when available, falls back to enum lookup.
+ */
+export function getDynamicStepText(status: GenerateStatusFields): string {
+	if (status.stepName) {
+		return status.stepName;
+	}
+	if (status.step) {
+		return getStepText(status.step as ItemsGeneratorStep);
+	}
+	return 'Processing';
+}
+
+/**
+ * Get progress percentage from dynamic pipeline status.
+ * Uses `progress` field when available, falls back to enum-based calculation.
+ */
+export function getDynamicStepProgress(status: GenerateStatusFields): number {
+	if (status.progress !== undefined) {
+		return Math.round(status.progress);
+	}
+	if (status.step) {
+		return getStepProgress(status.step as ItemsGeneratorStep);
+	}
+	return 0;
+}
+
+/**
+ * Get items-processed text when available.
+ * Returns e.g. "27 items" or undefined when not applicable.
+ */
+export function getItemsProcessedText(status: GenerateStatusFields): string | undefined {
+	if (status.itemsProcessed !== undefined && status.itemsProcessed > 0) {
+		return `${status.itemsProcessed} items`;
+	}
+	return undefined;
+}
