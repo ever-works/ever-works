@@ -49,19 +49,19 @@ export const deleteCommand = new Command('delete')
                     type: 'confirm',
                     name: 'delete_data_repository',
                     message: 'Delete data repository?',
-                    default: true,
+                    default: false,
                 },
                 {
                     type: 'confirm',
                     name: 'delete_markdown_repository',
                     message: 'Delete markdown repository?',
-                    default: true,
+                    default: false,
                 },
                 {
                     type: 'confirm',
                     name: 'delete_website_repository',
                     message: 'Delete website repository?',
-                    default: true,
+                    default: false,
                 },
                 {
                     type: 'confirm',
