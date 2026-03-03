@@ -8,7 +8,6 @@ export interface DirectoryInputData {
 	name: string;
 	description: string;
 	owner?: string;
-	readmeConfig?: MarkdownReadmeConfigDto;
 }
 
 export interface MarkdownReadmeConfigDto {
@@ -77,7 +76,99 @@ export interface Directory {
 	userRole?: DirectoryMemberRole;
 }
 
+export interface GitProviderChoice {
+	id: string;
+	name: string;
+	enabled: boolean;
+	connected: boolean;
+	username?: string;
+}
+
+export interface DeployProviderChoice {
+	id: string;
+	name: string;
+	enabled: boolean;
+}
+
 export class DirectoryPromptService extends BasePromptService {
+	async promptGitProviderSelection(providers: GitProviderChoice[]): Promise<string> {
+		const choices: Array<{ name: string; value: string }> = [];
+		let defaultValue: string | undefined;
+
+		for (const provider of providers) {
+			if (!provider.enabled) {
+				choices.push({
+					name: chalk.gray(`${provider.name} (not configured)`),
+					value: `__disabled__${provider.id}`
+				});
+				continue;
+			}
+
+			const statusLabel = provider.connected
+				? chalk.green(`[connected${provider.username ? ` as @${provider.username}` : ''}]`)
+				: chalk.yellow('[not connected]');
+
+			choices.push({
+				name: `${provider.name} ${statusLabel}`,
+				value: provider.id
+			});
+
+			if (!defaultValue && provider.connected) {
+				defaultValue = provider.id;
+			}
+		}
+
+		if (!defaultValue) {
+			const firstEnabled = providers.find((p) => p.enabled);
+			if (firstEnabled) {
+				defaultValue = firstEnabled.id;
+			}
+		}
+
+		let selected = await this.promptSelect('Git provider:', choices, defaultValue);
+
+		while (selected.startsWith('__disabled__')) {
+			console.log(chalk.yellow('  This provider is not configured. Please configure it in Settings > Plugins.'));
+			selected = await this.promptSelect('Git provider:', choices, defaultValue);
+		}
+
+		return selected;
+	}
+
+	async promptDeployProviderSelection(providers: DeployProviderChoice[]): Promise<string | null> {
+		const choices: Array<{ name: string; value: string }> = [{ name: 'None (skip)', value: '__none__' }];
+
+		let defaultValue = '__none__';
+
+		for (const provider of providers) {
+			if (!provider.enabled) {
+				choices.push({
+					name: chalk.gray(`${provider.name} (not configured)`),
+					value: `__disabled__${provider.id}`
+				});
+				continue;
+			}
+
+			choices.push({
+				name: `${provider.name} ${chalk.green('[configured]')}`,
+				value: provider.id
+			});
+
+			if (defaultValue === '__none__') {
+				defaultValue = provider.id;
+			}
+		}
+
+		let selected = await this.promptSelect('Deploy provider:', choices, defaultValue);
+
+		while (selected.startsWith('__disabled__')) {
+			console.log(chalk.yellow('  This provider is not configured. Please configure it in Settings > Plugins.'));
+			selected = await this.promptSelect('Deploy provider:', choices, defaultValue);
+		}
+
+		return selected === '__none__' ? null : selected;
+	}
+
 	async promptDirectoryCreation(
 		ownerDefault?: string,
 		orgs?: { name: string; value: any }[]
@@ -92,8 +183,9 @@ export class DirectoryPromptService extends BasePromptService {
 			this.validateName.bind(this)
 		);
 
-		// Generate initial slug from name
+		// Generate initial slug from name, let user confirm/edit
 		const initialSlug = this.slugifyName(name);
+		const slug = await this.promptRequiredText('URL slug:', initialSlug, validateSlug);
 
 		const description = await this.promptRequiredText(
 			'Directory description:',
@@ -101,40 +193,19 @@ export class DirectoryPromptService extends BasePromptService {
 			this.validateDescription.bind(this)
 		);
 
-		// Optional fields
-		console.log(chalk.cyan('\n--- Optional Fields ---'));
-
-		const wantsOptionalFields = await this.promptConfirm(
-			'Do you want to provide optional fields (owner, readme configuration)?',
-			false
-		);
-
+		// Owner / organization selection — Personal Account selected by default
 		let owner: string | undefined;
-		let readmeConfig: MarkdownReadmeConfigDto | undefined;
 
-		if (wantsOptionalFields) {
-			if (orgs) {
-				owner = await this.promptSelect('Repository Owner (username/organization):', orgs, ownerDefault);
-			} else {
-				owner = await this.promptOptionalText('Owner (leave empty to use default):');
-			}
-
-			const wantsReadmeConfig = await this.promptConfirm(
-				'Do you want to configure custom README header/footer?',
-				false
-			);
-
-			if (wantsReadmeConfig) {
-				readmeConfig = await this.promptReadmeConfig();
-			}
+		if (orgs && orgs.length > 0) {
+			const selected = await this.promptSelect('Repository owner (organization):', orgs, ownerDefault);
+			owner = selected || undefined;
 		}
 
 		return {
-			slug: initialSlug, // This will be the initial slug, may be modified later
+			slug,
 			name,
 			description,
-			owner,
-			readmeConfig
+			owner
 		};
 	}
 
@@ -235,64 +306,6 @@ export class DirectoryPromptService extends BasePromptService {
 
 		const label = roleLabels[role] || role;
 		return isShared ? chalk.magenta(`[${label}]`) : chalk.gray(`[${label}]`);
-	}
-
-	/**
-	 * Prompts for README configuration
-	 */
-	private async promptReadmeConfig(): Promise<MarkdownReadmeConfigDto> {
-		console.log(chalk.cyan('\n--- README Configuration ---'));
-
-		const config: MarkdownReadmeConfigDto = {};
-
-		// Header configuration
-		const wantsCustomHeader = await this.promptConfirm('Do you want to add a custom header?', false);
-
-		if (wantsCustomHeader) {
-			config.header = await this.promptMultilineText('Enter custom header content:');
-			config.overwriteDefaultHeader = await this.promptConfirm('Overwrite the default header completely?', false);
-		}
-
-		// Footer configuration
-		const wantsCustomFooter = await this.promptConfirm('Do you want to add a custom footer?', false);
-
-		if (wantsCustomFooter) {
-			config.footer = await this.promptMultilineText('Enter custom footer content:');
-			config.overwriteDefaultFooter = await this.promptConfirm('Overwrite the default footer completely?', false);
-		}
-
-		return config;
-	}
-
-	/**
-	 * Prompts for multiline text input
-	 */
-	private async promptMultilineText(message: string): Promise<string> {
-		console.log(chalk.yellow(message));
-		console.log(chalk.gray('(Type your content, then press Enter twice when finished)'));
-
-		const lines: string[] = [];
-		let emptyLineCount = 0;
-
-		while (emptyLineCount < 2) {
-			const { line } = await inquirer.prompt({
-				type: 'input',
-				name: 'line',
-				message: lines.length === 0 ? '>' : '|'
-			});
-
-			if (line.trim() === '') {
-				emptyLineCount++;
-				if (emptyLineCount < 2) {
-					lines.push('');
-				}
-			} else {
-				emptyLineCount = 0;
-				lines.push(line);
-			}
-		}
-
-		return lines.join('\n').trim();
 	}
 
 	/**

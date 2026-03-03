@@ -64,6 +64,8 @@ export interface CreateDirectoryDto {
     owner?: string;
     readmeConfig?: MarkdownReadmeConfigDto;
     organization: boolean;
+    gitProvider?: string;
+    deployProvider?: string;
 }
 
 export interface ItemResponse {
@@ -173,6 +175,18 @@ export interface GitProviderConnectionInfo extends GitProviderInfo {
 export interface GitProviderListResponse {
     configured: boolean;
     providers: GitProviderInfo[];
+}
+
+export interface DeployProviderInfo {
+    id: string;
+    name: string;
+    enabled: boolean;
+    description?: string;
+}
+
+export interface DeployProviderListResponse {
+    status: string;
+    providers: DeployProviderInfo[];
 }
 
 export interface GitOrganizationsResponse {
@@ -326,6 +340,13 @@ export class ApiService {
         const response = await this.httpClient.get<GitOrganizationsResponse>(
             `/git-providers/${providerId}/organizations`,
         );
+        return response.data;
+    }
+
+    // Deploy provider operations (plugin-based)
+
+    async getDeployProviders(): Promise<DeployProviderListResponse> {
+        const response = await this.httpClient.get<DeployProviderListResponse>('/deploy/providers');
         return response.data;
     }
 

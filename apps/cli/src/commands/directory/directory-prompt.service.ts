@@ -12,6 +12,8 @@ export type {
     SlugConflictResolution,
     DirectorySelection,
     Directory,
+    GitProviderChoice,
+    DeployProviderChoice,
 } from '@ever-works/cli-shared';
 
 export { DirectoryMemberRole } from '@ever-works/cli-shared';
