@@ -5,10 +5,9 @@ import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService, type CreateItemsGeneratorDto } from '../../services/api.service';
 import { GenerationMethod } from '../../services/api.service';
-import { DirectoryPromptService } from './directory-prompt.service';
+import { DirectoryPromptService, GenerateStatusType } from './directory-prompt.service';
 import { GeneratePromptService } from './generate-prompt.service';
 import { handleCliError } from '../../utils/error';
-import { GenerateStatusType } from '@ever-works/cli-shared';
 import { WEB_URL } from '../../utils/constants';
 import { buildSelectedProviders, findUnconfiguredProviders } from '@ever-works/plugin';
 

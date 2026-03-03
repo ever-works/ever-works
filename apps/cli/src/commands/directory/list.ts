@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
-import { Directory, DirectoryMemberRole } from '@ever-works/cli-shared';
+import { Directory, DirectoryMemberRole } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 
 export const listCommand = new Command('list')

@@ -3,14 +3,9 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
-import { DirectoryPromptService, Directory } from './directory-prompt.service';
+import { DirectoryPromptService, Directory, GenerateStatusType } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
-import {
-    GenerateStatusType,
-    getStepProgress,
-    getStepText,
-    ItemsGeneratorStep,
-} from '@ever-works/cli-shared';
+import { getStepProgress, getStepText, ItemsGeneratorStep } from '@ever-works/cli-shared';
 
 export const statusCommand = new Command('status')
     .description('Check the status of a directory')
