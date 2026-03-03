@@ -44,7 +44,10 @@ export const updateCommand = new Command('update')
                     name: 'generation_method',
                     message: 'Generation method:',
                     choices: [
-                        { name: 'Create/Update (incremental)', value: GenerationMethod.CREATE_UPDATE },
+                        {
+                            name: 'Create/Update (incremental)',
+                            value: GenerationMethod.CREATE_UPDATE,
+                        },
                         { name: 'Recreate (full rebuild)', value: GenerationMethod.RECREATE },
                     ],
                     default: GenerationMethod.CREATE_UPDATE,
@@ -53,9 +56,27 @@ export const updateCommand = new Command('update')
                     type: 'confirm',
                     name: 'update_with_pull_request',
                     message: 'Update with pull request?',
-                    default: true,
+                    default: false,
                 },
             ]);
+
+            // Recreate confirmation
+            if (answers.generation_method === GenerationMethod.RECREATE) {
+                const { confirmRecreate } = await inquirer.prompt([
+                    {
+                        type: 'confirm',
+                        name: 'confirmRecreate',
+                        message: chalk.yellow(
+                            'Recreate will delete existing items and regenerate from scratch. This cannot be undone. Continue?',
+                        ),
+                        default: false,
+                    },
+                ]);
+                if (!confirmRecreate) {
+                    console.log(chalk.yellow('\nOperation cancelled.'));
+                    return;
+                }
+            }
 
             // Show summary and confirm
             console.log('');

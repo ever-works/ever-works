@@ -1,6 +1,10 @@
 import { Directory } from '@ever-works/cli-shared';
 import { getHttpClient } from './http-client';
-import type { CreateItemsGeneratorDto, UpdateItemsGeneratorDto, ProvidersDto } from '@ever-works/contracts/api';
+import type {
+    CreateItemsGeneratorDto,
+    UpdateItemsGeneratorDto,
+    ProvidersDto,
+} from '@ever-works/contracts/api';
 import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@ever-works/contracts/api';
 import type {
     GeneratorFormSchema,
@@ -36,6 +40,15 @@ export type {
 export { GenerationMethod, WebsiteRepositoryCreationMethod };
 
 // Types for API responses
+
+export interface DirectoryConfig {
+    metadata?: {
+        initial_prompt?: string;
+        last_request_data?: CreateItemsGeneratorDto;
+        [key: string]: unknown;
+    };
+    [key: string]: unknown;
+}
 
 export interface MarkdownReadmeConfigDto {
     header?: string;
@@ -210,6 +223,17 @@ export class ApiService {
             `/directories/${id}`,
         );
         return response.data;
+    }
+
+    async getDirectoryConfig(directoryId: string): Promise<DirectoryConfig | null> {
+        try {
+            const response = await this.httpClient.get<ApiResponse<{ config: DirectoryConfig }>>(
+                `/directories/${directoryId}/config`,
+            );
+            return response.data.config;
+        } catch {
+            return null;
+        }
     }
 
     async generateContent(directoryId: string, data: CreateItemsGeneratorDto) {
