@@ -8,8 +8,13 @@ import type {
     FormFieldDefinition,
     FormFieldGroup,
 } from '../../services/api.service';
+import { GenerationMethod } from '../../services/api.service';
 import type { FormFieldCondition } from '@ever-works/contracts';
-import { getIndividualProviderCategories, type IndividualCategoryKey } from '@ever-works/plugin';
+import {
+    getIndividualProviderCategories,
+    resolveEffectiveDefault,
+    type IndividualCategoryKey,
+} from '@ever-works/plugin';
 
 export interface ProviderSelectionResult {
     providers: Partial<ProvidersDto>;
@@ -107,8 +112,12 @@ export class GeneratePromptService extends BasePromptService {
             const configured = category.options.filter((p) => p.configured);
             if (configured.length <= 1) continue;
 
+            const defaultProvider = resolveEffectiveDefault(
+                category.options.filter((p) => p.configured),
+            );
+            const autoLabel = defaultProvider ? `Auto (${defaultProvider.name})` : 'Auto (default)';
             const choices: Array<{ name: string; value: string }> = [
-                { name: 'Auto (default)', value: '' },
+                { name: autoLabel, value: '' },
             ];
 
             for (const provider of category.options) {
@@ -146,6 +155,29 @@ export class GeneratePromptService extends BasePromptService {
     }
 
     /**
+     * Prompts for generation method and PR options
+     */
+    async promptGenerationOptions(): Promise<{
+        generation_method: GenerationMethod;
+        update_with_pull_request: boolean;
+    }> {
+        const generation_method = await this.promptSelect(
+            'Generation method:',
+            [
+                { name: 'Create/Update (incremental)', value: GenerationMethod.CREATE_UPDATE },
+                { name: 'Recreate (full rebuild)', value: GenerationMethod.RECREATE },
+            ],
+            GenerationMethod.CREATE_UPDATE,
+        );
+
+        const update_with_pull_request = await this.promptConfirm(
+            'Update with pull request?',
+            true,
+        );
+        return { generation_method, update_with_pull_request };
+    }
+
+    /**
      * Prompts for dynamic plugin form fields
      */
     async promptDynamicFields(
@@ -155,15 +187,27 @@ export class GeneratePromptService extends BasePromptService {
     ): Promise<Record<string, unknown>> {
         if (!fields || fields.length === 0) return {};
 
+        // Deduplicate fields by name (first occurrence wins), matching web behavior
+        const seen = new Set<string>();
+        const uniqueFields = fields.filter((f) => {
+            if (seen.has(f.name)) return false;
+            seen.add(f.name);
+            return true;
+        });
+
         const values: Record<string, unknown> = { ...defaults };
 
-        // Sort fields by group and order
-        const sortedGroups = [...(groups || [])].sort(
-            (a, b) => (a.order ?? 999) - (b.order ?? 999),
-        );
+        // Deduplicate groups by name (first occurrence wins)
+        const seenGroups = new Set<string>();
+        const sortedGroups = [...(groups || [])]
+            .filter((g) => {
+                if (seenGroups.has(g.name)) return false;
+                seenGroups.add(g.name);
+                return true;
+            })
+            .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
 
-        // Get ungrouped fields first
-        const ungroupedFields = fields
+        const ungroupedFields = uniqueFields
             .filter((f) => !f.group)
             .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
 
@@ -174,7 +218,7 @@ export class GeneratePromptService extends BasePromptService {
 
         // Prompt grouped fields
         for (const group of sortedGroups) {
-            const groupFields = fields
+            const groupFields = uniqueFields
                 .filter((f) => f.group === group.name)
                 .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
 
@@ -406,10 +450,12 @@ export class GeneratePromptService extends BasePromptService {
         return conditionArray.every((condition) => {
             const fieldValue = values[condition.field];
 
-            switch (condition.operator) {
+            const op = condition.operator as string;
+            switch (op) {
                 case 'eq':
                     return fieldValue === condition.value;
                 case 'neq':
+                case 'ne':
                     return fieldValue !== condition.value;
                 case 'gt':
                     return Number(fieldValue) > Number(condition.value);
@@ -429,6 +475,8 @@ export class GeneratePromptService extends BasePromptService {
                         return !fieldValue.includes(condition.value);
                     }
                     return !String(fieldValue).includes(String(condition.value));
+                case 'in':
+                    return Array.isArray(condition.value) && condition.value.includes(fieldValue);
                 default:
                     return true;
             }

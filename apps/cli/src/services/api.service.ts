@@ -1,6 +1,7 @@
 import { Directory } from '@ever-works/cli-shared';
 import { getHttpClient } from './http-client';
-import type { CreateItemsGeneratorDto, ProvidersDto } from '@ever-works/contracts/api';
+import type { CreateItemsGeneratorDto, UpdateItemsGeneratorDto, ProvidersDto } from '@ever-works/contracts/api';
+import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@ever-works/contracts/api';
 import type {
     GeneratorFormSchema,
     ProviderOption,
@@ -19,6 +20,7 @@ import type {
 // Re-export types used by other CLI modules
 export type {
     CreateItemsGeneratorDto,
+    UpdateItemsGeneratorDto,
     ProvidersDto,
     GeneratorFormSchema,
     ProviderOption,
@@ -31,6 +33,7 @@ export type {
     UserPluginResponse,
     DirectoryPluginListResponse,
 };
+export { GenerationMethod, WebsiteRepositoryCreationMethod };
 
 // Types for API responses
 
@@ -48,11 +51,6 @@ export interface CreateDirectoryDto {
     owner?: string;
     readmeConfig?: MarkdownReadmeConfigDto;
     organization: boolean;
-}
-
-export interface UpdateDirectoryDto {
-    generation_method?: 'create-update' | 'recreate';
-    update_with_pull_request?: boolean;
 }
 
 export interface ItemResponse {
@@ -222,7 +220,7 @@ export class ApiService {
         return response.data;
     }
 
-    async updateDirectory(directoryId: string, data: UpdateDirectoryDto) {
+    async updateDirectory(directoryId: string, data: UpdateItemsGeneratorDto) {
         const response = await this.httpClient.post<ApiResponse<{ slug: string; message: string }>>(
             `/directories/${directoryId}/update`,
             data,

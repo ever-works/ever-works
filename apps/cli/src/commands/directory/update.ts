@@ -3,7 +3,8 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
-import { getApiService } from '../../services/api.service';
+import { getApiService, GenerationMethod } from '../../services/api.service';
+import type { UpdateItemsGeneratorDto } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 
@@ -43,10 +44,10 @@ export const updateCommand = new Command('update')
                     name: 'generation_method',
                     message: 'Generation method:',
                     choices: [
-                        { name: 'Create/Update (incremental)', value: 'create-update' },
-                        { name: 'Recreate (full rebuild)', value: 'recreate' },
+                        { name: 'Create/Update (incremental)', value: GenerationMethod.CREATE_UPDATE },
+                        { name: 'Recreate (full rebuild)', value: GenerationMethod.RECREATE },
                     ],
-                    default: 'create-update',
+                    default: GenerationMethod.CREATE_UPDATE,
                 },
                 {
                     type: 'confirm',
@@ -83,7 +84,7 @@ export const updateCommand = new Command('update')
             const spinner = ora('Starting update process...').start();
 
             try {
-                const updateDto = {
+                const updateDto: UpdateItemsGeneratorDto = {
                     generation_method: answers.generation_method,
                     update_with_pull_request: answers.update_with_pull_request,
                 };

@@ -44,43 +44,77 @@ export const pluginsCommand = new Command('plugins')
         }
     });
 
+type PluginChoice = { name: string; value: string; short: string };
+
 async function showPluginList(plugins: UserPluginResponse[], clear = false): Promise<void> {
     if (clear) console.clear();
 
     const grouped = groupByCategory(plugins);
-    const choices: { name: string; value: string }[] = [];
-
-    for (const [category, categoryPlugins] of Object.entries(grouped)) {
-        choices.push(
-            new inquirer.Separator(chalk.cyan.bold(`\n  ${formatCategory(category)}`)) as any,
-        );
-
-        for (const plugin of categoryPlugins) {
-            const status = plugin.enabled ? chalk.green('●') : chalk.gray('○');
-            choices.push({
-                name: `${status} ${plugin.name} ${chalk.gray(`— ${plugin.description || plugin.pluginId}`)}`,
-                value: plugin.pluginId,
-            });
-        }
-    }
-
-    choices.push(new inquirer.Separator('') as any);
-    choices.push({ name: chalk.gray('← Exit'), value: '__exit__' });
+    const groupedChoices = buildGroupedChoices(grouped);
+    const flatChoices = buildFlatChoices(grouped);
 
     const { selectedPlugin } = await inquirer.prompt([
         {
-            type: 'list',
+            type: 'search',
             name: 'selectedPlugin',
-            message: 'Select a plugin to manage:',
-            choices,
+            message: 'Search plugins:',
+            source: (term: string | undefined) => {
+                if (!term) return groupedChoices;
+                const lower = term.toLowerCase();
+                return flatChoices.filter(
+                    (c) =>
+                        c.value === '__exit__' ||
+                        c.name.toLowerCase().includes(lower) ||
+                        c.value.toLowerCase().includes(lower),
+                );
+            },
             pageSize: 20,
-        },
+        } as any,
     ]);
 
     if (selectedPlugin === '__exit__') return;
 
     const plugin = plugins.find((p) => p.pluginId === selectedPlugin)!;
     await showPluginActions(plugin, true);
+}
+
+function formatPluginChoice(plugin: UserPluginResponse, categoryLabel?: string): PluginChoice {
+    const status = plugin.enabled ? chalk.green('●') : chalk.gray('○');
+    const category = categoryLabel ? ` ${chalk.gray(`[${categoryLabel}]`)}` : '';
+    return {
+        name: `${status} ${plugin.name}${category} ${chalk.gray(`— ${plugin.description || plugin.pluginId}`)}`,
+        value: plugin.pluginId,
+        short: plugin.name,
+    };
+}
+
+function buildGroupedChoices(
+    grouped: Record<string, UserPluginResponse[]>,
+): (PluginChoice | InstanceType<typeof inquirer.Separator>)[] {
+    const choices: (PluginChoice | InstanceType<typeof inquirer.Separator>)[] = [];
+
+    for (const [category, categoryPlugins] of Object.entries(grouped)) {
+        choices.push(new inquirer.Separator(chalk.cyan.bold(`  ${formatCategory(category)}`)));
+        for (const plugin of categoryPlugins) {
+            choices.push(formatPluginChoice(plugin));
+        }
+    }
+
+    choices.push(new inquirer.Separator(''));
+    choices.push({ name: chalk.gray('← Exit'), value: '__exit__', short: 'Exit' });
+    return choices;
+}
+
+function buildFlatChoices(grouped: Record<string, UserPluginResponse[]>): PluginChoice[] {
+    const choices: PluginChoice[] = [];
+    for (const [category, categoryPlugins] of Object.entries(grouped)) {
+        const label = formatCategory(category);
+        for (const plugin of categoryPlugins) {
+            choices.push(formatPluginChoice(plugin, label));
+        }
+    }
+    choices.push({ name: chalk.gray('← Exit'), value: '__exit__', short: 'Exit' });
+    return choices;
 }
 
 async function showPluginActions(plugin: UserPluginResponse, clear = false): Promise<void> {

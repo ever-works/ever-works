@@ -3,12 +3,13 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
-import { getApiService, CreateItemsGeneratorDto } from '../../services/api.service';
+import { getApiService, type CreateItemsGeneratorDto } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { GeneratePromptService } from './generate-prompt.service';
 import { handleCliError } from '../../utils/error';
 import { GenerateStatusType } from '@ever-works/cli-shared';
 import { WEB_URL } from '../../utils/constants';
+import { buildSelectedProviders, findUnconfiguredProviders } from '@ever-works/plugin';
 
 export const generateCommand = new Command('generate')
     .description('Generate data and create a repository for a directory')
@@ -123,21 +124,31 @@ export const generateCommand = new Command('generate')
                 );
             }
 
+            // Generation options
+            const genOptions = await generatePrompt.promptGenerationOptions();
+
+            // Resolve provider defaults from schema
+            const providers = buildSelectedProviders(providerResult.providers, schema);
+
+            // Validate no unconfigured providers
+            const unconfigured = findUnconfiguredProviders(providerResult.providers, schema);
+            if (unconfigured.length > 0) {
+                console.log(chalk.yellow(`\nUnconfigured providers: ${unconfigured.join(', ')}`));
+                console.log(
+                    chalk.gray('Configure them in Settings > Plugins before generating.'),
+                );
+                return;
+            }
+
+            // Build full DTO
             const createItemsGeneratorDto: CreateItemsGeneratorDto = {
                 name: requiredData.name,
                 prompt: requiredData.prompt,
+                generation_method: genOptions.generation_method,
+                update_with_pull_request: genOptions.update_with_pull_request,
+                providers,
+                pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
             };
-
-            // Set providers if any were selected
-            const hasProviders = Object.values(providerResult.providers).some(Boolean);
-            if (hasProviders) {
-                createItemsGeneratorDto.providers = providerResult.providers;
-            }
-
-            // Set plugin config if any fields were filled
-            if (Object.keys(pluginConfig).length > 0) {
-                createItemsGeneratorDto.pluginConfig = pluginConfig;
-            }
 
             // Show summary and confirm
             generatePrompt.displayGenerationSummary(createItemsGeneratorDto);
