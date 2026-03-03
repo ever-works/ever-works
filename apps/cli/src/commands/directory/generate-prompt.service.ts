@@ -500,13 +500,21 @@ export class GeneratePromptService extends BasePromptService {
                 case 'ne':
                     return fieldValue !== condition.value;
                 case 'gt':
-                    return typeof fieldValue === 'number' && fieldValue > (condition.value as number);
+                    return (
+                        typeof fieldValue === 'number' && fieldValue > (condition.value as number)
+                    );
                 case 'gte':
-                    return typeof fieldValue === 'number' && fieldValue >= (condition.value as number);
+                    return (
+                        typeof fieldValue === 'number' && fieldValue >= (condition.value as number)
+                    );
                 case 'lt':
-                    return typeof fieldValue === 'number' && fieldValue < (condition.value as number);
+                    return (
+                        typeof fieldValue === 'number' && fieldValue < (condition.value as number)
+                    );
                 case 'lte':
-                    return typeof fieldValue === 'number' && fieldValue <= (condition.value as number);
+                    return (
+                        typeof fieldValue === 'number' && fieldValue <= (condition.value as number)
+                    );
                 case 'contains':
                     if (Array.isArray(fieldValue)) {
                         return fieldValue.includes(condition.value);
