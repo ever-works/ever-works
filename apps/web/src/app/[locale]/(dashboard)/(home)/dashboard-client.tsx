@@ -27,7 +27,7 @@ export default function DashboardClient({
     return (
         <div className="w-full">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-text/70 dark:text-text-dark">
+                <h1 className="text-3xl font-bold text-text dark:text-text-dark">
                     {t('header.welcome', { username: user.username })}
                 </h1>
                 <p className="mt-2 text-text-secondary dark:text-text-secondary-dark">

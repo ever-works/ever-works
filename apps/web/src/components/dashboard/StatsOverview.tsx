@@ -77,7 +77,7 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
                     className={cn(
                         'group relative rounded-xl p-5 transition-shadow duration-200 overflow-hidden',
                         'bg-card dark:bg-surface-secondary-dark/30',
-                        'border border-card-border dark:border-white/8',
+                        'border border-card-border dark:border-border-dark',
                     )}
                 >
                     {/* Decorative short top border accent with fading edges */}

@@ -24,7 +24,7 @@ export function DashboardHeader({
             className={cn(
                 'border-b',
                 'bg-white dark:bg-surface-dark',
-                'border-border dark:border-gray-700/30',
+                'border-border dark:border-border-dark',
             )}
         >
             <div className="px-4 sm:px-6 lg:px-8">

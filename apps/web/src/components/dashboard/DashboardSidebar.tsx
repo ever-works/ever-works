@@ -129,7 +129,7 @@ export function DashboardSidebar({
                     'fixed lg:relative top-0 h-full z-50',
                     'transition-[left,margin,width] duration-300 ease-in-out',
                     'bg-white dark:bg-surface-dark',
-                    'border-r border-border dark:border-gray-700/30',
+                    'border-r border-border dark:border-border-dark',
                     !width && !isCollapsed && 'w-80',
                     'shrink-0',
                     isOpen ? 'left-0' : '-left-80 lg:-ml-80',
@@ -366,7 +366,7 @@ export function DashboardSidebar({
 
                     <div
                         className={cn(
-                            'mt-auto py-3 shrink-0 border-t border-border dark:border-gray-700/30',
+                            'mt-auto py-3 shrink-0 border-t border-border dark:border-border-dark',
                             !isCollapsed && 'max-w-80',
                             isCollapsed ? 'px-2' : 'px-4',
                         )}
@@ -439,13 +439,13 @@ export function DashboardSidebar({
                         'fixed top-0 left-16 h-full z-40 flex flex-col',
                         'w-80',
                         'bg-white dark:bg-surface-dark',
-                        'border-r border-border dark:border-gray-700/30',
+                        'border-r border-border dark:border-border-dark',
                         'shadow-xl',
                         'animate-in slide-in-from-left-2 duration-200',
                     )}
                 >
                     {/* Panel header */}
-                    <div className="h-12 flex items-center justify-between px-4 border-b border-border dark:border-gray-700/30 shrink-0">
+                    <div className="h-12 flex items-center justify-between px-4 border-b border-border dark:border-border-dark shrink-0">
                         <div className="flex items-center gap-2 text-sm font-medium text-text dark:text-text-dark">
                             <Bot className="w-4 h-4" />
                             <span>{t('aiChat')}</span>

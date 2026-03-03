@@ -1963,6 +1963,7 @@
             "loadingConversation": "Loading conversation…",
             "inputPlaceholder": "Describe the directory you want to create...",
             "sendButton": "Send",
+            "sendHint": "Enter to send · Shift+Enter for new line",
             "providerNotConfigured": "This provider is not configured. Set it up in Plugins.",
             "errors": {
                 "unableToSend": "Unable to send message"

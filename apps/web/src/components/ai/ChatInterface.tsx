@@ -282,7 +282,7 @@ export function ChatInterface() {
                                     className={cn(
                                         'max-w-[90%] rounded-lg px-3 py-2 motion-safe:animate-fade-in',
                                         isUser
-                                            ? 'bg-brand-purple dark:bg-brand-purple/10 text-white'
+                                            ? 'bg-brand-purple dark:bg-brand-purple/80 text-white'
                                             : 'bg-surface-tertiary dark:bg-surface-tertiary-dark/50 text-text dark:text-text-dark',
                                         message.error &&
                                             'border border-danger/60 text-danger dark:text-danger',
@@ -387,7 +387,7 @@ export function ChatInterface() {
                     </div>
                 </div>
                 <p className="mt-1.5 text-center text-[10px] text-text-muted dark:text-white/25 select-none">
-                    Enter to send · Shift+Enter for new line
+                    {t('sendHint')}
                 </p>
             </form>
         </div>
