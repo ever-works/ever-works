@@ -70,7 +70,7 @@ export const statusCommand = new Command('status')
                 try {
                     // Check if we've exceeded max polling time
                     if (Date.now() - startTime > MAX_POLL_TIME) {
-                        spinner.warn('\n⚠ Status check timed out after 30 minutes');
+                        spinner.warn('Status check timed out after 30 minutes');
                         pollingComplete = true;
                         cleanup();
                         return;
@@ -83,7 +83,7 @@ export const statusCommand = new Command('status')
                     const status = freshDirectory.generateStatus?.status;
 
                     if (status === GenerateStatusType.GENERATED) {
-                        spinner.succeed('\n✓ Generation process finished!');
+                        spinner.succeed('Generation process finished!');
                         pollingComplete = true;
                         cleanup();
                         printDirectorySummary(freshDirectory);
@@ -91,7 +91,7 @@ export const statusCommand = new Command('status')
                     }
 
                     if (status === GenerateStatusType.ERROR) {
-                        spinner.fail('\n✗ Generation failed');
+                        spinner.fail('Generation failed');
                         if (freshDirectory.generateStatus?.error) {
                             console.log(chalk.red(`Error: ${freshDirectory.generateStatus.error}`));
                         }
@@ -102,7 +102,7 @@ export const statusCommand = new Command('status')
                     }
 
                     if (status === GenerateStatusType.CANCELLED) {
-                        spinner.warn('\n⚠ Generation cancelled');
+                        spinner.warn('Generation cancelled');
                         if (freshDirectory.generateStatus?.error) {
                             console.log(chalk.yellow(freshDirectory.generateStatus.error));
                         }

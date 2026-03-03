@@ -340,7 +340,6 @@ async function executeDeploy(
 
     // Deploy website
     const spinner = ora('Deploying website...').start();
-    let timeoutId: NodeJS.Timeout | null = null;
 
     try {
         const response = await apiService.deployWebsite(directory.id, {
@@ -368,56 +367,54 @@ async function executeDeploy(
             console.log(chalk.gray('Deployment team:'), chalk.white(teamLabel));
         }
 
-        const watchDeployment = async () => {
+        const STOP_STATES = ['READY', 'ERROR', 'CANCELED', 'TIMEOUT'];
+
+        while (true) {
             const { directory: freshDirectory } = await apiService.getDirectory(directory.id);
 
             if (isDeploying(freshDirectory)) {
                 spinner.text = `Deployment state: ${freshDirectory.deploymentState}`;
-                timeoutId = setTimeout(watchDeployment, 5000);
-            } else {
-                switch (freshDirectory.deploymentState) {
-                    case 'READY':
-                        spinner.succeed('Deployment completed successfully');
-                        break;
-                    case 'ERROR':
-                        spinner.fail('Deployment failed');
-                        if (freshDirectory.generateStatus?.error) {
-                            console.log(chalk.red(`\n✗ ${freshDirectory.generateStatus.error}`));
-                        }
-                        break;
-                    case 'CANCELED':
-                        spinner.warn('Deployment cancelled');
-                        break;
-                    case 'TIMEOUT':
-                        spinner.fail('Deployment timed out');
-                        break;
-                    case 'QUEUED':
-                        spinner.text = 'Deployment queued...';
-                        break;
-                    case 'BUILDING':
-                        spinner.text = 'Deployment in progress...';
-                        break;
-                    default:
-                        spinner.stop();
-                        break;
-                }
-
-                if (timeoutId) {
-                    clearTimeout(timeoutId);
-                }
-
-                const STOP_STEPS = ['READY', 'ERROR', 'CANCELED', 'TIMEOUT'];
-                if (STOP_STEPS.includes(freshDirectory.deploymentState as any)) {
-                    console.log(
-                        chalk.blue('\nWebsite URL:'),
-                        chalk.white(freshDirectory.website || directory.website || 'N/A'),
-                    );
-                    return;
-                }
+                await new Promise((resolve) => setTimeout(resolve, 5000));
+                continue;
             }
-        };
 
-        watchDeployment();
+            switch (freshDirectory.deploymentState) {
+                case 'READY':
+                    spinner.succeed('Deployment completed successfully');
+                    break;
+                case 'ERROR':
+                    spinner.fail('Deployment failed');
+                    if (freshDirectory.generateStatus?.error) {
+                        console.log(chalk.red(`\n✗ ${freshDirectory.generateStatus.error}`));
+                    }
+                    break;
+                case 'CANCELED':
+                    spinner.warn('Deployment cancelled');
+                    break;
+                case 'TIMEOUT':
+                    spinner.fail('Deployment timed out');
+                    break;
+                case 'QUEUED':
+                    spinner.text = 'Deployment queued...';
+                    break;
+                case 'BUILDING':
+                    spinner.text = 'Deployment in progress...';
+                    break;
+                default:
+                    spinner.stop();
+                    break;
+            }
+
+            if (STOP_STATES.includes(freshDirectory.deploymentState as any)) {
+                console.log(
+                    chalk.blue('\nWebsite URL:'),
+                    chalk.white(freshDirectory.website || directory.website || 'N/A'),
+                );
+                break;
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+        }
     } catch (error) {
         spinner.fail('Deployment failed');
         throw error;
