@@ -77,6 +77,30 @@ export function reportProgress(
 	});
 }
 
+/**
+ * Report item-level progress during the "Generate Items" step.
+ * Maps newItemCount / targetItems linearly to the 30–83% range,
+ * leaving a gap before step 4 (Collect Results at 85%).
+ */
+export function reportItemProgress(
+	onProgress: PipelineProgressCallback | undefined,
+	newItemCount: number,
+	targetItems: number,
+	stepIndex: number
+): void {
+	const ratio = newItemCount / Math.max(targetItems, 1);
+	const percent = Math.min(30 + Math.round(ratio * 53), 83);
+
+	onProgress?.({
+		percent,
+		currentStepIndex: stepIndex,
+		totalSteps: CLAUDE_CODE_STEP_IDS.length,
+		currentStepName: 'Generate Items',
+		message: `Generated ${newItemCount} of ${targetItems} items`,
+		itemsProcessed: newItemCount
+	});
+}
+
 export async function resolveSettings(
 	context: PluginContext | null,
 	userId: string,
