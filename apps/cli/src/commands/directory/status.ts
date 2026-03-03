@@ -116,7 +116,10 @@ export const statusCommand = new Command('status')
                         const elapsed = Math.floor((Date.now() - startTime) / 1000);
                         const timeStr = `[${Math.floor(elapsed / 60)}m ${elapsed % 60}s]`;
 
-                        if (freshDirectory.generateStatus?.step) {
+                        if (
+                            freshDirectory.generateStatus?.step ||
+                            freshDirectory.generateStatus?.stepName
+                        ) {
                             const stepText = getDynamicStepText(freshDirectory.generateStatus);
                             const progress = getDynamicStepProgress(freshDirectory.generateStatus);
                             const itemsText = getItemsProcessedText(freshDirectory.generateStatus);
@@ -180,7 +183,10 @@ function printDirectorySummary(directory: Directory) {
     }
 
     if (directory.generateStatus?.step) {
-        console.log(chalk.gray('Last step:'), chalk.white(getDynamicStepText(directory.generateStatus)));
+        console.log(
+            chalk.gray('Last step:'),
+            chalk.white(getDynamicStepText(directory.generateStatus)),
+        );
     }
 
     if (directory.deployProvider) {

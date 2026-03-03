@@ -53,6 +53,8 @@ export function getStepProgress(step: ItemsGeneratorStep): number {
 export interface GenerateStatusFields {
 	step?: string;
 	stepName?: string;
+	stepIndex?: number;
+	totalSteps?: number;
 	progress?: number;
 	itemsProcessed?: number;
 }
@@ -66,7 +68,11 @@ export function getDynamicStepText(status: GenerateStatusFields): string {
 		return status.stepName;
 	}
 	if (status.step) {
-		return getStepText(status.step as ItemsGeneratorStep);
+		// Try enum lookup (for legacy standard-pipeline steps)
+		const enumText = getStepText(status.step as ItemsGeneratorStep);
+		// If enum lookup fails ('Processing' fallback), use the raw step value
+		if (enumText !== 'Processing') return enumText;
+		return status.step;
 	}
 	return 'Processing';
 }
@@ -78,6 +84,9 @@ export function getDynamicStepText(status: GenerateStatusFields): string {
 export function getDynamicStepProgress(status: GenerateStatusFields): number {
 	if (status.progress !== undefined) {
 		return Math.round(status.progress);
+	}
+	if (status.stepIndex !== undefined && status.totalSteps !== undefined && status.totalSteps > 0) {
+		return Math.round(((status.stepIndex + 1) / status.totalSteps) * 100);
 	}
 	if (status.step) {
 		return getStepProgress(status.step as ItemsGeneratorStep);
