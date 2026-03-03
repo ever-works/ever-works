@@ -135,6 +135,97 @@ export async function lookupExistingDeployment(directoryId: string) {
     }
 }
 
+export async function getDomains(directoryId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await deployAPI.getDomains(directoryId);
+        return {
+            success: response.status === 'success',
+            domains: response.domains ?? [],
+        };
+    } catch (error) {
+        console.error('Get domains error:', error);
+        return {
+            success: false,
+            domains: [] as { name: string; verified: boolean; verification?: any[] }[],
+            error: error instanceof Error ? error.message : 'Failed to get domains',
+        };
+    }
+}
+
+export async function addDomain(directoryId: string, domain: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await deployAPI.addDomain(directoryId, domain);
+        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
+        return {
+            success: response.status === 'success',
+            domain: response.domain,
+            verified: response.verified ?? false,
+        };
+    } catch (error) {
+        console.error('Add domain error:', error);
+        return {
+            success: false,
+            domain: undefined,
+            verified: false,
+            error: error instanceof Error ? error.message : 'Failed to add domain',
+        };
+    }
+}
+
+export async function removeDomain(directoryId: string, domain: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await deployAPI.removeDomain(directoryId, domain);
+        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
+        return {
+            success: response.status === 'success',
+        };
+    } catch (error) {
+        console.error('Remove domain error:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to remove domain',
+        };
+    }
+}
+
+export async function verifyDomain(directoryId: string, domain: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await deployAPI.verifyDomain(directoryId, domain);
+        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
+        return {
+            success: response.status === 'success',
+            domain: response.domain,
+        };
+    } catch (error) {
+        console.error('Verify domain error:', error);
+        return {
+            success: false,
+            domain: undefined,
+            error: error instanceof Error ? error.message : 'Failed to verify domain',
+        };
+    }
+}
+
 export async function updateWebsiteTemplateSettings(
     directoryId: string,
     settings: {

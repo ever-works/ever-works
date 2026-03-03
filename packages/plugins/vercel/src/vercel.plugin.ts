@@ -8,7 +8,9 @@ import type {
 	JsonSchema,
 	DeploymentConfig,
 	DeploymentResult,
-	DeploymentProject
+	DeploymentProject,
+	DeploymentDomain,
+	AddDomainResult
 } from '@ever-works/plugin';
 import { VercelApiService } from './vercel-api.service.js';
 import type { VercelSettings } from './types.js';
@@ -112,7 +114,8 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 		return {
 			found: result.found,
 			website: result.website,
-			deploymentState: result.deploymentState
+			deploymentState: result.deploymentState,
+			projectId: result.projectId
 		};
 	}
 
@@ -152,6 +155,42 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 			id: project.id,
 			name: project.name,
 			createdAt: new Date().toISOString()
+		};
+	}
+
+	// Domain management methods
+
+	async getDomains(projectId: string, token: string, teamScope?: string): Promise<DeploymentDomain[]> {
+		const domains = await this.apiService.getProjectDomains(projectId, token, teamScope);
+		return domains.map((d) => ({
+			name: d.name,
+			verified: d.verified,
+			verification: d.verification
+		}));
+	}
+
+	async addDomain(projectId: string, domain: string, token: string, teamScope?: string): Promise<AddDomainResult> {
+		const result = await this.apiService.addProjectDomain(projectId, domain, token, teamScope);
+		return {
+			domain: {
+				name: result.name,
+				verified: result.verified,
+				verification: result.verification
+			},
+			verified: result.verified
+		};
+	}
+
+	async removeDomain(projectId: string, domain: string, token: string, teamScope?: string): Promise<boolean> {
+		return this.apiService.removeProjectDomain(projectId, domain, token, teamScope);
+	}
+
+	async verifyDomain(projectId: string, domain: string, token: string, teamScope?: string): Promise<DeploymentDomain> {
+		const result = await this.apiService.verifyProjectDomain(projectId, domain, token, teamScope);
+		return {
+			name: result.name,
+			verified: result.verified,
+			verification: result.verification
 		};
 	}
 

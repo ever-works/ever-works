@@ -66,6 +66,42 @@ export interface DeploymentProject {
 }
 
 /**
+ * Domain information from deployment provider
+ */
+export interface DeploymentDomain {
+	/** Domain name (e.g. 'example.com') */
+	readonly name: string;
+	/** Whether the domain is verified */
+	readonly verified: boolean;
+	/** Verification challenges if not verified */
+	readonly verification?: readonly DeploymentDomainVerification[];
+}
+
+/**
+ * DNS verification challenge for a domain
+ */
+export interface DeploymentDomainVerification {
+	/** DNS record type (e.g. 'CNAME', 'TXT', 'A') */
+	readonly type: string;
+	/** DNS record name/host */
+	readonly domain: string;
+	/** DNS record value */
+	readonly value: string;
+	/** Human-readable reason for this record */
+	readonly reason: string;
+}
+
+/**
+ * Result of adding a domain
+ */
+export interface AddDomainResult {
+	/** The domain that was added */
+	readonly domain: DeploymentDomain;
+	/** Whether the domain was verified immediately */
+	readonly verified: boolean;
+}
+
+/**
  * Deployment plugin interface
  * Capability: 'deployment'
  */
@@ -121,6 +157,26 @@ export interface IDeploymentPlugin extends IPlugin {
 	 * List all projects
 	 */
 	listProjects?(token: string): Promise<DeploymentProject[]>;
+
+	/**
+	 * Get domains for a project
+	 */
+	getDomains?(projectId: string, token: string, teamScope?: string): Promise<DeploymentDomain[]>;
+
+	/**
+	 * Add a domain to a project
+	 */
+	addDomain?(projectId: string, domain: string, token: string, teamScope?: string): Promise<AddDomainResult>;
+
+	/**
+	 * Remove a domain from a project
+	 */
+	removeDomain?(projectId: string, domain: string, token: string, teamScope?: string): Promise<boolean>;
+
+	/**
+	 * Verify a domain on a project
+	 */
+	verifyDomain?(projectId: string, domain: string, token: string, teamScope?: string): Promise<DeploymentDomain>;
 }
 
 /**

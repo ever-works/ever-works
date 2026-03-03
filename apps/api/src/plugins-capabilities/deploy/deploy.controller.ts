@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard, CurrentUser } from '../../auth';
 import { AuthenticatedUser } from '../../auth/types/jwt.types';
@@ -8,6 +8,7 @@ import { DeployService } from './deploy.service';
 import { DeploymentVerifierService } from './tasks/deployment-verifier.service';
 import { DeployDirectoryDto } from './dto/deploy.dto';
 import { BatchDeployDto, BatchDeployResponseDto } from './dto/batch-deploy.dto';
+import { AddDomainDto } from './dto/domain.dto';
 
 @ApiTags('Deploy')
 @ApiBearerAuth('JWT-auth')
@@ -393,5 +394,141 @@ export class DeployController {
             failed: result.failed,
             results: result.results,
         };
+    }
+
+    /**
+     * List domains for a directory deployment
+     */
+    @Get('/directories/:id/domains')
+    @ApiOperation({
+        summary: 'List domains',
+        description: 'Get custom domains for a deployed directory',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'List of domains' })
+    async listDomains(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const { directory, isCreator } = await this.ownershipService.ensureCanView(id, auth.userId);
+
+        if (!directory.website) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'No deployment exists for this directory. Deploy first before managing domains.',
+            });
+        }
+
+        try {
+            const domains = await this.deployFacade.getDomains({
+                userId: isCreator ? auth.userId : directory.user.id,
+                directoryId: id,
+            });
+            return { status: 'success', domains };
+        } catch (error) {
+            throw new BadRequestException({
+                status: 'error',
+                message: error?.message || 'Failed to get domains',
+            });
+        }
+    }
+
+    /**
+     * Add a domain to a directory deployment
+     */
+    @Post('/directories/:id/domains')
+    @ApiOperation({
+        summary: 'Add domain',
+        description: 'Add a custom domain to a deployed directory',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Domain added' })
+    async addDomain(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: AddDomainDto,
+    ) {
+        const { directory, isCreator } = await this.ownershipService.ensureCanEdit(id, auth.userId);
+
+        if (!directory.website) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'No deployment exists for this directory. Deploy first before adding domains.',
+            });
+        }
+
+        try {
+            const result = await this.deployFacade.addDomain(dto.domain, {
+                userId: isCreator ? auth.userId : directory.user.id,
+                directoryId: id,
+            });
+            return { status: 'success', ...result };
+        } catch (error) {
+            throw new BadRequestException({
+                status: 'error',
+                message: error?.message || 'Failed to add domain',
+            });
+        }
+    }
+
+    /**
+     * Remove a domain from a directory deployment
+     */
+    @Delete('/directories/:id/domains/:domain')
+    @ApiOperation({
+        summary: 'Remove domain',
+        description: 'Remove a custom domain from a deployed directory',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiParam({ name: 'domain', description: 'Domain name to remove' })
+    @ApiResponse({ status: 200, description: 'Domain removed' })
+    async removeDomain(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Param('domain') domain: string,
+    ) {
+        const { isCreator, directory } = await this.ownershipService.ensureCanEdit(id, auth.userId);
+
+        try {
+            const removed = await this.deployFacade.removeDomain(domain, {
+                userId: isCreator ? auth.userId : directory.user.id,
+                directoryId: id,
+            });
+            return { status: 'success', removed };
+        } catch (error) {
+            throw new BadRequestException({
+                status: 'error',
+                message: error?.message || 'Failed to remove domain',
+            });
+        }
+    }
+
+    /**
+     * Verify a domain on a directory deployment
+     */
+    @Post('/directories/:id/domains/:domain/verify')
+    @ApiOperation({
+        summary: 'Verify domain',
+        description: 'Trigger DNS verification for a domain on a deployed directory',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiParam({ name: 'domain', description: 'Domain name to verify' })
+    @ApiResponse({ status: 200, description: 'Verification result' })
+    async verifyDomain(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Param('domain') domain: string,
+    ) {
+        const { isCreator, directory } = await this.ownershipService.ensureCanEdit(id, auth.userId);
+
+        try {
+            const result = await this.deployFacade.verifyDomain(domain, {
+                userId: isCreator ? auth.userId : directory.user.id,
+                directoryId: id,
+            });
+            return { status: 'success', domain: result };
+        } catch (error) {
+            throw new BadRequestException({
+                status: 'error',
+                message: error?.message || 'Failed to verify domain',
+            });
+        }
     }
 }

@@ -100,7 +100,7 @@ export class VercelApiService {
 		projectId: string,
 		token: string,
 		teamScope?: string
-	): Promise<Array<{ name: string; verified: boolean }>> {
+	): Promise<Array<{ name: string; verified: boolean; verification?: Array<{ type: string; domain: string; value: string; reason: string }> }>> {
 		if (!token) {
 			return [];
 		}
@@ -110,13 +110,97 @@ export class VercelApiService {
 				idOrName: projectId,
 				slug: teamScope
 			});
-			return response.domains.map((d) => ({
+			return response.domains.map((d: any) => ({
 				name: d.name,
-				verified: d.verified ?? false
+				verified: d.verified ?? false,
+				verification: d.verification?.length
+					? d.verification.map((v: any) => ({
+							type: v.type || 'TXT',
+							domain: v.domain || d.name,
+							value: v.value || '',
+							reason: v.reason || 'Domain verification'
+						}))
+					: undefined
 			}));
 		} catch {
 			return [];
 		}
+	}
+
+	/**
+	 * Add a domain to a project
+	 */
+	async addProjectDomain(
+		projectId: string,
+		domain: string,
+		token: string,
+		teamScope?: string
+	): Promise<{ name: string; verified: boolean; verification?: Array<{ type: string; domain: string; value: string; reason: string }> }> {
+		const vercel = await this.createSDK(token);
+		const response: any = await vercel.projects.addProjectDomain({
+			idOrName: projectId,
+			slug: teamScope,
+			requestBody: { name: domain }
+		});
+		return {
+			name: response.name,
+			verified: response.verified ?? false,
+			verification: response.verification?.length
+				? response.verification.map((v: any) => ({
+						type: v.type || 'TXT',
+						domain: v.domain || response.name,
+						value: v.value || '',
+						reason: v.reason || 'Domain verification'
+					}))
+				: undefined
+		};
+	}
+
+	/**
+	 * Remove a domain from a project
+	 */
+	async removeProjectDomain(
+		projectId: string,
+		domain: string,
+		token: string,
+		teamScope?: string
+	): Promise<boolean> {
+		const vercel = await this.createSDK(token);
+		await vercel.projects.removeProjectDomain({
+			idOrName: projectId,
+			domain,
+			slug: teamScope
+		});
+		return true;
+	}
+
+	/**
+	 * Verify a domain on a project
+	 */
+	async verifyProjectDomain(
+		projectId: string,
+		domain: string,
+		token: string,
+		teamScope?: string
+	): Promise<{ name: string; verified: boolean; verification?: Array<{ type: string; domain: string; value: string; reason: string }> }> {
+		const vercel = await this.createSDK(token);
+		const response: any = await vercel.projects.verifyProjectDomain({
+			idOrName: projectId,
+			domain,
+			slug: teamScope
+		});
+		return {
+			name: response.name,
+			verified: response.verified ?? false,
+			verification: response.verification?.length
+				? response.verification.map((v: any) => ({
+						type: v.type || 'TXT',
+						domain: v.domain || response.name,
+						value: v.value || '',
+						reason: v.reason || 'Domain verification'
+					}))
+				: undefined
+		};
 	}
 
 	/**
@@ -226,6 +310,7 @@ export class VercelApiService {
 		website?: string;
 		deploymentState?: VercelDeploymentState;
 		teamScope?: string;
+		projectId?: string;
 	}> {
 		// Get all teams
 		const teams = await this.getTeams(token);
@@ -266,7 +351,8 @@ export class VercelApiService {
 				found: true,
 				website,
 				deploymentState: latestDeployment?.readyState,
-				teamScope: scope
+				teamScope: scope,
+				projectId: project.id
 			};
 		}
 
