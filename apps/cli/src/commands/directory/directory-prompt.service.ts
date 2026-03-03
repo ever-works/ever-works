@@ -16,7 +16,7 @@ export type {
     DeployProviderChoice,
 } from '@ever-works/cli-shared';
 
-export { DirectoryMemberRole } from '@ever-works/cli-shared';
+export { DirectoryMemberRole, GenerateStatusType } from '@ever-works/cli-shared';
 
 export class DirectoryPromptService extends BaseDirectoryPromptService {
     private apiService = getApiService();

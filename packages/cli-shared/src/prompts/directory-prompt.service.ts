@@ -73,6 +73,7 @@ export interface Directory {
 	generateStatus?: GenerateStatus;
 	deploymentState?: GetProjectsReadyState;
 	deploymentStartedAt?: string;
+	deployProvider?: string;
 	userRole?: DirectoryMemberRole;
 }
 
