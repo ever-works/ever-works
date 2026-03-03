@@ -4,7 +4,7 @@ import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService, type CreateItemsGeneratorDto } from '../../services/api.service';
-import { GenerationMethod } from '../../services/api.service';
+import { GenerationMethod, WebsiteRepositoryCreationMethod } from '../../services/api.service';
 import { DirectoryPromptService, GenerateStatusType, canEdit } from './directory-prompt.service';
 import { GeneratePromptService } from './generate-prompt.service';
 import { handleCliError } from '../../utils/error';
@@ -171,32 +171,6 @@ export const generateCommand = new Command('generate')
                 );
             }
 
-            // Generation options (pre-fill from last generation)
-            const genOptions = await generatePrompt.promptGenerationOptions({
-                generation_method: lastRequestData?.generation_method,
-                update_with_pull_request: lastRequestData?.update_with_pull_request,
-                website_repository_creation_method:
-                    lastRequestData?.website_repository_creation_method,
-            });
-
-            // Recreate confirmation for previously generated directories
-            if (genOptions.generation_method === GenerationMethod.RECREATE && isGenerated) {
-                const { confirmRecreate } = await inquirer.prompt([
-                    {
-                        type: 'confirm',
-                        name: 'confirmRecreate',
-                        message: chalk.yellow(
-                            'Recreate will delete existing items and regenerate from scratch. This cannot be undone. Continue?',
-                        ),
-                        default: false,
-                    },
-                ]);
-                if (!confirmRecreate) {
-                    console.log(chalk.yellow('\nOperation cancelled.'));
-                    return;
-                }
-            }
-
             // Resolve provider defaults from schema
             const providers = buildSelectedProviders(providerSelections, schema);
 
@@ -206,6 +180,55 @@ export const generateCommand = new Command('generate')
                 console.log(chalk.yellow(`\nUnconfigured providers: ${unconfigured.join(', ')}`));
                 console.log(chalk.gray('Configure them in Settings > Plugins before generating.'));
                 return;
+            }
+
+            // Sanitize plugin config before sending
+            if (pluginConfig && Object.keys(pluginConfig).length > 0) {
+                pluginConfig = sanitizePluginConfig(pluginConfig);
+            }
+
+            // Generation options:
+            // - New directories: always CREATE_UPDATE (no gen method prompt, matching web)
+            // - Existing directories: prompt for gen method + PR option
+            //   (for simple updates without re-configuring providers, use "directory update" instead)
+            let genOptions: {
+                generation_method: GenerationMethod;
+                update_with_pull_request: boolean;
+                website_repository_creation_method: WebsiteRepositoryCreationMethod;
+            };
+
+            if (isGenerated) {
+                genOptions = await generatePrompt.promptGenerationOptions({
+                    generation_method: lastRequestData?.generation_method,
+                    update_with_pull_request: lastRequestData?.update_with_pull_request,
+                    website_repository_creation_method:
+                        lastRequestData?.website_repository_creation_method,
+                });
+
+                if (genOptions.generation_method === GenerationMethod.RECREATE) {
+                    const { confirmRecreate } = await inquirer.prompt([
+                        {
+                            type: 'confirm',
+                            name: 'confirmRecreate',
+                            message: chalk.yellow(
+                                'Recreate will delete existing items and regenerate from scratch. This cannot be undone. Continue?',
+                            ),
+                            default: false,
+                        },
+                    ]);
+                    if (!confirmRecreate) {
+                        console.log(chalk.yellow('\nOperation cancelled.'));
+                        return;
+                    }
+                }
+            } else {
+                genOptions = {
+                    generation_method: GenerationMethod.CREATE_UPDATE,
+                    update_with_pull_request: false,
+                    website_repository_creation_method:
+                        lastRequestData?.website_repository_creation_method ||
+                        WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
+                };
             }
 
             // Build full DTO
@@ -269,3 +292,34 @@ export const generateCommand = new Command('generate')
             process.exit(1);
         }
     });
+
+/**
+ * Sanitize plugin config values before sending to API.
+ * Mirrors web's sanitizePluginConfig in apps/web/src/app/actions/dashboard/generator.ts
+ */
+function sanitizePluginConfig(config: Record<string, unknown>): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(config)) {
+        if (value === undefined || value === null) {
+            continue;
+        }
+
+        // String arrays (categories, keywords, tags, etc.)
+        if (Array.isArray(value) && value.every((v) => typeof v === 'string')) {
+            if (key.includes('url')) {
+                // URL arrays get trimmed only
+                sanitized[key] = (value as string[]).map((v) => v.trim()).filter(Boolean);
+            } else {
+                // Other string arrays get trimmed and cleaned
+                sanitized[key] = (value as string[])
+                    .map((v) => v.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim())
+                    .filter(Boolean);
+            }
+        } else {
+            sanitized[key] = value;
+        }
+    }
+
+    return sanitized;
+}

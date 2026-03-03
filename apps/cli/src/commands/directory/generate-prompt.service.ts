@@ -212,7 +212,8 @@ export class GeneratePromptService extends BasePromptService {
     }
 
     /**
-     * Prompts for generation method, PR option, and website repo creation method
+     * Prompts for generation method and PR option.
+     * website_repository_creation_method is not shown (matching web) — uses defaults silently.
      */
     async promptGenerationOptions(defaults?: {
         generation_method?: GenerationMethod;
@@ -229,7 +230,7 @@ export class GeneratePromptService extends BasePromptService {
                 { name: 'Create/Update (incremental)', value: GenerationMethod.CREATE_UPDATE },
                 { name: 'Recreate (full rebuild)', value: GenerationMethod.RECREATE },
             ],
-            defaults?.generation_method ?? GenerationMethod.CREATE_UPDATE,
+            GenerationMethod.CREATE_UPDATE,
         );
 
         const update_with_pull_request = await this.promptConfirm(
@@ -237,18 +238,10 @@ export class GeneratePromptService extends BasePromptService {
             defaults?.update_with_pull_request ?? false,
         );
 
-        const website_repository_creation_method = await this.promptSelect(
-            'Website repository creation method:',
-            [
-                {
-                    name: 'Create using template',
-                    value: WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
-                },
-                { name: 'Duplicate', value: WebsiteRepositoryCreationMethod.DUPLICATE },
-            ],
+        // website_repository_creation_method is not surfaced in the web UI — use last value or default
+        const website_repository_creation_method =
             defaults?.website_repository_creation_method ??
-                WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
-        );
+            WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE;
 
         return { generation_method, update_with_pull_request, website_repository_creation_method };
     }
