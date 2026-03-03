@@ -179,6 +179,10 @@ function printDirectorySummary(directory: Directory) {
         console.log(chalk.gray('Last step:'), chalk.white(getStepText(step)));
     }
 
+    if (directory.deployProvider) {
+        console.log(chalk.gray('Deploy provider:'), chalk.white(directory.deployProvider));
+    }
+
     console.log(
         chalk.gray('Deployment status:'),
         chalk.white(

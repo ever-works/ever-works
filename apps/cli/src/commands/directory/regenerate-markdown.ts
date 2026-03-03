@@ -4,7 +4,7 @@ import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
-import { DirectoryPromptService } from './directory-prompt.service';
+import { DirectoryPromptService, canEdit } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 
 export const regenerateMarkdownCommand = new Command('regenerate-markdown')
@@ -35,6 +35,12 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
                     `\n✓ Selected directory: ${directoryPrompt.formatSelectedDirectory(directory, role, isShared)}`,
                 ),
             );
+
+            if (!canEdit(role)) {
+                console.log(chalk.yellow('\n⚠ You do not have permission to perform this action.'));
+                console.log(chalk.gray(`  Your role: ${role}. Required: editor or higher.`));
+                return;
+            }
 
             // Show information about what will happen
             console.log('');

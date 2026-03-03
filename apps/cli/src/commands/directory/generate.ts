@@ -5,7 +5,7 @@ import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService, type CreateItemsGeneratorDto } from '../../services/api.service';
 import { GenerationMethod } from '../../services/api.service';
-import { DirectoryPromptService, GenerateStatusType } from './directory-prompt.service';
+import { DirectoryPromptService, GenerateStatusType, canEdit } from './directory-prompt.service';
 import { GeneratePromptService } from './generate-prompt.service';
 import { handleCliError } from '../../utils/error';
 import { WEB_URL } from '../../utils/constants';
@@ -40,6 +40,12 @@ export const generateCommand = new Command('generate')
                     `\n✓ Selected directory: ${directoryPrompt.formatSelectedDirectory(directory, role, isShared)}`,
                 ),
             );
+
+            if (!canEdit(role)) {
+                console.log(chalk.yellow('\n⚠ You do not have permission to perform this action.'));
+                console.log(chalk.gray(`  Your role: ${role}. Required: editor or higher.`));
+                return;
+            }
 
             if (directory.generateStatus?.status === GenerateStatusType.GENERATING) {
                 console.log(chalk.yellow('\n⚠ Generation already in progress.'));
@@ -107,21 +113,37 @@ export const generateCommand = new Command('generate')
             // Extract resolvedPipelineId from schema as fallback for pipeline selection
             const resolvedPipelineId = schema.resolvedPipelineId || undefined;
 
-            // Provider/pipeline selection first (determines available fields)
-            const providerResult = await generatePrompt.promptProviderSelection(
+            // Step 1: Pipeline selection using initial schema
+            const pipelineResult = await generatePrompt.promptPipelineSelection(
                 schema,
                 lastRequestData?.providers,
                 resolvedPipelineId,
             );
 
-            // If a pipeline was selected, re-fetch schema with pipeline-specific fields
-            if (providerResult.pipelineId) {
+            // Step 2: If pipeline selected, re-fetch schema with pipeline-specific filtering
+            // This ensures only relevant provider categories are shown (e.g. claude-code only shows screenshot)
+            if (pipelineResult.pipelineId) {
                 const pipelineSpinner = ora('Loading pipeline configuration...').start();
                 schema = await apiService.getGeneratorFormSchema(
                     directory.id,
-                    providerResult.pipelineId,
+                    pipelineResult.pipelineId,
                 );
                 pipelineSpinner.succeed('Pipeline configuration loaded');
+            }
+
+            // Step 3: Individual provider selection using (potentially filtered) schema
+            const individualProviders = await generatePrompt.promptIndividualProviders(
+                schema,
+                lastRequestData?.providers,
+            );
+
+            // Step 4: Merge selections
+            const providerSelections: Partial<typeof individualProviders & { pipeline?: string }> =
+                {
+                    ...individualProviders,
+                };
+            if (pipelineResult.pipelineId) {
+                providerSelections.pipeline = pipelineResult.pipelineId;
             }
 
             // Required fields (name is read-only, prompt pre-filled from last generation)
@@ -136,7 +158,7 @@ export const generateCommand = new Command('generate')
                 const defaults = { ...schema.defaultValues };
                 // Only merge last pluginConfig when pipeline matches (mirrors web GeneratorForm behavior)
                 const lastPipelineId = lastRequestData?.providers?.pipeline || null;
-                const currentPipelineId = providerResult.pipelineId;
+                const currentPipelineId = pipelineResult.pipelineId;
                 const isSamePipeline =
                     (currentPipelineId || 'default') === (lastPipelineId || 'default');
                 if (isSamePipeline && lastRequestData?.pluginConfig) {
@@ -176,10 +198,10 @@ export const generateCommand = new Command('generate')
             }
 
             // Resolve provider defaults from schema
-            const providers = buildSelectedProviders(providerResult.providers, schema);
+            const providers = buildSelectedProviders(providerSelections, schema);
 
             // Validate no unconfigured providers
-            const unconfigured = findUnconfiguredProviders(providerResult.providers, schema);
+            const unconfigured = findUnconfiguredProviders(providerSelections, schema);
             if (unconfigured.length > 0) {
                 console.log(chalk.yellow(`\nUnconfigured providers: ${unconfigured.join(', ')}`));
                 console.log(chalk.gray('Configure them in Settings > Plugins before generating.'));

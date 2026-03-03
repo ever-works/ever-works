@@ -21,6 +21,10 @@ export interface ProviderSelectionResult {
     pipelineId: string | null;
 }
 
+export interface PipelineSelectionResult {
+    pipelineId: string | null;
+}
+
 export class GeneratePromptService extends BasePromptService {
     /**
      * Prompts for required generation fields
@@ -46,71 +50,80 @@ export class GeneratePromptService extends BasePromptService {
     }
 
     /**
-     * Prompts for provider selection based on the generator form schema.
-     * Mirrors the web: pipeline selector first (when >1 available), then individual providers.
+     * Prompts for pipeline selection only.
+     * Returns the selected pipelineId so the caller can re-fetch the schema
+     * with pipeline-specific filtering before prompting individual providers.
      */
-    async promptProviderSelection(
+    async promptPipelineSelection(
         schema: GeneratorFormSchema,
         initialProviders?: Partial<ProvidersDto>,
         resolvedPipelineId?: string,
-    ): Promise<ProviderSelectionResult> {
+    ): Promise<PipelineSelectionResult> {
         this.displaySectionHeader('Provider Selection');
 
-        const providers: Partial<ProvidersDto> = {};
-        let pipelineId: string | null = null;
-
-        // Pipeline selection (shown when >1 pipeline available, matching web's PipelineModeSelector)
         const pipelines = schema.providers.pipeline || [];
-        if (pipelines.length > 1) {
-            const defaultPipeline = pipelines.find((p) => p.isDefault);
-            const choices: Array<{ name: string; value: string }> = [];
-
-            for (const pipeline of pipelines) {
-                if (pipeline.configured) {
-                    choices.push({
-                        name: `${pipeline.name}${pipeline.isDefault ? ' (default)' : ''}${pipeline.description ? chalk.gray(` — ${pipeline.description}`) : ''}`,
-                        value: pipeline.id,
-                    });
-                } else {
-                    choices.push({
-                        name: chalk.gray(`${pipeline.name} (not configured)`),
-                        value: `__disabled__${pipeline.id}`,
-                    });
-                }
-            }
-
-            // Default: initialProviders > resolvedPipelineId > schema default > first pipeline
-            const initialPipelineId = initialProviders?.pipeline;
-            const pipelineDefault =
-                (initialPipelineId && pipelines.some((p) => p.id === initialPipelineId)
-                    ? initialPipelineId
-                    : undefined) ||
-                (resolvedPipelineId && pipelines.some((p) => p.id === resolvedPipelineId)
-                    ? resolvedPipelineId
-                    : undefined) ||
-                defaultPipeline?.id ||
-                pipelines[0].id;
-
-            let selectedPipeline = await this.promptSelect('Pipeline:', choices, pipelineDefault);
-
-            while (selectedPipeline.startsWith('__disabled__')) {
-                console.log(
-                    chalk.yellow(
-                        '  This pipeline is not configured. Please configure it in Settings > Plugins.',
-                    ),
-                );
-                selectedPipeline = await this.promptSelect(
-                    'Pipeline:',
-                    choices,
-                    defaultPipeline?.id || pipelines[0].id,
-                );
-            }
-
-            providers.pipeline = selectedPipeline;
-            pipelineId = selectedPipeline;
+        if (pipelines.length <= 1) {
+            return { pipelineId: pipelines.length === 1 ? pipelines[0].id : null };
         }
 
-        // Individual provider categories
+        const defaultPipeline = pipelines.find((p) => p.isDefault);
+        const choices: Array<{ name: string; value: string }> = [];
+
+        for (const pipeline of pipelines) {
+            if (pipeline.configured) {
+                choices.push({
+                    name: `${pipeline.name}${pipeline.isDefault ? ' (default)' : ''}${pipeline.description ? chalk.gray(` — ${pipeline.description}`) : ''}`,
+                    value: pipeline.id,
+                });
+            } else {
+                choices.push({
+                    name: chalk.gray(`${pipeline.name} (not configured)`),
+                    value: `__disabled__${pipeline.id}`,
+                });
+            }
+        }
+
+        // Default: initialProviders > resolvedPipelineId > schema default > first pipeline
+        const initialPipelineId = initialProviders?.pipeline;
+        const pipelineDefault =
+            (initialPipelineId && pipelines.some((p) => p.id === initialPipelineId)
+                ? initialPipelineId
+                : undefined) ||
+            (resolvedPipelineId && pipelines.some((p) => p.id === resolvedPipelineId)
+                ? resolvedPipelineId
+                : undefined) ||
+            defaultPipeline?.id ||
+            pipelines[0].id;
+
+        let selectedPipeline = await this.promptSelect('Pipeline:', choices, pipelineDefault);
+
+        while (selectedPipeline.startsWith('__disabled__')) {
+            console.log(
+                chalk.yellow(
+                    '  This pipeline is not configured. Please configure it in Settings > Plugins.',
+                ),
+            );
+            selectedPipeline = await this.promptSelect(
+                'Pipeline:',
+                choices,
+                defaultPipeline?.id || pipelines[0].id,
+            );
+        }
+
+        return { pipelineId: selectedPipeline };
+    }
+
+    /**
+     * Prompts for individual provider categories (AI, search, screenshot, content extractor).
+     * Should be called with a (potentially pipeline-filtered) schema so only relevant
+     * categories are shown.
+     */
+    async promptIndividualProviders(
+        schema: GeneratorFormSchema,
+        initialProviders?: Partial<ProvidersDto>,
+    ): Promise<Partial<ProvidersDto>> {
+        const providers: Partial<ProvidersDto> = {};
+
         const cliLabels: Record<IndividualCategoryKey, string> = {
             ai: 'AI Provider',
             search: 'Search Provider',
@@ -169,6 +182,30 @@ export class GeneratePromptService extends BasePromptService {
             if (selected) {
                 providers[category.key] = selected;
             }
+        }
+
+        return providers;
+    }
+
+    /**
+     * Convenience wrapper: prompts pipeline + individual providers in one pass.
+     * Note: for pipeline-aware filtering, use promptPipelineSelection + re-fetch schema
+     * + promptIndividualProviders instead.
+     */
+    async promptProviderSelection(
+        schema: GeneratorFormSchema,
+        initialProviders?: Partial<ProvidersDto>,
+        resolvedPipelineId?: string,
+    ): Promise<ProviderSelectionResult> {
+        const { pipelineId } = await this.promptPipelineSelection(
+            schema,
+            initialProviders,
+            resolvedPipelineId,
+        );
+
+        const providers = await this.promptIndividualProviders(schema, initialProviders);
+        if (pipelineId) {
+            providers.pipeline = pipelineId;
         }
 
         return { providers, pipelineId };

@@ -9,7 +9,12 @@ import {
     DeployCapabilityResponse,
     DeployProviderInfo,
 } from '../../services/api.service';
-import { Directory, DirectoryPromptService, GenerateStatusType } from './directory-prompt.service';
+import {
+    Directory,
+    DirectoryPromptService,
+    GenerateStatusType,
+    canEdit,
+} from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 
 export const deployCommand = new Command('deploy')
@@ -39,6 +44,12 @@ export const deployCommand = new Command('deploy')
                     `\n✓ Selected directory: ${directoryPrompt.formatSelectedDirectory(selection.directory, role, isShared)}`,
                 ),
             );
+
+            if (!canEdit(role)) {
+                console.log(chalk.yellow('\n⚠ You do not have permission to perform this action.'));
+                console.log(chalk.gray(`  Your role: ${role}. Required: editor or higher.`));
+                return;
+            }
 
             // Step 3: Parallel fetch — fresh directory, deploy capability, deploy providers
             const checkSpinner = ora('Checking deployment status...').start();

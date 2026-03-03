@@ -4,7 +4,7 @@ import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
-import { DirectoryPromptService } from './directory-prompt.service';
+import { DirectoryPromptService, canDelete } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 
 export const deleteCommand = new Command('delete')
@@ -35,6 +35,12 @@ export const deleteCommand = new Command('delete')
                     `\n✓ Selected directory: ${directoryPrompt.formatSelectedDirectory(directory, role, isShared)}`,
                 ),
             );
+
+            if (!canDelete(role)) {
+                console.log(chalk.yellow('\n⚠ Only the directory owner can delete a directory.'));
+                console.log(chalk.gray(`  Your role: ${role}.`));
+                return;
+            }
 
             // Show warning about what will be deleted
             console.log(chalk.red('\n⚠️  WARNING: This action cannot be undone!'));
