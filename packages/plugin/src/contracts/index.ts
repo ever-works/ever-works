@@ -5,4 +5,5 @@ export * from './plugin-manifest.types.js';
 export * from './lifecycle.types.js';
 export * from './capabilities/index.js';
 export * from './provider-categories.js';
+export * from './provider-selection.js';
 export * from './facade-capabilities.js';

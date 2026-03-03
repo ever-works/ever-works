@@ -6,8 +6,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
-	PluginSettings,
 	ContentExtractionOptions,
 	ContentExtractionResult,
 	ExtractedImage,
@@ -399,10 +397,6 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 
 	async onUnload(): Promise<void> {
 		this.context = undefined;
-	}
-
-	async validateSettings(_settings: PluginSettings): Promise<ValidationResult> {
-		return { valid: true };
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

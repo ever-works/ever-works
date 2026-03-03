@@ -6,7 +6,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
 	PluginSettings,
 	ScreenshotOptions,
 	ScreenshotResult,
@@ -409,64 +408,6 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 
 	async onUnload(): Promise<void> {
 		this.context = undefined;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		// Access key is required
-		if (!settings.accessKey) {
-			errors.push({
-				path: 'accessKey',
-				message: 'Access key is required'
-			});
-		}
-
-		// Validate viewport width
-		if (settings.viewportWidth !== undefined) {
-			const width = settings.viewportWidth as number;
-			if (width < 320 || width > 3840) {
-				errors.push({
-					path: 'viewportWidth',
-					message: 'Viewport width must be between 320 and 3840 pixels'
-				});
-			}
-		}
-
-		// Validate viewport height
-		if (settings.viewportHeight !== undefined) {
-			const height = settings.viewportHeight as number;
-			if (height < 200 || height > 2160) {
-				errors.push({
-					path: 'viewportHeight',
-					message: 'Viewport height must be between 200 and 2160 pixels'
-				});
-			}
-		}
-
-		// Validate format
-		if (settings.format !== undefined && !['png', 'jpg', 'jpeg', 'webp'].includes(settings.format as string)) {
-			errors.push({
-				path: 'format',
-				message: 'Format must be png, jpg, jpeg, or webp'
-			});
-		}
-
-		// Validate device scale factor
-		if (settings.deviceScaleFactor !== undefined) {
-			const scale = settings.deviceScaleFactor as number;
-			if (scale < 0.5 || scale > 3) {
-				errors.push({
-					path: 'deviceScaleFactor',
-					message: 'Device scale factor must be between 0.5 and 3'
-				});
-			}
-		}
-
-		return {
-			valid: errors.length === 0,
-			errors: errors.length > 0 ? errors : undefined
-		};
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

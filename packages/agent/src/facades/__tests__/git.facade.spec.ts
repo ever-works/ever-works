@@ -47,7 +47,6 @@ describe('GitFacadeService', () => {
             providerName,
             onLoad: jest.fn(),
             onUnload: jest.fn(),
-            validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             getUser: jest.fn().mockResolvedValue({
                 id: 'user-123',
                 login: 'testuser',

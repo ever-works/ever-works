@@ -24,7 +24,7 @@ export const statusCommand = new Command('status')
 
             const selection = await directoryPrompt.promptDirectorySelection();
             if (selection.cancelled || !selection.directory) {
-                console.log(chalk.yellow('\n⚠ Operation cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -168,7 +168,7 @@ function formatStatus(status?: string) {
 }
 
 function printDirectorySummary(directory: Directory) {
-    console.log(chalk.cyan('\n--- Directory Status ---'));
+    console.log('');
     console.log(chalk.gray('Name:'), chalk.white(directory.name));
     console.log(
         chalk.gray('Generation status:'),

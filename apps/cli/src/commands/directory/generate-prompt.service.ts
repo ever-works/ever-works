@@ -8,8 +8,13 @@ import type {
     FormFieldDefinition,
     FormFieldGroup,
 } from '../../services/api.service';
+import { GenerationMethod, WebsiteRepositoryCreationMethod } from '../../services/api.service';
 import type { FormFieldCondition } from '@ever-works/contracts';
-import { getIndividualProviderCategories, type IndividualCategoryKey } from '@ever-works/plugin';
+import {
+    getIndividualProviderCategories,
+    resolveEffectiveDefault,
+    type IndividualCategoryKey,
+} from '@ever-works/plugin';
 
 export interface ProviderSelectionResult {
     providers: Partial<ProvidersDto>;
@@ -20,75 +25,92 @@ export class GeneratePromptService extends BasePromptService {
     /**
      * Prompts for required generation fields
      */
-    async promptRequiredFields(defaultName: string): Promise<{
+    async promptRequiredFields(
+        directoryName: string,
+        defaultPrompt?: string,
+    ): Promise<{
         name: string;
         prompt: string;
     }> {
         this.displaySectionHeader('Required Fields');
 
-        const name = await this.promptRequiredText(
-            'Generation name:',
-            defaultName,
-            this.validateName.bind(this),
-        );
+        console.log(chalk.gray('Generation name:'), chalk.white(directoryName));
 
         const prompt = await this.promptRequiredText(
             'Generation prompt (describe what you want to generate):',
-            undefined,
+            defaultPrompt,
             this.validatePrompt.bind(this),
         );
 
-        return { name, prompt };
+        return { name: directoryName, prompt };
     }
 
     /**
-     * Prompts for provider selection based on the generator form schema
+     * Prompts for provider selection based on the generator form schema.
+     * Mirrors the web: pipeline selector first (when >1 available), then individual providers.
      */
-    async promptProviderSelection(schema: GeneratorFormSchema): Promise<ProviderSelectionResult> {
+    async promptProviderSelection(
+        schema: GeneratorFormSchema,
+        initialProviders?: Partial<ProvidersDto>,
+        resolvedPipelineId?: string,
+    ): Promise<ProviderSelectionResult> {
         this.displaySectionHeader('Provider Selection');
 
         const providers: Partial<ProvidersDto> = {};
         let pipelineId: string | null = null;
 
-        // Check if full pipeline providers are available
-        const configuredPipelines = schema.providers.pipeline?.filter((p) => p.configured) || [];
+        // Pipeline selection (shown when >1 pipeline available, matching web's PipelineModeSelector)
+        const pipelines = schema.providers.pipeline || [];
+        if (pipelines.length > 1) {
+            const defaultPipeline = pipelines.find((p) => p.isDefault);
+            const choices: Array<{ name: string; value: string }> = [];
 
-        if (configuredPipelines.length > 0) {
-            const mode = await this.promptSelect(
-                'Generation mode:',
-                [
-                    {
-                        name: 'Standard (select individual providers)',
-                        value: 'standard' as const,
-                    },
-                    {
-                        name: 'Full Pipeline (use a preconfigured pipeline)',
-                        value: 'pipeline' as const,
-                    },
-                ],
-                'standard' as const,
-            );
-
-            if (mode === 'pipeline') {
-                const choices = configuredPipelines.map((p) => ({
-                    name: `${p.name}${p.isDefault ? ' (default)' : ''}${p.description ? ` - ${p.description}` : ''}`,
-                    value: p.id,
-                }));
-
-                const selectedPipeline = await this.promptSelect(
-                    'Select pipeline:',
-                    choices,
-                    configuredPipelines.find((p) => p.isDefault)?.id || configuredPipelines[0].id,
-                );
-
-                providers.pipeline = selectedPipeline;
-                pipelineId = selectedPipeline;
-
-                return { providers, pipelineId };
+            for (const pipeline of pipelines) {
+                if (pipeline.configured) {
+                    choices.push({
+                        name: `${pipeline.name}${pipeline.isDefault ? ' (default)' : ''}${pipeline.description ? chalk.gray(` — ${pipeline.description}`) : ''}`,
+                        value: pipeline.id,
+                    });
+                } else {
+                    choices.push({
+                        name: chalk.gray(`${pipeline.name} (not configured)`),
+                        value: `__disabled__${pipeline.id}`,
+                    });
+                }
             }
+
+            // Default: initialProviders > resolvedPipelineId > schema default > first pipeline
+            const initialPipelineId = initialProviders?.pipeline;
+            const pipelineDefault =
+                (initialPipelineId && pipelines.some((p) => p.id === initialPipelineId)
+                    ? initialPipelineId
+                    : undefined) ||
+                (resolvedPipelineId && pipelines.some((p) => p.id === resolvedPipelineId)
+                    ? resolvedPipelineId
+                    : undefined) ||
+                defaultPipeline?.id ||
+                pipelines[0].id;
+
+            let selectedPipeline = await this.promptSelect('Pipeline:', choices, pipelineDefault);
+
+            while (selectedPipeline.startsWith('__disabled__')) {
+                console.log(
+                    chalk.yellow(
+                        '  This pipeline is not configured. Please configure it in Settings > Plugins.',
+                    ),
+                );
+                selectedPipeline = await this.promptSelect(
+                    'Pipeline:',
+                    choices,
+                    defaultPipeline?.id || pipelines[0].id,
+                );
+            }
+
+            providers.pipeline = selectedPipeline;
+            pipelineId = selectedPipeline;
         }
 
-        // Standard mode: prompt for each provider category with >1 option
+        // Individual provider categories
         const cliLabels: Record<IndividualCategoryKey, string> = {
             ai: 'AI Provider',
             search: 'Search Provider',
@@ -104,11 +126,12 @@ export class GeneratePromptService extends BasePromptService {
         for (const category of categories) {
             if (!category.options || category.options.length <= 1) continue;
 
-            const configured = category.options.filter((p) => p.configured);
-            if (configured.length <= 1) continue;
-
+            const defaultProvider = resolveEffectiveDefault(
+                category.options.filter((p) => p.configured),
+            );
+            const autoLabel = defaultProvider ? `Auto (${defaultProvider.name})` : 'Auto (default)';
             const choices: Array<{ name: string; value: string }> = [
-                { name: 'Auto (default)', value: '' },
+                { name: autoLabel, value: '' },
             ];
 
             for (const provider of category.options) {
@@ -125,9 +148,15 @@ export class GeneratePromptService extends BasePromptService {
                 }
             }
 
-            let selected = await this.promptSelect(`${category.label}:`, choices, '');
+            // Default to initialProviders value if the provider is in the available options
+            const initialValue = initialProviders?.[category.key];
+            const categoryDefault =
+                initialValue && category.options.some((p) => p.id === initialValue)
+                    ? initialValue
+                    : '';
 
-            // Re-prompt if user selected a disabled provider
+            let selected = await this.promptSelect(`${category.label}:`, choices, categoryDefault);
+
             while (selected.startsWith('__disabled__')) {
                 console.log(
                     chalk.yellow(
@@ -146,6 +175,48 @@ export class GeneratePromptService extends BasePromptService {
     }
 
     /**
+     * Prompts for generation method, PR option, and website repo creation method
+     */
+    async promptGenerationOptions(defaults?: {
+        generation_method?: GenerationMethod;
+        update_with_pull_request?: boolean;
+        website_repository_creation_method?: WebsiteRepositoryCreationMethod;
+    }): Promise<{
+        generation_method: GenerationMethod;
+        update_with_pull_request: boolean;
+        website_repository_creation_method: WebsiteRepositoryCreationMethod;
+    }> {
+        const generation_method = await this.promptSelect(
+            'Generation method:',
+            [
+                { name: 'Create/Update (incremental)', value: GenerationMethod.CREATE_UPDATE },
+                { name: 'Recreate (full rebuild)', value: GenerationMethod.RECREATE },
+            ],
+            defaults?.generation_method ?? GenerationMethod.CREATE_UPDATE,
+        );
+
+        const update_with_pull_request = await this.promptConfirm(
+            'Update with pull request?',
+            defaults?.update_with_pull_request ?? false,
+        );
+
+        const website_repository_creation_method = await this.promptSelect(
+            'Website repository creation method:',
+            [
+                {
+                    name: 'Create using template',
+                    value: WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
+                },
+                { name: 'Duplicate', value: WebsiteRepositoryCreationMethod.DUPLICATE },
+            ],
+            defaults?.website_repository_creation_method ??
+                WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
+        );
+
+        return { generation_method, update_with_pull_request, website_repository_creation_method };
+    }
+
+    /**
      * Prompts for dynamic plugin form fields
      */
     async promptDynamicFields(
@@ -155,17 +226,27 @@ export class GeneratePromptService extends BasePromptService {
     ): Promise<Record<string, unknown>> {
         if (!fields || fields.length === 0) return {};
 
+        // Deduplicate fields by name (first occurrence wins), matching web behavior
+        const seen = new Set<string>();
+        const uniqueFields = fields.filter((f) => {
+            if (seen.has(f.name)) return false;
+            seen.add(f.name);
+            return true;
+        });
+
         const values: Record<string, unknown> = { ...defaults };
 
-        // Sort fields by group and order
-        const sortedGroups = [...(groups || [])].sort(
-            (a, b) => (a.order ?? 999) - (b.order ?? 999),
-        );
+        // Deduplicate groups by name (first occurrence wins)
+        const seenGroups = new Set<string>();
+        const sortedGroups = [...(groups || [])]
+            .filter((g) => {
+                if (seenGroups.has(g.name)) return false;
+                seenGroups.add(g.name);
+                return true;
+            })
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-        // Get ungrouped fields first
-        const ungroupedFields = fields
-            .filter((f) => !f.group)
-            .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+        const ungroupedFields = uniqueFields.filter((f) => !f.group);
 
         // Prompt ungrouped fields
         for (const field of ungroupedFields) {
@@ -174,9 +255,7 @@ export class GeneratePromptService extends BasePromptService {
 
         // Prompt grouped fields
         for (const group of sortedGroups) {
-            const groupFields = fields
-                .filter((f) => f.group === group.name)
-                .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+            const groupFields = uniqueFields.filter((f) => f.group === group.name);
 
             if (groupFields.length === 0) continue;
 
@@ -196,7 +275,7 @@ export class GeneratePromptService extends BasePromptService {
                     continue;
                 }
             } else {
-                console.log(chalk.cyan(`\n--- ${group.title} ---`));
+                console.log(chalk.cyan.bold(`\n  ${group.title}`));
                 if (group.description) {
                     console.log(chalk.gray(group.description));
                 }
@@ -244,8 +323,15 @@ export class GeneratePromptService extends BasePromptService {
 
         console.log(
             chalk.gray('Update with PR:'),
-            chalk.white(dto.update_with_pull_request !== false ? 'Yes' : 'No'),
+            chalk.white(dto.update_with_pull_request ? 'Yes' : 'No'),
         );
+
+        if (dto.website_repository_creation_method) {
+            console.log(
+                chalk.gray('Website Repo Method:'),
+                chalk.white(dto.website_repository_creation_method),
+            );
+        }
     }
 
     /**
@@ -406,19 +492,29 @@ export class GeneratePromptService extends BasePromptService {
         return conditionArray.every((condition) => {
             const fieldValue = values[condition.field];
 
-            switch (condition.operator) {
+            const op = condition.operator as string;
+            switch (op) {
                 case 'eq':
                     return fieldValue === condition.value;
                 case 'neq':
+                case 'ne':
                     return fieldValue !== condition.value;
                 case 'gt':
-                    return Number(fieldValue) > Number(condition.value);
+                    return (
+                        typeof fieldValue === 'number' && fieldValue > (condition.value as number)
+                    );
                 case 'gte':
-                    return Number(fieldValue) >= Number(condition.value);
+                    return (
+                        typeof fieldValue === 'number' && fieldValue >= (condition.value as number)
+                    );
                 case 'lt':
-                    return Number(fieldValue) < Number(condition.value);
+                    return (
+                        typeof fieldValue === 'number' && fieldValue < (condition.value as number)
+                    );
                 case 'lte':
-                    return Number(fieldValue) <= Number(condition.value);
+                    return (
+                        typeof fieldValue === 'number' && fieldValue <= (condition.value as number)
+                    );
                 case 'contains':
                     if (Array.isArray(fieldValue)) {
                         return fieldValue.includes(condition.value);
@@ -429,6 +525,8 @@ export class GeneratePromptService extends BasePromptService {
                         return !fieldValue.includes(condition.value);
                     }
                     return !String(fieldValue).includes(String(condition.value));
+                case 'in':
+                    return Array.isArray(condition.value) && condition.value.includes(fieldValue);
                 default:
                     return true;
             }
@@ -436,16 +534,6 @@ export class GeneratePromptService extends BasePromptService {
     }
 
     // Validation methods
-    private validateName(name: string): string | boolean {
-        if (name.length < 2) {
-            return 'Name must be at least 2 characters long';
-        }
-        if (name.length > 100) {
-            return 'Name must be less than 100 characters';
-        }
-        return true;
-    }
-
     private validatePrompt(prompt: string): string | boolean {
         if (prompt.length < 10) {
             return 'Prompt must be at least 10 characters long';

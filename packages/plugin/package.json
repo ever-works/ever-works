@@ -89,6 +89,7 @@
 	"devDependencies": {
 		"@langchain/core": "^0.3.80",
 		"@langchain/openai": "^0.6.17",
+		"@types/json-schema": "^7.0.15",
 		"@types/node": "^22.19.3",
 		"@types/stopword": "^2.0.3",
 		"isomorphic-git": "^1.36.3",

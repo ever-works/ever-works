@@ -6,7 +6,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
 	PluginSettings,
 	SearchOptions,
 	SearchResponse,
@@ -140,19 +139,6 @@ export class PerplexitySearchPlugin implements IPlugin, ISearchPlugin {
 
 	async onUnload(): Promise<void> {
 		this.context = undefined;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (!settings.apiKey) {
-			errors.push({ path: 'apiKey', message: 'API key is required' });
-		}
-
-		return {
-			valid: errors.length === 0,
-			errors: errors.length > 0 ? errors : undefined
-		};
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

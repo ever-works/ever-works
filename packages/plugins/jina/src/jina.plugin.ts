@@ -7,8 +7,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
-	PluginSettings,
 	SearchOptions,
 	SearchResponse,
 	SearchResult,
@@ -289,10 +287,6 @@ export class JinaReaderPlugin implements IPlugin, ISearchPlugin, IContentExtract
 
 	async onUnload(): Promise<void> {
 		this.context = undefined;
-	}
-
-	async validateSettings(_settings: PluginSettings): Promise<ValidationResult> {
-		return { valid: true };
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

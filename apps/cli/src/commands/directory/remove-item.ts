@@ -22,7 +22,7 @@ export const removeItemCommand = new Command('remove-item')
             // Select directory
             const selection = await directoryPrompt.promptDirectorySelection();
             if (selection.cancelled || !selection.directory) {
-                console.log(chalk.yellow('\n⚠ Operation cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -58,7 +58,7 @@ export const removeItemCommand = new Command('remove-item')
             ]);
 
             // Show summary and confirm
-            console.log(chalk.cyan('\n--- Item Removal Summary ---'));
+            console.log('');
             console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
             console.log(chalk.gray('Item slug to remove:'), chalk.white(answers.item_slug));
             if (answers.reason) {
@@ -75,7 +75,7 @@ export const removeItemCommand = new Command('remove-item')
             ]);
 
             if (!confirmed.proceed) {
-                console.log(chalk.yellow('\n⚠ Item removal cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -90,12 +90,10 @@ export const removeItemCommand = new Command('remove-item')
 
                 const response = await apiService.removeItem(directory.id, removeDto);
 
-                spinner.stop();
-
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Item removal failed'));
+                    spinner.fail('Item removal failed');
                 } else {
-                    console.log(chalk.green('\n✓ Item removed successfully!'));
+                    spinner.succeed('Item removed successfully!');
                 }
 
                 console.log(chalk.gray('Status:'), chalk.white(response.status));

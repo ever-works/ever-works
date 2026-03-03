@@ -41,7 +41,6 @@ describe('ContentExtractorFacadeService', () => {
         providerName,
         onLoad: jest.fn(),
         onUnload: jest.fn(),
-        validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         extract: jest.fn().mockResolvedValue({
             success: true,
             url: 'https://example.com',

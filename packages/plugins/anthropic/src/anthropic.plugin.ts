@@ -5,7 +5,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
 	PluginSettings,
 	ChatCompletionOptions,
 	ChatCompletionResponse,
@@ -165,22 +164,6 @@ export class AnthropicPlugin extends BaseAiProvider {
 
 	protected getDefaultModelId(): string {
 		return 'claude-sonnet-4-5-20250514';
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (!settings.apiKey || typeof settings.apiKey !== 'string') {
-			errors.push({
-				path: 'apiKey',
-				message: 'Anthropic API key is required'
-			});
-		}
-
-		return {
-			valid: errors.length === 0,
-			errors: errors.length > 0 ? errors : undefined
-		};
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

@@ -6,8 +6,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
-	PluginSettings,
 	SearchOptions,
 	SearchResponse,
 	SearchResult,
@@ -194,39 +192,6 @@ export class SerpApiSearchPlugin implements IPlugin, ISearchPlugin {
 
 	async onUnload(): Promise<void> {
 		this.context = undefined;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (!settings.apiKey) {
-			errors.push({
-				path: 'apiKey',
-				message: 'API key is required'
-			});
-		}
-
-		if (settings.engine && !SUPPORTED_ENGINES.includes(settings.engine as (typeof SUPPORTED_ENGINES)[number])) {
-			errors.push({
-				path: 'engine',
-				message: `Engine must be one of: ${SUPPORTED_ENGINES.join(', ')}`
-			});
-		}
-
-		if (settings.maxResults !== undefined) {
-			const maxResults = settings.maxResults as number;
-			if (maxResults < 1 || maxResults > 100) {
-				errors.push({
-					path: 'maxResults',
-					message: 'Max results must be between 1 and 100'
-				});
-			}
-		}
-
-		return {
-			valid: errors.length === 0,
-			errors: errors.length > 0 ? errors : undefined
-		};
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

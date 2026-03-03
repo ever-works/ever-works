@@ -9,7 +9,6 @@ import type {
 	PluginLogger,
 	JsonSchema,
 	ValidationResult,
-	PluginSettings,
 	PipelineStepDefinition,
 	PipelineState,
 	PipelineExecutionOptions,
@@ -106,21 +105,6 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 	async onUnload(): Promise<void> {
 		await this.cancel();
 		this.context = null;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (settings.maxSteps !== undefined && settings.maxSteps !== null) {
-			const num = Number(settings.maxSteps);
-			if (isNaN(num) || !Number.isInteger(num)) {
-				errors.push({ path: 'maxSteps', message: 'maxSteps must be an integer' });
-			} else if (num < 10 || num > 2000) {
-				errors.push({ path: 'maxSteps', message: 'maxSteps must be between 10 and 2000' });
-			}
-		}
-
-		return errors.length > 0 ? { valid: false, errors } : { valid: true };
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {
