@@ -135,26 +135,6 @@ describe('GroqPlugin', () => {
 		});
 	});
 
-	describe('validateSettings', () => {
-		it('should return valid when apiKey is provided', async () => {
-			const result = await plugin.validateSettings({ apiKey: 'gsk_test-key' });
-			expect(result.valid).toBe(true);
-			expect(result.errors).toBeUndefined();
-		});
-
-		it('should return invalid when apiKey is missing', async () => {
-			const result = await plugin.validateSettings({});
-			expect(result.valid).toBe(false);
-			expect(result.errors).toBeDefined();
-			expect(result.errors?.[0]?.path).toBe('apiKey');
-		});
-
-		it('should return invalid when apiKey is empty string', async () => {
-			const result = await plugin.validateSettings({ apiKey: '' });
-			expect(result.valid).toBe(false);
-		});
-	});
-
 	describe('healthCheck', () => {
 		it('should return healthy status', async () => {
 			const health = await plugin.healthCheck();

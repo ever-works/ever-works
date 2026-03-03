@@ -22,7 +22,7 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
             // Select directory
             const selection = await directoryPrompt.promptDirectorySelection();
             if (selection.cancelled || !selection.directory) {
-                console.log(chalk.yellow('\n⚠ Operation cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -37,7 +37,7 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
             );
 
             // Show information about what will happen
-            console.log(chalk.cyan('\n--- Markdown Regeneration Process ---'));
+            console.log('');
             console.log(chalk.gray('This will:'));
             console.log(chalk.gray('  • Regenerate the README.md file for the directory'));
             console.log(chalk.gray('  • Update the data repository with new markdown content'));
@@ -53,7 +53,7 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
             ]);
 
             if (!confirmed.proceed) {
-                console.log(chalk.yellow('\n⚠ Markdown regeneration cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -63,12 +63,10 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
             try {
                 const response = await apiService.regenerateMarkdown(directory.id);
 
-                spinner.stop();
-
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Markdown regeneration failed'));
+                    spinner.fail('Markdown regeneration failed');
                 } else {
-                    console.log(chalk.green('\n✓ Markdown regeneration completed successfully!'));
+                    spinner.succeed('Markdown regeneration completed successfully!');
                 }
 
                 console.log(chalk.gray('Status:'), chalk.white(response.status));

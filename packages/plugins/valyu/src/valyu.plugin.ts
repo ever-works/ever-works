@@ -7,7 +7,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
 	PluginSettings,
 	SearchOptions,
 	SearchResponse,
@@ -247,29 +246,6 @@ export class ValyuSearchPlugin implements IPlugin, ISearchPlugin, IContentExtrac
 
 	async onUnload(): Promise<void> {
 		this.context = undefined;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (!settings.apiKey) {
-			errors.push({ path: 'apiKey', message: 'API key is required' });
-		}
-
-		if (
-			settings.responseLength &&
-			!['short', 'medium', 'large', 'max'].includes(settings.responseLength as string)
-		) {
-			errors.push({
-				path: 'responseLength',
-				message: 'Response length must be "short", "medium", "large", or "max"'
-			});
-		}
-
-		return {
-			valid: errors.length === 0,
-			errors: errors.length > 0 ? errors : undefined
-		};
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

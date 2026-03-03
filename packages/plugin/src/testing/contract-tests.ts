@@ -66,12 +66,6 @@ export async function testBasePluginContract(plugin: IPlugin): Promise<PluginTes
 		})
 	);
 
-	results.push(
-		await harness.test('implements validateSettings', async () => {
-			harness.assert(typeof plugin.validateSettings === 'function', 'validateSettings must be a function');
-		})
-	);
-
 	// Run lifecycle tests
 	results.push(...(await harness.testLifecycle()));
 

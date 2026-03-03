@@ -9,7 +9,6 @@ import type { PluginEnvironment } from '../contracts/plugin-environment.interfac
 import type { PluginCategory } from '../contracts/plugin-manifest.types.js';
 import type { PluginHealthCheck, PluginHealthStatus } from '../contracts/lifecycle.types.js';
 import type { JsonSchema } from '../settings/json-schema.types.js';
-import type { ValidationResult } from '../settings/validation.types.js';
 import type { ConfigurationMode, PluginSettings } from '../settings/settings.types.js';
 
 /**
@@ -38,11 +37,6 @@ export abstract class BasePlugin implements IPlugin {
 	/** Called when plugin is unloaded. Override for custom cleanup. */
 	async onUnload(): Promise<void> {
 		this.context = undefined;
-	}
-
-	/** Validate settings. Override for custom validation. */
-	async validateSettings(_settings: PluginSettings): Promise<ValidationResult> {
-		return { valid: true };
 	}
 
 	/** Health check. Override for custom health checks. */

@@ -71,7 +71,6 @@ describe('PluginOperationsService', () => {
             configurationMode: 'hybrid',
             onLoad: jest.fn().mockResolvedValue(undefined),
             onUnload: jest.fn().mockResolvedValue(undefined),
-            validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         }) as unknown as IPlugin;
 
     const createRegisteredPlugin = (plugin?: IPlugin): RegisteredPlugin => ({
@@ -945,7 +944,6 @@ describe('PluginOperationsService', () => {
                 configurationMode: configMode,
                 onLoad: jest.fn().mockResolvedValue(undefined),
                 onUnload: jest.fn().mockResolvedValue(undefined),
-                validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             } as unknown as IPlugin;
 
             return {
@@ -1175,7 +1173,6 @@ describe('PluginOperationsService', () => {
                     configurationMode: 'admin-only',
                     onLoad: jest.fn().mockResolvedValue(undefined),
                     onUnload: jest.fn().mockResolvedValue(undefined),
-                    validateSettings: jest.fn().mockResolvedValue({ valid: true }),
                 } as unknown as IPlugin,
                 manifest: {
                     id: 'github',
@@ -1225,7 +1222,6 @@ describe('PluginOperationsService', () => {
                     configurationMode: 'admin-only',
                     onLoad: jest.fn().mockResolvedValue(undefined),
                     onUnload: jest.fn().mockResolvedValue(undefined),
-                    validateSettings: jest.fn().mockResolvedValue({ valid: true }),
                 } as unknown as IPlugin,
                 manifest: {
                     id: 'internal-tool',

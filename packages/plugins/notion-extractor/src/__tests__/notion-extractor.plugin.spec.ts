@@ -93,29 +93,6 @@ describe('NotionExtractorPlugin', () => {
 		});
 	});
 
-	describe('validateSettings', () => {
-		it('should accept valid Notion API key with secret_ prefix', async () => {
-			const result = await plugin.validateSettings({ apiKey: 'secret_abcdefghijk' });
-			expect(result.valid).toBe(true);
-		});
-
-		it('should accept valid Notion API key with ntn_ prefix', async () => {
-			const result = await plugin.validateSettings({ apiKey: 'ntn_abcdefghijk' });
-			expect(result.valid).toBe(true);
-		});
-
-		it('should reject invalid API key format', async () => {
-			const result = await plugin.validateSettings({ apiKey: 'invalid_key_format' });
-			expect(result.valid).toBe(false);
-			expect(result.errors?.[0].path).toBe('apiKey');
-		});
-
-		it('should accept empty settings (API key is optional)', async () => {
-			const result = await plugin.validateSettings({});
-			expect(result.valid).toBe(true);
-		});
-	});
-
 	describe('healthCheck', () => {
 		it('should return unhealthy when service not initialized', async () => {
 			const result = await plugin.healthCheck();

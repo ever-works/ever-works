@@ -5,7 +5,6 @@ import { Suspense, useState, useCallback } from 'react';
 import DashboardToasts from './toasts';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
-import { GlobalNotificationBanner } from '@/components/dashboard/GlobalNotificationBanner';
 import { Footer } from '@/components/footer';
 import { HelpDrawer } from '@/components/dashboard/HelpDrawer';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
@@ -65,8 +64,6 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
                         isSidebarOpen={sidebarOpen}
                         onHelpClick={openHelp}
                     />
-
-                    <GlobalNotificationBanner />
 
                     <main
                         className="flex-1 flex flex-col overflow-y-auto bg-surface dark:bg-surface-dark min-h-0"

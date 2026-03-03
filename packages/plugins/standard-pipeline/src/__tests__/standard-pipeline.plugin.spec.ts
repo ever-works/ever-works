@@ -366,15 +366,6 @@ describe('StandardPipelinePlugin', () => {
 		it('should have onUnload method', () => {
 			expect(typeof plugin.onUnload).toBe('function');
 		});
-
-		it('should have validateSettings method', () => {
-			expect(typeof plugin.validateSettings).toBe('function');
-		});
-
-		it('validateSettings should return valid for empty settings', async () => {
-			const result = await plugin.validateSettings({});
-			expect(result.valid).toBe(true);
-		});
 	});
 
 	describe('Health Check', () => {

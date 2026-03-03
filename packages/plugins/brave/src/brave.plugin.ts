@@ -6,8 +6,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
-	PluginSettings,
 	SearchOptions,
 	SearchResponse,
 	SearchResult,
@@ -188,32 +186,6 @@ export class BraveSearchPlugin implements IPlugin, ISearchPlugin {
 
 	async onUnload(): Promise<void> {
 		this.context = undefined;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (!settings.apiKey) {
-			errors.push({
-				path: 'apiKey',
-				message: 'API key is required'
-			});
-		}
-
-		if (settings.maxResults !== undefined) {
-			const maxResults = settings.maxResults as number;
-			if (maxResults < 1 || maxResults > MAX_RESULTS_LIMIT) {
-				errors.push({
-					path: 'maxResults',
-					message: `Max results must be between 1 and ${MAX_RESULTS_LIMIT}`
-				});
-			}
-		}
-
-		return {
-			valid: errors.length === 0,
-			errors: errors.length > 0 ? errors : undefined
-		};
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

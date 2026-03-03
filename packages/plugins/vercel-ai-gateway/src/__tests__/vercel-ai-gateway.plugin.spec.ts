@@ -224,36 +224,6 @@ describe('VercelAiGatewayPlugin', () => {
 		});
 	});
 
-	describe('validateSettings', () => {
-		it('should return valid when apiKey is provided', async () => {
-			const result = await plugin.validateSettings({ apiKey: 'vcel_valid-key' });
-			expect(result.valid).toBe(true);
-			expect(result.errors).toBeUndefined();
-		});
-
-		it('should return invalid when apiKey is missing', async () => {
-			const result = await plugin.validateSettings({});
-			expect(result.valid).toBe(false);
-			expect(result.errors).toBeDefined();
-			expect(result.errors?.[0]?.path).toBe('apiKey');
-		});
-
-		it('should return invalid when apiKey is empty string', async () => {
-			const result = await plugin.validateSettings({ apiKey: '' });
-			expect(result.valid).toBe(false);
-		});
-
-		it('should accept valid settings with optional fields', async () => {
-			const result = await plugin.validateSettings({
-				apiKey: 'vcel_valid-key',
-				defaultModel: 'anthropic/claude-sonnet-4',
-				temperature: 0.5,
-				maxTokens: 8192
-			});
-			expect(result.valid).toBe(true);
-		});
-	});
-
 	describe('healthCheck', () => {
 		it('should return healthy status', async () => {
 			const health = await plugin.healthCheck();

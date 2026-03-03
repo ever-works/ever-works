@@ -12,7 +12,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
 	PluginSettings,
 	ConfigurationMode
 } from '@ever-works/plugin';
@@ -194,24 +193,6 @@ export class MistralPlugin extends BaseAiProvider {
 			supportsToolCalling: true,
 			supportsVision: true,
 			maxContextLength: 128000
-		};
-	}
-
-	// Settings validation
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (!settings.apiKey || typeof settings.apiKey !== 'string') {
-			errors.push({
-				path: 'apiKey',
-				message: 'Mistral API key is required'
-			});
-		}
-
-		return {
-			valid: errors.length === 0,
-			errors: errors.length > 0 ? errors : undefined
 		};
 	}
 

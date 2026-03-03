@@ -7,7 +7,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
 	PluginSettings,
 	SearchOptions,
 	SearchResponse,
@@ -260,48 +259,6 @@ export class ExaSearchPlugin implements IPlugin, ISearchPlugin, IContentExtracto
 
 	async onUnload(): Promise<void> {
 		this.context = undefined;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (!settings.apiKey) {
-			errors.push({
-				path: 'apiKey',
-				message: 'API key is required'
-			});
-		}
-
-		if (settings.searchType && !SEARCH_TYPES.includes(settings.searchType as (typeof SEARCH_TYPES)[number])) {
-			errors.push({
-				path: 'searchType',
-				message: `Search type must be one of: ${SEARCH_TYPES.join(', ')}`
-			});
-		}
-
-		if (settings.maxResults !== undefined) {
-			const maxResults = settings.maxResults as number;
-			if (maxResults < 1 || maxResults > 100) {
-				errors.push({
-					path: 'maxResults',
-					message: 'Max results must be between 1 and 100'
-				});
-			}
-		}
-
-		if (settings.category) {
-			if (!CATEGORIES.includes(settings.category as (typeof CATEGORIES)[number])) {
-				errors.push({
-					path: 'category',
-					message: `Category must be one of: ${CATEGORIES.filter(Boolean).join(', ')}`
-				});
-			}
-		}
-
-		return {
-			valid: errors.length === 0,
-			errors: errors.length > 0 ? errors : undefined
-		};
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

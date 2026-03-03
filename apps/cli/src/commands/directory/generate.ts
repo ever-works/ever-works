@@ -3,12 +3,14 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
-import { getApiService, CreateItemsGeneratorDto } from '../../services/api.service';
+import { getApiService, type CreateItemsGeneratorDto } from '../../services/api.service';
+import { GenerationMethod } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { GeneratePromptService } from './generate-prompt.service';
 import { handleCliError } from '../../utils/error';
 import { GenerateStatusType } from '@ever-works/cli-shared';
 import { WEB_URL } from '../../utils/constants';
+import { buildSelectedProviders, findUnconfiguredProviders } from '@ever-works/plugin';
 
 export const generateCommand = new Command('generate')
     .description('Generate data and create a repository for a directory')
@@ -26,7 +28,7 @@ export const generateCommand = new Command('generate')
             // Select directory
             const selection = await directoryPrompt.promptDirectorySelection();
             if (selection.cancelled || !selection.directory) {
-                console.log(chalk.yellow('\n⚠ Operation cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -87,21 +89,31 @@ export const generateCommand = new Command('generate')
                 return;
             }
 
+            // Fetch config and generator form schema in parallel
+            const spinner = ora('Loading generator configuration...').start();
+            const [config, schema_] = await Promise.all([
+                apiService.getDirectoryConfig(directory.id),
+                apiService.getGeneratorFormSchema(directory.id),
+            ]);
+            let schema = schema_;
+            spinner.succeed('Generator configuration loaded');
+
+            const initialPrompt = config?.metadata?.initial_prompt || undefined;
+            const lastRequestData = config?.metadata?.last_request_data;
+            const isGenerated = !!config?.metadata;
+
             // Collect generation parameters
             console.log(chalk.cyan('\nGeneration Configuration'));
 
-            // Prompt for required fields
-            const requiredData = await generatePrompt.promptRequiredFields(
-                `${directory.name} Content Generation`,
+            // Extract resolvedPipelineId from schema as fallback for pipeline selection
+            const resolvedPipelineId = schema.resolvedPipelineId || undefined;
+
+            // Provider/pipeline selection first (determines available fields)
+            const providerResult = await generatePrompt.promptProviderSelection(
+                schema,
+                lastRequestData?.providers,
+                resolvedPipelineId,
             );
-
-            // Fetch generator form schema for provider selection and dynamic fields
-            const spinner = ora('Loading generator configuration...').start();
-            let schema = await apiService.getGeneratorFormSchema(directory.id);
-            spinner.succeed('Generator configuration loaded');
-
-            // Provider selection
-            const providerResult = await generatePrompt.promptProviderSelection(schema);
 
             // If a pipeline was selected, re-fetch schema with pipeline-specific fields
             if (providerResult.pipelineId) {
@@ -113,31 +125,78 @@ export const generateCommand = new Command('generate')
                 pipelineSpinner.succeed('Pipeline configuration loaded');
             }
 
-            // Dynamic plugin fields
+            // Required fields (name is read-only, prompt pre-filled from last generation)
+            const requiredData = await generatePrompt.promptRequiredFields(
+                directory.name,
+                initialPrompt,
+            );
+
+            // Dynamic plugin fields (merge lastRequestData.pluginConfig with schema defaults)
             let pluginConfig: Record<string, unknown> = {};
             if (schema.pluginFields && schema.pluginFields.length > 0) {
+                const defaults = { ...schema.defaultValues };
+                // Only merge last pluginConfig when pipeline matches (mirrors web GeneratorForm behavior)
+                const lastPipelineId = lastRequestData?.providers?.pipeline || null;
+                const currentPipelineId = providerResult.pipelineId;
+                const isSamePipeline =
+                    (currentPipelineId || 'default') === (lastPipelineId || 'default');
+                if (isSamePipeline && lastRequestData?.pluginConfig) {
+                    Object.assign(defaults, lastRequestData.pluginConfig);
+                }
                 pluginConfig = await generatePrompt.promptDynamicFields(
                     schema.pluginFields,
                     schema.pluginGroups,
-                    schema.defaultValues,
+                    defaults,
                 );
             }
 
+            // Generation options (pre-fill from last generation)
+            const genOptions = await generatePrompt.promptGenerationOptions({
+                generation_method: lastRequestData?.generation_method,
+                update_with_pull_request: lastRequestData?.update_with_pull_request,
+                website_repository_creation_method:
+                    lastRequestData?.website_repository_creation_method,
+            });
+
+            // Recreate confirmation for previously generated directories
+            if (genOptions.generation_method === GenerationMethod.RECREATE && isGenerated) {
+                const { confirmRecreate } = await inquirer.prompt([
+                    {
+                        type: 'confirm',
+                        name: 'confirmRecreate',
+                        message: chalk.yellow(
+                            'Recreate will delete existing items and regenerate from scratch. This cannot be undone. Continue?',
+                        ),
+                        default: false,
+                    },
+                ]);
+                if (!confirmRecreate) {
+                    console.log(chalk.yellow('\nOperation cancelled.'));
+                    return;
+                }
+            }
+
+            // Resolve provider defaults from schema
+            const providers = buildSelectedProviders(providerResult.providers, schema);
+
+            // Validate no unconfigured providers
+            const unconfigured = findUnconfiguredProviders(providerResult.providers, schema);
+            if (unconfigured.length > 0) {
+                console.log(chalk.yellow(`\nUnconfigured providers: ${unconfigured.join(', ')}`));
+                console.log(chalk.gray('Configure them in Settings > Plugins before generating.'));
+                return;
+            }
+
+            // Build full DTO
             const createItemsGeneratorDto: CreateItemsGeneratorDto = {
                 name: requiredData.name,
                 prompt: requiredData.prompt,
+                generation_method: genOptions.generation_method,
+                update_with_pull_request: genOptions.update_with_pull_request,
+                website_repository_creation_method: genOptions.website_repository_creation_method,
+                providers,
+                pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
             };
-
-            // Set providers if any were selected
-            const hasProviders = Object.values(providerResult.providers).some(Boolean);
-            if (hasProviders) {
-                createItemsGeneratorDto.providers = providerResult.providers;
-            }
-
-            // Set plugin config if any fields were filled
-            if (Object.keys(pluginConfig).length > 0) {
-                createItemsGeneratorDto.pluginConfig = pluginConfig;
-            }
 
             // Show summary and confirm
             generatePrompt.displayGenerationSummary(createItemsGeneratorDto);
@@ -152,7 +211,7 @@ export const generateCommand = new Command('generate')
             ]);
 
             if (!confirmed.proceed) {
-                console.log(chalk.yellow('\n⚠ Generation cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -173,7 +232,7 @@ export const generateCommand = new Command('generate')
                 }
 
                 // Tell user to use ever-works status to check status
-                console.log(chalk.cyan('\n--- Next Steps ---'));
+                console.log('');
                 console.log(
                     chalk.gray('  • Use ') +
                         chalk.cyan('ever-works directory status') +

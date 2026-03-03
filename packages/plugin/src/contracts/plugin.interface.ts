@@ -2,8 +2,8 @@ import type { PluginContext } from './plugin-context.interface.js';
 import type { PluginManifest, PluginCategory } from './plugin-manifest.types.js';
 import type { PluginHealthCheck } from './lifecycle.types.js';
 import type { JsonSchema } from '../settings/json-schema.types.js';
+import type { ConfigurationMode } from '../settings/settings.types.js';
 import type { ValidationResult } from '../settings/validation.types.js';
-import type { ConfigurationMode, PluginSettings } from '../settings/settings.types.js';
 
 /**
  * Base plugin interface that all plugins must implement
@@ -37,13 +37,6 @@ export interface IPlugin {
 	onUnload(): Promise<void>;
 
 	/**
-	 * Validate plugin settings
-	 * @param settings - Settings to validate
-	 * @returns Validation result
-	 */
-	validateSettings(settings: PluginSettings): Promise<ValidationResult>;
-
-	/**
 	 * Optional: Perform a health check
 	 * @returns Health check result
 	 */
@@ -54,6 +47,16 @@ export interface IPlugin {
 	 * @returns Plugin manifest
 	 */
 	getManifest?(): PluginManifest;
+
+	/**
+	 * Optional: Run custom validation logic on settings.
+	 * Called after JSON Schema validation passes.
+	 * Use for cross-field checks, async API key verification, or business rules
+	 * that JSON Schema cannot express.
+	 * @param settings - The settings to validate
+	 * @returns Validation result (sync or async)
+	 */
+	validateSettings?(settings: Record<string, unknown>): ValidationResult | Promise<ValidationResult>;
 }
 
 /**

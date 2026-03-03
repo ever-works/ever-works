@@ -288,63 +288,6 @@ describe('ScreenshotOnePlugin', () => {
 		});
 	});
 
-	describe('validateSettings', () => {
-		it('should fail when accessKey is missing', async () => {
-			const result = await plugin.validateSettings({});
-
-			expect(result.valid).toBe(false);
-			expect(result.errors?.[0].path).toBe('accessKey');
-		});
-
-		it('should pass with valid settings', async () => {
-			const result = await plugin.validateSettings({
-				accessKey: 'test-key'
-			});
-
-			expect(result.valid).toBe(true);
-		});
-
-		it('should fail when viewport width is out of range', async () => {
-			const result = await plugin.validateSettings({
-				accessKey: 'test-key',
-				viewportWidth: 100 // Too small
-			});
-
-			expect(result.valid).toBe(false);
-			expect(result.errors?.[0].path).toBe('viewportWidth');
-		});
-
-		it('should fail when viewport height is out of range', async () => {
-			const result = await plugin.validateSettings({
-				accessKey: 'test-key',
-				viewportHeight: 5000 // Too large
-			});
-
-			expect(result.valid).toBe(false);
-			expect(result.errors?.[0].path).toBe('viewportHeight');
-		});
-
-		it('should fail with invalid format', async () => {
-			const result = await plugin.validateSettings({
-				accessKey: 'test-key',
-				format: 'gif' // Not supported
-			});
-
-			expect(result.valid).toBe(false);
-			expect(result.errors?.[0].path).toBe('format');
-		});
-
-		it('should fail with invalid device scale factor', async () => {
-			const result = await plugin.validateSettings({
-				accessKey: 'test-key',
-				deviceScaleFactor: 5 // Too large
-			});
-
-			expect(result.valid).toBe(false);
-			expect(result.errors?.[0].path).toBe('deviceScaleFactor');
-		});
-	});
-
 	describe('Lifecycle', () => {
 		it('should log on load', async () => {
 			await plugin.onLoad(mockContext);

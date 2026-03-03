@@ -6,7 +6,6 @@ import type {
 	PluginCategory,
 	JsonSchema,
 	ValidationResult,
-	PluginSettings,
 	PipelineStepDefinition,
 	PipelineState,
 	PipelineExecutionOptions,
@@ -146,26 +145,6 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 	async onUnload(): Promise<void> {
 		await this.cancel();
 		this.context = null;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const oauthToken = settings.oauthToken as string | undefined;
-		const apiKey = settings.apiKey as string | undefined;
-
-		if (!oauthToken && !apiKey) {
-			return {
-				valid: false,
-				errors: [
-					{
-						path: '',
-						message: 'Either an OAuth token or Anthropic API key is required',
-						code: 'auth-required'
-					}
-				]
-			};
-		}
-
-		return { valid: true };
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

@@ -1,8 +1,6 @@
 import type { IPlugin } from '../contracts/plugin.interface.js';
 import type { PluginContext } from '../contracts/plugin-context.interface.js';
 import type { PluginHealthCheck } from '../contracts/lifecycle.types.js';
-import type { ValidationResult } from '../settings/validation.types.js';
-import type { PluginSettings } from '../settings/settings.types.js';
 import { createMockPluginContext, type MockPluginContextOptions } from './mock-plugin-context.js';
 
 /**
@@ -77,13 +75,6 @@ export class PluginTestHarness<T extends IPlugin = IPlugin> {
 	 */
 	get isLoaded(): boolean {
 		return this.loadedAt !== undefined;
-	}
-
-	/**
-	 * Validate plugin settings
-	 */
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		return this.plugin.validateSettings(settings);
 	}
 
 	/**
@@ -208,31 +199,6 @@ export class PluginTestHarness<T extends IPlugin = IPlugin> {
 				this.assert(!this.isLoaded, 'Plugin should be unloaded');
 			})
 		);
-
-		return results;
-	}
-
-	/**
-	 * Run settings validation tests
-	 */
-	async testSettingsValidation(
-		testCases: Array<{ settings: PluginSettings; expected: boolean; name?: string }>
-	): Promise<PluginTestResult[]> {
-		const results: PluginTestResult[] = [];
-
-		for (const testCase of testCases) {
-			const name = testCase.name ?? `settings validation: ${JSON.stringify(testCase.settings)}`;
-			results.push(
-				await this.test(name, async () => {
-					const result = await this.validateSettings(testCase.settings);
-					this.assertEqual(
-						result.valid,
-						testCase.expected,
-						`Expected valid=${testCase.expected}, got valid=${result.valid}`
-					);
-				})
-			);
-		}
 
 		return results;
 	}

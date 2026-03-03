@@ -7,7 +7,7 @@ export abstract class BasePromptService {
 	 * Displays a section header
 	 */
 	protected displaySectionHeader(title: string): void {
-		console.log('\n' + chalk.cyan.bold(`=== ${title} ===`));
+		console.log(chalk.cyan.bold(`\n  ${title}`));
 	}
 
 	/**
@@ -121,13 +121,18 @@ export abstract class BasePromptService {
 	/**
 	 * Prompts for a password input
 	 */
-	protected async promptPasswordRequired(message: string, required: boolean = true): Promise<string> {
+	protected async promptPasswordRequired(
+		message: string,
+		required: boolean = true,
+		defaultValue?: string
+	): Promise<string> {
 		const { value } = await inquirer.prompt([
 			{
 				type: 'password',
 				name: 'value',
 				message,
 				mask: '*',
+				default: defaultValue,
 				validate: required
 					? (input: string) => {
 							if (!input || input.trim().length === 0) {

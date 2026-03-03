@@ -303,6 +303,7 @@ export function ImportConfigureStep({
                     providerId={gitProvider!}
                     onChange={onOwnerChange}
                     disabled={isPending}
+                    suggestedOwner={analysisResult?.owner}
                 />
             </div>
 
