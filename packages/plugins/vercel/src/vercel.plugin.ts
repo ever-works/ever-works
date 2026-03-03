@@ -185,7 +185,12 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 		return this.apiService.removeProjectDomain(projectId, domain, token, teamScope);
 	}
 
-	async verifyDomain(projectId: string, domain: string, token: string, teamScope?: string): Promise<DeploymentDomain> {
+	async verifyDomain(
+		projectId: string,
+		domain: string,
+		token: string,
+		teamScope?: string
+	): Promise<DeploymentDomain> {
 		const result = await this.apiService.verifyProjectDomain(projectId, domain, token, teamScope);
 		return {
 			name: result.name,

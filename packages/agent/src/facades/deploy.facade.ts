@@ -301,7 +301,11 @@ export class DeployFacadeService implements IDeployFacade {
     async getDomains(options: DeployFacadeOptions): Promise<DeploymentDomain[]> {
         const { plugin, token, directory } = await this.resolvePluginAndTokenWithDirectory(options);
         if (!plugin.getDomains) {
-            throw new DeployFacadeError('Domain management is not supported by this provider', 'getDomains', plugin.id);
+            throw new DeployFacadeError(
+                'Domain management is not supported by this provider',
+                'getDomains',
+                plugin.id,
+            );
         }
         const projectId = await this.resolveProjectId(plugin, token, directory, options);
         const teamScope = await this.getTeamScope(plugin.id, options);
@@ -314,7 +318,11 @@ export class DeployFacadeService implements IDeployFacade {
     async addDomain(domain: string, options: DeployFacadeOptions): Promise<AddDomainResult> {
         const { plugin, token, directory } = await this.resolvePluginAndTokenWithDirectory(options);
         if (!plugin.addDomain) {
-            throw new DeployFacadeError('Domain management is not supported by this provider', 'addDomain', plugin.id);
+            throw new DeployFacadeError(
+                'Domain management is not supported by this provider',
+                'addDomain',
+                plugin.id,
+            );
         }
         const projectId = await this.resolveProjectId(plugin, token, directory, options);
         const teamScope = await this.getTeamScope(plugin.id, options);
@@ -469,7 +477,10 @@ export class DeployFacadeService implements IDeployFacade {
     /**
      * Get team scope from plugin settings
      */
-    private async getTeamScope(pluginId: string, options: DeployFacadeOptions): Promise<string | undefined> {
+    private async getTeamScope(
+        pluginId: string,
+        options: DeployFacadeOptions,
+    ): Promise<string | undefined> {
         const settings = await this.settingsService.getSettings(pluginId, {
             userId: options.userId,
             directoryId: options.directoryId,

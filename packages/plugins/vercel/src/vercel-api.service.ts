@@ -100,7 +100,13 @@ export class VercelApiService {
 		projectId: string,
 		token: string,
 		teamScope?: string
-	): Promise<Array<{ name: string; verified: boolean; verification?: Array<{ type: string; domain: string; value: string; reason: string }> }>> {
+	): Promise<
+		Array<{
+			name: string;
+			verified: boolean;
+			verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
+		}>
+	> {
 		if (!token) {
 			return [];
 		}
@@ -135,7 +141,11 @@ export class VercelApiService {
 		domain: string,
 		token: string,
 		teamScope?: string
-	): Promise<{ name: string; verified: boolean; verification?: Array<{ type: string; domain: string; value: string; reason: string }> }> {
+	): Promise<{
+		name: string;
+		verified: boolean;
+		verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
+	}> {
 		const vercel = await this.createSDK(token);
 		const response: any = await vercel.projects.addProjectDomain({
 			idOrName: projectId,
@@ -159,12 +169,7 @@ export class VercelApiService {
 	/**
 	 * Remove a domain from a project
 	 */
-	async removeProjectDomain(
-		projectId: string,
-		domain: string,
-		token: string,
-		teamScope?: string
-	): Promise<boolean> {
+	async removeProjectDomain(projectId: string, domain: string, token: string, teamScope?: string): Promise<boolean> {
 		const vercel = await this.createSDK(token);
 		await vercel.projects.removeProjectDomain({
 			idOrName: projectId,
@@ -182,7 +187,11 @@ export class VercelApiService {
 		domain: string,
 		token: string,
 		teamScope?: string
-	): Promise<{ name: string; verified: boolean; verification?: Array<{ type: string; domain: string; value: string; reason: string }> }> {
+	): Promise<{
+		name: string;
+		verified: boolean;
+		verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
+	}> {
 		const vercel = await this.createSDK(token);
 		const response: any = await vercel.projects.verifyProjectDomain({
 			idOrName: projectId,

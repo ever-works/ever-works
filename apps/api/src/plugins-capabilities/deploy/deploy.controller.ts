@@ -1,4 +1,13 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+    BadRequestException,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    Post,
+    UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard, CurrentUser } from '../../auth';
 import { AuthenticatedUser } from '../../auth/types/jwt.types';
@@ -412,7 +421,8 @@ export class DeployController {
         if (!directory.website) {
             throw new BadRequestException({
                 status: 'error',
-                message: 'No deployment exists for this directory. Deploy first before managing domains.',
+                message:
+                    'No deployment exists for this directory. Deploy first before managing domains.',
             });
         }
 
@@ -450,7 +460,8 @@ export class DeployController {
         if (!directory.website) {
             throw new BadRequestException({
                 status: 'error',
-                message: 'No deployment exists for this directory. Deploy first before adding domains.',
+                message:
+                    'No deployment exists for this directory. Deploy first before adding domains.',
             });
         }
 
