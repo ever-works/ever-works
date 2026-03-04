@@ -13,12 +13,14 @@ import type {
 
 import { LangfuseClient } from '@langfuse/client';
 
-/** All standard-pipeline prompt keys available for customization. */
+/** All prompt keys available for customization, grouped by plugin. */
 const PROMPT_KEY_DOCS = `
 ## Available Prompt Keys
 
-Pipeline prompts can be overridden by creating a Langfuse prompt with the matching key.
+Prompts can be overridden by creating a Langfuse prompt with the matching key.
 Each prompt uses \`{variable}\` placeholders that are substituted at runtime.
+
+### Standard Pipeline
 
 | Key | Description | Variables |
 |-----|-------------|-----------|
@@ -37,13 +39,31 @@ Each prompt uses \`{variable}\` placeholders that are substituted at runtime.
 | \`standard-pipeline.prompt-comparison\` | Compares two prompts for similarity | \`{existing_prompt}\`, \`{new_prompt}\` |
 | \`standard-pipeline.deduplication\` | Deduplicates directory items | \`{task}\`, \`{items}\` |
 | \`standard-pipeline.extract-new-items\` | Extracts genuinely new items | \`{existing}\`, \`{new}\` |
+
+### Agent Pipeline
+
+| Key | Description | Variables |
+|-----|-------------|-----------|
 | \`agent-pipeline.parent-system\` | Parent orchestrator system prompt | \`{date}\`, \`{existingCount}\`, \`{existingItemsSection}\`, \`{maxPages}\`, \`{modificationSection}\`, \`{targetItems}\`, \`{targetSuffix}\`, \`{directorySection}\` |
 | \`agent-pipeline.parent-user\` | Parent orchestrator user prompt | \`{userInstruction}\`, \`{directoryDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
 | \`agent-pipeline.worker-system\` | Content extraction worker prompt | \`{date}\`, \`{itemSchemaText}\`, \`{directoryName}\`, \`{directoryDescription}\`, \`{requestPrompt}\` |
 | \`agent-pipeline.chunk-user\` | Per-chunk extraction prompt | \`{sourceUrl}\`, \`{chunkInfo}\`, \`{previouslyExtractedList}\`, \`{chunkText}\` |
 | \`agent-pipeline.modification-system\` | Item modification worker prompt | \`{date}\`, \`{itemSchemaText}\` |
+
+### Claude Code
+
+| Key | Description | Variables |
+|-----|-------------|-----------|
 | \`claude-code.system\` | Claude Code system prompt | \`{workspacePath}\`, \`{date}\`, \`{itemSchemaText}\`, \`{existingCount}\`, \`{existingItemsSection}\`, \`{modificationSection}\`, \`{targetItems}\`, \`{directorySection}\` |
 | \`claude-code.user\` | Claude Code user prompt | \`{userInstruction}\`, \`{directoryDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
+
+### Comparison Generator
+
+| Key | Description | Variables |
+|-----|-------------|-----------|
+| \`comparison.structure\` | Structured comparison generation | \`{itemAName}\`, \`{itemADescription}\`, \`{itemASourceUrl}\`, \`{itemBName}\`, \`{itemBDescription}\`, \`{itemBSourceUrl}\`, \`{category}\`, \`{directoryContextSection}\`, \`{researchSection}\`, \`{customPromptSection}\` |
+| \`comparison.markdown\` | Comparison markdown article | \`{itemAName}\`, \`{itemBName}\`, \`{category}\`, \`{summary}\`, \`{dimensionsText}\`, \`{verdict}\`, \`{sourcesText}\`, \`{customPromptSection}\` |
+| \`comparison.extended-analysis\` | Extended deep-dive analysis | \`{itemAName}\`, \`{itemBName}\`, \`{title}\`, \`{verdict}\`, \`{category}\`, \`{researchContent}\`, \`{customPromptSection}\` |
 
 > **Note:** Use Langfuse's \`{{variable}}\` syntax in your templates — it will be
 > automatically converted to \`{variable}\` at runtime.
