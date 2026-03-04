@@ -350,6 +350,16 @@ export class DeployFacadeService implements IDeployFacade {
             );
         }
 
+        // Check for duplicate before inserting
+        const existing = await this.domainRepository.findOne(options.directoryId, domain);
+        if (existing) {
+            throw new DeployFacadeError(
+                `Domain "${domain}" is already added to this directory`,
+                'addDomain',
+                plugin.id,
+            );
+        }
+
         // Save to DB first (unverified, no provider yet)
         await this.domainRepository.addDomain(options.directoryId, domain);
 
@@ -368,9 +378,13 @@ export class DeployFacadeService implements IDeployFacade {
         await this.domainRepository.updateProvider(options.directoryId, domain, plugin.id);
         if (result.verified) {
             await this.domainRepository.updateVerified(options.directoryId, domain, true);
-            await this.directoryRepository.update(directory.id, {
-                website: `https://${result.domain.name}`,
-            });
+            // Only promote to primary URL if current website is auto-assigned or unset
+            const isAutoAssigned = !directory.website || directory.website.endsWith('.vercel.app');
+            if (isAutoAssigned) {
+                await this.directoryRepository.update(directory.id, {
+                    website: `https://${result.domain.name}`,
+                });
+            }
         }
 
         return result;
@@ -397,11 +411,11 @@ export class DeployFacadeService implements IDeployFacade {
             }
         }
 
-        // Always remove from DB
-        await this.domainRepository.removeDomain(options.directoryId, domain);
+        // Remove from DB
+        const removed = await this.domainRepository.removeDomain(options.directoryId, domain);
 
         // If the removed domain was the current website URL, re-lookup to update
-        if (directory.website === `https://${domain}`) {
+        if (removed && directory.website === `https://${domain}`) {
             try {
                 const teamScope = await this.getTeamScope(plugin.id, options);
                 if (plugin.lookupExistingDeployment) {
@@ -419,7 +433,7 @@ export class DeployFacadeService implements IDeployFacade {
             }
         }
 
-        return true;
+        return removed;
     }
 
     /**
@@ -442,11 +456,14 @@ export class DeployFacadeService implements IDeployFacade {
         // Update DB with verification result
         await this.domainRepository.updateVerified(options.directoryId, domain, result.verified);
 
-        // Update directory.website if newly verified
+        // Only promote to primary URL if current website is auto-assigned or unset
         if (result.verified) {
-            await this.directoryRepository.update(directory.id, {
-                website: `https://${result.name}`,
-            });
+            const isAutoAssigned = !directory.website || directory.website.endsWith('.vercel.app');
+            if (isAutoAssigned) {
+                await this.directoryRepository.update(directory.id, {
+                    website: `https://${result.name}`,
+                });
+            }
         }
 
         return result;
