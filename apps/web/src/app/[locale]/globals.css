@@ -20,8 +20,8 @@
     --color-card-hover: #f8fafc;
     --color-card-border: #e2e8f0;
 
-    --color-primary: #3b82f6;
-    --color-primary-hover: #2563eb;
+    --color-primary: #2563eb;
+    --color-primary-hover: #3b82f6;
 
     --color-text: #0f172a;
     --color-text-secondary: #475569;
@@ -285,12 +285,6 @@ body {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
-}
-
-/* ── Auth right-panel: dot grid background ─────────────────────────────────── */
-.auth-dot-grid {
-    background-image: radial-gradient(circle, rgba(139, 92, 246, 0.3) 1px, transparent 1px);
-    background-size: 32px 32px;
 }
 
 /* Semantic utility for auth area overlay */

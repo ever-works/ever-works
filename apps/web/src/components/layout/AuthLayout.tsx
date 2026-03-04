@@ -44,7 +44,7 @@ function BenefitCarousel({ items }: { items: BenefitItem[] }) {
         };
     }, [items.length]);
 
-    const item = items[active];
+    let item = items[active];
 
     const palette = {
         violet: {
@@ -67,7 +67,7 @@ function BenefitCarousel({ items }: { items: BenefitItem[] }) {
         },
     } as const;
 
-    const c = palette[item.color];
+    let c = palette[item.color];
 
     return (
         <div className="w-full max-w-xs">

@@ -136,7 +136,7 @@ export default function RegisterForm() {
                     disabled={isPending}
                     loading={isPending}
                     fullWidth
-                    className="bg-primary-hover hover:bg-primary"
+                    className="bg-primary hover:bg-primary-hover"
                 >
                     {isPending ? t('form.submitting') : t('form.submit')}
                 </Button>
