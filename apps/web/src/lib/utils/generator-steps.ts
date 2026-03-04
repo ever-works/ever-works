@@ -27,21 +27,28 @@ export function getStepProgress(status: GenerateStatus | undefined): number {
 
 /**
  * Get human-readable step text.
- * Uses dynamic stepName from the pipeline plugin.
- *
- * @param status - The generation status
- * @param fallbackText - Fallback text when no step name is available (e.g., "Processing...")
+ * Prefers the static `stepName` (e.g. "Generate Items") for a clean label.
+ * Falls back to `step` when `stepName` is not set.
  */
 export function getStepText(status: GenerateStatus | undefined, fallbackText: string): string {
     if (!status?.step) {
         return fallbackText;
     }
 
-    // Use dynamic step name from pipeline if available
     if (status.stepName) {
         return status.stepName;
     }
 
-    // Fallback: display the fallback text if no step name available
-    return fallbackText;
+    return status.step || fallbackText;
+}
+
+/**
+ * Get items-processed text when available.
+ * Returns e.g. "27 items generated" or undefined when not applicable.
+ */
+export function getItemsProcessedText(status: GenerateStatus | undefined): string | undefined {
+    if (status?.itemsProcessed !== undefined && status.itemsProcessed > 0) {
+        return `${status.itemsProcessed} items generated`;
+    }
+    return undefined;
 }

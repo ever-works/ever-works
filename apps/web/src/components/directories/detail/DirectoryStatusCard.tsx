@@ -8,7 +8,7 @@ import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import { GenerateStatusType } from '@/lib/api/enums';
-import { getStepProgress, getStepText } from '@/lib/utils/generator-steps';
+import { getStepProgress, getStepText, getItemsProcessedText } from '@/lib/utils/generator-steps';
 
 interface DirectoryStatusCardProps {
     directory: Directory;
@@ -50,11 +50,12 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
         // Get dynamic step description from pipeline plugin
         const progressPercentage = getStepProgress(generateStatus);
         const stepText = getStepText(generateStatus, tProgress('steps.processing'));
+        const itemsText = getItemsProcessedText(generateStatus);
 
         const configs = {
             [GenerateStatusType.GENERATING]: {
                 title: t('generating.title'),
-                description: stepText || t('generating.description'),
+                description: itemsText || stepText || t('generating.description'),
                 action: (
                     <div className="w-full">
                         <div className="flex items-center justify-between text-xs text-text-muted dark:text-text-muted-dark mb-1">

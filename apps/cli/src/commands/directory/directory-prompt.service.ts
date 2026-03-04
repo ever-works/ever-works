@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import {
     DirectoryPromptService as BaseDirectoryPromptService,
     DirectorySelection,
+    DirectoryMemberRole,
 } from '@ever-works/cli-shared';
 import { getApiService } from '../../services/api.service';
 
@@ -16,7 +17,28 @@ export type {
     DeployProviderChoice,
 } from '@ever-works/cli-shared';
 
-export { DirectoryMemberRole } from '@ever-works/cli-shared';
+export { DirectoryMemberRole, GenerateStatusType } from '@ever-works/cli-shared';
+
+/**
+ * Check if the user's role allows editing (editor, manager, or owner).
+ */
+export function canEdit(role?: DirectoryMemberRole | string): boolean {
+    return (
+        !!role &&
+        [
+            DirectoryMemberRole.OWNER,
+            DirectoryMemberRole.MANAGER,
+            DirectoryMemberRole.EDITOR,
+        ].includes(role as DirectoryMemberRole)
+    );
+}
+
+/**
+ * Check if the user's role allows deletion (owner only).
+ */
+export function canDelete(role?: DirectoryMemberRole | string): boolean {
+    return role === DirectoryMemberRole.OWNER;
+}
 
 export class DirectoryPromptService extends BaseDirectoryPromptService {
     private apiService = getApiService();

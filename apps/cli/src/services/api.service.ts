@@ -116,6 +116,18 @@ export interface DeployDto {
     teamScope?: string;
 }
 
+export interface PatchDirectoryDto {
+    deployProvider?: string;
+}
+
+export interface LookupDeploymentResponse {
+    status: 'success' | 'error';
+    website?: string;
+    deploymentState?: string;
+    found: boolean;
+    message?: string;
+}
+
 export interface DeleteDirectoryDto {
     reason?: string;
     force_delete?: boolean;
@@ -239,6 +251,14 @@ export class ApiService {
         return response.data;
     }
 
+    async patchDirectory(directoryId: string, data: PatchDirectoryDto) {
+        const response = await this.httpClient.put<ApiResponse<{ directory: Directory }>>(
+            `/directories/${directoryId}`,
+            data,
+        );
+        return response.data;
+    }
+
     async getDirectoryConfig(directoryId: string): Promise<DirectoryConfig | null> {
         try {
             const response = await this.httpClient.get<ApiResponse<{ config: DirectoryConfig }>>(
@@ -351,6 +371,14 @@ export class ApiService {
     }
 
     // Deploy operations (directory-scoped)
+
+    async lookupExistingDeployment(directoryId: string): Promise<LookupDeploymentResponse> {
+        const response = await this.httpClient.post<LookupDeploymentResponse>(
+            `/deploy/directories/${directoryId}/lookup`,
+            {},
+        );
+        return response.data;
+    }
 
     async checkDeployCapability(directoryId: string): Promise<DeployCapabilityResponse> {
         const response = await this.httpClient.post<DeployCapabilityResponse>(

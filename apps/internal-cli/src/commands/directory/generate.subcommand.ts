@@ -13,7 +13,11 @@ import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
 import { Directory, GenerateStatusType, User } from '@ever-works/agent/entities';
-import { getStepProgress, getStepText, ItemsGeneratorStep } from '@ever-works/cli-shared';
+import {
+    getDynamicStepText,
+    getDynamicStepProgress,
+    getItemsProcessedText,
+} from '@ever-works/cli-shared';
 
 @SubCommand({
     name: 'generate',
@@ -208,11 +212,12 @@ export class GenerateSubCommand extends CommandRunner {
                     const timeStr = `[${Math.floor(elapsed / 60)}m ${elapsed % 60}s]`;
 
                     if (freshDirectory.generateStatus?.step) {
-                        const step = freshDirectory.generateStatus.step as ItemsGeneratorStep;
-                        const stepText = getStepText(step);
-                        const progress = getStepProgress(step);
+                        const stepText = getDynamicStepText(freshDirectory.generateStatus);
+                        const progress = getDynamicStepProgress(freshDirectory.generateStatus);
+                        const itemsText = getItemsProcessedText(freshDirectory.generateStatus);
+                        const itemsSuffix = itemsText ? ` (${itemsText})` : '';
 
-                        spinner.text = `Generating ${timeStr}: ${stepText} - ${progress}%`;
+                        spinner.text = `Generating ${timeStr}: ${stepText}${itemsSuffix} - ${progress}%`;
                     } else {
                         spinner.text = `Generating ${timeStr}...`;
                     }

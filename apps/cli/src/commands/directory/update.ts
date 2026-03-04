@@ -5,7 +5,7 @@ import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService, GenerationMethod } from '../../services/api.service';
 import type { UpdateItemsGeneratorDto } from '../../services/api.service';
-import { DirectoryPromptService } from './directory-prompt.service';
+import { DirectoryPromptService, canEdit } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 
 export const updateCommand = new Command('update')
@@ -36,6 +36,12 @@ export const updateCommand = new Command('update')
                     `\n✓ Selected directory: ${directoryPrompt.formatSelectedDirectory(directory, role, isShared)}`,
                 ),
             );
+
+            if (!canEdit(role)) {
+                console.log(chalk.yellow('\n⚠ You do not have permission to perform this action.'));
+                console.log(chalk.gray(`  Your role: ${role}. Required: editor or higher.`));
+                return;
+            }
 
             // Prompt for update parameters
             const answers = await inquirer.prompt([

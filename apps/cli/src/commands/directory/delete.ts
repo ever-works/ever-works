@@ -4,7 +4,7 @@ import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
-import { DirectoryPromptService } from './directory-prompt.service';
+import { DirectoryPromptService, canDelete } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 
 export const deleteCommand = new Command('delete')
@@ -36,6 +36,12 @@ export const deleteCommand = new Command('delete')
                 ),
             );
 
+            if (!canDelete(role)) {
+                console.log(chalk.yellow('\n⚠ Only the directory owner can delete a directory.'));
+                console.log(chalk.gray(`  Your role: ${role}.`));
+                return;
+            }
+
             // Show warning about what will be deleted
             console.log(chalk.red('\n⚠️  WARNING: This action cannot be undone!'));
             console.log(chalk.gray('This will delete:'));
@@ -49,19 +55,19 @@ export const deleteCommand = new Command('delete')
                     type: 'confirm',
                     name: 'delete_data_repository',
                     message: 'Delete data repository?',
-                    default: true,
+                    default: false,
                 },
                 {
                     type: 'confirm',
                     name: 'delete_markdown_repository',
                     message: 'Delete markdown repository?',
-                    default: true,
+                    default: false,
                 },
                 {
                     type: 'confirm',
                     name: 'delete_website_repository',
                     message: 'Delete website repository?',
-                    default: true,
+                    default: false,
                 },
                 {
                     type: 'confirm',

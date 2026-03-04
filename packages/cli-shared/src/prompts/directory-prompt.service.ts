@@ -55,7 +55,13 @@ export enum GenerateStatusType {
 type GenerateStatus = {
 	status: GenerateStatusType;
 	step?: string;
+	stepName?: string;
+	stepIndex?: number;
+	totalSteps?: number;
+	progress?: number;
+	itemsProcessed?: number;
 	error?: string;
+	warnings?: string[];
 };
 
 export type GetProjectsReadyState = 'BUILDING' | 'ERROR' | 'INITIALIZING' | 'QUEUED' | 'READY' | 'CANCELED' | 'TIMEOUT';
@@ -73,6 +79,7 @@ export interface Directory {
 	generateStatus?: GenerateStatus;
 	deploymentState?: GetProjectsReadyState;
 	deploymentStartedAt?: string;
+	deployProvider?: string;
 	userRole?: DirectoryMemberRole;
 }
 

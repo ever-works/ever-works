@@ -44,6 +44,7 @@ import {
 	initializeState,
 	updateStepState,
 	reportProgress,
+	reportItemProgress,
 	resolveSettings,
 	resolveAuthEnv,
 	buildMetrics,
@@ -54,7 +55,8 @@ import {
 	getFormFields as formFields,
 	getFormGroups as formGroups,
 	validateFormInput as formValidate,
-	getDefaultValues as formDefaults
+	getDefaultValues as formDefaults,
+	DEFAULT_TARGET_ITEMS
 } from './form-schema.js';
 
 /**
@@ -308,8 +310,15 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			const userPrompt = buildUserPrompt(promptOptions);
 
 			const authEnv = resolveAuthEnv(settings);
+			const targetItems = ((request.config || {}).target_items as number) || DEFAULT_TARGET_ITEMS;
 
-			const taxonomyWatcher = startTaxonomyWatcher(workspacePath, logger);
+			const taxonomyWatcher = startTaxonomyWatcher({
+				workspacePath,
+				logger,
+				onNewItem: (newItemCount) => {
+					reportItemProgress(onProgress, newItemCount, targetItems, 2);
+				}
+			});
 
 			let execResult: ExecuteResult;
 			try {
