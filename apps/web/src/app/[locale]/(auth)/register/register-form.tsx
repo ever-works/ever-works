@@ -131,7 +131,13 @@ export default function RegisterForm() {
                     </label>
                 </div>
 
-                <Button type="submit" disabled={isPending} loading={isPending} fullWidth>
+                <Button
+                    type="submit"
+                    disabled={isPending}
+                    loading={isPending}
+                    fullWidth
+                    className="bg-primary-hover hover:bg-primary"
+                >
                     {isPending ? t('form.submitting') : t('form.submit')}
                 </Button>
 
