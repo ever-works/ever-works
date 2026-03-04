@@ -276,6 +276,7 @@
             "tabs": {
                 "profile": "Profile",
                 "security": "Security",
+                "apiKeys": "API Keys",
                 "gitProviders": "Git Providers",
                 "dangerZone": "Danger Zone"
             },
@@ -384,6 +385,46 @@
                         "connectError": "Failed to connect GitHub",
                         "disconnectError": "Failed to disconnect GitHub"
                     }
+                }
+            },
+            "apiKeys": {
+                "title": "API Keys",
+                "subtitle": "Manage API keys for external access to your resources",
+                "create": "Create API Key",
+                "empty": "No API keys yet. Create one to get started.",
+                "neverExpires": "Never",
+                "columns": {
+                    "name": "Name",
+                    "key": "Key",
+                    "created": "Created",
+                    "lastUsed": "Last Used",
+                    "expires": "Expires",
+                    "actions": "Actions"
+                },
+                "dialog": {
+                    "title": "Create API Key",
+                    "nameLabel": "Name",
+                    "namePlaceholder": "e.g. My Integration",
+                    "expirationLabel": "Expiration",
+                    "cancel": "Cancel",
+                    "createButton": "Create",
+                    "keyCreated": "API Key Created",
+                    "keyWarning": "Copy this key now. You won't be able to see it again.",
+                    "done": "Done"
+                },
+                "revoke": {
+                    "title": "Revoke API Key",
+                    "description": "Are you sure you want to revoke the API key \"{name}\"? This action cannot be undone and any integrations using this key will stop working.",
+                    "cancel": "Cancel",
+                    "confirm": "Revoke"
+                },
+                "messages": {
+                    "nameRequired": "Please enter a name for the API key",
+                    "createSuccess": "API key created successfully",
+                    "createError": "Failed to create API key",
+                    "revokeSuccess": "API key revoked successfully",
+                    "revokeError": "Failed to revoke API key",
+                    "copyError": "Failed to copy to clipboard"
                 }
             }
         },
@@ -2196,6 +2237,7 @@
             "plugins": "Plugins",
             "profile": "Profile",
             "security": "Security",
+            "apiKeys": "API Keys",
             "dangerZone": "Danger Zone",
             "pluginSettings": "Plugin Settings"
         }

@@ -1,13 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { RefreshTokenRepository } from '@ever-works/agent/database';
+import { ApiKeyRepository, RefreshTokenRepository } from '@ever-works/agent/database';
 import { authConstants, jwtConstants } from '../../config/constants';
 
 @Injectable()
 export class TokenCleanupService {
     private readonly logger = new Logger(TokenCleanupService.name);
 
-    constructor(private readonly refreshTokenRepository: RefreshTokenRepository) {}
+    constructor(
+        private readonly refreshTokenRepository: RefreshTokenRepository,
+        private readonly apiKeyRepository: ApiKeyRepository,
+    ) {}
 
     @Cron(CronExpression.EVERY_DAY_AT_3AM)
     async handleTokenCleanup() {
@@ -33,6 +36,12 @@ export class TokenCleanupService {
             this.logger.log(`Deleted ${revokedCount} old revoked refresh tokens`);
 
             this.logger.log('Refresh token cleanup completed');
+
+            // Clean up expired API keys
+            const expiredApiKeys = await this.apiKeyRepository.deleteExpiredKeys();
+            if (expiredApiKeys > 0) {
+                this.logger.log(`Deleted ${expiredApiKeys} expired API keys`);
+            }
         } catch (error) {
             this.logger.error('Error during token cleanup', error);
         }

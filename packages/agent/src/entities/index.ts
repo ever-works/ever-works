@@ -1,3 +1,4 @@
+export * from './api-key.entity';
 export * from './directory.entity';
 export * from './directory-advanced-prompts.entity';
 export * from './directory-custom-domain.entity';
