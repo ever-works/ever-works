@@ -60,9 +60,9 @@
     /* UI element colors */
     --color-toggle-dark: #3b4454;
     --color-surface-deeper-dark: #0f1729;
-    
+
     /* Auth right-panel overlay */
-    --color-auth-overlay: rgba(26,16,64,0.4);
+    --color-auth-overlay: rgba(26, 16, 64, 0.4);
     /* Auth right-panel background color */
     --color-auth-bg: #11102d;
 
@@ -329,7 +329,9 @@ input:-webkit-autofill:focus,
 textarea:-webkit-autofill:focus,
 select:-webkit-autofill:focus {
     outline: none;
-    box-shadow: 0 0 0 1000px #ffffff inset, 0 0 0 3px rgba(59,130,246,0.12) !important;
+    box-shadow:
+        0 0 0 1000px #ffffff inset,
+        0 0 0 3px rgba(59, 130, 246, 0.12) !important;
     border-color: var(--color-primary) !important;
 }
 
@@ -337,7 +339,9 @@ select:-webkit-autofill:focus {
 .dark textarea:-webkit-autofill:focus,
 .dark select:-webkit-autofill:focus {
     outline: none;
-    box-shadow: 0 0 0 1000px var(--color-input-bg-dark) inset, 0 0 0 3px #101827 !important;
+    box-shadow:
+        0 0 0 1000px var(--color-input-bg-dark) inset,
+        0 0 0 3px #101827 !important;
     border-color: var(--color-primary) !important;
 }
 

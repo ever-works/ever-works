@@ -113,7 +113,7 @@ export function LoginClient() {
                     className="text-sm shadow-sm"
                 />
 
-                <div className='mb-6'>
+                <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
                         <label className="block text-xs font-medium text-text dark:text-text-dark">
                             {t('form.password.label')}
