@@ -106,10 +106,13 @@ describe('VercelApiService', () => {
 			expect(typeof service.verifyProjectDomain).toBe('function');
 		});
 
-		it('should return domains with verification info from getProjectDomains', async () => {
-			// With an invalid token, getProjectDomains returns empty array
-			const result = await service.getProjectDomains('project-id', 'invalid-token');
+		it('should return empty array from getProjectDomains with empty token', async () => {
+			const result = await service.getProjectDomains('project-id', '');
 			expect(result).toEqual([]);
+		});
+
+		it('should throw from getProjectDomains with invalid token', async () => {
+			await expect(service.getProjectDomains('project-id', 'invalid-token')).rejects.toThrow();
 		});
 	});
 });

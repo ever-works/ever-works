@@ -38,17 +38,27 @@ export function DomainManagement({ directory }: DomainManagementProps) {
     const router = useRouter();
     const [domains, setDomains] = useState<DeploymentDomain[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [newDomain, setNewDomain] = useState('');
     const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
 
     useEffect(() => {
+        let cancelled = false;
+        setIsLoading(true);
+        setLoadError(null);
         getDomains(directory.id).then((result) => {
+            if (cancelled) return;
             if (result.success) {
                 setDomains(result.domains);
+            } else {
+                setLoadError(result.error ?? t('loadFailed'));
             }
             setIsLoading(false);
         });
-    }, [directory.id]);
+        return () => {
+            cancelled = true;
+        };
+    }, [directory.id, t]);
 
     const handleAddDomain = () => {
         const domain = newDomain.trim();
@@ -165,7 +175,13 @@ export function DomainManagement({ directory }: DomainManagementProps) {
                             <Loader2 className="w-4 h-4 animate-spin" />
                             {t('loading')}
                         </div>
-                    ) : domains.length > 0 ? (
+                    ) : loadError ? (
+                        <p className="text-sm text-error dark:text-error-dark py-2">{loadError}</p>
+                    ) : domains.length === 0 ? (
+                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark py-2">
+                            {t('noDomains')}
+                        </p>
+                    ) : (
                         <div className="space-y-2">
                             {domains.map((domain) => (
                                 <div
@@ -304,7 +320,7 @@ export function DomainManagement({ directory }: DomainManagementProps) {
                                 </div>
                             ))}
                         </div>
-                    ) : null}
+                    )}
                 </div>
             </div>
         </div>

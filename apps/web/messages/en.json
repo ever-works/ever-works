@@ -1515,6 +1515,8 @@
                     "placeholder": "example.com",
                     "addButton": "Add",
                     "loading": "Loading domains...",
+                    "loadFailed": "Failed to load domains",
+                    "noDomains": "No custom domains configured. Add one above to get started.",
                     "added": "Domain added. Configure DNS to verify it.",
                     "addedAndVerified": "Domain added and verified!",
                     "addFailed": "Failed to add domain",

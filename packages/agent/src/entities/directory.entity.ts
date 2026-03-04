@@ -112,6 +112,9 @@ export class Directory {
 
     // Deployment FIELDS
     @Column({ nullable: true })
+    deployProjectId?: string;
+
+    @Column({ nullable: true })
     deploymentState?: string;
 
     @TimestampColumn({ nullable: true })

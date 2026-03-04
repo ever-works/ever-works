@@ -497,6 +497,14 @@ export class DeployController {
     ) {
         const { isCreator, directory } = await this.ownershipService.ensureCanEdit(id, auth.userId);
 
+        if (!directory.website) {
+            throw new BadRequestException({
+                status: 'error',
+                message:
+                    'No deployment exists for this directory. Deploy first before managing domains.',
+            });
+        }
+
         try {
             const removed = await this.deployFacade.removeDomain(domain, {
                 userId: isCreator ? auth.userId : directory.user.id,
@@ -528,6 +536,14 @@ export class DeployController {
         @Param('domain') domain: string,
     ) {
         const { isCreator, directory } = await this.ownershipService.ensureCanEdit(id, auth.userId);
+
+        if (!directory.website) {
+            throw new BadRequestException({
+                status: 'error',
+                message:
+                    'No deployment exists for this directory. Deploy first before managing domains.',
+            });
+        }
 
         try {
             const result = await this.deployFacade.verifyDomain(domain, {

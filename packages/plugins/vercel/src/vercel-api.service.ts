@@ -128,8 +128,8 @@ export class VercelApiService {
 						}))
 					: undefined
 			}));
-		} catch {
-			return [];
+		} catch (error) {
+			throw error;
 		}
 	}
 

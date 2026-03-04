@@ -452,7 +452,8 @@ export class DeployFacadeService implements IDeployFacade {
     }
 
     /**
-     * Resolve the Vercel projectId for a directory
+     * Resolve the deployment projectId for a directory.
+     * Uses the cached deployProjectId when available to avoid redundant API calls.
      */
     private async resolveProjectId(
         plugin: IDeploymentPlugin,
@@ -460,10 +461,19 @@ export class DeployFacadeService implements IDeployFacade {
         directory: Directory,
         options: DeployFacadeOptions,
     ): Promise<string> {
+        // Use cached value if available
+        if (directory.deployProjectId) {
+            return directory.deployProjectId;
+        }
+
         const teamScope = await this.getTeamScope(plugin.id, options);
         if (plugin.lookupExistingDeployment) {
             const result = await plugin.lookupExistingDeployment(directory.slug, token, teamScope);
             if (result.found && result.projectId) {
+                // Cache the projectId for future calls
+                await this.directoryRepository.update(directory.id, {
+                    deployProjectId: result.projectId,
+                });
                 return result.projectId;
             }
         }
