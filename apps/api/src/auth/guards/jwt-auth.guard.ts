@@ -10,79 +10,79 @@ const API_KEY_PREFIX = 'ew_live_';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-	constructor(
-		private reflector: Reflector,
-		private apiKeyService: ApiKeyService,
-		private userRepository: UserRepository,
-	) {
-		super();
-	}
+    constructor(
+        private reflector: Reflector,
+        private apiKeyService: ApiKeyService,
+        private userRepository: UserRepository,
+    ) {
+        super();
+    }
 
-	async canActivate(context: ExecutionContext): Promise<boolean> {
-		const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-			context.getHandler(),
-			context.getClass(),
-		]);
-		if (isPublic) {
-			return true;
-		}
+    async canActivate(context: ExecutionContext): Promise<boolean> {
+        const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+            context.getHandler(),
+            context.getClass(),
+        ]);
+        if (isPublic) {
+            return true;
+        }
 
-		// Try API key authentication first
-		const request = context.switchToHttp().getRequest();
-		const apiKey = this.extractApiKey(request);
+        // Try API key authentication first
+        const request = context.switchToHttp().getRequest();
+        const apiKey = this.extractApiKey(request);
 
-		if (apiKey) {
-			const keyRecord = await this.apiKeyService.validateKey(apiKey);
-			if (!keyRecord) {
-				throw new UnauthorizedException('Invalid or expired API key');
-			}
+        if (apiKey) {
+            const keyRecord = await this.apiKeyService.validateKey(apiKey);
+            if (!keyRecord) {
+                throw new UnauthorizedException('Invalid or expired API key');
+            }
 
-			const user = await this.userRepository.findById(keyRecord.userId);
-			if (!user || !user.isActive) {
-				throw new UnauthorizedException('User account is inactive');
-			}
+            const user = await this.userRepository.findById(keyRecord.userId);
+            if (!user || !user.isActive) {
+                throw new UnauthorizedException('User account is inactive');
+            }
 
-			const authenticatedUser: AuthenticatedUser = {
-				userId: user.id,
-				email: user.email,
-				username: user.username,
-				provider: user.registrationProvider,
-				emailVerified: user.emailVerified,
-				isActive: user.isActive,
-				avatar: user.avatar || null,
-				iat: Math.floor(Date.now() / 1000),
-				iss: 'ever-works',
-				aud: 'ever-works',
-			};
+            const authenticatedUser: AuthenticatedUser = {
+                userId: user.id,
+                email: user.email,
+                username: user.username,
+                provider: user.registrationProvider,
+                emailVerified: user.emailVerified,
+                isActive: user.isActive,
+                avatar: user.avatar || null,
+                iat: Math.floor(Date.now() / 1000),
+                iss: 'ever-works',
+                aud: 'ever-works',
+            };
 
-			request.user = authenticatedUser;
-			return true;
-		}
+            request.user = authenticatedUser;
+            return true;
+        }
 
-		// Fall through to Passport JWT
-		const result = super.canActivate(context);
-		if (result instanceof Promise) {
-			return result as Promise<boolean>;
-		}
-		return result as boolean;
-	}
+        // Fall through to Passport JWT
+        const result = super.canActivate(context);
+        if (result instanceof Promise) {
+            return result as Promise<boolean>;
+        }
+        return result as boolean;
+    }
 
-	private extractApiKey(request: any): string | null {
-		// Check x-api-key header
-		const headerKey = request.headers?.['x-api-key'];
-		if (headerKey && typeof headerKey === 'string' && headerKey.startsWith(API_KEY_PREFIX)) {
-			return headerKey;
-		}
+    private extractApiKey(request: any): string | null {
+        // Check x-api-key header
+        const headerKey = request.headers?.['x-api-key'];
+        if (headerKey && typeof headerKey === 'string' && headerKey.startsWith(API_KEY_PREFIX)) {
+            return headerKey;
+        }
 
-		// Check Authorization: Bearer ew_live_...
-		const authHeader = request.headers?.authorization;
-		if (authHeader && typeof authHeader === 'string') {
-			const [scheme, token] = authHeader.split(' ');
-			if (scheme === 'Bearer' && token?.startsWith(API_KEY_PREFIX)) {
-				return token;
-			}
-		}
+        // Check Authorization: Bearer ew_live_...
+        const authHeader = request.headers?.authorization;
+        if (authHeader && typeof authHeader === 'string') {
+            const [scheme, token] = authHeader.split(' ');
+            if (scheme === 'Bearer' && token?.startsWith(API_KEY_PREFIX)) {
+                return token;
+            }
+        }
 
-		return null;
-	}
+        return null;
+    }
 }
