@@ -128,17 +128,7 @@ async function buildCLI() {
         bugs: {
             url: 'https://github.com/ever-works/ever-works/issues',
         },
-        keywords: [
-            'cli',
-            'directory',
-            'builder',
-            'ever-works',
-            'automation',
-            'ai',
-            'markdown',
-            'website-generator',
-            'api-client',
-        ],
+        keywords: ['cli', 'directory', 'builder', 'ever-works', 'automation', 'ai'],
         bin: {
             'ever-works': './cli.js',
         },
