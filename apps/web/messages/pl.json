@@ -1754,6 +1754,13 @@
                         "title": "Łatwe zarządzanie",
                         "description": "Aktualizuj i organizuj swoją treść bez wysiłku"
                     }
+                },
+                "badge": "Napędzany przez AI",
+                "howItWorks": {
+                    "step1": "Opisz swój pomysł",
+                    "step2": "Wybierz szablon",
+                    "step3": "AI generuje treść",
+                    "step4": "Opublikuj i udostępnij"
                 }
             },
             "footer": {

@@ -1754,6 +1754,13 @@
                         "title": "Manajemen Mudah",
                         "description": "Perbarui dan atur konten Anda dengan mudah"
                     }
+                },
+                "badge": "Bertenaga AI",
+                "howItWorks": {
+                    "step1": "Jelaskan ide Anda",
+                    "step2": "Pilih template",
+                    "step3": "AI menghasilkan konten",
+                    "step4": "Terbitkan & bagikan"
                 }
             },
             "footer": {
