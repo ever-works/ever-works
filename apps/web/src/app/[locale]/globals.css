@@ -300,7 +300,7 @@ body {
 
 /* Auth background utility */
 .bg-auth-bg {
-    background-color: var(--color-auth-bg) !important;
+    background-color: var(--color-auth-bg);
 }
 
 /* Autofill overrides: use theme surface colors so autofill blends with dark/light modes */
@@ -345,35 +345,7 @@ select:-webkit-autofill:focus {
     border-color: var(--color-primary) !important;
 }
 
-/* ── Auth tree: electric dash animation ────────────────────────────────────── */
-@keyframes auth-dash-flow {
-    from {
-        stroke-dashoffset: 80;
-    }
-    to {
-        stroke-dashoffset: 0;
-    }
-}
 
-.auth-tree-dash {
-    animation: auth-dash-flow linear infinite;
-}
-
-/* ── Auth tree: node fade-in ───────────────────────────────────────────────── */
-@keyframes auth-node-appear {
-    from {
-        opacity: 0;
-        transform: translateY(8px) scale(0.92);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
-
-.auth-tree-node {
-    animation: auth-node-appear 0.5s ease-out both;
-}
 
 /* Gradient text */
 .gradient-text {

@@ -12,7 +12,7 @@ interface DotLottiePlayerProps {
 }
 
 const DotLottiePlayer: React.FC<DotLottiePlayerProps> = ({
-    src = 'https://lottie.host/6b0373c2-299a-4231-b481-abdccc1de3a5/EX5wjKeUd7.lottie',
+    src = '/auth-default.lottie',
     loop = true,
     autoplay = true,
     className,

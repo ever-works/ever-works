@@ -91,7 +91,7 @@ export function LoginClient() {
 
     return (
         <AuthLayout title={t('title')} subtitle={t('subtitle')}>
-            <ThemeToggle />
+            <ThemeToggle variant="fixed" />
             <form onSubmit={handleSubmit} className="space-y-4">
                 {showResetSuccess && <PasswordResetSuccessMessage />}
 

@@ -51,7 +51,7 @@ export default function RegisterForm() {
 
     return (
         <AuthLayout title={t('title')} subtitle={t('subtitle')}>
-            <ThemeToggle />
+            <ThemeToggle variant="fixed" />
             <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
                     <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm">

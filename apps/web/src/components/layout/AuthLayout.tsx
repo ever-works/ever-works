@@ -12,7 +12,7 @@ interface AuthLayoutProps {
     subtitle: string;
 }
 
-// ─── Tree node data type (removed DirectoryTree implementation) ─────────────
+// ─── Icon component type used by benefit items ──────────────────────────────
 type IconType = React.ComponentType<any>;
 
 // ─── Cycling benefit card ────────────────────────────────────────────────────
@@ -26,16 +26,22 @@ type BenefitItem = {
 function BenefitCarousel({ items }: { items: BenefitItem[] }) {
     const [active, setActive] = useState(0);
     const [phase, setPhase] = useState<'in' | 'out'>('in');
+    const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         const id = setInterval(() => {
             setPhase('out');
-            setTimeout(() => {
+            timeoutRef.current = setTimeout(() => {
                 setActive((p) => (p + 1) % items.length);
                 setPhase('in');
             }, 380);
         }, 3400);
-        return () => clearInterval(id);
+        return () => {
+            clearInterval(id);
+            if (timeoutRef.current !== null) {
+                clearTimeout(timeoutRef.current);
+            }
+        };
     }, [items.length]);
 
     const item = items[active];
@@ -84,21 +90,15 @@ function BenefitCarousel({ items }: { items: BenefitItem[] }) {
 
             {/* dot strip */}
             <div className="flex items-center justify-center gap-1.5 mt-3">
-                {items.map((_, i) => (
+                {items.map((item, i) => (
                     <span
                         key={i}
-                        className="block rounded-full transition-all duration-300"
+                        className={`block rounded-full transition-all duration-300 ${
+                            i === active ? palette[item.color].dot : 'bg-slate-500/50'
+                        }`}
                         style={{
                             width: i === active ? 20 : 6,
                             height: 6,
-                            background:
-                                i === active
-                                    ? i === 0
-                                        ? 'rgb(167 139 250)'
-                                        : i === 1
-                                          ? 'rgb(129 140 248)'
-                                          : 'rgb(96 165 250)'
-                                    : 'rgba(100,116,139,0.5)',
                         }}
                     />
                 ))}
@@ -261,7 +261,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                             alt=""
                             width={480}
                             height={900}
-                            className="object-contain object-left filter brightness-200  absolute top-0 left-0 w-full rotate-180 h-auto"
+                            className="object-contain object-left filter brightness-200 absolute top-0 left-0 w-full rotate-180 h-auto"
                         />
 
                         {/* headline */}
@@ -284,8 +284,8 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                         </div>
 
                         {/* player + corner labels */}
-                        <div className="relative flex items-center justify-center ">
-                            <div className="relative">
+                        <div className="relative flex items-center justify-center">
+                            <div className="relative w-70 h-70">
                                 <AnimatedBackgroundCircles />
                                 <DotLottiePlayer className="w-70 h-70 relative z-20" />
                                 <HowItWorks />
