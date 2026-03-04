@@ -68,6 +68,12 @@ export const ASSIGNABLE_MEMBER_ROLES = [
 
 export type AssignableMemberRole = (typeof ASSIGNABLE_MEMBER_ROLES)[number];
 
+export enum DomainEnvironment {
+    PRODUCTION = 'production',
+    STAGING = 'staging',
+    DEVELOPMENT = 'development',
+}
+
 export interface CommunityPrState {
     processedPrNumbers: number[];
     lastProcessedAt?: string;
