@@ -9,6 +9,7 @@ import { register as registerAction } from '@/app/actions/auth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export default function RegisterForm() {
     const t = useTranslations('auth.register');
@@ -50,7 +51,8 @@ export default function RegisterForm() {
 
     return (
         <AuthLayout title={t('title')} subtitle={t('subtitle')}>
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <ThemeToggle />
+            <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
                     <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm">
                         {error}
@@ -66,6 +68,7 @@ export default function RegisterForm() {
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
                     disabled={isPending}
+                    className="text-sm shadow-sm"
                 />
 
                 <Input
@@ -77,6 +80,7 @@ export default function RegisterForm() {
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     required
                     disabled={isPending}
+                    className="text-sm shadow-sm"
                 />
 
                 <Input
@@ -89,6 +93,7 @@ export default function RegisterForm() {
                     helperText={t('form.password.hint')}
                     required
                     disabled={isPending}
+                    className="text-sm shadow-sm"
                 />
 
                 <Input
@@ -100,9 +105,10 @@ export default function RegisterForm() {
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                     required
                     disabled={isPending}
+                    className="text-sm shadow-sm"
                 />
 
-                <div className="flex items-start">
+                <div className="flex items-center mb-6">
                     <input
                         id="terms"
                         type="checkbox"
@@ -112,7 +118,7 @@ export default function RegisterForm() {
 
                     <label
                         htmlFor="terms"
-                        className="ml-2 text-sm text-text-secondary dark:text-text-secondary-dark"
+                        className="ml-2 text-xs text-text-secondary dark:text-text-secondary-dark"
                     >
                         {t('form.terms.text')}{' '}
                         <Link href="/terms" className="text-primary hover:text-primary-hover">

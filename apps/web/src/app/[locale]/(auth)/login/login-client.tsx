@@ -37,7 +37,7 @@ function PasswordResetSuccessMessage() {
                     <p className="text-sm font-medium text-text dark:text-text-dark">
                         {t('passwordReset.success')}
                     </p>
-                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark mt-1">
+                    <p className="text-xs text-text-secondary/70 dark:text-text-secondary-dark/70 mt-1">
                         {t('passwordReset.canLogin')}
                     </p>
                 </div>
@@ -92,7 +92,7 @@ export function LoginClient() {
     return (
         <AuthLayout title={t('title')} subtitle={t('subtitle')}>
             <ThemeToggle />
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
                 {showResetSuccess && <PasswordResetSuccessMessage />}
 
                 {error && (
@@ -110,11 +110,12 @@ export function LoginClient() {
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     required
                     disabled={isPending}
+                    className="text-sm shadow-sm"
                 />
 
-                <div>
+                <div className='mb-6'>
                     <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium text-text dark:text-text-dark">
+                        <label className="block text-xs font-medium text-text dark:text-text-dark">
                             {t('form.password.label')}
                         </label>
                         <Link
@@ -132,6 +133,7 @@ export function LoginClient() {
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         required
                         disabled={isPending}
+                        className="text-sm shadow-sm"
                     />
                 </div>
 
