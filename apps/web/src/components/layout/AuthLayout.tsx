@@ -16,7 +16,12 @@ interface AuthLayoutProps {
 type IconType = React.ComponentType<any>;
 
 // ─── Cycling benefit card ────────────────────────────────────────────────────
-type BenefitItem = { title: string; desc: string; icon: IconType; color: 'violet' | 'indigo' | 'blue' };
+type BenefitItem = {
+    title: string;
+    desc: string;
+    icon: IconType;
+    color: 'violet' | 'indigo' | 'blue';
+};
 
 function BenefitCarousel({ items }: { items: BenefitItem[] }) {
     const [active, setActive] = useState(0);
@@ -91,8 +96,8 @@ function BenefitCarousel({ items }: { items: BenefitItem[] }) {
                                     ? i === 0
                                         ? 'rgb(167 139 250)'
                                         : i === 1
-                                            ? 'rgb(129 140 248)'
-                                            : 'rgb(96 165 250)'
+                                          ? 'rgb(129 140 248)'
+                                          : 'rgb(96 165 250)'
                                     : 'rgba(100,116,139,0.5)',
                         }}
                     />
@@ -108,15 +113,30 @@ function AnimatedBackgroundCircles() {
         <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none">
             <span
                 className="absolute rounded-full bg-violet-400/10 animate-ping"
-                style={{ width: 240, height: 240, animationDuration: '3000ms', animationDelay: '0ms' }}
+                style={{
+                    width: 240,
+                    height: 240,
+                    animationDuration: '3000ms',
+                    animationDelay: '0ms',
+                }}
             />
             <span
                 className="absolute rounded-full bg-violet-400/20 animate-ping"
-                style={{ width: 180, height: 180, animationDuration: '3000ms', animationDelay: '600ms' }}
+                style={{
+                    width: 180,
+                    height: 180,
+                    animationDuration: '3000ms',
+                    animationDelay: '600ms',
+                }}
             />
             <span
                 className="absolute rounded-full bg-violet-400/30 animate-ping"
-                style={{ width: 100, height: 100, animationDuration: '3000ms', animationDelay: '1200ms' }}
+                style={{
+                    width: 100,
+                    height: 100,
+                    animationDuration: '3000ms',
+                    animationDelay: '1200ms',
+                }}
             />
         </div>
     );
@@ -124,10 +144,34 @@ function AnimatedBackgroundCircles() {
 
 // ─── How it works — four corner labels, appear sequentially then slow-bounce ─
 const HOW_IT_WORKS = [
-    { num: '01', key: 'feature.howItWorks.step1', pos: { top: '2%',    right: 'calc(80%)' }, align: 'right', delay: '0s'    },
-    { num: '02', key: 'feature.howItWorks.step2', pos: { top: '2%',    left:  'calc(80%)' }, align: 'left',  delay: '0.25s' },
-    { num: '03', key: 'feature.howItWorks.step3', pos: { bottom: '2%', right: 'calc(80%)' }, align: 'right', delay: '0.5s'  },
-    { num: '04', key: 'feature.howItWorks.step4', pos: { bottom: '2%', left:  'calc(80%)' }, align: 'left',  delay: '0.75s' },
+    {
+        num: '01',
+        key: 'feature.howItWorks.step1',
+        pos: { top: '2%', right: 'calc(80%)' },
+        align: 'right',
+        delay: '0s',
+    },
+    {
+        num: '02',
+        key: 'feature.howItWorks.step2',
+        pos: { top: '2%', left: 'calc(80%)' },
+        align: 'left',
+        delay: '0.25s',
+    },
+    {
+        num: '03',
+        key: 'feature.howItWorks.step3',
+        pos: { bottom: '2%', right: 'calc(80%)' },
+        align: 'right',
+        delay: '0.5s',
+    },
+    {
+        num: '04',
+        key: 'feature.howItWorks.step4',
+        pos: { bottom: '2%', left: 'calc(80%)' },
+        align: 'left',
+        delay: '0.75s',
+    },
 ] as const;
 
 function HowItWorks() {
@@ -163,7 +207,9 @@ function HowItWorks() {
                         >
                             <div
                                 className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 bg-white/5 backdrop-blur-md shadow-lg w-44"
-                                style={{ flexDirection: step.align === 'right' ? 'row-reverse' : 'row' }}
+                                style={{
+                                    flexDirection: step.align === 'right' ? 'row-reverse' : 'row',
+                                }}
                             >
                                 <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-violet-500/30 text-violet-300 text-[10px] font-bold">
                                     {step.num}
