@@ -3,6 +3,7 @@ import type { StepExecutionContext, MutableItemData, FacadeOptions } from '@ever
 import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
+import { PROMPT_KEYS } from '../prompt-keys.js';
 
 const urlValidationSchema = z.object({
 	is_official: z.boolean(),
@@ -60,7 +61,7 @@ export class SourceValidationStep extends BasePipelineStep {
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
 		const { directory, finalItems, metrics, subject, advancedPrompts } = context;
-		const { logger, aiFacade, searchFacade, contentExtractorFacade } = execContext;
+		const { logger, aiFacade, searchFacade, contentExtractorFacade, promptFacade } = execContext;
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
@@ -78,7 +79,8 @@ export class SourceValidationStep extends BasePipelineStep {
 			aiFacade,
 			searchFacade,
 			contentExtractorFacade,
-			facadeOptions
+			facadeOptions,
+			promptFacade
 		);
 
 		context.finalItems = validatedItems;
@@ -95,7 +97,8 @@ export class SourceValidationStep extends BasePipelineStep {
 		aiFacade: StepExecutionContext['aiFacade'],
 		searchFacade: StepExecutionContext['searchFacade'],
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<MutableItemData[]> {
 		if (!items || items.length === 0) {
 			return [];
@@ -118,7 +121,8 @@ export class SourceValidationStep extends BasePipelineStep {
 						aiFacade,
 						searchFacade,
 						contentExtractorFacade,
-						facadeOptions
+						facadeOptions,
+						promptFacade
 					)
 						.then((validatedSourceUrl) => {
 							if (validatedSourceUrl) {
@@ -160,7 +164,8 @@ export class SourceValidationStep extends BasePipelineStep {
 		aiFacade: StepExecutionContext['aiFacade'],
 		searchFacade: StepExecutionContext['searchFacade'],
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<string | undefined> {
 		const sourceUrl = currentItem.source_url;
 		const itemName = currentItem.name;
@@ -266,7 +271,8 @@ export class SourceValidationStep extends BasePipelineStep {
 					customPrompt,
 					aiFacade,
 					contentExtractorFacade,
-					facadeOptions
+					facadeOptions,
+					promptFacade
 				);
 				return { url, aiValidation };
 			});
@@ -316,7 +322,8 @@ export class SourceValidationStep extends BasePipelineStep {
 		customPrompt: string | null | undefined,
 		aiFacade: StepExecutionContext['aiFacade'],
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<{ isOfficial: boolean; confidence: number; reasoning: string } | null> {
 		if (!aiFacade.isConfigured()) {
 			return null;
@@ -339,7 +346,10 @@ export class SourceValidationStep extends BasePipelineStep {
 			const partialContent =
 				pageContent.slice(midContent - 1000, midContent + 1000) || pageContent.slice(0, 2000);
 
-			const finalPrompt = appendCustomPrompt(URL_VALIDATION_PROMPT, customPrompt);
+			const resolvedPrompt = promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.SOURCE_VALIDATION, URL_VALIDATION_PROMPT)
+				: URL_VALIDATION_PROMPT;
+			const finalPrompt = appendCustomPrompt(resolvedPrompt, customPrompt);
 			const { result, usage, cost } = await aiFacade.askJson<UrlValidationResult>(
 				finalPrompt,
 				urlValidationSchema,

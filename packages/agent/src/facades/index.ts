@@ -76,6 +76,9 @@ export {
     type DeployFacadeFullOptions,
 } from './deploy.facade';
 
+// Prompt Facade
+export { PromptFacadeService } from './prompt.facade';
+
 // Re-export facade types from plugin for convenience
 export type { FacadeExtractionOptions, FacadeExtractedContent } from '@ever-works/plugin';
 export type {

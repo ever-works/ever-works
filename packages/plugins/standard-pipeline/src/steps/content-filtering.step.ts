@@ -4,6 +4,7 @@ import type { MutableGenerationContext, StandardPipelineMetrics } from '../conte
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { getErrorStack } from '../utils/error.utils.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
+import { PROMPT_KEYS } from '../prompt-keys.js';
 
 const RELEVANCE_ASSESSMENT_PROMPT =
 	`You are an expert content analyst. Assess the relevance of the following web page content to the main topic.
@@ -50,7 +51,7 @@ export class ContentFilteringStep extends BasePipelineStep {
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
 		const { request, directory, webPages, metrics, advancedPrompts } = context;
-		const { logger, aiFacade } = execContext;
+		const { logger, aiFacade, promptFacade } = execContext;
 		const config = request.config || {};
 
 		const facadeOptions: FacadeOptions = {
@@ -73,7 +74,8 @@ export class ContentFilteringStep extends BasePipelineStep {
 				advancedPrompts?.relevanceAssessment,
 				logger,
 				aiFacade,
-				facadeOptions
+				facadeOptions,
+				promptFacade
 			);
 
 			logger.log(`[${directory.slug}] Filtered down to ${filteredWebPages.length} relevant pages.`);
@@ -103,7 +105,8 @@ export class ContentFilteringStep extends BasePipelineStep {
 		customPrompt: string | null | undefined,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<WebPageData[]> {
 		logger.log(`[${directorySlug}] Starting content filtering for ${webPages.length} pages`);
 
@@ -139,7 +142,10 @@ export class ContentFilteringStep extends BasePipelineStep {
 		}> => {
 			try {
 				const snippet = this.buildSnippet(page.raw_content);
-				const finalPrompt = appendCustomPrompt(RELEVANCE_ASSESSMENT_PROMPT, customPrompt);
+				const resolvedPrompt = promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.CONTENT_FILTERING, RELEVANCE_ASSESSMENT_PROMPT)
+					: RELEVANCE_ASSESSMENT_PROMPT;
+				const finalPrompt = appendCustomPrompt(resolvedPrompt, customPrompt);
 
 				const {
 					result: assessmentResult,

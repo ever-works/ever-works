@@ -3,6 +3,7 @@ import type { ISearchFacade } from '../facades/search-facade.interface.js';
 import type { IScreenshotFacade } from '../facades/screenshot-facade.interface.js';
 import type { IContentExtractorFacade } from '../facades/content-extractor-facade.interface.js';
 import type { IDataSourceFacade } from '../facades/data-source-facade.interface.js';
+import type { IPromptFacade } from '../facades/prompt-facade.interface.js';
 import type { DirectoryReference, UserReference } from './generation-context.interface.js';
 
 /**
@@ -56,6 +57,12 @@ export interface StepExecutionContext {
 	 * Provides access to items from external data sources.
 	 */
 	readonly dataSourceFacade?: IDataSourceFacade;
+
+	/**
+	 * Prompt facade for resolving externally managed prompts.
+	 * Optional — when absent, steps use their hardcoded defaults.
+	 */
+	readonly promptFacade?: IPromptFacade;
 
 	/**
 	 * Logger instance for the step.

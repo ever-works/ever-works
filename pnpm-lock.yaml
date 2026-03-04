@@ -1073,6 +1073,25 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.11)(jiti@2.6.1)(lightningcss@1.31.1)(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(terser@5.46.0)(yaml@2.8.2)
 
+  packages/plugins/langfuse:
+    dependencies:
+      '@langfuse/client':
+        specifier: ^4.6.1
+        version: 4.6.1(@opentelemetry/api@1.9.0)
+    devDependencies:
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(@swc/core@1.15.11(@swc/helpers@0.5.18))(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.11)(jiti@2.6.1)(lightningcss@1.31.1)(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(terser@5.46.0)(yaml@2.8.2)
+
   packages/plugins/local-content-extractor:
     dependencies:
       '@mozilla/readability':
@@ -2839,6 +2858,22 @@ packages:
     engines: {node: '>=18'}
     peerDependencies:
       '@langchain/core': '>=0.2.21 <0.4.0'
+
+  '@langfuse/client@4.6.1':
+    resolution: {integrity: sha512-/jR/a/tJx7gZtrPla56IfG2/B9+QabZzdATXPgdUAph4Nc87Kaj9O5jHvm3y1n7JJTqfAvAvYL9lWq8jjSEAMw==}
+    peerDependencies:
+      '@opentelemetry/api': ^1.9.0
+
+  '@langfuse/core@4.6.1':
+    resolution: {integrity: sha512-DtQoKWHQh0I0MsJxcKrBQVKAJ3fea6+raXlISVY3NDMFG/zSKkdkNouQvUXQtSCHBbOFupHMBw8imM30lbhq3g==}
+    peerDependencies:
+      '@opentelemetry/api': ^1.9.0
+
+  '@langfuse/tracing@4.6.1':
+    resolution: {integrity: sha512-Ld1bPU6RxzifgGEDtN70Og8u2eL906jtnnEnt62BEOcML8UUiMgzwAKZDBbIjF2midnfac7Xnho3s546fcCDtQ==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@opentelemetry/api': ^1.9.0
 
   '@lukeed/csprng@1.1.0':
     resolution: {integrity: sha512-Z7C/xXCiGWsg0KuKsHTKJxbWhpI3Vs5GwLfOean7MGyVFGqdRgBbAjOCh6u4bbjPc/8MJ2pZmK/0DLdCbivLDA==}
@@ -12085,6 +12120,22 @@ snapshots:
     dependencies:
       '@langchain/core': 0.3.80(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.5.1(@opentelemetry/api@1.9.0))(openai@5.12.2(ws@8.19.0)(zod@3.25.76))
       js-tiktoken: 1.0.21
+
+  '@langfuse/client@4.6.1(@opentelemetry/api@1.9.0)':
+    dependencies:
+      '@langfuse/core': 4.6.1(@opentelemetry/api@1.9.0)
+      '@langfuse/tracing': 4.6.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/api': 1.9.0
+      mustache: 4.2.0
+
+  '@langfuse/core@4.6.1(@opentelemetry/api@1.9.0)':
+    dependencies:
+      '@opentelemetry/api': 1.9.0
+
+  '@langfuse/tracing@4.6.1(@opentelemetry/api@1.9.0)':
+    dependencies:
+      '@langfuse/core': 4.6.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/api': 1.9.0
 
   '@lukeed/csprng@1.1.0': {}
 

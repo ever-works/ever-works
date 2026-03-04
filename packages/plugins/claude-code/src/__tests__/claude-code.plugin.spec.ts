@@ -48,7 +48,11 @@ vi.mock('../utils/process-runner', () => ({
 
 vi.mock('../prompt/system-prompt', () => ({
 	buildSystemPrompt: vi.fn().mockReturnValue('system prompt'),
-	buildUserPrompt: vi.fn().mockReturnValue('user prompt')
+	buildUserPrompt: vi.fn().mockReturnValue('user prompt'),
+	buildSystemPromptVariables: vi.fn().mockReturnValue({}),
+	buildUserPromptVariables: vi.fn().mockReturnValue({}),
+	DEFAULT_SYSTEM_PROMPT: 'default system prompt',
+	DEFAULT_USER_PROMPT: 'default user prompt'
 }));
 
 vi.mock('../utils/taxonomy-watcher', () => ({

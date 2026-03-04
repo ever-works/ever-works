@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { StepExecutionContext, FacadeOptions } from '@ever-works/plugin';
 import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
+import { PROMPT_KEYS } from '../prompt-keys.js';
 
 const PROMPT_PROCESSING_PROMPT = `
 # Prompt Extraction and Rewriting Task
@@ -124,7 +125,7 @@ export class PromptProcessingStep extends BasePipelineStep {
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
 		const { request, existing, directory, metrics } = context;
-		const { logger, aiFacade } = execContext;
+		const { logger, aiFacade, promptFacade } = execContext;
 		const config = request.config || {};
 
 		const facadeOptions: FacadeOptions = {
@@ -141,7 +142,15 @@ export class PromptProcessingStep extends BasePipelineStep {
 			featuredItemHints,
 			subject,
 			rewrittenPrompt: prompt
-		} = await this.processPrompt(context, request.prompt || '', metrics, logger, aiFacade, facadeOptions);
+		} = await this.processPrompt(
+			context,
+			request.prompt || '',
+			metrics,
+			logger,
+			aiFacade,
+			facadeOptions,
+			promptFacade
+		);
 
 		// Merge with request priority categories
 		const requestPriorityCategories = (config.priority_categories as string[]) || [];
@@ -213,7 +222,8 @@ export class PromptProcessingStep extends BasePipelineStep {
 		metrics: StandardPipelineMetrics,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<{
 		extractedUrls: string[];
 		suggestedCategories: string[];
@@ -235,8 +245,12 @@ export class PromptProcessingStep extends BasePipelineStep {
 		}
 
 		try {
+			const resolvedPrompt = promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.PROMPT_PROCESSING, PROMPT_PROCESSING_PROMPT)
+				: PROMPT_PROCESSING_PROMPT;
+
 			const { result, usage, cost } = await aiFacade.askJson(
-				PROMPT_PROCESSING_PROMPT,
+				resolvedPrompt,
 				promptProcessingOutputSchema,
 				{
 					temperature: 0,

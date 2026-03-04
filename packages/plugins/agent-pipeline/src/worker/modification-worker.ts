@@ -1,7 +1,7 @@
 import { generateText, stepCountIs, ToolSet } from 'ai';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
-import type { PluginLogger } from '@ever-works/plugin';
-import { getCurrentDateString, ITEM_SCHEMA_PROMPT_TEXT } from '@ever-works/plugin';
+import type { PluginLogger, IPromptFacade, FacadeOptions } from '@ever-works/plugin';
+import { getCurrentDateString, ITEM_SCHEMA_PROMPT_TEXT, substituteVariables } from '@ever-works/plugin';
 
 import { createUpdateFileTool } from '../tools/file-tools.js';
 import { createFindItemsTool } from '../tools/find-items-tool.js';
@@ -10,6 +10,7 @@ import { createPrepareStep } from '../utils/context-compaction.js';
 import { createToolCallRepairFn, withToolCallingRetry } from '../utils/tool-call-resilience.js';
 import { DEFAULT_CONTEXT_BUDGET_RATIO } from '../types.js';
 import type { TokenUsageAccumulator } from '../types.js';
+import { PROMPT_KEYS } from '../prompt-keys.js';
 
 export interface ModificationWorkerContext {
 	model: LanguageModelV3;
@@ -18,6 +19,8 @@ export interface ModificationWorkerContext {
 	logger: PluginLogger;
 	tokenAccumulator?: TokenUsageAccumulator;
 	signal?: AbortSignal;
+	promptFacade?: IPromptFacade;
+	facadeOptions?: FacadeOptions;
 }
 
 export interface ModificationWorkerResult {
@@ -64,11 +67,21 @@ export async function processModification(
 
 		const repairToolCall = createToolCallRepairFn(model, logger);
 
+		const sysTemplate =
+			ctx.promptFacade && ctx.facadeOptions
+				? await ctx.promptFacade.getPrompt(
+						PROMPT_KEYS.MODIFICATION_SYSTEM,
+						DEFAULT_MODIFICATION_SYSTEM_PROMPT,
+						ctx.facadeOptions
+					)
+				: DEFAULT_MODIFICATION_SYSTEM_PROMPT;
+		const systemPrompt = substituteVariables(sysTemplate, buildModificationSystemPromptVariables());
+
 		const result = await withToolCallingRetry(
 			() => {
 				return generateText({
 					model,
-					system: buildModificationSystemPrompt(),
+					system: systemPrompt,
 					prompt: instructions,
 					tools: {
 						bash: bashTools.bash,
@@ -102,44 +115,64 @@ export async function processModification(
 	}
 }
 
-function buildModificationSystemPrompt(): string {
-	return [
-		`You are a directory item modifier. Today is ${getCurrentDateString()}.`,
-		'',
-		'## Tools',
-		'- `bash` — Run targeted search commands to find items. NEVER `ls *.json` — workspaces can have thousands of files.',
-		'- `readFile` — Read a workspace file',
-		'- `findItems` — Fuzzy-search items by name, slug, or URL. Returns up to 5 best matches.',
-		'- `updateFile` — Update an existing file',
-		'- `validateItemJson` — Validate and auto-repair JSON after each update',
-		'',
-		`## Item JSON Schema\n\n${ITEM_SCHEMA_PROMPT_TEXT}`,
-		'',
-		'## Category & Tag Rules',
-		'- Each item must have ONE category based on its primary function.',
-		'- Use domain-specific categories (e.g., "Monitoring", "CI/CD", "Data Visualization").',
-		'- Avoid duplicate or overlapping categories — merge similar ones when instructed.',
-		'- Add 1-3 specific, descriptive tags per item.',
-		'- When merging categories, update ALL items that reference the old category name.',
-		'',
-		'## Markdown Rules',
-		'- Factual, no marketing language.',
-		'- Use ## headings, bullet lists, tables.',
-		'- Include Pricing section when applicable.',
-		'',
-		'## Workflow',
-		'1. Read `_meta/categories.json`, `_meta/tags.json` for current taxonomy.',
-		'2. Use `findItems(name)` to check if the target item exists and get its slug (slug = filename, e.g. slug "gauzy" → file "gauzy.json").',
-		'   For broader content-based searches (e.g., all items in a category), use: `grep -rli "keyword" --include="*.json" .`',
-		'3. `readFile` to inspect matched items.',
-		'4. `updateFile` to apply modifications.',
-		'5. Run `validateItemJson` after each `updateFile`.',
-		'6. If validation repaired formatting, verify the intended change is still present.',
-		'',
-		'## Rules',
-		'- Only modify as instructed',
-		'- Do NOT create new items or modify `_meta/` files',
-		'- Preserve unchanged fields',
-		'- Ensure modified items still conform to the Item JSON Schema above'
-	].join('\n');
+/**
+ * Default template for the modification worker system prompt.
+ * Variables: {date}, {itemSchemaText}
+ */
+export const DEFAULT_MODIFICATION_SYSTEM_PROMPT = `You are a directory item modifier. Today is {date}.
+
+## Tools
+- \`bash\` — Run targeted search commands to find items. NEVER \`ls *.json\` — workspaces can have thousands of files.
+- \`readFile\` — Read a workspace file
+- \`findItems\` — Fuzzy-search items by name, slug, or URL. Returns up to 5 best matches.
+- \`updateFile\` — Update an existing file
+- \`validateItemJson\` — Validate and auto-repair JSON after each update
+
+## Item JSON Schema
+
+{itemSchemaText}
+
+## Category & Tag Rules
+- Each item must have ONE category based on its primary function.
+- Use domain-specific categories (e.g., "Monitoring", "CI/CD", "Data Visualization").
+- Avoid duplicate or overlapping categories — merge similar ones when instructed.
+- Add 1-3 specific, descriptive tags per item.
+- When merging categories, update ALL items that reference the old category name.
+
+## Markdown Rules
+- Factual, no marketing language.
+- Use ## headings, bullet lists, tables.
+- Include Pricing section when applicable.
+
+## Workflow
+1. Read \`_meta/categories.json\`, \`_meta/tags.json\` for current taxonomy.
+2. Use \`findItems(name)\` to check if the target item exists and get its slug (slug = filename, e.g. slug "gauzy" → file "gauzy.json").
+   For broader content-based searches (e.g., all items in a category), use: \`grep -rli "keyword" --include="*.json" .\`
+3. \`readFile\` to inspect matched items.
+4. \`updateFile\` to apply modifications.
+5. Run \`validateItemJson\` after each \`updateFile\`.
+6. If validation repaired formatting, verify the intended change is still present.
+
+## Rules
+- Only modify as instructed
+- Do NOT create new items or modify \`_meta/\` files
+- Preserve unchanged fields
+- Ensure modified items still conform to the Item JSON Schema above`;
+
+/**
+ * Build variables for the modification system prompt template.
+ */
+export function buildModificationSystemPromptVariables(): Record<string, string> {
+	return {
+		date: getCurrentDateString(),
+		itemSchemaText: ITEM_SCHEMA_PROMPT_TEXT
+	};
+}
+
+/**
+ * Build the system prompt for the modification worker.
+ * Backward-compatible wrapper.
+ */
+export function buildModificationSystemPrompt(): string {
+	return substituteVariables(DEFAULT_MODIFICATION_SYSTEM_PROMPT, buildModificationSystemPromptVariables());
 }

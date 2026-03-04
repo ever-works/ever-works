@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { StepExecutionContext, FacadeOptions } from '@ever-works/plugin';
 import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
+import { PROMPT_KEYS } from '../prompt-keys.js';
 
 const PROMPT_COMPARISON_PROMPT =
 	`You are a helpful assistant tasked with comparing two prompts to determine if they are related and describe the same or similar data generation context.
@@ -59,7 +60,7 @@ export class PromptComparisonStep extends BasePipelineStep {
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
 		const { request, existing, directory } = context;
-		const { logger, aiFacade } = execContext;
+		const { logger, aiFacade, promptFacade } = execContext;
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
@@ -85,7 +86,8 @@ export class PromptComparisonStep extends BasePipelineStep {
 				context.metrics,
 				aiFacade,
 				logger,
-				facadeOptions
+				facadeOptions,
+				promptFacade
 			);
 
 			const confidence = comparisonResult.confidence;
@@ -120,7 +122,8 @@ export class PromptComparisonStep extends BasePipelineStep {
 		metrics: StandardPipelineMetrics,
 		aiFacade: StepExecutionContext['aiFacade'],
 		logger: StepExecutionContext['logger'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<PromptComparisonResult> {
 		if (!existingPrompt || !newPrompt) {
 			return {
@@ -140,8 +143,12 @@ export class PromptComparisonStep extends BasePipelineStep {
 		}
 
 		try {
+			const resolvedPrompt = promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.PROMPT_COMPARISON, PROMPT_COMPARISON_PROMPT)
+				: PROMPT_COMPARISON_PROMPT;
+
 			const { result, usage, cost } = await aiFacade.askJson(
-				PROMPT_COMPARISON_PROMPT,
+				resolvedPrompt,
 				promptComparisonOutputSchema,
 				{
 					temperature: 0.1,

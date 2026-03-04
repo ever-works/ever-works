@@ -3,6 +3,7 @@ import type { StepExecutionContext, MutableItemData, ItemBadges, FacadeOptions }
 import { DomainType } from '@ever-works/plugin';
 import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
+import { PROMPT_KEYS } from '../prompt-keys.js';
 
 interface BadgeEvaluationResult {
 	badges: ItemBadges;
@@ -77,7 +78,7 @@ export class BadgeProcessingStep extends BasePipelineStep {
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
 		const { request, finalItems, metrics, domainAnalysis } = context;
-		const { logger, aiFacade } = execContext;
+		const { logger, aiFacade, promptFacade } = execContext;
 		const config = request.config || {};
 		const domainType: DomainType = domainAnalysis?.domain_type ?? DomainType.SOFTWARE;
 
@@ -93,7 +94,8 @@ export class BadgeProcessingStep extends BasePipelineStep {
 				metrics,
 				logger,
 				aiFacade,
-				facadeOptions
+				facadeOptions,
+				promptFacade
 			);
 			context.finalItems = processedItems;
 		}
@@ -112,7 +114,8 @@ export class BadgeProcessingStep extends BasePipelineStep {
 		metrics: StandardPipelineMetrics,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<MutableItemData[]> {
 		try {
 			const eligibleItems = items.filter((item) => this.isEligibleForBadgeEvaluation(item, domainType));
@@ -127,7 +130,8 @@ export class BadgeProcessingStep extends BasePipelineStep {
 				metrics,
 				logger,
 				aiFacade,
-				facadeOptions
+				facadeOptions,
+				promptFacade
 			);
 
 			return items.map((item) => {
@@ -149,7 +153,8 @@ export class BadgeProcessingStep extends BasePipelineStep {
 		metrics: StandardPipelineMetrics,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<Map<string, BadgeEvaluationResult>> {
 		const results = new Map<string, BadgeEvaluationResult>();
 		const chunks = this.chunkArray(items, this.CONCURRENCY_LIMIT);
@@ -162,7 +167,8 @@ export class BadgeProcessingStep extends BasePipelineStep {
 					metrics,
 					logger,
 					aiFacade,
-					facadeOptions
+					facadeOptions,
+					promptFacade
 				);
 				if (result && item.source_url) {
 					results.set(item.source_url, result);
@@ -180,7 +186,8 @@ export class BadgeProcessingStep extends BasePipelineStep {
 		metrics: StandardPipelineMetrics,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<BadgeEvaluationResult | null> {
 		try {
 			if (domainType === 'software' && !this.isRepositoryUrl(item.source_url || '')) {
@@ -193,8 +200,12 @@ export class BadgeProcessingStep extends BasePipelineStep {
 
 			const schema = this.buildSchema(domainType);
 
+			const resolvedPrompt = promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.BADGE_PROCESSING, BADGE_PROMPT)
+				: BADGE_PROMPT;
+
 			const { result, usage, cost } = await aiFacade.askJson(
-				BADGE_PROMPT,
+				resolvedPrompt,
 				schema,
 				{
 					temperature: 0,
