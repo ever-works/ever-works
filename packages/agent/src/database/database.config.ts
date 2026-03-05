@@ -7,6 +7,7 @@ import {
     User,
     Directory,
     DirectoryAdvancedPrompts,
+    DirectoryCustomDomain,
     DirectoryMember,
     DirectoryGenerationHistory,
     SubscriptionPlan,
@@ -49,6 +50,7 @@ export interface DatabaseConfig extends Omit<TypeOrmModuleOptions, 'type'> {
 export const ENTITIES = [
     Directory,
     DirectoryAdvancedPrompts,
+    DirectoryCustomDomain,
     DirectoryMember,
     User,
     RefreshToken,

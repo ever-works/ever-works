@@ -1508,6 +1508,34 @@
                         "skipAndDeploy": "Skip & Deploy",
                         "cancel": "Cancel"
                     }
+                },
+                "domains": {
+                    "title": "Custom Domains",
+                    "description": "Add custom domains to your deployed website.",
+                    "placeholder": "example.com",
+                    "addButton": "Add",
+                    "loading": "Loading domains...",
+                    "loadFailed": "Failed to load domains",
+                    "noDomains": "No custom domains configured. Add one above to get started.",
+                    "added": "Domain added. Configure DNS to verify it.",
+                    "addedAndVerified": "Domain added and verified!",
+                    "addFailed": "Failed to add domain",
+                    "removed": "Domain removed",
+                    "removeFailed": "Failed to remove domain",
+                    "verified": "Domain verified successfully!",
+                    "verifyPending": "DNS not verified yet. Please check your DNS settings and try again later.",
+                    "verifyFailed": "Failed to verify domain",
+                    "copied": "Copied to clipboard",
+                    "autoAssigned": "Auto-assigned",
+                    "verifiedBadge": "Verified",
+                    "pendingBadge": "Pending",
+                    "verifyButton": "Verify DNS",
+                    "removeButton": "Remove domain",
+                    "dnsInstructions": "Show DNS instructions",
+                    "dnsTitle": "Configure these DNS records:",
+                    "dnsName": "Name:",
+                    "dnsValue": "Value:",
+                    "copyButton": "Copy"
                 }
             }
         },

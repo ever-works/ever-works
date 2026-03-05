@@ -118,4 +118,22 @@ describe('VercelPlugin', () => {
 			expect(typeof apiService.getTeams).toBe('function');
 		});
 	});
+
+	describe('domain management methods', () => {
+		it('should have getDomains method', () => {
+			expect(typeof plugin.getDomains).toBe('function');
+		});
+
+		it('should have addDomain method', () => {
+			expect(typeof plugin.addDomain).toBe('function');
+		});
+
+		it('should have removeDomain method', () => {
+			expect(typeof plugin.removeDomain).toBe('function');
+		});
+
+		it('should have verifyDomain method', () => {
+			expect(typeof plugin.verifyDomain).toBe('function');
+		});
+	});
 });
