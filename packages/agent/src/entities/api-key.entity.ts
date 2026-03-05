@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import type { ClassToObject } from './types';
+import { TimestampColumn } from './_types';
 
 @Entity({ name: 'api_keys' })
 @Index(['hashedKey'], { unique: true })
@@ -31,10 +32,10 @@ export class ApiKey {
     @Column({ length: 12 })
     prefix: string;
 
-    @Column({ type: 'datetime', nullable: true })
+    @TimestampColumn({ nullable: true })
     expiresAt: Date | null;
 
-    @Column({ type: 'datetime', nullable: true })
+    @TimestampColumn({ nullable: true })
     lastUsedAt: Date | null;
 
     @Column({ default: true })
