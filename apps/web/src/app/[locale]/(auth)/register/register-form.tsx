@@ -50,7 +50,13 @@ export default function RegisterForm() {
     };
 
     return (
-        <AuthLayout title={t('title')} subtitle={t('subtitle')} formWidth="lg:w-3/5" innerMaxWidth="max-w-xl" mLeft="lg:-ml-10">
+        <AuthLayout
+            title={t('title')}
+            subtitle={t('subtitle')}
+            formWidth="lg:w-3/5"
+            innerMaxWidth="max-w-xl"
+            mLeft="lg:-ml-10"
+        >
             <ThemeToggle variant="fixed" />
             <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
@@ -103,7 +109,9 @@ export default function RegisterForm() {
                         label={t('form.confirmPassword.label')}
                         placeholder={t('form.confirmPassword.placeholder')}
                         value={formData.confirmPassword}
-                        onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                        onChange={(e) =>
+                            setFormData({ ...formData, confirmPassword: e.target.value })
+                        }
                         required
                         disabled={isPending}
                         className="text-sm shadow-sm"
