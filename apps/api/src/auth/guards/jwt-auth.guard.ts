@@ -1,4 +1,5 @@
 import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
@@ -10,10 +11,12 @@ const API_KEY_PREFIX = 'ew_live_';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
+    private apiKeyService: ApiKeyService;
+    private userRepository: UserRepository;
+
     constructor(
         private reflector: Reflector,
-        private apiKeyService: ApiKeyService,
-        private userRepository: UserRepository,
+        private moduleRef: ModuleRef,
     ) {
         super();
     }
@@ -32,6 +35,14 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
         const apiKey = this.extractApiKey(request);
 
         if (apiKey) {
+            // Lazily resolve dependencies on first API key request
+            if (!this.apiKeyService) {
+                this.apiKeyService = this.moduleRef.get(ApiKeyService, { strict: false });
+            }
+            if (!this.userRepository) {
+                this.userRepository = this.moduleRef.get(UserRepository, { strict: false });
+            }
+
             const keyRecord = await this.apiKeyService.validateKey(apiKey);
             if (!keyRecord) {
                 throw new UnauthorizedException('Invalid or expired API key');
