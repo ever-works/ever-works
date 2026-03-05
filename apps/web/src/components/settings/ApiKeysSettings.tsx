@@ -15,7 +15,6 @@ import { createApiKey, revokeApiKey } from '@/app/actions/api-keys';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { Key, Copy, Trash2, AlertTriangle } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
 import type { ApiKeyListItem } from '@/lib/api/api-keys';
 
 interface ApiKeysSettingsProps {
@@ -233,22 +232,18 @@ export function ApiKeysSettings({ initialKeys }: ApiKeysSettingsProps) {
                                     {t('dialog.keyWarning')}
                                 </p>
                             </div>
-                            <div className="relative">
-                                <pre className="text-xs font-mono bg-surface-secondary dark:bg-surface-secondary-dark p-3 rounded-lg overflow-x-auto break-all whitespace-pre-wrap text-text dark:text-text-dark">
-                                    {createdKey}
-                                </pre>
-                                <button
-                                    onClick={() => handleCopy(createdKey)}
-                                    className={cn(
-                                        'absolute top-2 right-2 p-1.5 rounded transition-colors',
-                                        copied
-                                            ? 'text-green-500'
-                                            : 'text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark',
-                                    )}
-                                >
-                                    <Copy className="w-4 h-4" />
-                                </button>
-                            </div>
+                            <pre className="text-xs font-mono bg-surface-secondary dark:bg-surface-secondary-dark p-3 rounded-lg overflow-x-auto break-all whitespace-pre-wrap text-text dark:text-text-dark">
+                                {createdKey}
+                            </pre>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleCopy(createdKey)}
+                                className="w-full"
+                            >
+                                <Copy className="w-4 h-4 mr-2" />
+                                {copied ? t('dialog.copied') : t('dialog.copy')}
+                            </Button>
                             <DialogFooter>
                                 <Button onClick={closeCreateDialog}>{t('dialog.done')}</Button>
                             </DialogFooter>

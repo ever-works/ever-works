@@ -410,7 +410,9 @@
                     "createButton": "Create",
                     "keyCreated": "API Key Created",
                     "keyWarning": "Copy this key now. You won't be able to see it again.",
-                    "done": "Done"
+                    "done": "Done",
+                    "copy": "Copy to clipboard",
+                    "copied": "Copied!"
                 },
                 "revoke": {
                     "title": "Revoke API Key",
