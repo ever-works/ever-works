@@ -60,20 +60,20 @@ EVER_WORKS_API_KEY=ew_live_... npx @modelcontextprotocol/inspector node apps/mcp
 
 ### Directories (12)
 
-| Tool                      | Description                                       |
-| ------------------------- | ------------------------------------------------- |
-| `list_directories`        | List all directories with pagination and search   |
-| `get_directory`           | Get full details for a directory                  |
-| `create_directory`        | Create a new directory                            |
-| `update_directory`        | Update directory settings                         |
-| `delete_directory`        | Delete a directory and optionally its repos       |
-| `get_directory_config`    | Get directory configuration and metadata          |
-| `get_directory_items`     | Get all items in a directory                      |
-| `get_categories_tags`     | Get categories and tags for a directory           |
-| `get_directory_history`   | Get generation/update history                     |
-| `regenerate_markdown`     | Regenerate markdown files for all items           |
-| `update_website`          | Trigger a website rebuild and update              |
-| `process_community_prs`   | Process pending community pull requests           |
+| Tool                    | Description                                     |
+| ----------------------- | ----------------------------------------------- |
+| `list_directories`      | List all directories with pagination and search |
+| `get_directory`         | Get full details for a directory                |
+| `create_directory`      | Create a new directory                          |
+| `update_directory`      | Update directory settings                       |
+| `delete_directory`      | Delete a directory and optionally its repos     |
+| `get_directory_config`  | Get directory configuration and metadata        |
+| `get_directory_items`   | Get all items in a directory                    |
+| `get_categories_tags`   | Get categories and tags for a directory         |
+| `get_directory_history` | Get generation/update history                   |
+| `regenerate_markdown`   | Regenerate markdown files for all items         |
+| `update_website`        | Trigger a website rebuild and update            |
+| `process_community_prs` | Process pending community pull requests         |
 
 ### Generation (4)
 
