@@ -28,7 +28,7 @@ const Input = ({
             {label && (
                 <label
                     htmlFor={inputId}
-                    className="block text-sm font-medium text-text dark:text-text-dark mb-2"
+                    className="block text-xs font-medium text-text dark:text-text-dark mb-2"
                 >
                     {label}
                 </label>
@@ -37,16 +37,16 @@ const Input = ({
                 type={type}
                 id={inputId}
                 className={cn(
-                    'w-full rounded-lg transition-colors outline-none',
+                    'w-full rounded-lg transition-colors outline-none dark:bg-surface-dark/40',
                     'text-text dark:text-text-dark placeholder-text-muted dark:placeholder-text-muted-dark',
-                    'border border-border dark:border-border-dark',
+                    'border border-primary/30 dark:border-primary/10',
                     'focus:border-primary',
                     'disabled:bg-surface-tertiary dark:disabled:bg-surface-tertiary-dark disabled:text-text-muted dark:disabled:text-text-muted-dark disabled:cursor-not-allowed',
                     // Variant-specific styles
-                    variant === 'form' && ['px-4 py-2', 'bg-surface dark:bg-surface-dark'],
+                    variant === 'form' && ['px-4 py-2', 'bg-white dark:bg-input-bg-dark'],
                     variant === 'default' && [
                         'px-4 py-3',
-                        'bg-surface-secondary dark:bg-surface-secondary-dark',
+                        'bg-white dark:bg-input-bg-dark',
                         'focus:ring-2 focus:ring-primary/20',
                         'hover:border-border-secondary dark:hover:border-border-secondary-dark',
                         'duration-200',

@@ -1754,6 +1754,13 @@
                         "title": "Einfache Verwaltung",
                         "description": "Aktualisieren und organisieren Sie Ihre Inhalte mühelos"
                     }
+                },
+                "badge": "KI-gestützt",
+                "howItWorks": {
+                    "step1": "Beschreiben Sie Ihre Idee",
+                    "step2": "Vorlage auswählen",
+                    "step3": "KI generiert Inhalte",
+                    "step4": "Veröffentlichen & teilen"
                 }
             },
             "footer": {
