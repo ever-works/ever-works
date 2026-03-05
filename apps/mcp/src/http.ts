@@ -13,6 +13,12 @@ async function main() {
 
 	const httpServer = createHttpServer((req, res) => {
 		if (req.url === '/mcp') {
+			const authHeader = req.headers.authorization;
+			if (!authHeader || authHeader !== `Bearer ${config.apiKey}`) {
+				res.writeHead(401, { 'Content-Type': 'application/json' });
+				res.end(JSON.stringify({ error: 'Unauthorized' }));
+				return;
+			}
 			transport.handleRequest(req, res);
 		} else if (req.url === '/health') {
 			res.writeHead(200, { 'Content-Type': 'application/json' });

@@ -20,6 +20,12 @@ export function loadConfig(): McpConfig {
 	}
 
 	const httpPort = parseInt(process.env.EVER_WORKS_MCP_PORT || '3200', 10);
+	if (isNaN(httpPort) || httpPort < 1 || httpPort > 65535) {
+		console.error(
+			`EVER_WORKS_MCP_PORT must be a valid port number (1-65535), got: "${process.env.EVER_WORKS_MCP_PORT}"`
+		);
+		process.exit(1);
+	}
 
 	return { apiUrl, apiKey, httpPort };
 }

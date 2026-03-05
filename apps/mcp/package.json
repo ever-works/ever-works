@@ -6,6 +6,7 @@
 	"scripts": {
 		"build": "tsc --noEmit && tsup",
 		"dev": "tsup --watch",
+		"format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\"",
 		"start:stdio": "node dist/stdio.js",
 		"start:http": "node dist/http.js",
 		"type-check": "tsc --noEmit"

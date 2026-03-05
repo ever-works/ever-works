@@ -51,7 +51,10 @@ export function registerDirectoryTools(server: McpServer, client: EverWorksClien
 			name: z.string().describe('Display name for the directory'),
 			description: z.string().describe('Short description of what the directory lists'),
 			owner: z.string().optional().describe('GitHub owner/org for repositories'),
-			organization: z.boolean().describe('Whether to create under a GitHub organization'),
+			organization: z
+				.boolean()
+				.optional()
+				.describe('Whether to create under a GitHub organization (default: false)'),
 			gitProvider: z.string().optional().describe('Git provider plugin ID (e.g. "github")'),
 			deployProvider: z.string().optional().describe('Deploy provider plugin ID (e.g. "vercel")')
 		},
