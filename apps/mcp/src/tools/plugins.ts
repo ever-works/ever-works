@@ -13,7 +13,7 @@ export function registerPluginTools(server: McpServer, client: EverWorksClient):
 				.optional()
 				.describe(
 					'Filter by category: ai-provider, search, content-extraction, screenshot, git, infrastructure, pipeline, ai-tools'
-				),
+				)
 		},
 		async ({ category }) => {
 			try {
@@ -32,7 +32,7 @@ export function registerPluginTools(server: McpServer, client: EverWorksClient):
 		'get_plugin',
 		'Get details for a specific plugin, including its settings schema, current configuration, and enabled status.',
 		{
-			plugin_id: z.string().describe('Plugin ID (e.g. "openai", "vercel", "github")'),
+			plugin_id: z.string().describe('Plugin ID (e.g. "openai", "vercel", "github")')
 		},
 		async ({ plugin_id }) => {
 			try {
@@ -49,14 +49,11 @@ export function registerPluginTools(server: McpServer, client: EverWorksClient):
 		'Enable a plugin for your account. Optionally provide settings (like API keys) at the same time. Use get_plugin first to see the settings schema.',
 		{
 			plugin_id: z.string().describe('Plugin ID (e.g. "openai", "vercel", "github")'),
-			settings: z
-				.record(z.unknown())
-				.optional()
-				.describe('Plugin settings (non-secret, e.g. model preferences)'),
+			settings: z.record(z.unknown()).optional().describe('Plugin settings (non-secret, e.g. model preferences)'),
 			secret_settings: z
 				.record(z.unknown())
 				.optional()
-				.describe('Secret settings (e.g. API keys — stored encrypted)'),
+				.describe('Secret settings (e.g. API keys — stored encrypted)')
 		},
 		async ({ plugin_id, settings, secret_settings }) => {
 			try {
@@ -75,7 +72,7 @@ export function registerPluginTools(server: McpServer, client: EverWorksClient):
 		'disable_plugin',
 		'Disable a plugin for your account. This does not delete saved settings — re-enabling will restore them.',
 		{
-			plugin_id: z.string().describe('Plugin ID (e.g. "openai", "vercel", "github")'),
+			plugin_id: z.string().describe('Plugin ID (e.g. "openai", "vercel", "github")')
 		},
 		async ({ plugin_id }) => {
 			try {
@@ -92,14 +89,8 @@ export function registerPluginTools(server: McpServer, client: EverWorksClient):
 		'Update settings for an already-enabled plugin. Use get_plugin to see the current settings and available options.',
 		{
 			plugin_id: z.string().describe('Plugin ID (e.g. "openai", "vercel", "github")'),
-			settings: z
-				.record(z.unknown())
-				.optional()
-				.describe('Plugin settings to update (non-secret)'),
-			secret_settings: z
-				.record(z.unknown())
-				.optional()
-				.describe('Secret settings to update (e.g. API keys)'),
+			settings: z.record(z.unknown()).optional().describe('Plugin settings to update (non-secret)'),
+			secret_settings: z.record(z.unknown()).optional().describe('Secret settings to update (e.g. API keys)')
 		},
 		async ({ plugin_id, settings, secret_settings }) => {
 			try {

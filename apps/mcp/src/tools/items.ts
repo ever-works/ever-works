@@ -6,7 +6,7 @@ import { toMcpError } from '../errors.js';
 export function registerItemTools(server: McpServer, client: EverWorksClient): void {
 	server.tool(
 		'submit_item',
-		'Add a single item to a directory. Provide the item name, description, source URL, and category. The item will be processed and added to the directory\'s data repository.',
+		"Add a single item to a directory. Provide the item name, description, source URL, and category. The item will be processed and added to the directory's data repository.",
 		{
 			directory_id: z.string().describe('Directory ID (UUID)'),
 			name: z.string().describe('Item display name'),
@@ -19,7 +19,7 @@ export function registerItemTools(server: McpServer, client: EverWorksClient): v
 			create_pull_request: z
 				.boolean()
 				.optional()
-				.describe('Create a PR instead of committing directly (default: true)'),
+				.describe('Create a PR instead of committing directly (default: true)')
 		},
 		async ({ directory_id, ...data }) => {
 			try {
@@ -38,10 +38,7 @@ export function registerItemTools(server: McpServer, client: EverWorksClient): v
 			directory_id: z.string().describe('Directory ID (UUID)'),
 			item_slug: z.string().describe('Slug of the item to remove'),
 			reason: z.string().optional().describe('Reason for removing the item'),
-			create_pull_request: z
-				.boolean()
-				.optional()
-				.describe('Create a PR instead of committing directly'),
+			create_pull_request: z.boolean().optional().describe('Create a PR instead of committing directly')
 		},
 		async ({ directory_id, ...data }) => {
 			try {
@@ -61,10 +58,7 @@ export function registerItemTools(server: McpServer, client: EverWorksClient): v
 			item_slug: z.string().describe('Slug of the item to update'),
 			featured: z.boolean().optional().describe('Set featured status'),
 			order: z.number().int().nonnegative().optional().describe('Display order (0-based)'),
-			create_pull_request: z
-				.boolean()
-				.optional()
-				.describe('Create a PR instead of committing directly'),
+			create_pull_request: z.boolean().optional().describe('Create a PR instead of committing directly')
 		},
 		async ({ directory_id, ...data }) => {
 			try {
@@ -81,10 +75,7 @@ export function registerItemTools(server: McpServer, client: EverWorksClient): v
 		'Extract item details (name, description, category, tags) from a URL using AI. Does NOT add the item to any directory — use submit_item for that. Useful for previewing what an item would look like before adding it.',
 		{
 			source_url: z.string().url().describe('URL to extract details from'),
-			existing_categories: z
-				.array(z.string())
-				.optional()
-				.describe('Existing categories to try to match against'),
+			existing_categories: z.array(z.string()).optional().describe('Existing categories to try to match against')
 		},
 		async (data) => {
 			try {

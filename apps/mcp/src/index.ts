@@ -9,7 +9,7 @@ export function createServer(): { server: McpServer; config: McpConfig } {
 
 	const server = new McpServer({
 		name: 'ever-works',
-		version: '0.1.0',
+		version: '0.1.0'
 	});
 
 	registerAllTools(server, client);

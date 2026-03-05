@@ -6,7 +6,7 @@ async function main() {
 	const { server, config } = createServer();
 
 	const transport = new StreamableHTTPServerTransport({
-		sessionIdGenerator: undefined,
+		sessionIdGenerator: undefined
 	});
 
 	await server.connect(transport);

@@ -9,7 +9,7 @@ export class EverWorksClient {
 	private get headers(): Record<string, string> {
 		return {
 			'Content-Type': 'application/json',
-			'x-api-key': this.apiKey,
+			'x-api-key': this.apiKey
 		};
 	}
 
@@ -18,7 +18,7 @@ export class EverWorksClient {
 
 		const init: RequestInit = {
 			method,
-			headers: this.headers,
+			headers: this.headers
 		};
 
 		if (body !== undefined) {

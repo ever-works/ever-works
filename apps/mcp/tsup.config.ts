@@ -7,5 +7,5 @@ export default defineConfig({
 	outDir: 'dist',
 	clean: true,
 	sourcemap: true,
-	splitting: true,
+	splitting: true
 });

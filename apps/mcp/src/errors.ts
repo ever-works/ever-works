@@ -26,6 +26,6 @@ export function toMcpError(error: unknown): { content: Array<{ type: 'text'; tex
 
 	return {
 		content: [{ type: 'text', text }],
-		isError: true,
+		isError: true
 	};
 }

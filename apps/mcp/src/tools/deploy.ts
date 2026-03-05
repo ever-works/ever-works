@@ -6,10 +6,10 @@ import { toMcpError } from '../errors.js';
 export function registerDeployTools(server: McpServer, client: EverWorksClient): void {
 	server.tool(
 		'deploy_directory',
-		'Deploy a directory\'s website to the configured deploy provider (e.g. Vercel). The directory must have a website repository and a deploy provider configured.',
+		"Deploy a directory's website to the configured deploy provider (e.g. Vercel). The directory must have a website repository and a deploy provider configured.",
 		{
 			directory_id: z.string().describe('Directory ID (UUID)'),
-			team_scope: z.string().optional().describe('Deploy provider team/scope to deploy under'),
+			team_scope: z.string().optional().describe('Deploy provider team/scope to deploy under')
 		},
 		async ({ directory_id, team_scope }) => {
 			try {
@@ -27,7 +27,7 @@ export function registerDeployTools(server: McpServer, client: EverWorksClient):
 		'list_domains',
 		'List all domains (including auto-assigned and custom) for a deployed directory.',
 		{
-			directory_id: z.string().describe('Directory ID (UUID)'),
+			directory_id: z.string().describe('Directory ID (UUID)')
 		},
 		async ({ directory_id }) => {
 			try {
@@ -57,7 +57,7 @@ export function registerDeployTools(server: McpServer, client: EverWorksClient):
 		'check_deploy_capability',
 		'Check if a directory can be deployed. Returns whether the user has the required tokens and permissions.',
 		{
-			directory_id: z.string().describe('Directory ID (UUID)'),
+			directory_id: z.string().describe('Directory ID (UUID)')
 		},
 		async ({ directory_id }) => {
 			try {

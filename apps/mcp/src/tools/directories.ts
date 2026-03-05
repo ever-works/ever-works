@@ -10,7 +10,7 @@ export function registerDirectoryTools(server: McpServer, client: EverWorksClien
 		{
 			limit: z.number().int().positive().optional().describe('Max results to return (default: 20)'),
 			offset: z.number().int().nonnegative().optional().describe('Number of results to skip'),
-			search: z.string().optional().describe('Filter directories by name or slug'),
+			search: z.string().optional().describe('Filter directories by name or slug')
 		},
 		async ({ limit, offset, search }) => {
 			try {
@@ -31,7 +31,7 @@ export function registerDirectoryTools(server: McpServer, client: EverWorksClien
 		'get_directory',
 		'Get full details for a single directory by its ID. Returns name, slug, description, config, repository info, and deploy status.',
 		{
-			directory_id: z.string().describe('Directory ID (UUID)'),
+			directory_id: z.string().describe('Directory ID (UUID)')
 		},
 		async ({ directory_id }) => {
 			try {
@@ -53,7 +53,7 @@ export function registerDirectoryTools(server: McpServer, client: EverWorksClien
 			owner: z.string().optional().describe('GitHub owner/org for repositories'),
 			organization: z.boolean().describe('Whether to create under a GitHub organization'),
 			gitProvider: z.string().optional().describe('Git provider plugin ID (e.g. "github")'),
-			deployProvider: z.string().optional().describe('Deploy provider plugin ID (e.g. "vercel")'),
+			deployProvider: z.string().optional().describe('Deploy provider plugin ID (e.g. "vercel")')
 		},
 		async (params) => {
 			try {
@@ -67,12 +67,12 @@ export function registerDirectoryTools(server: McpServer, client: EverWorksClien
 
 	server.tool(
 		'update_directory',
-		'Update a directory\'s settings. Can change name, description, or deploy provider.',
+		"Update a directory's settings. Can change name, description, or deploy provider.",
 		{
 			directory_id: z.string().describe('Directory ID (UUID)'),
 			name: z.string().optional().describe('New display name'),
 			description: z.string().optional().describe('New description'),
-			deployProvider: z.string().optional().describe('New deploy provider plugin ID'),
+			deployProvider: z.string().optional().describe('New deploy provider plugin ID')
 		},
 		async ({ directory_id, ...data }) => {
 			try {
@@ -96,10 +96,7 @@ export function registerDirectoryTools(server: McpServer, client: EverWorksClien
 				.boolean()
 				.optional()
 				.describe('Also delete the markdown repository on GitHub'),
-			delete_website_repository: z
-				.boolean()
-				.optional()
-				.describe('Also delete the website repository on GitHub'),
+			delete_website_repository: z.boolean().optional().describe('Also delete the website repository on GitHub')
 		},
 		async ({ directory_id, ...data }) => {
 			try {
@@ -115,7 +112,7 @@ export function registerDirectoryTools(server: McpServer, client: EverWorksClien
 		'get_directory_config',
 		'Get the configuration and metadata for a directory, including initial prompt, last generation settings, and plugin config.',
 		{
-			directory_id: z.string().describe('Directory ID (UUID)'),
+			directory_id: z.string().describe('Directory ID (UUID)')
 		},
 		async ({ directory_id }) => {
 			try {
@@ -131,7 +128,7 @@ export function registerDirectoryTools(server: McpServer, client: EverWorksClien
 		'get_directory_items',
 		'Get all items (listings) in a directory. Returns item names, slugs, descriptions, categories, tags, and URLs.',
 		{
-			directory_id: z.string().describe('Directory ID (UUID)'),
+			directory_id: z.string().describe('Directory ID (UUID)')
 		},
 		async ({ directory_id }) => {
 			try {
@@ -147,7 +144,7 @@ export function registerDirectoryTools(server: McpServer, client: EverWorksClien
 		'get_categories_tags',
 		'Get all categories and tags defined for a directory. Useful before submitting items to see valid category/tag values.',
 		{
-			directory_id: z.string().describe('Directory ID (UUID)'),
+			directory_id: z.string().describe('Directory ID (UUID)')
 		},
 		async ({ directory_id }) => {
 			try {
@@ -165,7 +162,7 @@ export function registerDirectoryTools(server: McpServer, client: EverWorksClien
 		{
 			directory_id: z.string().describe('Directory ID (UUID)'),
 			limit: z.number().int().positive().optional().describe('Max results to return'),
-			offset: z.number().int().nonnegative().optional().describe('Number of results to skip'),
+			offset: z.number().int().nonnegative().optional().describe('Number of results to skip')
 		},
 		async ({ directory_id, limit, offset }) => {
 			try {
