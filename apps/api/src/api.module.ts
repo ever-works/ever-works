@@ -26,6 +26,7 @@ import {
     PluginBootstrapService,
 } from '@ever-works/agent/plugins';
 import { CacheFactory } from '@ever-works/agent/cache';
+import { DatabaseModule } from '@ever-works/agent/database';
 
 @Module({
     imports: [
@@ -46,6 +47,7 @@ import { CacheFactory } from '@ever-works/agent/cache';
                 host: process.env.POSTHOG_HOST || 'https://app.posthog.com',
             },
         }),
+        DatabaseModule,
         AuthModule,
         DirectoriesModule,
         MailModule,
