@@ -5,6 +5,8 @@ import { registerGenerationTools } from './generation.js';
 import { registerItemTools } from './items.js';
 import { registerDeployTools } from './deploy.js';
 import { registerPluginTools } from './plugins.js';
+import { registerSchedulingTools } from './scheduling.js';
+import { registerComparisonTools } from './comparisons.js';
 
 export function registerAllTools(server: McpServer, client: EverWorksClient): void {
 	registerDirectoryTools(server, client);
@@ -12,4 +14,6 @@ export function registerAllTools(server: McpServer, client: EverWorksClient): vo
 	registerItemTools(server, client);
 	registerDeployTools(server, client);
 	registerPluginTools(server, client);
+	registerSchedulingTools(server, client);
+	registerComparisonTools(server, client);
 }

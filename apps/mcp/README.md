@@ -56,21 +56,24 @@ cd apps/mcp && pnpm type-check
 EVER_WORKS_API_KEY=ew_live_... npx @modelcontextprotocol/inspector node apps/mcp/dist/stdio.js
 ```
 
-## Available Tools (24)
+## Available Tools (36)
 
-### Directories (9)
+### Directories (12)
 
-| Tool                    | Description                                     |
-| ----------------------- | ----------------------------------------------- |
-| `list_directories`      | List all directories with pagination and search |
-| `get_directory`         | Get full details for a directory                |
-| `create_directory`      | Create a new directory                          |
-| `update_directory`      | Update directory settings                       |
-| `delete_directory`      | Delete a directory and optionally its repos     |
-| `get_directory_config`  | Get directory configuration and metadata        |
-| `get_directory_items`   | Get all items in a directory                    |
-| `get_categories_tags`   | Get categories and tags for a directory         |
-| `get_directory_history` | Get generation/update history                   |
+| Tool                      | Description                                       |
+| ------------------------- | ------------------------------------------------- |
+| `list_directories`        | List all directories with pagination and search   |
+| `get_directory`           | Get full details for a directory                  |
+| `create_directory`        | Create a new directory                            |
+| `update_directory`        | Update directory settings                         |
+| `delete_directory`        | Delete a directory and optionally its repos       |
+| `get_directory_config`    | Get directory configuration and metadata          |
+| `get_directory_items`     | Get all items in a directory                      |
+| `get_categories_tags`     | Get categories and tags for a directory           |
+| `get_directory_history`   | Get generation/update history                     |
+| `regenerate_markdown`     | Regenerate markdown files for all items           |
+| `update_website`          | Trigger a website rebuild and update              |
+| `process_community_prs`   | Process pending community pull requests           |
 
 ### Generation (4)
 
@@ -108,3 +111,22 @@ EVER_WORKS_API_KEY=ew_live_... npx @modelcontextprotocol/inspector node apps/mcp
 | `enable_plugin`          | Enable a plugin with optional settings          |
 | `disable_plugin`         | Disable a plugin                                |
 | `update_plugin_settings` | Update settings for an enabled plugin           |
+
+### Scheduling (4)
+
+| Tool                   | Description                                     |
+| ---------------------- | ----------------------------------------------- |
+| `get_schedule`         | Get scheduled update configuration              |
+| `update_schedule`      | Update schedule (cadence, enable/disable, etc.) |
+| `cancel_schedule`      | Cancel and remove scheduled updates             |
+| `run_scheduled_update` | Manually trigger a scheduled update             |
+
+### Comparisons (5)
+
+| Tool                         | Description                                    |
+| ---------------------------- | ---------------------------------------------- |
+| `list_comparisons`           | List all comparisons for a directory           |
+| `get_comparison`             | Get a specific comparison by slug              |
+| `generate_comparison`        | Auto-generate comparisons using AI             |
+| `generate_manual_comparison` | Generate comparison between two specific items |
+| `delete_comparison`          | Delete a comparison                            |

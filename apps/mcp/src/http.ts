@@ -19,7 +19,7 @@ async function main() {
 				res.end(JSON.stringify({ error: 'Unauthorized' }));
 				return;
 			}
-			transport.handleRequest(req, res);
+			void transport.handleRequest(req, res);
 		} else if (req.url === '/health') {
 			res.writeHead(200, { 'Content-Type': 'application/json' });
 			res.end(JSON.stringify({ status: 'ok' }));

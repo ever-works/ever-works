@@ -180,4 +180,52 @@ export function registerDirectoryTools(server: McpServer, client: EverWorksClien
 			}
 		}
 	);
+
+	server.tool(
+		'regenerate_markdown',
+		'Regenerate markdown files for all items in a directory. Useful after updating templates or fixing formatting issues.',
+		{
+			directory_id: z.string().describe('Directory ID (UUID)')
+		},
+		async ({ directory_id }) => {
+			try {
+				const result = await client.post(`/directories/${directory_id}/regenerate-markdown`);
+				return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+			} catch (error) {
+				return toMcpError(error);
+			}
+		}
+	);
+
+	server.tool(
+		'update_website',
+		"Trigger a website rebuild and update for a directory. Pushes latest data to the directory's website repository.",
+		{
+			directory_id: z.string().describe('Directory ID (UUID)')
+		},
+		async ({ directory_id }) => {
+			try {
+				const result = await client.post(`/directories/${directory_id}/update-website`);
+				return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+			} catch (error) {
+				return toMcpError(error);
+			}
+		}
+	);
+
+	server.tool(
+		'process_community_prs',
+		'Process pending community pull requests for a directory. Reviews and merges or closes PRs submitted by community contributors.',
+		{
+			directory_id: z.string().describe('Directory ID (UUID)')
+		},
+		async ({ directory_id }) => {
+			try {
+				const result = await client.post(`/directories/${directory_id}/process-community-prs`);
+				return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+			} catch (error) {
+				return toMcpError(error);
+			}
+		}
+	);
 }

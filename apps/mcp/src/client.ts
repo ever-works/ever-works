@@ -1,4 +1,5 @@
 import { ApiError } from './errors.js';
+import { sanitizeResponse } from './sanitize.js';
 
 export class EverWorksClient {
 	constructor(
@@ -18,7 +19,8 @@ export class EverWorksClient {
 
 		const init: RequestInit = {
 			method,
-			headers: this.headers
+			headers: this.headers,
+			signal: AbortSignal.timeout(30_000)
 		};
 
 		if (body !== undefined) {
@@ -43,7 +45,7 @@ export class EverWorksClient {
 			throw new ApiError(response.status, message, data);
 		}
 
-		return data as T;
+		return sanitizeResponse(data as T);
 	}
 
 	async get<T>(path: string): Promise<T> {
