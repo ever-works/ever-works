@@ -1,6 +1,7 @@
 export * from './database-config.factory';
 export * from './database.config';
 export * from './database.module';
+export * from './repositories/api-key.repository';
 export * from './repositories/directory.repository';
 export * from './repositories/directory-member.repository';
 export * from './repositories/user.repository';

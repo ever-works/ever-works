@@ -82,6 +82,7 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <button
+                    suppressHydrationWarning
                     type="button"
                     className={cn(
                         'inline-flex items-center justify-center',
