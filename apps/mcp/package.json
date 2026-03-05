@@ -1,0 +1,25 @@
+{
+	"name": "ever-works-mcp",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"start:stdio": "node dist/stdio.js",
+		"start:http": "node dist/http.js",
+		"type-check": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.27.1",
+		"zod": "^3.25.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.19.3",
+		"tsup": "^8.5.0",
+		"typescript": "^5.9.3"
+	},
+	"engines": {
+		"node": ">=20.0.0"
+	}
+}
