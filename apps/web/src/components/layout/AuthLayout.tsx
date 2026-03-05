@@ -10,6 +10,9 @@ interface AuthLayoutProps {
     children: React.ReactNode;
     title: string;
     subtitle: string;
+    formWidth?: string;
+    mLeft?: string;
+    innerMaxWidth?: string;
 }
 
 // ─── Icon component type used by benefit items ──────────────────────────────
@@ -227,15 +230,15 @@ function HowItWorks() {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
+export function AuthLayout({ children, title, subtitle, formWidth = 'lg:w-1/2', innerMaxWidth = 'max-w-md', mLeft = 'lg:ml-10' }: AuthLayoutProps) {
     const t = useTranslations('layout.auth');
 
     return (
         <div className="bg-background dark:bg-surface-dark">
             <div className="flex">
                 {/* ── Left side – form ── */}
-                <div className="w-full lg:w-1/2 min-h-screen flex items-center justify-center px-8 py-12">
-                    <div className="w-full max-w-md px-12">
+                <div className={`w-full ${formWidth} min-h-screen flex items-center justify-center px-8 py-12 ${mLeft}`}>
+                    <div className={`w-full ${innerMaxWidth} px-12`}>
                         <div className="mb-8 mt-5">
                             <h1 className="text-3xl font-bold text-text dark:text-text-dark mb-2">
                                 {title}
@@ -250,7 +253,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                 </div>
 
                 {/* ── Right side – animated directory showcase ── */}
-                <div className="hidden lg:flex lg:fixed lg:top-0 lg:right-0 lg:h-screen lg:w-1/2 overflow-hidden items-center justify-center px-10">
+                <div className={`hidden lg:flex lg:fixed lg:top-0 lg:right-0 lg:h-screen lg:w-1/2 overflow-hidden items-center justify-center px-10`}>
                     {/* solid background */}
                     <div className="absolute inset-0 bg-auth-bg dark:bg-auth-bg/90" />
 

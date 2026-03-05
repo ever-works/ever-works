@@ -50,7 +50,7 @@ export default function RegisterForm() {
     };
 
     return (
-        <AuthLayout title={t('title')} subtitle={t('subtitle')}>
+        <AuthLayout title={t('title')} subtitle={t('subtitle')} formWidth="lg:w-3/5" innerMaxWidth="max-w-xl" mLeft="lg:-ml-10">
             <ThemeToggle variant="fixed" />
             <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
@@ -59,54 +59,56 @@ export default function RegisterForm() {
                     </div>
                 )}
 
-                <Input
-                    type="text"
-                    label={t('form.name.label')}
-                    name="name"
-                    placeholder={t('form.name.placeholder')}
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                    disabled={isPending}
-                    className="text-sm shadow-sm"
-                />
+                <div className="lg:grid grid-cols-2 gap-4">
+                    <Input
+                        type="text"
+                        label={t('form.name.label')}
+                        name="name"
+                        placeholder={t('form.name.placeholder')}
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        required
+                        disabled={isPending}
+                        className="text-sm shadow-sm"
+                    />
 
-                <Input
-                    type="email"
-                    label={t('form.email.label')}
-                    name="email"
-                    placeholder={t('form.email.placeholder')}
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
-                    disabled={isPending}
-                    className="text-sm shadow-sm"
-                />
+                    <Input
+                        type="email"
+                        label={t('form.email.label')}
+                        name="email"
+                        placeholder={t('form.email.placeholder')}
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        required
+                        disabled={isPending}
+                        className="text-sm shadow-sm"
+                    />
 
-                <Input
-                    type="password"
-                    name="password"
-                    label={t('form.password.label')}
-                    placeholder={t('form.password.placeholder')}
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    helperText={t('form.password.hint')}
-                    required
-                    disabled={isPending}
-                    className="text-sm shadow-sm"
-                />
+                    <Input
+                        type="password"
+                        name="password"
+                        label={t('form.password.label')}
+                        placeholder={t('form.password.placeholder')}
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        helperText={t('form.password.hint')}
+                        required
+                        disabled={isPending}
+                        className="text-sm shadow-sm"
+                    />
 
-                <Input
-                    type="password"
-                    name="confirmPassword"
-                    label={t('form.confirmPassword.label')}
-                    placeholder={t('form.confirmPassword.placeholder')}
-                    value={formData.confirmPassword}
-                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    required
-                    disabled={isPending}
-                    className="text-sm shadow-sm"
-                />
+                    <Input
+                        type="password"
+                        name="confirmPassword"
+                        label={t('form.confirmPassword.label')}
+                        placeholder={t('form.confirmPassword.placeholder')}
+                        value={formData.confirmPassword}
+                        onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                        required
+                        disabled={isPending}
+                        className="text-sm shadow-sm"
+                    />
+                </div>
 
                 <div className="flex items-center mb-6">
                     <input
