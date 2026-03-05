@@ -84,6 +84,7 @@ export const ROUTES = {
     DASHBOARD_SETTINGS: '/settings',
     DASHBOARD_SETTINGS_PROFILE: '/settings',
     DASHBOARD_SETTINGS_SECURITY: '/settings/security',
+    DASHBOARD_SETTINGS_API_KEYS: '/settings/api-keys',
     DASHBOARD_SETTINGS_DANGER_ZONE: '/settings/danger',
     // Dynamic plugin settings routes
     DASHBOARD_SETTINGS_PLUGIN_CATEGORY: (category: string) => `/settings/plugins/${category}`,

@@ -1,8 +1,10 @@
 import { Logger, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ApiKeyRepository } from './repositories/api-key.repository';
 import { DirectoryRepository } from './repositories/directory.repository';
 import { DirectoryAdvancedPromptsRepository } from './repositories/directory-advanced-prompts.repository';
+import { DirectoryCustomDomainRepository } from './repositories/directory-custom-domain.repository';
 import { DirectoryMemberRepository } from './repositories/directory-member.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { OAuthTokenRepository } from './repositories/oauth-token.repository';
@@ -31,8 +33,10 @@ import { NotificationRepository } from './repositories/notification.repository';
         TypeOrmModule.forFeature(ENTITIES),
     ],
     providers: [
+        ApiKeyRepository,
         DirectoryRepository,
         DirectoryAdvancedPromptsRepository,
+        DirectoryCustomDomainRepository,
         DirectoryMemberRepository,
         RefreshTokenRepository,
         UserRepository,
@@ -46,8 +50,10 @@ import { NotificationRepository } from './repositories/notification.repository';
     ],
     exports: [
         TypeOrmModule,
+        ApiKeyRepository,
         DirectoryRepository,
         DirectoryAdvancedPromptsRepository,
+        DirectoryCustomDomainRepository,
         DirectoryMemberRepository,
         UserRepository,
         RefreshTokenRepository,

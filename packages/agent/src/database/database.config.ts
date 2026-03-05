@@ -2,11 +2,13 @@ import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { CacheEntry } from '../entities/cache.entity';
 import {
+    ApiKey,
     RefreshToken,
     OAuthToken,
     User,
     Directory,
     DirectoryAdvancedPrompts,
+    DirectoryCustomDomain,
     DirectoryMember,
     DirectoryGenerationHistory,
     SubscriptionPlan,
@@ -47,8 +49,10 @@ export interface DatabaseConfig extends Omit<TypeOrmModuleOptions, 'type'> {
 }
 
 export const ENTITIES = [
+    ApiKey,
     Directory,
     DirectoryAdvancedPrompts,
+    DirectoryCustomDomain,
     DirectoryMember,
     User,
     RefreshToken,

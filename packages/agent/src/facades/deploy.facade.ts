@@ -6,6 +6,8 @@ import type {
     DeployFacadeTeam,
     DeployProviderInfo,
     DeploymentLookupResult,
+    DeploymentDomain,
+    AddDomainResult,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -14,6 +16,7 @@ import { DirectoryPluginRepository } from '../plugins/repositories/directory-plu
 import { DirectoryRepository } from '../database/repositories/directory.repository';
 import { OAuthTokenRepository } from '../database/repositories/oauth-token.repository';
 import { GitFacadeService } from './git.facade';
+import { DirectoryCustomDomainRepository } from '../database/repositories/directory-custom-domain.repository';
 import { FacadeError, NoProviderError, ProviderNotFoundError } from './base.facade';
 import type { Directory } from '../entities/directory.entity';
 import type { User } from '../entities/user.entity';
@@ -80,6 +83,7 @@ export class DeployFacadeService implements IDeployFacade {
         private readonly directoryRepository: DirectoryRepository,
         private readonly gitFacade: GitFacadeService,
         private readonly oauthTokenRepository: OAuthTokenRepository,
+        private readonly domainRepository: DirectoryCustomDomainRepository,
         private readonly directoryPluginRepository?: DirectoryPluginRepository,
     ) {}
 
@@ -291,6 +295,180 @@ export class DeployFacadeService implements IDeployFacade {
         return this.resolvePluginAndTokenWithDirectory(options);
     }
 
+    // Domain management methods
+    // DB is the primary source of truth; provider APIs are used for sync and verification.
+
+    /**
+     * Get domains for a deployed directory.
+     * Reads from DB, enriches with provider verification data when available.
+     */
+    async getDomains(options: DeployFacadeOptions): Promise<DeploymentDomain[]> {
+        const dbDomains = await this.domainRepository.findByDirectory(options.directoryId);
+
+        // Try to enrich with provider verification data
+        let providerDomains: DeploymentDomain[] = [];
+        try {
+            const { plugin, token, directory } =
+                await this.resolvePluginAndTokenWithDirectory(options);
+            if (plugin.getDomains) {
+                const projectId = await this.resolveProjectId(plugin, token, directory, options);
+                const teamScope = await this.getTeamScope(plugin.id, options);
+                providerDomains = await plugin.getDomains(projectId, token, teamScope);
+            }
+        } catch (error) {
+            this.logger.warn(`Failed to fetch provider domains for enrichment: ${error}`);
+        }
+
+        // Build a lookup map from provider data
+        const providerMap = new Map<string, DeploymentDomain>();
+        for (const pd of providerDomains) {
+            providerMap.set(pd.name, pd);
+        }
+
+        // Merge: DB domains with provider verification details
+        return dbDomains.map((dbDomain) => {
+            const providerData = providerMap.get(dbDomain.domain);
+            return {
+                name: dbDomain.domain,
+                verified: providerData?.verified ?? dbDomain.verified,
+                verification: providerData?.verification,
+            };
+        });
+    }
+
+    /**
+     * Add a domain to a deployed directory.
+     * Saves to DB first, then pushes to provider.
+     */
+    async addDomain(domain: string, options: DeployFacadeOptions): Promise<AddDomainResult> {
+        const { plugin, token, directory } = await this.resolvePluginAndTokenWithDirectory(options);
+        if (!plugin.addDomain) {
+            throw new DeployFacadeError(
+                'Domain management is not supported by this provider',
+                'addDomain',
+                plugin.id,
+            );
+        }
+
+        // Check for duplicate before inserting
+        const existing = await this.domainRepository.findOne(options.directoryId, domain);
+        if (existing) {
+            throw new DeployFacadeError(
+                `Domain "${domain}" is already added to this directory`,
+                'addDomain',
+                plugin.id,
+            );
+        }
+
+        // Save to DB first (unverified, no provider yet)
+        await this.domainRepository.addDomain(options.directoryId, domain);
+
+        // Push to provider
+        const projectId = await this.resolveProjectId(plugin, token, directory, options);
+        const teamScope = await this.getTeamScope(plugin.id, options);
+        let result: AddDomainResult;
+        try {
+            result = await plugin.addDomain(projectId, domain, token, teamScope);
+        } catch (error) {
+            // Provider failed — keep DB record so user can retry, but rethrow
+            throw error;
+        }
+
+        // Update DB with provider and verified status
+        await this.domainRepository.updateProvider(options.directoryId, domain, plugin.id);
+        if (result.verified) {
+            await this.domainRepository.updateVerified(options.directoryId, domain, true);
+            // Only promote to primary URL if current website is auto-assigned or unset
+            const isAutoAssigned = !directory.website || directory.website.endsWith('.vercel.app');
+            if (isAutoAssigned) {
+                await this.directoryRepository.update(directory.id, {
+                    website: `https://${result.domain.name}`,
+                });
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Remove a domain from a deployed directory.
+     * Removes from provider first, then from DB.
+     */
+    async removeDomain(domain: string, options: DeployFacadeOptions): Promise<boolean> {
+        const { plugin, token, directory } = await this.resolvePluginAndTokenWithDirectory(options);
+
+        // If provider supports removal and domain is synced, remove from provider
+        const dbRecord = await this.domainRepository.findOne(options.directoryId, domain);
+        if (dbRecord?.provider && plugin.removeDomain) {
+            try {
+                const projectId = await this.resolveProjectId(plugin, token, directory, options);
+                const teamScope = await this.getTeamScope(plugin.id, options);
+                await plugin.removeDomain(projectId, domain, token, teamScope);
+            } catch (error) {
+                this.logger.warn(
+                    `Failed to remove domain from provider, removing from DB anyway: ${error}`,
+                );
+            }
+        }
+
+        // Remove from DB
+        const removed = await this.domainRepository.removeDomain(options.directoryId, domain);
+
+        // If the removed domain was the current website URL, re-lookup to update
+        if (removed && directory.website === `https://${domain}`) {
+            try {
+                const teamScope = await this.getTeamScope(plugin.id, options);
+                if (plugin.lookupExistingDeployment) {
+                    const lookup = await plugin.lookupExistingDeployment(
+                        directory.slug,
+                        token,
+                        teamScope,
+                    );
+                    await this.directoryRepository.update(directory.id, {
+                        website: lookup.website ?? undefined,
+                    });
+                }
+            } catch (error) {
+                this.logger.warn(`Failed to re-lookup website URL after domain removal: ${error}`);
+            }
+        }
+
+        return removed;
+    }
+
+    /**
+     * Verify a domain on a deployed directory.
+     * Verifies at provider, updates DB with result.
+     */
+    async verifyDomain(domain: string, options: DeployFacadeOptions): Promise<DeploymentDomain> {
+        const { plugin, token, directory } = await this.resolvePluginAndTokenWithDirectory(options);
+        if (!plugin.verifyDomain) {
+            throw new DeployFacadeError(
+                'Domain management is not supported by this provider',
+                'verifyDomain',
+                plugin.id,
+            );
+        }
+        const projectId = await this.resolveProjectId(plugin, token, directory, options);
+        const teamScope = await this.getTeamScope(plugin.id, options);
+        const result = await plugin.verifyDomain(projectId, domain, token, teamScope);
+
+        // Update DB with verification result
+        await this.domainRepository.updateVerified(options.directoryId, domain, result.verified);
+
+        // Only promote to primary URL if current website is auto-assigned or unset
+        if (result.verified) {
+            const isAutoAssigned = !directory.website || directory.website.endsWith('.vercel.app');
+            if (isAutoAssigned) {
+                await this.directoryRepository.update(directory.id, {
+                    website: `https://${result.name}`,
+                });
+            }
+        }
+
+        return result;
+    }
+
     // Private methods
 
     private async resolvePluginAndToken(options: DeployFacadeOptions): Promise<{
@@ -346,6 +524,54 @@ export class DeployFacadeService implements IDeployFacade {
             token,
             directory,
         };
+    }
+
+    /**
+     * Resolve the deployment projectId for a directory.
+     * Uses the cached deployProjectId when available to avoid redundant API calls.
+     */
+    private async resolveProjectId(
+        plugin: IDeploymentPlugin,
+        token: string,
+        directory: Directory,
+        options: DeployFacadeOptions,
+    ): Promise<string> {
+        // Use cached value if available
+        if (directory.deployProjectId) {
+            return directory.deployProjectId;
+        }
+
+        const teamScope = await this.getTeamScope(plugin.id, options);
+        if (plugin.lookupExistingDeployment) {
+            const result = await plugin.lookupExistingDeployment(directory.slug, token, teamScope);
+            if (result.found && result.projectId) {
+                // Cache the projectId for future calls
+                await this.directoryRepository.update(directory.id, {
+                    deployProjectId: result.projectId,
+                });
+                return result.projectId;
+            }
+        }
+        throw new DeployFacadeError(
+            'Could not resolve project ID. Ensure a deployment exists.',
+            'resolveProjectId',
+            plugin.id,
+        );
+    }
+
+    /**
+     * Get team scope from plugin settings
+     */
+    private async getTeamScope(
+        pluginId: string,
+        options: DeployFacadeOptions,
+    ): Promise<string | undefined> {
+        const settings = await this.settingsService.getSettings(pluginId, {
+            userId: options.userId,
+            directoryId: options.directoryId,
+            includeSecrets: false,
+        });
+        return settings.defaultTeamScope as string | undefined;
     }
 
     /**

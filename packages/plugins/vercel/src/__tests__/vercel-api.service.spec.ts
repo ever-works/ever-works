@@ -92,4 +92,27 @@ describe('VercelApiService', () => {
 			expect(result.found).toBe(false);
 		});
 	});
+
+	describe('domain management methods', () => {
+		it('should have addProjectDomain method', () => {
+			expect(typeof service.addProjectDomain).toBe('function');
+		});
+
+		it('should have removeProjectDomain method', () => {
+			expect(typeof service.removeProjectDomain).toBe('function');
+		});
+
+		it('should have verifyProjectDomain method', () => {
+			expect(typeof service.verifyProjectDomain).toBe('function');
+		});
+
+		it('should return empty array from getProjectDomains with empty token', async () => {
+			const result = await service.getProjectDomains('project-id', '');
+			expect(result).toEqual([]);
+		});
+
+		it('should throw from getProjectDomains with invalid token', async () => {
+			await expect(service.getProjectDomains('project-id', 'invalid-token')).rejects.toThrow();
+		});
+	});
 });
