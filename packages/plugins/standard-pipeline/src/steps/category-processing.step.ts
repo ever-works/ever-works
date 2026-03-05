@@ -406,12 +406,16 @@ export class CategoryProcessingStep extends BasePipelineStep {
 			const hasContext = existingCategories.size > 0 || existingTags.size > 0;
 
 			// Resolve prompts from external provider, then apply custom prompt
-			const resolvedEnhanced = promptFacade
-				? await promptFacade.getPrompt(PROMPT_KEYS.ENHANCED_CATEGORY_PROCESSING, ENHANCED_CATEGORY_PROMPT)
-				: ENHANCED_CATEGORY_PROMPT;
-			const resolvedBase = promptFacade
-				? await promptFacade.getPrompt(PROMPT_KEYS.CATEGORY_PROCESSING, CATEGORY_PROMPT)
-				: CATEGORY_PROMPT;
+			const resolvedEnhanced = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.ENHANCED_CATEGORY_PROCESSING, ENHANCED_CATEGORY_PROMPT)
+					: ENHANCED_CATEGORY_PROMPT
+			) as typeof ENHANCED_CATEGORY_PROMPT;
+			const resolvedBase = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.CATEGORY_PROCESSING, CATEGORY_PROMPT)
+					: CATEGORY_PROMPT
+			) as typeof CATEGORY_PROMPT;
 			const finalEnhancedPrompt = appendCustomPrompt(resolvedEnhanced, customPrompt);
 			const finalBasePrompt = appendCustomPrompt(resolvedBase, customPrompt);
 
@@ -515,9 +519,14 @@ export class CategoryProcessingStep extends BasePipelineStep {
 				});
 
 				// Always use enhanced prompt for batch processing (we always have context)
-				const resolvedBatchPrompt = promptFacade
-					? await promptFacade.getPrompt(PROMPT_KEYS.ENHANCED_CATEGORY_PROCESSING, ENHANCED_CATEGORY_PROMPT)
-					: ENHANCED_CATEGORY_PROMPT;
+				const resolvedBatchPrompt = (
+					promptFacade
+						? await promptFacade.getPrompt(
+								PROMPT_KEYS.ENHANCED_CATEGORY_PROCESSING,
+								ENHANCED_CATEGORY_PROMPT
+							)
+						: ENHANCED_CATEGORY_PROMPT
+				) as typeof ENHANCED_CATEGORY_PROMPT;
 				const finalPrompt = appendCustomPrompt(resolvedBatchPrompt, customPrompt);
 				const { result, usage, cost } = await aiFacade.askJson<CategorizeResult>(
 					finalPrompt,

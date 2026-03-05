@@ -163,9 +163,11 @@ export class ItemExtractionStep extends BasePipelineStep {
 		const featuredHintsSection = this.generateFeaturedHintsSection(featuredItemHints);
 		const schema = withTags ? extractedItemsSchemaWithTags : extractedItemsSchema;
 		const validationSchema = withTags ? itemDataWithCategoriesAndTagsSchema : itemDataSchema;
-		const resolvedPrompt = promptFacade
-			? await promptFacade.getPrompt(PROMPT_KEYS.ITEM_EXTRACTION, ITEMS_EXTRACTION_PROMPT)
-			: ITEMS_EXTRACTION_PROMPT;
+		const resolvedPrompt = (
+			promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.ITEM_EXTRACTION, ITEMS_EXTRACTION_PROMPT)
+				: ITEMS_EXTRACTION_PROMPT
+		) as typeof ITEMS_EXTRACTION_PROMPT;
 		const finalPrompt = appendCustomPrompt(resolvedPrompt, customPrompt);
 
 		// Define the item extraction function

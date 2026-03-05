@@ -53,9 +53,11 @@ export class DomainDetectionStep extends BasePipelineStep {
 		logger.log(`[${directory.slug}] Domain Detection - Starting`);
 
 		try {
-			const resolvedPrompt = promptFacade
-				? await promptFacade.getPrompt(PROMPT_KEYS.DOMAIN_DETECTION, DOMAIN_DETECTION_PROMPT)
-				: DOMAIN_DETECTION_PROMPT;
+			const resolvedPrompt = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.DOMAIN_DETECTION, DOMAIN_DETECTION_PROMPT)
+					: DOMAIN_DETECTION_PROMPT
+			) as typeof DOMAIN_DETECTION_PROMPT;
 
 			const { result, usage, cost } = await aiFacade.askJson(
 				resolvedPrompt,

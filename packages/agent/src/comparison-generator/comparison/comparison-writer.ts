@@ -1,6 +1,6 @@
 import type { ComparisonDimension } from '@ever-works/contracts';
 import { substituteVariables } from '@ever-works/plugin';
-import type { IPromptFacade, FacadeOptions } from '@ever-works/plugin';
+import type { IPromptFacade, FacadeOptions, TemplateVariables } from '@ever-works/plugin';
 import type { ComparisonPair, ComparisonResearch, ComparisonGenerationResult } from './types';
 import { buildPairKey } from './pair-selector';
 import { PROMPT_KEYS } from './prompt-keys';
@@ -105,7 +105,7 @@ export function buildStructurePromptVariables(
     pair: ComparisonPair,
     research: ComparisonResearch,
     directoryContext?: { name?: string; description?: string; customPrompt?: string },
-): Record<string, string> {
+): TemplateVariables<typeof DEFAULT_STRUCTURE_PROMPT> {
     let directoryContextSection = '';
     if (directoryContext?.name) {
         directoryContextSection = `\n\n## Directory Context\nThis comparison is for the "${directoryContext.name}" directory.`;
@@ -194,7 +194,7 @@ export function buildMarkdownPromptVariables(
     structure: AiComparisonStructure,
     research: ComparisonResearch,
     customPrompt?: string,
-): Record<string, string> {
+): TemplateVariables<typeof DEFAULT_MARKDOWN_PROMPT> {
     const dimensionsText = structure.dimensions
         .map(
             (d) =>
@@ -277,7 +277,7 @@ export function buildExtendedAnalysisPromptVariables(
     structure: AiComparisonStructure,
     research: ComparisonResearch,
     customPrompt?: string,
-): Record<string, string> {
+): TemplateVariables<typeof DEFAULT_EXTENDED_ANALYSIS_PROMPT> {
     let customPromptSection = '';
     if (customPrompt?.trim()) {
         customPromptSection = `\n## Additional User Instructions:\n${customPrompt.trim()}`;
@@ -333,14 +333,15 @@ export async function generateComparison(
     const { promptFacade, facadeOptions } = promptOptions ?? {};
 
     // Resolve structure prompt
-    const structureTemplate =
+    const structureTemplate = (
         promptFacade && facadeOptions
             ? await promptFacade.getPrompt(
                   PROMPT_KEYS.STRUCTURE,
                   DEFAULT_STRUCTURE_PROMPT,
                   facadeOptions,
               )
-            : DEFAULT_STRUCTURE_PROMPT;
+            : DEFAULT_STRUCTURE_PROMPT
+    ) as typeof DEFAULT_STRUCTURE_PROMPT;
     const structurePrompt = substituteVariables(
         structureTemplate,
         buildStructurePromptVariables(pair, research, directoryContext),
@@ -352,14 +353,15 @@ export async function generateComparison(
     );
 
     // Resolve markdown prompt
-    const markdownTemplate =
+    const markdownTemplate = (
         promptFacade && facadeOptions
             ? await promptFacade.getPrompt(
                   PROMPT_KEYS.MARKDOWN,
                   DEFAULT_MARKDOWN_PROMPT,
                   facadeOptions,
               )
-            : DEFAULT_MARKDOWN_PROMPT;
+            : DEFAULT_MARKDOWN_PROMPT
+    ) as typeof DEFAULT_MARKDOWN_PROMPT;
     const markdownPrompt = substituteVariables(
         markdownTemplate,
         buildMarkdownPromptVariables(pair, structure, research, directoryContext?.customPrompt),
@@ -370,14 +372,15 @@ export async function generateComparison(
     let extendedAnalysisMarkdown: string | undefined;
     if (directoryContext?.extendedAnalysis) {
         // Resolve extended analysis prompt
-        const extendedTemplate =
+        const extendedTemplate = (
             promptFacade && facadeOptions
                 ? await promptFacade.getPrompt(
                       PROMPT_KEYS.EXTENDED_ANALYSIS,
                       DEFAULT_EXTENDED_ANALYSIS_PROMPT,
                       facadeOptions,
                   )
-                : DEFAULT_EXTENDED_ANALYSIS_PROMPT;
+                : DEFAULT_EXTENDED_ANALYSIS_PROMPT
+        ) as typeof DEFAULT_EXTENDED_ANALYSIS_PROMPT;
         const extendedPrompt = substituteVariables(
             extendedTemplate,
             buildExtendedAnalysisPromptVariables(

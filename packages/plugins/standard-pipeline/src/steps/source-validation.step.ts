@@ -346,9 +346,11 @@ export class SourceValidationStep extends BasePipelineStep {
 			const partialContent =
 				pageContent.slice(midContent - 1000, midContent + 1000) || pageContent.slice(0, 2000);
 
-			const resolvedPrompt = promptFacade
-				? await promptFacade.getPrompt(PROMPT_KEYS.SOURCE_VALIDATION, URL_VALIDATION_PROMPT)
-				: URL_VALIDATION_PROMPT;
+			const resolvedPrompt = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.SOURCE_VALIDATION, URL_VALIDATION_PROMPT)
+					: URL_VALIDATION_PROMPT
+			) as typeof URL_VALIDATION_PROMPT;
 			const finalPrompt = appendCustomPrompt(resolvedPrompt, customPrompt);
 			const { result, usage, cost } = await aiFacade.askJson<UrlValidationResult>(
 				finalPrompt,

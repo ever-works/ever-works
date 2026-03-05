@@ -50,10 +50,10 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         super(registry, settingsService, directoryPluginRepository);
     }
 
-    async askJson<T>(
-        promptTemplate: string,
+    async askJson<T, Template extends string = string>(
+        promptTemplate: Template,
         schema: z.ZodSchema<T>,
-        options: AskJsonOptions | undefined,
+        options: AskJsonOptions<Template> | undefined,
         facadeOptions: FacadeOptions,
     ): Promise<AskJsonResponse<T>> {
         const plugin = await this.resolvePlugin<IAiProviderPlugin>(

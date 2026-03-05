@@ -316,14 +316,18 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			const promptFacade = execContext?.promptFacade;
 			const facadeOptions = { userId, directoryId: directory.id };
 
-			const sysTemplate = promptFacade
-				? await promptFacade.getPrompt(PROMPT_KEYS.SYSTEM, DEFAULT_SYSTEM_PROMPT, facadeOptions)
-				: DEFAULT_SYSTEM_PROMPT;
+			const sysTemplate = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.SYSTEM, DEFAULT_SYSTEM_PROMPT, facadeOptions)
+					: DEFAULT_SYSTEM_PROMPT
+			) as typeof DEFAULT_SYSTEM_PROMPT;
 			const systemPrompt = substituteVariables(sysTemplate, buildSystemPromptVariables(promptOptions));
 
-			const userTemplate = promptFacade
-				? await promptFacade.getPrompt(PROMPT_KEYS.USER, DEFAULT_USER_PROMPT, facadeOptions)
-				: DEFAULT_USER_PROMPT;
+			const userTemplate = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.USER, DEFAULT_USER_PROMPT, facadeOptions)
+					: DEFAULT_USER_PROMPT
+			) as typeof DEFAULT_USER_PROMPT;
 			const userPrompt = substituteVariables(userTemplate, buildUserPromptVariables(promptOptions));
 
 			const authEnv = resolveAuthEnv(settings);

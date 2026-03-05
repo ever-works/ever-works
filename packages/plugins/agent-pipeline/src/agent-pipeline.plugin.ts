@@ -457,14 +457,18 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		const promptOptions = { directory, request, existing };
 		const promptFacade = execContext.promptFacade;
 
-		const sysTemplate = promptFacade
-			? await promptFacade.getPrompt(PROMPT_KEYS.PARENT_SYSTEM, DEFAULT_PARENT_SYSTEM_PROMPT, facadeOptions)
-			: DEFAULT_PARENT_SYSTEM_PROMPT;
+		const sysTemplate = (
+			promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.PARENT_SYSTEM, DEFAULT_PARENT_SYSTEM_PROMPT, facadeOptions)
+				: DEFAULT_PARENT_SYSTEM_PROMPT
+		) as typeof DEFAULT_PARENT_SYSTEM_PROMPT;
 		const systemPrompt = substituteVariables(sysTemplate, buildParentSystemPromptVariables(promptOptions));
 
-		const userTemplate = promptFacade
-			? await promptFacade.getPrompt(PROMPT_KEYS.PARENT_USER, DEFAULT_PARENT_USER_PROMPT, facadeOptions)
-			: DEFAULT_PARENT_USER_PROMPT;
+		const userTemplate = (
+			promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.PARENT_USER, DEFAULT_PARENT_USER_PROMPT, facadeOptions)
+				: DEFAULT_PARENT_USER_PROMPT
+		) as typeof DEFAULT_PARENT_USER_PROMPT;
 		const userPrompt = substituteVariables(userTemplate, buildParentUserPromptVariables(promptOptions));
 
 		const settings = await resolveSettings(this.context, facadeOptions.userId, directory.id);

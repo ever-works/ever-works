@@ -1,4 +1,4 @@
-import type { DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
+import type { DirectoryReference, GenerationRequest, ExistingItems, TemplateVariables } from '@ever-works/plugin';
 import { ITEM_SCHEMA_PROMPT_TEXT, getCurrentDateString, substituteVariables } from '@ever-works/plugin';
 import { DEFAULT_TARGET_ITEMS } from '../form-schema.js';
 
@@ -80,7 +80,9 @@ Aim to generate approximately **{targetItems}** new items. This is a target — 
 /**
  * Build variables for the system prompt template.
  */
-export function buildSystemPromptVariables(options: SystemPromptOptions): Record<string, string> {
+export function buildSystemPromptVariables(
+	options: SystemPromptOptions
+): TemplateVariables<typeof DEFAULT_SYSTEM_PROMPT> {
 	const { directory, request, existing, workspacePath } = options;
 	const existingCount = existing.items.length;
 	const hasExisting = existingCount > 0;
@@ -125,7 +127,6 @@ export function buildSystemPromptVariables(options: SystemPromptOptions): Record
 		workspacePath,
 		date: getCurrentDateString(),
 		itemSchemaText: ITEM_SCHEMA_PROMPT_TEXT,
-		existingCount: String(existingCount),
 		existingItemsSection,
 		modificationSection,
 		targetItems: String(targetItems),
@@ -154,7 +155,7 @@ Target: generate approximately {targetItems} new items.`;
 /**
  * Build variables for the user prompt template.
  */
-export function buildUserPromptVariables(options: SystemPromptOptions): Record<string, string> {
+export function buildUserPromptVariables(options: SystemPromptOptions): TemplateVariables<typeof DEFAULT_USER_PROMPT> {
 	const { directory, request, existing } = options;
 	const hasExisting = existing.items.length > 0;
 	const targetItems = ((request.config || {}).target_items as number) || DEFAULT_TARGET_ITEMS;

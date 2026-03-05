@@ -66,9 +66,11 @@ export class NewItemsExtractor {
 			const relevant = findRelevantExistingItems(newItems, existingItems, 40);
 			this.logger.debug(`AI comparing ${newItems.length} new vs ${relevant.length} relevant existing`);
 
-			const resolvedPrompt = this.promptFacade
-				? await this.promptFacade.getPrompt(PROMPT_KEYS.EXTRACT_NEW_ITEMS, EXTRACT_NEW_ITEMS_PROMPT)
-				: EXTRACT_NEW_ITEMS_PROMPT;
+			const resolvedPrompt = (
+				this.promptFacade
+					? await this.promptFacade.getPrompt(PROMPT_KEYS.EXTRACT_NEW_ITEMS, EXTRACT_NEW_ITEMS_PROMPT)
+					: EXTRACT_NEW_ITEMS_PROMPT
+			) as typeof EXTRACT_NEW_ITEMS_PROMPT;
 
 			const { result, usage, cost } = await this.aiFacade.askJson<ExtractedItems>(
 				resolvedPrompt,
@@ -154,9 +156,11 @@ export class NewItemsExtractor {
 		metrics: StandardPipelineMetrics
 	): Promise<MutableItemData[]> {
 		try {
-			const resolvedPrompt = this.promptFacade
-				? await this.promptFacade.getPrompt(PROMPT_KEYS.EXTRACT_NEW_ITEMS, EXTRACT_NEW_ITEMS_PROMPT)
-				: EXTRACT_NEW_ITEMS_PROMPT;
+			const resolvedPrompt = (
+				this.promptFacade
+					? await this.promptFacade.getPrompt(PROMPT_KEYS.EXTRACT_NEW_ITEMS, EXTRACT_NEW_ITEMS_PROMPT)
+					: EXTRACT_NEW_ITEMS_PROMPT
+			) as typeof EXTRACT_NEW_ITEMS_PROMPT;
 
 			const { result, usage, cost } = await this.aiFacade.askJson<ExtractedItems>(
 				resolvedPrompt,

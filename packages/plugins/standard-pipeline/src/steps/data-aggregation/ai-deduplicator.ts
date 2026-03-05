@@ -54,9 +54,11 @@ export class AiDeduplicator {
 		customPrompt?: string | null
 	): Promise<MutableItemData[]> {
 		try {
-			const resolvedPrompt = this.promptFacade
-				? await this.promptFacade.getPrompt(PROMPT_KEYS.DEDUPLICATION, DEDUPLICATOR_PROMPT)
-				: DEDUPLICATOR_PROMPT;
+			const resolvedPrompt = (
+				this.promptFacade
+					? await this.promptFacade.getPrompt(PROMPT_KEYS.DEDUPLICATION, DEDUPLICATOR_PROMPT)
+					: DEDUPLICATOR_PROMPT
+			) as typeof DEDUPLICATOR_PROMPT;
 			const finalPrompt = appendCustomPrompt(resolvedPrompt, customPrompt);
 			const { result, usage, cost } = await this.aiFacade.askJson<ExtractedItems>(
 				finalPrompt,

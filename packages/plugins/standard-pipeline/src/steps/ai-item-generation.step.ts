@@ -145,9 +145,11 @@ export class AiItemGenerationStep extends BasePipelineStep {
 
 		// First, assess if the prompt is clear enough
 		try {
-			const resolvedUnderstandingPrompt = promptFacade
-				? await promptFacade.getPrompt(PROMPT_KEYS.UNDERSTANDING, UNDERSTANDING_PROMPT)
-				: UNDERSTANDING_PROMPT;
+			const resolvedUnderstandingPrompt = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.UNDERSTANDING, UNDERSTANDING_PROMPT)
+					: UNDERSTANDING_PROMPT
+			) as typeof UNDERSTANDING_PROMPT;
 
 			const {
 				result: assessment,
@@ -203,9 +205,11 @@ export class AiItemGenerationStep extends BasePipelineStep {
 		const featuredHintsSection = this.generateFeaturedHintsSection(featuredItemHints);
 
 		try {
-			const resolvedGenerationPrompt = promptFacade
-				? await promptFacade.getPrompt(PROMPT_KEYS.GENERATION, GENERATION_PROMPT)
-				: GENERATION_PROMPT;
+			const resolvedGenerationPrompt = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.GENERATION, GENERATION_PROMPT)
+					: GENERATION_PROMPT
+			) as typeof GENERATION_PROMPT;
 			const finalPrompt = appendCustomPrompt(resolvedGenerationPrompt, customPrompt);
 
 			const { result, usage, cost } = await aiFacade.askJson<ExtractedItems>(

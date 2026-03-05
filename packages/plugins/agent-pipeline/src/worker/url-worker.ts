@@ -137,20 +137,22 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 
 		const validateItemJsonTool = createValidateItemJsonTool(sandbox, '/');
 
-		const sysTemplate =
+		const sysTemplate = (
 			ctx.promptFacade && ctx.facadeOptions
 				? await ctx.promptFacade.getPrompt(
 						PROMPT_KEYS.WORKER_SYSTEM,
 						DEFAULT_WORKER_SYSTEM_PROMPT,
 						ctx.facadeOptions
 					)
-				: DEFAULT_WORKER_SYSTEM_PROMPT;
+				: DEFAULT_WORKER_SYSTEM_PROMPT
+		) as typeof DEFAULT_WORKER_SYSTEM_PROMPT;
 		const systemPrompt = substituteVariables(sysTemplate, buildWorkerSystemPromptVariables(directoryContext));
 
-		const chunkTemplate =
+		const chunkTemplate = (
 			ctx.promptFacade && ctx.facadeOptions
 				? await ctx.promptFacade.getPrompt(PROMPT_KEYS.CHUNK_USER, DEFAULT_CHUNK_USER_PROMPT, ctx.facadeOptions)
-				: DEFAULT_CHUNK_USER_PROMPT;
+				: DEFAULT_CHUNK_USER_PROMPT
+		) as typeof DEFAULT_CHUNK_USER_PROMPT;
 
 		const repairToolCall = createToolCallRepairFn(workerModel, logger);
 

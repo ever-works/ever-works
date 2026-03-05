@@ -1,3 +1,4 @@
+import type { TemplateVariables } from '@ever-works/plugin';
 import { ITEM_SCHEMA_PROMPT_TEXT, getCurrentDateString, substituteVariables } from '@ever-works/plugin';
 import type { ContentChunk } from './content-chunker.js';
 
@@ -70,7 +71,9 @@ Note: \`_meta/\` files are auto-updated when you create items. Do NOT modify the
 /**
  * Build variables for the worker system prompt template.
  */
-export function buildWorkerSystemPromptVariables(opts: WorkerPromptOptions): Record<string, string> {
+export function buildWorkerSystemPromptVariables(
+	opts: WorkerPromptOptions
+): TemplateVariables<typeof DEFAULT_WORKER_SYSTEM_PROMPT> {
 	return {
 		date: getCurrentDateString(),
 		itemSchemaText: ITEM_SCHEMA_PROMPT_TEXT,
@@ -107,7 +110,7 @@ export function buildChunkUserPromptVariables(
 	chunk: ContentChunk,
 	sourceUrl: string,
 	previouslyExtracted?: string[]
-): Record<string, string> {
+): TemplateVariables<typeof DEFAULT_CHUNK_USER_PROMPT> {
 	return {
 		sourceUrl,
 		chunkInfo: chunk.total > 1 ? `\n(Chunk ${chunk.index + 1} of ${chunk.total})` : '',

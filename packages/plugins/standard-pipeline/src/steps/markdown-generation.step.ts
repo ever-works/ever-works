@@ -183,9 +183,11 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 			}
 
 			// Generate markdown using the content
-			const resolvedPrompt = promptFacade
-				? await promptFacade.getPrompt(PROMPT_KEYS.MARKDOWN_GENERATION, MARKDOWN_PROMPT)
-				: MARKDOWN_PROMPT;
+			const resolvedPrompt = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.MARKDOWN_GENERATION, MARKDOWN_PROMPT)
+					: MARKDOWN_PROMPT
+			) as typeof MARKDOWN_PROMPT;
 
 			const { result, usage, cost } = await aiFacade.askJson<MarkdownOutput>(
 				resolvedPrompt,

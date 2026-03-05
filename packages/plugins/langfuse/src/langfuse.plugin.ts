@@ -187,6 +187,7 @@ export class LangfusePlugin implements IPlugin, IPromptProviderPlugin {
 			license: 'MIT',
 			builtIn: true,
 			autoEnable: true,
+			visibility: "user-only",
 			defaultForCapabilities: ['prompt-provider'],
 			icon: {
 				type: 'svg',

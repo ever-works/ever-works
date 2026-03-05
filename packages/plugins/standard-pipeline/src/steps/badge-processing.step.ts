@@ -200,9 +200,9 @@ export class BadgeProcessingStep extends BasePipelineStep {
 
 			const schema = this.buildSchema(domainType);
 
-			const resolvedPrompt = promptFacade
-				? await promptFacade.getPrompt(PROMPT_KEYS.BADGE_PROCESSING, BADGE_PROMPT)
-				: BADGE_PROMPT;
+			const resolvedPrompt = (
+				promptFacade ? await promptFacade.getPrompt(PROMPT_KEYS.BADGE_PROCESSING, BADGE_PROMPT) : BADGE_PROMPT
+			) as typeof BADGE_PROMPT;
 
 			const { result, usage, cost } = await aiFacade.askJson(
 				resolvedPrompt,

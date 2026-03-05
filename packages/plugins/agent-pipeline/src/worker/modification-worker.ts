@@ -1,6 +1,7 @@
 import { generateText, stepCountIs, ToolSet } from 'ai';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import type { PluginLogger, IPromptFacade, FacadeOptions } from '@ever-works/plugin';
+import type { TemplateVariables } from '@ever-works/plugin';
 import { getCurrentDateString, ITEM_SCHEMA_PROMPT_TEXT, substituteVariables } from '@ever-works/plugin';
 
 import { createUpdateFileTool } from '../tools/file-tools.js';
@@ -67,14 +68,15 @@ export async function processModification(
 
 		const repairToolCall = createToolCallRepairFn(model, logger);
 
-		const sysTemplate =
+		const sysTemplate = (
 			ctx.promptFacade && ctx.facadeOptions
 				? await ctx.promptFacade.getPrompt(
 						PROMPT_KEYS.MODIFICATION_SYSTEM,
 						DEFAULT_MODIFICATION_SYSTEM_PROMPT,
 						ctx.facadeOptions
 					)
-				: DEFAULT_MODIFICATION_SYSTEM_PROMPT;
+				: DEFAULT_MODIFICATION_SYSTEM_PROMPT
+		) as typeof DEFAULT_MODIFICATION_SYSTEM_PROMPT;
 		const systemPrompt = substituteVariables(sysTemplate, buildModificationSystemPromptVariables());
 
 		const result = await withToolCallingRetry(
@@ -162,7 +164,7 @@ export const DEFAULT_MODIFICATION_SYSTEM_PROMPT = `You are a directory item modi
 /**
  * Build variables for the modification system prompt template.
  */
-export function buildModificationSystemPromptVariables(): Record<string, string> {
+export function buildModificationSystemPromptVariables(): TemplateVariables<typeof DEFAULT_MODIFICATION_SYSTEM_PROMPT> {
 	return {
 		date: getCurrentDateString(),
 		itemSchemaText: ITEM_SCHEMA_PROMPT_TEXT

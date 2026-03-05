@@ -245,9 +245,11 @@ export class PromptProcessingStep extends BasePipelineStep {
 		}
 
 		try {
-			const resolvedPrompt = promptFacade
-				? await promptFacade.getPrompt(PROMPT_KEYS.PROMPT_PROCESSING, PROMPT_PROCESSING_PROMPT)
-				: PROMPT_PROCESSING_PROMPT;
+			const resolvedPrompt = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.PROMPT_PROCESSING, PROMPT_PROCESSING_PROMPT)
+					: PROMPT_PROCESSING_PROMPT
+			) as typeof PROMPT_PROCESSING_PROMPT;
 
 			const { result, usage, cost } = await aiFacade.askJson(
 				resolvedPrompt,

@@ -99,9 +99,11 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 
 		const dateStr = getCurrentDateString();
 
-		const resolvedPrompt = promptFacade
-			? await promptFacade.getPrompt(PROMPT_KEYS.SEARCH_QUERY_GENERATION, SEARCH_QUERY_PROMPT)
-			: SEARCH_QUERY_PROMPT;
+		const resolvedPrompt = (
+			promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.SEARCH_QUERY_GENERATION, SEARCH_QUERY_PROMPT)
+				: SEARCH_QUERY_PROMPT
+		) as typeof SEARCH_QUERY_PROMPT;
 		const finalPrompt = appendCustomPrompt(resolvedPrompt, customPrompt);
 
 		try {

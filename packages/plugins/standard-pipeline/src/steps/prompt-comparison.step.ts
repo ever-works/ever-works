@@ -143,9 +143,11 @@ export class PromptComparisonStep extends BasePipelineStep {
 		}
 
 		try {
-			const resolvedPrompt = promptFacade
-				? await promptFacade.getPrompt(PROMPT_KEYS.PROMPT_COMPARISON, PROMPT_COMPARISON_PROMPT)
-				: PROMPT_COMPARISON_PROMPT;
+			const resolvedPrompt = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.PROMPT_COMPARISON, PROMPT_COMPARISON_PROMPT)
+					: PROMPT_COMPARISON_PROMPT
+			) as typeof PROMPT_COMPARISON_PROMPT;
 
 			const { result, usage, cost } = await aiFacade.askJson(
 				resolvedPrompt,

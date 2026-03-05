@@ -1,4 +1,4 @@
-import type { DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
+import type { DirectoryReference, GenerationRequest, ExistingItems, TemplateVariables } from '@ever-works/plugin';
 import { getCurrentDateString, substituteVariables } from '@ever-works/plugin';
 import { DEFAULT_TARGET_ITEMS, DEFAULT_MAX_PAGES_TO_PROCESS } from '../form-schema.js';
 
@@ -12,7 +12,7 @@ export interface PromptOptions {
 
 /**
  * Default template for the parent orchestrator system prompt.
- * Variables: {date}, {existingItemsSection}, {existingCount}, {maxPages},
+ * Variables: {date}, {existingItemsSection}, {maxPages},
  *   {modificationSection}, {targetItems}, {targetSuffix}, {directorySection}
  */
 export const DEFAULT_PARENT_SYSTEM_PROMPT = `You are a research orchestrator for directory content generation. Your job is to find relevant items through web search and dispatch URLs to workers for extraction, or to dispatch modification instructions when the user wants to reorganize existing items.
@@ -60,7 +60,9 @@ Aim to generate approximately **{targetItems}** new items. This is a target — 
 /**
  * Build variables for the parent system prompt template.
  */
-export function buildParentSystemPromptVariables(options: PromptOptions): Record<string, string> {
+export function buildParentSystemPromptVariables(
+	options: PromptOptions
+): TemplateVariables<typeof DEFAULT_PARENT_SYSTEM_PROMPT> {
 	const { directory, request, existing } = options;
 	const existingCount = existing.items.length;
 	const hasExisting = existingCount > 0;
@@ -97,7 +99,6 @@ export function buildParentSystemPromptVariables(options: PromptOptions): Record
 
 	return {
 		date: getCurrentDateString(),
-		existingCount: String(existingCount),
 		existingItemsSection,
 		maxPages: String(maxPages),
 		modificationSection,
@@ -128,7 +129,9 @@ Target: generate approximately {targetItems} new items.`;
 /**
  * Build variables for the parent user prompt template.
  */
-export function buildParentUserPromptVariables(options: PromptOptions): Record<string, string> {
+export function buildParentUserPromptVariables(
+	options: PromptOptions
+): TemplateVariables<typeof DEFAULT_PARENT_USER_PROMPT> {
 	const { directory, request, existing } = options;
 	const hasExisting = existing.items.length > 0;
 	const targetItems = ((request.config || {}).target_items as number) || DEFAULT_TARGET_ITEMS;

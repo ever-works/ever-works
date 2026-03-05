@@ -127,10 +127,10 @@ export class PipelineFacadeService {
             providerOverride: ctx.providerOverrides?.ai,
         };
         return {
-            askJson: <T>(
-                promptTemplate: string,
+            askJson: <T, Template extends string = string>(
+                promptTemplate: Template,
                 schema: SchemaType<T>,
-                options: AskJsonOptions | undefined,
+                options: AskJsonOptions<Template> | undefined,
                 _facadeOptions: FacadeOptions,
             ): Promise<AskJsonResponse<T>> =>
                 facade.askJson(promptTemplate, schema as any, options, boundFacadeOptions),
