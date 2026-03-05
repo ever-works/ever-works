@@ -17,6 +17,10 @@ export class ApiKeyService {
             );
         }
 
+        if (expiresAt && new Date(expiresAt) <= new Date()) {
+            throw new BadRequestException('Expiration date must be in the future');
+        }
+
         const rawBytes = randomBytes(32);
         const rawKey = API_KEY_PREFIX + rawBytes.toString('hex');
         const hashedKey = createHash('sha256').update(rawKey).digest('hex');

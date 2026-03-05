@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Repository, LessThan, MoreThan, IsNull } from 'typeorm';
 import { ApiKey } from '../../entities/api-key.entity';
 
 @Injectable()
@@ -45,7 +45,12 @@ export class ApiKeyRepository {
     }
 
     async countByUserId(userId: string): Promise<number> {
-        return this.repository.count({ where: { userId } });
+        return this.repository.count({
+            where: [
+                { userId, expiresAt: IsNull() },
+                { userId, expiresAt: MoreThan(new Date()) },
+            ],
+        });
     }
 
     async deleteExpiredKeys(): Promise<number> {

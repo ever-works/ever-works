@@ -9,8 +9,8 @@ import {
     DialogHeader,
     DialogFooter,
     DialogClose,
+    DialogTitle,
 } from '@/components/ui/dialog';
-import { DialogTitle } from '@headlessui/react';
 import { createApiKey, revokeApiKey } from '@/app/actions/api-keys';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
