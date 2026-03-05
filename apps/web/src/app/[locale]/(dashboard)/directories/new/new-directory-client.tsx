@@ -10,6 +10,8 @@ import { GitProviderSelector } from './git-provider-selector';
 import { DeployProviderSelector, type DeployProvider } from './deploy-provider-selector';
 import { useTranslations } from 'next-intl';
 import type { ProviderWithConnection } from './page';
+import { Bot, PenLine, Import, ArrowRight } from 'lucide-react';
+import Image from 'next/image';
 
 interface NewDirectoryClientProps {
     user: AuthUser;
@@ -58,56 +60,52 @@ export default function NewDirectoryClient({
                     <button
                         onClick={() => setCreationMode('ai')}
                         className={cn(
-                            'p-6 rounded-lg border-2 text-left transition-all',
-                            'bg-card dark:bg-card-dark',
+                            'p-6 rounded-lg border text-left transition-all h-full',
+                            'bg-card dark:bg-[#0f1625]',
                             'border-card-border dark:border-card-border-dark',
-                            'hover:border-primary hover:shadow-lg',
-                            'group',
+                            'hover:border-primary/30 hover:shadow-lg shadow-sm',
+                            'group cursor-pointer relative',
                         )}
                     >
-                        <div className="mb-4">
-                            <div
-                                className={cn(
-                                    'w-12 h-12 rounded-lg flex items-center justify-center',
-                                    'bg-primary/10 group-hover:bg-primary/20 transition-colors',
-                                )}
-                            >
-                                <svg
-                                    className="w-6 h-6 text-primary"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                                    />
-                                </svg>
-                            </div>
+                        {/* Decorative short top border accent with fading edges */}
+                        <div className="card-top-accent opacity-0 group-hover:opacity-100 pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 rounded-full" />
+                        {/* Hover image at top, reversed horizontally, only visible on hover */}
+                        <div className="pointer-events-none opacity-0 group-hover:opacity-100 absolute left-0 right-0 top-0 z-20">
+                            <Image
+                                src="/bg-cards.png"
+                                alt="Decorative pattern"
+                                className="w-full filter brightness-0 dark:brightness-200 -rotate-180"
+                                width={200}
+                                height={100}
+                                unoptimized
+                            />
                         </div>
-                        <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                            {t('ai.title')}
-                        </h3>
-                        <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
-                            {t('ai.subtitle')}
-                        </p>
-                        <div className="flex items-center gap-2 text-primary font-medium">
-                            <span>{t('ai.getStarted')}</span>
-                            <svg
-                                className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
+                        <div className="flex flex-col h-full">
+                            <div className="mb-4">
+                                <div
+                                    className={cn(
+                                        'w-12 h-12 rounded-lg flex items-center justify-center',
+                                        'bg-primary/10 border border-primary/20 group-hover:bg-primary/20 transition-colors',
+                                    )}
+                                >
+                                    <Bot className="w-6 h-6 text-primary" strokeWidth={1.5} />
+                                </div>
+                            </div>
+
+                            <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
+                                {t('ai.title')}
+                            </h3>
+                            <p className="text-text-secondary text-sm dark:text-text-secondary-dark mb-4">
+                                {t('ai.subtitle')}
+                            </p>
+
+                            <div className="flex items-center gap-2 text-primary mt-auto">
+                                <span>{t('ai.getStarted')}</span>
+                                <ArrowRight
+                                    className="w-4 h-4 group-hover:translate-x-1 transition-transform"
                                     strokeWidth={2}
-                                    d="M9 5l7 7-7 7"
                                 />
-                            </svg>
+                            </div>
                         </div>
                     </button>
 
@@ -115,56 +113,52 @@ export default function NewDirectoryClient({
                     <button
                         onClick={() => setCreationMode('manual')}
                         className={cn(
-                            'p-6 rounded-lg border-2 text-left transition-all',
-                            'bg-card dark:bg-card-dark',
+                            'p-6 rounded-lg border text-left transition-all h-full',
+                            'bg-card dark:bg-[#0f1625]',
                             'border-card-border dark:border-card-border-dark',
-                            'hover:border-primary hover:shadow-lg',
-                            'group',
+                            'hover:border-primary/30 hover:shadow-lg shadow-sm',
+                            'group cursor-pointer relative',
                         )}
                     >
-                        <div className="mb-4">
-                            <div
-                                className={cn(
-                                    'w-12 h-12 rounded-lg flex items-center justify-center',
-                                    'bg-success/10 group-hover:bg-success/20 transition-colors',
-                                )}
-                            >
-                                <svg
-                                    className="w-6 h-6 text-success"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                    />
-                                </svg>
-                            </div>
+                        {/* Decorative short top border accent with fading edges */}
+                        <div className="card-top-accent opacity-0 group-hover:opacity-100 pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 rounded-full" />
+                        {/* Hover image at top, reversed horizontally, only visible on hover */}
+                        <div className="pointer-events-none opacity-0 group-hover:opacity-100 absolute left-0 right-0 top-0 z-20">
+                            <Image
+                                src="/bg-cards.png"
+                                alt="Decorative pattern"
+                                className="w-full filter brightness-0 dark:brightness-200 -rotate-180"
+                                width={200}
+                                height={100}
+                                unoptimized
+                            />
                         </div>
-                        <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                            {t('manual.title')}
-                        </h3>
-                        <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
-                            {t('manual.subtitle')}
-                        </p>
-                        <div className="flex items-center gap-2 text-success font-medium">
-                            <span>{t('manual.configureNow')}</span>
-                            <svg
-                                className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
+                        <div className="flex flex-col h-full">
+                            <div className="mb-4">
+                                <div
+                                    className={cn(
+                                        'w-12 h-12 rounded-lg flex items-center justify-center',
+                                        'bg-success/10 border border-success/20 group-hover:bg-success/20 transition-colors',
+                                    )}
+                                >
+                                    <PenLine className="w-6 h-6 text-success" strokeWidth={1.5} />
+                                </div>
+                            </div>
+
+                            <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
+                                {t('manual.title')}
+                            </h3>
+                            <p className="text-text-secondary text-sm dark:text-text-secondary-dark mb-4">
+                                {t('manual.subtitle')}
+                            </p>
+
+                            <div className="flex items-center gap-2 text-success mt-auto">
+                                <span>{t('manual.configureNow')}</span>
+                                <ArrowRight
+                                    className="w-4 h-4 group-hover:translate-x-1 transition-transform"
                                     strokeWidth={2}
-                                    d="M9 5l7 7-7 7"
                                 />
-                            </svg>
+                            </div>
                         </div>
                     </button>
 
@@ -172,56 +166,50 @@ export default function NewDirectoryClient({
                     <button
                         onClick={() => setCreationMode('import')}
                         className={cn(
-                            'p-6 rounded-lg border-2 text-left transition-all',
-                            'bg-card dark:bg-card-dark',
+                            'p-6 rounded-lg border text-left transition-all h-full',
+                            'bg-card dark:bg-[#0f1625]',
                             'border-card-border dark:border-card-border-dark',
-                            'hover:border-primary hover:shadow-lg',
-                            'group',
+                            'hover:border-primary/20 hover:shadow-lg shadow-sm',
+                            'group cursor-pointer relative',
                         )}
                     >
-                        <div className="mb-4">
+                        {/* Decorative short top border accent with fading edges */}
+                        <div className="card-top-accent opacity-0 group-hover:opacity-100 pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 rounded-full" />
+                        {/* Hover image at top, reversed horizontally, only visible on hover */}
+                        <div className="pointer-events-none opacity-0 group-hover:opacity-100 absolute left-0 right-0 top-0 z-20">
+                            <Image
+                                src="/bg-cards.png"
+                                alt="Decorative pattern"
+                                className="w-full filter brightness-0 dark:brightness-200 -rotate-180"
+                                width={200}
+                                height={100}
+                                unoptimized
+                            />
+                        </div>
+                        <div className="flex flex-col h-full">
                             <div
                                 className={cn(
-                                    'w-12 h-12 rounded-lg flex items-center justify-center',
-                                    'bg-warning/10 group-hover:bg-warning/20 transition-colors',
+                                    'w-12 h-12 mb-4 rounded-lg flex items-center justify-center',
+                                    'bg-warning/10 border border-warning/20 group-hover:bg-warning/20 transition-colors',
                                 )}
                             >
-                                <svg
-                                    className="w-6 h-6 text-warning"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                                    />
-                                </svg>
+                                <Import className="w-6 h-6 text-warning" strokeWidth={1.5} />
                             </div>
-                        </div>
-                        <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                            {t('import.title')}
-                        </h3>
-                        <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
-                            {t('import.subtitle')}
-                        </p>
-                        <div className="flex items-center gap-2 text-warning font-medium">
-                            <span>{t('import.importNow')}</span>
-                            <svg
-                                className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
+
+                            <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
+                                {t('import.title')}
+                            </h3>
+                            <p className="text-text-secondary text-sm dark:text-text-secondary-dark mb-4">
+                                {t('import.subtitle')}
+                            </p>
+
+                            <div className="flex items-center gap-2 text-warning mt-auto">
+                                <span>{t('import.importNow')}</span>
+                                <ArrowRight
+                                    className="w-4 h-4 group-hover:translate-x-1 transition-transform"
                                     strokeWidth={2}
-                                    d="M9 5l7 7-7 7"
                                 />
-                            </svg>
+                            </div>
                         </div>
                     </button>
                 </div>
