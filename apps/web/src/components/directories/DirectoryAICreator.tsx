@@ -147,8 +147,8 @@ export function DirectoryAICreator({
             <div
                 className={cn(
                     'p-6 rounded-lg',
-                    'bg-card dark:bg-card-dark',
-                    'border border-card-border dark:border-card-border-dark',
+                    'bg-card dark:bg-card-primary-dark',
+                    'border border-card-border dark:border-border-secondary-dark',
                 )}
             >
                 <div className="space-y-6">
@@ -174,6 +174,7 @@ export function DirectoryAICreator({
 
                     {/* Example Prompts */}
                     <ExamplePrompts
+                        selectedName={directoryName}
                         onSelect={(selectedPrompt, selectedName) => {
                             setPrompt(selectedPrompt);
                             setDirectoryName(selectedName);
@@ -185,25 +186,25 @@ export function DirectoryAICreator({
                     />
 
                     {/* AI Features Info */}
-                    <div className={cn('p-4 rounded-lg', 'bg-primary/5 border border-primary/20')}>
+                    <div className={cn('p-4 rounded-lg', '')}>
                         <h4 className="text-sm font-medium text-text dark:text-text-dark mb-2">
                             {t('featuresTitle')}
                         </h4>
-                        <ul className="space-y-1 text-sm text-text-secondary dark:text-text-secondary-dark">
+                        <ul className="space-y-1 text-sm text-text-secondary dark:text-text-secondary-dark border-l border-primary/20 pl-4">
                             <li className="flex items-start gap-2">
-                                <Check className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                                <Check className="w-4 h-4 bg-primary-500 dark:bg-primary-800 p-1 rounded-full text-white mt-0.5 shrink-0" />
                                 <span>{t('features.0')}</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                                <Check className="w-4 h-4 bg-primary-500 dark:bg-primary-800 p-1 rounded-full text-white mt-0.5 shrink-0" />
                                 <span>{t('features.1')}</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                                <Check className="w-4 h-4 bg-primary-500 dark:bg-primary-800 p-1 rounded-full text-white mt-0.5 shrink-0" />
                                 <span>{t('features.2')}</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                                <Check className="w-4 h-4 bg-primary-500 dark:bg-primary-800 p-1 rounded-full text-white mt-0.5 shrink-0" />
                                 <span>{t('features.3')}</span>
                             </li>
                         </ul>
@@ -255,6 +256,7 @@ export function DirectoryAICreator({
                     variant="primary"
                     size="lg"
                     fullWidth
+                    className="bg-primary-500"
                 >
                     {isPending ? (
                         t('generatingButton')
@@ -291,7 +293,13 @@ export function DirectoryAICreator({
     );
 }
 
-function ExamplePrompts({ onSelect }: { onSelect: (prompt: string, name: string) => void }) {
+function ExamplePrompts({
+    onSelect,
+    selectedName,
+}: {
+    onSelect: (prompt: string, name: string) => void;
+    selectedName: string;
+}) {
     const t = useTranslations('dashboard.directoryCreation.ai');
 
     const examplePrompts = [
@@ -326,11 +334,14 @@ function ExamplePrompts({ onSelect }: { onSelect: (prompt: string, name: string)
                         variant="ghost"
                         size="sm"
                         className={cn(
-                            'rounded-full',
-                            'bg-surface dark:bg-surface-dark',
-                            'border border-border dark:border-border-dark',
-                            'text-text-secondary dark:text-text-secondary-dark',
-                            'hover:border-primary hover:text-primary',
+                            'rounded-full py-1 cursor-pointer font-medium',
+                            'bg-surface dark:bg-card-secondary-dark/80',
+                            'border border-primary-500 dark:border-border-secondary-dark',
+                            'text-text-secondary dark:text-text-dark',
+                            'hover:border-primary-500 hover:bg-primary-500 hover:text-white',
+                            'dark:hover:border-primary-800 dark:hover:bg-primary-800 dark:hover:text-white',
+                            selectedName === example.name &&
+                                'dark:border-primary-800 dark:bg-primary-800 dark:text-white border-primary-800 bg-primary-500 text-white',
                         )}
                     >
                         {example.name}
