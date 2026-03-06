@@ -132,6 +132,13 @@ export class ContentFilteringStep extends BasePipelineStep {
 			return [];
 		}
 
+		const resolvedPrompt = (
+			promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.CONTENT_FILTERING, RELEVANCE_ASSESSMENT_PROMPT)
+				: RELEVANCE_ASSESSMENT_PROMPT
+		) as typeof RELEVANCE_ASSESSMENT_PROMPT;
+		const finalPrompt = appendCustomPrompt(resolvedPrompt, customPrompt);
+
 		const assessPageRelevance = async (
 			page: WebPageData
 		): Promise<{
@@ -142,12 +149,6 @@ export class ContentFilteringStep extends BasePipelineStep {
 		}> => {
 			try {
 				const snippet = this.buildSnippet(page.raw_content);
-				const resolvedPrompt = (
-					promptFacade
-						? await promptFacade.getPrompt(PROMPT_KEYS.CONTENT_FILTERING, RELEVANCE_ASSESSMENT_PROMPT)
-						: RELEVANCE_ASSESSMENT_PROMPT
-				) as typeof RELEVANCE_ASSESSMENT_PROMPT;
-				const finalPrompt = appendCustomPrompt(resolvedPrompt, customPrompt);
 
 				const {
 					result: assessmentResult,

@@ -102,6 +102,12 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 
 		const processedItems: MutableItemData[] = [];
 
+		const resolvedPrompt = (
+			promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.MARKDOWN_GENERATION, MARKDOWN_PROMPT)
+				: MARKDOWN_PROMPT
+		) as typeof MARKDOWN_PROMPT;
+
 		// Process items with content in batches
 		for (let i = 0; i < itemsWithContent.length; i += this.BATCH_SIZE) {
 			const batch = itemsWithContent.slice(i, i + this.BATCH_SIZE);
@@ -115,7 +121,7 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 					aiFacade,
 					contentExtractorFacade,
 					facadeOptions,
-					promptFacade
+					resolvedPrompt
 				);
 				return {
 					...item,
@@ -150,7 +156,7 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 		aiFacade: StepExecutionContext['aiFacade'],
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
 		facadeOptions: FacadeOptions,
-		promptFacade?: StepExecutionContext['promptFacade']
+		resolvedPrompt: typeof MARKDOWN_PROMPT
 	): Promise<string> {
 		if (!item || !item.source_url) {
 			logger.warn(`Cannot generate markdown: Missing item or source URL`);
@@ -183,12 +189,6 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 			}
 
 			// Generate markdown using the content
-			const resolvedPrompt = (
-				promptFacade
-					? await promptFacade.getPrompt(PROMPT_KEYS.MARKDOWN_GENERATION, MARKDOWN_PROMPT)
-					: MARKDOWN_PROMPT
-			) as typeof MARKDOWN_PROMPT;
-
 			const { result, usage, cost } = await aiFacade.askJson<MarkdownOutput>(
 				resolvedPrompt,
 				markdownOutputSchema,

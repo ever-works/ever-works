@@ -159,6 +159,10 @@ export class BadgeProcessingStep extends BasePipelineStep {
 		const results = new Map<string, BadgeEvaluationResult>();
 		const chunks = this.chunkArray(items, this.CONCURRENCY_LIMIT);
 
+		const resolvedPrompt = (
+			promptFacade ? await promptFacade.getPrompt(PROMPT_KEYS.BADGE_PROCESSING, BADGE_PROMPT) : BADGE_PROMPT
+		) as typeof BADGE_PROMPT;
+
 		for (const chunk of chunks) {
 			const promises = chunk.map(async (item) => {
 				const result = await this.evaluateItemBadges(
@@ -168,7 +172,7 @@ export class BadgeProcessingStep extends BasePipelineStep {
 					logger,
 					aiFacade,
 					facadeOptions,
-					promptFacade
+					resolvedPrompt
 				);
 				if (result && item.source_url) {
 					results.set(item.source_url, result);
@@ -187,7 +191,7 @@ export class BadgeProcessingStep extends BasePipelineStep {
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
 		facadeOptions: FacadeOptions,
-		promptFacade?: StepExecutionContext['promptFacade']
+		resolvedPrompt: typeof BADGE_PROMPT
 	): Promise<BadgeEvaluationResult | null> {
 		try {
 			if (domainType === 'software' && !this.isRepositoryUrl(item.source_url || '')) {
@@ -199,10 +203,6 @@ export class BadgeProcessingStep extends BasePipelineStep {
 			}
 
 			const schema = this.buildSchema(domainType);
-
-			const resolvedPrompt = (
-				promptFacade ? await promptFacade.getPrompt(PROMPT_KEYS.BADGE_PROCESSING, BADGE_PROMPT) : BADGE_PROMPT
-			) as typeof BADGE_PROMPT;
 
 			const { result, usage, cost } = await aiFacade.askJson(
 				resolvedPrompt,
