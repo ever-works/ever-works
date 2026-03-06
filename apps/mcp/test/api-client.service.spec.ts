@@ -1,13 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { EverWorksClient } from './client.js';
-import { ApiError } from './errors.js';
+import { ApiClientService } from '../src/api-client/api-client.service.js';
+import { ApiError } from '../src/api-client/api-error.js';
+import { McpConfigService } from '../src/config/mcp-config.service.js';
 
-describe('EverWorksClient', () => {
-	let client: EverWorksClient;
+describe('ApiClientService', () => {
+	let service: ApiClientService;
 	let fetchSpy: ReturnType<typeof vi.fn>;
 
 	beforeEach(() => {
-		client = new EverWorksClient('http://localhost:3100/api', 'ew_test_key');
+		const config = {
+			apiUrl: 'http://localhost:3100/api',
+			apiKey: 'ew_test_key',
+			httpPort: 3200,
+			transport: 'stdio'
+		} as McpConfigService;
+
+		service = new ApiClientService(config);
 		fetchSpy = vi.fn();
 		globalThis.fetch = fetchSpy;
 	});
@@ -28,7 +36,7 @@ describe('EverWorksClient', () => {
 
 	it('sends correct headers', async () => {
 		mockResponse({ id: '1' });
-		await client.get('/directories');
+		await service.request('GET', '/directories');
 		expect(fetchSpy).toHaveBeenCalledWith(
 			'http://localhost:3100/api/directories',
 			expect.objectContaining({
@@ -42,13 +50,13 @@ describe('EverWorksClient', () => {
 
 	it('parses JSON responses', async () => {
 		mockResponse({ id: '1', name: 'Test' });
-		const result = await client.get('/directories/1');
+		const result = await service.request('GET', '/directories/1');
 		expect(result).toEqual({ id: '1', name: 'Test' });
 	});
 
 	it('throws ApiError on non-OK status', async () => {
 		mockResponse({ message: 'Not Found' }, 404);
-		await expect(client.get('/directories/missing')).rejects.toThrow(ApiError);
+		await expect(service.request('GET', '/directories/missing')).rejects.toThrow(ApiError);
 	});
 
 	it('strips sensitive fields from responses', async () => {
@@ -62,7 +70,7 @@ describe('EverWorksClient', () => {
 				lastLoginIp: '127.0.0.1'
 			}
 		});
-		const result = await client.get<Record<string, unknown>>('/directories/1');
+		const result = await service.request<Record<string, unknown>>('GET', '/directories/1');
 		const user = result.user as Record<string, unknown>;
 		expect(user.password).toBeUndefined();
 		expect(user.lastLoginIp).toBeUndefined();
@@ -71,14 +79,14 @@ describe('EverWorksClient', () => {
 
 	it('includes AbortSignal.timeout in requests', async () => {
 		mockResponse({ id: '1' });
-		await client.get('/directories');
+		await service.request('GET', '/directories');
 		const callArgs = fetchSpy.mock.calls[0];
 		expect(callArgs[1].signal).toBeDefined();
 	});
 
 	it('sends body for POST requests', async () => {
 		mockResponse({ id: '1' });
-		await client.post('/directories', { name: 'New Dir' });
+		await service.request('POST', '/directories', { name: 'New Dir' });
 		const callArgs = fetchSpy.mock.calls[0];
 		expect(callArgs[1].method).toBe('POST');
 		expect(callArgs[1].body).toBe(JSON.stringify({ name: 'New Dir' }));

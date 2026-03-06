@@ -1,19 +1,34 @@
 # Ever Works MCP Server
 
-An MCP (Model Context Protocol) server that exposes the Ever Works API as AI-consumable tools. Connect it to Claude Desktop, Claude Code, or any MCP-compatible client to manage directories, generate content, deploy websites, and configure plugins programmatically.
+A NestJS-based MCP (Model Context Protocol) server that auto-generates tools from the Ever Works API's OpenAPI spec. Connect it to Claude Desktop, Claude Code, or any MCP-compatible client to manage directories, generate content, deploy websites, and configure plugins programmatically.
+
+## Architecture
+
+Tools are dynamically generated at startup by fetching the OpenAPI spec from the Ever Works API and filtering endpoints against a whitelist. This means:
+
+- **No manual tool definitions** — schemas come from the API's OpenAPI spec
+- **Adding new tools** — just add a line to `src/openapi-tools/whitelist.ts`
+- **Backwards compatible** — tool names match the previous hardcoded implementation
+
+```
+Startup -> fetch /api/openapi.json -> filter by whitelist -> convert schemas to Zod -> register tools
+```
+
+Built with [NestJS](https://nestjs.com/) and [@rekog/mcp-nest](https://github.com/rekog/mcp-nest).
 
 ## Prerequisites
 
 - Node.js >= 20
 - An Ever Works API key (generate one at **Settings > API Keys** in the dashboard)
+- The Ever Works API running and accessible
 
 ## Environment Variables
 
-| Variable              | Required | Default                 | Description                    |
-| --------------------- | -------- | ----------------------- | ------------------------------ |
-| `EVER_WORKS_API_KEY`  | Yes      | —                       | API key for authentication     |
+| Variable              | Required | Default                | Description                    |
+| --------------------- | -------- | ---------------------- | ------------------------------ |
+| `EVER_WORKS_API_KEY`  | Yes      | --                     | API key for authentication     |
 | `EVER_WORKS_API_URL`  | No       | `http://localhost:3100` | Base URL of the Ever Works API |
-| `EVER_WORKS_MCP_PORT` | No       | `3200`                  | Port for HTTP transport        |
+| `EVER_WORKS_MCP_PORT` | No       | `3200`                 | Port for HTTP transport        |
 
 ## Claude Desktop Configuration
 
@@ -43,14 +58,20 @@ pnpm install
 # Build
 pnpm build --filter=ever-works-mcp
 
-# Run with stdio transport (primary — for Claude Desktop)
+# Run with stdio transport (primary -- for Claude Desktop)
 EVER_WORKS_API_KEY=ew_live_... pnpm --filter=ever-works-mcp start:stdio
 
-# Run with HTTP transport (secondary — for remote access)
+# Run with HTTP transport (secondary -- for remote access)
 EVER_WORKS_API_KEY=ew_live_... pnpm --filter=ever-works-mcp start:http
+
+# Run tests
+cd apps/mcp && pnpm test
 
 # Type check
 cd apps/mcp && pnpm type-check
+
+# Lint
+cd apps/mcp && pnpm lint
 
 # Interactive debugging with MCP Inspector
 EVER_WORKS_API_KEY=ew_live_... npx @modelcontextprotocol/inspector node apps/mcp/dist/stdio.js
@@ -130,3 +151,16 @@ EVER_WORKS_API_KEY=ew_live_... npx @modelcontextprotocol/inspector node apps/mcp
 | `generate_comparison`        | Auto-generate comparisons using AI             |
 | `generate_manual_comparison` | Generate comparison between two specific items |
 | `delete_comparison`          | Delete a comparison                            |
+
+## Adding New Tools
+
+To expose a new API endpoint as an MCP tool:
+
+1. Ensure the endpoint is documented in the API's OpenAPI spec (via `@nestjs/swagger` decorators)
+2. Add an entry to `src/openapi-tools/whitelist.ts`:
+   ```typescript
+   { method: 'GET', path: '/api/your-endpoint', toolName: 'your_tool_name' }
+   ```
+3. Rebuild and restart the server
+
+The tool's parameter schema and description are automatically derived from the OpenAPI spec.

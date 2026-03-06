@@ -7,8 +7,10 @@
 		"strict": true,
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true,
-		"esModuleInterop": true
+		"esModuleInterop": true,
+		"experimentalDecorators": true,
+		"emitDecoratorMetadata": true
 	},
 	"include": ["src"],
-	"exclude": ["node_modules", "dist", "src/**/*.spec.ts", "src/**/*.test.ts"]
+	"exclude": ["node_modules", "dist", "test"]
 }

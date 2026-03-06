@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeResponse } from './sanitize.js';
+import { sanitizeResponse } from '../src/api-client/sanitize.js';
 
 describe('sanitizeResponse', () => {
 	it('strips all sensitive fields from an object', () => {

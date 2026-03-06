@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ApiError, toMcpError } from './errors.js';
+import { ApiError, toMcpError } from '../src/api-client/api-error.js';
 
 describe('toMcpError', () => {
 	it('formats ApiError with body', () => {
