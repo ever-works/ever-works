@@ -24,11 +24,11 @@ Built with [NestJS](https://nestjs.com/) and [@rekog/mcp-nest](https://github.co
 
 ## Environment Variables
 
-| Variable              | Required | Default                | Description                    |
-| --------------------- | -------- | ---------------------- | ------------------------------ |
-| `EVER_WORKS_API_KEY`  | Yes      | --                     | API key for authentication     |
+| Variable              | Required | Default                 | Description                    |
+| --------------------- | -------- | ----------------------- | ------------------------------ |
+| `EVER_WORKS_API_KEY`  | Yes      | --                      | API key for authentication     |
 | `EVER_WORKS_API_URL`  | No       | `http://localhost:3100` | Base URL of the Ever Works API |
-| `EVER_WORKS_MCP_PORT` | No       | `3200`                 | Port for HTTP transport        |
+| `EVER_WORKS_MCP_PORT` | No       | `3200`                  | Port for HTTP transport        |
 
 ## Claude Desktop Configuration
 
@@ -158,9 +158,9 @@ To expose a new API endpoint as an MCP tool:
 
 1. Ensure the endpoint is documented in the API's OpenAPI spec (via `@nestjs/swagger` decorators)
 2. Add an entry to `src/openapi-tools/whitelist.ts`:
-   ```typescript
-   { method: 'GET', path: '/api/your-endpoint', toolName: 'your_tool_name' }
-   ```
+    ```typescript
+    { method: 'GET', path: '/api/your-endpoint', toolName: 'your_tool_name' }
+    ```
 3. Rebuild and restart the server
 
 The tool's parameter schema and description are automatically derived from the OpenAPI spec.
