@@ -1754,6 +1754,13 @@
                         "title": "轻松管理",
                         "description": "轻松更新和组织您的内容"
                     }
+                },
+                "badge": "AI 驱动",
+                "howItWorks": {
+                    "step1": "描述您的想法",
+                    "step2": "选择模板",
+                    "step3": "AI 生成内容",
+                    "step4": "发布并分享"
                 }
             },
             "footer": {

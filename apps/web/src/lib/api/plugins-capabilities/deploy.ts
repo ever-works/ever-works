@@ -67,6 +67,36 @@ export type DeploymentCapabilityResponseDto = APIResponse<{
     userHasToken: boolean;
 }>;
 
+export interface DeploymentDomainVerification {
+    type: string;
+    domain: string;
+    value: string;
+    reason: string;
+}
+
+export interface DeploymentDomain {
+    name: string;
+    verified: boolean;
+    verification?: DeploymentDomainVerification[];
+}
+
+export type DomainsResponseDto = APIResponse<{
+    domains: DeploymentDomain[];
+}>;
+
+export type AddDomainResponseDto = APIResponse<{
+    domain: DeploymentDomain;
+    verified: boolean;
+}>;
+
+export type RemoveDomainResponseDto = APIResponse<{
+    removed: boolean;
+}>;
+
+export type VerifyDomainResponseDto = APIResponse<{
+    domain: DeploymentDomain;
+}>;
+
 export const deployAPI = {
     // Get available deployment providers
     getProviders: async () => {
@@ -135,6 +165,49 @@ export const deployAPI = {
     checkDeploymentCapability(directoryId: string) {
         return serverMutation<DeploymentCapabilityResponseDto>({
             endpoint: `/deploy/directories/${directoryId}/check`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Get domains for a deployed directory
+     */
+    getDomains(directoryId: string) {
+        return serverFetch<DomainsResponseDto>(`/deploy/directories/${directoryId}/domains`);
+    },
+
+    /**
+     * Add a domain to a deployed directory
+     */
+    addDomain(directoryId: string, domain: string) {
+        return serverMutation<AddDomainResponseDto>({
+            endpoint: `/deploy/directories/${directoryId}/domains`,
+            data: { domain },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Remove a domain from a deployed directory
+     */
+    removeDomain(directoryId: string, domain: string) {
+        return serverMutation<RemoveDomainResponseDto>({
+            endpoint: `/deploy/directories/${encodeURIComponent(directoryId)}/domains/${encodeURIComponent(domain)}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Verify a domain on a deployed directory
+     */
+    verifyDomain(directoryId: string, domain: string) {
+        return serverMutation<VerifyDomainResponseDto>({
+            endpoint: `/deploy/directories/${directoryId}/domains/${encodeURIComponent(domain)}/verify`,
             data: {},
             method: 'POST',
             wrapInData: false,

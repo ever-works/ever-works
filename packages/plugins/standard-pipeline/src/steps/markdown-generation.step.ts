@@ -3,6 +3,7 @@ import type { StepExecutionContext, MutableItemData, FacadeOptions } from '@ever
 import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { getErrorStack } from '../utils/error.utils.js';
+import { PROMPT_KEYS } from '../prompt-keys.js';
 
 export const MARKDOWN_PROMPT = `
 You are directory website builder and your task is to generate markdown summary for item:
@@ -45,7 +46,7 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
 		const { directory, finalItems, contentCache, metrics } = context;
-		const { logger, aiFacade, contentExtractorFacade } = execContext;
+		const { logger, aiFacade, contentExtractorFacade, promptFacade } = execContext;
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
@@ -65,7 +66,8 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 			logger,
 			aiFacade,
 			contentExtractorFacade,
-			facadeOptions
+			facadeOptions,
+			promptFacade
 		);
 
 		context.finalItems = itemsWithMarkdown;
@@ -83,7 +85,8 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<MutableItemData[]> {
 		if (!items || items.length === 0) {
 			return [];
@@ -99,6 +102,12 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 
 		const processedItems: MutableItemData[] = [];
 
+		const resolvedPrompt = (
+			promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.MARKDOWN_GENERATION, MARKDOWN_PROMPT)
+				: MARKDOWN_PROMPT
+		) as typeof MARKDOWN_PROMPT;
+
 		// Process items with content in batches
 		for (let i = 0; i < itemsWithContent.length; i += this.BATCH_SIZE) {
 			const batch = itemsWithContent.slice(i, i + this.BATCH_SIZE);
@@ -111,7 +120,8 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 					logger,
 					aiFacade,
 					contentExtractorFacade,
-					facadeOptions
+					facadeOptions,
+					resolvedPrompt
 				);
 				return {
 					...item,
@@ -145,7 +155,8 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		resolvedPrompt: typeof MARKDOWN_PROMPT
 	): Promise<string> {
 		if (!item || !item.source_url) {
 			logger.warn(`Cannot generate markdown: Missing item or source URL`);
@@ -179,7 +190,7 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 
 			// Generate markdown using the content
 			const { result, usage, cost } = await aiFacade.askJson<MarkdownOutput>(
-				MARKDOWN_PROMPT,
+				resolvedPrompt,
 				markdownOutputSchema,
 				{
 					temperature: 0.6,

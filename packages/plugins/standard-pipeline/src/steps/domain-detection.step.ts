@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { StepExecutionContext, DomainType, FacadeOptions } from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
+import { PROMPT_KEYS } from '../prompt-keys.js';
 
 /**
  * Domain detection prompt template
@@ -41,7 +42,7 @@ export class DomainDetectionStep extends BasePipelineStep {
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
 		const { request, directory, metrics } = context;
-		const { logger, aiFacade } = execContext;
+		const { logger, aiFacade, promptFacade } = execContext;
 		const { name, prompt } = request;
 
 		const facadeOptions: FacadeOptions = {
@@ -52,8 +53,14 @@ export class DomainDetectionStep extends BasePipelineStep {
 		logger.log(`[${directory.slug}] Domain Detection - Starting`);
 
 		try {
+			const resolvedPrompt = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.DOMAIN_DETECTION, DOMAIN_DETECTION_PROMPT)
+					: DOMAIN_DETECTION_PROMPT
+			) as typeof DOMAIN_DETECTION_PROMPT;
+
 			const { result, usage, cost } = await aiFacade.askJson(
-				DOMAIN_DETECTION_PROMPT,
+				resolvedPrompt,
 				domainDetectionSchema,
 				{
 					temperature: 0.1,

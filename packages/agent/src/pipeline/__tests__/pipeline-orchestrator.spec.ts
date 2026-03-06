@@ -63,7 +63,6 @@ describe('PipelineOrchestratorService', () => {
             settingsSchema: { type: 'object', properties: {} },
             onLoad: jest.fn(),
             onUnload: jest.fn(),
-            validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             getStepDefinitions: jest.fn().mockReturnValue([]),
             execute: jest.fn().mockResolvedValue(
                 makePipelineResult(

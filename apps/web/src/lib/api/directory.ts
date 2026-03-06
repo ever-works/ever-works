@@ -84,6 +84,8 @@ export type GenerateStatus = {
     totalSteps?: number;
     /** Progress percentage (0-100) */
     progress?: number;
+    /** Number of items processed so far */
+    itemsProcessed?: number;
     /** Error message if status is ERROR */
     error?: string;
     /** Warnings from degraded services (e.g. circuit breaker tripped) */

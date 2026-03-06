@@ -27,7 +27,6 @@ describe('DataSourceFacadeService', () => {
         sourceName,
         onLoad: jest.fn(),
         onUnload: jest.fn(),
-        validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         query: jest.fn().mockResolvedValue({
             items: [],
             hasMore: false,

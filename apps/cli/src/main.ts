@@ -4,6 +4,7 @@ import * as path from 'path';
 import dotenv from 'dotenv';
 import { authCommand } from './commands/auth';
 import { directoryCommand } from './commands/directory';
+import { pluginsCommand } from './commands/plugins';
 
 // Load environment variables
 dotenv.config({ debug: false, quiet: true });
@@ -20,6 +21,7 @@ program
 // commands
 program.addCommand(authCommand);
 program.addCommand(directoryCommand);
+program.addCommand(pluginsCommand);
 
 // Parse arguments
 program.parse(process.argv);

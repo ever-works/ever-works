@@ -48,42 +48,6 @@ describe('AgentPipelinePlugin', () => {
 		});
 	});
 
-	describe('validateSettings', () => {
-		it('should return valid for empty settings', async () => {
-			const result = await plugin.validateSettings({});
-			expect(result.valid).toBe(true);
-		});
-
-		it('should return valid for correct maxSteps', async () => {
-			const result = await plugin.validateSettings({ maxSteps: 100 });
-			expect(result.valid).toBe(true);
-		});
-
-		it('should reject non-integer maxSteps', async () => {
-			const result = await plugin.validateSettings({ maxSteps: 'abc' });
-			expect(result.valid).toBe(false);
-			expect(result.errors).toHaveLength(1);
-			expect(result.errors![0].path).toBe('maxSteps');
-		});
-
-		it('should reject maxSteps below minimum', async () => {
-			const result = await plugin.validateSettings({ maxSteps: 5 });
-			expect(result.valid).toBe(false);
-			expect(result.errors![0].message).toContain('between 10 and 2000');
-		});
-
-		it('should reject maxSteps above maximum', async () => {
-			const result = await plugin.validateSettings({ maxSteps: 5000 });
-			expect(result.valid).toBe(false);
-			expect(result.errors![0].message).toContain('between 10 and 2000');
-		});
-
-		it('should accept boundary values', async () => {
-			expect((await plugin.validateSettings({ maxSteps: 10 })).valid).toBe(true);
-			expect((await plugin.validateSettings({ maxSteps: 2000 })).valid).toBe(true);
-		});
-	});
-
 	describe('healthCheck', () => {
 		it('should return healthy status', async () => {
 			const health = await plugin.healthCheck();

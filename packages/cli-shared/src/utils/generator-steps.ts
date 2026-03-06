@@ -45,3 +45,62 @@ export function getStepProgress(step: ItemsGeneratorStep): number {
 	// Calculate percentage based on step position
 	return Math.round(((currentIndex + 1) / steps.length) * 100);
 }
+
+/**
+ * Generation status shape expected by dynamic helpers.
+ * Matches the fields available on both API and agent GenerateStatus types.
+ */
+export interface GenerateStatusFields {
+	step?: string;
+	stepName?: string;
+	stepIndex?: number;
+	totalSteps?: number;
+	progress?: number;
+	itemsProcessed?: number;
+}
+
+/**
+ * Get human-readable step text from dynamic pipeline status.
+ * Uses `stepName` when available, falls back to enum lookup.
+ */
+export function getDynamicStepText(status: GenerateStatusFields): string {
+	if (status.stepName) {
+		return status.stepName;
+	}
+	if (status.step) {
+		// Try enum lookup (for legacy standard-pipeline steps)
+		const enumText = getStepText(status.step as ItemsGeneratorStep);
+		// If enum lookup fails ('Processing' fallback), use the raw step value
+		if (enumText !== 'Processing') return enumText;
+		return status.step;
+	}
+	return 'Processing';
+}
+
+/**
+ * Get progress percentage from dynamic pipeline status.
+ * Uses `progress` field when available, falls back to enum-based calculation.
+ */
+export function getDynamicStepProgress(status: GenerateStatusFields): number {
+	if (status.progress !== undefined) {
+		return Math.round(status.progress);
+	}
+	if (status.stepIndex !== undefined && status.totalSteps !== undefined && status.totalSteps > 0) {
+		return Math.round(((status.stepIndex + 1) / status.totalSteps) * 100);
+	}
+	if (status.step) {
+		return getStepProgress(status.step as ItemsGeneratorStep);
+	}
+	return 0;
+}
+
+/**
+ * Get items-processed text when available.
+ * Returns e.g. "27 items" or undefined when not applicable.
+ */
+export function getItemsProcessedText(status: GenerateStatusFields): string | undefined {
+	if (status.itemsProcessed !== undefined && status.itemsProcessed > 0) {
+		return `${status.itemsProcessed} items`;
+	}
+	return undefined;
+}

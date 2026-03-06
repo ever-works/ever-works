@@ -27,6 +27,8 @@ export type GenerateStatus = {
     totalSteps?: number;
     /** Progress percentage (0-100) */
     progress?: number;
+    /** Number of items processed so far */
+    itemsProcessed?: number;
     /** Error message if status is ERROR */
     error?: string;
     /** Warnings from circuit breaker or degraded services */
@@ -67,6 +69,12 @@ export const ASSIGNABLE_MEMBER_ROLES = [
 ] as const;
 
 export type AssignableMemberRole = (typeof ASSIGNABLE_MEMBER_ROLES)[number];
+
+export enum DomainEnvironment {
+    PRODUCTION = 'production',
+    STAGING = 'staging',
+    DEVELOPMENT = 'development',
+}
 
 export interface CommunityPrState {
     processedPrNumbers: number[];

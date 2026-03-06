@@ -4,6 +4,7 @@ import { AiFacadeService } from '../facades/ai.facade';
 import { SearchFacadeService } from '../facades/search.facade';
 import { ContentExtractorFacadeService } from '../facades/content-extractor.facade';
 import { GitFacadeService, type GitFacadeOptions } from '../facades/git.facade';
+import { PromptFacadeService } from '../facades/prompt.facade';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import type { Directory } from '../entities/directory.entity';
@@ -21,6 +22,7 @@ import {
     type ComparisonPair,
     type ResearchDependencies,
     type ComparisonAiDependencies,
+    type ComparisonPromptOptions,
 } from './comparison';
 
 const comparisonStructureSchema = z.object({
@@ -55,6 +57,7 @@ export class ComparisonGenerationService {
         private readonly searchFacade: SearchFacadeService,
         private readonly contentExtractorFacade: ContentExtractorFacadeService,
         private readonly gitFacade: GitFacadeService,
+        private readonly promptFacade: PromptFacadeService,
         private readonly directoryRepository: DirectoryRepository,
         private readonly directoryPluginRepository: DirectoryPluginRepository,
     ) {}
@@ -412,12 +415,22 @@ export class ComparisonGenerationService {
         };
 
         this.logger.log(`Generating comparison: ${pair.itemA.name} vs ${pair.itemB.name}`);
-        const result = await generateComparison(pair, research, aiDeps, {
-            name: directory.name,
-            description: directory.description,
-            customPrompt: pluginSettings.custom_prompt,
-            extendedAnalysis: pluginSettings.extended_analysis,
-        });
+        const promptOptions: ComparisonPromptOptions = {
+            promptFacade: this.promptFacade,
+            facadeOptions,
+        };
+        const result = await generateComparison(
+            pair,
+            research,
+            aiDeps,
+            {
+                name: directory.name,
+                description: directory.description,
+                customPrompt: pluginSettings.custom_prompt,
+                extendedAnalysis: pluginSettings.extended_analysis,
+            },
+            promptOptions,
+        );
 
         // 3. Write to data repo
         await dataRepo.writeComparison(result.comparison);

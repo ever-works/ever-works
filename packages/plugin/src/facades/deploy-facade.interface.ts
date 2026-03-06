@@ -7,6 +7,7 @@
  */
 
 import type { PluginIcon } from '../contracts/plugin-manifest.types.js';
+import type { DeploymentDomain, AddDomainResult } from '../contracts/capabilities/deployment.interface.js';
 
 /**
  * Options for deploy facade operations
@@ -132,4 +133,35 @@ export interface IDeployFacade {
 	 * @returns Deployment lookup result
 	 */
 	lookupExistingDeployment(projectName: string, options: DeployFacadeOptions): Promise<DeploymentLookupResult>;
+
+	/**
+	 * Get domains for a deployed directory
+	 * @param options Facade options with user and directory IDs
+	 * @returns Array of domain information
+	 */
+	getDomains(options: DeployFacadeOptions): Promise<DeploymentDomain[]>;
+
+	/**
+	 * Add a domain to a deployed directory
+	 * @param domain Domain name to add
+	 * @param options Facade options with user and directory IDs
+	 * @returns Result of domain addition
+	 */
+	addDomain(domain: string, options: DeployFacadeOptions): Promise<AddDomainResult>;
+
+	/**
+	 * Remove a domain from a deployed directory
+	 * @param domain Domain name to remove
+	 * @param options Facade options with user and directory IDs
+	 * @returns True if domain was removed
+	 */
+	removeDomain(domain: string, options: DeployFacadeOptions): Promise<boolean>;
+
+	/**
+	 * Verify a domain on a deployed directory
+	 * @param domain Domain name to verify
+	 * @param options Facade options with user and directory IDs
+	 * @returns Updated domain information
+	 */
+	verifyDomain(domain: string, options: DeployFacadeOptions): Promise<DeploymentDomain>;
 }

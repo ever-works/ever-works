@@ -4,14 +4,14 @@ import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
-import { DirectoryPromptService } from './directory-prompt.service';
+import { DirectoryPromptService, canDelete } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 
 export const deleteCommand = new Command('delete')
     .description('Delete a directory')
     .action(async () => {
         try {
-            console.log(chalk.red.bold('\nDelete Directory\n'));
+            console.log(chalk.cyan.bold('\nDelete Directory\n'));
 
             // Ensure user is authenticated
             await requireAuth();
@@ -22,7 +22,7 @@ export const deleteCommand = new Command('delete')
             // Select directory
             const selection = await directoryPrompt.promptDirectorySelection();
             if (selection.cancelled || !selection.directory) {
-                console.log(chalk.yellow('\n⚠ Operation cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -35,6 +35,12 @@ export const deleteCommand = new Command('delete')
                     `\n✓ Selected directory: ${directoryPrompt.formatSelectedDirectory(directory, role, isShared)}`,
                 ),
             );
+
+            if (!canDelete(role)) {
+                console.log(chalk.yellow('\n⚠ Only the directory owner can delete a directory.'));
+                console.log(chalk.gray(`  Your role: ${role}.`));
+                return;
+            }
 
             // Show warning about what will be deleted
             console.log(chalk.red('\n⚠️  WARNING: This action cannot be undone!'));
@@ -49,19 +55,19 @@ export const deleteCommand = new Command('delete')
                     type: 'confirm',
                     name: 'delete_data_repository',
                     message: 'Delete data repository?',
-                    default: true,
+                    default: false,
                 },
                 {
                     type: 'confirm',
                     name: 'delete_markdown_repository',
                     message: 'Delete markdown repository?',
-                    default: true,
+                    default: false,
                 },
                 {
                     type: 'confirm',
                     name: 'delete_website_repository',
                     message: 'Delete website repository?',
-                    default: true,
+                    default: false,
                 },
                 {
                     type: 'confirm',
@@ -77,7 +83,7 @@ export const deleteCommand = new Command('delete')
             ]);
 
             // Double confirmation
-            console.log(chalk.red('\n--- Deletion Summary ---'));
+            console.log('');
             console.log(chalk.gray('Directory to delete:'), chalk.white(directory.slug));
             console.log(
                 chalk.gray('Delete data repository:'),
@@ -125,7 +131,7 @@ export const deleteCommand = new Command('delete')
             ]);
 
             if (!finalConfirmation.proceed) {
-                console.log(chalk.yellow('\n⚠ Directory deletion cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -143,12 +149,10 @@ export const deleteCommand = new Command('delete')
 
                 const response = await apiService.deleteDirectory(directory.id, deleteDto);
 
-                spinner.stop();
-
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Directory deletion failed'));
+                    spinner.fail('Directory deletion failed');
                 } else {
-                    console.log(chalk.green('\n✓ Directory deleted successfully!'));
+                    spinner.succeed('Directory deleted successfully!');
                 }
 
                 console.log(chalk.gray('Status:'), chalk.white(response.status));

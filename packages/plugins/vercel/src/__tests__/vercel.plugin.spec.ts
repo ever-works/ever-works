@@ -86,34 +86,6 @@ describe('VercelPlugin', () => {
 		});
 	});
 
-	describe('validateSettings', () => {
-		it('should return valid when apiToken is provided', async () => {
-			const result = await plugin.validateSettings({ apiToken: 'valid-token' });
-			expect(result.valid).toBe(true);
-			expect(result.errors).toBeUndefined();
-		});
-
-		it('should return invalid when apiToken is missing', async () => {
-			const result = await plugin.validateSettings({});
-			expect(result.valid).toBe(false);
-			expect(result.errors).toBeDefined();
-			expect(result.errors?.[0]?.path).toBe('apiToken');
-		});
-
-		it('should return invalid when apiToken is empty string', async () => {
-			const result = await plugin.validateSettings({ apiToken: '' });
-			expect(result.valid).toBe(false);
-		});
-
-		it('should accept optional defaultTeamScope', async () => {
-			const result = await plugin.validateSettings({
-				apiToken: 'valid-token',
-				defaultTeamScope: 'my-team'
-			});
-			expect(result.valid).toBe(true);
-		});
-	});
-
 	describe('healthCheck', () => {
 		it('should return healthy status', async () => {
 			const health = await plugin.healthCheck();
@@ -144,6 +116,24 @@ describe('VercelPlugin', () => {
 			expect(apiService).toBeDefined();
 			expect(typeof apiService.validateToken).toBe('function');
 			expect(typeof apiService.getTeams).toBe('function');
+		});
+	});
+
+	describe('domain management methods', () => {
+		it('should have getDomains method', () => {
+			expect(typeof plugin.getDomains).toBe('function');
+		});
+
+		it('should have addDomain method', () => {
+			expect(typeof plugin.addDomain).toBe('function');
+		});
+
+		it('should have removeDomain method', () => {
+			expect(typeof plugin.removeDomain).toBe('function');
+		});
+
+		it('should have verifyDomain method', () => {
+			expect(typeof plugin.verifyDomain).toBe('function');
 		});
 	});
 });

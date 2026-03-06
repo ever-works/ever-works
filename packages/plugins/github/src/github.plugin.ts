@@ -7,8 +7,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
-	PluginSettings,
 	GitAuth,
 	GitRepository,
 	GitUser,
@@ -82,6 +80,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 				title: 'API Base URL',
 				description: 'GitHub API base URL (for GitHub Enterprise)',
 				default: 'https://api.github.com',
+				format: 'uri',
 				'x-hidden': true,
 				'x-scope': 'global'
 			}
@@ -532,26 +531,6 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 	async onUnload(): Promise<void> {
 		this.context = undefined;
 		this.gitOps = undefined;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (settings.apiBaseUrl && typeof settings.apiBaseUrl === 'string') {
-			try {
-				new URL(settings.apiBaseUrl);
-			} catch {
-				errors.push({
-					path: 'apiBaseUrl',
-					message: 'Invalid URL format'
-				});
-			}
-		}
-
-		return {
-			valid: errors.length === 0,
-			errors: errors.length > 0 ? errors : undefined
-		};
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

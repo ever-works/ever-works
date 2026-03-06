@@ -82,17 +82,18 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <button
+                    suppressHydrationWarning
                     type="button"
                     className={cn(
                         'inline-flex items-center justify-center',
-                        'h-9 min-w-[100px] px-3 text-xs font-normal',
+                        'h-8 min-w-25 px-2 text-xs font-normal',
                         'rounded-md transition-all duration-200',
                         'bg-surface-secondary dark:bg-surface-secondary-dark',
                         'border border-border dark:border-border-dark',
                         'text-text dark:text-text-dark',
                         'hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
                         'hover:border-border-secondary dark:hover:border-border-secondary-dark',
-                        'focus:outline-none focus:ring-2 focus:ring-primary/20',
+                        'focus:outline-none focus:ring-1 focus:ring-primary/20',
                         'active:scale-[0.98] ',
                         'cursor-pointer',
                         className,
@@ -111,7 +112,7 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                     />
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="top" className="min-w-[160px]">
+            <DropdownMenuContent align="end" side="top" className="min-w-21">
                 {LOCALES.map((loc) => {
                     const isActive = locale === loc;
                     return (
@@ -119,9 +120,9 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                             key={loc}
                             onClick={() => handleLocaleChange(loc)}
                             className={cn(
-                                'flex items-center gap-2',
+                                'flex items-center gap-2 py-1 hover:bg-surface-tertiary/50 hover:dark:bg-surface-tertiary-dark/70',
                                 isActive &&
-                                    'bg-surface-tertiary cursor-pointer dark:bg-surface-tertiary-dark font-medium',
+                                    'bg-surface-tertiary dark:bg-surface-tertiary-dark cursor-pointer font-medium',
                                 !isActive && 'cursor-pointer',
                             )}
                         >

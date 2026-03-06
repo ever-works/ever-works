@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import pickBy from 'lodash/pickBy';
 import {
+    type IPlugin,
     type JsonSchema,
     type PluginManifest,
     toPluginSettingsSchemaProperty,
@@ -315,7 +316,7 @@ export class PluginOperationsService {
                 ...(settings || {}),
                 ...(secretSettings || {}),
             };
-            this.validateSettingsOrThrow(allSettings, schema, 'user');
+            await this.validateSettingsOrThrow(allSettings, schema, 'user', registered.plugin);
         }
 
         // Get the plugin entity from database
@@ -483,7 +484,7 @@ export class PluginOperationsService {
             };
             // Strip null values before validation — null means "cleared"
             const cleanedSettings = this.stripNullValues(allSettings);
-            this.validateSettingsOrThrow(cleanedSettings, schema, 'user');
+            await this.validateSettingsOrThrow(cleanedSettings, schema, 'user', registered.plugin);
         }
 
         // Merge settings and strip null keys to clear them
@@ -608,7 +609,7 @@ export class PluginOperationsService {
                 ...(userPlugin?.secretSettings || {}),
                 ...options.settings,
             };
-            this.validateSettingsOrThrow(allSettings, schema, 'directory');
+            await this.validateSettingsOrThrow(allSettings, schema, 'directory', registered.plugin);
         }
 
         // Get the plugin entity
@@ -778,7 +779,12 @@ export class PluginOperationsService {
                 ...dirSecretsAfterUpdate,
             };
 
-            this.validateSettingsOrThrow(allSettingsForValidation, schema, 'directory');
+            await this.validateSettingsOrThrow(
+                allSettingsForValidation,
+                schema,
+                'directory',
+                registered.plugin,
+            );
         }
 
         // Merge settings and strip null keys to clear them
@@ -1100,24 +1106,44 @@ export class PluginOperationsService {
             description: schema.description,
             properties,
             required: filteredRequired?.length ? filteredRequired : undefined,
+            requiredGroups: schema['x-requiredGroups']
+                ?.map((g) => ({
+                    fields: g.fields.filter((f) => f in properties),
+                    message: g.message,
+                }))
+                .filter((g) => g.fields.length > 0),
         };
     }
 
     /**
-     * Validate settings against a plugin's JSON schema.
+     * Validate settings against a plugin's JSON schema,
+     * then run the plugin's custom validateSettings hook if defined.
      * Throws BadRequestException if validation fails.
      */
-    private validateSettingsOrThrow(
+    private async validateSettingsOrThrow(
         settings: Record<string, unknown>,
         schema: JsonSchema | undefined,
         scope: SettingsScope,
-    ): void {
+        plugin?: IPlugin,
+    ): Promise<void> {
         const result = this.settingsValidator.validate(settings, schema, scope);
         if (!result.valid) {
             throw new BadRequestException({
                 message: 'Invalid plugin settings',
                 errors: result.errors,
             });
+        }
+
+        if (plugin?.validateSettings) {
+            const pluginResult = await plugin.validateSettings(settings);
+            if (!pluginResult.valid) {
+                throw new BadRequestException({
+                    message: 'Invalid plugin settings',
+                    errors: pluginResult.errors?.map((e) => e.message) ?? [
+                        'Custom validation failed',
+                    ],
+                });
+            }
         }
     }
 

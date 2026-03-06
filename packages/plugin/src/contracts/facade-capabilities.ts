@@ -9,7 +9,8 @@ export const PLUGIN_CAPABILITIES = {
 	FORM_SCHEMA_PROVIDER: 'form-schema-provider',
 	DEPLOYMENT: 'deployment',
 	GIT_PROVIDER: 'git-provider',
-	OAUTH: 'oauth'
+	OAUTH: 'oauth',
+	PROMPT_PROVIDER: 'prompt-provider'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

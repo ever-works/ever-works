@@ -5,10 +5,10 @@ import { Suspense, useState, useCallback } from 'react';
 import DashboardToasts from './toasts';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
-import { GlobalNotificationBanner } from '@/components/dashboard/GlobalNotificationBanner';
 import { Footer } from '@/components/footer';
 import { HelpDrawer } from '@/components/dashboard/HelpDrawer';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
+import { useSidebarPersistence } from '@/lib/hooks/use-sidebar-persistence';
 
 interface DashboardLayoutClientProps {
     user: AuthUser;
@@ -18,6 +18,13 @@ interface DashboardLayoutClientProps {
 export function DashboardLayoutClient({ user, children }: DashboardLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [helpOpen, setHelpOpen] = useState(false);
+
+    const {
+        sidebarWidth,
+        sidebarCollapsed,
+        handleSidebarWidthChange,
+        handleSidebarCollapsedChange,
+    } = useSidebarPersistence();
 
     const openHelp = useCallback(() => setHelpOpen(true), []);
     const closeHelp = useCallback(() => setHelpOpen(false), []);
@@ -44,6 +51,10 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
                     user={user}
                     isOpen={sidebarOpen}
                     onToggle={() => setSidebarOpen(!sidebarOpen)}
+                    width={sidebarCollapsed ? 64 : sidebarWidth}
+                    onWidthChange={handleSidebarWidthChange}
+                    isCollapsed={sidebarCollapsed}
+                    onCollapsedChange={handleSidebarCollapsedChange}
                 />
 
                 <div className="flex-1 flex flex-col overflow-hidden">
@@ -53,8 +64,6 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
                         isSidebarOpen={sidebarOpen}
                         onHelpClick={openHelp}
                     />
-
-                    <GlobalNotificationBanner />
 
                     <main
                         className="flex-1 flex flex-col overflow-y-auto bg-surface dark:bg-surface-dark min-h-0"

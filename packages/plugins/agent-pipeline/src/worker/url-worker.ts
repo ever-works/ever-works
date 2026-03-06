@@ -2,11 +2,18 @@ import { appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { generateText, stepCountIs, ToolSet } from 'ai';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
-import type { IContentExtractorFacade, FacadeOptions, PluginLogger } from '@ever-works/plugin';
+import type { IContentExtractorFacade, FacadeOptions, PluginLogger, IPromptFacade } from '@ever-works/plugin';
+import { substituteVariables } from '@ever-works/plugin';
 
 import { chunkContent } from './content-chunker.js';
-import { buildWorkerSystemPrompt, buildChunkUserPrompt } from './extraction-prompt.js';
+import {
+	buildWorkerSystemPromptVariables,
+	buildChunkUserPromptVariables,
+	DEFAULT_WORKER_SYSTEM_PROMPT,
+	DEFAULT_CHUNK_USER_PROMPT
+} from './extraction-prompt.js';
 import type { WorkerPromptOptions } from './extraction-prompt.js';
+import { PROMPT_KEYS } from '../prompt-keys.js';
 import { createCreateFileTool, createUpdateFileTool } from '../tools/file-tools.js';
 import { createValidateItemJsonTool } from '../tools/validate-json-tools.js';
 import { createFindItemsTool } from '../tools/find-items-tool.js';
@@ -32,6 +39,7 @@ export interface UrlWorkerContext {
 	breaker: ToolCircuitBreaker;
 	tokenAccumulator?: TokenUsageAccumulator;
 	signal?: AbortSignal;
+	promptFacade?: IPromptFacade;
 }
 
 export interface UrlWorkerResult {
@@ -129,7 +137,23 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 
 		const validateItemJsonTool = createValidateItemJsonTool(sandbox, '/');
 
-		const systemPrompt = buildWorkerSystemPrompt(directoryContext);
+		const sysTemplate = (
+			ctx.promptFacade && ctx.facadeOptions
+				? await ctx.promptFacade.getPrompt(
+						PROMPT_KEYS.WORKER_SYSTEM,
+						DEFAULT_WORKER_SYSTEM_PROMPT,
+						ctx.facadeOptions
+					)
+				: DEFAULT_WORKER_SYSTEM_PROMPT
+		) as typeof DEFAULT_WORKER_SYSTEM_PROMPT;
+		const systemPrompt = substituteVariables(sysTemplate, buildWorkerSystemPromptVariables(directoryContext));
+
+		const chunkTemplate = (
+			ctx.promptFacade && ctx.facadeOptions
+				? await ctx.promptFacade.getPrompt(PROMPT_KEYS.CHUNK_USER, DEFAULT_CHUNK_USER_PROMPT, ctx.facadeOptions)
+				: DEFAULT_CHUNK_USER_PROMPT
+		) as typeof DEFAULT_CHUNK_USER_PROMPT;
+
 		const repairToolCall = createToolCallRepairFn(workerModel, logger);
 
 		for (const chunk of chunks) {
@@ -141,10 +165,13 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 							model: workerModel,
 							system: systemPrompt,
 							timeout: 5 * 60 * 1000, // 5 min per chunk
-							prompt: buildChunkUserPrompt(
-								chunk,
-								url,
-								createdFiles.length > 0 ? createdFiles : undefined
+							prompt: substituteVariables(
+								chunkTemplate,
+								buildChunkUserPromptVariables(
+									chunk,
+									url,
+									createdFiles.length > 0 ? createdFiles : undefined
+								)
 							),
 							tools: {
 								bash: bashTools.bash,

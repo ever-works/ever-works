@@ -1754,6 +1754,13 @@
                         "title": "Gestione Semplice",
                         "description": "Aggiorna e organizza i tuoi contenuti senza sforzo"
                     }
+                },
+                "badge": "Alimentato da IA",
+                "howItWorks": {
+                    "step1": "Descrivi la tua idea",
+                    "step2": "Scegli un modello",
+                    "step3": "L'IA genera il contenuto",
+                    "step4": "Pubblica e condividi"
                 }
             },
             "footer": {

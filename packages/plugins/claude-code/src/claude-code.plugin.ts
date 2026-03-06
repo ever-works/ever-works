@@ -6,7 +6,6 @@ import type {
 	PluginCategory,
 	JsonSchema,
 	ValidationResult,
-	PluginSettings,
 	PipelineStepDefinition,
 	PipelineState,
 	PipelineExecutionOptions,
@@ -22,7 +21,7 @@ import type {
 	FormFieldGroup,
 	ItemData
 } from '@ever-works/plugin';
-import { buildSuccessPipelineResult } from '@ever-works/plugin';
+import { buildSuccessPipelineResult, substituteVariables } from '@ever-works/plugin';
 
 import type { ClaudeCodeStepId } from './types.js';
 import { CLAUDE_CODE_STEP_IDS, DEFAULT_CLI_VERSION, DEFAULT_MAX_TURNS, BASE_TEMP_DIR } from './types.js';
@@ -38,13 +37,20 @@ import {
 	ensureOnboardingConfig
 } from './utils/workspace-manager.js';
 import { executeClaudeCode, type ExecuteResult } from './utils/process-runner.js';
-import { buildSystemPrompt, buildUserPrompt } from './prompt/system-prompt.js';
+import {
+	buildSystemPromptVariables,
+	buildUserPromptVariables,
+	DEFAULT_SYSTEM_PROMPT,
+	DEFAULT_USER_PROMPT
+} from './prompt/system-prompt.js';
+import { PROMPT_KEYS } from './prompt-keys.js';
 import { startTaxonomyWatcher } from './utils/taxonomy-watcher.js';
 import { captureScreenshots } from './utils/screenshot-capture.js';
 import {
 	initializeState,
 	updateStepState,
 	reportProgress,
+	reportItemProgress,
 	resolveSettings,
 	resolveAuthEnv,
 	buildMetrics,
@@ -55,7 +61,8 @@ import {
 	getFormFields as formFields,
 	getFormGroups as formGroups,
 	validateFormInput as formValidate,
-	getDefaultValues as formDefaults
+	getDefaultValues as formDefaults,
+	DEFAULT_TARGET_ITEMS
 } from './form-schema.js';
 
 /**
@@ -146,26 +153,6 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 	async onUnload(): Promise<void> {
 		await this.cancel();
 		this.context = null;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const oauthToken = settings.oauthToken as string | undefined;
-		const apiKey = settings.apiKey as string | undefined;
-
-		if (!oauthToken && !apiKey) {
-			return {
-				valid: false,
-				errors: [
-					{
-						path: '',
-						message: 'Either an OAuth token or Anthropic API key is required',
-						code: 'auth-required'
-					}
-				]
-			};
-		}
-
-		return { valid: true };
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {
@@ -325,12 +312,34 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			reportProgress(onProgress, 2, 30, 'Generate Items');
 
 			const promptOptions = { directory, request, existing, workspacePath };
-			const systemPrompt = buildSystemPrompt(promptOptions);
-			const userPrompt = buildUserPrompt(promptOptions);
+			const execContext = options?.execContext;
+			const promptFacade = execContext?.promptFacade;
+			const facadeOptions = { userId, directoryId: directory.id };
+
+			const sysTemplate = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.SYSTEM, DEFAULT_SYSTEM_PROMPT, facadeOptions)
+					: DEFAULT_SYSTEM_PROMPT
+			) as typeof DEFAULT_SYSTEM_PROMPT;
+			const systemPrompt = substituteVariables(sysTemplate, buildSystemPromptVariables(promptOptions));
+
+			const userTemplate = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.USER, DEFAULT_USER_PROMPT, facadeOptions)
+					: DEFAULT_USER_PROMPT
+			) as typeof DEFAULT_USER_PROMPT;
+			const userPrompt = substituteVariables(userTemplate, buildUserPromptVariables(promptOptions));
 
 			const authEnv = resolveAuthEnv(settings);
+			const targetItems = ((request.config || {}).target_items as number) || DEFAULT_TARGET_ITEMS;
 
-			const taxonomyWatcher = startTaxonomyWatcher(workspacePath, logger);
+			const taxonomyWatcher = startTaxonomyWatcher({
+				workspacePath,
+				logger,
+				onNewItem: (newItemCount) => {
+					reportItemProgress(onProgress, newItemCount, targetItems, 2);
+				}
+			});
 
 			let execResult: ExecuteResult;
 			try {

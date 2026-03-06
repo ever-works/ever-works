@@ -9,6 +9,7 @@ import { DataSourceFacadeService } from './data-source.facade';
 import { GitFacadeService } from './git.facade';
 import { OAuthFacadeService } from './oauth.facade';
 import { DeployFacadeService } from './deploy.facade';
+import { PromptFacadeService } from './prompt.facade';
 
 const FACADES = [
     AiFacadeService,
@@ -19,6 +20,7 @@ const FACADES = [
     GitFacadeService,
     OAuthFacadeService,
     DeployFacadeService,
+    PromptFacadeService,
 ];
 
 /**

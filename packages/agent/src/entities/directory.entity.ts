@@ -21,6 +21,7 @@ import type { PRUpdate } from '@src/generators/data-generator';
 import { DirectoryGenerationHistory } from './directory-generation-history.entity';
 import { TimestampColumn } from './_types';
 import { DirectorySchedule } from './directory-schedule.entity';
+import { DirectoryCustomDomain } from './directory-custom-domain.entity';
 import { DirectoryMember } from './directory-member.entity';
 
 @Entity({ name: 'directories' })
@@ -98,6 +99,9 @@ export class Directory {
     @OneToMany(() => DirectoryMember, (member) => member.directory)
     members?: ClassToObject<DirectoryMember>[];
 
+    @OneToMany(() => DirectoryCustomDomain, (customDomain) => customDomain.directory)
+    customDomains?: ClassToObject<DirectoryCustomDomain>[];
+
     @Column({ type: 'boolean', default: false })
     scheduledUpdatesEnabled: boolean;
 
@@ -111,6 +115,9 @@ export class Directory {
     scheduledStatus?: DirectoryScheduleStatus | null;
 
     // Deployment FIELDS
+    @Column({ nullable: true })
+    deployProjectId?: string;
+
     @Column({ nullable: true })
     deploymentState?: string;
 

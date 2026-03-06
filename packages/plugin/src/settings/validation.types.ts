@@ -25,34 +25,3 @@ export interface ValidationResult {
 	/** Warnings that don't fail validation */
 	readonly warnings?: readonly ValidationError[];
 }
-
-/**
- * Validator function type
- */
-export type Validator<T = unknown> = (value: T) => ValidationResult | Promise<ValidationResult>;
-
-/**
- * Validation context passed to validators
- */
-export interface ValidationContext {
-	/** Current field path */
-	readonly path: string;
-	/** Parent value if nested */
-	readonly parent?: unknown;
-	/** Root value being validated */
-	readonly root: unknown;
-	/** Additional context data */
-	readonly data?: Record<string, unknown>;
-}
-
-/**
- * Custom validator definition
- */
-export interface CustomValidator {
-	/** Validator name */
-	readonly name: string;
-	/** Validator function */
-	readonly validate: (value: unknown, context: ValidationContext) => ValidationResult | Promise<ValidationResult>;
-	/** Error message template */
-	readonly message?: string;
-}

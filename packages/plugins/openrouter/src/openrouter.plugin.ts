@@ -12,7 +12,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
 	PluginSettings,
 	ConfigurationMode
 } from '@ever-works/plugin';
@@ -195,24 +194,6 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			supportsToolCalling: true,
 			supportsVision: false,
 			maxContextLength: 128000
-		};
-	}
-
-	// Settings validation
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (!settings.apiKey || typeof settings.apiKey !== 'string') {
-			errors.push({
-				path: 'apiKey',
-				message: 'OpenRouter API key is required'
-			});
-		}
-
-		return {
-			valid: errors.length === 0,
-			errors: errors.length > 0 ? errors : undefined
 		};
 	}
 

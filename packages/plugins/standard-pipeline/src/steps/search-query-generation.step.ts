@@ -5,6 +5,7 @@ import type { MutableGenerationContext, StandardPipelineMetrics } from '../conte
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { getErrorStack } from '../utils/error.utils.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
+import { PROMPT_KEYS } from '../prompt-keys.js';
 
 const SEARCH_QUERY_PROMPT =
 	`You are a directory builder generating search queries to find the most relevant, official sources.
@@ -39,7 +40,7 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
 		const { request, directory, metrics, advancedPrompts } = context;
-		const { logger, aiFacade } = execContext;
+		const { logger, aiFacade, promptFacade } = execContext;
 		const config = request.config || {};
 
 		const facadeOptions: FacadeOptions = {
@@ -59,7 +60,8 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 			advancedPrompts?.searchQuery,
 			logger,
 			aiFacade,
-			facadeOptions
+			facadeOptions,
+			promptFacade
 		);
 
 		logger.log(`[${directory.slug}] Generated ${searchQueries.length} search queries.`);
@@ -82,7 +84,8 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 		customPrompt: string | null | undefined,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<string[]> {
 		logger.debug(`[${name}] Generating search queries using LLM...`);
 
@@ -96,7 +99,12 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 
 		const dateStr = getCurrentDateString();
 
-		const finalPrompt = appendCustomPrompt(SEARCH_QUERY_PROMPT, customPrompt);
+		const resolvedPrompt = (
+			promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.SEARCH_QUERY_GENERATION, SEARCH_QUERY_PROMPT)
+				: SEARCH_QUERY_PROMPT
+		) as typeof SEARCH_QUERY_PROMPT;
+		const finalPrompt = appendCustomPrompt(resolvedPrompt, customPrompt);
 
 		try {
 			const { result, usage, cost } = await aiFacade.askJson(

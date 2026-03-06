@@ -45,7 +45,6 @@ describe('AiFacadeService', () => {
         providerName,
         onLoad: jest.fn(),
         onUnload: jest.fn(),
-        validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         isAvailable: jest.fn().mockResolvedValue(true),
         createChatCompletion: jest.fn().mockResolvedValue({
             id: 'test-id',

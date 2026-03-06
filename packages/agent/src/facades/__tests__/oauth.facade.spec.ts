@@ -23,7 +23,6 @@ describe('OAuthFacadeService', () => {
             settingsSchema: { type: 'object', properties: {} },
             onLoad: jest.fn(),
             onUnload: jest.fn(),
-            validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             getAuthorizationUrl: jest.fn().mockReturnValue(`https://provider.com/oauth?state=test`),
             exchangeCodeForToken: jest.fn().mockResolvedValue({
                 accessToken: 'token-123',

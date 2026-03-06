@@ -5,7 +5,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
 	PluginSettings,
 	ChatCompletionOptions,
 	ChatCompletionResponse,
@@ -168,22 +167,6 @@ export class GooglePlugin extends BaseAiProvider {
 
 	protected getDefaultModelId(): string {
 		return 'models/gemini-2.5-flash';
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (!settings.apiKey || typeof settings.apiKey !== 'string') {
-			errors.push({
-				path: 'apiKey',
-				message: 'Google AI API key is required'
-			});
-		}
-
-		return {
-			valid: errors.length === 0,
-			errors: errors.length > 0 ? errors : undefined
-		};
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

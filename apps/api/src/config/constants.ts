@@ -60,7 +60,7 @@ export const config = {
                 return emailFrom;
             }
             // Extract email from EMAIL_FROM or use default
-            const defaultEmail = process.env.EMAIL_FROM_EMAIL || 'no-reply@ever.works';
+            const defaultEmail = process.env.EMAIL_FROM_EMAIL || 'ever@ever.works';
             return `${appName} <${defaultEmail}>`;
         },
         smtpHost: () => process.env.SMTP_HOST || '127.0.0.1',
