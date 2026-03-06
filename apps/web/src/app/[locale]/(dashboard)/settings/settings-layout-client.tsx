@@ -2,7 +2,7 @@
 
 import { usePathname } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
-import { User, Lock, AlertTriangle } from 'lucide-react';
+import { User, Lock, Key, AlertTriangle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useMemo } from 'react';
@@ -36,6 +36,12 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 label: t('tabs.security'),
                 icon: Lock,
                 href: `${baseSettingsPath}/security`,
+            },
+            {
+                id: 'api-keys',
+                label: t('tabs.apiKeys'),
+                icon: Key,
+                href: `${baseSettingsPath}/api-keys`,
             },
         ],
         [t],

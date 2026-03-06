@@ -10,7 +10,30 @@ interface PluginReadmeProps {
 export function PluginReadme({ content }: PluginReadmeProps) {
     return (
         <div className="prose prose-sm dark:prose-invert prose-a:text-primary hover:prose-a:text-primary-hover max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+            <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                    code: ({ children, className, ...props }) => {
+                        if (className) {
+                            return (
+                                <code className={className} {...props}>
+                                    {children}
+                                </code>
+                            );
+                        }
+                        return (
+                            <code
+                                className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono"
+                                {...props}
+                            >
+                                {children}
+                            </code>
+                        );
+                    },
+                }}
+            >
+                {content}
+            </ReactMarkdown>
         </div>
     );
 }

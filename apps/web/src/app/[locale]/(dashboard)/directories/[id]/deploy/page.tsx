@@ -7,6 +7,7 @@ import { DeployForm } from '@/components/directories/detail/deploy/DeployForm';
 import { DeployTokenAlert } from '@/components/directories/detail/deploy/DeployTokenAlert';
 import { DeployProviderSelector } from '@/components/directories/detail/deploy/DeployProviderSelector';
 import { SharedDirectoryNoTokenAlert } from '@/components/directories/detail/deploy/SharedDirectoryNoTokenAlert';
+import { DomainManagement } from '@/components/directories/detail/deploy/DomainManagement';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { canDeploy } from '@/lib/permissions';
 
@@ -114,6 +115,7 @@ export default async function DeployPage({ params }: DeployPageParams) {
                 isDeploying={isDeploying(directory)}
                 providerName={providerName}
             />
+            {directory.website && <DomainManagement directory={directory} />}
         </div>
     );
 }

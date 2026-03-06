@@ -6,7 +6,7 @@
  * @param customPrompt - Optional user-defined prompt to append
  * @returns The combined prompt, or just the base prompt if no custom prompt is provided
  */
-export function appendCustomPrompt(basePrompt: string, customPrompt?: string | null): string {
+export function appendCustomPrompt<T extends string>(basePrompt: T, customPrompt?: string | null): T {
 	if (!customPrompt || customPrompt.trim().length === 0) {
 		return basePrompt;
 	}
@@ -14,5 +14,5 @@ export function appendCustomPrompt(basePrompt: string, customPrompt?: string | n
 	return `${basePrompt}
 
 ## Additional User Instructions:
-${customPrompt.trim()}`;
+${customPrompt.trim()}` as T;
 }

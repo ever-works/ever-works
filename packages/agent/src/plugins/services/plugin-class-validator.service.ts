@@ -33,8 +33,6 @@ function isIPlugin(obj: unknown): obj is IPlugin {
     // Check required methods
     if (typeof plugin.onLoad !== 'function') return false;
     if (typeof plugin.onUnload !== 'function') return false;
-    if (typeof plugin.validateSettings !== 'function') return false;
-
     return true;
 }
 
@@ -187,7 +185,6 @@ export class PluginClassValidatorService {
         // Check required methods
         this.checkRequiredMethod(p, 'onLoad', errors);
         this.checkRequiredMethod(p, 'onUnload', errors);
-        this.checkRequiredMethod(p, 'validateSettings', errors);
 
         // Check optional methods
         if (p.healthCheck !== undefined && typeof p.healthCheck !== 'function') {

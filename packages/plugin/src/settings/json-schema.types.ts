@@ -1,138 +1,22 @@
 /**
- * JSON Schema types for plugin settings validation
- * Based on JSON Schema Draft 7
+ * JSON Schema types for plugin settings validation.
+ * Based on JSON Schema Draft 7 via @types/json-schema, extended with Ever Works custom properties.
  */
+import type { JSONSchema7, JSONSchema7TypeName } from 'json-schema';
 
 /**
  * Primitive JSON Schema types
  */
-export type JsonSchemaType = 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'null';
+export type JsonSchemaType = JSONSchema7TypeName;
 
 /**
- * String format validators
+ * Ever Works custom schema extensions for plugin settings
  */
-export type JsonSchemaStringFormat =
-	| 'date-time'
-	| 'date'
-	| 'time'
-	| 'email'
-	| 'uri'
-	| 'uri-reference'
-	| 'hostname'
-	| 'ipv4'
-	| 'ipv6'
-	| 'uuid'
-	| 'regex';
-
-/**
- * JSON Schema definition for a single property or schema
- */
-export interface JsonSchema {
-	/** Schema type */
-	readonly type?: JsonSchemaType | readonly JsonSchemaType[];
-
-	/** Schema title for display */
-	readonly title?: string;
-
-	/** Schema description */
-	readonly description?: string;
-
-	/** Default value */
-	readonly default?: unknown;
-
-	/** Example values */
-	readonly examples?: readonly unknown[];
-
-	// String constraints
-	/** Minimum string length */
-	readonly minLength?: number;
-	/** Maximum string length */
-	readonly maxLength?: number;
-	/** Regular expression pattern */
-	readonly pattern?: string;
-	/** String format */
-	readonly format?: JsonSchemaStringFormat | string;
-
-	// Number constraints
-	/** Minimum value */
-	readonly minimum?: number;
-	/** Maximum value */
-	readonly maximum?: number;
-	/** Exclusive minimum value */
-	readonly exclusiveMinimum?: number;
-	/** Exclusive maximum value */
-	readonly exclusiveMaximum?: number;
-	/** Value must be a multiple of this */
-	readonly multipleOf?: number;
-
-	// Object constraints
-	/** Object properties */
-	readonly properties?: Record<string, JsonSchema>;
-	/** Required property names */
-	readonly required?: readonly string[];
-	/** Additional properties schema or boolean */
-	readonly additionalProperties?: boolean | JsonSchema;
-	/** Minimum number of properties */
-	readonly minProperties?: number;
-	/** Maximum number of properties */
-	readonly maxProperties?: number;
-	/** Property name pattern to schema mapping */
-	readonly patternProperties?: Record<string, JsonSchema>;
-	/** Property dependencies */
-	readonly dependencies?: Record<string, JsonSchema | readonly string[]>;
-
-	// Array constraints
-	/** Array items schema */
-	readonly items?: JsonSchema;
-	/** Additional items schema (for tuple validation) */
-	readonly additionalItems?: boolean | JsonSchema;
-	/** Minimum number of items */
-	readonly minItems?: number;
-	/** Maximum number of items */
-	readonly maxItems?: number;
-	/** All items must be unique */
-	readonly uniqueItems?: boolean;
-	/** Array must contain items matching this schema */
-	readonly contains?: JsonSchema;
-
-	// Enum and const
-	/** Enumerated allowed values */
-	readonly enum?: readonly unknown[];
-	/** Constant value */
-	readonly const?: unknown;
-
-	// Composition
-	/** Must match all schemas */
-	readonly allOf?: readonly JsonSchema[];
-	/** Must match at least one schema */
-	readonly anyOf?: readonly JsonSchema[];
-	/** Must match exactly one schema */
-	readonly oneOf?: readonly JsonSchema[];
-	/** Must not match this schema */
-	readonly not?: JsonSchema;
-
-	// Conditional
-	/** Condition schema */
-	readonly if?: JsonSchema;
-	/** Schema to apply if condition matches */
-	readonly then?: JsonSchema;
-	/** Schema to apply if condition does not match */
-	readonly else?: JsonSchema;
-
-	// References
-	/** Reference to another schema */
-	readonly $ref?: string;
-	/** Schema definitions for references */
-	readonly definitions?: Record<string, JsonSchema>;
-	readonly $defs?: Record<string, JsonSchema>;
-
-	// UI extensions (for form generation)
+export interface PluginSchemaExtensions {
 	/** UI widget type hint */
 	readonly 'x-widget'?: string;
 	/** Whether field is secret: never returned in API responses, rendered as password input */
 	readonly 'x-secret'?: boolean;
-
-	// Plugin settings extensions
 	/** Environment variable fallback (checked when no other setting is found) */
 	readonly 'x-envVar'?: string;
 	/** Setting scope: global, user, or directory */
@@ -143,7 +27,6 @@ export interface JsonSchema {
 	readonly 'x-hidden'?: boolean;
 	/** Conditional visibility: show this field only when the referenced field matches the given value */
 	readonly 'x-showIf'?: { readonly field: string; readonly value: unknown };
-
 	/** Groups of fields where at least one must be set. Each group is independent. */
 	readonly 'x-requiredGroups'?: readonly {
 		readonly fields: readonly string[];
@@ -152,11 +35,51 @@ export interface JsonSchema {
 }
 
 /**
+ * JSON Schema definition for a single property or schema.
+ * Extends JSONSchema7 with Ever Works custom x-* extensions, recursively applied.
+ */
+export type JsonSchema = Omit<
+	JSONSchema7,
+	| 'properties'
+	| 'patternProperties'
+	| 'additionalProperties'
+	| 'items'
+	| 'additionalItems'
+	| 'contains'
+	| 'allOf'
+	| 'anyOf'
+	| 'oneOf'
+	| 'not'
+	| 'if'
+	| 'then'
+	| 'else'
+	| 'definitions'
+	| 'dependencies'
+	| 'examples'
+> &
+	PluginSchemaExtensions & {
+		examples?: readonly unknown[];
+		properties?: Record<string, JsonSchema>;
+		patternProperties?: Record<string, JsonSchema>;
+		additionalProperties?: boolean | JsonSchema;
+		items?: JsonSchema | JsonSchema[];
+		additionalItems?: boolean | JsonSchema;
+		contains?: JsonSchema;
+		allOf?: JsonSchema[];
+		anyOf?: JsonSchema[];
+		oneOf?: JsonSchema[];
+		not?: JsonSchema;
+		if?: JsonSchema;
+		then?: JsonSchema;
+		else?: JsonSchema;
+		definitions?: Record<string, JsonSchema>;
+		dependencies?: Record<string, JsonSchema | string[]>;
+	};
+
+/**
  * Root JSON Schema with metadata
  */
 export interface RootJsonSchema extends JsonSchema {
-	/** JSON Schema version */
 	readonly $schema?: string;
-	/** Schema identifier */
 	readonly $id?: string;
 }

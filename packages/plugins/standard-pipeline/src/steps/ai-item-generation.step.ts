@@ -4,6 +4,7 @@ import { BasePipelineStep } from '../base-pipeline-step.js';
 import { slugifyText } from '../utils/text.utils.js';
 import { getErrorStack } from '../utils/error.utils.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
+import { PROMPT_KEYS } from '../prompt-keys.js';
 import { z } from 'zod';
 import {
 	extractedItemsSchema,
@@ -76,7 +77,7 @@ export class AiItemGenerationStep extends BasePipelineStep {
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
 		const { request, directory, featuredItemHints, metrics, advancedPrompts } = context;
-		const { logger, aiFacade } = execContext;
+		const { logger, aiFacade, promptFacade } = execContext;
 		const config = request.config || {};
 
 		const facadeOptions: FacadeOptions = {
@@ -100,7 +101,8 @@ export class AiItemGenerationStep extends BasePipelineStep {
 				advancedPrompts?.itemGeneration,
 				logger,
 				aiFacade,
-				facadeOptions
+				facadeOptions,
+				promptFacade
 			);
 
 			logger.log(`[${directory.slug}] AI generated ${initialAiItems.length} initial items.`);
@@ -128,7 +130,8 @@ export class AiItemGenerationStep extends BasePipelineStep {
 		customPrompt: string | null | undefined,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<MutableItemData[]> {
 		logger.debug(`[${directorySlug}] AI-First Item Generation - Starting for topic: ${topicName}`);
 		const allGeneratedItems: MutableItemData[] = [];
@@ -142,12 +145,18 @@ export class AiItemGenerationStep extends BasePipelineStep {
 
 		// First, assess if the prompt is clear enough
 		try {
+			const resolvedUnderstandingPrompt = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.UNDERSTANDING, UNDERSTANDING_PROMPT)
+					: UNDERSTANDING_PROMPT
+			) as typeof UNDERSTANDING_PROMPT;
+
 			const {
 				result: assessment,
 				usage,
 				cost
 			} = await aiFacade.askJson<PromptAssessment>(
-				UNDERSTANDING_PROMPT,
+				resolvedUnderstandingPrompt,
 				promptUnderstandingAssessmentSchema,
 				{
 					temperature: 0.3,
@@ -196,7 +205,12 @@ export class AiItemGenerationStep extends BasePipelineStep {
 		const featuredHintsSection = this.generateFeaturedHintsSection(featuredItemHints);
 
 		try {
-			const finalPrompt = appendCustomPrompt(GENERATION_PROMPT, customPrompt);
+			const resolvedGenerationPrompt = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.GENERATION, GENERATION_PROMPT)
+					: GENERATION_PROMPT
+			) as typeof GENERATION_PROMPT;
+			const finalPrompt = appendCustomPrompt(resolvedGenerationPrompt, customPrompt);
 
 			const { result, usage, cost } = await aiFacade.askJson<ExtractedItems>(
 				finalPrompt,

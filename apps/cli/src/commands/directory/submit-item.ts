@@ -4,7 +4,7 @@ import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
-import { DirectoryPromptService } from './directory-prompt.service';
+import { DirectoryPromptService, canEdit } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 
 export const submitItemCommand = new Command('submit-item')
@@ -22,7 +22,7 @@ export const submitItemCommand = new Command('submit-item')
             // Select directory
             const selection = await directoryPrompt.promptDirectorySelection();
             if (selection.cancelled || !selection.directory) {
-                console.log(chalk.yellow('\n⚠ Operation cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -35,6 +35,12 @@ export const submitItemCommand = new Command('submit-item')
                     `\n✓ Selected directory: ${directoryPrompt.formatSelectedDirectory(directory, role, isShared)}`,
                 ),
             );
+
+            if (!canEdit(role)) {
+                console.log(chalk.yellow('\n⚠ You do not have permission to perform this action.'));
+                console.log(chalk.gray(`  Your role: ${role}. Required: editor or higher.`));
+                return;
+            }
 
             // Collect item information
             const answers = await inquirer.prompt([
@@ -107,7 +113,7 @@ export const submitItemCommand = new Command('submit-item')
             ]);
 
             // Show summary and confirm
-            console.log(chalk.cyan('\n--- Item Submission Summary ---'));
+            console.log('');
             console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
             console.log(chalk.gray('URL:'), chalk.white(answers.source_url));
             console.log(chalk.gray('Name:'), chalk.white(answers.name));
@@ -130,7 +136,7 @@ export const submitItemCommand = new Command('submit-item')
             ]);
 
             if (!confirmed.proceed) {
-                console.log(chalk.yellow('\n⚠ Item submission cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -162,12 +168,10 @@ export const submitItemCommand = new Command('submit-item')
 
                 const response = await apiService.submitItem(directory.id, submitDto);
 
-                spinner.stop();
-
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Item submission failed:'));
+                    spinner.fail('Item submission failed');
                 } else {
-                    console.log(chalk.green('\n✓ Item submitted successfully!'));
+                    spinner.succeed('Item submitted successfully!');
                 }
 
                 console.log(chalk.gray('Status:'), chalk.white(response.status));

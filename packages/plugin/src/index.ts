@@ -37,7 +37,6 @@ export * from './testing/index.js';
 // API response utilities (for transforming JsonSchema to API response types)
 export {
 	toPluginSettingsSchemaProperty,
-	toPluginSettingsSchema,
 	type PluginSettingsSchemaProperty,
 	type PluginSettingsSchema,
 	type PluginResponse,

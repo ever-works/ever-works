@@ -9,7 +9,6 @@ import type {
 	PluginLogger,
 	JsonSchema,
 	ValidationResult,
-	PluginSettings,
 	PipelineStepDefinition,
 	PipelineState,
 	PipelineExecutionOptions,
@@ -26,7 +25,7 @@ import type {
 	FormFieldGroup,
 	MutableItemData
 } from '@ever-works/plugin';
-import { buildSuccessPipelineResult } from '@ever-works/plugin';
+import { buildSuccessPipelineResult, substituteVariables } from '@ever-works/plugin';
 import { collectMetadataFromItems, createItemLookupIndex, isItemDuplicate } from '@ever-works/plugin';
 
 import type { AgentPipelineStepId, TokenUsageBreakdown } from './types.js';
@@ -43,7 +42,15 @@ import {
 	validateFormInput as formValidate,
 	getDefaultValues as formDefaults
 } from './form-schema.js';
-import { buildSystemPrompt, buildUserPrompt } from './prompt/system-prompt.js';
+import {
+	buildSystemPrompt,
+	buildUserPrompt,
+	buildParentSystemPromptVariables,
+	buildParentUserPromptVariables,
+	DEFAULT_PARENT_SYSTEM_PROMPT,
+	DEFAULT_PARENT_USER_PROMPT
+} from './prompt/system-prompt.js';
+import { PROMPT_KEYS } from './prompt-keys.js';
 import { createParentTools } from './tools/parent-tools.js';
 import { createWorkspace, collectItemsFromWorkspace, cleanupWorkspace } from './utils/sandbox-workspace.js';
 import { captureScreenshots } from './utils/screenshot-capture.js';
@@ -106,21 +113,6 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 	async onUnload(): Promise<void> {
 		await this.cancel();
 		this.context = null;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (settings.maxSteps !== undefined && settings.maxSteps !== null) {
-			const num = Number(settings.maxSteps);
-			if (isNaN(num) || !Number.isInteger(num)) {
-				errors.push({ path: 'maxSteps', message: 'maxSteps must be an integer' });
-			} else if (num < 10 || num > 2000) {
-				errors.push({ path: 'maxSteps', message: 'maxSteps must be between 10 and 2000' });
-			}
-		}
-
-		return errors.length > 0 ? { valid: false, errors } : { valid: true };
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {
@@ -458,12 +450,26 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			totalSteps: AGENT_PIPELINE_STEP_IDS.length,
 			logger,
 			tokenAccumulator,
-			signal
+			signal,
+			promptFacade: execContext.promptFacade
 		});
 
 		const promptOptions = { directory, request, existing };
-		const systemPrompt = buildSystemPrompt(promptOptions);
-		const userPrompt = buildUserPrompt(promptOptions);
+		const promptFacade = execContext.promptFacade;
+
+		const sysTemplate = (
+			promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.PARENT_SYSTEM, DEFAULT_PARENT_SYSTEM_PROMPT, facadeOptions)
+				: DEFAULT_PARENT_SYSTEM_PROMPT
+		) as typeof DEFAULT_PARENT_SYSTEM_PROMPT;
+		const systemPrompt = substituteVariables(sysTemplate, buildParentSystemPromptVariables(promptOptions));
+
+		const userTemplate = (
+			promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.PARENT_USER, DEFAULT_PARENT_USER_PROMPT, facadeOptions)
+				: DEFAULT_PARENT_USER_PROMPT
+		) as typeof DEFAULT_PARENT_USER_PROMPT;
+		const userPrompt = substituteVariables(userTemplate, buildParentUserPromptVariables(promptOptions));
 
 		const settings = await resolveSettings(this.context, facadeOptions.userId, directory.id);
 		const maxSteps = (settings.maxSteps as number) || DEFAULT_MAX_STEPS;

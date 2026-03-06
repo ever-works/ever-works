@@ -22,7 +22,6 @@ describe('PluginClassValidatorService', () => {
             configurationMode: 'hybrid',
             onLoad: jest.fn().mockResolvedValue(undefined),
             onUnload: jest.fn().mockResolvedValue(undefined),
-            validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             ...overrides,
         }) as unknown as IPlugin;
 
@@ -141,16 +140,6 @@ describe('PluginClassValidatorService', () => {
             expect(result.errors?.some((e) => e.path === 'onUnload')).toBe(true);
         });
 
-        it('should reject plugin without validateSettings method', () => {
-            const plugin = createValidPlugin();
-            delete (plugin as any).validateSettings;
-
-            const result = service.validatePlugin(plugin);
-
-            expect(result.valid).toBe(false);
-            expect(result.errors?.some((e) => e.path === 'validateSettings')).toBe(true);
-        });
-
         it('should warn about invalid healthCheck when defined', () => {
             const plugin = createValidPlugin();
             (plugin as any).healthCheck = 'not-a-function';
@@ -182,9 +171,6 @@ describe('PluginClassValidatorService', () => {
                 capabilities = ['test'];
                 onLoad() {}
                 onUnload() {}
-                validateSettings() {
-                    return { valid: true };
-                }
             }
 
             const result = service.validatePlugin(TestPlugin);
@@ -614,13 +600,6 @@ describe('PluginClassValidatorService', () => {
         it('should return false when onLoad is missing', () => {
             const plugin = createValidPlugin();
             delete (plugin as any).onLoad;
-
-            expect(service.isPlugin(plugin)).toBe(false);
-        });
-
-        it('should return false when validateSettings is missing', () => {
-            const plugin = createValidPlugin();
-            delete (plugin as any).validateSettings;
 
             expect(service.isPlugin(plugin)).toBe(false);
         });

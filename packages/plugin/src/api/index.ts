@@ -5,6 +5,8 @@
  * Import from '@ever-works/plugin/api' for these types.
  */
 export * from './api-response.types.js';
+export * from './validate-settings-constraints.js';
+export * from './settings-helpers.js';
 
 // Re-export core types that are commonly used with API responses
 export type {

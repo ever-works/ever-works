@@ -23,7 +23,6 @@ describe('PluginRegistryService', () => {
             configurationMode: 'hybrid',
             onLoad: jest.fn(),
             onUnload: jest.fn(),
-            validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         }) as unknown as IPlugin;
 
     const createMockManifest = (

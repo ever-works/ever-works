@@ -30,7 +30,6 @@ describe('PluginLifecycleManagerService', () => {
             settingsSchema: { type: 'object', properties: {} },
             onLoad: jest.fn().mockResolvedValue(undefined),
             onUnload: jest.fn().mockResolvedValue(undefined),
-            validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         }) as unknown as IPlugin;
 
     const createMockManifest = (): PluginManifest => ({

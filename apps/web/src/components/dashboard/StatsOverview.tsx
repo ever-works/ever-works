@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 
@@ -40,11 +41,13 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
         icon: React.ComponentType<{ className?: string }>;
         change: string;
         changeType: 'positive' | 'negative' | 'neutral';
+        iconColor?: string;
     }> = [
         {
             title: t('totalDirectories'),
             value: stats.totalDirectories,
             icon: FolderIcon,
+            iconColor: 'text-blue-500',
             change: '+12%',
             changeType: 'positive',
         },
@@ -52,6 +55,7 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
             title: t('totalItems'),
             value: stats.totalItems,
             icon: ItemsIcon,
+            iconColor: 'text-violet-500',
             change: '+23%',
             changeType: 'positive',
         },
@@ -59,6 +63,7 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
             title: t('activeWebsites'),
             value: stats.activeWebsites,
             icon: WebsiteIcon,
+            iconColor: 'text-emerald-500',
             change: '0%',
             changeType: 'neutral',
         },
@@ -70,12 +75,34 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
                 <div
                     key={stat.title}
                     className={cn(
-                        'rounded-lg p-6',
-                        'bg-card dark:bg-card-dark',
-                        'border border-card-border dark:border-card-border-dark',
+                        'group relative rounded-xl p-5 transition-shadow duration-200 overflow-hidden',
+                        'bg-card dark:bg-surface-secondary-dark/30',
+                        'border border-card-border dark:border-border-dark',
                     )}
                 >
-                    <div className="flex items-center justify-between">
+                    {/* Decorative short top border accent with fading edges */}
+                    <div className="card-top-accent pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 opacity-70 rounded-full" />
+
+                    {/* Decorative blurred circles background */}
+                    <div className="pointer-events-none absolute inset-0 z-0 opacity-50">
+                        <div className="absolute w-40 h-40 bg-brand-purple/20 opacity-50 rounded-full blur-3xl left-2 top-0"></div>
+                        <div className="absolute w-32 h-32 bg-blue-200/20 opacity-50 rounded-full blur-3xl right-1 top-20"></div>
+                        <div className="absolute w-28 h-28 bg-brand-purple/20 opacity-50 rounded-full blur-2xl left-1/2 -translate-x-1/2 bottom-4"></div>
+                    </div>
+
+                    {/* Hover image at top, reversed horizontally, only visible on hover */}
+                    <div className="pointer-events-none absolute left-0 right-0 top-0 z-20">
+                        <Image
+                            src="/bg-cards.png"
+                            alt="Decorative pattern"
+                            className="w-full filter brightness-0 dark:brightness-200 -rotate-180"
+                            width={200}
+                            height={100}
+                            unoptimized
+                        />
+                    </div>
+
+                    <div>
                         <div>
                             <p className="text-sm text-text-muted dark:text-text-muted-dark">
                                 {stat.title}
@@ -84,8 +111,13 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
                                 {stat.value}
                             </p>
                         </div>
-                        <div className={cn('p-3 rounded-lg', 'bg-surface dark:bg-surface-dark')}>
-                            <stat.icon className="w-6 h-6 text-primary" />
+                    </div>
+
+                    <div className="absolute top-3 right-3">
+                        <div className={cn('p-3 rounded-lg', 'bg-surface dark:bg-surface-dark/50')}>
+                            <stat.icon
+                                className={cn('w-6 h-6', stat.iconColor ?? 'text-primary')}
+                            />
                         </div>
                     </div>
                     <div className="mt-4  items-center hidden">

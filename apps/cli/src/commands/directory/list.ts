@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
-import { Directory, DirectoryMemberRole } from '@ever-works/cli-shared';
+import { Directory, DirectoryMemberRole } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 
 export const listCommand = new Command('list')
@@ -36,7 +36,7 @@ export const listCommand = new Command('list')
                 }
 
                 console.log(chalk.cyan('\nDirectories:'));
-                console.log(chalk.gray('─'.repeat(80)));
+                console.log(chalk.gray('─'.repeat(50)));
 
                 const ownedCount = directories.filter(
                     (d) => d.userRole === DirectoryMemberRole.OWNER || !d.userRole,
@@ -64,7 +64,7 @@ export const listCommand = new Command('list')
                     console.log('');
                 });
 
-                console.log(chalk.gray('─'.repeat(80)));
+                console.log(chalk.gray('─'.repeat(50)));
                 console.log(
                     chalk.cyan(`Total: ${directories.length} directories`) +
                         chalk.gray(` (${ownedCount} owned, ${sharedCount} shared with you)`),

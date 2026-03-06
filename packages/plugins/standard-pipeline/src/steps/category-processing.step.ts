@@ -13,6 +13,7 @@ import { BasePipelineStep } from '../base-pipeline-step.js';
 import { slugifyText, unSlugifyText } from '../utils/text.utils.js';
 import { getErrorStack } from '../utils/error.utils.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
+import { PROMPT_KEYS } from '../prompt-keys.js';
 import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.schemas.js';
 
 // Base prompt for categorization
@@ -373,7 +374,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 		customPrompt: string | null | undefined,
 		execContext: StepExecutionContext
 	): Promise<MutableItemData[]> {
-		const { logger, aiFacade } = execContext;
+		const { logger, aiFacade, promptFacade } = execContext;
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
@@ -404,9 +405,19 @@ export class CategoryProcessingStep extends BasePipelineStep {
 			// Use enhanced prompt if we have existing categories/tags
 			const hasContext = existingCategories.size > 0 || existingTags.size > 0;
 
-			// Apply custom prompt to whichever base prompt we use
-			const finalEnhancedPrompt = appendCustomPrompt(ENHANCED_CATEGORY_PROMPT, customPrompt);
-			const finalBasePrompt = appendCustomPrompt(CATEGORY_PROMPT, customPrompt);
+			// Resolve prompts from external provider, then apply custom prompt
+			const resolvedEnhanced = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.ENHANCED_CATEGORY_PROCESSING, ENHANCED_CATEGORY_PROMPT)
+					: ENHANCED_CATEGORY_PROMPT
+			) as typeof ENHANCED_CATEGORY_PROMPT;
+			const resolvedBase = (
+				promptFacade
+					? await promptFacade.getPrompt(PROMPT_KEYS.CATEGORY_PROCESSING, CATEGORY_PROMPT)
+					: CATEGORY_PROMPT
+			) as typeof CATEGORY_PROMPT;
+			const finalEnhancedPrompt = appendCustomPrompt(resolvedEnhanced, customPrompt);
+			const finalBasePrompt = appendCustomPrompt(resolvedBase, customPrompt);
 
 			const { result, usage, cost } = hasContext
 				? await aiFacade.askJson<CategorizeResult>(
@@ -473,7 +484,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 		customPrompt: string | null | undefined,
 		execContext: StepExecutionContext
 	): Promise<MutableItemData[]> {
-		const { logger, aiFacade } = execContext;
+		const { logger, aiFacade, promptFacade } = execContext;
 		const allCategorizedItems: MutableItemData[] = [];
 
 		const facadeOptions: FacadeOptions = {
@@ -508,7 +519,15 @@ export class CategoryProcessingStep extends BasePipelineStep {
 				});
 
 				// Always use enhanced prompt for batch processing (we always have context)
-				const finalPrompt = appendCustomPrompt(ENHANCED_CATEGORY_PROMPT, customPrompt);
+				const resolvedBatchPrompt = (
+					promptFacade
+						? await promptFacade.getPrompt(
+								PROMPT_KEYS.ENHANCED_CATEGORY_PROCESSING,
+								ENHANCED_CATEGORY_PROMPT
+							)
+						: ENHANCED_CATEGORY_PROMPT
+				) as typeof ENHANCED_CATEGORY_PROMPT;
+				const finalPrompt = appendCustomPrompt(resolvedBatchPrompt, customPrompt);
 				const { result, usage, cost } = await aiFacade.askJson<CategorizeResult>(
 					finalPrompt,
 					categorizeOutputSchema,

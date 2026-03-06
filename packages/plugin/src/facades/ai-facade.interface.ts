@@ -6,6 +6,7 @@ import type {
 } from '../contracts/capabilities/ai-provider.interface.js';
 import type { IBaseFacade } from './base-facade.interface.js';
 import type { FacadeOptions } from './facade-options.interface.js';
+import type { TemplateVariables } from '../helpers/template.utils.js';
 
 /**
  * Task complexity levels for AI model routing.
@@ -45,11 +46,11 @@ export interface AiModelRoutingSettings {
 	readonly complexModel?: string;
 }
 
-export interface AskJsonOptions {
+export interface AskJsonOptions<Template extends string = string> {
 	/** Temperature for response generation (0-2) */
 	readonly temperature?: number;
 	/** Template variables to substitute */
-	readonly variables?: Record<string, string>;
+	readonly variables?: TemplateVariables<Template>;
 	/** Routing options for model selection */
 	readonly routing?: AiRoutingOptions;
 }
@@ -121,10 +122,10 @@ export interface IAiFacade extends IBaseFacade {
 	 * );
 	 * ```
 	 */
-	askJson<T>(
-		promptTemplate: string,
+	askJson<T, Template extends string = string>(
+		promptTemplate: Template,
 		schema: SchemaType<T>,
-		options: AskJsonOptions | undefined,
+		options: AskJsonOptions<Template> | undefined,
 		facadeOptions: FacadeOptions
 	): Promise<AskJsonResponse<T>>;
 

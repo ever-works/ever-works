@@ -276,6 +276,7 @@
             "tabs": {
                 "profile": "Profile",
                 "security": "Security",
+                "apiKeys": "API Keys",
                 "gitProviders": "Git Providers",
                 "dangerZone": "Danger Zone"
             },
@@ -384,6 +385,48 @@
                         "connectError": "Failed to connect GitHub",
                         "disconnectError": "Failed to disconnect GitHub"
                     }
+                }
+            },
+            "apiKeys": {
+                "title": "API Keys",
+                "subtitle": "Manage API keys for external access to your resources",
+                "create": "Create API Key",
+                "empty": "No API keys yet. Create one to get started.",
+                "neverExpires": "Never",
+                "columns": {
+                    "name": "Name",
+                    "key": "Key",
+                    "created": "Created",
+                    "lastUsed": "Last Used",
+                    "expires": "Expires",
+                    "actions": "Actions"
+                },
+                "dialog": {
+                    "title": "Create API Key",
+                    "nameLabel": "Name",
+                    "namePlaceholder": "e.g. My Integration",
+                    "expirationLabel": "Expiration",
+                    "cancel": "Cancel",
+                    "createButton": "Create",
+                    "keyCreated": "API Key Created",
+                    "keyWarning": "Copy this key now. You won't be able to see it again.",
+                    "done": "Done",
+                    "copy": "Copy to clipboard",
+                    "copied": "Copied!"
+                },
+                "revoke": {
+                    "title": "Revoke API Key",
+                    "description": "Are you sure you want to revoke the API key \"{name}\"? This action cannot be undone and any integrations using this key will stop working.",
+                    "cancel": "Cancel",
+                    "confirm": "Revoke"
+                },
+                "messages": {
+                    "nameRequired": "Please enter a name for the API key",
+                    "createSuccess": "API key created successfully",
+                    "createError": "Failed to create API key",
+                    "revokeSuccess": "API key revoked successfully",
+                    "revokeError": "Failed to revoke API key",
+                    "copyError": "Failed to copy to clipboard"
                 }
             }
         },
@@ -1508,6 +1551,34 @@
                         "skipAndDeploy": "Skip & Deploy",
                         "cancel": "Cancel"
                     }
+                },
+                "domains": {
+                    "title": "Custom Domains",
+                    "description": "Add custom domains to your deployed website.",
+                    "placeholder": "example.com",
+                    "addButton": "Add",
+                    "loading": "Loading domains...",
+                    "loadFailed": "Failed to load domains",
+                    "noDomains": "No custom domains configured. Add one above to get started.",
+                    "added": "Domain added. Configure DNS to verify it.",
+                    "addedAndVerified": "Domain added and verified!",
+                    "addFailed": "Failed to add domain",
+                    "removed": "Domain removed",
+                    "removeFailed": "Failed to remove domain",
+                    "verified": "Domain verified successfully!",
+                    "verifyPending": "DNS not verified yet. Please check your DNS settings and try again later.",
+                    "verifyFailed": "Failed to verify domain",
+                    "copied": "Copied to clipboard",
+                    "autoAssigned": "Auto-assigned",
+                    "verifiedBadge": "Verified",
+                    "pendingBadge": "Pending",
+                    "verifyButton": "Verify DNS",
+                    "removeButton": "Remove domain",
+                    "dnsInstructions": "Show DNS instructions",
+                    "dnsTitle": "Configure these DNS records:",
+                    "dnsName": "Name:",
+                    "dnsValue": "Value:",
+                    "copyButton": "Copy"
                 }
             }
         },
@@ -1963,6 +2034,7 @@
             "loadingConversation": "Loading conversation…",
             "inputPlaceholder": "Describe the directory you want to create...",
             "sendButton": "Send",
+            "sendHint": "Enter to send · Shift+Enter for new line",
             "providerNotConfigured": "This provider is not configured. Set it up in Plugins.",
             "errors": {
                 "unableToSend": "Unable to send message"
@@ -2114,6 +2186,7 @@
             "feature": {
                 "title": "Build Directories with AI",
                 "subtitle": "Create beautiful, searchable directories in minutes using natural language. No coding required.",
+                "badge": "AI-Powered",
                 "benefits": {
                     "ai": {
                         "title": "AI-Powered Creation",
@@ -2127,6 +2200,12 @@
                         "title": "Easy Management",
                         "description": "Update and organize your content effortlessly"
                     }
+                },
+                "howItWorks": {
+                    "step1": "Describe your idea",
+                    "step2": "Choose a template",
+                    "step3": "AI generates content",
+                    "step4": "Publish & share"
                 }
             },
             "footer": {
@@ -2167,6 +2246,7 @@
             "plugins": "Plugins",
             "profile": "Profile",
             "security": "Security",
+            "apiKeys": "API Keys",
             "dangerZone": "Danger Zone",
             "pluginSettings": "Plugin Settings"
         }

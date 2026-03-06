@@ -124,6 +124,10 @@ spec:
               value: "$DATABASE_CA_CERT"
 
             # Mail
+            - name: MAILER_PROVIDER
+              value: "$MAILER_PROVIDER"
+            - name: EMAIL_FROM
+              value: "$EMAIL_FROM"
             - name: SMTP_HOST
               value: "$SMTP_HOST"
             - name: SMTP_PORT
@@ -136,8 +140,10 @@ spec:
               value: "$SMTP_USER"
             - name: SMTP_PASSWORD
               value: "$SMTP_PASSWORD"
-            - name: MAIL_FROM
-              value: "$MAIL_FROM"
+            - name: RESEND_APIKEY
+              value: "$RESEND_APIKEY"
+            - name: RESEND_EMAIL_FROM
+              value: "$RESEND_EMAIL_FROM"
 
           resources:
             requests:

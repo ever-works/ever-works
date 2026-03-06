@@ -5,7 +5,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
 	PluginSettings,
 	ChatCompletionOptions,
 	ChatCompletionResponse,
@@ -168,22 +167,6 @@ export class OpenAiPlugin extends BaseAiProvider {
 
 	protected getDefaultModelId(): string {
 		return 'gpt-5-nano';
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (!settings.apiKey || typeof settings.apiKey !== 'string') {
-			errors.push({
-				path: 'apiKey',
-				message: 'OpenAI API key is required'
-			});
-		}
-
-		return {
-			valid: errors.length === 0,
-			errors: errors.length > 0 ? errors : undefined
-		};
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

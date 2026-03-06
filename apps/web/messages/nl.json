@@ -1754,6 +1754,13 @@
                         "title": "Eenvoudig Beheer",
                         "description": "Werk uw inhoud bij en organiseer moeiteloos"
                     }
+                },
+                "badge": "AI-aangedreven",
+                "howItWorks": {
+                    "step1": "Beschrijf uw idee",
+                    "step2": "Kies een sjabloon",
+                    "step3": "AI genereert inhoud",
+                    "step4": "Publiceer en deel"
                 }
             },
             "footer": {

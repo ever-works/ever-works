@@ -65,24 +65,24 @@ function getProviderBrandColors(providerId: string) {
     switch (providerId.toLowerCase()) {
         case 'github':
             return {
-                bg: 'bg-[#24292e]/10 dark:bg-[#24292e]/30',
-                border: 'border-[#24292e]/20 dark:border-[#24292e]/40',
-                text: 'text-[#24292e] dark:text-white',
-                icon: 'text-[#24292e] dark:text-white',
+                bg: 'bg-github/10 dark:bg-github/30',
+                border: 'border-github/20 dark:border-github/40',
+                text: 'text-github dark:text-white',
+                icon: 'text-github dark:text-white',
             };
         case 'gitlab':
             return {
-                bg: 'bg-[#fc6d26]/10 dark:bg-[#fc6d26]/20',
-                border: 'border-[#fc6d26]/20 dark:border-[#fc6d26]/30',
-                text: 'text-[#fc6d26]',
-                icon: 'text-[#fc6d26]',
+                bg: 'bg-gitlab/10 dark:bg-gitlab/20',
+                border: 'border-gitlab/20 dark:border-gitlab/30',
+                text: 'text-gitlab',
+                icon: 'text-gitlab',
             };
         case 'bitbucket':
             return {
-                bg: 'bg-[#0052cc]/10 dark:bg-[#0052cc]/20',
-                border: 'border-[#0052cc]/20 dark:border-[#0052cc]/30',
-                text: 'text-[#0052cc] dark:text-[#4c9aff]',
-                icon: 'text-[#0052cc] dark:text-[#4c9aff]',
+                bg: 'bg-bitbucket/10 dark:bg-bitbucket/20',
+                border: 'border-bitbucket/20 dark:border-bitbucket/30',
+                text: 'text-bitbucket dark:text-bitbucket-light',
+                icon: 'text-bitbucket dark:text-bitbucket-light',
             };
         default:
             return {

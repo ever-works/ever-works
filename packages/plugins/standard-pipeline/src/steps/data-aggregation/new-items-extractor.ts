@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { MutableItemData, StepExecutionContext, FacadeOptions } from '@ever-works/plugin';
+import type { MutableItemData, StepExecutionContext, FacadeOptions, IPromptFacade } from '@ever-works/plugin';
 import type { StandardPipelineMetrics } from '../../context/index.js';
 import { filterNewItemsManually } from '@ever-works/plugin';
 import { slugifyText } from '../../utils/text.utils.js';
@@ -7,17 +7,20 @@ import { getErrorMessage, getErrorStack } from '../../utils/error.utils.js';
 import { extractedItemsSchema } from '../../schemas/item-extraction.schemas.js';
 import { MAX_CLUSTER_SIZE, chunkArray, groupSimilarItems, findRelevantExistingItems } from './clustering.js';
 import { EXTRACT_NEW_ITEMS_PROMPT } from './prompts.constants.js';
+import { PROMPT_KEYS } from '../../prompt-keys.js';
 
 type ExtractedItems = z.infer<typeof extractedItemsSchema>;
 
 export class NewItemsExtractor {
 	private readonly logger: StepExecutionContext['logger'];
 	private readonly aiFacade: StepExecutionContext['aiFacade'];
+	private readonly promptFacade: IPromptFacade | undefined;
 	private readonly facadeOptions: FacadeOptions;
 
 	constructor(execContext: StepExecutionContext) {
 		this.logger = execContext.logger;
 		this.aiFacade = execContext.aiFacade;
+		this.promptFacade = execContext.promptFacade;
 		this.facadeOptions = {
 			userId: execContext.user!.id,
 			directoryId: execContext.directory.id
@@ -63,8 +66,14 @@ export class NewItemsExtractor {
 			const relevant = findRelevantExistingItems(newItems, existingItems, 40);
 			this.logger.debug(`AI comparing ${newItems.length} new vs ${relevant.length} relevant existing`);
 
+			const resolvedPrompt = (
+				this.promptFacade
+					? await this.promptFacade.getPrompt(PROMPT_KEYS.EXTRACT_NEW_ITEMS, EXTRACT_NEW_ITEMS_PROMPT)
+					: EXTRACT_NEW_ITEMS_PROMPT
+			) as typeof EXTRACT_NEW_ITEMS_PROMPT;
+
 			const { result, usage, cost } = await this.aiFacade.askJson<ExtractedItems>(
-				EXTRACT_NEW_ITEMS_PROMPT,
+				resolvedPrompt,
 				extractedItemsSchema,
 				{
 					temperature: 0,
@@ -147,8 +156,14 @@ export class NewItemsExtractor {
 		metrics: StandardPipelineMetrics
 	): Promise<MutableItemData[]> {
 		try {
+			const resolvedPrompt = (
+				this.promptFacade
+					? await this.promptFacade.getPrompt(PROMPT_KEYS.EXTRACT_NEW_ITEMS, EXTRACT_NEW_ITEMS_PROMPT)
+					: EXTRACT_NEW_ITEMS_PROMPT
+			) as typeof EXTRACT_NEW_ITEMS_PROMPT;
+
 			const { result, usage, cost } = await this.aiFacade.askJson<ExtractedItems>(
-				EXTRACT_NEW_ITEMS_PROMPT,
+				resolvedPrompt,
 				extractedItemsSchema,
 				{
 					temperature: 0,

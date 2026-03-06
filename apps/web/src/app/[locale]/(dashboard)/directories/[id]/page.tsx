@@ -44,7 +44,7 @@ export default async function DirectoryOverviewPage({ params }: Params) {
                 itemsCount={directory.itemsCount || countRes.items}
                 categoriesCount={countRes.categories}
                 tagsCount={countRes.tags}
-                comparisonsCount={countRes.comparisons}
+                comparisonsCount={countRes.comparisons || 0}
                 directory={directory}
             />
 

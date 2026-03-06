@@ -9,6 +9,7 @@ import { register as registerAction } from '@/app/actions/auth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export default function RegisterForm() {
     const t = useTranslations('auth.register');
@@ -49,60 +50,75 @@ export default function RegisterForm() {
     };
 
     return (
-        <AuthLayout title={t('title')} subtitle={t('subtitle')}>
-            <form onSubmit={handleSubmit} className="space-y-6">
+        <AuthLayout
+            title={t('title')}
+            subtitle={t('subtitle')}
+            formWidth="lg:w-3/5"
+            innerMaxWidth="max-w-xl"
+            mLeft="lg:-ml-10"
+        >
+            <ThemeToggle variant="fixed" />
+            <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
                     <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm">
                         {error}
                     </div>
                 )}
 
-                <Input
-                    type="text"
-                    label={t('form.name.label')}
-                    name="name"
-                    placeholder={t('form.name.placeholder')}
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                    disabled={isPending}
-                />
+                <div className="lg:grid grid-cols-2 gap-4">
+                    <Input
+                        type="text"
+                        label={t('form.name.label')}
+                        name="name"
+                        placeholder={t('form.name.placeholder')}
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        required
+                        disabled={isPending}
+                        className="text-sm shadow-sm"
+                    />
 
-                <Input
-                    type="email"
-                    label={t('form.email.label')}
-                    name="email"
-                    placeholder={t('form.email.placeholder')}
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
-                    disabled={isPending}
-                />
+                    <Input
+                        type="email"
+                        label={t('form.email.label')}
+                        name="email"
+                        placeholder={t('form.email.placeholder')}
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        required
+                        disabled={isPending}
+                        className="text-sm shadow-sm"
+                    />
 
-                <Input
-                    type="password"
-                    name="password"
-                    label={t('form.password.label')}
-                    placeholder={t('form.password.placeholder')}
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    helperText={t('form.password.hint')}
-                    required
-                    disabled={isPending}
-                />
+                    <Input
+                        type="password"
+                        name="password"
+                        label={t('form.password.label')}
+                        placeholder={t('form.password.placeholder')}
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        helperText={t('form.password.hint')}
+                        required
+                        disabled={isPending}
+                        className="text-sm shadow-sm"
+                    />
 
-                <Input
-                    type="password"
-                    name="confirmPassword"
-                    label={t('form.confirmPassword.label')}
-                    placeholder={t('form.confirmPassword.placeholder')}
-                    value={formData.confirmPassword}
-                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    required
-                    disabled={isPending}
-                />
+                    <Input
+                        type="password"
+                        name="confirmPassword"
+                        label={t('form.confirmPassword.label')}
+                        placeholder={t('form.confirmPassword.placeholder')}
+                        value={formData.confirmPassword}
+                        onChange={(e) =>
+                            setFormData({ ...formData, confirmPassword: e.target.value })
+                        }
+                        required
+                        disabled={isPending}
+                        className="text-sm shadow-sm"
+                    />
+                </div>
 
-                <div className="flex items-start">
+                <div className="flex items-center mb-6">
                     <input
                         id="terms"
                         type="checkbox"
@@ -112,7 +128,7 @@ export default function RegisterForm() {
 
                     <label
                         htmlFor="terms"
-                        className="ml-2 text-sm text-text-secondary dark:text-text-secondary-dark"
+                        className="ml-2 text-xs text-text-secondary dark:text-text-secondary-dark"
                     >
                         {t('form.terms.text')}{' '}
                         <Link href="/terms" className="text-primary hover:text-primary-hover">
@@ -125,7 +141,13 @@ export default function RegisterForm() {
                     </label>
                 </div>
 
-                <Button type="submit" disabled={isPending} loading={isPending} fullWidth>
+                <Button
+                    type="submit"
+                    disabled={isPending}
+                    loading={isPending}
+                    fullWidth
+                    className="bg-primary hover:bg-primary-hover"
+                >
                     {isPending ? t('form.submitting') : t('form.submit')}
                 </Button>
 

@@ -135,7 +135,6 @@ describe('FullPipelineExecutorService', () => {
             settingsSchema: { type: 'object', properties: {} },
             onLoad: jest.fn(),
             onUnload: jest.fn(),
-            validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             getStepDefinitions: jest.fn().mockReturnValue(stepDefinitions),
             execute: jest.fn().mockImplementation(() => {
                 if (executeError) {

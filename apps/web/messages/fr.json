@@ -1754,6 +1754,13 @@
                         "title": "Gestion facile",
                         "description": "Mettez à jour et organisez votre contenu sans effort"
                     }
+                },
+                "badge": "Propulsé par IA",
+                "howItWorks": {
+                    "step1": "Décrivez votre idée",
+                    "step2": "Choisissez un modèle",
+                    "step3": "L'IA génère le contenu",
+                    "step4": "Publiez et partagez"
                 }
             },
             "footer": {

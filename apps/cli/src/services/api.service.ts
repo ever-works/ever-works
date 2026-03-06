@@ -1,6 +1,11 @@
 import { Directory } from '@ever-works/cli-shared';
 import { getHttpClient } from './http-client';
-import type { CreateItemsGeneratorDto, ProvidersDto } from '@ever-works/contracts/api';
+import type {
+    CreateItemsGeneratorDto,
+    UpdateItemsGeneratorDto,
+    ProvidersDto,
+} from '@ever-works/contracts/api';
+import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@ever-works/contracts/api';
 import type {
     GeneratorFormSchema,
     ProviderOption,
@@ -8,11 +13,18 @@ import type {
     GitOrganization,
     FormFieldDefinition,
     FormFieldGroup,
+    AiModel,
 } from '@ever-works/plugin';
+import type {
+    PluginListResponse,
+    UserPluginResponse,
+    DirectoryPluginListResponse,
+} from '@ever-works/plugin/api';
 
 // Re-export types used by other CLI modules
 export type {
     CreateItemsGeneratorDto,
+    UpdateItemsGeneratorDto,
     ProvidersDto,
     GeneratorFormSchema,
     ProviderOption,
@@ -20,9 +32,23 @@ export type {
     GitOrganization,
     FormFieldDefinition,
     FormFieldGroup,
+    AiModel,
+    PluginListResponse,
+    UserPluginResponse,
+    DirectoryPluginListResponse,
 };
+export { GenerationMethod, WebsiteRepositoryCreationMethod };
 
 // Types for API responses
+
+export interface DirectoryConfig {
+    metadata?: {
+        initial_prompt?: string;
+        last_request_data?: CreateItemsGeneratorDto;
+        [key: string]: unknown;
+    };
+    [key: string]: unknown;
+}
 
 export interface MarkdownReadmeConfigDto {
     header?: string;
@@ -38,11 +64,8 @@ export interface CreateDirectoryDto {
     owner?: string;
     readmeConfig?: MarkdownReadmeConfigDto;
     organization: boolean;
-}
-
-export interface UpdateDirectoryDto {
-    generation_method?: 'create-update' | 'recreate';
-    update_with_pull_request?: boolean;
+    gitProvider?: string;
+    deployProvider?: string;
 }
 
 export interface ItemResponse {
@@ -91,6 +114,18 @@ export interface RemoveItemDto {
 
 export interface DeployDto {
     teamScope?: string;
+}
+
+export interface PatchDirectoryDto {
+    deployProvider?: string;
+}
+
+export interface LookupDeploymentResponse {
+    status: 'success' | 'error';
+    website?: string;
+    deploymentState?: string;
+    found: boolean;
+    message?: string;
 }
 
 export interface DeleteDirectoryDto {
@@ -154,6 +189,18 @@ export interface GitProviderListResponse {
     providers: GitProviderInfo[];
 }
 
+export interface DeployProviderInfo {
+    id: string;
+    name: string;
+    enabled: boolean;
+    description?: string;
+}
+
+export interface DeployProviderListResponse {
+    status: string;
+    providers: DeployProviderInfo[];
+}
+
 export interface GitOrganizationsResponse {
     success: boolean;
     organizations: GitOrganization[];
@@ -204,6 +251,25 @@ export class ApiService {
         return response.data;
     }
 
+    async patchDirectory(directoryId: string, data: PatchDirectoryDto) {
+        const response = await this.httpClient.put<ApiResponse<{ directory: Directory }>>(
+            `/directories/${directoryId}`,
+            data,
+        );
+        return response.data;
+    }
+
+    async getDirectoryConfig(directoryId: string): Promise<DirectoryConfig | null> {
+        try {
+            const response = await this.httpClient.get<ApiResponse<{ config: DirectoryConfig }>>(
+                `/directories/${directoryId}/config`,
+            );
+            return response.data.config;
+        } catch {
+            return null;
+        }
+    }
+
     async generateContent(directoryId: string, data: CreateItemsGeneratorDto) {
         const response = await this.httpClient.post<ApiResponse<{ slug: string; message: string }>>(
             `/directories/${directoryId}/generate`,
@@ -212,7 +278,7 @@ export class ApiService {
         return response.data;
     }
 
-    async updateDirectory(directoryId: string, data: UpdateDirectoryDto) {
+    async updateDirectory(directoryId: string, data: UpdateItemsGeneratorDto) {
         const response = await this.httpClient.post<ApiResponse<{ slug: string; message: string }>>(
             `/directories/${directoryId}/update`,
             data,
@@ -297,7 +363,22 @@ export class ApiService {
         return response.data;
     }
 
+    // Deploy provider operations (plugin-based)
+
+    async getDeployProviders(): Promise<DeployProviderListResponse> {
+        const response = await this.httpClient.get<DeployProviderListResponse>('/deploy/providers');
+        return response.data;
+    }
+
     // Deploy operations (directory-scoped)
+
+    async lookupExistingDeployment(directoryId: string): Promise<LookupDeploymentResponse> {
+        const response = await this.httpClient.post<LookupDeploymentResponse>(
+            `/deploy/directories/${directoryId}/lookup`,
+            {},
+        );
+        return response.data;
+    }
 
     async checkDeployCapability(directoryId: string): Promise<DeployCapabilityResponse> {
         const response = await this.httpClient.post<DeployCapabilityResponse>(
@@ -328,6 +409,123 @@ export class ApiService {
 
         const response = await this.httpClient.get<GeneratorFormSchema>(url);
         return response.data;
+    }
+
+    // Plugin operations (user-level)
+
+    async getPlugins(options?: { category?: string }): Promise<PluginListResponse> {
+        const queryParams = new URLSearchParams();
+        if (options?.category) queryParams.append('category', options.category);
+        const query = queryParams.toString();
+        const response = await this.httpClient.get<PluginListResponse>(
+            `/plugins${query ? `?${query}` : ''}`,
+        );
+        return response.data;
+    }
+
+    async getPlugin(pluginId: string): Promise<UserPluginResponse> {
+        const response = await this.httpClient.get<UserPluginResponse>(`/plugins/${pluginId}`);
+        return response.data;
+    }
+
+    async listPluginModels(pluginId: string): Promise<readonly AiModel[]> {
+        try {
+            const response = await this.httpClient.get<readonly AiModel[]>(
+                `/plugins/${pluginId}/models`,
+            );
+            return response.data;
+        } catch {
+            return [];
+        }
+    }
+
+    async enablePlugin(
+        pluginId: string,
+        data?: {
+            settings?: Record<string, unknown>;
+            secretSettings?: Record<string, unknown>;
+            autoEnableForDirectories?: boolean;
+        },
+    ): Promise<UserPluginResponse> {
+        const response = await this.httpClient.post<UserPluginResponse>(
+            `/plugins/${pluginId}/enable`,
+            data || {},
+        );
+        return response.data;
+    }
+
+    async disablePlugin(pluginId: string): Promise<UserPluginResponse> {
+        const response = await this.httpClient.post<UserPluginResponse>(
+            `/plugins/${pluginId}/disable`,
+            {},
+        );
+        return response.data;
+    }
+
+    async updatePluginSettings(
+        pluginId: string,
+        data: {
+            settings?: Record<string, unknown>;
+            secretSettings?: Record<string, unknown>;
+        },
+    ): Promise<UserPluginResponse> {
+        const response = await this.httpClient.patch<UserPluginResponse>(
+            `/plugins/${pluginId}/settings`,
+            data,
+        );
+        return response.data;
+    }
+
+    // Plugin operations (directory-level)
+
+    async getDirectoryPlugins(directoryId: string): Promise<DirectoryPluginListResponse> {
+        const response = await this.httpClient.get<DirectoryPluginListResponse>(
+            `/directories/${directoryId}/plugins`,
+        );
+        return response.data;
+    }
+
+    async enableDirectoryPlugin(
+        directoryId: string,
+        pluginId: string,
+        data?: {
+            settings?: Record<string, unknown>;
+            activeCapability?: string;
+            priority?: number;
+        },
+    ): Promise<void> {
+        await this.httpClient.post(
+            `/directories/${directoryId}/plugins/${pluginId}/enable`,
+            data || {},
+        );
+    }
+
+    async disableDirectoryPlugin(directoryId: string, pluginId: string): Promise<void> {
+        await this.httpClient.post(`/directories/${directoryId}/plugins/${pluginId}/disable`, {});
+    }
+
+    async updateDirectoryPluginSettings(
+        directoryId: string,
+        pluginId: string,
+        data: {
+            settings?: Record<string, unknown>;
+            secretSettings?: Record<string, unknown>;
+        },
+    ): Promise<void> {
+        await this.httpClient.patch(
+            `/directories/${directoryId}/plugins/${pluginId}/settings`,
+            data,
+        );
+    }
+
+    async setDirectoryPluginCapability(
+        directoryId: string,
+        pluginId: string,
+        capability: string,
+    ): Promise<void> {
+        await this.httpClient.post(`/directories/${directoryId}/plugins/${pluginId}/capability`, {
+            capability,
+        });
     }
 }
 

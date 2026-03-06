@@ -10,6 +10,7 @@ import { updateWebsiteCommand } from './update-website';
 import { deployCommand } from './deploy';
 import { deleteCommand } from './delete';
 import { statusCommand } from './status';
+import { pluginsCommand } from './plugins';
 
 export const directoryCommand = new Command('directory')
     .description('Directory management commands')
@@ -24,6 +25,7 @@ export const directoryCommand = new Command('directory')
     .addCommand(deployCommand)
     .addCommand(deleteCommand)
     .addCommand(statusCommand)
+    .addCommand(pluginsCommand)
     .action(() => {
         console.log('Available directory commands:');
         console.log('  create              - Create a new directory');
@@ -39,5 +41,6 @@ export const directoryCommand = new Command('directory')
         console.log('  deploy              - Deploy the website for a directory');
         console.log('  delete              - Delete a directory');
         console.log('  status              - Check the status of a directory');
+        console.log('  plugins             - Manage plugins for a directory');
         console.log('\nUse "directory <command> --help" for more information about a command.');
     });

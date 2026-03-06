@@ -225,28 +225,6 @@ describe('PdfExtractorPlugin', () => {
 		});
 	});
 
-	describe('validateSettings', () => {
-		it('should accept empty settings', async () => {
-			expect((await plugin.validateSettings({})).valid).toBe(true);
-		});
-
-		it('should accept a valid API key', async () => {
-			expect((await plugin.validateSettings({ mistralApiKey: 'valid-api-key-1234567890' })).valid).toBe(true);
-		});
-
-		it('should reject a too-short API key', async () => {
-			const result = await plugin.validateSettings({ mistralApiKey: 'short' });
-			expect(result.valid).toBe(false);
-			expect(result.errors?.[0].path).toBe('mistralApiKey');
-		});
-
-		it('should reject invalid threshold', async () => {
-			const result = await plugin.validateSettings({ textDensityThreshold: -1 });
-			expect(result.valid).toBe(false);
-			expect(result.errors?.[0].path).toBe('textDensityThreshold');
-		});
-	});
-
 	describe('healthCheck', () => {
 		it('should return unhealthy when not initialized', async () => {
 			expect((await plugin.healthCheck()).status).toBe('unhealthy');

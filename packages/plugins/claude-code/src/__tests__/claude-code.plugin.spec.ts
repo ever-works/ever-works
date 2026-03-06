@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { ClaudeCodePlugin } from '../claude-code.plugin';
 import type { PluginContext, PluginSettings } from '@ever-works/plugin';
+import type { TaxonomyWatcherOptions } from '../utils/taxonomy-watcher';
+
+// Capture the onNewItem callback passed to startTaxonomyWatcher
+let capturedWatcherOptions: TaxonomyWatcherOptions | null = null;
 
 // Mock all utility modules
 vi.mock('../utils/binary-manager', () => ({
@@ -44,7 +48,18 @@ vi.mock('../utils/process-runner', () => ({
 
 vi.mock('../prompt/system-prompt', () => ({
 	buildSystemPrompt: vi.fn().mockReturnValue('system prompt'),
-	buildUserPrompt: vi.fn().mockReturnValue('user prompt')
+	buildUserPrompt: vi.fn().mockReturnValue('user prompt'),
+	buildSystemPromptVariables: vi.fn().mockReturnValue({}),
+	buildUserPromptVariables: vi.fn().mockReturnValue({}),
+	DEFAULT_SYSTEM_PROMPT: 'default system prompt',
+	DEFAULT_USER_PROMPT: 'default user prompt'
+}));
+
+vi.mock('../utils/taxonomy-watcher', () => ({
+	startTaxonomyWatcher: vi.fn().mockImplementation((options: TaxonomyWatcherOptions) => {
+		capturedWatcherOptions = options;
+		return { stop: vi.fn() };
+	})
 }));
 
 function createMockContext(settingsOverride?: PluginSettings): PluginContext {
@@ -104,6 +119,7 @@ describe('ClaudeCodePlugin', () => {
 
 	beforeEach(() => {
 		plugin = new ClaudeCodePlugin();
+		capturedWatcherOptions = null;
 		vi.clearAllMocks();
 	});
 
@@ -130,19 +146,6 @@ describe('ClaudeCodePlugin', () => {
 		expect(groups).toHaveLength(1);
 		expect(groups![0].fields).toContain('oauthToken');
 		expect(groups![0].fields).toContain('apiKey');
-	});
-
-	describe('validateSettings', () => {
-		it('should pass when oauthToken or apiKey is provided', async () => {
-			expect((await plugin.validateSettings({ oauthToken: 'token' })).valid).toBe(true);
-			expect((await plugin.validateSettings({ apiKey: 'key' })).valid).toBe(true);
-		});
-
-		it('should fail when neither auth credential is provided', async () => {
-			const result = await plugin.validateSettings({});
-			expect(result.valid).toBe(false);
-			expect(result.errors![0].code).toBe('auth-required');
-		});
 	});
 
 	it('should return 6 step definitions in correct order', () => {
@@ -210,6 +213,47 @@ describe('ClaudeCodePlugin', () => {
 
 			expect(progressUpdates.length).toBeGreaterThan(0);
 			expect(progressUpdates[progressUpdates.length - 1].percent).toBe(100);
+		});
+
+		it('should report item-level progress via onNewItem callback', async () => {
+			// Make executeClaudeCode call onNewItem before resolving
+			const { executeClaudeCode } = await import('../utils/process-runner');
+			vi.mocked(executeClaudeCode).mockImplementationOnce(() => ({
+				promise: (async () => {
+					// Simulate items being created during generation
+					if (capturedWatcherOptions?.onNewItem) {
+						capturedWatcherOptions.onNewItem(1, 'item-1.json');
+						capturedWatcherOptions.onNewItem(2, 'item-2.json');
+						capturedWatcherOptions.onNewItem(3, 'item-3.json');
+					}
+					return { stdout: 'Done', stderr: '', exitCode: 0, killed: false, duration: 5000 };
+				})(),
+				kill: vi.fn()
+			}));
+
+			const ctx = createMockContext();
+			await plugin.onLoad(ctx);
+
+			const progressUpdates: Array<{ percent: number; message?: string; itemsProcessed?: number }> = [];
+			await plugin.execute(directory, { ...request, config: { target_items: 10 } }, existing, undefined, (p) =>
+				progressUpdates.push(p)
+			);
+
+			// Find item-level progress updates (those with itemsProcessed)
+			const itemUpdates = progressUpdates.filter((p) => p.itemsProcessed !== undefined);
+			expect(itemUpdates).toHaveLength(3);
+
+			expect(itemUpdates[0].itemsProcessed).toBe(1);
+			expect(itemUpdates[0].message).toBe('1 items generated');
+			expect(itemUpdates[0].percent).toBe(35); // 30 + round(1/10 * 53) = 35
+
+			expect(itemUpdates[1].itemsProcessed).toBe(2);
+			expect(itemUpdates[1].message).toBe('2 items generated');
+			expect(itemUpdates[1].percent).toBe(41); // 30 + round(2/10 * 53) = 41
+
+			expect(itemUpdates[2].itemsProcessed).toBe(3);
+			expect(itemUpdates[2].message).toBe('3 items generated');
+			expect(itemUpdates[2].percent).toBe(46); // 30 + round(3/10 * 53) = 46
 		});
 
 		it('should include a warning when CLI exits with non-zero code', async () => {

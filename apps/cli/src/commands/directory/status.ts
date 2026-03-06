@@ -3,13 +3,12 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
-import { DirectoryPromptService, Directory } from './directory-prompt.service';
+import { DirectoryPromptService, Directory, GenerateStatusType } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 import {
-    GenerateStatusType,
-    getStepProgress,
-    getStepText,
-    ItemsGeneratorStep,
+    getDynamicStepText,
+    getDynamicStepProgress,
+    getItemsProcessedText,
 } from '@ever-works/cli-shared';
 
 export const statusCommand = new Command('status')
@@ -24,7 +23,7 @@ export const statusCommand = new Command('status')
 
             const selection = await directoryPrompt.promptDirectorySelection();
             if (selection.cancelled || !selection.directory) {
-                console.log(chalk.yellow('\n⚠ Operation cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -71,7 +70,7 @@ export const statusCommand = new Command('status')
                 try {
                     // Check if we've exceeded max polling time
                     if (Date.now() - startTime > MAX_POLL_TIME) {
-                        spinner.warn('\n⚠ Status check timed out after 30 minutes');
+                        spinner.warn('Status check timed out after 30 minutes');
                         pollingComplete = true;
                         cleanup();
                         return;
@@ -84,7 +83,7 @@ export const statusCommand = new Command('status')
                     const status = freshDirectory.generateStatus?.status;
 
                     if (status === GenerateStatusType.GENERATED) {
-                        spinner.succeed('\n✓ Generation process finished!');
+                        spinner.succeed('Generation process finished!');
                         pollingComplete = true;
                         cleanup();
                         printDirectorySummary(freshDirectory);
@@ -92,7 +91,7 @@ export const statusCommand = new Command('status')
                     }
 
                     if (status === GenerateStatusType.ERROR) {
-                        spinner.fail('\n✗ Generation failed');
+                        spinner.fail('Generation failed');
                         if (freshDirectory.generateStatus?.error) {
                             console.log(chalk.red(`Error: ${freshDirectory.generateStatus.error}`));
                         }
@@ -103,7 +102,7 @@ export const statusCommand = new Command('status')
                     }
 
                     if (status === GenerateStatusType.CANCELLED) {
-                        spinner.warn('\n⚠ Generation cancelled');
+                        spinner.warn('Generation cancelled');
                         if (freshDirectory.generateStatus?.error) {
                             console.log(chalk.yellow(freshDirectory.generateStatus.error));
                         }
@@ -117,12 +116,16 @@ export const statusCommand = new Command('status')
                         const elapsed = Math.floor((Date.now() - startTime) / 1000);
                         const timeStr = `[${Math.floor(elapsed / 60)}m ${elapsed % 60}s]`;
 
-                        if (freshDirectory.generateStatus?.step) {
-                            const step = freshDirectory.generateStatus.step as ItemsGeneratorStep;
-                            const stepText = getStepText(step);
-                            const progress = getStepProgress(step);
+                        if (
+                            freshDirectory.generateStatus?.step ||
+                            freshDirectory.generateStatus?.stepName
+                        ) {
+                            const stepText = getDynamicStepText(freshDirectory.generateStatus);
+                            const progress = getDynamicStepProgress(freshDirectory.generateStatus);
+                            const itemsText = getItemsProcessedText(freshDirectory.generateStatus);
+                            const itemsSuffix = itemsText ? ` (${itemsText})` : '';
 
-                            spinner.text = `Generating ${timeStr}: ${stepText} - ${progress}%`;
+                            spinner.text = `Generating ${timeStr}: ${stepText}${itemsSuffix} - ${progress}%`;
                         } else {
                             spinner.text = `Generating ${timeStr}...`;
                         }
@@ -168,7 +171,7 @@ function formatStatus(status?: string) {
 }
 
 function printDirectorySummary(directory: Directory) {
-    console.log(chalk.cyan('\n--- Directory Status ---'));
+    console.log('');
     console.log(chalk.gray('Name:'), chalk.white(directory.name));
     console.log(
         chalk.gray('Generation status:'),
@@ -180,8 +183,14 @@ function printDirectorySummary(directory: Directory) {
     }
 
     if (directory.generateStatus?.step) {
-        const step = directory.generateStatus.step as ItemsGeneratorStep;
-        console.log(chalk.gray('Last step:'), chalk.white(getStepText(step)));
+        console.log(
+            chalk.gray('Last step:'),
+            chalk.white(getDynamicStepText(directory.generateStatus)),
+        );
+    }
+
+    if (directory.deployProvider) {
+        console.log(chalk.gray('Deploy provider:'), chalk.white(directory.deployProvider));
     }
 
     console.log(

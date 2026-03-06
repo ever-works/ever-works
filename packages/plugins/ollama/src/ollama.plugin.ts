@@ -5,7 +5,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
 	PluginSettings,
 	ChatCompletionOptions,
 	ChatCompletionResponse,
@@ -35,6 +34,12 @@ export class OllamaPlugin extends BaseAiProvider {
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {
+			baseUrl: {
+				type: 'string',
+				title: 'Ollama Server URL',
+				description: 'Address of your Ollama instance (e.g: http://localhost:11434/v1)',
+				'x-scope': 'user'
+			},
 			apiKey: {
 				type: 'string',
 				title: 'API Key',
@@ -74,12 +79,7 @@ export class OllamaPlugin extends BaseAiProvider {
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
-			baseUrl: {
-				type: 'string',
-				title: 'Ollama Server URL',
-				description: 'Address of your Ollama instance (e.g: http://localhost:11434/v1)',
-				'x-scope': 'user'
-			},
+
 			temperature: {
 				type: 'number',
 				title: 'Temperature',
@@ -168,13 +168,6 @@ export class OllamaPlugin extends BaseAiProvider {
 
 	protected getDefaultModelId(): string {
 		return 'ministral-3:8b';
-	}
-
-	async validateSettings(_settings: PluginSettings): Promise<ValidationResult> {
-		// Ollama has no required fields - defaults work out of the box
-		return {
-			valid: true
-		};
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

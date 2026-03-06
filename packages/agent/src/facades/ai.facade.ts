@@ -16,7 +16,7 @@ import type {
     AskJsonCompletionResponse,
     TaskComplexity,
 } from '@ever-works/plugin';
-import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES, substituteVariables } from '@ever-works/plugin';
 import { jsonrepair } from '@ever-works/plugin/ai';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
@@ -50,10 +50,10 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         super(registry, settingsService, directoryPluginRepository);
     }
 
-    async askJson<T>(
-        promptTemplate: string,
+    async askJson<T, Template extends string = string>(
+        promptTemplate: Template,
         schema: z.ZodSchema<T>,
-        options: AskJsonOptions | undefined,
+        options: AskJsonOptions<Template> | undefined,
         facadeOptions: FacadeOptions,
     ): Promise<AskJsonResponse<T>> {
         const plugin = await this.resolvePlugin<IAiProviderPlugin>(
@@ -68,7 +68,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         });
 
         const model = this.resolveModel(plugin, settings, options?.routing);
-        const prompt = this.renderTemplate(promptTemplate, options?.variables);
+        const prompt = substituteVariables(promptTemplate, options?.variables);
 
         const call = (callModel?: string) =>
             this.callAskJson(plugin, prompt, schema, {
@@ -425,13 +425,5 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
 
         this.logger.debug(`No model routing configured, plugin ${plugin.id} will use default`);
         return undefined;
-    }
-
-    private renderTemplate(template: string, variables?: Record<string, string>): string {
-        if (!variables) return template;
-        return template.replace(/\{(\w+)\}/g, (match, key) => {
-            const value = variables[key];
-            return value !== undefined ? value : match;
-        });
     }
 }

@@ -6,7 +6,6 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	ValidationResult,
 	PluginSettings,
 	ScreenshotOptions,
 	ScreenshotResult,
@@ -293,59 +292,6 @@ export class UrlboxPlugin implements IPlugin, IScreenshotPlugin {
 
 	async onUnload(): Promise<void> {
 		this.context = undefined;
-	}
-
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (!settings.apiKey) {
-			errors.push({
-				path: 'apiKey',
-				message: 'API key is required'
-			});
-		}
-
-		if (settings.viewportWidth !== undefined) {
-			const width = settings.viewportWidth as number;
-			if (width < 320 || width > 3840) {
-				errors.push({
-					path: 'viewportWidth',
-					message: 'Viewport width must be between 320 and 3840 pixels'
-				});
-			}
-		}
-
-		if (settings.viewportHeight !== undefined) {
-			const height = settings.viewportHeight as number;
-			if (height < 200 || height > 2160) {
-				errors.push({
-					path: 'viewportHeight',
-					message: 'Viewport height must be between 200 and 2160 pixels'
-				});
-			}
-		}
-
-		if (settings.format !== undefined && !['png', 'jpg', 'jpeg', 'webp'].includes(settings.format as string)) {
-			errors.push({
-				path: 'format',
-				message: 'Format must be png, jpg, jpeg, or webp'
-			});
-		}
-
-		if (settings.quality !== undefined) {
-			const quality = settings.quality as number;
-			if (quality < 1 || quality > 100) {
-				errors.push({
-					path: 'quality',
-					message: 'Quality must be between 1 and 100'
-				});
-			}
-		}
-
-		return {
-			valid: errors.length === 0,
-			errors: errors.length > 0 ? errors : undefined
-		};
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

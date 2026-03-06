@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl';
 import { DirectoryMemberRole } from '@/lib/api/enums';
 import { Link as IconLink, Users, Zap, Code2, Clock } from 'lucide-react';
 import { useDirectoryDetail, useDirectoryPermissions } from './DirectoryDetailContext';
-import { getStepText } from '@/lib/utils/generator-steps';
+import { getStepText, getItemsProcessedText } from '@/lib/utils/generator-steps';
 import { Link } from '@/i18n/navigation';
 
 interface DirectoryHeaderProps {
@@ -62,10 +62,11 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                                 <span className="text-xs opacity-75">
                                     •{' '}
                                     <span className="ml-1">
-                                        {getStepText(
-                                            directory.generateStatus,
-                                            tProgress('steps.processing'),
-                                        )}
+                                        {getItemsProcessedText(directory.generateStatus) ||
+                                            getStepText(
+                                                directory.generateStatus,
+                                                tProgress('steps.processing'),
+                                            )}
                                     </span>
                                 </span>
                             )}

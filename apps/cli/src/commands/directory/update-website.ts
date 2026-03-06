@@ -4,7 +4,7 @@ import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
-import { DirectoryPromptService } from './directory-prompt.service';
+import { DirectoryPromptService, canEdit } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 
 export const updateWebsiteCommand = new Command('update-website')
@@ -22,7 +22,7 @@ export const updateWebsiteCommand = new Command('update-website')
             // Select directory
             const selection = await directoryPrompt.promptDirectorySelection();
             if (selection.cancelled || !selection.directory) {
-                console.log(chalk.yellow('\n⚠ Operation cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -36,8 +36,14 @@ export const updateWebsiteCommand = new Command('update-website')
                 ),
             );
 
+            if (!canEdit(role)) {
+                console.log(chalk.yellow('\n⚠ You do not have permission to perform this action.'));
+                console.log(chalk.gray(`  Your role: ${role}. Required: editor or higher.`));
+                return;
+            }
+
             // Show information about what will happen
-            console.log(chalk.cyan('\n--- Website Update Process ---'));
+            console.log('');
             console.log(chalk.gray('This will:'));
             console.log(chalk.gray('  • Update the website repository with latest data'));
             console.log(chalk.gray('  • Sync content from the data repository'));
@@ -59,7 +65,7 @@ export const updateWebsiteCommand = new Command('update-website')
             ]);
 
             if (!confirmed.proceed) {
-                console.log(chalk.yellow('\n⚠ Website update cancelled.'));
+                console.log(chalk.yellow('\nOperation cancelled.'));
                 return;
             }
 
@@ -69,11 +75,10 @@ export const updateWebsiteCommand = new Command('update-website')
             try {
                 const response = await apiService.updateWebsite(directory.id);
 
-                spinner.stop();
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Website update failed'));
+                    spinner.fail('Website update failed');
                 } else {
-                    console.log(chalk.green('\n✓ Website updated successfully!'));
+                    spinner.succeed('Website updated successfully!');
                 }
 
                 console.log(chalk.gray('Status:'), chalk.white(response.status));

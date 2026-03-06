@@ -1,23 +1,19 @@
 import type {
 	IPlugin,
-	IFormSchemaProvider,
 	PluginCategory,
 	PluginContext,
-	PluginSettings,
 	PluginManifest,
 	JsonSchema,
-	ValidationResult,
 	PluginHealthCheck
 } from '@ever-works/plugin';
-import type { FormFieldDefinition, FormFieldGroup } from '@ever-works/contracts';
 
-export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
+export class ComparisonGeneratorPlugin implements IPlugin {
 	readonly id = 'comparison-generator';
 	readonly name = 'Comparison Generator';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'utility';
-	readonly capabilities = ['form-schema-provider'] as const;
-	readonly configurationMode = 'hybrid' as const;
+	readonly capabilities = [];
+	readonly configurationMode = 'hybrid';
 
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
@@ -93,46 +89,6 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 		this.context = undefined;
 	}
 
-	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (
-			settings.max_comparisons_mode !== undefined &&
-			!['custom', 'unlimited'].includes(settings.max_comparisons_mode as string)
-		) {
-			errors.push({ path: 'max_comparisons_mode', message: 'Must be "custom" or "unlimited"' });
-		}
-
-		if (settings.max_comparisons !== undefined && settings.max_comparisons_mode !== 'unlimited') {
-			const max = Number(settings.max_comparisons);
-			if (isNaN(max) || max < 1 || max > 500) {
-				errors.push({ path: 'max_comparisons', message: 'Max comparisons must be between 1 and 500' });
-			}
-		}
-
-		if (settings.min_items_for_comparison !== undefined) {
-			const min = Number(settings.min_items_for_comparison);
-			if (isNaN(min) || min < 2 || min > 20) {
-				errors.push({
-					path: 'min_items_for_comparison',
-					message: 'Min items must be between 2 and 20'
-				});
-			}
-		}
-
-		if (
-			settings.cadence_override !== undefined &&
-			!['use_directory', 'daily', 'weekly', 'monthly'].includes(settings.cadence_override as string)
-		) {
-			errors.push({
-				path: 'cadence_override',
-				message: 'Invalid cadence value'
-			});
-		}
-
-		return errors.length > 0 ? { valid: false, errors } : { valid: true };
-	}
-
 	async healthCheck(): Promise<PluginHealthCheck> {
 		return {
 			status: 'healthy',
@@ -183,93 +139,6 @@ export class ComparisonGeneratorPlugin implements IPlugin, IFormSchemaProvider {
 				'- **Max comparisons** — cap at a custom limit (1–500) or set to "All" to generate every possible pair',
 				'- **Min items** — minimum items required in a category before comparisons are generated'
 			].join('\n')
-		};
-	}
-
-	getFormFields(): FormFieldDefinition[] {
-		return [
-			{
-				name: 'comparison_enabled',
-				type: 'boolean',
-				label: 'Enable Comparisons',
-				description: 'Automatically generate A vs B comparison pages between directory items',
-				defaultValue: false,
-				group: 'comparisons',
-				order: 1
-			},
-			{
-				name: 'comparison_cadence',
-				type: 'select',
-				label: 'Generation Cadence',
-				description: 'How often to auto-generate comparisons',
-				defaultValue: 'use_directory',
-				options: [
-					{ value: 'use_directory', label: 'Use Directory Schedule' },
-					{ value: 'daily', label: 'Daily' },
-					{ value: 'weekly', label: 'Weekly' },
-					{ value: 'monthly', label: 'Monthly' }
-				],
-				group: 'comparisons',
-				order: 2
-			},
-			{
-				name: 'comparison_max_mode',
-				type: 'select',
-				label: 'Max Comparisons Mode',
-				description: 'Whether to cap comparisons at a custom limit or generate all possible pairs',
-				defaultValue: 'custom',
-				options: [
-					{ value: 'custom', label: 'Custom Limit' },
-					{ value: 'unlimited', label: 'All Pairs' }
-				],
-				group: 'comparisons',
-				order: 3
-			},
-			{
-				name: 'comparison_max',
-				type: 'number',
-				label: 'Max Comparisons',
-				description: 'Maximum total comparisons to generate (only used in Custom mode)',
-				defaultValue: 50,
-				validation: { min: 1, max: 500 },
-				showIf: { field: 'comparison_max_mode', operator: 'eq', value: 'custom' },
-				group: 'comparisons',
-				order: 4
-			}
-		];
-	}
-
-	getFormGroups(): FormFieldGroup[] {
-		return [
-			{
-				name: 'comparisons',
-				title: 'Comparisons',
-				description: 'Configure automatic A vs B comparison page generation',
-				collapsible: true,
-				collapsed: true
-			}
-		];
-	}
-
-	validateFormInput(values: Record<string, unknown>): ValidationResult {
-		const errors: Array<{ path: string; message: string }> = [];
-
-		if (values.comparison_max !== undefined && values.comparison_max_mode !== 'unlimited') {
-			const max = Number(values.comparison_max);
-			if (isNaN(max) || max < 1 || max > 500) {
-				errors.push({ path: 'comparison_max', message: 'Max comparisons must be between 1 and 500' });
-			}
-		}
-
-		return errors.length > 0 ? { valid: false, errors } : { valid: true };
-	}
-
-	getDefaultValues(): Record<string, unknown> {
-		return {
-			comparison_enabled: false,
-			comparison_cadence: 'use_directory',
-			comparison_max_mode: 'custom',
-			comparison_max: 50
 		};
 	}
 }

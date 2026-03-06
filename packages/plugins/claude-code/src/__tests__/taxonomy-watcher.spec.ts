@@ -20,7 +20,7 @@ describe('taxonomy-watcher', () => {
 	});
 
 	it('should pick up new .json files and sync taxonomy', async () => {
-		const watcher = startTaxonomyWatcher(workspacePath, logger);
+		const watcher = startTaxonomyWatcher({ workspacePath, logger });
 
 		try {
 			const item = JSON.stringify({ name: 'Tool', category: 'Cloud Services', tags: ['cloud'] });
@@ -40,7 +40,7 @@ describe('taxonomy-watcher', () => {
 	});
 
 	it('should ignore _meta/ files', async () => {
-		const watcher = startTaxonomyWatcher(workspacePath, logger);
+		const watcher = startTaxonomyWatcher({ workspacePath, logger });
 
 		try {
 			// Write directly to _meta — the watcher should not process this
@@ -61,7 +61,7 @@ describe('taxonomy-watcher', () => {
 	});
 
 	it('should handle watcher stop/cleanup', async () => {
-		const watcher = startTaxonomyWatcher(workspacePath, logger);
+		const watcher = startTaxonomyWatcher({ workspacePath, logger });
 		watcher.stop();
 
 		// Writing after stop should not trigger any processing
@@ -76,7 +76,7 @@ describe('taxonomy-watcher', () => {
 	});
 
 	it('should survive file read errors', async () => {
-		const watcher = startTaxonomyWatcher(workspacePath, logger);
+		const watcher = startTaxonomyWatcher({ workspacePath, logger });
 
 		try {
 			// Write a file then immediately delete it to cause a read error in the handler
@@ -90,6 +90,115 @@ describe('taxonomy-watcher', () => {
 		} finally {
 			watcher.stop();
 		}
+	});
+
+	describe('onNewItem callback', () => {
+		it('should fire for new (non-seeded) files with incrementing count', async () => {
+			const onNewItem = vi.fn();
+			const watcher = startTaxonomyWatcher({ workspacePath, logger, onNewItem });
+
+			try {
+				await writeFile(
+					join(workspacePath, 'item-a.json'),
+					JSON.stringify({ name: 'A', category: 'Cat' }),
+					'utf-8'
+				);
+				await sleep(200);
+
+				await writeFile(
+					join(workspacePath, 'item-b.json'),
+					JSON.stringify({ name: 'B', category: 'Cat' }),
+					'utf-8'
+				);
+				await sleep(200);
+
+				expect(onNewItem).toHaveBeenCalledTimes(2);
+				expect(onNewItem).toHaveBeenNthCalledWith(1, 1, 'item-a.json');
+				expect(onNewItem).toHaveBeenNthCalledWith(2, 2, 'item-b.json');
+			} finally {
+				watcher.stop();
+			}
+		});
+
+		it('should skip files present in _meta/seeded.json', async () => {
+			// Write a seeded manifest before starting the watcher
+			await writeFile(
+				join(workspacePath, '_meta', 'seeded.json'),
+				JSON.stringify({ 'seeded-item.json': 'abc123' }),
+				'utf-8'
+			);
+
+			const onNewItem = vi.fn();
+			const watcher = startTaxonomyWatcher({ workspacePath, logger, onNewItem });
+
+			try {
+				// Write a seeded file — should NOT trigger onNewItem
+				await writeFile(
+					join(workspacePath, 'seeded-item.json'),
+					JSON.stringify({ name: 'Seeded', category: 'Test' }),
+					'utf-8'
+				);
+				await sleep(200);
+
+				// Write a new file — should trigger onNewItem
+				await writeFile(
+					join(workspacePath, 'new-item.json'),
+					JSON.stringify({ name: 'New', category: 'Test' }),
+					'utf-8'
+				);
+				await sleep(200);
+
+				expect(onNewItem).toHaveBeenCalledTimes(1);
+				expect(onNewItem).toHaveBeenCalledWith(1, 'new-item.json');
+			} finally {
+				watcher.stop();
+			}
+		});
+
+		it('should not double-count on repeated writes to the same file', async () => {
+			const onNewItem = vi.fn();
+			const watcher = startTaxonomyWatcher({ workspacePath, logger, onNewItem });
+
+			try {
+				await writeFile(
+					join(workspacePath, 'item.json'),
+					JSON.stringify({ name: 'V1', category: 'Cat' }),
+					'utf-8'
+				);
+				await sleep(200);
+
+				// Write again to the same file
+				await writeFile(
+					join(workspacePath, 'item.json'),
+					JSON.stringify({ name: 'V2', category: 'Cat' }),
+					'utf-8'
+				);
+				await sleep(200);
+
+				expect(onNewItem).toHaveBeenCalledTimes(1);
+				expect(onNewItem).toHaveBeenCalledWith(1, 'item.json');
+			} finally {
+				watcher.stop();
+			}
+		});
+
+		it('should work without onNewItem (backward compat)', async () => {
+			// No onNewItem provided — should not throw
+			const watcher = startTaxonomyWatcher({ workspacePath, logger });
+
+			try {
+				await writeFile(
+					join(workspacePath, 'item.json'),
+					JSON.stringify({ name: 'Item', category: 'Cat' }),
+					'utf-8'
+				);
+				await sleep(200);
+
+				// No error means backward compatibility works
+			} finally {
+				watcher.stop();
+			}
+		});
 	});
 });
 
