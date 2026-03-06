@@ -75,7 +75,7 @@ export class ToolRegistrationService {
 						if (value !== undefined && value !== null) {
 							queryParams.append(key, `${value as string | number | boolean}`);
 						}
-					} else {
+					} else if (entry.method !== 'GET' && entry.method !== 'DELETE') {
 						bodyParams[key] = value;
 					}
 				}

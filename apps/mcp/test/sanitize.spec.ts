@@ -64,6 +64,33 @@ describe('sanitizeResponse', () => {
 		expect(sanitizeResponse(undefined)).toBeUndefined();
 	});
 
+	it('strips plugin secret fields (API keys, tokens)', () => {
+		const input = {
+			id: 'plugin-1',
+			name: 'OpenAI',
+			settings: {
+				model: 'gpt-4',
+				apiKey: 'sk-abc123',
+				api_key: 'sk-def456'
+			},
+			secretSettings: {
+				accessToken: 'ghp_xxxx',
+				refreshToken: 'rt_xxxx',
+				clientSecret: 'cs_xxxx',
+				privateKey: '-----BEGIN RSA-----',
+				token: 'bearer-token',
+				secret: 's3cret'
+			}
+		};
+		const result = sanitizeResponse(input);
+		expect(result).toEqual({
+			id: 'plugin-1',
+			name: 'OpenAI',
+			settings: { model: 'gpt-4' },
+			secretSettings: {}
+		});
+	});
+
 	it('preserves non-sensitive fields', () => {
 		const input = {
 			id: '123',

@@ -13,7 +13,7 @@ async function bootstrap() {
 	await app.listen(config.httpPort);
 
 	console.log(`Ever Works MCP server (HTTP) listening on port ${config.httpPort}`);
-	console.log(`MCP endpoint: http://localhost:${config.httpPort}/mcp`);
+	console.log(`MCP endpoint: /mcp (port ${config.httpPort})`);
 }
 
 bootstrap().catch((error) => {

@@ -4,7 +4,19 @@ const SENSITIVE_FIELDS = new Set([
 	'passwordResetExpires',
 	'emailVerificationToken',
 	'emailVerificationExpires',
-	'lastLoginIp'
+	'lastLoginIp',
+	'apiKey',
+	'api_key',
+	'secret',
+	'clientSecret',
+	'client_secret',
+	'accessToken',
+	'access_token',
+	'refreshToken',
+	'refresh_token',
+	'privateKey',
+	'private_key',
+	'token'
 ]);
 
 export function sanitizeResponse<T>(data: T): T {
