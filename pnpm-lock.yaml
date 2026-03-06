@@ -365,6 +365,9 @@ importers:
       '@headlessui/react':
         specifier: ^2.2.9
         version: 2.2.9(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@lottiefiles/dotlottie-react':
+        specifier: ^0.18.3
+        version: 0.18.3(react@19.2.3)
       '@tanstack/react-virtual':
         specifier: ^3.13.13
         version: 3.13.18(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -2874,6 +2877,14 @@ packages:
     engines: {node: '>=20'}
     peerDependencies:
       '@opentelemetry/api': ^1.9.0
+
+  '@lottiefiles/dotlottie-react@0.18.3':
+    resolution: {integrity: sha512-/6iVC4y9KCyPKS2gDUFp+omYndo3KPombAsZXB0h5sSyEO/+ydVppd5fIoHg2ogGAPOCPK97Y5Eos65JnyTjww==}
+    peerDependencies:
+      react: ^17 || ^18 || ^19
+
+  '@lottiefiles/dotlottie-web@0.65.0':
+    resolution: {integrity: sha512-D5ALEwZerjy+MkOv9mMjY7bxRfe7rQPWMtDl8hlNYLnrDKj4AzTaRztZ2u5hBHHiSfSc7TnA4MJgq+ktNZPpIg==}
 
   '@lukeed/csprng@1.1.0':
     resolution: {integrity: sha512-Z7C/xXCiGWsg0KuKsHTKJxbWhpI3Vs5GwLfOean7MGyVFGqdRgBbAjOCh6u4bbjPc/8MJ2pZmK/0DLdCbivLDA==}
@@ -12136,6 +12147,13 @@ snapshots:
     dependencies:
       '@langfuse/core': 4.6.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/api': 1.9.0
+
+  '@lottiefiles/dotlottie-react@0.18.3(react@19.2.3)':
+    dependencies:
+      '@lottiefiles/dotlottie-web': 0.65.0
+      react: 19.2.3
+
+  '@lottiefiles/dotlottie-web@0.65.0': {}
 
   '@lukeed/csprng@1.1.0': {}
 

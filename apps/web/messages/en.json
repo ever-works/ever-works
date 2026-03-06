@@ -2186,6 +2186,7 @@
             "feature": {
                 "title": "Build Directories with AI",
                 "subtitle": "Create beautiful, searchable directories in minutes using natural language. No coding required.",
+                "badge": "AI-Powered",
                 "benefits": {
                     "ai": {
                         "title": "AI-Powered Creation",
@@ -2199,6 +2200,12 @@
                         "title": "Easy Management",
                         "description": "Update and organize your content effortlessly"
                     }
+                },
+                "howItWorks": {
+                    "step1": "Describe your idea",
+                    "step2": "Choose a template",
+                    "step3": "AI generates content",
+                    "step4": "Publish & share"
                 }
             },
             "footer": {

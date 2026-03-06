@@ -1754,6 +1754,13 @@
                         "title": "Kolay Yönetim",
                         "description": "İçeriğinizi kolayca güncelleyin ve düzenleyin"
                     }
+                },
+                "badge": "YZ Destekli",
+                "howItWorks": {
+                    "step1": "Fikrinizi açıklayın",
+                    "step2": "Bir şablon seçin",
+                    "step3": "YZ içerik oluşturur",
+                    "step4": "Yayınlayın ve paylaşın"
                 }
             },
             "footer": {

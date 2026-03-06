@@ -38,7 +38,7 @@ export function ThemeToggle({ className, variant = 'fixed' }: ThemeToggleProps =
             onClick={() => toggleTheme()}
             variant="ghost"
             size="icon"
-            className={cn(buttonClasses, className)}
+            className={cn(buttonClasses, className, 'cursor-pointer')}
             aria-label={t('toggle')}
             title={isDark ? t('switchToLight') : t('switchToDark')}
         >

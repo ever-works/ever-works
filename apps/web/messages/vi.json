@@ -1754,6 +1754,13 @@
                         "title": "Quản lý Dễ dàng",
                         "description": "Cập nhật và tổ chức nội dung của bạn một cách dễ dàng"
                     }
+                },
+                "badge": "Được hỗ trợ bởi AI",
+                "howItWorks": {
+                    "step1": "Mô tả ý tưởng của bạn",
+                    "step2": "Chọn mẫu",
+                    "step3": "AI tạo nội dung",
+                    "step4": "Xuất bản & chia sẻ"
                 }
             },
             "footer": {
