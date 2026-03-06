@@ -6,6 +6,7 @@ import { OpenApiToolsModule } from './openapi-tools/openapi-tools.module.js';
 import { ToolRegistrationService } from './openapi-tools/tool-registration.service.js';
 import { HealthController } from './health.controller.js';
 import { ApiKeyGuard } from './guards/api-key.guard.js';
+import { PingTool } from './ping.tool.js';
 
 const transport =
 	process.env.MCP_TRANSPORT === 'streamable-http' ? McpTransportType.STREAMABLE_HTTP : McpTransportType.STDIO;
@@ -17,6 +18,7 @@ const isHttp = transport === McpTransportType.STREAMABLE_HTTP;
 		McpModule.forRoot({
 			name: 'ever-works',
 			version: '0.1.0',
+			capabilities: { tools: {} },
 			transport,
 			...(isHttp
 				? {
@@ -34,7 +36,7 @@ const isHttp = transport === McpTransportType.STREAMABLE_HTTP;
 		OpenApiToolsModule
 	],
 	controllers: isHttp ? [HealthController] : [],
-	providers: [ToolRegistrationService, ApiKeyGuard]
+	providers: [ToolRegistrationService, ApiKeyGuard, PingTool]
 })
 export class AppModule implements OnApplicationBootstrap {
 	constructor(@Inject(ToolRegistrationService) private readonly toolRegistration: ToolRegistrationService) {}
