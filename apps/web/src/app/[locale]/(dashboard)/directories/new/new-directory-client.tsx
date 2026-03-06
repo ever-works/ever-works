@@ -12,6 +12,7 @@ import { useTranslations } from 'next-intl';
 import type { ProviderWithConnection } from './page';
 import { Bot, PenLine, Import, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
+import { CardDecoration } from '@/components/ui/CardDecoration';
 
 interface NewDirectoryClientProps {
     user: AuthUser;
@@ -61,25 +62,16 @@ export default function NewDirectoryClient({
                         onClick={() => setCreationMode('ai')}
                         className={cn(
                             'p-6 rounded-lg border text-left transition-all h-full',
-                            'bg-card dark:bg-[#0f1625]',
+                            'bg-card dark:bg-card-primary-dark',
                             'border-card-border dark:border-card-border-dark',
-                            'hover:border-primary/30 hover:shadow-lg shadow-sm',
+                            'hover:border-primary-500/70 hover:shadow-lg shadow-sm',
                             'group cursor-pointer relative',
                         )}
                     >
-                        {/* Decorative short top border accent with fading edges */}
-                        <div className="card-top-accent opacity-0 group-hover:opacity-100 pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 rounded-full" />
-                        {/* Hover image at top, reversed horizontally, only visible on hover */}
-                        <div className="pointer-events-none opacity-0 group-hover:opacity-100 absolute left-0 right-0 top-0 z-20">
-                            <Image
-                                src="/bg-cards.png"
-                                alt="Decorative pattern"
-                                className="w-full filter brightness-0 dark:brightness-200 -rotate-180"
-                                width={200}
-                                height={100}
-                                unoptimized
-                            />
-                        </div>
+                        <CardDecoration
+                            accentClassName="opacity-0 group-hover:opacity-100"
+                            wrapperClassName="opacity-0 group-hover:opacity-100"
+                        />
                         <div className="flex flex-col h-full">
                             <div className="mb-4">
                                 <div
@@ -114,25 +106,16 @@ export default function NewDirectoryClient({
                         onClick={() => setCreationMode('manual')}
                         className={cn(
                             'p-6 rounded-lg border text-left transition-all h-full',
-                            'bg-card dark:bg-[#0f1625]',
+                            'bg-card dark:bg-card-primary-dark',
                             'border-card-border dark:border-card-border-dark',
-                            'hover:border-primary/30 hover:shadow-lg shadow-sm',
+                            'hover:border-primary-500/70 hover:shadow-lg shadow-sm',
                             'group cursor-pointer relative',
                         )}
                     >
-                        {/* Decorative short top border accent with fading edges */}
-                        <div className="card-top-accent opacity-0 group-hover:opacity-100 pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 rounded-full" />
-                        {/* Hover image at top, reversed horizontally, only visible on hover */}
-                        <div className="pointer-events-none opacity-0 group-hover:opacity-100 absolute left-0 right-0 top-0 z-20">
-                            <Image
-                                src="/bg-cards.png"
-                                alt="Decorative pattern"
-                                className="w-full filter brightness-0 dark:brightness-200 -rotate-180"
-                                width={200}
-                                height={100}
-                                unoptimized
-                            />
-                        </div>
+                        <CardDecoration
+                            accentClassName="opacity-0 group-hover:opacity-100"
+                            wrapperClassName="opacity-0 group-hover:opacity-100"
+                        />
                         <div className="flex flex-col h-full">
                             <div className="mb-4">
                                 <div
@@ -167,25 +150,16 @@ export default function NewDirectoryClient({
                         onClick={() => setCreationMode('import')}
                         className={cn(
                             'p-6 rounded-lg border text-left transition-all h-full',
-                            'bg-card dark:bg-[#0f1625]',
+                            'bg-card dark:bg-card-primary-dark',
                             'border-card-border dark:border-card-border-dark',
-                            'hover:border-primary/20 hover:shadow-lg shadow-sm',
+                            'hover:border-primary-500/70 hover:shadow-lg shadow-sm',
                             'group cursor-pointer relative',
                         )}
                     >
-                        {/* Decorative short top border accent with fading edges */}
-                        <div className="card-top-accent opacity-0 group-hover:opacity-100 pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 rounded-full" />
-                        {/* Hover image at top, reversed horizontally, only visible on hover */}
-                        <div className="pointer-events-none opacity-0 group-hover:opacity-100 absolute left-0 right-0 top-0 z-20">
-                            <Image
-                                src="/bg-cards.png"
-                                alt="Decorative pattern"
-                                className="w-full filter brightness-0 dark:brightness-200 -rotate-180"
-                                width={200}
-                                height={100}
-                                unoptimized
-                            />
-                        </div>
+                        <CardDecoration
+                            accentClassName="opacity-0 group-hover:opacity-100"
+                            wrapperClassName="opacity-0 group-hover:opacity-100"
+                        />
                         <div className="flex flex-col h-full">
                             <div
                                 className={cn(
@@ -271,35 +245,43 @@ export default function NewDirectoryClient({
             <aside className="w-80 shrink-0">
                 <div
                     className={cn(
-                        'sticky top-8 p-6 rounded-lg space-y-6',
-                        'bg-card dark:bg-card-dark',
-                        'border border-card-border dark:border-card-border-dark',
+                        'sticky top-8 p-1 rounded-lg space-y-6',
+                        'bg-card/10 dark:bg-card-primary-dark/30',
+                        'border border-card-border dark:border-border-secondary-dark',
                     )}
                 >
-                    <div>
-                        <h3 className="font-medium text-text dark:text-text-dark mb-4">
-                            {t('sidebar.selectedProvider')}
-                        </h3>
-                        <GitProviderSelector
-                            providers={providers}
-                            selectedProviderId={selectedProviderId}
-                            onSelect={setSelectedProviderId}
-                            compact
-                        />
-                    </div>
-                    {deployProviders.length > 0 && (
+                    <div
+                        className={cn(
+                            'p-6 rounded-sm',
+                            'bg-card dark:bg-card-secondary-dark/50',
+                            'border border-card-border dark:border-border-secondary-dark',
+                        )}
+                    >
                         <div>
                             <h3 className="font-medium text-text dark:text-text-dark mb-4">
-                                {t('sidebar.selectedDeployProvider')}
+                                {t('sidebar.selectedProvider')}
                             </h3>
-                            <DeployProviderSelector
-                                providers={deployProviders}
-                                selectedProviderId={selectedDeployProviderId}
-                                onSelect={setSelectedDeployProviderId}
+                            <GitProviderSelector
+                                providers={providers}
+                                selectedProviderId={selectedProviderId}
+                                onSelect={setSelectedProviderId}
                                 compact
                             />
                         </div>
-                    )}
+                        {deployProviders.length > 0 && (
+                            <div>
+                                <h3 className="font-medium text-text dark:text-text-dark mb-4">
+                                    {t('sidebar.selectedDeployProvider')}
+                                </h3>
+                                <DeployProviderSelector
+                                    providers={deployProviders}
+                                    selectedProviderId={selectedDeployProviderId}
+                                    onSelect={setSelectedDeployProviderId}
+                                    compact
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
             </aside>
         </div>
