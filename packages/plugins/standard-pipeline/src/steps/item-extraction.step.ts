@@ -6,6 +6,7 @@ import { BasePipelineStep } from '../base-pipeline-step.js';
 import { slugifyText } from '../utils/text.utils.js';
 import { getErrorStack } from '../utils/error.utils.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
+import { PROMPT_KEYS } from '../prompt-keys.js';
 import {
 	extractedItemsSchema,
 	extractedItemsSchemaWithTags,
@@ -80,7 +81,7 @@ export class ItemExtractionStep extends BasePipelineStep {
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
 		const { request, directory, webPages, featuredItemHints, metrics, advancedPrompts } = context;
-		const { logger, aiFacade } = execContext;
+		const { logger, aiFacade, promptFacade } = execContext;
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
@@ -101,7 +102,8 @@ export class ItemExtractionStep extends BasePipelineStep {
 			advancedPrompts?.itemExtraction,
 			logger,
 			aiFacade,
-			facadeOptions
+			facadeOptions,
+			promptFacade
 		);
 
 		logger.log(`[${directory.slug}] Extracted ${extractedWebItems.length} potential items from web pages.`);
@@ -130,7 +132,8 @@ export class ItemExtractionStep extends BasePipelineStep {
 		customPrompt: string | null | undefined,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<MutableItemData[]> {
 		if (!aiFacade.isConfigured()) {
 			logger.warn(`[${directorySlug}] AI provider not configured. Skipping AI-driven item extraction.`);
@@ -160,7 +163,12 @@ export class ItemExtractionStep extends BasePipelineStep {
 		const featuredHintsSection = this.generateFeaturedHintsSection(featuredItemHints);
 		const schema = withTags ? extractedItemsSchemaWithTags : extractedItemsSchema;
 		const validationSchema = withTags ? itemDataWithCategoriesAndTagsSchema : itemDataSchema;
-		const finalPrompt = appendCustomPrompt(ITEMS_EXTRACTION_PROMPT, customPrompt);
+		const resolvedPrompt = (
+			promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.ITEM_EXTRACTION, ITEMS_EXTRACTION_PROMPT)
+				: ITEMS_EXTRACTION_PROMPT
+		) as typeof ITEMS_EXTRACTION_PROMPT;
+		const finalPrompt = appendCustomPrompt(resolvedPrompt, customPrompt);
 
 		// Define the item extraction function
 		const extractItemsFromPage = async (page: WebPageData): Promise<MutableItemData[]> => {

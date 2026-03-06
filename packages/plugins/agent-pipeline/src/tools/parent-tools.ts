@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type {
 	ISearchFacade,
 	IContentExtractorFacade,
+	IPromptFacade,
 	FacadeOptions,
 	PipelineProgressCallback,
 	PluginLogger
@@ -37,6 +38,7 @@ export interface ParentToolContext {
 	logger: PluginLogger;
 	tokenAccumulator?: TokenUsageAccumulator;
 	signal?: AbortSignal;
+	promptFacade?: IPromptFacade;
 }
 
 export interface ParentToolsResult {
@@ -66,7 +68,8 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 				breaker,
 				logger: ctx.logger,
 				tokenAccumulator: ctx.tokenAccumulator,
-				signal: ctx.signal
+				signal: ctx.signal,
+				promptFacade: ctx.promptFacade
 			};
 
 			const mapper = async (url: string) => {
@@ -100,7 +103,9 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 				workspacePath: ctx.workspacePath,
 				logger: ctx.logger,
 				tokenAccumulator: ctx.tokenAccumulator,
-				signal: ctx.signal
+				signal: ctx.signal,
+				promptFacade: ctx.promptFacade,
+				facadeOptions: ctx.facadeOptions
 			});
 		}
 	});

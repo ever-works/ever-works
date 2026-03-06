@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { MutableItemData, StepExecutionContext, FacadeOptions } from '@ever-works/plugin';
+import type { MutableItemData, StepExecutionContext, FacadeOptions, IPromptFacade } from '@ever-works/plugin';
 import type { StandardPipelineMetrics } from '../../context/index.js';
 import { slugifyText } from '../../utils/text.utils.js';
 import { extractedItemsSchema } from '../../schemas/item-extraction.schemas.js';
@@ -7,6 +7,7 @@ import { getErrorMessage, getErrorStack } from '../../utils/error.utils.js';
 import { appendCustomPrompt } from '../../utils/prompt.utils.js';
 import { MAX_CLUSTER_SIZE, chunkArray, groupSimilarItems } from './clustering.js';
 import { DEDUPLICATOR_PROMPT } from './prompts.constants.js';
+import { PROMPT_KEYS } from '../../prompt-keys.js';
 
 type ExtractedItems = z.infer<typeof extractedItemsSchema>;
 
@@ -16,11 +17,13 @@ export class AiDeduplicator {
 
 	private readonly logger: StepExecutionContext['logger'];
 	private readonly aiFacade: StepExecutionContext['aiFacade'];
+	private readonly promptFacade: IPromptFacade | undefined;
 	private readonly facadeOptions: FacadeOptions;
 
 	constructor(execContext: StepExecutionContext) {
 		this.logger = execContext.logger;
 		this.aiFacade = execContext.aiFacade;
+		this.promptFacade = execContext.promptFacade;
 		this.facadeOptions = {
 			userId: execContext.user!.id,
 			directoryId: execContext.directory.id
@@ -51,7 +54,12 @@ export class AiDeduplicator {
 		customPrompt?: string | null
 	): Promise<MutableItemData[]> {
 		try {
-			const finalPrompt = appendCustomPrompt(DEDUPLICATOR_PROMPT, customPrompt);
+			const resolvedPrompt = (
+				this.promptFacade
+					? await this.promptFacade.getPrompt(PROMPT_KEYS.DEDUPLICATION, DEDUPLICATOR_PROMPT)
+					: DEDUPLICATOR_PROMPT
+			) as typeof DEDUPLICATOR_PROMPT;
+			const finalPrompt = appendCustomPrompt(resolvedPrompt, customPrompt);
 			const { result, usage, cost } = await this.aiFacade.askJson<ExtractedItems>(
 				finalPrompt,
 				extractedItemsSchema,

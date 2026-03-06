@@ -9,6 +9,7 @@ import type {
     IScreenshotFacade,
     IContentExtractorFacade,
     IDataSourceFacade,
+    IPromptFacade,
     AskJsonOptions,
     AskJsonResponse,
     SchemaType,
@@ -33,6 +34,7 @@ import { SearchFacadeService } from '../facades/search.facade';
 import { ScreenshotFacadeService } from '../facades/screenshot.facade';
 import { ContentExtractorFacadeService } from '../facades/content-extractor.facade';
 import { DataSourceFacadeService } from '../facades/data-source.facade';
+import { PromptFacadeService } from '../facades/prompt.facade';
 
 /**
  * Context for binding facades to a specific directory/user.
@@ -65,6 +67,7 @@ export class PipelineFacadeService {
         private readonly searchFacade: SearchFacadeService,
         private readonly screenshotFacade: ScreenshotFacadeService,
         private readonly contentExtractorFacade: ContentExtractorFacadeService,
+        private readonly promptFacade: PromptFacadeService,
         @Optional() private readonly dataSourceFacade?: DataSourceFacadeService,
     ) {}
 
@@ -108,6 +111,7 @@ export class PipelineFacadeService {
             screenshotFacade: this.createBoundScreenshotFacade(facadeContext),
             contentExtractorFacade: this.createBoundContentExtractorFacade(facadeContext),
             dataSourceFacade: this.createBoundDataSourceFacade(facadeContext),
+            promptFacade: this.createBoundPromptFacade(facadeContext),
             logger: stepLogger,
             directory,
             user: directory.user,
@@ -123,10 +127,10 @@ export class PipelineFacadeService {
             providerOverride: ctx.providerOverrides?.ai,
         };
         return {
-            askJson: <T>(
-                promptTemplate: string,
+            askJson: <T, Template extends string = string>(
+                promptTemplate: Template,
                 schema: SchemaType<T>,
-                options: AskJsonOptions | undefined,
+                options: AskJsonOptions<Template> | undefined,
                 _facadeOptions: FacadeOptions,
             ): Promise<AskJsonResponse<T>> =>
                 facade.askJson(promptTemplate, schema as any, options, boundFacadeOptions),
@@ -217,6 +221,22 @@ export class PipelineFacadeService {
                     directoryId: ctx.directoryId,
                     providerOverride: ctx.providerOverrides?.contentExtractor,
                 }),
+            isConfigured: () => facade.isConfigured(),
+        };
+    }
+
+    private createBoundPromptFacade(ctx: FacadeBindingContext): IPromptFacade {
+        const facade = this.promptFacade;
+        const boundFacadeOptions: FacadeOptions = {
+            directoryId: ctx.directoryId,
+            userId: ctx.userId,
+        };
+        return {
+            getPrompt: (
+                key: string,
+                defaultPrompt: string,
+                _facadeOptions?: FacadeOptions,
+            ): Promise<string> => facade.getPrompt(key, defaultPrompt, boundFacadeOptions),
             isConfigured: () => facade.isConfigured(),
         };
     }
