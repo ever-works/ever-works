@@ -76,7 +76,7 @@ export default function NewDirectoryClient({
                         </div>
                         <div className="relative overflow-hidden rounded-lg bg-card dark:bg-card-primary-dark p-6 mt-4  h-[94%]">
                             <div className="opacity-0 group-hover:opacity-100 absolute -bottom-5 right-6 w-40 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/15  blur-2xl pointer-events-none" />
-                            <div className="card-top-accent-indigo opacity-0 group-hover:opacity-100 pointer-events-none absolute right-8 bottom-0 w-1/2 h-px z-20 rounded-full"/>
+                            <div className="card-top-accent-indigo opacity-0 group-hover:opacity-100 pointer-events-none absolute right-8 bottom-0 w-1/2 h-px z-20 rounded-full" />
                             <div className="mb-4">
                                 <div
                                     className={cn(
@@ -124,7 +124,7 @@ export default function NewDirectoryClient({
                         </div>
                         <div className="relative overflow-hidden rounded-lg bg-card dark:bg-card-primary-dark p-6 mt-4  h-[94%]">
                             <div className="opacity-0 group-hover:opacity-100 absolute -bottom-5 right-6 w-40 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/15  blur-2xl pointer-events-none" />
-                            <div className="card-top-accent-indigo opacity-0 group-hover:opacity-100 pointer-events-none absolute right-8 bottom-0 w-1/2 h-px z-20 rounded-full"/>
+                            <div className="card-top-accent-indigo opacity-0 group-hover:opacity-100 pointer-events-none absolute right-8 bottom-0 w-1/2 h-px z-20 rounded-full" />
                             <div className="mb-4">
                                 <div
                                     className={cn(
@@ -172,7 +172,7 @@ export default function NewDirectoryClient({
                         </div>
                         <div className="relative overflow-hidden rounded-lg bg-card dark:bg-card-primary-dark p-6 mt-4 h-[94%]">
                             <div className="opacity-0 group-hover:opacity-100 absolute -bottom-5 right-6 w-40 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/15  blur-2xl pointer-events-none" />
-                            <div className="card-top-accent-indigo opacity-0 group-hover:opacity-100 pointer-events-none absolute right-8 bottom-0 w-1/2 h-px z-20 rounded-full"/>
+                            <div className="card-top-accent-indigo opacity-0 group-hover:opacity-100 pointer-events-none absolute right-8 bottom-0 w-1/2 h-px z-20 rounded-full" />
                             <div className="mb-4">
                                 <div
                                     className={cn(
