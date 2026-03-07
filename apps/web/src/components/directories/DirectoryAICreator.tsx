@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useTransition, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
@@ -186,7 +186,7 @@ export function DirectoryAICreator({
                     />
 
                     {/* AI Features Info */}
-                    <div className={cn('p-4 rounded-lg', '')}>
+                    <div className="p-4 rounded-lg">
                         <h4 className="text-sm font-medium text-text dark:text-text-dark mb-2">
                             {t('featuresTitle')}
                         </h4>

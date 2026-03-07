@@ -61,8 +61,7 @@ export default function NewDirectoryClient({
                         className={cn(
                             'rounded-b-lg rounded-t-lg rounded-tr-lg text-left transition-all',
                             'bg-surface-tertiary dark:bg-card-navy-dark',
-                            'border-card-border dark:border-card-border-dark',
-                            'hover:border-primary hover:shadow-lg shadow-sm',
+                            'hover:shadow-lg shadow-sm',
                             'group relative cursor-pointer',
                         )}
                     >
@@ -109,8 +108,7 @@ export default function NewDirectoryClient({
                         className={cn(
                             'rounded-b-lg rounded-t-lg rounded-tr-lg text-left transition-all',
                             'bg-surface-tertiary dark:bg-card-navy-dark',
-                            'border-card-border dark:border-card-border-dark',
-                            'hover:border-primary hover:shadow-lg shadow-sm',
+                            'hover:shadow-lg shadow-sm',
                             'group relative cursor-pointer',
                         )}
                     >
@@ -157,8 +155,7 @@ export default function NewDirectoryClient({
                         className={cn(
                             'rounded-b-lg rounded-t-lg rounded-tr-lg text-left transition-all',
                             'bg-surface-tertiary dark:bg-card-navy-dark',
-                            'border-card-border dark:border-card-border-dark',
-                            'hover:border-primary hover:shadow-lg shadow-sm',
+                            'hover:shadow-lg shadow-sm',
                             'group relative cursor-pointer',
                         )}
                     >
