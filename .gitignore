@@ -47,6 +47,7 @@ Thumbs.db
 
 # claude
 .claude
+.mcp.json
 
 # API
 apps/api/data

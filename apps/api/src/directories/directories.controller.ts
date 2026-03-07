@@ -80,6 +80,7 @@ import { DirectoryRepository } from '@ever-works/agent/database';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { GenerateDirectoryDetailDto } from './dto/generate-detail.dto';
+import { GenerateManualComparisonDto } from './dto/generate-manual-comparison.dto';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
 import { UpdateDirectoryScheduleDto } from '@ever-works/agent/dto';
 import { DirectoryScheduleStatus } from '@ever-works/agent/entities';
@@ -167,6 +168,12 @@ export class DirectoriesController {
 
     @Put('directories/:id')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Update directory',
+        description: 'Update directory settings and configuration',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Directory updated successfully' })
     async updateDirectory(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
@@ -178,6 +185,9 @@ export class DirectoriesController {
 
     @Get('directories/:id/items')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Get directory items', description: 'Get all items in a directory' })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'List of directory items' })
     async getDirectoryItems(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const cacheKey = `directory-items-${id}-${auth.userId}`;
 
@@ -193,6 +203,12 @@ export class DirectoriesController {
 
     @Get('directories/:id/config')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get directory config',
+        description: 'Get directory configuration and metadata',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Directory configuration' })
     async getDirectoryConfig(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const cacheKey = `directory-config-${id}-${auth.userId}`;
 
@@ -241,6 +257,12 @@ export class DirectoriesController {
 
     @Get('directories/:id/categories-tags')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get categories and tags',
+        description: 'Get categories and tags for a directory',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Categories and tags' })
     async getDirectoryCategoriesTags(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
@@ -259,6 +281,14 @@ export class DirectoriesController {
 
     @Get('directories/:id/history')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get directory history',
+        description: 'Get generation and update history for a directory',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiQuery({ name: 'limit', required: false, description: 'Maximum number of results' })
+    @ApiQuery({ name: 'offset', required: false, description: 'Number of results to skip' })
+    @ApiResponse({ status: 200, description: 'Generation history' })
     async getDirectoryHistory(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
@@ -283,6 +313,11 @@ export class DirectoriesController {
 
     @Post('directories/generate-details')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Generate directory details',
+        description: 'AI-generate directory name, description, and categories from a prompt',
+    })
+    @ApiResponse({ status: 200, description: 'Generated directory details' })
     async generateDirectoryDetails(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() generateDirectoryDetailDto: GenerateDirectoryDetailDto,
@@ -365,6 +400,12 @@ export class DirectoriesController {
 
     @Post('directories/:id/update')
     @HttpCode(HttpStatus.ACCEPTED)
+    @ApiOperation({
+        summary: 'Update items',
+        description: 'Update existing items in a directory using AI',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 202, description: 'Update started' })
     async updateItemsGenerator(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
@@ -382,6 +423,12 @@ export class DirectoriesController {
 
     @Get('directories/:id/schedule')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get schedule',
+        description: 'Get scheduled update configuration for a directory',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Schedule configuration' })
     async getDirectorySchedule(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const user = await this.authService.getUser(auth.userId);
         const result = await this.directoryScheduleService.getSchedule(id, user);
@@ -394,6 +441,13 @@ export class DirectoriesController {
 
     @Put('directories/:id/schedule')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Update schedule',
+        description:
+            'Update scheduled update configuration (cadence, enable/disable, billing mode)',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Schedule updated' })
     async updateDirectorySchedule(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
@@ -414,6 +468,12 @@ export class DirectoriesController {
 
     @Delete('directories/:id/schedule')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Cancel schedule',
+        description: 'Cancel and remove scheduled updates for a directory',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Schedule cancelled' })
     async cancelDirectorySchedule(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const user = await this.authService.getUser(auth.userId);
         const schedule = await this.directoryScheduleService.cancelSchedule(id, user);
@@ -426,6 +486,13 @@ export class DirectoriesController {
 
     @Post('directories/:id/schedule/run')
     @HttpCode(HttpStatus.ACCEPTED)
+    @ApiOperation({
+        summary: 'Run scheduled update',
+        description: 'Manually trigger a scheduled update now',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 202, description: 'Scheduled update triggered' })
+    @ApiResponse({ status: 400, description: 'Schedule must be active to run' })
     async runScheduledUpdate(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const user = await this.authService.getUser(auth.userId);
         const schedule = await this.directoryScheduleService.getScheduleEntity(id, user);
@@ -443,6 +510,9 @@ export class DirectoriesController {
 
     @Post('directories/:id/submit-item')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Submit item', description: 'Add a single item to a directory' })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Item submitted successfully' })
     async submitItem(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
@@ -455,6 +525,9 @@ export class DirectoriesController {
 
     @Post('directories/:id/remove-item')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Remove item', description: 'Remove an item from a directory' })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Item removed successfully' })
     async removeItem(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
@@ -467,6 +540,12 @@ export class DirectoriesController {
 
     @Post('directories/:id/update-item')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Update item',
+        description: 'Update item metadata (featured status, display order)',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Item updated successfully' })
     async updateItemMetadata(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
@@ -479,6 +558,11 @@ export class DirectoriesController {
 
     @Post('extract-item-details')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Extract item details',
+        description: 'Extract item details from a URL using AI',
+    })
+    @ApiResponse({ status: 200, description: 'Extracted item details' })
     async extractItemDetails(
         @Body() extractItemDetailsDto: ExtractItemDetailsDto,
     ): Promise<ExtractItemDetailsResponseDto> {
@@ -520,6 +604,12 @@ export class DirectoriesController {
 
     @Post('directories/:id/regenerate-markdown')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Regenerate markdown',
+        description: 'Regenerate markdown files for all items in a directory',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Markdown regenerated' })
     async regenerateMarkdown(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const user = await this.authService.getUser(auth.userId);
 
@@ -536,6 +626,12 @@ export class DirectoriesController {
 
     @Post('directories/:id/update-website')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Update website',
+        description: 'Trigger a website rebuild and update',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Website update triggered' })
     async updateWebsiteRepository(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
@@ -547,6 +643,12 @@ export class DirectoriesController {
 
     @Post('directories/:id/delete')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Delete directory',
+        description: 'Delete a directory and optionally its repositories',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Directory deleted' })
     async deleteDirectory(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
@@ -920,17 +1022,14 @@ export class DirectoriesController {
         description: 'Generate a comparison between two specific items',
     })
     @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 202, description: 'Comparison generation started' })
     async generateManualComparison(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
-        @Body() body: { itemASlug: string; itemBSlug: string },
+        @Body() body: GenerateManualComparisonDto,
     ) {
         const user = await this.authService.getUser(auth.userId);
         await this.directoryOwnershipService.ensureCanEdit(id, user.id);
-
-        if (!body.itemASlug || !body.itemBSlug) {
-            throw new BadRequestException('Both itemASlug and itemBSlug are required');
-        }
 
         if (body.itemASlug === body.itemBSlug) {
             throw new BadRequestException('Cannot compare an item with itself');
