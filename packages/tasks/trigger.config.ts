@@ -41,6 +41,7 @@ export default defineConfig({
             'nats',
             'amqplib',
             'amqp-connection-manager',
+            'class-transformer',
         ],
         extensions: [
             // Enable TypeScript decorator metadata for TypeORM
