@@ -39,7 +39,7 @@ const Input = ({
                 className={cn(
                     'w-full rounded-lg transition-colors outline-none dark:bg-surface-dark/40',
                     'text-text dark:text-text-dark placeholder-text-muted dark:placeholder-text-muted-dark',
-                    'border border-primary/30 dark:border-primary/10',
+                    'border border-primary-800/30 dark:border-card-border-dark',
                     'focus:border-primary',
                     'disabled:bg-surface-tertiary dark:disabled:bg-surface-tertiary-dark disabled:text-text-muted dark:disabled:text-text-muted-dark disabled:cursor-not-allowed',
                     // Variant-specific styles
@@ -47,7 +47,7 @@ const Input = ({
                     variant === 'default' && [
                         'px-4 py-3',
                         'bg-white dark:bg-input-bg-dark',
-                        'focus:ring-2 focus:ring-primary/20',
+                        'focus:ring-2 focus:ring-primary-800/20',
                         'hover:border-border-secondary dark:hover:border-border-secondary-dark',
                         'duration-200',
                     ],
