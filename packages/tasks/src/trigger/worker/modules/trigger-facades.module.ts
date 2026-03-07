@@ -6,6 +6,7 @@ import {
     ContentExtractorFacadeService,
     DataSourceFacadeService,
     GitFacadeService,
+    PromptFacadeService,
 } from '@ever-works/agent/facades';
 import { OAuthTokenRepository } from '@ever-works/agent/database';
 import { TriggerInternalModule } from './trigger-internal.module';
@@ -19,6 +20,7 @@ const FACADES = [
     ContentExtractorFacadeService,
     DataSourceFacadeService,
     GitFacadeService,
+    PromptFacadeService,
 ];
 
 /**

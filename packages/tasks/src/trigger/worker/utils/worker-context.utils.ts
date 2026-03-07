@@ -12,9 +12,9 @@ export async function withWorkerContext<T>(
     fn: (appContext: INestApplicationContext) => Promise<T>,
     module: Type<any> = TriggerWorkerModule,
 ): Promise<T> {
-    const appContext = await NestFactory.createApplicationContext(module, {
-        logger: createTriggerLogger(loggerName),
-    });
+    const appContext = await NestFactory.createApplicationContext(module);
+
+    appContext.useLogger(createTriggerLogger(loggerName));
 
     try {
         return await fn(appContext);

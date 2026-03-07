@@ -1,0 +1,166 @@
+# Ever Works MCP Server
+
+A NestJS-based MCP (Model Context Protocol) server that auto-generates tools from the Ever Works API's OpenAPI spec. Connect it to Claude Desktop, Claude Code, or any MCP-compatible client to manage directories, generate content, deploy websites, and configure plugins programmatically.
+
+## Architecture
+
+Tools are dynamically generated at startup by fetching the OpenAPI spec from the Ever Works API and filtering endpoints against a whitelist. This means:
+
+- **No manual tool definitions** — schemas come from the API's OpenAPI spec
+- **Adding new tools** — just add a line to `src/openapi-tools/whitelist.ts`
+- **Backwards compatible** — tool names match the previous hardcoded implementation
+
+```
+Startup -> fetch /api/openapi.json -> filter by whitelist -> convert schemas to Zod -> register tools
+```
+
+Built with [NestJS](https://nestjs.com/) and [@rekog/mcp-nest](https://github.com/rekog/mcp-nest).
+
+## Prerequisites
+
+- Node.js >= 20
+- An Ever Works API key (generate one at **Settings > API Keys** in the dashboard)
+- The Ever Works API running and accessible
+
+## Environment Variables
+
+| Variable              | Required | Default                 | Description                    |
+| --------------------- | -------- | ----------------------- | ------------------------------ |
+| `EVER_WORKS_API_KEY`  | Yes      | --                      | API key for authentication     |
+| `EVER_WORKS_API_URL`  | No       | `http://localhost:3100` | Base URL of the Ever Works API |
+| `EVER_WORKS_MCP_PORT` | No       | `3200`                  | Port for HTTP transport        |
+
+## Claude Desktop Configuration
+
+Add to your Claude Desktop `claude_desktop_config.json`:
+
+```json
+{
+	"mcpServers": {
+		"ever-works": {
+			"command": "node",
+			"args": ["<path-to-repo>/apps/mcp/dist/stdio.js"],
+			"env": {
+				"EVER_WORKS_API_URL": "http://localhost:3100",
+				"EVER_WORKS_API_KEY": "ew_live_your_key_here"
+			}
+		}
+	}
+}
+```
+
+## Development
+
+```bash
+# Install dependencies (from repo root)
+pnpm install
+
+# Build
+pnpm build --filter=ever-works-mcp
+
+# Run with stdio transport (primary -- for Claude Desktop)
+EVER_WORKS_API_KEY=ew_live_... pnpm --filter=ever-works-mcp start:stdio
+
+# Run with HTTP transport (secondary -- for remote access)
+EVER_WORKS_API_KEY=ew_live_... pnpm --filter=ever-works-mcp start:http
+
+# Run tests
+cd apps/mcp && pnpm test
+
+# Type check
+cd apps/mcp && pnpm type-check
+
+# Lint
+cd apps/mcp && pnpm lint
+
+# Interactive debugging with MCP Inspector
+EVER_WORKS_API_KEY=ew_live_... npx @modelcontextprotocol/inspector node apps/mcp/dist/stdio.js
+```
+
+## Available Tools (36)
+
+### Directories (12)
+
+| Tool                    | Description                                     |
+| ----------------------- | ----------------------------------------------- |
+| `list_directories`      | List all directories with pagination and search |
+| `get_directory`         | Get full details for a directory                |
+| `create_directory`      | Create a new directory                          |
+| `update_directory`      | Update directory settings                       |
+| `delete_directory`      | Delete a directory and optionally its repos     |
+| `get_directory_config`  | Get directory configuration and metadata        |
+| `get_directory_items`   | Get all items in a directory                    |
+| `get_categories_tags`   | Get categories and tags for a directory         |
+| `get_directory_history` | Get generation/update history                   |
+| `regenerate_markdown`   | Regenerate markdown files for all items         |
+| `update_website`        | Trigger a website rebuild and update            |
+| `process_community_prs` | Process pending community pull requests         |
+
+### Generation (4)
+
+| Tool                         | Description                                         |
+| ---------------------------- | --------------------------------------------------- |
+| `generate_items`             | Start AI-powered item generation                    |
+| `update_items`               | Update existing items using AI                      |
+| `generate_directory_details` | AI-generate directory name, description, categories |
+| `get_generator_form`         | Get the dynamic generator form schema               |
+
+### Items (4)
+
+| Tool                   | Description                              |
+| ---------------------- | ---------------------------------------- |
+| `submit_item`          | Add a single item to a directory         |
+| `remove_item`          | Remove an item from a directory          |
+| `update_item`          | Update item metadata (featured, order)   |
+| `extract_item_details` | Extract item details from a URL using AI |
+
+### Deploy (4)
+
+| Tool                      | Description                           |
+| ------------------------- | ------------------------------------- |
+| `deploy_directory`        | Deploy a directory's website          |
+| `list_domains`            | List domains for a deployed directory |
+| `list_deploy_providers`   | List available deploy providers       |
+| `check_deploy_capability` | Check if a directory can be deployed  |
+
+### Plugins (5)
+
+| Tool                     | Description                                     |
+| ------------------------ | ----------------------------------------------- |
+| `list_plugins`           | List available plugins (optionally by category) |
+| `get_plugin`             | Get plugin details and settings schema          |
+| `enable_plugin`          | Enable a plugin with optional settings          |
+| `disable_plugin`         | Disable a plugin                                |
+| `update_plugin_settings` | Update settings for an enabled plugin           |
+
+### Scheduling (4)
+
+| Tool                   | Description                                     |
+| ---------------------- | ----------------------------------------------- |
+| `get_schedule`         | Get scheduled update configuration              |
+| `update_schedule`      | Update schedule (cadence, enable/disable, etc.) |
+| `cancel_schedule`      | Cancel and remove scheduled updates             |
+| `run_scheduled_update` | Manually trigger a scheduled update             |
+
+### Comparisons (5)
+
+| Tool                         | Description                                    |
+| ---------------------------- | ---------------------------------------------- |
+| `list_comparisons`           | List all comparisons for a directory           |
+| `get_comparison`             | Get a specific comparison by slug              |
+| `generate_comparison`        | Auto-generate comparisons using AI             |
+| `generate_manual_comparison` | Generate comparison between two specific items |
+| `delete_comparison`          | Delete a comparison                            |
+
+## Adding New Tools
+
+To expose a new API endpoint as an MCP tool:
+
+1. Ensure the endpoint is documented in the API's OpenAPI spec (via `@nestjs/swagger` decorators)
+2. Add an entry to `src/openapi-tools/whitelist.ts`:
+    ```typescript
+    { method: 'GET', path: '/api/your-endpoint', toolName: 'your_tool_name' }
+    ```
+3. Rebuild and restart the server
+
+The tool's parameter schema and description are automatically derived from the OpenAPI spec.
