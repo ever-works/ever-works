@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo, useState } from 'react';
 import { AuthUser } from '@/lib/auth';
@@ -10,9 +10,7 @@ import { GitProviderSelector } from './git-provider-selector';
 import { DeployProviderSelector, type DeployProvider } from './deploy-provider-selector';
 import { useTranslations } from 'next-intl';
 import type { ProviderWithConnection } from './page';
-import { Bot, PenLine, Import, ArrowRight } from 'lucide-react';
-import Image from 'next/image';
-import { CardDecoration } from '@/components/ui/CardDecoration';
+import { Bot, PenLine, FolderInput, ArrowRight } from 'lucide-react';
 
 interface NewDirectoryClientProps {
     user: AuthUser;
@@ -61,18 +59,24 @@ export default function NewDirectoryClient({
                     <button
                         onClick={() => setCreationMode('ai')}
                         className={cn(
-                            'p-6 rounded-lg border text-left transition-all h-full',
-                            'bg-card dark:bg-card-primary-dark',
+                            'rounded-b-lg rounded-t-lg rounded-tr-lg text-left transition-all',
+                            'bg-surface-tertiary dark:bg-card-navy-dark',
                             'border-card-border dark:border-card-border-dark',
-                            'hover:border-primary-500/70 hover:shadow-lg shadow-sm',
-                            'group cursor-pointer relative',
+                            'hover:border-primary hover:shadow-lg shadow-sm',
+                            'group relative cursor-pointer',
                         )}
                     >
-                        <CardDecoration
-                            accentClassName="opacity-0 group-hover:opacity-100"
-                            wrapperClassName="opacity-0 group-hover:opacity-100"
-                        />
-                        <div className="flex flex-col h-full">
+                        <div className="absolute left-0 -top-2 flex w-full">
+                            <div className="h-6 w-2/4 bg-surface-tertiary dark:bg-card-navy-dark rounded-t-2xl" />
+                            <div className="w-0 h-0 -ml-2 mt-0.5 border-b-20 border-r-20 border-b-surface-tertiary dark:border-b-card-navy-dark border-r-transparent" />
+                        </div>
+                        <div className="flex absolute right-0 top-1 w-[55%] h-6">
+                            <div className="w-0 h-0 border-b-20 mt-1 -mr-1.5 border-l-20 border-b-card dark:border-b-card-primary-dark border-l-transparent"></div>
+                            <div className="w-[94%] h-full bg-card dark:bg-card-primary-dark rounded-tl-2xl rounded-tr-lg" />
+                        </div>
+                        <div className="relative overflow-hidden rounded-lg bg-card dark:bg-card-primary-dark p-6 mt-4  h-[94%]">
+                            <div className="opacity-0 group-hover:opacity-100 absolute -bottom-5 right-6 w-40 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/15  blur-2xl pointer-events-none" />
+                            <div className="card-top-accent-indigo opacity-0 group-hover:opacity-100 pointer-events-none absolute right-8 bottom-0 w-1/2 h-px z-20 rounded-full"/>
                             <div className="mb-4">
                                 <div
                                     className={cn(
@@ -83,15 +87,13 @@ export default function NewDirectoryClient({
                                     <Bot className="w-6 h-6 text-primary" strokeWidth={1.5} />
                                 </div>
                             </div>
-
                             <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
                                 {t('ai.title')}
                             </h3>
                             <p className="text-text-secondary text-sm dark:text-text-secondary-dark mb-4">
                                 {t('ai.subtitle')}
                             </p>
-
-                            <div className="flex items-center gap-2 text-primary mt-auto">
+                            <div className="flex items-center gap-2 text-primary font-medium">
                                 <span>{t('ai.getStarted')}</span>
                                 <ArrowRight
                                     className="w-4 h-4 group-hover:translate-x-1 transition-transform"
@@ -105,18 +107,24 @@ export default function NewDirectoryClient({
                     <button
                         onClick={() => setCreationMode('manual')}
                         className={cn(
-                            'p-6 rounded-lg border text-left transition-all h-full',
-                            'bg-card dark:bg-card-primary-dark',
+                            'rounded-b-lg rounded-t-lg rounded-tr-lg text-left transition-all',
+                            'bg-surface-tertiary dark:bg-card-navy-dark',
                             'border-card-border dark:border-card-border-dark',
-                            'hover:border-primary-500/70 hover:shadow-lg shadow-sm',
-                            'group cursor-pointer relative',
+                            'hover:border-primary hover:shadow-lg shadow-sm',
+                            'group relative cursor-pointer',
                         )}
                     >
-                        <CardDecoration
-                            accentClassName="opacity-0 group-hover:opacity-100"
-                            wrapperClassName="opacity-0 group-hover:opacity-100"
-                        />
-                        <div className="flex flex-col h-full">
+                        <div className="absolute left-0 -top-2 flex w-full">
+                            <div className="h-6 w-2/4 bg-surface-tertiary dark:bg-card-navy-dark rounded-t-2xl" />
+                            <div className="w-0 h-0 -ml-2 mt-0.5 border-b-20 border-r-20 border-b-surface-tertiary dark:border-b-card-navy-dark border-r-transparent" />
+                        </div>
+                        <div className="flex absolute right-0 top-1 w-[55%] h-6">
+                            <div className="w-0 h-0 border-b-20 mt-1 -mr-1.5 border-l-20 border-b-card dark:border-b-card-primary-dark border-l-transparent"></div>
+                            <div className="w-[94%] h-full bg-card dark:bg-card-primary-dark rounded-tl-2xl rounded-tr-lg" />
+                        </div>
+                        <div className="relative overflow-hidden rounded-lg bg-card dark:bg-card-primary-dark p-6 mt-4  h-[94%]">
+                            <div className="opacity-0 group-hover:opacity-100 absolute -bottom-5 right-6 w-40 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/15  blur-2xl pointer-events-none" />
+                            <div className="card-top-accent-indigo opacity-0 group-hover:opacity-100 pointer-events-none absolute right-8 bottom-0 w-1/2 h-px z-20 rounded-full"/>
                             <div className="mb-4">
                                 <div
                                     className={cn(
@@ -127,15 +135,13 @@ export default function NewDirectoryClient({
                                     <PenLine className="w-6 h-6 text-success" strokeWidth={1.5} />
                                 </div>
                             </div>
-
                             <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
                                 {t('manual.title')}
                             </h3>
                             <p className="text-text-secondary text-sm dark:text-text-secondary-dark mb-4">
                                 {t('manual.subtitle')}
                             </p>
-
-                            <div className="flex items-center gap-2 text-success mt-auto">
+                            <div className="flex items-center gap-2 text-success font-medium">
                                 <span>{t('manual.configureNow')}</span>
                                 <ArrowRight
                                     className="w-4 h-4 group-hover:translate-x-1 transition-transform"
@@ -149,35 +155,44 @@ export default function NewDirectoryClient({
                     <button
                         onClick={() => setCreationMode('import')}
                         className={cn(
-                            'p-6 rounded-lg border text-left transition-all h-full',
-                            'bg-card dark:bg-card-primary-dark',
+                            'rounded-b-lg rounded-t-lg rounded-tr-lg text-left transition-all',
+                            'bg-surface-tertiary dark:bg-card-navy-dark',
                             'border-card-border dark:border-card-border-dark',
-                            'hover:border-primary-500/70 hover:shadow-lg shadow-sm',
-                            'group cursor-pointer relative',
+                            'hover:border-primary hover:shadow-lg shadow-sm',
+                            'group relative cursor-pointer',
                         )}
                     >
-                        <CardDecoration
-                            accentClassName="opacity-0 group-hover:opacity-100"
-                            wrapperClassName="opacity-0 group-hover:opacity-100"
-                        />
-                        <div className="flex flex-col h-full">
-                            <div
-                                className={cn(
-                                    'w-12 h-12 mb-4 rounded-lg flex items-center justify-center',
-                                    'bg-warning/10 border border-warning/20 group-hover:bg-warning/20 transition-colors',
-                                )}
-                            >
-                                <Import className="w-6 h-6 text-warning" strokeWidth={1.5} />
+                        <div className="absolute left-0 -top-2 flex w-full">
+                            <div className="h-6 w-2/4 bg-surface-tertiary dark:bg-card-navy-dark rounded-t-2xl" />
+                            <div className="w-0 h-0 -ml-2 mt-0.5 border-b-20 border-r-20 border-b-surface-tertiary dark:border-b-card-navy-dark border-r-transparent" />
+                        </div>
+                        <div className="flex absolute right-0 top-1 w-[55%] h-6">
+                            <div className="w-0 h-0 border-b-20 mt-1 -mr-1.5 border-l-20 border-b-card dark:border-b-card-primary-dark border-l-transparent"></div>
+                            <div className="w-[94%] h-full bg-card dark:bg-card-primary-dark rounded-tl-2xl rounded-tr-lg" />
+                        </div>
+                        <div className="relative overflow-hidden rounded-lg bg-card dark:bg-card-primary-dark p-6 mt-4 h-[94%]">
+                            <div className="opacity-0 group-hover:opacity-100 absolute -bottom-5 right-6 w-40 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/15  blur-2xl pointer-events-none" />
+                            <div className="card-top-accent-indigo opacity-0 group-hover:opacity-100 pointer-events-none absolute right-8 bottom-0 w-1/2 h-px z-20 rounded-full"/>
+                            <div className="mb-4">
+                                <div
+                                    className={cn(
+                                        'w-12 h-12 rounded-lg flex items-center justify-center',
+                                        'bg-warning/10 border border-warning/20 group-hover:bg-warning/20 transition-colors',
+                                    )}
+                                >
+                                    <FolderInput
+                                        className="w-6 h-6 text-warning"
+                                        strokeWidth={1.5}
+                                    />
+                                </div>
                             </div>
-
                             <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
                                 {t('import.title')}
                             </h3>
                             <p className="text-text-secondary text-sm dark:text-text-secondary-dark mb-4">
                                 {t('import.subtitle')}
                             </p>
-
-                            <div className="flex items-center gap-2 text-warning mt-auto">
+                            <div className="flex items-center gap-2 text-warning font-medium">
                                 <span>{t('import.importNow')}</span>
                                 <ArrowRight
                                     className="w-4 h-4 group-hover:translate-x-1 transition-transform"
@@ -252,12 +267,13 @@ export default function NewDirectoryClient({
                 >
                     <div
                         className={cn(
-                            'p-6 rounded-sm',
-                            'bg-card dark:bg-card-secondary-dark/50',
+                            'p-6 rounded-sm relative overflow-hidden',
+                            'bg-card dark:bg-card-secondary-dark/30',
                             'border border-card-border dark:border-border-secondary-dark',
                         )}
                     >
-                        <div>
+                        <div className="absolute -top-5 -right-6 w-30 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/15  blur-xl pointer-events-none" />
+                        <div className="relative z-20">
                             <h3 className="font-medium text-text dark:text-text-dark mb-4">
                                 {t('sidebar.selectedProvider')}
                             </h3>
@@ -269,7 +285,7 @@ export default function NewDirectoryClient({
                             />
                         </div>
                         {deployProviders.length > 0 && (
-                            <div>
+                            <div className="relative z-20">
                                 <h3 className="font-medium text-text dark:text-text-dark mb-4">
                                     {t('sidebar.selectedDeployProvider')}
                                 </h3>

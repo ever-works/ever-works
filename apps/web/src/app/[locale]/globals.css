@@ -51,6 +51,7 @@
 
     --color-card-dark: #1e293b;
     --color-card-primary-dark: #101828;
+    --color-card-navy-dark: #101e46;
     --color-card-secondary-dark: #28364a;
     --color-card-hover-dark: #334155;
     --color-card-border-dark: #232f43;
@@ -66,6 +67,7 @@
     --color-brand-purple: #6209bb;
     --color-brand-indigo: #382686;
     --color-accent-indigo: #6763ee;
+    --color-accent-indigo-rgb: 103, 99, 238;
 
     /* UI element colors */
     --color-toggle-dark: #3b4454;
@@ -90,6 +92,15 @@
         rgba(255, 255, 255, 0) 0%,
         rgba(255, 255, 255, 0.6) 50%,
         rgba(255, 255, 255, 0) 100%
+    );
+}
+
+.card-top-accent-indigo {
+    background: linear-gradient(
+        90deg,
+        rgba(var(--color-accent-indigo-rgb), 0) 0%,
+        rgba(var(--color-accent-indigo-rgb), 0.6) 50%,
+        rgba(var(--color-accent-indigo-rgb), 0) 100%
     );
 }
 
