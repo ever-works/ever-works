@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import Image from 'next/image';
 import { useLocale } from 'next-intl';
 import { useRouter, usePathname } from '@/i18n/navigation';
 import { LOCALES } from '@/lib/constants';
@@ -38,7 +40,7 @@ const LOCALE_NAMES: Record<Locale, string> = {
     zh: 'Zh',
 } as const;
 
-const LOCALE_FLAGS: Record<Locale, string> = {
+const LOCALE_EMOJI_FALLBACK: Partial<Record<Locale, string>> = {
     en: '🇬🇧',
     ar: '🇸🇦',
     bg: '🇧🇬',
@@ -60,7 +62,50 @@ const LOCALE_FLAGS: Record<Locale, string> = {
     uk: '🇺🇦',
     vi: '🇻🇳',
     zh: '🇨🇳',
-} as const;
+};
+
+function FlagImage({
+    locale,
+    alt,
+    className,
+    width = 18,
+    height = 14,
+}: {
+    locale: Locale;
+    alt: string;
+    className?: string;
+    width?: number;
+    height?: number;
+}) {
+    const [errored, setErrored] = useState(false);
+
+    if (errored) {
+        const emoji = LOCALE_EMOJI_FALLBACK[locale] || alt?.[0] || locale;
+        return (
+            <span
+                className={cn(
+                    'inline-flex items-center justify-center rounded-[2px] bg-muted text-sm leading-none',
+                    className,
+                )}
+                aria-hidden="true"
+            >
+                {emoji}
+            </span>
+        );
+    }
+
+    return (
+        <Image
+            src={`/flags/${locale}.svg`}
+            alt={alt}
+            width={width}
+            height={height}
+            className={cn('shrink-0 rounded-[2px]', className)}
+            onError={() => setErrored(true)}
+            unoptimized
+        />
+    );
+}
 
 interface LanguageSelectorProps {
     className?: string;
@@ -76,7 +121,6 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
     };
 
     const currentLocaleName = LOCALE_NAMES[locale] || LOCALE_NAMES.en;
-    const currentLocaleFlag = LOCALE_FLAGS[locale] || LOCALE_FLAGS.en;
 
     return (
         <DropdownMenu>
@@ -86,7 +130,7 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                     type="button"
                     className={cn(
                         'inline-flex items-center justify-center',
-                        'h-8 min-w-25 px-2 text-xs font-normal',
+                        'h-8 min-w-20 px-2 text-xs font-normal',
                         'rounded-md transition-all duration-200',
                         'bg-surface-secondary dark:bg-surface-secondary-dark',
                         'border border-border dark:border-border-dark',
@@ -100,9 +144,13 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                     )}
                     aria-label="Select language"
                 >
-                    <span className="mr-2 text-base leading-none" aria-hidden="true">
-                        {currentLocaleFlag}
-                    </span>
+                    <FlagImage
+                        locale={locale}
+                        alt={currentLocaleName}
+                        className="mr-2"
+                        width={18}
+                        height={14}
+                    />
                     <span className="text-xs leading-tight whitespace-nowrap">
                         {currentLocaleName}
                     </span>
@@ -112,7 +160,7 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                     />
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="top" className="min-w-21">
+            <DropdownMenuContent align="end" side="top" className="min-w-16">
                 {LOCALES.map((loc) => {
                     const isActive = locale === loc;
                     return (
@@ -120,22 +168,20 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                             key={loc}
                             onClick={() => handleLocaleChange(loc)}
                             className={cn(
-                                'flex items-center gap-2 py-1 hover:bg-surface-tertiary/50 hover:dark:bg-surface-tertiary-dark/70',
+                                'flex items-center gap-2 mb-px py-1 hover:bg-surface-tertiary/50 hover:dark:bg-surface-tertiary-dark/70',
                                 isActive &&
-                                    'bg-surface-tertiary dark:bg-surface-tertiary-dark cursor-pointer font-medium',
+                                    'bg-surface-tertiary dark:bg-surface-tertiary-dark/80 cursor-pointer font-medium',
                                 !isActive && 'cursor-pointer',
                             )}
                         >
-                            <span aria-hidden="true">{LOCALE_FLAGS[loc]}</span>
+                            <FlagImage
+                                locale={loc}
+                                alt={LOCALE_NAMES[loc]}
+                                className="shrink-0"
+                                width={18}
+                                height={14}
+                            />
                             <span>{LOCALE_NAMES[loc]}</span>
-                            {isActive && (
-                                <span
-                                    className="ml-auto text-xs text-primary dark:text-primary-dark"
-                                    aria-label="Current language"
-                                >
-                                    ✓
-                                </span>
-                            )}
                         </DropdownMenuItem>
                     );
                 })}
