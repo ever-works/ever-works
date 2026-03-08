@@ -349,6 +349,7 @@ export interface AnalyzeRepositoryResponseDto {
         conflictingRepos: string[];
         suggestedSlug: string;
     };
+    hasDataRepoWriteAccess?: boolean;
     error?: string;
 }
 

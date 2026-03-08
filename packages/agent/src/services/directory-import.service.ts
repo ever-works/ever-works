@@ -243,13 +243,18 @@ export class DirectoryImportService {
                 );
             }
 
+            // For link_existing, the owner must be the source repo's owner
+            // since the repos already exist under that account
+            const directoryOwner =
+                dto.sourceType === ImportSourceTypeEnum.LINK_EXISTING ? parsed.owner : dto.owner;
+
             const directory = await this.directoryRepository.create(
                 {
                     slug,
                     name: normalizedName,
                     description: `Imported from ${dto.sourceUrl}`,
                     userId: user.id,
-                    owner: dto.owner,
+                    owner: directoryOwner,
                     organization: dto.organization || false,
                     gitProvider: dto.gitProvider,
                     deployProvider: dto.deployProvider,

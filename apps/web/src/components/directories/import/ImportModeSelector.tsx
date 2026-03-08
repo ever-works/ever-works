@@ -15,6 +15,7 @@ interface ImportModeSelectorProps {
     };
     onSelectMode: (mode: ImportMode) => void;
     disabled?: boolean;
+    hasWriteAccess?: boolean;
 }
 
 interface ModeOptionProps {
@@ -61,8 +62,14 @@ function ModeOption({ title, description, icon, selected, onClick, disabled }: M
     );
 }
 
-export function ImportModeSelector({ repoInfo, onSelectMode, disabled }: ImportModeSelectorProps) {
+export function ImportModeSelector({
+    repoInfo,
+    onSelectMode,
+    disabled,
+    hasWriteAccess,
+}: ImportModeSelectorProps) {
     const t = useTranslations('dashboard.directoryCreation.import.chooseMode');
+    const showLinkOption = hasWriteAccess !== false;
 
     const repoDescription =
         repoInfo.itemCount !== undefined
@@ -82,7 +89,12 @@ export function ImportModeSelector({ repoInfo, onSelectMode, disabled }: ImportM
                 <p className="text-sm text-muted dark:text-muted-dark mt-1">{repoDescription}</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div
+                className={cn(
+                    'grid gap-4',
+                    showLinkOption ? 'grid-cols-2' : 'grid-cols-1 max-w-sm mx-auto',
+                )}
+            >
                 <ModeOption
                     title={t('importCopy.title')}
                     description={t('importCopy.description')}
@@ -91,13 +103,15 @@ export function ImportModeSelector({ repoInfo, onSelectMode, disabled }: ImportM
                     disabled={disabled}
                 />
 
-                <ModeOption
-                    title={t('linkExisting.title')}
-                    description={t('linkExisting.description')}
-                    icon={<LinkIcon className="w-6 h-6 text-primary" />}
-                    onClick={() => onSelectMode('link_existing')}
-                    disabled={disabled}
-                />
+                {showLinkOption && (
+                    <ModeOption
+                        title={t('linkExisting.title')}
+                        description={t('linkExisting.description')}
+                        icon={<LinkIcon className="w-6 h-6 text-primary" />}
+                        onClick={() => onSelectMode('link_existing')}
+                        disabled={disabled}
+                    />
+                )}
             </div>
         </div>
     );

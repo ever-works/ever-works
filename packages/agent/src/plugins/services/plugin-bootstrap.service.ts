@@ -91,6 +91,16 @@ export class PluginBootstrapService {
             `Plugin discovery complete: ${result.loaded} loaded, ${result.failed} failed`,
         );
 
+        // Log details of failed plugins for easier debugging
+        if (result.failed > 0) {
+            const failedPlugins = result.results.filter((r) => !r.success);
+            for (const failure of failedPlugins) {
+                this.logger.warn(
+                    `Plugin "${failure.pluginId || 'unknown'}" failed: ${failure.error || 'unknown error'}`,
+                );
+            }
+        }
+
         // Call onLoad for all loaded plugins
         for (const loadResult of result.results) {
             if (loadResult.success && loadResult.pluginId) {
