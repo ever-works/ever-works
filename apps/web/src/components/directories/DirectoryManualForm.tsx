@@ -102,7 +102,7 @@ export function DirectoryManualForm({
                     className={cn(
                         'p-6 rounded-lg',
                         'bg-card dark:bg-card-primary-dark',
-                        'border border-card-border dark:border-card-border-dark',
+                        'border border-card-border dark:border-border-secondary-dark',
                     )}
                 >
                     <h2 className="text-lg font-semibold text-text dark:text-text-dark mb-4">

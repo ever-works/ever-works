@@ -22,7 +22,7 @@ export function CollapsibleSection({
             className={cn(
                 'rounded-lg overflow-hidden',
                 'bg-card dark:bg-card-primary-dark',
-                'border border-card-border dark:border-[#1e2838]',
+                'border border-card-border dark:border-card-border-dark',
             )}
         >
             <button
