@@ -144,12 +144,7 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                     )}
                     aria-label="Select language"
                 >
-                    <FlagImage
-                        locale={locale}
-                        className="mr-2"
-                        width={18}
-                        height={14}
-                    />
+                    <FlagImage locale={locale} className="mr-2" width={18} height={14} />
                     <span className="text-xs leading-tight whitespace-nowrap">
                         {currentLocaleName}
                     </span>
@@ -173,12 +168,7 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                                 !isActive && 'cursor-pointer',
                             )}
                         >
-                            <FlagImage
-                                locale={loc}
-                                className="shrink-0"
-                                width={18}
-                                height={14}
-                            />
+                            <FlagImage locale={loc} className="shrink-0" width={18} height={14} />
                             <span>{LOCALE_NAMES[loc]}</span>
                         </DropdownMenuItem>
                     );
