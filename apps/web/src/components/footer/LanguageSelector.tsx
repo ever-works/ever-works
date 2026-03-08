@@ -41,7 +41,7 @@ const LOCALE_NAMES: Record<Locale, string> = {
 } as const;
 
 const LOCALE_EMOJI_FALLBACK: Partial<Record<Locale, string>> = {
-    en: '🇺🇸',
+    en: '�',
     ar: '🇸🇦',
     bg: '🇧🇬',
     de: '🇩🇪',
