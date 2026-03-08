@@ -41,7 +41,7 @@ const LOCALE_NAMES: Record<Locale, string> = {
 } as const;
 
 const LOCALE_EMOJI_FALLBACK: Partial<Record<Locale, string>> = {
-    en: '🇬🇧',
+    en: '🇺🇸',
     ar: '🇸🇦',
     bg: '🇧🇬',
     de: '🇩🇪',
@@ -66,13 +66,11 @@ const LOCALE_EMOJI_FALLBACK: Partial<Record<Locale, string>> = {
 
 function FlagImage({
     locale,
-    alt,
     className,
     width = 18,
     height = 14,
 }: {
     locale: Locale;
-    alt: string;
     className?: string;
     width?: number;
     height?: number;
@@ -80,11 +78,12 @@ function FlagImage({
     const [errored, setErrored] = useState(false);
 
     if (errored) {
-        const emoji = LOCALE_EMOJI_FALLBACK[locale] || alt?.[0] || locale;
+        const emoji = LOCALE_EMOJI_FALLBACK[locale] ?? '🏳';
         return (
             <span
+                style={{ width, height }}
                 className={cn(
-                    'inline-flex items-center justify-center rounded-[2px] bg-muted text-sm leading-none',
+                    'inline-flex shrink-0 items-center justify-center rounded-[2px] bg-muted text-sm leading-none',
                     className,
                 )}
                 aria-hidden="true"
@@ -97,7 +96,8 @@ function FlagImage({
     return (
         <Image
             src={`/flags/${locale}.svg`}
-            alt={alt}
+            alt=""
+            aria-hidden="true"
             width={width}
             height={height}
             className={cn('shrink-0 rounded-[2px]', className)}
@@ -146,7 +146,6 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                 >
                     <FlagImage
                         locale={locale}
-                        alt={currentLocaleName}
                         className="mr-2"
                         width={18}
                         height={14}
@@ -176,7 +175,6 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                         >
                             <FlagImage
                                 locale={loc}
-                                alt={LOCALE_NAMES[loc]}
                                 className="shrink-0"
                                 width={18}
                                 height={14}
