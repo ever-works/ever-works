@@ -1727,6 +1727,7 @@
             "editMessage": "تعديل الرسالة",
             "saveEdit": "حفظ وإرسال",
             "cancelEdit": "إلغاء",
+            "edited": "(تم التعديل)",
             "errors": {
                 "unableToSend": "تعذر إرسال الرسالة."
             },

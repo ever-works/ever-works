@@ -1727,6 +1727,7 @@
             "editMessage": "메시지 편집",
             "saveEdit": "저장 및 제출",
             "cancelEdit": "취소",
+            "edited": "(수정됨)",
             "errors": {
                 "unableToSend": "메시지를 보낼 수 없습니다."
             },

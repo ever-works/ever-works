@@ -9,6 +9,10 @@ export type ChatMessage = {
     role: ChatMessageRole;
     content: string;
     timestamp: string | null;
+    // Whether the message was edited by the user after sending
+    edited?: boolean;
+    // When the message was edited (ISO string)
+    editedTimestamp?: string | null;
     isStreaming?: boolean;
     metadata?: Record<string, any>;
     error?: string;

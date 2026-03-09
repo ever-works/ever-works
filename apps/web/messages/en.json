@@ -2040,6 +2040,7 @@
             "editMessage": "Edit message",
             "saveEdit": "Save & Submit",
             "cancelEdit": "Cancel",
+            "edited": "(edited)",
             "errors": {
                 "unableToSend": "Unable to send message"
             }

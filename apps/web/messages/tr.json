@@ -1727,6 +1727,7 @@
             "editMessage": "Mesajı düzenle",
             "saveEdit": "Kaydet ve Gönder",
             "cancelEdit": "İptal",
+            "edited": "(düzenlendi)",
             "errors": {
                 "unableToSend": "Mesaj gönderilemedi."
             },

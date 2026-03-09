@@ -1727,6 +1727,7 @@
             "editMessage": "Chỉnh sửa tin nhắn",
             "saveEdit": "Lưu & Gửi",
             "cancelEdit": "Hủy",
+            "edited": "(đã chỉnh sửa)",
             "errors": {
                 "unableToSend": "Không thể gửi tin nhắn."
             },

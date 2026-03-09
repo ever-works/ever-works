@@ -1727,6 +1727,7 @@
             "editMessage": "メッセージを編集",
             "saveEdit": "保存して送信",
             "cancelEdit": "キャンセル",
+            "edited": "(編集済み)",
             "errors": {
                 "unableToSend": "メッセージを送信できませんでした。"
             },

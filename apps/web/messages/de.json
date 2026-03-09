@@ -1727,6 +1727,7 @@
             "editMessage": "Nachricht bearbeiten",
             "saveEdit": "Speichern & Senden",
             "cancelEdit": "Abbrechen",
+            "edited": "(bearbeitet)",
             "errors": {
                 "unableToSend": "Nachricht konnte nicht gesendet werden."
             },

@@ -205,10 +205,15 @@ export function ChatInterface() {
         setErrorMessage(null);
 
         const now = new Date().toISOString();
+        // Preserve the original user message timestamp so edits don't change the displayed send time
+        const originalTimestamp = messages[editIndex].timestamp ?? now;
         const updatedUserMessage: ChatMessage = {
             ...messages[editIndex],
             content: trimmed,
-            timestamp: now,
+            // Preserve the original send timestamp but mark as edited
+            timestamp: originalTimestamp,
+            edited: true,
+            editedTimestamp: now,
         };
         const assistantMessage: ChatMessage = {
             id: generateMessageId(),
@@ -219,11 +224,11 @@ export function ChatInterface() {
         };
 
         pendingMessageRef.current = assistantMessage.id;
-        const newMessages = [...messages.slice(0, editIndex), updatedUserMessage, assistantMessage];
+        let newMessages = [...messages.slice(0, editIndex), updatedUserMessage, assistantMessage];
         setMessages(newMessages);
         scrollToBottom('smooth');
 
-        const chatHistory = newMessages
+        let chatHistory = newMessages
             .filter((m) => m.content.trim().length > 0)
             .map((m) => ({ role: m.role, content: m.content }));
 
@@ -452,13 +457,21 @@ export function ChatInterface() {
                                             <div className="flex items-center justify-between gap-2 mt-1">
                                                 <p
                                                     className={cn(
-                                                        'text-[10px]',
+                                                        'text-[10px] flex items-center gap-1',
                                                         isUser
                                                             ? 'text-text-secondary dark:text-white/60'
                                                             : 'text-text-muted dark:text-text-muted-dark',
                                                     )}
                                                 >
-                                                    {formatTimestamp(message.timestamp)}
+                                                    <span>
+                                                        {formatTimestamp(message.timestamp)}
+                                                    </span>
+                                                    {message.edited && (
+                                                        <span className="text-[10px] text-text-muted dark:text-white/40">
+                                                            {' '}
+                                                            {t('edited')}
+                                                        </span>
+                                                    )}
                                                 </p>
                                                 {isUser && !isStreaming && !message.isStreaming && (
                                                     <button
