@@ -1717,10 +1717,17 @@
         "aiChat": {
             "title": "Asystent AI",
             "subtitle": "Twórz katalogi językiem naturalnym",
+            "welcomeMessage": "Cześć! Mogę pomóc Ci tworzyć katalogi przy użyciu języka naturalnego. Zapytaj na przykład \"Utwórz katalog narzędzi AI\" lub opisz, czego potrzebujesz.",
             "newChat": "Nowy czat",
             "loadingConversation": "Ładowanie rozmowy...",
             "inputPlaceholder": "Opisz katalog, który chcesz utworzyć...",
             "sendButton": "Wyślij",
+            "sendHint": "Enter, aby wysłać · Shift+Enter dla nowej linii",
+            "providerNotConfigured": "Ten dostawca nie jest skonfigurowany. Skonfiguruj go w Wtyczkach.",
+            "editMessage": "Edytuj wiadomość",
+            "saveEdit": "Zapisz i wyślij",
+            "cancelEdit": "Anuluj",
+            "edited": "(edytowano)",
             "errors": {
                 "unableToSend": "Nie można wysłać wiadomości."
             },

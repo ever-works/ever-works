@@ -1717,10 +1717,17 @@
         "aiChat": {
             "title": "Asisten AI",
             "subtitle": "Buat direktori dengan bahasa alami",
+            "welcomeMessage": "Halo! Saya dapat membantu Anda membuat direktori menggunakan bahasa alami. Tanyakan sesuatu seperti \"Buat direktori untuk alat AI\" atau jelaskan apa yang Anda butuhkan.",
             "newChat": "Obrolan baru",
             "loadingConversation": "Memuat percakapan…",
             "inputPlaceholder": "Jelaskan direktori yang ingin Anda buat...",
             "sendButton": "Kirim",
+            "sendHint": "Enter untuk mengirim · Shift+Enter untuk baris baru",
+            "providerNotConfigured": "Penyedia ini belum dikonfigurasi. Siapkan di Plugins.",
+            "editMessage": "Edit pesan",
+            "saveEdit": "Simpan & Kirim",
+            "cancelEdit": "Batal",
+            "edited": "(disunting)",
             "errors": {
                 "unableToSend": "Tidak dapat mengirim pesan."
             },

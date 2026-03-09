@@ -1717,10 +1717,17 @@
         "aiChat": {
             "title": "KI-Assistent",
             "subtitle": "Erstellen Sie Verzeichnisse mit natürlicher Sprache",
+            "welcomeMessage": "Hallo! Ich kann Ihnen helfen, Verzeichnisse mit natürlicher Sprache zu erstellen. Fragen Sie etwas wie \"Erstelle ein Verzeichnis für KI-Tools\" oder beschreiben Sie, was Sie benötigen.",
             "newChat": "Neuer Chat",
             "loadingConversation": "Konversation wird geladen…",
             "inputPlaceholder": "Beschreiben Sie das Verzeichnis, das Sie erstellen möchten...",
             "sendButton": "Senden",
+            "sendHint": "Enter zum Senden · Shift+Enter für neue Zeile",
+            "providerNotConfigured": "Dieser Anbieter ist nicht konfiguriert. Richten Sie ihn in Plugins ein.",
+            "editMessage": "Nachricht bearbeiten",
+            "saveEdit": "Speichern & Senden",
+            "cancelEdit": "Abbrechen",
+            "edited": "(bearbeitet)",
             "errors": {
                 "unableToSend": "Nachricht konnte nicht gesendet werden."
             },
