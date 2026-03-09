@@ -20,9 +20,9 @@ export function CollapsibleSection({
     return (
         <div
             className={cn(
-                'rounded-lg border overflow-hidden',
-                'bg-card dark:bg-card-dark',
-                'border-card-border dark:border-card-border-dark',
+                'rounded-lg overflow-hidden',
+                'bg-card dark:bg-card-primary-dark',
+                'border border-card-border dark:border-card-border-dark',
             )}
         >
             <button
