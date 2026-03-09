@@ -358,6 +358,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                             if (importPath === 'from_choose_mode') {
                                 setStep('choose_mode');
                                 setImportPath('direct');
+                                setManualSourceType(null);
                             } else {
                                 setStep('source');
                                 setAnalysisResult(null);

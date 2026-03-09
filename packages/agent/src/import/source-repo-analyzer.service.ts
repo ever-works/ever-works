@@ -208,13 +208,13 @@ export class SourceRepoAnalyzerService {
             };
 
             if (detectionResult.type === 'data_repo') {
-                response.hasDataRepoWriteAccess = repoInfo.permissions?.push ?? false;
+                response.hasDataRepoWriteAccess = repoInfo.permissions?.push ?? true;
             } else {
                 const ecosystem = await this.detectDirectoryEcosystem(owner, repo, token, provider);
                 if (ecosystem) {
                     response.relatedDataRepo = ecosystem.dataRepo;
                     response.baseSlug = ecosystem.baseSlug;
-                    response.hasDataRepoWriteAccess = ecosystem.dataRepoPermissions?.push ?? false;
+                    response.hasDataRepoWriteAccess = ecosystem.dataRepoPermissions?.push ?? true;
                 }
             }
 
