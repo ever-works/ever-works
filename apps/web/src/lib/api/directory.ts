@@ -163,6 +163,12 @@ export interface DirectoriesResponse {
     offset?: number;
 }
 
+export interface DirectoryStatsResponse {
+    totalDirectories: number;
+    totalItems: number;
+    activeWebsites: number;
+}
+
 export interface DeleteDirectoryResponse {
     status: 'success' | 'error' | 'pending';
     slug: string;
@@ -488,6 +494,11 @@ export const directoryAPI = {
         const query = params.toString() ? `?${params.toString()}` : '';
 
         return serverFetch<DirectoriesResponse>(`/directories${query}`);
+    },
+
+    // Get aggregated stats for the current user's directories
+    getStats: async () => {
+        return serverFetch<DirectoryStatsResponse>(`/directories/stats`);
     },
 
     // Get a directory by ID
