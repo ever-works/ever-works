@@ -207,11 +207,14 @@ export class SourceRepoAnalyzerService {
                 structure: detectionResult.structure,
             };
 
-            if (detectionResult.type !== 'data_repo') {
+            if (detectionResult.type === 'data_repo') {
+                response.hasDataRepoWriteAccess = repoInfo.permissions?.push ?? true;
+            } else {
                 const ecosystem = await this.detectDirectoryEcosystem(owner, repo, token, provider);
                 if (ecosystem) {
                     response.relatedDataRepo = ecosystem.dataRepo;
                     response.baseSlug = ecosystem.baseSlug;
+                    response.hasDataRepoWriteAccess = ecosystem.dataRepoPermissions?.push ?? true;
                 }
             }
 
@@ -683,7 +686,11 @@ export class SourceRepoAnalyzerService {
         repo: string,
         token?: string,
         provider?: string,
-    ): Promise<{ baseSlug: string; dataRepo: { name: string; owner: string } } | null> {
+    ): Promise<{
+        baseSlug: string;
+        dataRepo: { name: string; owner: string };
+        dataRepoPermissions?: { push: boolean };
+    } | null> {
         if (repo.endsWith('-data')) {
             return null;
         }
@@ -729,9 +736,14 @@ export class SourceRepoAnalyzerService {
                 return null;
             }
 
+            const dataRepoPermissions = dataRepoInfo.permissions
+                ? { push: dataRepoInfo.permissions.push }
+                : undefined;
+
             return {
                 baseSlug,
                 dataRepo: { name: candidateDataRepo, owner },
+                dataRepoPermissions,
             };
         } catch (err) {
             this.logger.debug(`No ecosystem data repo found for ${owner}/${repo}: ${err.message}`);

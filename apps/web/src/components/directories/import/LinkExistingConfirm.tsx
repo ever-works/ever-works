@@ -44,11 +44,15 @@ function RepoStatusRow({ label, icon, status, foundText, notFoundText }: RepoSta
             )}
         >
             <div className="flex items-center gap-3">
-                <div className="text-muted dark:text-muted-dark">{icon}</div>
+                <div className="text-muted dark:text-text-muted-dark">{icon}</div>
                 <div>
-                    <p className="font-medium text-foreground dark:text-foreground-dark">{label}</p>
+                    <p className="font-medium text-foreground dark:text-text-foreground-dark">
+                        {label}
+                    </p>
                     {status.name && (
-                        <p className="text-xs text-muted dark:text-muted-dark">{status.name}</p>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {status.name}
+                        </p>
                     )}
                 </div>
             </div>

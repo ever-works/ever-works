@@ -269,20 +269,22 @@ export function ImportConfigureStep({
                 />
             )}
 
-            {/* Sync Toggle */}
-            <div className="flex items-center justify-between p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
-                <div>
-                    <h3 className="font-medium text-text dark:text-text-dark">
-                        {t('sync.title', { fallback: 'Keep synchronized' })}
-                    </h3>
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                        {t('sync.description', {
-                            fallback: 'Automatically pull updates from the source repository.',
-                        })}
-                    </p>
+            {/* Sync Toggle — only relevant for awesome_readme imports */}
+            {effectiveSourceType === 'awesome_readme' && (
+                <div className="flex items-center justify-between p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
+                    <div>
+                        <h3 className="font-medium text-text dark:text-text-dark">
+                            {t('sync.title', { fallback: 'Keep synchronized' })}
+                        </h3>
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                            {t('sync.description', {
+                                fallback: 'Automatically pull updates from the source repository.',
+                            })}
+                        </p>
+                    </div>
+                    <Switch checked={sync} onChange={onSyncChange} disabled={isPending} />
                 </div>
-                <Switch checked={sync} onChange={onSyncChange} disabled={isPending} />
-            </div>
+            )}
 
             {/* AI Provider Selection - only for awesome_readme */}
             {effectiveSourceType === 'awesome_readme' && aiProviders.length > 0 && (
@@ -296,14 +298,16 @@ export function ImportConfigureStep({
                 </div>
             )}
 
-            {/* Advanced Fields */}
+            {/* Destination Account */}
             <div className="space-y-4 p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
                 <OrganizationSelector
                     value={owner}
                     providerId={gitProvider!}
                     onChange={onOwnerChange}
                     disabled={isPending}
-                    suggestedOwner={analysisResult?.owner}
+                    suggestedOwner={
+                        effectiveSourceType === 'data_repo' ? undefined : analysisResult?.owner
+                    }
                 />
             </div>
 

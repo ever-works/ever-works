@@ -39,9 +39,7 @@
 			"name": "Comparison Generator",
 			"version": "1.0.0",
 			"category": "utility",
-			"capabilities": [
-				"form-schema-provider"
-			],
+			"capabilities": [],
 			"description": "Auto-generates SEO-optimized A vs B comparison pages between directory items. Runs on a schedule, generating one high-quality comparison per pass. Also supports manual item-to-item comparison.",
 			"author": {
 				"name": "Ever Works Team"

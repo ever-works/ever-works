@@ -535,6 +535,9 @@ export class PluginLoaderService {
                 loaded++;
             } else {
                 failed++;
+                this.logger.warn(
+                    `Failed to load plugin "${result.pluginId || 'unknown'}": ${result.error || 'unknown error'}`,
+                );
             }
         }
 
