@@ -199,7 +199,7 @@ export function PluginSettingsField({
                     onChange={
                         isMaskedValue
                             ? () => {
-                                    /* block direct edits on masked display; cleared via onFocus */
+                                  /* block direct edits on masked display; cleared via onFocus */
                               }
                             : (e) => onChange(e.target.value)
                     }
