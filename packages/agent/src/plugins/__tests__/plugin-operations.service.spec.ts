@@ -164,8 +164,8 @@ describe('PluginOperationsService', () => {
     });
 
     describe('secret settings in API response', () => {
-        describe('x-secret fields return real values', () => {
-            it('should return real secret values for x-secret fields', async () => {
+        describe('x-secret fields are masked in responses', () => {
+            it('should return masked secret values for x-secret fields', async () => {
                 const registered = createRegisteredPlugin();
                 jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
                 jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
@@ -185,11 +185,12 @@ describe('PluginOperationsService', () => {
                 const result = await service.getPlugin('test-plugin', 'user-1');
 
                 expect(result.settings).toBeDefined();
-                expect(result.settings!.secretField).toBe('real-secret-value');
+                // Secret field should be masked (first 4 + •••• + last 4)
+                expect(result.settings!.secretField).toBe('real••••alue');
                 expect(result.settings!.normalSetting).toBe('should-appear');
             });
 
-            it('should return real secret values in directory plugin response', async () => {
+            it('should return masked secret values in directory plugin response', async () => {
                 const registered = createRegisteredPlugin();
                 jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
                 jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([registered]);
@@ -227,7 +228,8 @@ describe('PluginOperationsService', () => {
                 const plugin = result.plugins.find((p) => p.pluginId === 'test-plugin');
                 expect(plugin).toBeDefined();
                 expect(plugin!.directorySettings).toBeDefined();
-                expect(plugin!.directorySettings!.secretField).toBe('real-dir-secret');
+                // Secret field should be masked (first 4 + •••• + last 4)
+                expect(plugin!.directorySettings!.secretField).toBe('real••••cret');
                 expect(plugin!.directorySettings!.normalSetting).toBe('should-appear');
             });
         });
@@ -260,7 +262,7 @@ describe('PluginOperationsService', () => {
         });
 
         describe('combined settings and secretSettings merge', () => {
-            it('should return all fields with real values', async () => {
+            it('should return masked secret fields and real non-secret fields', async () => {
                 const registered = createRegisteredPlugin();
                 jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
                 jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
@@ -283,10 +285,10 @@ describe('PluginOperationsService', () => {
                 const result = await service.getPlugin('test-plugin', 'user-1');
 
                 expect(result.settings).toBeDefined();
-                // Secret fields return real values
-                expect(result.settings!.clientSecret).toBe('secret-env-var');
-                expect(result.settings!.secretField).toBe('secret-value');
-                // Non-secret fields pass through
+                // Secret fields are masked (first 4 + •••• + last 4)
+                expect(result.settings!.clientSecret).toBe('secr••••-var');
+                expect(result.settings!.secretField).toBe('secr••••alue');
+                // Non-secret fields pass through unchanged
                 expect(result.settings!.clientId).toBe('env-var-field');
                 expect(result.settings!.apiBaseUrl).toBe('https://custom.api.com');
                 expect(result.settings!.normalSetting).toBe('normal');

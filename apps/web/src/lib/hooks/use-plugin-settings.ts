@@ -188,14 +188,16 @@ export function usePluginSettings({
                 });
             }
             if (sanitizedSecretSettings) {
-                // Update secretSettings state
+                // Replace saved secret values with a masked placeholder immediately
+                // so the full value is never visible in state after save.
+                // The actual masked value from the API will replace this on router.refresh().
                 setSecretSettings((prev) => {
                     const updated = { ...prev };
                     for (const [key, value] of Object.entries(sanitizedSecretSettings)) {
                         if (value === null) {
                             delete updated[key];
                         } else {
-                            updated[key] = value;
+                            updated[key] = '••••••••';
                         }
                     }
                     return updated;

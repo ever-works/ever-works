@@ -687,6 +687,7 @@ export class PluginSettingsService {
 
     /**
      * Strip masked placeholder values from settings based on schema x-secret fields.
+     * Recognizes both the full mask ('********') and partial-reveal format ('sk-p••••n4Xj').
      */
     private stripMaskedPlaceholders(
         settings: Record<string, unknown>,
@@ -697,9 +698,11 @@ export class PluginSettingsService {
         const filtered: Record<string, unknown> = {};
         for (const [key, value] of Object.entries(settings)) {
             const propSchema = schema.properties[key] as JsonSchema | undefined;
-            if (propSchema?.['x-secret'] && value === MASKED_SECRET_PLACEHOLDER) {
-                this.logger.debug(`Stripping masked placeholder for field "${key}"`);
-                continue;
+            if (propSchema?.['x-secret'] && typeof value === 'string') {
+                if (value === MASKED_SECRET_PLACEHOLDER || value.includes('••••')) {
+                    this.logger.debug(`Stripping masked placeholder for field "${key}"`);
+                    continue;
+                }
             }
             filtered[key] = value;
         }

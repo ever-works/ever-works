@@ -36,6 +36,9 @@ export function PluginSettingsField({
     const isSecret = schema.secret;
     const primaryType = getPrimaryType(schema.type);
 
+    // Check if the current value is a masked placeholder from the API
+    const isMaskedValue = isSecret && typeof value === 'string' && value.includes('••••');
+
     // Determine input type for string/number inputs
     const getInputType = () => {
         if (isSecret && !showSecret) return 'password';
@@ -180,20 +183,47 @@ export function PluginSettingsField({
         }
 
         // String input (default) - with secret support
+        // For masked values: eye closed = dots, eye open = partial reveal (e.g. sk-p••••n4Xj)
+        // Clicking into the field clears it so the user can enter a new value
+        const displayValue = isMaskedValue
+            ? showSecret
+                ? String(value)
+                : '••••••••••••••••'
+            : String(value ?? schema.default ?? '');
+
         return (
             <div className="relative">
                 <input
-                    type={getInputType()}
-                    value={String(value ?? schema.default ?? '')}
-                    onChange={(e) => onChange(e.target.value)}
+                    type={isMaskedValue ? 'text' : getInputType()}
+                    value={displayValue}
+                    onChange={(e) => {
+                        if (!isMaskedValue) {
+                            onChange(e.target.value);
+                        }
+                    }}
+                    onKeyDown={
+                        isMaskedValue
+                            ? (e) => {
+                                  // Only clear when user actually types a character, not on Tab/Shift/etc
+                                  if (
+                                      e.key.length === 1 ||
+                                      e.key === 'Backspace' ||
+                                      e.key === 'Delete'
+                                  ) {
+                                      onChange('');
+                                  }
+                              }
+                            : undefined
+                    }
                     maxLength={schema.maxLength}
-                    required={required}
+                    required={isMaskedValue ? false : required}
                     className={cn(
                         'w-full px-3 py-2 rounded-lg border border-border dark:border-border-dark',
                         'bg-surface-secondary dark:bg-surface-secondary-dark',
                         'text-text dark:text-text-dark',
                         'focus:outline-none focus:ring-2 focus:ring-primary/50',
                         isSecret && 'pr-10',
+                        isMaskedValue && !showSecret && 'tracking-wider',
                     )}
                 />
                 {isSecret && (
