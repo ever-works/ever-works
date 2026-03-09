@@ -183,13 +183,27 @@ export function PluginSettingsField({
         }
 
         // String input (default) - with secret support
+        // For masked values: eye closed = dots, eye open = partial reveal (e.g. sk-p••••n4Xj)
+        // Clicking into the field clears it so the user can enter a new value
+        const displayValue = isMaskedValue
+            ? showSecret
+                ? String(value)
+                : '••••••••••••••••'
+            : String(value ?? schema.default ?? '');
+
         return (
             <div className="relative">
                 <input
-                    type={getInputType()}
-                    value={isMaskedValue ? '' : String(value ?? schema.default ?? '')}
-                    placeholder={isMaskedValue ? String(value) : undefined}
-                    onChange={(e) => onChange(e.target.value)}
+                    type={isMaskedValue ? 'text' : getInputType()}
+                    value={displayValue}
+                    onChange={
+                        isMaskedValue
+                            ? () => {
+                                    /* block direct edits on masked display; cleared via onFocus */
+                              }
+                            : (e) => onChange(e.target.value)
+                    }
+                    onFocus={isMaskedValue ? () => onChange('') : undefined}
                     maxLength={schema.maxLength}
                     required={isMaskedValue ? false : required}
                     className={cn(
@@ -198,6 +212,7 @@ export function PluginSettingsField({
                         'text-text dark:text-text-dark',
                         'focus:outline-none focus:ring-2 focus:ring-primary/50',
                         isSecret && 'pr-10',
+                        isMaskedValue && !showSecret && 'tracking-wider',
                     )}
                 />
                 {isSecret && (
