@@ -119,6 +119,38 @@ export function getCapabilityLabel(capability: string): string {
 }
 
 /**
+ * Display order for plugin categories.
+ * Type-safe: compiler will error if a value is not a valid PluginCategory.
+ */
+export const CATEGORY_DISPLAY_ORDER: readonly PluginCategory[] = [
+    'pipeline',
+    'ai-provider',
+    'search',
+    'content-extractor',
+    'screenshot',
+    'git-provider',
+    'deployment',
+    'data-source',
+    'form',
+    'integration',
+    'utility',
+    'theme',
+];
+
+/**
+ * Sort comparator for plugin categories by display order.
+ * Categories not in CATEGORY_DISPLAY_ORDER are placed at the end.
+ */
+export function compareCategoryOrder(a: string, b: string): number {
+    const ai = CATEGORY_DISPLAY_ORDER.indexOf(a as PluginCategory);
+    const bi = CATEGORY_DISPLAY_ORDER.indexOf(b as PluginCategory);
+    return (
+        (ai === -1 ? CATEGORY_DISPLAY_ORDER.length : ai) -
+        (bi === -1 ? CATEGORY_DISPLAY_ORDER.length : bi)
+    );
+}
+
+/**
  * Get all available plugin categories
  * Re-exports from @ever-works/plugin for convenience
  */

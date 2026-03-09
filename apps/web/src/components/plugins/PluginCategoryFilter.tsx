@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { PluginCategory } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
-import { getCategoryLabel } from '@/lib/utils/plugin-category-icons';
+import { getCategoryLabel, compareCategoryOrder } from '@/lib/utils/plugin-category-icons';
 
 interface PluginCategoryFilterProps {
     categories: PluginCategory[];
@@ -36,7 +36,7 @@ export function PluginCategoryFilter({
                 >
                     {t('all')}
                 </button>
-                {categories.map((category) => (
+                {[...categories].sort(compareCategoryOrder).map((category) => (
                     <button
                         key={category}
                         onClick={() => onSelectCategory(category)}

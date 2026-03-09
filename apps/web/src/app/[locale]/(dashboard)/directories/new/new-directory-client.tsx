@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo, useState } from 'react';
 import { AuthUser } from '@/lib/auth';
@@ -10,6 +10,7 @@ import { GitProviderSelector } from './git-provider-selector';
 import { DeployProviderSelector, type DeployProvider } from './deploy-provider-selector';
 import { useTranslations } from 'next-intl';
 import type { ProviderWithConnection } from './page';
+import { Bot, PenLine, FolderInput, ArrowRight } from 'lucide-react';
 
 interface NewDirectoryClientProps {
     user: AuthUser;
@@ -58,56 +59,46 @@ export default function NewDirectoryClient({
                     <button
                         onClick={() => setCreationMode('ai')}
                         className={cn(
-                            'p-6 rounded-lg border-2 text-left transition-all',
-                            'bg-card dark:bg-card-dark',
-                            'border-card-border dark:border-card-border-dark',
-                            'hover:border-primary hover:shadow-lg',
-                            'group',
+                            'rounded-b-lg rounded-t-lg rounded-tr-lg text-left transition-all',
+                            'bg-surface-tertiary dark:bg-card-navy-dark',
+                            'hover:shadow-lg shadow-sm',
+                            'group relative cursor-pointer',
                         )}
                     >
-                        <div className="mb-4">
-                            <div
-                                className={cn(
-                                    'w-12 h-12 rounded-lg flex items-center justify-center',
-                                    'bg-primary/10 group-hover:bg-primary/20 transition-colors',
-                                )}
-                            >
-                                <svg
-                                    className="w-6 h-6 text-primary"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                                    />
-                                </svg>
-                            </div>
+                        <div className="absolute left-0 -top-2 flex w-full">
+                            <div className="h-6 w-2/4 bg-surface-tertiary dark:bg-card-navy-dark rounded-t-2xl" />
+                            <div className="w-0 h-0 -ml-2 mt-0.5 border-b-20 border-r-20 border-b-surface-tertiary dark:border-b-card-navy-dark border-r-transparent" />
                         </div>
-                        <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                            {t('ai.title')}
-                        </h3>
-                        <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
-                            {t('ai.subtitle')}
-                        </p>
-                        <div className="flex items-center gap-2 text-primary font-medium">
-                            <span>{t('ai.getStarted')}</span>
-                            <svg
-                                className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
+                        <div className="flex absolute right-0 top-1 w-[55%] h-6">
+                            <div className="w-0 h-0 border-b-20 mt-1 -mr-1.5 border-l-20 border-b-card dark:border-b-card-primary-dark border-l-transparent"></div>
+                            <div className="w-[94%] h-full bg-card dark:bg-card-primary-dark rounded-tl-2xl rounded-tr-lg" />
+                        </div>
+                        <div className="relative overflow-hidden rounded-lg bg-card dark:bg-card-primary-dark p-6 mt-4  h-[94%]">
+                            <div className="opacity-0 group-hover:opacity-100 absolute -bottom-5 right-6 w-40 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/15  blur-2xl pointer-events-none" />
+                            <div className="card-top-accent-indigo opacity-0 group-hover:opacity-100 pointer-events-none absolute right-8 bottom-0 w-1/2 h-px z-20 rounded-full" />
+                            <div className="mb-4">
+                                <div
+                                    className={cn(
+                                        'w-12 h-12 rounded-lg flex items-center justify-center',
+                                        'bg-primary/10 border border-primary/20 group-hover:bg-primary/20 transition-colors',
+                                    )}
+                                >
+                                    <Bot className="w-6 h-6 text-primary" strokeWidth={1.5} />
+                                </div>
+                            </div>
+                            <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
+                                {t('ai.title')}
+                            </h3>
+                            <p className="text-text-secondary text-sm dark:text-text-secondary-dark mb-4">
+                                {t('ai.subtitle')}
+                            </p>
+                            <div className="flex items-center gap-2 text-primary font-medium">
+                                <span>{t('ai.getStarted')}</span>
+                                <ArrowRight
+                                    className="w-4 h-4 group-hover:translate-x-1 transition-transform"
                                     strokeWidth={2}
-                                    d="M9 5l7 7-7 7"
                                 />
-                            </svg>
+                            </div>
                         </div>
                     </button>
 
@@ -115,56 +106,46 @@ export default function NewDirectoryClient({
                     <button
                         onClick={() => setCreationMode('manual')}
                         className={cn(
-                            'p-6 rounded-lg border-2 text-left transition-all',
-                            'bg-card dark:bg-card-dark',
-                            'border-card-border dark:border-card-border-dark',
-                            'hover:border-primary hover:shadow-lg',
-                            'group',
+                            'rounded-b-lg rounded-t-lg rounded-tr-lg text-left transition-all',
+                            'bg-surface-tertiary dark:bg-card-navy-dark',
+                            'hover:shadow-lg shadow-sm',
+                            'group relative cursor-pointer',
                         )}
                     >
-                        <div className="mb-4">
-                            <div
-                                className={cn(
-                                    'w-12 h-12 rounded-lg flex items-center justify-center',
-                                    'bg-success/10 group-hover:bg-success/20 transition-colors',
-                                )}
-                            >
-                                <svg
-                                    className="w-6 h-6 text-success"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                    />
-                                </svg>
-                            </div>
+                        <div className="absolute left-0 -top-2 flex w-full">
+                            <div className="h-6 w-2/4 bg-surface-tertiary dark:bg-card-navy-dark rounded-t-2xl" />
+                            <div className="w-0 h-0 -ml-2 mt-0.5 border-b-20 border-r-20 border-b-surface-tertiary dark:border-b-card-navy-dark border-r-transparent" />
                         </div>
-                        <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                            {t('manual.title')}
-                        </h3>
-                        <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
-                            {t('manual.subtitle')}
-                        </p>
-                        <div className="flex items-center gap-2 text-success font-medium">
-                            <span>{t('manual.configureNow')}</span>
-                            <svg
-                                className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
+                        <div className="flex absolute right-0 top-1 w-[55%] h-6">
+                            <div className="w-0 h-0 border-b-20 mt-1 -mr-1.5 border-l-20 border-b-card dark:border-b-card-primary-dark border-l-transparent"></div>
+                            <div className="w-[94%] h-full bg-card dark:bg-card-primary-dark rounded-tl-2xl rounded-tr-lg" />
+                        </div>
+                        <div className="relative overflow-hidden rounded-lg bg-card dark:bg-card-primary-dark p-6 mt-4  h-[94%]">
+                            <div className="opacity-0 group-hover:opacity-100 absolute -bottom-5 right-6 w-40 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/15  blur-2xl pointer-events-none" />
+                            <div className="card-top-accent-indigo opacity-0 group-hover:opacity-100 pointer-events-none absolute right-8 bottom-0 w-1/2 h-px z-20 rounded-full" />
+                            <div className="mb-4">
+                                <div
+                                    className={cn(
+                                        'w-12 h-12 rounded-lg flex items-center justify-center',
+                                        'bg-success/10 border border-success/20 group-hover:bg-success/20 transition-colors',
+                                    )}
+                                >
+                                    <PenLine className="w-6 h-6 text-success" strokeWidth={1.5} />
+                                </div>
+                            </div>
+                            <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
+                                {t('manual.title')}
+                            </h3>
+                            <p className="text-text-secondary text-sm dark:text-text-secondary-dark mb-4">
+                                {t('manual.subtitle')}
+                            </p>
+                            <div className="flex items-center gap-2 text-success font-medium">
+                                <span>{t('manual.configureNow')}</span>
+                                <ArrowRight
+                                    className="w-4 h-4 group-hover:translate-x-1 transition-transform"
                                     strokeWidth={2}
-                                    d="M9 5l7 7-7 7"
                                 />
-                            </svg>
+                            </div>
                         </div>
                     </button>
 
@@ -172,56 +153,49 @@ export default function NewDirectoryClient({
                     <button
                         onClick={() => setCreationMode('import')}
                         className={cn(
-                            'p-6 rounded-lg border-2 text-left transition-all',
-                            'bg-card dark:bg-card-dark',
-                            'border-card-border dark:border-card-border-dark',
-                            'hover:border-primary hover:shadow-lg',
-                            'group',
+                            'rounded-b-lg rounded-t-lg rounded-tr-lg text-left transition-all',
+                            'bg-surface-tertiary dark:bg-card-navy-dark',
+                            'hover:shadow-lg shadow-sm',
+                            'group relative cursor-pointer',
                         )}
                     >
-                        <div className="mb-4">
-                            <div
-                                className={cn(
-                                    'w-12 h-12 rounded-lg flex items-center justify-center',
-                                    'bg-warning/10 group-hover:bg-warning/20 transition-colors',
-                                )}
-                            >
-                                <svg
-                                    className="w-6 h-6 text-warning"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                                    />
-                                </svg>
-                            </div>
+                        <div className="absolute left-0 -top-2 flex w-full">
+                            <div className="h-6 w-2/4 bg-surface-tertiary dark:bg-card-navy-dark rounded-t-2xl" />
+                            <div className="w-0 h-0 -ml-2 mt-0.5 border-b-20 border-r-20 border-b-surface-tertiary dark:border-b-card-navy-dark border-r-transparent" />
                         </div>
-                        <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                            {t('import.title')}
-                        </h3>
-                        <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
-                            {t('import.subtitle')}
-                        </p>
-                        <div className="flex items-center gap-2 text-warning font-medium">
-                            <span>{t('import.importNow')}</span>
-                            <svg
-                                className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
+                        <div className="flex absolute right-0 top-1 w-[55%] h-6">
+                            <div className="w-0 h-0 border-b-20 mt-1 -mr-1.5 border-l-20 border-b-card dark:border-b-card-primary-dark border-l-transparent"></div>
+                            <div className="w-[94%] h-full bg-card dark:bg-card-primary-dark rounded-tl-2xl rounded-tr-lg" />
+                        </div>
+                        <div className="relative overflow-hidden rounded-lg bg-card dark:bg-card-primary-dark p-6 mt-4 h-[94%]">
+                            <div className="opacity-0 group-hover:opacity-100 absolute -bottom-5 right-6 w-40 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/15  blur-2xl pointer-events-none" />
+                            <div className="card-top-accent-indigo opacity-0 group-hover:opacity-100 pointer-events-none absolute right-8 bottom-0 w-1/2 h-px z-20 rounded-full" />
+                            <div className="mb-4">
+                                <div
+                                    className={cn(
+                                        'w-12 h-12 rounded-lg flex items-center justify-center',
+                                        'bg-warning/10 border border-warning/20 group-hover:bg-warning/20 transition-colors',
+                                    )}
+                                >
+                                    <FolderInput
+                                        className="w-6 h-6 text-warning"
+                                        strokeWidth={1.5}
+                                    />
+                                </div>
+                            </div>
+                            <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
+                                {t('import.title')}
+                            </h3>
+                            <p className="text-text-secondary text-sm dark:text-text-secondary-dark mb-4">
+                                {t('import.subtitle')}
+                            </p>
+                            <div className="flex items-center gap-2 text-warning font-medium">
+                                <span>{t('import.importNow')}</span>
+                                <ArrowRight
+                                    className="w-4 h-4 group-hover:translate-x-1 transition-transform"
                                     strokeWidth={2}
-                                    d="M9 5l7 7-7 7"
                                 />
-                            </svg>
+                            </div>
                         </div>
                     </button>
                 </div>
@@ -283,35 +257,44 @@ export default function NewDirectoryClient({
             <aside className="w-80 shrink-0">
                 <div
                     className={cn(
-                        'sticky top-8 p-6 rounded-lg space-y-6',
-                        'bg-card dark:bg-card-dark',
-                        'border border-card-border dark:border-card-border-dark',
+                        'sticky top-8 p-1 rounded-lg space-y-6',
+                        'bg-card/10 dark:bg-card-primary-dark/30',
+                        'border border-card-border dark:border-border-secondary-dark',
                     )}
                 >
-                    <div>
-                        <h3 className="font-medium text-text dark:text-text-dark mb-4">
-                            {t('sidebar.selectedProvider')}
-                        </h3>
-                        <GitProviderSelector
-                            providers={providers}
-                            selectedProviderId={selectedProviderId}
-                            onSelect={setSelectedProviderId}
-                            compact
-                        />
-                    </div>
-                    {deployProviders.length > 0 && (
-                        <div>
+                    <div
+                        className={cn(
+                            'p-6 rounded-sm relative overflow-hidden',
+                            'bg-card dark:bg-card-secondary-dark/30',
+                            'border border-card-border dark:border-border-secondary-dark',
+                        )}
+                    >
+                        <div className="absolute -top-5 -right-6 w-30 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/15  blur-xl pointer-events-none" />
+                        <div className="relative z-20">
                             <h3 className="font-medium text-text dark:text-text-dark mb-4">
-                                {t('sidebar.selectedDeployProvider')}
+                                {t('sidebar.selectedProvider')}
                             </h3>
-                            <DeployProviderSelector
-                                providers={deployProviders}
-                                selectedProviderId={selectedDeployProviderId}
-                                onSelect={setSelectedDeployProviderId}
+                            <GitProviderSelector
+                                providers={providers}
+                                selectedProviderId={selectedProviderId}
+                                onSelect={setSelectedProviderId}
                                 compact
                             />
                         </div>
-                    )}
+                        {deployProviders.length > 0 && (
+                            <div className="relative z-20">
+                                <h3 className="font-medium text-text dark:text-text-dark mb-4">
+                                    {t('sidebar.selectedDeployProvider')}
+                                </h3>
+                                <DeployProviderSelector
+                                    providers={deployProviders}
+                                    selectedProviderId={selectedDeployProviderId}
+                                    onSelect={setSelectedDeployProviderId}
+                                    compact
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
             </aside>
         </div>

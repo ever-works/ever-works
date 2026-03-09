@@ -15,6 +15,7 @@ interface ImportModeSelectorProps {
     };
     onSelectMode: (mode: ImportMode) => void;
     disabled?: boolean;
+    hasWriteAccess?: boolean;
 }
 
 interface ModeOptionProps {
@@ -50,19 +51,23 @@ function ModeOption({ title, description, icon, selected, onClick, disabled }: M
             </div>
             <div className="flex-1 flex flex-col items-center">
                 <div className="flex items-center gap-2 mb-2">
-                    <h4 className="font-medium text-foreground dark:text-foreground-dark">
-                        {title}
-                    </h4>
-                    <ArrowRight className="w-4 h-4 text-muted dark:text-muted-dark" />
+                    <h4 className="font-medium text-foreground">{title}</h4>
+                    <ArrowRight className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
                 </div>
-                <p className="text-sm text-muted dark:text-muted-dark">{description}</p>
+                <p className="text-sm text-text-muted dark:text-text-muted-dark">{description}</p>
             </div>
         </button>
     );
 }
 
-export function ImportModeSelector({ repoInfo, onSelectMode, disabled }: ImportModeSelectorProps) {
+export function ImportModeSelector({
+    repoInfo,
+    onSelectMode,
+    disabled,
+    hasWriteAccess,
+}: ImportModeSelectorProps) {
     const t = useTranslations('dashboard.directoryCreation.import.chooseMode');
+    const showLinkOption = hasWriteAccess !== false;
 
     const repoDescription =
         repoInfo.itemCount !== undefined
@@ -76,13 +81,18 @@ export function ImportModeSelector({ repoInfo, onSelectMode, disabled }: ImportM
     return (
         <div className="space-y-4">
             <div className="text-center mb-6">
-                <h3 className="text-lg font-semibold text-foreground dark:text-foreground-dark">
-                    {t('title')}
-                </h3>
-                <p className="text-sm text-muted dark:text-muted-dark mt-1">{repoDescription}</p>
+                <h3 className="text-lg font-semibold text-foreground">{t('title')}</h3>
+                <p className="text-sm text-text-muted dark:text-text-muted-dark mt-1">
+                    {repoDescription}
+                </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div
+                className={cn(
+                    'grid gap-4',
+                    showLinkOption ? 'grid-cols-2' : 'grid-cols-1 max-w-sm mx-auto',
+                )}
+            >
                 <ModeOption
                     title={t('importCopy.title')}
                     description={t('importCopy.description')}
@@ -91,13 +101,15 @@ export function ImportModeSelector({ repoInfo, onSelectMode, disabled }: ImportM
                     disabled={disabled}
                 />
 
-                <ModeOption
-                    title={t('linkExisting.title')}
-                    description={t('linkExisting.description')}
-                    icon={<LinkIcon className="w-6 h-6 text-primary" />}
-                    onClick={() => onSelectMode('link_existing')}
-                    disabled={disabled}
-                />
+                {showLinkOption && (
+                    <ModeOption
+                        title={t('linkExisting.title')}
+                        description={t('linkExisting.description')}
+                        icon={<LinkIcon className="w-6 h-6 text-primary" />}
+                        onClick={() => onSelectMode('link_existing')}
+                        disabled={disabled}
+                    />
+                )}
             </div>
         </div>
     );

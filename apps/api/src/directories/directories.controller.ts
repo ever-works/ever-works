@@ -142,6 +142,19 @@ export class DirectoriesController {
         );
     }
 
+    @Get('directories/stats')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get directory stats',
+        description:
+            'Get aggregated stats (total directories, total items, active websites) for the authenticated user',
+    })
+    @ApiResponse({ status: 200, description: 'Directory stats' })
+    async getDirectoryStats(@CurrentUser() auth: AuthenticatedUser) {
+        const user = await this.authService.getUser(auth.userId);
+        return this.directoryQueryService.getStats(user);
+    }
+
     @Post('directories')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Create directory', description: 'Create a new directory' })

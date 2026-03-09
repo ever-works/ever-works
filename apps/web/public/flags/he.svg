@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="900" height="600" viewBox="0 0 220 160" xmlns="http://www.w3.org/2000/svg">
+  <!-- White background -->
+  <rect width="220" height="160" fill="#FFFFFF"/>
+  <!-- Top blue stripe -->
+  <rect width="220" height="25" y="15" fill="#0038b8"/>
+  <!-- Bottom blue stripe -->
+  <rect width="220" height="25" y="120" fill="#0038b8"/>
+  <!-- Star of David -->
+  <g transform="translate(110,80)" fill="none" stroke="#0038b8" stroke-width="5.5">
+    <!-- Upward pointing triangle -->
+    <polygon points="0,-30 26,15 -26,15"/>
+    <!-- Downward pointing triangle -->
+    <polygon points="0,30 26,-15 -26,-15"/>
+  </g>
+</svg>
+

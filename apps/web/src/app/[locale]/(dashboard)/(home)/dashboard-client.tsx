@@ -13,12 +13,16 @@ interface DashboardClientProps {
     user: AuthUser;
     initialDirectories: Directory[];
     totalDirectories: number;
+    totalItems: number;
+    activeWebsites: number;
 }
 
 export default function DashboardClient({
     user,
     initialDirectories,
     totalDirectories,
+    totalItems,
+    activeWebsites,
 }: DashboardClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard');
@@ -35,7 +39,11 @@ export default function DashboardClient({
                 </p>
             </div>
 
-            <StatsOverview totalDirectories={totalDirectories} />
+            <StatsOverview
+                totalDirectories={totalDirectories}
+                totalItems={totalItems}
+                activeWebsites={activeWebsites}
+            />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
                 <div className="lg:col-span-3">
