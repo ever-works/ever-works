@@ -265,20 +265,20 @@ function ScheduleForm({
         <section className="rounded-2xl border border-card-border dark:border-card-border-dark bg-card dark:bg-card-dark p-6 shadow-sm space-y-6">
             <header className="flex items-start justify-between gap-4">
                 <div className="space-y-2">
-                    <p className="text-lg font-semibold text-text dark:text-text-dark">{t('title')}</p>
+                    <p className="text-lg font-semibold text-text dark:text-text-dark">
+                        {t('title')}
+                    </p>
                     <p className="text-sm text-text-secondary dark:text-text-secondary-dark max-w-2xl">
-                        {schedule.subscriptionsEnabled ? t('subtitle.enabled') : t('subtitle.disabled')}
+                        {schedule.subscriptionsEnabled
+                            ? t('subtitle.enabled')
+                            : t('subtitle.disabled')}
                     </p>
                 </div>
                 <button
                     type="button"
                     onClick={toggleAutomation}
                     disabled={anyBusy}
-                    title={
-                        isActive
-                            ? t('actions.stopAutomation')
-                            : t('actions.startAutomation')
-                    }
+                    title={isActive ? t('actions.stopAutomation') : t('actions.startAutomation')}
                     className={cn(
                         'p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0',
                         'border border-border dark:border-border-dark',
