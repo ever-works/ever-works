@@ -36,6 +36,9 @@ export function PluginSettingsField({
     const isSecret = schema.secret;
     const primaryType = getPrimaryType(schema.type);
 
+    // Check if the current value is a masked placeholder from the API
+    const isMaskedValue = isSecret && typeof value === 'string' && value.includes('••••');
+
     // Determine input type for string/number inputs
     const getInputType = () => {
         if (isSecret && !showSecret) return 'password';
@@ -184,10 +187,11 @@ export function PluginSettingsField({
             <div className="relative">
                 <input
                     type={getInputType()}
-                    value={String(value ?? schema.default ?? '')}
+                    value={isMaskedValue ? '' : String(value ?? schema.default ?? '')}
+                    placeholder={isMaskedValue ? String(value) : undefined}
                     onChange={(e) => onChange(e.target.value)}
                     maxLength={schema.maxLength}
-                    required={required}
+                    required={isMaskedValue ? false : required}
                     className={cn(
                         'w-full px-3 py-2 rounded-lg border border-border dark:border-border-dark',
                         'bg-surface-secondary dark:bg-surface-secondary-dark',
