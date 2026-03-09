@@ -1030,13 +1030,15 @@ export class PluginOperationsService {
             hasDirectoryContext: false,
         });
 
+        const mergedSettings = userPlugin
+            ? { ...userPlugin.settings, ...userPlugin.secretSettings }
+            : undefined;
+
         return {
             ...baseResponse,
             installed: !!userPlugin || enabled,
             enabled,
-            settings: userPlugin
-                ? { ...userPlugin.settings, ...userPlugin.secretSettings }
-                : undefined,
+            settings: this.maskSecretSettings(mergedSettings, registered.plugin.settingsSchema),
             userPluginId: userPlugin?.id,
             autoEnableForDirectories: userPlugin?.autoEnableForDirectories ?? false,
         };
@@ -1065,9 +1067,12 @@ export class PluginOperationsService {
                 hasDirectoryContext: true,
             }),
             activeCapability: directoryPlugin?.activeCapability,
-            directorySettings: directoryPlugin
-                ? { ...directoryPlugin.settings, ...directoryPlugin.secretSettings }
-                : undefined,
+            directorySettings: this.maskSecretSettings(
+                directoryPlugin
+                    ? { ...directoryPlugin.settings, ...directoryPlugin.secretSettings }
+                    : undefined,
+                registered.plugin.settingsSchema,
+            ),
             directoryPluginId: directoryPlugin?.id,
             priority: directoryPlugin?.priority,
         };
@@ -1081,6 +1086,33 @@ export class PluginOperationsService {
         if (!icon) return undefined;
 
         return { ...icon };
+    }
+
+    /**
+     * Mask secret values in settings for API responses.
+     * Shows first 4 + '••••' + last 4 chars (or first 2 + '••••' + last 2 for short values).
+     */
+    private maskSecretSettings(
+        settings: Record<string, unknown> | undefined,
+        schema: JsonSchema | undefined,
+    ): Record<string, unknown> | undefined {
+        if (!settings || !schema?.properties) return settings;
+
+        const masked: Record<string, unknown> = { ...settings };
+        for (const [key, value] of Object.entries(masked)) {
+            const propSchema = schema.properties[key];
+            if (propSchema?.['x-secret'] && typeof value === 'string' && value.length > 0) {
+                masked[key] = this.partialReveal(value);
+            }
+        }
+        return masked;
+    }
+
+    private partialReveal(value: string): string {
+        if (value.length <= 8) {
+            return value.slice(0, 2) + '••••' + value.slice(-2);
+        }
+        return value.slice(0, 4) + '••••' + value.slice(-4);
     }
 
     /**
