@@ -31,6 +31,7 @@ interface DirectoryImportFormProps {
 }
 
 type ImportStep = 'source' | 'analyzing' | 'choose_mode' | 'configure' | 'importing';
+type ImportPath = 'direct' | 'from_choose_mode';
 
 interface AnalysisResult {
     sourceUrl: string;
@@ -54,6 +55,7 @@ interface AnalysisResult {
         conflictingRepos: string[];
         suggestedSlug: string;
     };
+    hasDataRepoWriteAccess?: boolean;
     error?: string;
 }
 
@@ -71,6 +73,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
     );
     const [owner, setOwner] = useState('');
     const [organization, setOrganization] = useState(false);
+    const [importPath, setImportPath] = useState<ImportPath>('direct');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const t = useTranslations('dashboard.directoryCreation.import');
@@ -149,6 +152,10 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
 
     const handleModeSelect = async (mode: ImportMode) => {
         if (mode === 'import') {
+            // Reset owner to personal account — user picks their destination in configure step
+            setOwner('');
+            setOrganization(false);
+            setImportPath('from_choose_mode');
             setStep('configure');
         } else if (mode === 'link_existing' && analysisResult && gitProvider) {
             startTransition(async () => {
@@ -260,8 +267,8 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
             <div
                 className={cn(
                     'p-6 rounded-lg',
-                    'bg-card dark:bg-card-dark',
-                    'border border-card-border dark:border-card-border-dark',
+                    'bg-card dark:bg-card-primary-dark',
+                    'border border-card-border dark:border-border-secondary-dark',
                 )}
             >
                 {step === 'source' && (
@@ -301,6 +308,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                             }}
                             onSelectMode={handleModeSelect}
                             disabled={isPending}
+                            hasWriteAccess={analysisResult?.hasDataRepoWriteAccess}
                         />
                         <div className="flex justify-center">
                             <Button
@@ -347,9 +355,15 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                             setOrganization(isOrganization);
                         }}
                         onBack={() => {
-                            setStep('source');
-                            setAnalysisResult(null);
-                            setManualSourceType(null);
+                            if (importPath === 'from_choose_mode') {
+                                setStep('choose_mode');
+                                setImportPath('direct');
+                                setManualSourceType(null);
+                            } else {
+                                setStep('source');
+                                setAnalysisResult(null);
+                                setManualSourceType(null);
+                            }
                             setOwner('');
                             setOrganization(false);
                         }}

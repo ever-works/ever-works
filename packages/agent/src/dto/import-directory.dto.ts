@@ -53,6 +53,7 @@ export class AnalyzeRepositoryResponseDto {
         conflictingRepos: string[];
         suggestedSlug: string;
     };
+    hasDataRepoWriteAccess?: boolean;
     error?: string;
 }
 

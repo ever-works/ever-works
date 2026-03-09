@@ -81,7 +81,10 @@ export function GitProviderSelector({
                     'border border-border dark:border-border-dark',
                 )}
             >
-                <Boxes className="w-8 h-8 mx-auto text-text-muted dark:text-text-muted-dark mb-2" />
+                <Boxes
+                    className="w-8 h-8 mx-auto text-text-muted dark:text-accent-indigo mb-2"
+                    strokeWidth={1.4}
+                />
                 <p className="text-sm text-text-muted dark:text-text-muted-dark">
                     {t('noProviders')}
                 </p>

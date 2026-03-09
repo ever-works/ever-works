@@ -257,7 +257,7 @@ export class GitFacadeService implements IGitFacade {
         owner: string,
         repo: string,
         options: GitFacadeOptions,
-    ): Promise<GitRepository | null> {
+    ): Promise<GitRepositoryWithPermissions | null> {
         const { plugin, token } = await this.resolvePluginAndToken(options);
         return plugin.getRepository(owner, repo, token);
     }

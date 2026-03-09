@@ -71,7 +71,7 @@ export class DeployService {
             withDelay: false,
         });
 
-        await this.setRequiredSecrets(ctx, token, directory, options.teamScope);
+        await this.setRequiredSecrets(ctx, token, directory);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
 
@@ -198,12 +198,7 @@ export class DeployService {
         return this.setActionVariable({ key, value, owner: ctx.owner, repo: ctx.repo }, ctx.token);
     }
 
-    private async setRequiredSecrets(
-        ctx: RepoContext,
-        deployToken: string,
-        directory: Directory,
-        teamScope?: string,
-    ) {
+    private async setRequiredSecrets(ctx: RepoContext, deployToken: string, directory: Directory) {
         const provider = directory.deployProvider || 'vercel';
         try {
             await this.setVariable(ctx, 'DEPLOY_PROVIDER', provider);
@@ -214,6 +209,7 @@ export class DeployService {
         }
 
         await Promise.all([
+            this.setSecret(ctx, 'TENANT_ID', directory.id),
             this.setSecret(ctx, 'DATA_REPOSITORY', `${directory.slug}-data`),
             this.setSecret(ctx, `${provider.toUpperCase()}_TOKEN`, deployToken),
             this.setSecret(ctx, 'DEPLOY_TOKEN', deployToken),

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 500" width="750" height="500">
+  <rect width="750" height="500" fill="#c60b1e"/>
+  <rect width="750" height="250" y="125" fill="#ffc400"/>
+  <path d="M 150,250 h 50 v 50 h -50 z" fill="#c60b1e"/>
+  <g id="castle" fill="#ffc400">
+    <rect width="20" height="50" x="165" y="200"/>
+    <rect width="10" height="10" x="160" y="190"/>
+    <rect width="10" height="10" x="180" y="190"/>
+    <rect width="40" height="10" x="155" y="240"/>
+  </g>
+</svg>

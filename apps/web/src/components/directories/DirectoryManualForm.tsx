@@ -101,8 +101,8 @@ export function DirectoryManualForm({
                 <div
                     className={cn(
                         'p-6 rounded-lg',
-                        'bg-card dark:bg-card-dark',
-                        'border border-card-border dark:border-card-border-dark',
+                        'bg-card dark:bg-card-primary-dark',
+                        'border border-card-border dark:border-border-secondary-dark',
                     )}
                 >
                     <h2 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
@@ -179,6 +179,7 @@ export function DirectoryManualForm({
                         variant="primary"
                         size="lg"
                         fullWidth
+                        className="bg-primary-500"
                     >
                         {isPending ? (
                             t('creatingButton')

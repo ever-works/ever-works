@@ -41,14 +41,14 @@ export function ImportSourceStep({
                     type="button"
                     onClick={() => onSourceMethodChange('url')}
                     className={cn(
-                        'p-4 rounded-lg border-2 text-left transition-all',
+                        'p-4 rounded-lg border text-left transition-all cursor-pointer',
                         'bg-card dark:bg-card-dark',
                         sourceMethod === 'url'
-                            ? 'border-primary shadow-md'
-                            : 'border-card-border dark:border-card-border-dark hover:border-primary/50',
+                            ? 'border-primary-500 shadow-lg'
+                            : 'border-card-border dark:border-card-border-dark hover:border-primary-500/50',
                     )}
                 >
-                    <Link className="w-6 h-6 text-primary mb-2" />
+                    <Link className="w-6 h-6 text-primary-500 mb-2" strokeWidth={1.4} />
                     <h4 className="font-medium text-text dark:text-text-dark">
                         {t('sourceMethod.url.title')}
                     </h4>
@@ -61,14 +61,14 @@ export function ImportSourceStep({
                     type="button"
                     onClick={() => onSourceMethodChange('repository')}
                     className={cn(
-                        'p-4 rounded-lg border-2 text-left transition-all',
+                        'p-4 rounded-lg border text-left transition-all cursor-pointer',
                         'bg-card dark:bg-card-dark',
                         sourceMethod === 'repository'
-                            ? 'border-primary shadow-md'
-                            : 'border-card-border dark:border-card-border-dark hover:border-primary/50',
+                            ? 'border-accent-indigo shadow-lg'
+                            : 'border-card-border dark:border-card-border-dark hover:border-primary-500/50',
                     )}
                 >
-                    <FolderGit2 className="w-6 h-6 text-primary mb-2" />
+                    <FolderGit2 className="w-6 h-6 text-accent-indigo mb-2" strokeWidth={1.4} />
                     <h4 className="font-medium text-text dark:text-text-dark">
                         {t('sourceMethod.repository.title')}
                     </h4>
@@ -139,6 +139,7 @@ export function ImportSourceStep({
                     variant="primary"
                     size="lg"
                     fullWidth
+                    className="bg-primary-600"
                 >
                     <ArrowRight className="w-5 h-5" />
                     {t('analyzeButton')}

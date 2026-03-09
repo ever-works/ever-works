@@ -197,7 +197,7 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		options?: ListRepositoriesOptions
 	): Promise<GitRepositoryWithPermissions[]>;
 	createRepository(options: CreateRepoOptions, token: string): Promise<GitRepository>;
-	getRepository(owner: string, repo: string, token: string): Promise<GitRepository | null>;
+	getRepository(owner: string, repo: string, token: string): Promise<GitRepositoryWithPermissions | null>;
 	hasRepositoryAccess?(owner: string, repo: string, token: string): Promise<boolean>;
 	deleteRepository(owner: string, repo: string, token: string): Promise<void>;
 	updateRepository?(

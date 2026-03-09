@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { Search } from 'lucide-react';
 import { UserPlugin } from '@/lib/api/plugins';
 import { PluginCard } from './PluginCard';
-import { getCategoryLabel } from '@/lib/utils/plugin-category-icons';
+import { getCategoryLabel, compareCategoryOrder } from '@/lib/utils/plugin-category-icons';
 
 interface PluginGridProps {
     plugins: UserPlugin[];
@@ -65,18 +65,20 @@ export function PluginGrid({ plugins, grouped, searchQuery, onClearSearch }: Plu
 
     return (
         <div className="space-y-8">
-            {Object.entries(groupByCategory(plugins)).map(([category, categoryPlugins]) => (
-                <div key={category}>
-                    <h2 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
-                        {getCategoryLabel(category)}
-                    </h2>
-                    <div className={GRID}>
-                        {categoryPlugins.map((plugin) => (
-                            <PluginCard key={plugin.pluginId} plugin={plugin} />
-                        ))}
+            {Object.entries(groupByCategory(plugins))
+                .sort(([a], [b]) => compareCategoryOrder(a, b))
+                .map(([category, categoryPlugins]) => (
+                    <div key={category}>
+                        <h2 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
+                            {getCategoryLabel(category)}
+                        </h2>
+                        <div className={GRID}>
+                            {categoryPlugins.map((plugin) => (
+                                <PluginCard key={plugin.pluginId} plugin={plugin} />
+                            ))}
+                        </div>
                     </div>
-                </div>
-            ))}
+                ))}
         </div>
     );
 }

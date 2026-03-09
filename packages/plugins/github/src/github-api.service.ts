@@ -58,7 +58,12 @@ export class GitHubApiService {
 		}));
 	}
 
-	async getRepository(owner: string, repo: string, token: string, baseUrl?: string): Promise<GitRepository | null> {
+	async getRepository(
+		owner: string,
+		repo: string,
+		token: string,
+		baseUrl?: string
+	): Promise<GitRepositoryWithPermissions | null> {
 		const octokit = this.createOctokit(token, baseUrl);
 
 		try {
@@ -79,6 +84,13 @@ export class GitHubApiService {
 							owner: data.parent.owner.login,
 							name: data.parent.name,
 							fullName: data.parent.full_name
+						}
+					: undefined,
+				permissions: data.permissions
+					? {
+							admin: data.permissions.admin ?? false,
+							push: data.permissions.push ?? false,
+							pull: data.permissions.pull ?? false
 						}
 					: undefined
 			};
