@@ -205,7 +205,11 @@ export function PluginSettingsField({
                         isMaskedValue
                             ? (e) => {
                                   // Only clear when user actually types a character, not on Tab/Shift/etc
-                                  if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+                                  if (
+                                      e.key.length === 1 ||
+                                      e.key === 'Backspace' ||
+                                      e.key === 'Delete'
+                                  ) {
                                       onChange('');
                                   }
                               }
