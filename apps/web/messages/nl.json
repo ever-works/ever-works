@@ -1717,10 +1717,16 @@
         "aiChat": {
             "title": "AI Assistent",
             "subtitle": "Maak directory's met natuurlijke taal",
+            "welcomeMessage": "Hallo! Ik kan je helpen directory's te maken met natuurlijke taal. Stel een vraag zoals \"Maak een directory voor AI-tools\" of beschrijf wat je nodig hebt.",
             "newChat": "Nieuwe chat",
             "loadingConversation": "Gesprek laden…",
             "inputPlaceholder": "Beschrijf de directory die u wilt maken...",
             "sendButton": "Verzenden",
+            "sendHint": "Enter om te verzenden · Shift+Enter voor nieuwe regel",
+            "providerNotConfigured": "Deze provider is niet geconfigureerd. Stel het in bij Plugins.",
+            "editMessage": "Bericht bewerken",
+            "saveEdit": "Opslaan en verzenden",
+            "cancelEdit": "Annuleren",
             "errors": {
                 "unableToSend": "Kan bericht niet verzenden."
             },

@@ -1717,10 +1717,16 @@
         "aiChat": {
             "title": "עוזר AI",
             "subtitle": "צור מדריכים בשפה טבעית",
+            "welcomeMessage": "שלום! אני יכול לעזור לך ליצור מדריכים בשפה טבעית. שאל משהו כמו \"צור מדריך לכליי בינה מלאכותית\" או תאר מה אתה צריך.",
             "newChat": "צ'אט חדש",
             "loadingConversation": "טוען שיחה...",
             "inputPlaceholder": "תאר את המדריך שברצונך ליצור...",
             "sendButton": "שלח",
+            "sendHint": "Enter לשליחה · Shift+Enter לשורה חדשה",
+            "providerNotConfigured": "ספק זה אינו מוגדר. הגדרתו בתוספים.",
+            "editMessage": "עריכת הודעה",
+            "saveEdit": "שמור ושלח",
+            "cancelEdit": "ביטול",
             "errors": {
                 "unableToSend": "לא ניתן לשלוח את ההודעה."
             },

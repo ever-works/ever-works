@@ -1717,10 +1717,16 @@
         "aiChat": {
             "title": "Yapay Zeka Asistanı",
             "subtitle": "Doğal dil ile dizinler oluşturun",
+            "welcomeMessage": "Merhaba! Doğal dil kullanarak dizinler oluşturmanıza yardımcı olabilirim. \"Yapay zeka araçları için bir dizin oluştur\" gibi sorular sorabilir ya da ihtiyacınızı tanımlayabilirsiniz.",
             "newChat": "Yeni sohbet",
             "loadingConversation": "Sohbet yükleniyor…",
             "inputPlaceholder": "Oluşturmak istediğiniz dizini açıklayın...",
             "sendButton": "Gönder",
+            "sendHint": "Göndermek için Enter · Yeni satır için Shift+Enter",
+            "providerNotConfigured": "Bu sağlayıcı yapılandırılmamış. Eklentiler'de ayarlayın.",
+            "editMessage": "Mesajı düzenle",
+            "saveEdit": "Kaydet ve Gönder",
+            "cancelEdit": "İptal",
             "errors": {
                 "unableToSend": "Mesaj gönderilemedi."
             },

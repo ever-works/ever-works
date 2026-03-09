@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { useChatHistory, UseChatHistoryValue } from '@/lib/hooks/use-chat-history';
 import type { ProviderOption } from '@/lib/api/types-only';
 import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
@@ -15,7 +16,8 @@ interface ChatContextValue extends UseChatHistoryValue {
 const ChatContext = createContext<ChatContextValue | null>(null);
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
-    const chatHistory = useChatHistory();
+    const t = useTranslations('dashboard.aiChat');
+    const chatHistory = useChatHistory({ initialMessage: t('welcomeMessage') });
     const [providers, setProviders] = useState<ProviderOption[]>([]);
     const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
 

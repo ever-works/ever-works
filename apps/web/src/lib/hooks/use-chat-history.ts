@@ -14,6 +14,10 @@ export type ChatMessage = {
     error?: string;
 };
 
+export interface UseChatHistoryOptions {
+    initialMessage: string;
+}
+
 export interface UseChatHistoryValue {
     messages: ChatMessage[];
     error: string | null;
@@ -23,22 +27,19 @@ export interface UseChatHistoryValue {
     resetHistory: () => void;
 }
 
-const INITIAL_ASSISTANT_MESSAGE =
-    'Hi! I can help you create directories using natural language. Ask something like "Create a directory for AI tools" or describe what you need.';
-
 export const generateMessageId = () =>
     `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-const createInitialMessages = (): ChatMessage[] => [
+const createInitialMessages = (initialMessage: string): ChatMessage[] => [
     {
         id: generateMessageId(),
         role: 'assistant',
-        content: INITIAL_ASSISTANT_MESSAGE,
+        content: initialMessage,
         timestamp: new Date().toISOString(),
     },
 ];
 
-export function useChatHistory(): UseChatHistoryValue {
+export function useChatHistory({ initialMessage }: UseChatHistoryOptions): UseChatHistoryValue {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -46,11 +47,11 @@ export function useChatHistory(): UseChatHistoryValue {
     const hasLoadedRef = useRef(false);
 
     const resetHistory = useCallback(() => {
-        setMessages(createInitialMessages());
+        setMessages(createInitialMessages(initialMessage));
         setError(null);
         hasLoadedRef.current = false;
         setIsLoading(false);
-    }, []);
+    }, [initialMessage]);
 
     const loadHistory = useCallback(() => {
         if (hasLoadedRef.current) {
@@ -58,9 +59,9 @@ export function useChatHistory(): UseChatHistoryValue {
         }
 
         hasLoadedRef.current = true;
-        setMessages(createInitialMessages());
+        setMessages(createInitialMessages(initialMessage));
         setIsLoading(false);
-    }, []);
+    }, [initialMessage]);
 
     return useMemo(
         () => ({

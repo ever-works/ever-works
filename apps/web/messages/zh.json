@@ -1717,10 +1717,16 @@
         "aiChat": {
             "title": "AI 助手",
             "subtitle": "使用自然语言创建目录",
+            "welcomeMessage": "你好！我可以帮助你使用自然语言创建目录。试着问“为 AI 工具创建一个目录”或描述你需要的内容。",
             "newChat": "新聊天",
             "loadingConversation": "加载对话中…",
             "inputPlaceholder": "描述您想要创建的目录...",
             "sendButton": "发送",
+            "sendHint": "按 Enter 发送 · Shift+Enter 换行",
+            "providerNotConfigured": "此提供商未配置。请在插件中进行设置。",
+            "editMessage": "编辑消息",
+            "saveEdit": "保存并发送",
+            "cancelEdit": "取消",
             "errors": {
                 "unableToSend": "无法发送消息。"
             },

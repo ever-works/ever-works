@@ -1717,10 +1717,16 @@
         "aiChat": {
             "title": "Assistant IA",
             "subtitle": "Créer des répertoires en langage naturel",
+            "welcomeMessage": "Bonjour ! Je peux vous aider à créer des répertoires en langage naturel. Posez une question comme \"Crée un répertoire pour les outils IA\" ou décrivez ce dont vous avez besoin.",
             "newChat": "Nouveau chat",
             "loadingConversation": "Chargement de la conversation…",
             "inputPlaceholder": "Décrivez le répertoire que vous souhaitez créer...",
             "sendButton": "Envoyer",
+            "sendHint": "Entrée pour envoyer · Maj+Entrée pour une nouvelle ligne",
+            "providerNotConfigured": "Ce fournisseur n'est pas configuré. Configurez-le dans Plugins.",
+            "editMessage": "Modifier le message",
+            "saveEdit": "Enregistrer et envoyer",
+            "cancelEdit": "Annuler",
             "errors": {
                 "unableToSend": "Impossible d'envoyer le message."
             },

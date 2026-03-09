@@ -1717,10 +1717,16 @@
         "aiChat": {
             "title": "Trợ lý AI",
             "subtitle": "Tạo thư mục bằng ngôn ngữ tự nhiên",
+            "welcomeMessage": "Xin chào! Tôi có thể giúp bạn tạo thư mục bằng ngôn ngữ tự nhiên. Hãy hỏi điều gì đó như \"Tạo thư mục cho công cụ AI\" hoặc mô tả những gì bạn cần.",
             "newChat": "Cuộc trò chuyện mới",
             "loadingConversation": "Đang tải cuộc trò chuyện…",
             "inputPlaceholder": "Mô tả thư mục bạn muốn tạo...",
             "sendButton": "Gửi",
+            "sendHint": "Enter để gửi · Shift+Enter để xuống dòng",
+            "providerNotConfigured": "Nhà cung cấp này chưa được cấu hình. Thiết lập trong Plugins.",
+            "editMessage": "Chỉnh sửa tin nhắn",
+            "saveEdit": "Lưu & Gửi",
+            "cancelEdit": "Hủy",
             "errors": {
                 "unableToSend": "Không thể gửi tin nhắn."
             },

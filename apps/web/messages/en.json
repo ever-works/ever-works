@@ -2030,12 +2030,16 @@
         "aiChat": {
             "title": "AI Assistant",
             "subtitle": "Create directories with natural language",
+            "welcomeMessage": "Hi! I can help you create directories using natural language. Ask something like \"Create a directory for AI tools\" or describe what you need.",
             "newChat": "New chat",
             "loadingConversation": "Loading conversation…",
             "inputPlaceholder": "Describe the directory you want to create...",
             "sendButton": "Send",
             "sendHint": "Enter to send · Shift+Enter for new line",
             "providerNotConfigured": "This provider is not configured. Set it up in Plugins.",
+            "editMessage": "Edit message",
+            "saveEdit": "Save & Submit",
+            "cancelEdit": "Cancel",
             "errors": {
                 "unableToSend": "Unable to send message"
             }
