@@ -115,12 +115,13 @@ export function ChatInterface() {
             }));
             clearPending();
         },
-        onError: (error) => {
-            setErrorMessage(error.message);
+        onError: (_error) => {
+            const streamError = t('errors.unableToSend');
+            setErrorMessage(streamError);
             updatePendingMessage((message) => ({
                 ...message,
                 isStreaming: false,
-                error: error.message,
+                error: streamError,
             }));
             clearPending();
         },
@@ -168,7 +169,7 @@ export function ChatInterface() {
                 providerOverride: selectedProvider ?? undefined,
             });
         } catch (error) {
-            const message = error instanceof Error ? error.message : t('errors.unableToSend');
+            const message = t('errors.unableToSend');
             setErrorMessage(message);
             updatePendingMessage((current) => ({
                 ...current,
@@ -229,7 +230,7 @@ export function ChatInterface() {
                 providerOverride: selectedProvider ?? undefined,
             });
         } catch (error) {
-            const message = error instanceof Error ? error.message : t('errors.unableToSend');
+            const message = t('errors.unableToSend');
             setErrorMessage(message);
             updatePendingMessage((current) => ({
                 ...current,
