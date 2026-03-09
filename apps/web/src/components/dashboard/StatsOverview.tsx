@@ -1,39 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 
-interface Stats {
-    totalDirectories: number;
-    totalItems: number;
-    apiCalls: number;
-    activeWebsites: number;
-}
-
 interface StatsOverviewProps {
     totalDirectories?: number;
+    totalItems?: number;
+    activeWebsites?: number;
 }
 
-export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
+export function StatsOverview({
+    totalDirectories = 0,
+    totalItems = 0,
+    activeWebsites = 0,
+}: StatsOverviewProps) {
     const t = useTranslations('dashboard.stats');
-    const [stats, setStats] = useState<Stats>({
-        totalDirectories: totalDirectories,
-        totalItems: 0,
-        apiCalls: 0,
-        activeWebsites: 0,
-    });
-
-    useEffect(() => {
-        // TODO: Fetch other stats from API
-        setStats({
-            totalDirectories: totalDirectories,
-            totalItems: 0,
-            apiCalls: 0,
-            activeWebsites: 0,
-        });
-    }, [totalDirectories]);
 
     const statCards: Array<{
         title: string;
@@ -45,7 +27,7 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
     }> = [
         {
             title: t('totalDirectories'),
-            value: stats.totalDirectories,
+            value: totalDirectories,
             icon: FolderIcon,
             iconColor: 'text-blue-500',
             change: '+12%',
@@ -53,7 +35,7 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
         },
         {
             title: t('totalItems'),
-            value: stats.totalItems,
+            value: totalItems,
             icon: ItemsIcon,
             iconColor: 'text-violet-500',
             change: '+23%',
@@ -61,7 +43,7 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
         },
         {
             title: t('activeWebsites'),
-            value: stats.activeWebsites,
+            value: activeWebsites,
             icon: WebsiteIcon,
             iconColor: 'text-emerald-500',
             change: '0%',

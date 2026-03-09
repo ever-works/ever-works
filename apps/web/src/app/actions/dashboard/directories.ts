@@ -477,6 +477,24 @@ export async function getDirectories(params: GetDirectoriesParams = {}) {
     }
 }
 
+export async function getDirectoryStats() {
+    try {
+        const stats = await directoryAPI.getStats();
+        return {
+            success: true,
+            ...stats,
+        };
+    } catch (error) {
+        console.error('Failed to fetch directory stats:', error);
+        return {
+            success: false,
+            totalDirectories: 0,
+            totalItems: 0,
+            activeWebsites: 0,
+        };
+    }
+}
+
 // Import actions
 
 export async function analyzeRepository(sourceUrl: string, providerId?: string) {

@@ -112,6 +112,20 @@ export class DirectoryQueryService {
         }
     }
 
+    async getStats(user: User) {
+        try {
+            const memberDirectoryIds =
+                await this.directoryMemberRepository.getAccessibleDirectoryIds(user.id);
+
+            return await this.directoryRepository.getAccessibleStats({
+                userId: user.id,
+                memberDirectoryIds,
+            });
+        } catch (error) {
+            rethrowAsNormalized(error, this.logger, 'getting directory stats');
+        }
+    }
+
     async getDirectory(id: string, user: User) {
         try {
             const accessResult = await this.ownershipService.ensureAccess(id, user.id);

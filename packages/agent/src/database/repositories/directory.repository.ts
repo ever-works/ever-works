@@ -363,6 +363,50 @@ export class DirectoryRepository {
     }
 
     /**
+     * Get aggregated stats for all directories accessible to a user.
+     */
+    async getAccessibleStats(options: {
+        userId: string;
+        memberDirectoryIds?: string[];
+    }): Promise<{ totalDirectories: number; totalItems: number; activeWebsites: number }> {
+        const { userId, memberDirectoryIds = [] } = options;
+
+        if (!userId) {
+            return { totalDirectories: 0, totalItems: 0, activeWebsites: 0 };
+        }
+
+        const queryBuilder = this.repository.createQueryBuilder('directory');
+
+        if (memberDirectoryIds.length > 0) {
+            queryBuilder.where(
+                new Brackets((qb) => {
+                    qb.where('directory.userId = :userId', { userId }).orWhere(
+                        'directory.id IN (:...memberDirectoryIds)',
+                        { memberDirectoryIds },
+                    );
+                }),
+            );
+        } else {
+            queryBuilder.where('directory.userId = :userId', { userId });
+        }
+
+        const result = await queryBuilder
+            .select('COUNT(*)', 'totalDirectories')
+            .addSelect('COALESCE(SUM(directory.itemsCount), 0)', 'totalItems')
+            .addSelect(
+                "SUM(CASE WHEN directory.website IS NOT NULL AND directory.website != '' THEN 1 ELSE 0 END)",
+                'activeWebsites',
+            )
+            .getRawOne();
+
+        return {
+            totalDirectories: parseInt(result.totalDirectories, 10) || 0,
+            totalItems: parseInt(result.totalItems, 10) || 0,
+            activeWebsites: parseInt(result.activeWebsites, 10) || 0,
+        };
+    }
+
+    /**
      * Find a directory by ID with members relation loaded.
      */
     async findByIdWithMembers(id: string): Promise<Directory | null> {
