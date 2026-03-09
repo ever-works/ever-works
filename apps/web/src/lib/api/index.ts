@@ -13,4 +13,5 @@ export * from './plugins-capabilities/screenshot';
 export * from './plugins-capabilities/deploy';
 export * from './plugins-capabilities/git-providers';
 export * from './plugins-capabilities/oauth';
+export * from './account-transfer.types';
 export * from './types';
