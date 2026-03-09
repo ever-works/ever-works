@@ -169,8 +169,9 @@ function ScheduleForm({
             });
 
             if (!result.success) {
-                // Revert on failure
-                updateForm({ enable: form.enable });
+                // Revert on failure without marking dirty
+                setForm((prev) => ({ ...prev, enable: form.enable }));
+                setDirty(false);
                 toast.error(result.error || t('errors.updateFailed'));
                 return;
             }
@@ -262,44 +263,45 @@ function ScheduleForm({
 
     return (
         <section className="rounded-2xl border border-card-border dark:border-card-border-dark bg-card dark:bg-card-dark p-6 shadow-sm space-y-6">
-            <header className="space-y-2">
-                <p className="text-lg font-semibold text-text dark:text-text-dark">{t('title')}</p>
-                <p className="text-sm text-text-secondary dark:text-text-secondary-dark max-w-2xl">
-                    {schedule.subscriptionsEnabled ? t('subtitle.enabled') : t('subtitle.disabled')}
-                </p>
+            <header className="flex items-start justify-between gap-4">
+                <div className="space-y-2">
+                    <p className="text-lg font-semibold text-text dark:text-text-dark">{t('title')}</p>
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark max-w-2xl">
+                        {schedule.subscriptionsEnabled ? t('subtitle.enabled') : t('subtitle.disabled')}
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={toggleAutomation}
+                    disabled={anyBusy}
+                    title={
+                        isActive
+                            ? t('actions.stopAutomation')
+                            : t('actions.startAutomation')
+                    }
+                    className={cn(
+                        'p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0',
+                        'border border-border dark:border-border-dark',
+                        'bg-surface-secondary dark:bg-surface-tertiary-dark',
+                        isActive
+                            ? 'text-danger hover:bg-surface-tertiary dark:hover:bg-card-hover-dark'
+                            : 'text-primary hover:bg-surface-tertiary dark:hover:bg-card-hover-dark',
+                    )}
+                >
+                    {isActive ? (
+                        <Square className="h-4.5 w-4.5" aria-hidden />
+                    ) : (
+                        <PlayCircle className="h-4.5 w-4.5" aria-hidden />
+                    )}
+                </button>
             </header>
 
-            {/* Status chip with inline Start/Stop button */}
+            {/* Summary chips */}
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-4 space-y-1">
-                    <div className="flex items-center justify-between">
-                        <p className="text-xs uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-                            {t('summary.status')}
-                        </p>
-                        <button
-                            type="button"
-                            onClick={toggleAutomation}
-                            disabled={anyBusy}
-                            title={
-                                isActive
-                                    ? t('actions.stopAutomation')
-                                    : t('actions.startAutomation')
-                            }
-                            className={cn(
-                                'p-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
-                                'bg-surface-secondary dark:bg-surface-secondary-dark',
-                                isActive
-                                    ? 'text-danger hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark'
-                                    : 'text-primary hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
-                            )}
-                        >
-                            {isActive ? (
-                                <Square className="h-4 w-4" aria-hidden />
-                            ) : (
-                                <PlayCircle className="h-4 w-4" aria-hidden />
-                            )}
-                        </button>
-                    </div>
+                    <p className="text-xs uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
+                        {t('summary.status')}
+                    </p>
                     <div className="flex items-center gap-2">
                         <span
                             className={cn(
