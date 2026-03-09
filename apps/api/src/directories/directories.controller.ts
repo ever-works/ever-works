@@ -146,7 +146,8 @@ export class DirectoriesController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Get directory stats',
-        description: 'Get aggregated stats (total directories, total items, active websites) for the authenticated user',
+        description:
+            'Get aggregated stats (total directories, total items, active websites) for the authenticated user',
     })
     @ApiResponse({ status: 200, description: 'Directory stats' })
     async getDirectoryStats(@CurrentUser() auth: AuthenticatedUser) {
