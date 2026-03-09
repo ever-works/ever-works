@@ -180,11 +180,14 @@ export function ChatInterface() {
         }
     };
 
-    const handleEditStart = useCallback((message: ChatMessage) => {
-        if (isStreaming) return;
-        setEditingId(message.id);
-        setEditingContent(message.content);
-    }, [isStreaming]);
+    const handleEditStart = useCallback(
+        (message: ChatMessage) => {
+            if (isStreaming) return;
+            setEditingId(message.id);
+            setEditingContent(message.content);
+        },
+        [isStreaming],
+    );
 
     const handleEditCancel = useCallback(() => {
         setEditingId(null);
