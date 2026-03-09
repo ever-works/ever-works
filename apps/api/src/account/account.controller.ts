@@ -1,117 +1,110 @@
 import {
-	Controller,
-	Get,
-	Post,
-	Delete,
-	Body,
-	Query,
-	HttpCode,
-	HttpStatus,
-	Header,
+    Controller,
+    Get,
+    Post,
+    Delete,
+    Body,
+    Query,
+    HttpCode,
+    HttpStatus,
+    Header,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/jwt.types';
 import {
-	AccountExportService,
-	AccountImportService,
-	GitHubSyncService,
+    AccountExportService,
+    AccountImportService,
+    GitHubSyncService,
 } from '@ever-works/agent/account-transfer';
-import type {
-	AccountExportPayload,
-	ConflictResolution,
-} from '@ever-works/agent/account-transfer';
+import type { AccountExportPayload, ConflictResolution } from '@ever-works/agent/account-transfer';
 
 @Controller('api/account')
 export class AccountController {
-	constructor(
-		private readonly exportService: AccountExportService,
-		private readonly importService: AccountImportService,
-		private readonly syncService: GitHubSyncService,
-	) {}
+    constructor(
+        private readonly exportService: AccountExportService,
+        private readonly importService: AccountImportService,
+        private readonly syncService: GitHubSyncService,
+    ) {}
 
-	// ─── Export ──────────────────────────────────────────────────
+    // ─── Export ──────────────────────────────────────────────────
 
-	@Get('export')
-	@HttpCode(HttpStatus.OK)
-	async exportData(
-		@CurrentUser() auth: AuthenticatedUser,
-		@Query('includeSecrets') includeSecrets: string,
-	) {
-		return this.exportService.exportAccountData(auth.userId, {
-			includeSecrets: includeSecrets === 'true',
-		});
-	}
+    @Get('export')
+    @HttpCode(HttpStatus.OK)
+    async exportData(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query('includeSecrets') includeSecrets: string,
+    ) {
+        return this.exportService.exportAccountData(auth.userId, {
+            includeSecrets: includeSecrets === 'true',
+        });
+    }
 
-	// ─── Import ─────────────────────────────────────────────────
+    // ─── Import ─────────────────────────────────────────────────
 
-	@Post('import/preview')
-	@HttpCode(HttpStatus.OK)
-	async previewImport(
-		@CurrentUser() auth: AuthenticatedUser,
-		@Body() payload: AccountExportPayload,
-	) {
-		return this.importService.previewImport(auth.userId, payload);
-	}
+    @Post('import/preview')
+    @HttpCode(HttpStatus.OK)
+    async previewImport(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() payload: AccountExportPayload,
+    ) {
+        return this.importService.previewImport(auth.userId, payload);
+    }
 
-	@Post('import/apply')
-	@HttpCode(HttpStatus.OK)
-	async applyImport(
-		@CurrentUser() auth: AuthenticatedUser,
-		@Body() body: { payload: AccountExportPayload; resolutions: ConflictResolution[] },
-	) {
-		return this.importService.applyImport(
-			auth.userId,
-			body.payload,
-			body.resolutions || [],
-		);
-	}
+    @Post('import/apply')
+    @HttpCode(HttpStatus.OK)
+    async applyImport(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: { payload: AccountExportPayload; resolutions: ConflictResolution[] },
+    ) {
+        return this.importService.applyImport(auth.userId, body.payload, body.resolutions || []);
+    }
 
-	// ─── GitHub Sync ────────────────────────────────────────────
+    // ─── GitHub Sync ────────────────────────────────────────────
 
-	@Get('sync/status')
-	@HttpCode(HttpStatus.OK)
-	async getSyncStatus(@CurrentUser() auth: AuthenticatedUser) {
-		return this.syncService.getSyncStatus(auth.userId);
-	}
+    @Get('sync/status')
+    @HttpCode(HttpStatus.OK)
+    async getSyncStatus(@CurrentUser() auth: AuthenticatedUser) {
+        return this.syncService.getSyncStatus(auth.userId);
+    }
 
-	@Post('sync/configure')
-	@HttpCode(HttpStatus.OK)
-	async configureSyncRepo(
-		@CurrentUser() auth: AuthenticatedUser,
-		@Body() body: { repoFullName?: string; createNew?: boolean },
-	) {
-		return this.syncService.configureSyncRepo(auth.userId, body);
-	}
+    @Post('sync/configure')
+    @HttpCode(HttpStatus.OK)
+    async configureSyncRepo(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: { repoFullName?: string; createNew?: boolean },
+    ) {
+        return this.syncService.configureSyncRepo(auth.userId, body);
+    }
 
-	@Post('sync/push')
-	@HttpCode(HttpStatus.OK)
-	async pushToGitHub(
-		@CurrentUser() auth: AuthenticatedUser,
-		@Body() body: { includeSecrets?: boolean },
-	) {
-		await this.syncService.pushToGitHub(auth.userId, body);
-		return { status: 'success' };
-	}
+    @Post('sync/push')
+    @HttpCode(HttpStatus.OK)
+    async pushToGitHub(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: { includeSecrets?: boolean },
+    ) {
+        await this.syncService.pushToGitHub(auth.userId, body);
+        return { status: 'success' };
+    }
 
-	@Post('sync/pull')
-	@HttpCode(HttpStatus.OK)
-	async pullFromGitHub(@CurrentUser() auth: AuthenticatedUser) {
-		return this.syncService.pullFromGitHub(auth.userId);
-	}
+    @Post('sync/pull')
+    @HttpCode(HttpStatus.OK)
+    async pullFromGitHub(@CurrentUser() auth: AuthenticatedUser) {
+        return this.syncService.pullFromGitHub(auth.userId);
+    }
 
-	@Post('sync/pull/apply')
-	@HttpCode(HttpStatus.OK)
-	async applyPull(
-		@CurrentUser() auth: AuthenticatedUser,
-		@Body() body: { resolutions: ConflictResolution[] },
-	) {
-		return this.syncService.applyPull(auth.userId, body.resolutions || []);
-	}
+    @Post('sync/pull/apply')
+    @HttpCode(HttpStatus.OK)
+    async applyPull(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: { resolutions: ConflictResolution[] },
+    ) {
+        return this.syncService.applyPull(auth.userId, body.resolutions || []);
+    }
 
-	@Delete('sync')
-	@HttpCode(HttpStatus.OK)
-	async removeSyncConfig(@CurrentUser() auth: AuthenticatedUser) {
-		await this.syncService.removeSyncConfig(auth.userId);
-		return { status: 'success' };
-	}
+    @Delete('sync')
+    @HttpCode(HttpStatus.OK)
+    async removeSyncConfig(@CurrentUser() auth: AuthenticatedUser) {
+        await this.syncService.removeSyncConfig(auth.userId);
+        return { status: 'success' };
+    }
 }

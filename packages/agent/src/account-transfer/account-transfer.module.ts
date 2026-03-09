@@ -9,22 +9,18 @@ import { UserSyncConfig } from './entities/user-sync-config.entity';
 import { UserSyncConfigRepository } from './repositories/user-sync-config.repository';
 
 @Module({
-	imports: [
-		DatabaseModule,
-		FacadesModule,
-		TypeOrmModule.forFeature([UserSyncConfig]),
-	],
-	providers: [
-		AccountExportService,
-		AccountImportService,
-		GitHubSyncService,
-		UserSyncConfigRepository,
-	],
-	exports: [
-		AccountExportService,
-		AccountImportService,
-		GitHubSyncService,
-		UserSyncConfigRepository,
-	],
+    imports: [DatabaseModule, FacadesModule, TypeOrmModule.forFeature([UserSyncConfig])],
+    providers: [
+        AccountExportService,
+        AccountImportService,
+        GitHubSyncService,
+        UserSyncConfigRepository,
+    ],
+    exports: [
+        AccountExportService,
+        AccountImportService,
+        GitHubSyncService,
+        UserSyncConfigRepository,
+    ],
 })
 export class AccountTransferModule {}
