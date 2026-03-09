@@ -394,7 +394,7 @@ export class DirectoryRepository {
             .select('COUNT(*)', 'totalDirectories')
             .addSelect('COALESCE(SUM(directory.itemsCount), 0)', 'totalItems')
             .addSelect(
-                "SUM(CASE WHEN directory.website IS NOT NULL AND directory.website != '' THEN 1 ELSE 0 END)",
+                "COALESCE(SUM(CASE WHEN directory.website IS NOT NULL AND directory.website != '' THEN 1 ELSE 0 END), 0)",
                 'activeWebsites',
             )
             .getRawOne();

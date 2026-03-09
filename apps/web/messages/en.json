@@ -615,12 +615,16 @@
                         "runNow": "Run now",
                         "starting": "Starting...",
                         "cancel": "Cancel schedule",
-                        "cancelling": "Cancelling..."
+                        "cancelling": "Cancelling...",
+                        "startAutomation": "Start Automation",
+                        "stopAutomation": "Stop Automation"
                     },
                     "success": {
                         "saved": "Schedule saved.",
                         "runStarted": "Scheduled run started.",
-                        "cancelled": "Schedule cancelled."
+                        "cancelled": "Schedule cancelled.",
+                        "started": "Automation started.",
+                        "stopped": "Automation stopped."
                     },
                     "errors": {
                         "requireUsage": "Enable pay-per-use billing to use this cadence.",
