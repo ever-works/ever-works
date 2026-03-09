@@ -70,7 +70,7 @@ export function DataManagement() {
                     </div>
                 )}
 
-                <Button onClick={handleExport} disabled={isExporting}>
+                <Button onClick={handleExport} disabled={isExporting} size="sm">
                     <Download className="w-4 h-4 mr-2" />
                     {isExporting ? t('exporting') : t('exportButton')}
                 </Button>
@@ -88,7 +88,7 @@ export function DataManagement() {
                 </p>
 
                 {!showImport ? (
-                    <Button variant="secondary" onClick={() => setShowImport(true)}>
+                    <Button variant="secondary" onClick={() => setShowImport(true)} size="sm">
                         <Upload className="w-4 h-4 mr-2" />
                         {t('importButton')}
                     </Button>

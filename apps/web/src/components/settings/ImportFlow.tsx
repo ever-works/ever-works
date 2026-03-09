@@ -308,11 +308,11 @@ export function ImportFlow({
 
                 <div className="flex gap-2">
                     {preview.valid && (
-                        <Button onClick={handleApply} disabled={isPending}>
+                        <Button onClick={handleApply} disabled={isPending} size="sm">
                             {isPending ? t('applying') : t('applyImport')}
                         </Button>
                     )}
-                    <Button variant="ghost" onClick={onClose}>
+                    <Button variant="ghost" onClick={onClose} size="sm">
                         {t('cancel')}
                     </Button>
                 </div>
@@ -388,7 +388,7 @@ export function ImportFlow({
                     </div>
                 )}
 
-                <Button variant="ghost" onClick={onClose}>
+                <Button variant="ghost" onClick={onClose} size="sm">
                     {t('done')}
                 </Button>
             </div>

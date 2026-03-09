@@ -147,7 +147,7 @@ export function GitHubSync() {
         return (
             <div className="space-y-4">
                 {!showConfigure ? (
-                    <Button variant="secondary" onClick={() => setShowConfigure(true)}>
+                    <Button variant="secondary" onClick={() => setShowConfigure(true)} size="sm">
                         <Github className="w-4 h-4 mr-2" />
                         {t('setupSync')}
                     </Button>
@@ -158,6 +158,7 @@ export function GitHubSync() {
                                 onClick={handleCreateNew}
                                 disabled={isPending}
                                 variant="secondary"
+                                size="sm"
                                 className="w-full justify-start"
                             >
                                 <Plus className="w-4 h-4 mr-2" />
@@ -187,6 +188,7 @@ export function GitHubSync() {
                                 onClick={handleConnectExisting}
                                 disabled={isPending || !repoName.trim()}
                                 variant="secondary"
+                                size="sm"
                             >
                                 {t('connect')}
                             </Button>
