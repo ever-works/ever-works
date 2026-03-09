@@ -1098,7 +1098,7 @@ export class PluginOperationsService {
     ): Record<string, unknown> | undefined {
         if (!settings || !schema?.properties) return settings;
 
-        const masked: Record<string, unknown> = { ...settings };
+        let masked: Record<string, unknown> = { ...settings };
         for (const [key, value] of Object.entries(masked)) {
             const propSchema = schema.properties[key];
             if (propSchema?.['x-secret'] && typeof value === 'string' && value.length > 0) {
@@ -1109,10 +1109,12 @@ export class PluginOperationsService {
     }
 
     private partialReveal(value: string): string {
-        if (value.length <= 8) {
-            return value.slice(0, 2) + '••••' + value.slice(-2);
+        const prefixLen = value.length <= 8 ? 2 : 4;
+        const suffixLen = prefixLen;
+        if (prefixLen + suffixLen >= value.length) {
+            return '••••••••';
         }
-        return value.slice(0, 4) + '••••' + value.slice(-4);
+        return value.slice(0, prefixLen) + '••••' + value.slice(-suffixLen);
     }
 
     /**

@@ -196,14 +196,21 @@ export function PluginSettingsField({
                 <input
                     type={isMaskedValue ? 'text' : getInputType()}
                     value={displayValue}
-                    onChange={
+                    onChange={(e) => {
+                        if (!isMaskedValue) {
+                            onChange(e.target.value);
+                        }
+                    }}
+                    onKeyDown={
                         isMaskedValue
-                            ? () => {
-                                  /* block direct edits on masked display; cleared via onFocus */
+                            ? (e) => {
+                                  // Only clear when user actually types a character, not on Tab/Shift/etc
+                                  if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+                                      onChange('');
+                                  }
                               }
-                            : (e) => onChange(e.target.value)
+                            : undefined
                     }
-                    onFocus={isMaskedValue ? () => onChange('') : undefined}
                     maxLength={schema.maxLength}
                     required={isMaskedValue ? false : required}
                     className={cn(
