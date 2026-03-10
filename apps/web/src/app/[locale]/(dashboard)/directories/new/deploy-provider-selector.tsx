@@ -61,10 +61,10 @@ export function DeployProviderSelector({
                                 onClick={() => onSelect(provider.id)}
                                 disabled={!provider.enabled}
                                 className={cn(
-                                    'w-full flex items-center gap-3 p-3 rounded-lg transition-all',
-                                    'border-2',
+                                    'w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all',
+                                    'border',
                                     isSelected
-                                        ? 'border-primary bg-primary/5'
+                                        ? 'border-primary-500/50 bg-card dark:bg-card-primary-dark/40'
                                         : 'border-border dark:border-border-dark bg-surface dark:bg-surface-dark hover:border-primary/50',
                                     !provider.enabled && 'opacity-50 cursor-not-allowed',
                                 )}

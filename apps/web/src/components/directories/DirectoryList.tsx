@@ -66,7 +66,7 @@ export function DirectoryList({
                         href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
                         className={cn(
                             'px-4 py-2 rounded-lg font-medium transition-colors',
-                            'bg-primary hover:bg-primary-hover text-white',
+                            'bg-primary-500 hover:bg-primary-700 text-white',
                         )}
                     >
                         {t('createButton')}

@@ -78,9 +78,7 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                 <span className="text-sm font-mono text-gray-600 dark:text-gray-200 truncate">
                     {directory.slug}
                     {directory.owner && (
-                        <span className="text-gray-400 dark:text-gray-400">
-                            /{directory.owner}
-                        </span>
+                        <span className="text-gray-400 dark:text-gray-400">/{directory.owner}</span>
                     )}
                 </span>
             </div>
