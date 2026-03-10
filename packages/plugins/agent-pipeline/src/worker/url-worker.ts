@@ -67,17 +67,20 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 	try {
 		if (signal?.aborted) return { url, files: [], count: 0, error: 'Aborted' };
 
+		let extractionError: string | null = null;
 		const extracted = await contentExtractorFacade.extractContent(url, undefined, facadeOptions).catch((err) => {
-			const errMsg = err instanceof Error ? err.message : String(err);
-			logger.warn(`Worker: content extraction threw for ${url}: ${errMsg}`);
-			breaker.recordFailure('contentExtractor', errMsg);
+			extractionError = err instanceof Error ? err.message : String(err);
+			logger.warn(`Worker: content extraction threw for ${url}: ${extractionError}`);
+			breaker.recordFailure('contentExtractor', extractionError);
 			return null;
 		});
 
 		if (!extracted) {
-			logger.warn(`Worker: content extraction returned null for ${url} (no provider or extraction failed)`);
-			breaker.recordFailure('contentExtractor', `extraction returned null for ${url}`);
-			return { url, files: [], count: 0, error: `Content extraction failed for URL: ${url}` };
+			if (!extractionError) {
+				logger.warn(`Worker: content extraction returned null for ${url} (no provider or extraction failed)`);
+				breaker.recordFailure('contentExtractor', `extraction returned null for ${url}`);
+			}
+			return { url, files: [], count: 0, error: extractionError ?? `Content extraction failed for URL: ${url}` };
 		}
 
 		if (!extracted.rawContent) {
