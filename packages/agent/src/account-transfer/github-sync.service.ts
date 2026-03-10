@@ -46,12 +46,14 @@ export class GitHubSyncService {
             hasOAuth,
             repoOwner: config.repoOwner,
             repoName: config.repoName,
-            lastPushAt: config.lastPushAt && !isNaN(config.lastPushAt.getTime())
-                ? config.lastPushAt.toISOString()
-                : undefined,
-            lastPullAt: config.lastPullAt && !isNaN(config.lastPullAt.getTime())
-                ? config.lastPullAt.toISOString()
-                : undefined,
+            lastPushAt:
+                config.lastPushAt && !isNaN(config.lastPushAt.getTime())
+                    ? config.lastPushAt.toISOString()
+                    : undefined,
+            lastPullAt:
+                config.lastPullAt && !isNaN(config.lastPullAt.getTime())
+                    ? config.lastPullAt.toISOString()
+                    : undefined,
             lastSyncError: config.lastSyncError || undefined,
         };
     }

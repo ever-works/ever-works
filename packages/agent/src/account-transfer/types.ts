@@ -258,7 +258,9 @@ export function maskSecretSettings(
  * Checks if a secret settings record contains any masked values.
  * Used during import to detect and warn about masked secrets that need replacing.
  */
-export function containsMaskedSecrets(settings: Record<string, unknown> | undefined | null): boolean {
+export function containsMaskedSecrets(
+    settings: Record<string, unknown> | undefined | null,
+): boolean {
     if (!settings || typeof settings !== 'object') return false;
     return Object.values(settings).some(
         (v) => typeof v === 'string' && v.startsWith(MASKED_SECRET_PREFIX),
