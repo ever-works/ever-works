@@ -21,11 +21,7 @@ interface ImportFlowProps {
 
 type ImportStep = 'upload' | 'preview' | 'result';
 
-export function ImportFlow({
-    onClose,
-    initialPreview,
-    isPullMode,
-}: ImportFlowProps) {
+export function ImportFlow({ onClose, initialPreview, isPullMode }: ImportFlowProps) {
     const t = useTranslations('dashboard.settings.data.import');
     const [step, setStep] = useState<ImportStep>(initialPreview ? 'preview' : 'upload');
     const [payload, setPayload] = useState<AccountExportPayload | null>(null);
