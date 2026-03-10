@@ -24,6 +24,7 @@ export function GitHubSync() {
     const [showConfigure, setShowConfigure] = useState(false);
     const [pullPreview, setPullPreview] = useState<ImportPreview | null>(null);
     const [showPullImport, setShowPullImport] = useState(false);
+    const [includeSecrets, setIncludeSecrets] = useState(false);
 
     useEffect(() => {
         loadStatus();
@@ -72,7 +73,7 @@ export function GitHubSync() {
 
     const handlePush = () => {
         startTransition(async () => {
-            const result = await pushToGitHub();
+            const result = await pushToGitHub({ includeSecrets });
             if (result.success) {
                 toast.success(t('pushSuccess'));
                 loadStatus();
@@ -242,6 +243,24 @@ export function GitHubSync() {
                     <div className="p-2 rounded bg-destructive/10 text-sm text-destructive mb-4 flex items-start gap-2">
                         <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                         <span>{status.lastSyncError}</span>
+                    </div>
+                )}
+
+                <div className="flex items-center gap-2 mb-3">
+                    <label className="flex items-center gap-2 text-sm text-text dark:text-text-dark cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={includeSecrets}
+                            onChange={(e) => setIncludeSecrets(e.target.checked)}
+                            className="rounded border-border dark:border-border-dark"
+                        />
+                        {t('includeSecrets')}
+                    </label>
+                </div>
+
+                {includeSecrets && (
+                    <div className="mb-3 p-3 rounded-lg bg-warning/10 border border-warning/20 text-sm text-warning-foreground">
+                        {t('secretsWarning')}
                     </div>
                 )}
 

@@ -354,7 +354,9 @@
                     "pushError": "Failed to push to GitHub",
                     "pullError": "Failed to pull from GitHub",
                     "disconnectSuccess": "Sync disconnected",
-                    "disconnectError": "Failed to disconnect"
+                    "disconnectError": "Failed to disconnect",
+                    "includeSecrets": "Include API keys and secrets",
+                    "secretsWarning": "Warning: API keys and secrets will be stored in your GitHub repository. Make sure the repository is private."
                 }
             },
             "pluginCategories": {
