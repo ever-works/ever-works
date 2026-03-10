@@ -89,14 +89,11 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 			return { url, files: [], count: 0, error: 'Content extraction returned empty content' };
 		}
 
-		// Content extraction succeeded, reset breaker and proceed with processing
 		breaker.recordSuccess('contentExtractor');
 
 		logger.log(`Worker: extracted ${extracted.rawContent.length} chars from ${url}`);
 
 		const contentRatio = getWorkerContentBudgetRatio(maxContextTokens);
-		// Calculate max chars based on model context budget, then cap to a practical
-		// extraction limit so large documents get split into manageable chunks.
 		const modelBudgetChars = Math.max(
 			Math.floor((maxContextTokens * contentRatio - WORKER_PROMPT_OVERHEAD_TOKENS) * 4),
 			MIN_CHUNK_CHARS
@@ -110,7 +107,6 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 			);
 		}
 
-		// Set up sandbox for tool-based agent
 		const [{ createBashTool }, { Bash, ReadWriteFs }] = await Promise.all([
 			import('bash-tool'),
 			import('just-bash')
@@ -120,7 +116,6 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 		const bashInstance = new Bash({ fs: sandboxFs });
 		const { tools: bashTools } = await createBashTool({ sandbox: bashInstance, destination: '/' });
 
-		// Track created files across all chunks
 		const createdFiles: string[] = [];
 
 		const sandbox = {
@@ -134,7 +129,6 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 			onCreated: async (path, content) => {
 				createdFiles.push(path);
 
-				// Append to existing-items index for cross-worker dedup
 				try {
 					const parsed = JSON.parse(content);
 					await appendFile(
@@ -171,8 +165,6 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 
 		const repairToolCall = createToolCallRepairFn(workerModel, logger);
 
-		// Load existing items once for chunk-level pre-filtering.
-		// Lines matching existing items are stripped from chunks before sending to AI.
 		const existingItems = await loadExistingItems(workspacePath);
 		if (existingItems.length > 0) {
 			logger.log(`Worker: loaded ${existingItems.length} existing items for chunk pre-filtering`);
@@ -181,8 +173,6 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 		for (const chunk of chunks) {
 			if (signal?.aborted) break;
 
-			// Pre-filter: strip lines for items that already exist from the chunk.
-			// If all items are stripped, skip the chunk entirely (no AI call).
 			let chunkText = chunk.text;
 			if (existingItems.length > 0) {
 				const filtered = filterChunk(chunk.text, existingItems);

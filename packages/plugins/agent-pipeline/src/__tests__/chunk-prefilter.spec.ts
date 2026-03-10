@@ -13,6 +13,7 @@ describe('chunk-prefilter', () => {
 			const result = filterChunk(text, []);
 			expect(result.text).toBe(text);
 			expect(result.removedCount).toBe(0);
+			expect(result.remainingCount).toBe(-1);
 			expect(result.skip).toBe(false);
 		});
 
