@@ -74,7 +74,7 @@ export function isAgentPipelineStepId(value: string): value is AgentPipelineStep
 	return (AGENT_PIPELINE_STEP_IDS as readonly string[]).includes(value);
 }
 
-export const DEFAULT_MAX_STEPS = 50;
+export const DEFAULT_MAX_STEPS = 100;
 export const DEFAULT_CONTEXT_BUDGET_RATIO = 0.8;
 
 export const WORKER_PROMPT_OVERHEAD_TOKENS = 2000;
@@ -105,7 +105,7 @@ export function getWorkerContentBudgetRatio(maxContextTokens: number): number {
  */
 export const BASE_STEPS_PER_CHUNK = 100;
 export const STEPS_PER_ESTIMATED_ITEM = 4;
-export const MAX_STEPS_PER_CHUNK = 500;
+export const MAX_STEPS_PER_CHUNK = 800;
 
 export function getStepsPerChunk(chunkChars: number): number {
 	// ~200 chars per structured list item (markdown row/entry)

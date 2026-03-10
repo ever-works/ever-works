@@ -46,11 +46,11 @@ Note: \`_meta/\` files are auto-updated when you create items. Do NOT modify the
 5. You may use \`updateFile\` to correct or enrich a file you just created in this session, but never to modify pre-existing items.
 
 ## Extraction Rules
-1. Only extract items DIRECTLY relevant to the directory topic.
+1. Extract ALL items from the content. Do NOT stop early — process every item in the chunk.
 2. Every item must have a valid source_url.
 3. Extract factual information only — no fabrication.
 4. If the page describes a single item, extract it with comprehensive detail.
-5. If the page lists multiple items, extract each relevant one separately.
+5. If the page lists multiple items, extract each one separately. Do not skip items.
 6. Ignore blog posts or marketing content unless they describe a specific item.
 7. Set featured=false unless the item is widely recognized.
 
@@ -97,7 +97,7 @@ export function buildWorkerSystemPrompt(opts: WorkerPromptOptions): string {
  * Default template for the per-chunk extraction user prompt.
  * Variables: {sourceUrl}, {chunkInfo}, {previouslyExtractedList}, {chunkText}
  */
-export const DEFAULT_CHUNK_USER_PROMPT = `Extract directory items from this page.
+export const DEFAULT_CHUNK_USER_PROMPT = `Extract ALL directory items from this content. Process every item — do not stop early or skip any.
 Source URL: {sourceUrl}{chunkInfo}{previouslyExtractedList}
 
 ---

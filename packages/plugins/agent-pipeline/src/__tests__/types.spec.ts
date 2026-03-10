@@ -75,8 +75,13 @@ describe('types', () => {
 			expect(getStepsPerChunk(20_000)).toBe(400);
 		});
 
-		it('should cap at MAX_STEPS_PER_CHUNK for large chunks', () => {
-			expect(getStepsPerChunk(30_000)).toBe(MAX_STEPS_PER_CHUNK);
+		it('should scale for large chunks within cap', () => {
+			// 30K chars → ~150 estimated items → 150 * 4 = 600 steps (under cap)
+			expect(getStepsPerChunk(30_000)).toBe(600);
+		});
+
+		it('should cap at MAX_STEPS_PER_CHUNK for very large chunks', () => {
+			expect(getStepsPerChunk(50_000)).toBe(MAX_STEPS_PER_CHUNK);
 			expect(getStepsPerChunk(100_000)).toBe(MAX_STEPS_PER_CHUNK);
 		});
 	});

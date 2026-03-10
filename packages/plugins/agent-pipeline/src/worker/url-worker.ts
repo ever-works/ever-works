@@ -6,6 +6,7 @@ import type { IContentExtractorFacade, FacadeOptions, PluginLogger, IPromptFacad
 import { substituteVariables } from '@ever-works/plugin';
 
 import { chunkContent } from './content-chunker.js';
+import { loadExistingItems, filterChunk } from './chunk-prefilter.js';
 import {
 	buildWorkerSystemPromptVariables,
 	buildChunkUserPromptVariables,
@@ -88,14 +89,11 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 			return { url, files: [], count: 0, error: 'Content extraction returned empty content' };
 		}
 
-		// Content extraction succeeded, reset breaker and proceed with processing
 		breaker.recordSuccess('contentExtractor');
 
 		logger.log(`Worker: extracted ${extracted.rawContent.length} chars from ${url}`);
 
 		const contentRatio = getWorkerContentBudgetRatio(maxContextTokens);
-		// Calculate max chars based on model context budget, then cap to a practical
-		// extraction limit so large documents get split into manageable chunks.
 		const modelBudgetChars = Math.max(
 			Math.floor((maxContextTokens * contentRatio - WORKER_PROMPT_OVERHEAD_TOKENS) * 4),
 			MIN_CHUNK_CHARS
@@ -109,7 +107,6 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 			);
 		}
 
-		// Set up sandbox for tool-based agent
 		const [{ createBashTool }, { Bash, ReadWriteFs }] = await Promise.all([
 			import('bash-tool'),
 			import('just-bash')
@@ -119,7 +116,6 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 		const bashInstance = new Bash({ fs: sandboxFs });
 		const { tools: bashTools } = await createBashTool({ sandbox: bashInstance, destination: '/' });
 
-		// Track created files across all chunks
 		const createdFiles: string[] = [];
 
 		const sandbox = {
@@ -133,7 +129,6 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 			onCreated: async (path, content) => {
 				createdFiles.push(path);
 
-				// Append to existing-items index for cross-worker dedup
 				try {
 					const parsed = JSON.parse(content);
 					await appendFile(
@@ -170,9 +165,34 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 
 		const repairToolCall = createToolCallRepairFn(workerModel, logger);
 
+		const existingItems = await loadExistingItems(workspacePath);
+		if (existingItems.length > 0) {
+			logger.log(`Worker: loaded ${existingItems.length} existing items for chunk pre-filtering`);
+		}
+
 		for (const chunk of chunks) {
 			if (signal?.aborted) break;
-			const chunkStepLimit = getStepsPerChunk(chunk.text.length);
+
+			let chunkText = chunk.text;
+			if (existingItems.length > 0) {
+				const filtered = filterChunk(chunk.text, existingItems);
+				if (filtered.skip) {
+					logger.log(
+						`Worker: skipping chunk ${chunk.index + 1}/${chunk.total} — ` +
+							`all ${filtered.removedCount} items already exist`
+					);
+					continue;
+				}
+				if (filtered.removedCount > 0) {
+					logger.log(
+						`Worker: chunk ${chunk.index + 1}/${chunk.total} — ` +
+							`stripped ${filtered.removedCount} existing items, ${filtered.remainingCount} new items to extract`
+					);
+					chunkText = filtered.text;
+				}
+			}
+
+			const chunkStepLimit = getStepsPerChunk(chunkText.length);
 			try {
 				const result = await withToolCallingRetry(
 					() => {
@@ -183,7 +203,7 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 							prompt: substituteVariables(
 								chunkTemplate,
 								buildChunkUserPromptVariables(
-									chunk,
+									{ ...chunk, text: chunkText },
 									url,
 									createdFiles.length > 0 ? createdFiles : undefined
 								)
