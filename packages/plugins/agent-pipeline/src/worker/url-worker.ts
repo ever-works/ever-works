@@ -101,7 +101,9 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 
 		const { chunks, wasSplit } = await chunkContent(extracted.rawContent, maxChunkChars);
 		if (wasSplit) {
-			logger.log(`Worker: split ${extracted.rawContent.length} chars into ${chunks.length} chunks (max ${maxChunkChars} chars/chunk)`);
+			logger.log(
+				`Worker: split ${extracted.rawContent.length} chars into ${chunks.length} chunks (max ${maxChunkChars} chars/chunk)`
+			);
 		}
 
 		// Set up sandbox for tool-based agent
