@@ -76,10 +76,10 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
             <div className="inline-flex items-center gap-1 mt-0.5 mb-2 bg-primary-400/10 dark:bg-white/10 self-start max-w-full px-1.5 rounded-full">
                 <Github className="w-3 h-3 shrink-0 text-gray-600 dark:text-gray-200" />
                 <span className="text-sm font-mono text-gray-600 dark:text-gray-200 truncate">
-                    {directory.slug}
                     {directory.owner && (
-                        <span className="text-gray-400 dark:text-gray-400">/{directory.owner}</span>
+                        <span className="text-gray-400 dark:text-gray-400">{directory.owner}/</span>
                     )}
+                    {directory.slug}
                 </span>
             </div>
 

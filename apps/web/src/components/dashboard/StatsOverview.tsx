@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 
@@ -55,6 +54,7 @@ export function StatsOverview({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {statCards.map((stat) => (
                 <div
+                    key={stat.title}
                     className={cn(
                         'p-1 rounded-lg space-y-6',
                         'bg-card/10 dark:bg-card-primary-dark/30',
@@ -62,7 +62,6 @@ export function StatsOverview({
                     )}
                 >
                     <div
-                        key={stat.title}
                         className={cn(
                             'group relative rounded-sm p-5 transition-shadow duration-200 overflow-hidden',
                             'bg-card dark:bg-surface-secondary-dark/30',
@@ -71,25 +70,6 @@ export function StatsOverview({
                     >
                         {/* Decorative short top border accent with fading edges */}
                         <div className="card-top-accent pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 opacity-50 rounded-full" />
-
-                        {/* Decorative blurred circles background */}
-                        {/* <div className="pointer-events-none absolute inset-0 z-0 opacity-50">
-                        <div className="absolute w-40 h-40 bg-brand-purple/20 opacity-50 rounded-full blur-3xl left-2 top-0"></div>
-                        <div className="absolute w-32 h-32 bg-blue-200/20 opacity-50 rounded-full blur-3xl right-1 top-20"></div>
-                        <div className="absolute w-28 h-28 bg-brand-purple/20 opacity-50 rounded-full blur-2xl left-1/2 -translate-x-1/2 bottom-4"></div>
-                    </div> */}
-
-                        {/* Hover image at top, reversed horizontally, only visible on hover */}
-                        {/* <div className="pointer-events-none absolute left-0 right-0 top-0 z-20">
-                        <Image
-                            src="/bg-cards.png"
-                            alt="Decorative pattern"
-                            className="w-full filter brightness-0 dark:brightness-200 -rotate-180"
-                            width={200}
-                            height={100}
-                            unoptimized
-                        />
-                    </div> */}
 
                         <div>
                             <div>
