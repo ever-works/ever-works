@@ -6,6 +6,7 @@ import type { IContentExtractorFacade, FacadeOptions, PluginLogger, IPromptFacad
 import { substituteVariables } from '@ever-works/plugin';
 
 import { chunkContent } from './content-chunker.js';
+import { loadExistingItems, filterChunk } from './chunk-prefilter.js';
 import {
 	buildWorkerSystemPromptVariables,
 	buildChunkUserPromptVariables,
@@ -170,9 +171,38 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 
 		const repairToolCall = createToolCallRepairFn(workerModel, logger);
 
+		// Load existing items once for chunk-level pre-filtering.
+		// Lines matching existing items are stripped from chunks before sending to AI.
+		const existingItems = await loadExistingItems(workspacePath);
+		if (existingItems.length > 0) {
+			logger.log(`Worker: loaded ${existingItems.length} existing items for chunk pre-filtering`);
+		}
+
 		for (const chunk of chunks) {
 			if (signal?.aborted) break;
-			const chunkStepLimit = getStepsPerChunk(chunk.text.length);
+
+			// Pre-filter: strip lines for items that already exist from the chunk.
+			// If all items are stripped, skip the chunk entirely (no AI call).
+			let chunkText = chunk.text;
+			if (existingItems.length > 0) {
+				const filtered = filterChunk(chunk.text, existingItems);
+				if (filtered.skip) {
+					logger.log(
+						`Worker: skipping chunk ${chunk.index + 1}/${chunk.total} — ` +
+							`all ${filtered.removedCount} items already exist`
+					);
+					continue;
+				}
+				if (filtered.removedCount > 0) {
+					logger.log(
+						`Worker: chunk ${chunk.index + 1}/${chunk.total} — ` +
+							`stripped ${filtered.removedCount} existing items, ${filtered.remainingCount} new items to extract`
+					);
+					chunkText = filtered.text;
+				}
+			}
+
+			const chunkStepLimit = getStepsPerChunk(chunkText.length);
 			try {
 				const result = await withToolCallingRetry(
 					() => {
@@ -183,7 +213,7 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 							prompt: substituteVariables(
 								chunkTemplate,
 								buildChunkUserPromptVariables(
-									chunk,
+									{ ...chunk, text: chunkText },
 									url,
 									createdFiles.length > 0 ? createdFiles : undefined
 								)
