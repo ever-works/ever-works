@@ -81,6 +81,14 @@ export const WORKER_PROMPT_OVERHEAD_TOKENS = 2000;
 export const MIN_CHUNK_CHARS = 4000;
 
 /**
+ * Hard cap on chunk size for extraction workers.
+ * Prevents huge documents (e.g., a 200K-char README with 3000+ items) from
+ * landing in a single chunk where the step limit can't process them all.
+ * At ~30K chars, a structured list chunk typically contains 50–150 items.
+ */
+export const MAX_CHUNK_CHARS = 30_000;
+
+/**
  * Returns the content-budget ratio for the extraction worker based on model context size.
  * Smaller models get a lower ratio so more tokens are available for the JSON response.
  */
@@ -89,6 +97,22 @@ export function getWorkerContentBudgetRatio(maxContextTokens: number): number {
 	if (maxContextTokens <= 32_000) return 0.4;
 	if (maxContextTokens <= 64_000) return 0.5;
 	return 0.55;
+}
+
+/**
+ * Calculates the worker step limit for a single chunk based on its character count.
+ * Larger chunks with more extractable items get proportionally more steps.
+ */
+export const BASE_STEPS_PER_CHUNK = 100;
+export const STEPS_PER_ESTIMATED_ITEM = 4;
+export const MAX_STEPS_PER_CHUNK = 500;
+
+export function getStepsPerChunk(chunkChars: number): number {
+	// ~200 chars per structured list item (markdown row/entry)
+	const estimatedItems = Math.ceil(chunkChars / 200);
+	// ~4 steps per item (findItems + createFile + validateItemJson + reasoning)
+	const needed = estimatedItems * STEPS_PER_ESTIMATED_ITEM;
+	return Math.min(Math.max(needed, BASE_STEPS_PER_CHUNK), MAX_STEPS_PER_CHUNK);
 }
 
 export const MAX_URLS_PER_BATCH = 10;

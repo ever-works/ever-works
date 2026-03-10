@@ -146,7 +146,7 @@ describe('processUrlWorker', () => {
 		const result = await processUrlWorker('https://example.com', ctx);
 
 		expect(result.count).toBe(0);
-		expect(result.error).toBe('Failed to extract content from URL');
+		expect(result.error).toBe('Content extraction failed for URL: https://example.com');
 	});
 
 	it('returns error when no items are created by agent', async () => {

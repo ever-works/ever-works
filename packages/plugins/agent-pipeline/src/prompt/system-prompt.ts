@@ -33,14 +33,15 @@ Today is {date}. Use this when formulating search queries to find current, up-to
 6. **reportProgress** — Report progress to the user. Call periodically.
 
 ## Generation Workflow
-When creating NEW items:
-1. Use \`search\` to find items relevant to the directory topic.
-2. Select the most relevant URLs from search results — only pass REAL URLs that are directly related to the directory topic. Skip blog posts, news articles, and marketing pages if not related to the topic.
-3. Use \`processUrls\` with a batch of URLs (up to 10 at a time) for efficient parallel extraction.
-4. Use \`reportProgress\` to update the user on items created so far.
-5. Repeat: search with different queries, process more URLs (applying the same relevance criteria), until you reach the target.
+**Read the user's request carefully first.** If the user provides specific URL(s), process those DIRECTLY with \`processUrls\` — do NOT search the web first. Only use \`search\` when the user asks for open-ended research or doesn't provide URLs.
 
-**URL budget:** Do not exceed **{maxPages} total URLs** across all processUrls calls. When a URL returns count=0, treat it as exhausted — do not retry it or send very similar URLs. Use getWorkspaceOverview to check progress and diversify search queries if results are sparse.
+When creating NEW items:
+1. If the user provides URL(s): use \`processUrls\` immediately with those URLs. The worker will extract ALL items from each URL automatically (content is chunked and fully processed).
+2. If no URLs provided: use \`search\` to find relevant items, select the best URLs, then use \`processUrls\`.
+3. Use \`reportProgress\` to update the user on items created so far.
+4. Repeat search with different queries only if needed and if the user did not ask to skip search.
+
+**URL budget:** Do not exceed **{maxPages} total URLs** across all processUrls calls. When a URL returns count=0, treat it as exhausted — do not retry it or send very similar URLs (e.g., different URL variants of the same page). Use getWorkspaceOverview to check progress.
 
 **Deduplication is enforced by the pipeline** — workers perform best-effort checks and a final pass removes duplicates by source URL (with name fallback). You do not need to manually check duplicates yourself.
 
@@ -54,7 +55,7 @@ When creating NEW items:
 - Maintain category balance — avoid putting most items in a single category.
 
 ## Generation Target
-Aim to generate approximately **{targetItems}** new items. This is a target — prioritize quality and relevance over hitting the exact number, but do not stop early if there are more relevant items to find.{targetSuffix}
+The default target is approximately **{targetItems}** new items, but **the user's request always takes priority**. If the user asks to extract all items from a specific source, extract ALL of them regardless of this target. The target is a guideline for open-ended research — not a cap when the user explicitly asks for more.{targetSuffix}
 {directorySection}`;
 
 /**
@@ -122,9 +123,10 @@ export function buildSystemPrompt(options: PromptOptions): string {
  * Default template for the parent orchestrator user prompt.
  * Variables: {userInstruction}, {directoryDescription}, {workflowInstructions}, {targetItems}
  */
-export const DEFAULT_PARENT_USER_PROMPT = `{userInstruction}{directoryDescription}{workflowInstructions}
+export const DEFAULT_PARENT_USER_PROMPT = `## User Request
+{userInstruction}{directoryDescription}{workflowInstructions}
 
-Target: generate approximately {targetItems} new items.`;
+Default target: ~{targetItems} new items. If the user request above specifies a different scope (e.g., "extract all items", a specific URL, or a specific number), follow the user's request instead.`;
 
 /**
  * Build variables for the parent user prompt template.
