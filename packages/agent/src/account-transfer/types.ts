@@ -79,6 +79,45 @@ export interface ExportedAdvancedPrompts {
     sourceValidation?: string | null;
 }
 
+export interface ExportedSchedule {
+    cadence?: string | null;
+    status: string;
+    billingMode: string;
+    alwaysCreatePullRequest: boolean;
+    maxFailureBeforePause: number;
+    providerOverrides?: Record<string, any> | null;
+}
+
+export interface ExportedComparison {
+    id: string;
+    slug: string;
+    title: string;
+    item_a_slug: string;
+    item_b_slug: string;
+    item_a_name: string;
+    item_b_name: string;
+    category: string;
+    summary: string;
+    verdict: string;
+    verdict_winner?: 'item_a' | 'item_b' | 'tie';
+    dimensions: readonly {
+        name: string;
+        item_a_summary: string;
+        item_b_summary: string;
+        item_a_score?: number;
+        item_b_score?: number;
+        winner?: 'item_a' | 'item_b' | 'tie';
+    }[];
+    sources: readonly string[];
+    generated_at: string;
+    markdown?: string;
+}
+
+export interface ExportedMarkdownTemplate {
+    header: string;
+    footer: string;
+}
+
 export interface ExportedDirectory {
     name: string;
     slug: string;
@@ -98,10 +137,14 @@ export interface ExportedDirectory {
     customDomains: ExportedCustomDomain[];
     directoryPlugins: ExportedDirectoryPlugin[];
     advancedPrompts?: ExportedAdvancedPrompts;
+    schedule?: ExportedSchedule;
+    siteConfig?: Record<string, any>;
+    markdownTemplate?: ExportedMarkdownTemplate;
     items?: ExportedDirectoryItem[];
     categories?: ExportedDirectoryCategory[];
     tags?: ExportedDirectoryTag[];
     collections?: ExportedDirectoryCollection[];
+    comparisons?: ExportedComparison[];
 }
 
 export interface ExportedUserPlugin {

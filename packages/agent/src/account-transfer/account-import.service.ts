@@ -8,6 +8,7 @@ import { DirectoryPluginRepository } from '../plugins/repositories/directory-plu
 import { PluginRepository } from '../plugins/repositories/plugin.repository';
 import { UserRepository } from '../database/repositories/user.repository';
 import { DirectoryAdvancedPromptsRepository } from '../database/repositories/directory-advanced-prompts.repository';
+import { DirectoryScheduleRepository } from '../database/repositories/directory-schedule.repository';
 import { GitFacadeService } from '../facades/git.facade';
 import { DataRepository } from '../generators/data-generator/data-repository';
 import { Directory } from '../entities/directory.entity';
@@ -38,6 +39,7 @@ export class AccountImportService {
         private readonly pluginRepository: PluginRepository,
         private readonly userRepository: UserRepository,
         private readonly advancedPromptsRepository: DirectoryAdvancedPromptsRepository,
+        private readonly scheduleRepository: DirectoryScheduleRepository,
         private readonly gitFacade: GitFacadeService,
     ) {}
 
@@ -301,8 +303,8 @@ export class AccountImportService {
                     comparisonsEnabled: dir.comparisonsEnabled,
                 });
 
-                await this.importDirectoryRelations(existing.id, dir, result);
-                await this.importDirectoryItems(existing, dir, user, result);
+                await this.importDirectoryRelations(existing.id, userId, dir, result);
+                await this.importDirectoryRepoData(existing, dir, user, result);
                 result.directoriesUpdated++;
                 return;
             }
@@ -330,13 +332,14 @@ export class AccountImportService {
             user,
         );
 
-        await this.importDirectoryRelations(newDir.id, dir, result);
-        await this.importDirectoryItems(newDir, dir, user, result);
+        await this.importDirectoryRelations(newDir.id, userId, dir, result);
+        await this.importDirectoryRepoData(newDir, dir, user, result);
         result.directoriesCreated++;
     }
 
     private async importDirectoryRelations(
         directoryId: string,
+        userId: string,
         dir: ExportedDirectory,
         result: ImportResult,
     ): Promise<void> {
@@ -408,6 +411,25 @@ export class AccountImportService {
             }
         }
 
+        // Import schedule
+        if (dir.schedule) {
+            try {
+                await this.scheduleRepository.upsert(directoryId, {
+                    userId,
+                    cadence: dir.schedule.cadence as any,
+                    status: dir.schedule.status as any,
+                    billingMode: dir.schedule.billingMode as any,
+                    alwaysCreatePullRequest: dir.schedule.alwaysCreatePullRequest,
+                    maxFailureBeforePause: dir.schedule.maxFailureBeforePause,
+                    providerOverrides: dir.schedule.providerOverrides || null,
+                });
+            } catch (error) {
+                result.warnings.push(
+                    `Failed to import schedule for directory "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
+                );
+            }
+        }
+
         // Import directory plugins
         for (const dp of dir.directoryPlugins || []) {
             try {
@@ -437,13 +459,18 @@ export class AccountImportService {
         }
     }
 
-    private async importDirectoryItems(
+    private async importDirectoryRepoData(
         directory: any,
         dir: ExportedDirectory,
         user: any,
         result: ImportResult,
     ): Promise<void> {
-        if (!dir.items || dir.items.length === 0) {
+        const hasItems = dir.items && dir.items.length > 0;
+        const hasComparisons = dir.comparisons && dir.comparisons.length > 0;
+        const hasSiteConfig = dir.siteConfig && Object.keys(dir.siteConfig).length > 0;
+        const hasMarkdownTemplate = dir.markdownTemplate && (dir.markdownTemplate.header || dir.markdownTemplate.footer);
+
+        if (!hasItems && !hasComparisons && !hasSiteConfig && !hasMarkdownTemplate) {
             return;
         }
 
@@ -460,6 +487,19 @@ export class AccountImportService {
             const data = await DataRepository.create(dest);
             await data.ensureDirectoriesExist();
 
+            // Write site config
+            if (hasSiteConfig) {
+                await data.writeConfig(dir.siteConfig as any);
+            }
+
+            // Write markdown template
+            if (hasMarkdownTemplate) {
+                await data.writeMarkdownTemplate(
+                    dir.markdownTemplate!.header || '',
+                    dir.markdownTemplate!.footer || '',
+                );
+            }
+
             // Write categories, tags, collections
             if (dir.categories && dir.categories.length > 0) {
                 await data.writeCategories(dir.categories as any);
@@ -472,11 +512,24 @@ export class AccountImportService {
             }
 
             // Write items
-            for (const item of dir.items) {
-                const { markdown, ...itemData } = item;
-                await data.writeItem(itemData as any);
-                if (markdown) {
-                    await data.writeItemMarkdown(item as any, markdown);
+            if (hasItems) {
+                for (const item of dir.items!) {
+                    const { markdown, ...itemData } = item;
+                    await data.writeItem(itemData as any);
+                    if (markdown) {
+                        await data.writeItemMarkdown(item as any, markdown);
+                    }
+                }
+            }
+
+            // Write comparisons
+            if (hasComparisons) {
+                for (const comp of dir.comparisons!) {
+                    const { markdown, ...compData } = comp;
+                    await data.writeComparison(compData as any);
+                    if (markdown) {
+                        await data.writeComparisonMarkdown(comp.slug, markdown);
+                    }
                 }
             }
 
@@ -484,10 +537,16 @@ export class AccountImportService {
             await this.gitFacade.addAll(dir.gitProvider, dest);
             const status = await this.gitFacade.getStatus(dir.gitProvider, dest);
             if (status.length > 0) {
+                const parts: string[] = [];
+                if (hasItems) parts.push(`${dir.items!.length} items`);
+                if (hasComparisons) parts.push(`${dir.comparisons!.length} comparisons`);
+                if (hasSiteConfig) parts.push('site config');
+                if (hasMarkdownTemplate) parts.push('markdown template');
+
                 await this.gitFacade.commit(
                     dir.gitProvider,
                     dest,
-                    `import: restore ${dir.items.length} items from account export`,
+                    `import: restore ${parts.join(', ')} from account export`,
                     committer,
                 );
                 await this.gitFacade.push(
@@ -497,10 +556,10 @@ export class AccountImportService {
             }
         } catch (error) {
             this.logger.warn(
-                `Failed to import items for directory "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
+                `Failed to import repo data for directory "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
             );
             result.warnings.push(
-                `Items for directory "${dir.slug}" could not be imported: ${error instanceof Error ? error.message : String(error)}`,
+                `Repo data for directory "${dir.slug}" could not be imported: ${error instanceof Error ? error.message : String(error)}`,
             );
         }
     }

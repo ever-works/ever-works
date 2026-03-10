@@ -6,12 +6,16 @@ import { UserPluginRepository } from '../plugins/repositories/user-plugin.reposi
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import { UserRepository } from '../database/repositories/user.repository';
 import { DirectoryAdvancedPromptsRepository } from '../database/repositories/directory-advanced-prompts.repository';
+import { DirectoryScheduleRepository } from '../database/repositories/directory-schedule.repository';
 import { GitFacadeService } from '../facades/git.facade';
 import { DataRepository } from '../generators/data-generator/data-repository';
 import type {
     AccountExportPayload,
     ExportedDirectory,
     ExportedAdvancedPrompts,
+    ExportedSchedule,
+    ExportedComparison,
+    ExportedMarkdownTemplate,
     ExportedDirectoryItem,
     ExportedDirectoryCategory,
     ExportedDirectoryTag,
@@ -32,6 +36,7 @@ export class AccountExportService {
         private readonly directoryPluginRepository: DirectoryPluginRepository,
         private readonly userRepository: UserRepository,
         private readonly advancedPromptsRepository: DirectoryAdvancedPromptsRepository,
+        private readonly scheduleRepository: DirectoryScheduleRepository,
         private readonly gitFacade: GitFacadeService,
     ) {}
 
@@ -87,15 +92,30 @@ export class AccountExportService {
         dir: any,
         includeSecrets: boolean,
     ): Promise<ExportedDirectory> {
-        const [members, customDomains, directoryPlugins, prompts] = await Promise.all([
-            this.directoryMemberRepository.findByDirectory(directoryId),
-            this.directoryCustomDomainRepository.findByDirectory(directoryId),
-            this.directoryPluginRepository.findByDirectory(directoryId),
-            this.advancedPromptsRepository.findByDirectoryId(directoryId),
-        ]);
+        const [members, customDomains, directoryPlugins, prompts, scheduleEntity] =
+            await Promise.all([
+                this.directoryMemberRepository.findByDirectory(directoryId),
+                this.directoryCustomDomainRepository.findByDirectory(directoryId),
+                this.directoryPluginRepository.findByDirectory(directoryId),
+                this.advancedPromptsRepository.findByDirectoryId(directoryId),
+                this.scheduleRepository.findByDirectoryId(directoryId),
+            ]);
 
-        // Fetch items from the data repo
-        const { items, categories, tags, collections } = await this.fetchDirectoryItems(dir);
+        // Fetch items, config, comparisons, and markdown template from the data repo
+        const repoData = await this.fetchDirectoryRepoData(dir);
+
+        // Build schedule if configured
+        let schedule: ExportedSchedule | undefined;
+        if (scheduleEntity) {
+            schedule = {
+                cadence: scheduleEntity.cadence,
+                status: scheduleEntity.status,
+                billingMode: scheduleEntity.billingMode,
+                alwaysCreatePullRequest: scheduleEntity.alwaysCreatePullRequest,
+                maxFailureBeforePause: scheduleEntity.maxFailureBeforePause,
+                providerOverrides: scheduleEntity.providerOverrides || undefined,
+            };
+        }
 
         // Build advanced prompts if any are set
         let advancedPrompts: ExportedAdvancedPrompts | undefined;
@@ -150,20 +170,35 @@ export class AccountExportService {
                 return exported;
             }),
             advancedPrompts,
-            items,
-            categories,
-            tags,
-            collections,
+            schedule,
+            siteConfig: repoData.siteConfig,
+            markdownTemplate: repoData.markdownTemplate,
+            items: repoData.items,
+            categories: repoData.categories,
+            tags: repoData.tags,
+            collections: repoData.collections,
+            comparisons: repoData.comparisons,
         };
     }
 
-    private async fetchDirectoryItems(dir: any): Promise<{
+    private async fetchDirectoryRepoData(dir: any): Promise<{
         items: ExportedDirectoryItem[];
         categories: ExportedDirectoryCategory[];
         tags: ExportedDirectoryTag[];
         collections: ExportedDirectoryCollection[];
+        siteConfig?: Record<string, any>;
+        comparisons: ExportedComparison[];
+        markdownTemplate?: ExportedMarkdownTemplate;
     }> {
-        const empty = { items: [], categories: [], tags: [], collections: [] };
+        const empty = {
+            items: [],
+            categories: [],
+            tags: [],
+            collections: [],
+            siteConfig: undefined,
+            comparisons: [],
+            markdownTemplate: undefined,
+        };
 
         try {
             const repoOwner = dir.getRepoOwner();
@@ -177,22 +212,39 @@ export class AccountExportService {
 
             const data = await DataRepository.create(dest);
 
-            const [items, categories, tags, collections] = await Promise.all([
-                data.getItems().catch(() => []),
-                data.getCategories().catch(() => []),
-                data.getTags().catch(() => []),
-                data.getCollections().catch(() => []),
-            ]);
+            const [items, categories, tags, collections, siteConfig, comparisons, mdTemplate] =
+                await Promise.all([
+                    data.getItems().catch(() => []),
+                    data.getCategories().catch(() => []),
+                    data.getTags().catch(() => []),
+                    data.getCollections().catch(() => []),
+                    data.getConfig().catch(() => null),
+                    data.getComparisons().catch(() => []),
+                    data.readMarkdownTemplate().catch(() => null),
+                ]);
+
+            // Build comparisons with markdown
+            const exportedComparisons: ExportedComparison[] = [];
+            for (const comp of comparisons) {
+                const md = await data.getComparisonMarkdown(comp.slug).catch(() => undefined);
+                exportedComparisons.push({ ...comp, markdown: md } as ExportedComparison);
+            }
 
             return {
                 items: items as ExportedDirectoryItem[],
                 categories: categories as ExportedDirectoryCategory[],
                 tags: tags as ExportedDirectoryTag[],
                 collections: collections as ExportedDirectoryCollection[],
+                siteConfig: siteConfig || undefined,
+                comparisons: exportedComparisons,
+                markdownTemplate:
+                    mdTemplate && (mdTemplate.header || mdTemplate.footer)
+                        ? mdTemplate
+                        : undefined,
             };
         } catch (error) {
             this.logger.warn(
-                `Failed to fetch items for directory "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
+                `Failed to fetch repo data for directory "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
             );
             return empty;
         }

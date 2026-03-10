@@ -277,10 +277,14 @@ export class GitHubSyncService {
                 customDomains,
                 directoryPlugins,
                 advancedPrompts,
+                schedule,
+                siteConfig,
+                markdownTemplate,
                 items,
                 categories,
                 tags,
                 collections,
+                comparisons,
                 ...config
             } = directory;
             this.writeJsonFile(path.join(dirPath, 'config.json'), config);
@@ -289,6 +293,15 @@ export class GitHubSyncService {
             this.writeJsonFile(path.join(dirPath, 'plugins.json'), directoryPlugins);
             if (advancedPrompts && Object.keys(advancedPrompts).length > 0) {
                 this.writeJsonFile(path.join(dirPath, 'prompts.json'), advancedPrompts);
+            }
+            if (schedule) {
+                this.writeJsonFile(path.join(dirPath, 'schedule.json'), schedule);
+            }
+            if (siteConfig && Object.keys(siteConfig).length > 0) {
+                this.writeJsonFile(path.join(dirPath, 'site-config.json'), siteConfig);
+            }
+            if (markdownTemplate && (markdownTemplate.header || markdownTemplate.footer)) {
+                this.writeJsonFile(path.join(dirPath, 'markdown-template.json'), markdownTemplate);
             }
             if (items && items.length > 0) {
                 this.writeJsonFile(path.join(dirPath, 'items.json'), items);
@@ -301,6 +314,9 @@ export class GitHubSyncService {
             }
             if (collections && collections.length > 0) {
                 this.writeJsonFile(path.join(dirPath, 'collections.json'), collections);
+            }
+            if (comparisons && comparisons.length > 0) {
+                this.writeJsonFile(path.join(dirPath, 'comparisons.json'), comparisons);
             }
         }
     }
@@ -337,12 +353,21 @@ export class GitHubSyncService {
 
                     const advancedPrompts =
                         this.readJsonFile(path.join(dirPath, 'prompts.json')) || undefined;
+                    const schedule =
+                        this.readJsonFile(path.join(dirPath, 'schedule.json')) || undefined;
+                    const siteConfig =
+                        this.readJsonFile(path.join(dirPath, 'site-config.json')) || undefined;
+                    const markdownTemplate =
+                        this.readJsonFile(path.join(dirPath, 'markdown-template.json')) ||
+                        undefined;
                     const items = this.readJsonFile(path.join(dirPath, 'items.json')) || [];
                     const categories =
                         this.readJsonFile(path.join(dirPath, 'categories.json')) || [];
                     const tags = this.readJsonFile(path.join(dirPath, 'tags.json')) || [];
                     const collections =
                         this.readJsonFile(path.join(dirPath, 'collections.json')) || [];
+                    const comparisons =
+                        this.readJsonFile(path.join(dirPath, 'comparisons.json')) || [];
 
                     directories.push({
                         ...config,
@@ -351,10 +376,14 @@ export class GitHubSyncService {
                         customDomains,
                         directoryPlugins,
                         advancedPrompts,
+                        schedule,
+                        siteConfig,
+                        markdownTemplate,
                         items,
                         categories,
                         tags,
                         collections,
+                        comparisons,
                     });
                 }
             }
