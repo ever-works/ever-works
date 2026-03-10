@@ -1,5 +1,7 @@
 /**
  * Account transfer types for import/export and GitHub sync.
+ * Supports versioned JSON export (v1) with full directory data including
+ * items, comparisons, site config, schedules, and advanced prompts.
  */
 
 // ─── Export Types ────────────────────────────────────────────────
