@@ -257,7 +257,7 @@ export default function NewDirectoryClient({
             <aside className="w-80 shrink-0">
                 <div
                     className={cn(
-                        'sticky top-8 p-1 rounded-lg space-y-6',
+                        'sticky top-8 p-1 rounded-lg space-y-6 shadow-xs',
                         'bg-card/10 dark:bg-card-primary-dark/30',
                         'border border-card-border dark:border-border-secondary-dark',
                     )}
@@ -269,9 +269,9 @@ export default function NewDirectoryClient({
                             'border border-card-border dark:border-border-secondary-dark',
                         )}
                     >
-                        <div className="absolute -top-5 -right-6 w-30 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/15  blur-xl pointer-events-none" />
-                        <div className="relative z-20">
-                            <h3 className="font-medium text-text dark:text-text-dark mb-4">
+                        <div className="absolute -top-5 -right-6 w-30 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/10  blur-xl pointer-events-none" />
+                        <div className="relative z-20 mb-4">
+                            <h3 className="font-bold text-sm text-text dark:text-text-dark mb-2">
                                 {t('sidebar.selectedProvider')}
                             </h3>
                             <GitProviderSelector
@@ -282,8 +282,8 @@ export default function NewDirectoryClient({
                             />
                         </div>
                         {deployProviders.length > 0 && (
-                            <div className="relative z-20">
-                                <h3 className="font-medium text-text dark:text-text-dark mb-4">
+                            <div className="relative z-20 mb-4">
+                                <h3 className="font-bold text-sm text-text dark:text-text-dark mb-2">
                                     {t('sidebar.selectedDeployProvider')}
                                 </h3>
                                 <DeployProviderSelector
