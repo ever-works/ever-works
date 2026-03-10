@@ -341,27 +341,6 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
 
         const apiKey = this.getSettingTyped<string>(settings, 'apiKey', 'string');
 
-        // Detect masked/corrupted API keys — the masking system uses '••••' (U+2022)
-        // which causes ByteString errors when passed as HTTP headers.
-        if (apiKey && /[^\x00-\x7F]/.test(apiKey)) {
-            this.logger.error(
-                `API key for provider "${plugin.id}" contains non-ASCII characters ` +
-                    '(likely a masked placeholder was saved). Please re-enter the API key.',
-            );
-            return {
-                providerId: plugin.id,
-                providerName: plugin.providerName,
-                baseUrl: undefined,
-                apiKey: undefined,
-                defaultModel: this.getSettingTyped<string>(settings, 'defaultModel', 'string'),
-                routing: {
-                    simpleModel: this.getSettingTyped<string>(settings, 'simpleModel', 'string'),
-                    mediumModel: this.getSettingTyped<string>(settings, 'mediumModel', 'string'),
-                    complexModel: this.getSettingTyped<string>(settings, 'complexModel', 'string'),
-                },
-            };
-        }
-
         return {
             providerId: plugin.id,
             providerName: plugin.providerName,

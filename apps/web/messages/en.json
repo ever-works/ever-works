@@ -2118,6 +2118,7 @@
                 "removeItem": "Remove",
                 "addItem": "Add",
                 "modify": "Modify",
+                "cancel": "Cancel",
                 "enterNewValue": "Enter new value..."
             },
             "oauth": {

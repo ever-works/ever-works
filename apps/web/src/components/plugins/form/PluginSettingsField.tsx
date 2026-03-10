@@ -4,8 +4,8 @@
 import { useTranslations } from 'next-intl';
 import { PluginSettingsSchemaProperty } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
-import { Eye, EyeOff, Pencil, KeyRound } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Eye, EyeOff, Pencil, X, KeyRound } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import { PluginModelSelect } from './PluginModelSelect';
 import { PluginSettingsObjectField } from './PluginSettingsObjectField';
 import { PluginSettingsArrayField } from './PluginSettingsArrayField';
@@ -31,6 +31,7 @@ export function PluginSettingsField({
     const t = useTranslations('dashboard.plugins.settingsField');
     const [showSecret, setShowSecret] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const previousMaskedValue = useRef<string | null>(null);
 
     const label = schema.title || name;
     const description = schema.description;
@@ -44,6 +45,7 @@ export function PluginSettingsField({
     useEffect(() => {
         if (isMaskedValue) {
             setIsEditing(false);
+            previousMaskedValue.current = null;
         }
     }, [isMaskedValue]);
 
@@ -209,6 +211,7 @@ export function PluginSettingsField({
                     <button
                         type="button"
                         onClick={() => {
+                            previousMaskedValue.current = String(value);
                             setIsEditing(true);
                             onChange('');
                         }}
@@ -230,30 +233,56 @@ export function PluginSettingsField({
         // Editing mode for secret field (after clicking Modify) or new secret field
         // Also used for non-secret string fields
         return (
-            <div className="relative">
-                <input
-                    type={getInputType()}
-                    value={String(value ?? schema.default ?? '')}
-                    onChange={(e) => onChange(e.target.value)}
-                    maxLength={schema.maxLength}
-                    required={required}
-                    autoFocus={isEditing}
-                    placeholder={isEditing ? t('enterNewValue') : undefined}
-                    className={cn(
-                        'w-full px-3 py-2 rounded-lg border border-border dark:border-border-dark',
-                        'bg-surface-secondary dark:bg-surface-secondary-dark',
-                        'text-text dark:text-text-dark',
-                        'focus:outline-none focus:ring-2 focus:ring-primary/50',
-                        isSecret && 'pr-10',
+            <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                    <input
+                        type={getInputType()}
+                        value={String(value ?? schema.default ?? '')}
+                        onChange={(e) => onChange(e.target.value)}
+                        maxLength={schema.maxLength}
+                        required={required}
+                        autoFocus={isEditing}
+                        placeholder={isEditing ? t('enterNewValue') : undefined}
+                        className={cn(
+                            'w-full px-3 py-2 rounded-lg border border-border dark:border-border-dark',
+                            'bg-surface-secondary dark:bg-surface-secondary-dark',
+                            'text-text dark:text-text-dark',
+                            'focus:outline-none focus:ring-2 focus:ring-primary/50',
+                            isSecret && 'pr-10',
+                        )}
+                    />
+                    {isSecret && (
+                        <button
+                            type="button"
+                            onClick={() => setShowSecret(!showSecret)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark"
+                        >
+                            {showSecret ? (
+                                <EyeOff className="w-4 h-4" />
+                            ) : (
+                                <Eye className="w-4 h-4" />
+                            )}
+                        </button>
                     )}
-                />
-                {isSecret && (
+                </div>
+                {isEditing && previousMaskedValue.current && (
                     <button
                         type="button"
-                        onClick={() => setShowSecret(!showSecret)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark"
+                        onClick={() => {
+                            onChange(previousMaskedValue.current);
+                            previousMaskedValue.current = null;
+                            setIsEditing(false);
+                        }}
+                        className={cn(
+                            'flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border dark:border-border-dark',
+                            'bg-surface-secondary dark:bg-surface-secondary-dark',
+                            'text-text-muted dark:text-text-muted-dark',
+                            'hover:text-text dark:hover:text-text-dark hover:border-danger/50',
+                            'transition-colors text-sm font-medium',
+                        )}
                     >
-                        {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        <X className="w-3.5 h-3.5" />
+                        {t('cancel')}
                     </button>
                 )}
             </div>
