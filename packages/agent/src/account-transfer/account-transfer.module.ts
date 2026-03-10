@@ -18,7 +18,12 @@ import { UserSyncConfigRepository } from './repositories/user-sync-config.reposi
     imports: [
         DatabaseModule,
         FacadesModule,
-        TypeOrmModule.forFeature([UserSyncConfig, PluginEntity, UserPluginEntity, DirectoryPluginEntity]),
+        TypeOrmModule.forFeature([
+            UserSyncConfig,
+            PluginEntity,
+            UserPluginEntity,
+            DirectoryPluginEntity,
+        ]),
     ],
     providers: [
         AccountExportService,
