@@ -1,19 +1,27 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
 import { DirectoryMemberRepository } from '../database/repositories/directory-member.repository';
 import { DirectoryCustomDomainRepository } from '../database/repositories/directory-custom-domain.repository';
 import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import { UserRepository } from '../database/repositories/user.repository';
+import { GitFacadeService } from '../facades/git.facade';
+import { DataRepository } from '../generators/data-generator/data-repository';
 import type {
     AccountExportPayload,
     ExportedDirectory,
+    ExportedDirectoryItem,
+    ExportedDirectoryCategory,
+    ExportedDirectoryTag,
+    ExportedDirectoryCollection,
     ExportedUserPlugin,
     ExportOptions,
 } from './types';
 
 @Injectable()
 export class AccountExportService {
+    private readonly logger = new Logger(AccountExportService.name);
+
     constructor(
         private readonly directoryRepository: DirectoryRepository,
         private readonly directoryMemberRepository: DirectoryMemberRepository,
@@ -21,6 +29,7 @@ export class AccountExportService {
         private readonly userPluginRepository: UserPluginRepository,
         private readonly directoryPluginRepository: DirectoryPluginRepository,
         private readonly userRepository: UserRepository,
+        private readonly gitFacade: GitFacadeService,
     ) {}
 
     async exportAccountData(
@@ -81,6 +90,9 @@ export class AccountExportService {
             this.directoryPluginRepository.findByDirectory(directoryId),
         ]);
 
+        // Fetch items from the data repo
+        const { items, categories, tags, collections } = await this.fetchDirectoryItems(dir);
+
         return {
             name: dir.name,
             slug: dir.slug,
@@ -119,6 +131,51 @@ export class AccountExportService {
                 }
                 return exported;
             }),
+            items,
+            categories,
+            tags,
+            collections,
         };
+    }
+
+    private async fetchDirectoryItems(dir: any): Promise<{
+        items: ExportedDirectoryItem[];
+        categories: ExportedDirectoryCategory[];
+        tags: ExportedDirectoryTag[];
+        collections: ExportedDirectoryCollection[];
+    }> {
+        const empty = { items: [], categories: [], tags: [], collections: [] };
+
+        try {
+            const repoOwner = dir.getRepoOwner();
+            const dataRepo = dir.getDataRepo();
+            const userId = dir.user?.id || dir.userId;
+
+            const dest = await this.gitFacade.cloneOrPull(
+                { owner: repoOwner, repo: dataRepo },
+                { userId, providerId: dir.gitProvider },
+            );
+
+            const data = await DataRepository.create(dest);
+
+            const [items, categories, tags, collections] = await Promise.all([
+                data.getItems().catch(() => []),
+                data.getCategories().catch(() => []),
+                data.getTags().catch(() => []),
+                data.getCollections().catch(() => []),
+            ]);
+
+            return {
+                items: items as ExportedDirectoryItem[],
+                categories: categories as ExportedDirectoryCategory[],
+                tags: tags as ExportedDirectoryTag[],
+                collections: collections as ExportedDirectoryCollection[],
+            };
+        } catch (error) {
+            this.logger.warn(
+                `Failed to fetch items for directory "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
+            );
+            return empty;
+        }
     }
 }

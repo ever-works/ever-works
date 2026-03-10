@@ -22,6 +22,7 @@ export interface ImportPreview {
     includesSecrets: boolean;
     profile: { username: string; email: string; avatar?: string };
     directoryCount: number;
+    totalItemCount: number;
     userPluginCount: number;
     conflicts: ImportConflict[];
     missingPlugins: string[];

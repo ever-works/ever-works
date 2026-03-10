@@ -304,6 +304,7 @@
                     "previewError": "Failed to analyze import file",
                     "summary": "Import Summary",
                     "directories": "Directories",
+                    "items": "Items",
                     "userPlugins": "User Plugins",
                     "version": "Format Version",
                     "missingPlugins": "These plugins are not installed and will be skipped",

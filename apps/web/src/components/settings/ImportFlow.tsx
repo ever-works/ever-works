@@ -220,6 +220,12 @@ export function ImportFlow({
                                     {preview.directoryCount}
                                 </span>
                                 <span className="text-text-muted dark:text-text-muted-dark">
+                                    {t('items')}:
+                                </span>
+                                <span className="text-text dark:text-text-dark">
+                                    {preview.totalItemCount}
+                                </span>
+                                <span className="text-text-muted dark:text-text-muted-dark">
                                     {t('userPlugins')}:
                                 </span>
                                 <span className="text-text dark:text-text-dark">

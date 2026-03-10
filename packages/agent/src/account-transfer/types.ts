@@ -31,6 +31,44 @@ export interface ExportedDirectoryPlugin {
     priority: number;
 }
 
+export interface ExportedDirectoryItem {
+    name: string;
+    description: string;
+    featured?: boolean;
+    order?: number;
+    source_url: string;
+    category: string | readonly string[];
+    slug?: string;
+    tags: readonly string[] | readonly { id: string; name: string }[];
+    collection?: string;
+    markdown?: string;
+    badges?: Record<string, unknown>;
+    brand?: string | { id: string; name: string; logo_url?: string; website?: string };
+    brand_logo_url?: string | null;
+    images?: readonly string[];
+}
+
+export interface ExportedDirectoryCategory {
+    id: string;
+    name: string;
+    description?: string;
+    icon_url?: string;
+    priority?: number;
+}
+
+export interface ExportedDirectoryTag {
+    id: string;
+    name: string;
+}
+
+export interface ExportedDirectoryCollection {
+    id: string;
+    name: string;
+    description?: string;
+    icon_url?: string;
+    priority?: number;
+}
+
 export interface ExportedDirectory {
     name: string;
     slug: string;
@@ -49,6 +87,10 @@ export interface ExportedDirectory {
     members: ExportedDirectoryMember[];
     customDomains: ExportedCustomDomain[];
     directoryPlugins: ExportedDirectoryPlugin[];
+    items?: ExportedDirectoryItem[];
+    categories?: ExportedDirectoryCategory[];
+    tags?: ExportedDirectoryTag[];
+    collections?: ExportedDirectoryCollection[];
 }
 
 export interface ExportedUserPlugin {
@@ -87,6 +129,7 @@ export interface ImportPreview {
     includesSecrets: boolean;
     profile: ExportedProfile;
     directoryCount: number;
+    totalItemCount: number;
     userPluginCount: number;
     conflicts: ImportConflict[];
     missingPlugins: string[];

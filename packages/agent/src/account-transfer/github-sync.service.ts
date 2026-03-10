@@ -192,6 +192,7 @@ export class GitHubSyncService {
                     includesSecrets: false,
                     profile: { username: '', email: '' },
                     directoryCount: 0,
+                    totalItemCount: 0,
                     userPluginCount: 0,
                     conflicts: [],
                     missingPlugins: [],
@@ -271,11 +272,23 @@ export class GitHubSyncService {
             const dirPath = path.join(directoriesDir, directory.slug);
             fs.mkdirSync(dirPath, { recursive: true });
 
-            const { members, customDomains, directoryPlugins, ...config } = directory;
+            const { members, customDomains, directoryPlugins, items, categories, tags, collections, ...config } = directory;
             this.writeJsonFile(path.join(dirPath, 'config.json'), config);
             this.writeJsonFile(path.join(dirPath, 'members.json'), members);
             this.writeJsonFile(path.join(dirPath, 'domains.json'), customDomains);
             this.writeJsonFile(path.join(dirPath, 'plugins.json'), directoryPlugins);
+            if (items && items.length > 0) {
+                this.writeJsonFile(path.join(dirPath, 'items.json'), items);
+            }
+            if (categories && categories.length > 0) {
+                this.writeJsonFile(path.join(dirPath, 'categories.json'), categories);
+            }
+            if (tags && tags.length > 0) {
+                this.writeJsonFile(path.join(dirPath, 'tags.json'), tags);
+            }
+            if (collections && collections.length > 0) {
+                this.writeJsonFile(path.join(dirPath, 'collections.json'), collections);
+            }
         }
     }
 
@@ -309,12 +322,25 @@ export class GitHubSyncService {
                     const directoryPlugins =
                         this.readJsonFile(path.join(dirPath, 'plugins.json')) || [];
 
+                    const items =
+                        this.readJsonFile(path.join(dirPath, 'items.json')) || [];
+                    const categories =
+                        this.readJsonFile(path.join(dirPath, 'categories.json')) || [];
+                    const tags =
+                        this.readJsonFile(path.join(dirPath, 'tags.json')) || [];
+                    const collections =
+                        this.readJsonFile(path.join(dirPath, 'collections.json')) || [];
+
                     directories.push({
                         ...config,
                         slug,
                         members,
                         customDomains,
                         directoryPlugins,
+                        items,
+                        categories,
+                        tags,
+                        collections,
                     });
                 }
             }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
 import { DirectoryMemberRepository } from '../database/repositories/directory-member.repository';
@@ -7,6 +7,8 @@ import { UserPluginRepository } from '../plugins/repositories/user-plugin.reposi
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import { PluginRepository } from '../plugins/repositories/plugin.repository';
 import { UserRepository } from '../database/repositories/user.repository';
+import { GitFacadeService } from '../facades/git.facade';
+import { DataRepository } from '../generators/data-generator/data-repository';
 import { Directory } from '../entities/directory.entity';
 import { DirectoryMember } from '../entities/directory-member.entity';
 import { DirectoryCustomDomain } from '../entities/directory-custom-domain.entity';
@@ -23,6 +25,8 @@ import type {
 
 @Injectable()
 export class AccountImportService {
+    private readonly logger = new Logger(AccountImportService.name);
+
     constructor(
         private readonly dataSource: DataSource,
         private readonly directoryRepository: DirectoryRepository,
@@ -32,6 +36,7 @@ export class AccountImportService {
         private readonly directoryPluginRepository: DirectoryPluginRepository,
         private readonly pluginRepository: PluginRepository,
         private readonly userRepository: UserRepository,
+        private readonly gitFacade: GitFacadeService,
     ) {}
 
     async previewImport(userId: string, payload: AccountExportPayload): Promise<ImportPreview> {
@@ -45,6 +50,7 @@ export class AccountImportService {
                 includesSecrets: false,
                 profile: { username: '', email: '' },
                 directoryCount: 0,
+                totalItemCount: 0,
                 userPluginCount: 0,
                 conflicts: [],
                 missingPlugins: [],
@@ -61,6 +67,7 @@ export class AccountImportService {
                 includesSecrets: false,
                 profile: { username: '', email: '' },
                 directoryCount: 0,
+                totalItemCount: 0,
                 userPluginCount: 0,
                 conflicts: [],
                 missingPlugins: [],
@@ -91,6 +98,7 @@ export class AccountImportService {
                 includesSecrets: payload.includesSecrets || false,
                 profile: payload.data?.profile || { username: '', email: '' },
                 directoryCount: 0,
+                totalItemCount: 0,
                 userPluginCount: 0,
                 conflicts: [],
                 missingPlugins: [],
@@ -132,6 +140,11 @@ export class AccountImportService {
             }
         }
 
+        const totalItemCount = payload.data.directories.reduce(
+            (sum, d) => sum + (d.items?.length || 0),
+            0,
+        );
+
         return {
             valid: true,
             errors: [],
@@ -139,6 +152,7 @@ export class AccountImportService {
             includesSecrets: payload.includesSecrets || false,
             profile: payload.data.profile,
             directoryCount: payload.data.directories.length,
+            totalItemCount,
             userPluginCount: payload.data.userPlugins.length,
             conflicts,
             missingPlugins,
@@ -286,6 +300,7 @@ export class AccountImportService {
                 });
 
                 await this.importDirectoryRelations(existing.id, dir, result);
+                await this.importDirectoryItems(existing, dir, user, result);
                 result.directoriesUpdated++;
                 return;
             }
@@ -314,6 +329,7 @@ export class AccountImportService {
         );
 
         await this.importDirectoryRelations(newDir.id, dir, result);
+        await this.importDirectoryItems(newDir, dir, user, result);
         result.directoriesCreated++;
     }
 
@@ -397,6 +413,74 @@ export class AccountImportService {
                     `Failed to import directory plugin "${dp.pluginId}": ${error instanceof Error ? error.message : String(error)}`,
                 );
             }
+        }
+    }
+
+    private async importDirectoryItems(
+        directory: any,
+        dir: ExportedDirectory,
+        user: any,
+        result: ImportResult,
+    ): Promise<void> {
+        if (!dir.items || dir.items.length === 0) {
+            return;
+        }
+
+        try {
+            const repoOwner = directory.getRepoOwner?.() || dir.owner || user.username;
+            const dataRepo = `${directory.slug || dir.slug}-data`;
+            const committer = user.asCommitter?.() || { name: user.username, email: user.email };
+
+            const dest = await this.gitFacade.cloneOrPull(
+                { owner: repoOwner, repo: dataRepo, committer },
+                { userId: user.id || directory.userId, providerId: dir.gitProvider },
+            );
+
+            const data = await DataRepository.create(dest);
+            await data.ensureDirectoriesExist();
+
+            // Write categories, tags, collections
+            if (dir.categories && dir.categories.length > 0) {
+                await data.writeCategories(dir.categories as any);
+            }
+            if (dir.tags && dir.tags.length > 0) {
+                await data.writeTags(dir.tags as any);
+            }
+            if (dir.collections && dir.collections.length > 0) {
+                await data.writeCollections(dir.collections as any);
+            }
+
+            // Write items
+            for (const item of dir.items) {
+                const { markdown, ...itemData } = item;
+                await data.writeItem(itemData as any);
+                if (markdown) {
+                    await data.writeItemMarkdown(item as any, markdown);
+                }
+            }
+
+            // Stage, commit, push
+            await this.gitFacade.addAll(dir.gitProvider, dest);
+            const status = await this.gitFacade.getStatus(dir.gitProvider, dest);
+            if (status.length > 0) {
+                await this.gitFacade.commit(
+                    dir.gitProvider,
+                    dest,
+                    `import: restore ${dir.items.length} items from account export`,
+                    committer,
+                );
+                await this.gitFacade.push(
+                    { dir: dest },
+                    { userId: user.id || directory.userId, providerId: dir.gitProvider },
+                );
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Failed to import items for directory "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
+            );
+            result.warnings.push(
+                `Items for directory "${dir.slug}" could not be imported: ${error instanceof Error ? error.message : String(error)}`,
+            );
         }
     }
 }
