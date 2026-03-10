@@ -23,7 +23,9 @@ import {
 	getWorkerContentBudgetRatio,
 	WORKER_PROMPT_OVERHEAD_TOKENS,
 	MIN_CHUNK_CHARS,
-	DEFAULT_CONTEXT_BUDGET_RATIO
+	MAX_CHUNK_CHARS,
+	DEFAULT_CONTEXT_BUDGET_RATIO,
+	getStepsPerChunk
 } from '../types.js';
 import type { TokenUsageAccumulator } from '../types.js';
 import { ToolCircuitBreaker } from '../utils/tool-circuit-breaker.js';
@@ -67,14 +69,20 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 
 		const extracted = await contentExtractorFacade.extractContent(url, undefined, facadeOptions).catch((err) => {
 			const errMsg = err instanceof Error ? err.message : String(err);
-			logger.warn(`Worker: content extraction failed for ${url}: ${errMsg}`);
-			// Record failure in breaker but don't throw, allowing for graceful degradation if extraction fails
+			logger.warn(`Worker: content extraction threw for ${url}: ${errMsg}`);
 			breaker.recordFailure('contentExtractor', errMsg);
 			return null;
 		});
 
-		if (!extracted?.rawContent) {
-			return { url, files: [], count: 0, error: 'Failed to extract content from URL' };
+		if (!extracted) {
+			logger.warn(`Worker: content extraction returned null for ${url} (no provider or extraction failed)`);
+			breaker.recordFailure('contentExtractor', `extraction returned null for ${url}`);
+			return { url, files: [], count: 0, error: `Content extraction failed for URL: ${url}` };
+		}
+
+		if (!extracted.rawContent) {
+			logger.warn(`Worker: content extraction returned empty content for ${url}`);
+			return { url, files: [], count: 0, error: 'Content extraction returned empty content' };
 		}
 
 		// Content extraction succeeded, reset breaker and proceed with processing
@@ -83,16 +91,17 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 		logger.log(`Worker: extracted ${extracted.rawContent.length} chars from ${url}`);
 
 		const contentRatio = getWorkerContentBudgetRatio(maxContextTokens);
-		// Calculate max chars for content chunk based on context budget,
-		// accounting for prompt overhead and leaving room for tools and reasoning.
-		const maxChunkChars = Math.max(
+		// Calculate max chars based on model context budget, then cap to a practical
+		// extraction limit so large documents get split into manageable chunks.
+		const modelBudgetChars = Math.max(
 			Math.floor((maxContextTokens * contentRatio - WORKER_PROMPT_OVERHEAD_TOKENS) * 4),
 			MIN_CHUNK_CHARS
 		);
+		const maxChunkChars = Math.min(modelBudgetChars, MAX_CHUNK_CHARS);
 
 		const { chunks, wasSplit } = await chunkContent(extracted.rawContent, maxChunkChars);
 		if (wasSplit) {
-			logger.log(`Worker: split into ${chunks.length} chunks`);
+			logger.log(`Worker: split ${extracted.rawContent.length} chars into ${chunks.length} chunks (max ${maxChunkChars} chars/chunk)`);
 		}
 
 		// Set up sandbox for tool-based agent
@@ -158,13 +167,14 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 
 		for (const chunk of chunks) {
 			if (signal?.aborted) break;
+			const chunkStepLimit = getStepsPerChunk(chunk.text.length);
 			try {
 				const result = await withToolCallingRetry(
 					() => {
 						return generateText({
 							model: workerModel,
 							system: systemPrompt,
-							timeout: 5 * 60 * 1000, // 5 min per chunk
+							timeout: Math.max(5, Math.ceil(chunkStepLimit / 20)) * 60 * 1000,
 							prompt: substituteVariables(
 								chunkTemplate,
 								buildChunkUserPromptVariables(
@@ -181,7 +191,7 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 								updateFile: updateFileTool,
 								validateItemJson: validateItemJsonTool
 							} as ToolSet,
-							stopWhen: stepCountIs(100),
+							stopWhen: stepCountIs(chunkStepLimit),
 							prepareStep: createPrepareStep({
 								maxContextTokens,
 								budgetRatio: DEFAULT_CONTEXT_BUDGET_RATIO,

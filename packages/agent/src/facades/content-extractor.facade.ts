@@ -70,6 +70,13 @@ export class ContentExtractorFacadeService
             const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
             const result = await plugin.extract({ url, settings });
 
+            if (!result.success) {
+                this.logger.warn(
+                    `Content extraction returned failure for ${url} (plugin: ${plugin.id}): ${result.error || 'unknown error'}`,
+                );
+                return null;
+            }
+
             return {
                 url: result.url,
                 rawContent: result.content || result.markdown || '',
