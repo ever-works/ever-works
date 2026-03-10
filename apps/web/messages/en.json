@@ -2116,7 +2116,10 @@
                 "fieldEncrypted": "This field is encrypted",
                 "nullValue": "No value set",
                 "removeItem": "Remove",
-                "addItem": "Add"
+                "addItem": "Add",
+                "modify": "Modify",
+                "cancel": "Cancel",
+                "enterNewValue": "Enter new value..."
             },
             "oauth": {
                 "title": "Account Connection",
