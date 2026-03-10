@@ -9,7 +9,7 @@ This document represents official information about our licensing. Make sure you
 
 This software is available under an Open Source License ("Community Edition"). It is suitable if your business can comply with the requirements of corresponding open-source licenses, see more information below (e.g. requirements to release your modifications under the same open-source licenses for the benefit of our community).
 
-Alternatively, commercial versions of the Ever Works software must be used in accordance with the terms and conditions of the separate written license agreement between you and Ever Co. LTD. With a commercial license, your source code (including your changes) is kept proprietary. You can purchase a commercial license at <https://ever.team/pricing>.
+Alternatively, commercial versions of the Ever Works software must be used in accordance with the terms and conditions of the separate written license agreement between you and Ever Co. LTD. With a commercial license, your source code (including your changes) is kept proprietary. You can purchase a commercial license at <https://ever.works/pricing>.
 
 In addition, Ever Co. LTD holds copyright and/or sufficient licenses to all components of the Ever Works Platform, and therefore can grant, at its sole discretion, the ability for companies, individuals, or organizations to create proprietary modules that may be dynamically linked at runtime with the portions of Ever Works Platform which fall under our copyright/license umbrella.
 
