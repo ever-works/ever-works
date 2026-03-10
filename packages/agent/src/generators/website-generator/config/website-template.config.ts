@@ -1,6 +1,6 @@
 export const WEBSITE_TEMPLATE_CONFIG = {
     owner: 'ever-works',
-    repo: 'ever-works-website-template',
+    repo: 'directory-web-template',
     branch: 'main',
     syncBranches: ['main', 'stage', 'develop'],
 } as const;
