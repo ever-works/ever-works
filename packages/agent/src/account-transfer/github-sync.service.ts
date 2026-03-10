@@ -368,7 +368,9 @@ export class GitHubSyncService {
                     .map((d) => d.name);
 
                 for (const slug of slugs) {
-                    const dirPath = path.join(directoriesDir, slug);
+                    const safeName = path.basename(slug);
+                    if (safeName !== slug) continue;
+                    const dirPath = path.join(directoriesDir, safeName);
                     const config = this.readJsonFile(path.join(dirPath, 'config.json')) || {};
                     const members = this.readJsonFile(path.join(dirPath, 'members.json')) || [];
                     const customDomains =
