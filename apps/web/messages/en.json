@@ -284,8 +284,8 @@
             "data": {
                 "exportTitle": "Export Data",
                 "exportDescription": "Download your account data including directories, plugin settings, and profile information as a JSON file.",
-                "includeSecrets": "Include secret settings (API keys, tokens)",
-                "secretsWarning": "Secret settings will be exported in plain text. Keep the exported file secure and do not share it publicly.",
+                "includeSecrets": "Include secret settings (API keys, tokens) — exported as masked values",
+                "secretsWarning": "Secret settings will be exported as masked values. You will need to manually replace them with real credentials before importing.",
                 "exportButton": "Export Data",
                 "exporting": "Exporting...",
                 "exportSuccess": "Data exported successfully",
@@ -315,6 +315,7 @@
                     "strategyOverwrite": "Overwrite existing",
                     "strategyRename": "Import with new slug",
                     "secretsIncluded": "This export includes secret settings that will be imported.",
+                    "maskedSecretsWarning": "This file contains masked secret values (MASKED:***). Please open the JSON file and replace all masked values with your real API keys and credentials before importing. Masked values will be skipped during import.",
                     "applyImport": "Apply Import",
                     "applying": "Importing...",
                     "importSuccess": "Data imported successfully",
@@ -355,8 +356,8 @@
                     "pullError": "Failed to pull from GitHub",
                     "disconnectSuccess": "Sync disconnected",
                     "disconnectError": "Failed to disconnect",
-                    "includeSecrets": "Include API keys and secrets",
-                    "secretsWarning": "Warning: API keys and secrets will be stored in your GitHub repository. Make sure the repository is private."
+                    "includeSecrets": "Include API keys and secrets (masked)",
+                    "secretsWarning": "Secret values will be stored as masked placeholders in your GitHub repository. Real credentials are never pushed to GitHub."
                 }
             },
             "pluginCategories": {

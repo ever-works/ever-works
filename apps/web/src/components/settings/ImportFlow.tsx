@@ -297,7 +297,15 @@ export function ImportFlow({ onClose, initialPreview, isPullMode }: ImportFlowPr
                         )}
 
                         {/* Secrets notice */}
-                        {preview.includesSecrets && (
+                        {/* Masked secrets warning — user needs to replace placeholders */}
+                        {preview.hasMaskedSecrets && (
+                            <div className="p-3 rounded-lg bg-warning/10 border border-warning/20 text-sm">
+                                <AlertTriangle className="w-4 h-4 inline mr-1 text-warning" />
+                                {t('maskedSecretsWarning')}
+                            </div>
+                        )}
+
+                        {preview.includesSecrets && !preview.hasMaskedSecrets && (
                             <div className="p-3 rounded-lg bg-warning/10 border border-warning/20 text-sm">
                                 <AlertTriangle className="w-4 h-4 inline mr-1 text-warning" />
                                 {t('secretsIncluded')}

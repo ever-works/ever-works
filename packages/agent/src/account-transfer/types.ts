@@ -183,6 +183,7 @@ export interface ImportPreview {
     errors: string[];
     version: number;
     includesSecrets: boolean;
+    hasMaskedSecrets: boolean;
     profile: ExportedProfile;
     directoryCount: number;
     totalItemCount: number;
@@ -213,6 +214,55 @@ export interface ImportOptions {
 
 export interface ExportOptions {
     includeSecrets?: boolean;
+}
+
+// ─── Secret Masking ─────────────────────────────────────────────
+
+/**
+ * Prefix used to identify masked secret values in export payloads.
+ * Real secret values are NEVER exported — only masked representations.
+ */
+export const MASKED_SECRET_PREFIX = 'MASKED:';
+
+/**
+ * Masks a single secret string value for export.
+ * Shows first 3 and last 4 characters for identification, rest is hidden.
+ * Short values are fully masked.
+ */
+export function maskSecretValue(value: unknown): string {
+    if (typeof value !== 'string' || !value) {
+        return `${MASKED_SECRET_PREFIX}********`;
+    }
+    if (value.length <= 8) {
+        return `${MASKED_SECRET_PREFIX}********`;
+    }
+    return `${MASKED_SECRET_PREFIX}${value.slice(0, 3)}***${value.slice(-4)}`;
+}
+
+/**
+ * Masks all values in a secret settings record for safe export.
+ * The original keys are preserved but values are replaced with masked strings.
+ */
+export function maskSecretSettings(
+    settings: Record<string, unknown> | undefined | null,
+): Record<string, unknown> {
+    if (!settings || typeof settings !== 'object') return {};
+    const masked: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(settings)) {
+        masked[key] = maskSecretValue(value);
+    }
+    return masked;
+}
+
+/**
+ * Checks if a secret settings record contains any masked values.
+ * Used during import to detect and warn about masked secrets that need replacing.
+ */
+export function containsMaskedSecrets(settings: Record<string, unknown> | undefined | null): boolean {
+    if (!settings || typeof settings !== 'object') return false;
+    return Object.values(settings).some(
+        (v) => typeof v === 'string' && v.startsWith(MASKED_SECRET_PREFIX),
+    );
 }
 
 // ─── GitHub Sync Types ───────────────────────────────────────────

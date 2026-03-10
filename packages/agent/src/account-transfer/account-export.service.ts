@@ -23,6 +23,7 @@ import type {
     ExportedUserPlugin,
     ExportOptions,
 } from './types';
+import { maskSecretSettings } from './types';
 
 @Injectable()
 export class AccountExportService {
@@ -66,7 +67,8 @@ export class AccountExportService {
                 settings: up.settings || {},
             };
             if (includeSecrets && up.secretSettings) {
-                exported.secretSettings = up.secretSettings;
+                // Never export real secrets — only masked representations
+                exported.secretSettings = maskSecretSettings(up.secretSettings);
             }
             return exported;
         });
@@ -165,7 +167,8 @@ export class AccountExportService {
                     priority: dp.priority,
                 };
                 if (includeSecrets && dp.secretSettings) {
-                    exported.secretSettings = dp.secretSettings;
+                    // Never export real secrets — only masked representations
+                    exported.secretSettings = maskSecretSettings(dp.secretSettings);
                 }
                 return exported;
             }),

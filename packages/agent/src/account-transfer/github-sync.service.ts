@@ -46,8 +46,12 @@ export class GitHubSyncService {
             hasOAuth,
             repoOwner: config.repoOwner,
             repoName: config.repoName,
-            lastPushAt: config.lastPushAt?.toISOString(),
-            lastPullAt: config.lastPullAt?.toISOString(),
+            lastPushAt: config.lastPushAt && !isNaN(config.lastPushAt.getTime())
+                ? config.lastPushAt.toISOString()
+                : undefined,
+            lastPullAt: config.lastPullAt && !isNaN(config.lastPullAt.getTime())
+                ? config.lastPullAt.toISOString()
+                : undefined,
             lastSyncError: config.lastSyncError || undefined,
         };
     }
@@ -190,6 +194,7 @@ export class GitHubSyncService {
                     errors: ['No valid configuration found in repository'],
                     version: 0,
                     includesSecrets: false,
+                    hasMaskedSecrets: false,
                     profile: { username: '', email: '' },
                     directoryCount: 0,
                     totalItemCount: 0,
@@ -198,6 +203,9 @@ export class GitHubSyncService {
                     missingPlugins: [],
                 };
             }
+
+            // GitHub pull always ignores secrets — force includesSecrets to false
+            payload.includesSecrets = false;
 
             return this.importService.previewImport(userId, payload);
         } catch (error) {
@@ -236,6 +244,9 @@ export class GitHubSyncService {
                     warnings: [],
                 };
             }
+
+            // GitHub pull always ignores secrets — they are masked in the repo
+            payload.includesSecrets = false;
 
             const result = await this.importService.applyImport(userId, payload, resolutions);
             if (result.success) {

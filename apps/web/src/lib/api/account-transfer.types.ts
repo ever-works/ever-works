@@ -20,6 +20,7 @@ export interface ImportPreview {
     errors: string[];
     version: number;
     includesSecrets: boolean;
+    hasMaskedSecrets: boolean;
     profile: { username: string; email: string; avatar?: string };
     directoryCount: number;
     totalItemCount: number;

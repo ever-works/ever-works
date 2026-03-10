@@ -24,6 +24,7 @@ import type {
     ImportResult,
     ExportedDirectory,
 } from './types';
+import { containsMaskedSecrets, MASKED_SECRET_PREFIX } from './types';
 
 @Injectable()
 export class AccountImportService {
@@ -52,6 +53,7 @@ export class AccountImportService {
                 errors: ['Invalid payload: expected a JSON object'],
                 version: 0,
                 includesSecrets: false,
+                hasMaskedSecrets: false,
                 profile: { username: '', email: '' },
                 directoryCount: 0,
                 totalItemCount: 0,
@@ -69,6 +71,7 @@ export class AccountImportService {
                 ],
                 version: payload.version || 0,
                 includesSecrets: false,
+                hasMaskedSecrets: false,
                 profile: { username: '', email: '' },
                 directoryCount: 0,
                 totalItemCount: 0,
@@ -100,6 +103,7 @@ export class AccountImportService {
                 errors,
                 version: payload.version,
                 includesSecrets: payload.includesSecrets || false,
+                hasMaskedSecrets: false,
                 profile: payload.data?.profile || { username: '', email: '' },
                 directoryCount: 0,
                 totalItemCount: 0,
@@ -149,11 +153,32 @@ export class AccountImportService {
             0,
         );
 
+        // Detect masked secret values in the payload
+        let hasMaskedSecrets = false;
+        for (const up of payload.data.userPlugins) {
+            if (containsMaskedSecrets(up.secretSettings)) {
+                hasMaskedSecrets = true;
+                break;
+            }
+        }
+        if (!hasMaskedSecrets) {
+            for (const dir of payload.data.directories) {
+                for (const dp of dir.directoryPlugins || []) {
+                    if (containsMaskedSecrets(dp.secretSettings)) {
+                        hasMaskedSecrets = true;
+                        break;
+                    }
+                }
+                if (hasMaskedSecrets) break;
+            }
+        }
+
         return {
             valid: true,
             errors: [],
             version: payload.version,
             includesSecrets: payload.includesSecrets || false,
+            hasMaskedSecrets,
             profile: payload.data.profile,
             directoryCount: payload.data.directories.length,
             totalItemCount,
@@ -230,7 +255,14 @@ export class AccountImportService {
                         settings: up.settings || {},
                     };
                     if (payload.includesSecrets && up.secretSettings) {
-                        data.secretSettings = up.secretSettings;
+                        // Skip masked secret values — they are placeholders, not real credentials
+                        if (containsMaskedSecrets(up.secretSettings)) {
+                            result.warnings.push(
+                                `Plugin "${up.pluginId}" has masked secret values. Replace "${MASKED_SECRET_PREFIX}..." values with real credentials in the JSON file and re-import.`,
+                            );
+                        } else {
+                            data.secretSettings = up.secretSettings;
+                        }
                     }
 
                     await this.userPluginRepository.upsert(data);
@@ -456,6 +488,18 @@ export class AccountImportService {
                     continue;
                 }
 
+                // Determine secret settings: skip masked values, use real values only
+                let secretSettings: Record<string, unknown> = {};
+                if (includesSecrets && dp.secretSettings) {
+                    if (containsMaskedSecrets(dp.secretSettings)) {
+                        result.warnings.push(
+                            `Directory plugin "${dp.pluginId}" has masked secret values. Replace "${MASKED_SECRET_PREFIX}..." values with real credentials in the JSON file and re-import.`,
+                        );
+                    } else {
+                        secretSettings = dp.secretSettings;
+                    }
+                }
+
                 await this.directoryPluginRepository.upsert({
                     directoryId,
                     pluginId: dp.pluginId,
@@ -463,7 +507,7 @@ export class AccountImportService {
                     enabled: dp.enabled,
                     activeCapability: dp.activeCapability || null,
                     settings: dp.settings || {},
-                    secretSettings: includesSecrets && dp.secretSettings ? dp.secretSettings : {},
+                    secretSettings,
                     priority: dp.priority,
                 });
             } catch (error) {
