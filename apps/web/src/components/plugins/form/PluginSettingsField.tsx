@@ -4,8 +4,8 @@
 import { useTranslations } from 'next-intl';
 import { PluginSettingsSchemaProperty } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
-import { Eye, EyeOff } from 'lucide-react';
-import { useState } from 'react';
+import { Eye, EyeOff, Pencil, KeyRound } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { PluginModelSelect } from './PluginModelSelect';
 import { PluginSettingsObjectField } from './PluginSettingsObjectField';
 import { PluginSettingsArrayField } from './PluginSettingsArrayField';
@@ -30,6 +30,7 @@ export function PluginSettingsField({
 }: PluginSettingsFieldProps) {
     const t = useTranslations('dashboard.plugins.settingsField');
     const [showSecret, setShowSecret] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
 
     const label = schema.title || name;
     const description = schema.description;
@@ -38,6 +39,13 @@ export function PluginSettingsField({
 
     // Check if the current value is a masked placeholder from the API
     const isMaskedValue = isSecret && typeof value === 'string' && value.includes('••••');
+
+    // Reset editing mode when a new masked value arrives (after save + router refresh)
+    useEffect(() => {
+        if (isMaskedValue) {
+            setIsEditing(false);
+        }
+    }, [isMaskedValue]);
 
     // Determine input type for string/number inputs
     const getInputType = () => {
@@ -182,48 +190,61 @@ export function PluginSettingsField({
             );
         }
 
-        // String input (default) - with secret support
-        // For masked values: eye closed = dots, eye open = partial reveal (e.g. sk-p••••n4Xj)
-        // Clicking into the field clears it so the user can enter a new value
-        const displayValue = isMaskedValue
-            ? showSecret
-                ? String(value)
-                : '••••••••••••••••'
-            : String(value ?? schema.default ?? '');
+        // Secret field with existing masked value: show a placeholder with "Modify" button
+        // instead of putting masked characters in the input (which caused ByteString errors
+        // when masked values were accidentally saved back).
+        if (isMaskedValue && !isEditing) {
+            return (
+                <div className="flex items-center gap-2">
+                    <div
+                        className={cn(
+                            'flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-border dark:border-border-dark',
+                            'bg-surface-tertiary/50 dark:bg-surface-tertiary-dark/50',
+                            'text-text-muted dark:text-text-muted-dark text-sm',
+                        )}
+                    >
+                        <KeyRound className="w-4 h-4 shrink-0" />
+                        <span className="select-none">{String(value)}</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setIsEditing(true);
+                            onChange('');
+                        }}
+                        className={cn(
+                            'flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border dark:border-border-dark',
+                            'bg-surface-secondary dark:bg-surface-secondary-dark',
+                            'text-text-muted dark:text-text-muted-dark',
+                            'hover:text-text dark:hover:text-text-dark hover:border-primary/50',
+                            'transition-colors text-sm font-medium',
+                        )}
+                    >
+                        <Pencil className="w-3.5 h-3.5" />
+                        {t('modify')}
+                    </button>
+                </div>
+            );
+        }
 
+        // Editing mode for secret field (after clicking Modify) or new secret field
+        // Also used for non-secret string fields
         return (
             <div className="relative">
                 <input
-                    type={isMaskedValue ? 'text' : getInputType()}
-                    value={displayValue}
-                    onChange={(e) => {
-                        if (!isMaskedValue) {
-                            onChange(e.target.value);
-                        }
-                    }}
-                    onKeyDown={
-                        isMaskedValue
-                            ? (e) => {
-                                  // Only clear when user actually types a character, not on Tab/Shift/etc
-                                  if (
-                                      e.key.length === 1 ||
-                                      e.key === 'Backspace' ||
-                                      e.key === 'Delete'
-                                  ) {
-                                      onChange('');
-                                  }
-                              }
-                            : undefined
-                    }
+                    type={getInputType()}
+                    value={String(value ?? schema.default ?? '')}
+                    onChange={(e) => onChange(e.target.value)}
                     maxLength={schema.maxLength}
-                    required={isMaskedValue ? false : required}
+                    required={required}
+                    autoFocus={isEditing}
+                    placeholder={isEditing ? t('enterNewValue') : undefined}
                     className={cn(
                         'w-full px-3 py-2 rounded-lg border border-border dark:border-border-dark',
                         'bg-surface-secondary dark:bg-surface-secondary-dark',
                         'text-text dark:text-text-dark',
                         'focus:outline-none focus:ring-2 focus:ring-primary/50',
                         isSecret && 'pr-10',
-                        isMaskedValue && !showSecret && 'tracking-wider',
                     )}
                 />
                 {isSecret && (

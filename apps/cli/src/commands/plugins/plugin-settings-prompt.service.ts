@@ -150,9 +150,9 @@ export class PluginSettingsPromptService extends BasePromptService {
         defaultValue: unknown,
     ): Promise<unknown> {
         if (prop.secret) {
-            const maskedDefault = defaultValue ? String(defaultValue) : undefined;
-            const secretLabel = maskedDefault
-                ? `${label} ${chalk.gray(`(${maskedDefault.slice(0, 6)}${'•'.repeat(Math.min(maskedDefault.length - 6, 12))})`)}`
+            const hasExisting = defaultValue != null && String(defaultValue).length > 0;
+            const secretLabel = hasExisting
+                ? `${label} ${chalk.gray('(configured — leave empty to keep)')}`
                 : label;
             return this.promptPasswordRequired(secretLabel, false);
         }

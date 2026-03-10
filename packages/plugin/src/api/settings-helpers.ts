@@ -132,6 +132,7 @@ export function validateRequiredSettings(
 
 /**
  * Sanitize settings for save: undefined → null, empty string → null at directory scope.
+ * Strips masked placeholder values (containing '••••') so they are never sent to the API.
  */
 export function sanitizeSettingsForSave(
 	settings: Record<string, unknown>,
@@ -139,6 +140,10 @@ export function sanitizeSettingsForSave(
 ): Record<string, unknown> {
 	const result: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(settings)) {
+		// Never send masked placeholders back to the API
+		if (typeof value === 'string' && value.includes('••••')) {
+			continue;
+		}
 		if (value === undefined) {
 			result[key] = null;
 		} else if (scope === 'directory' && value === '') {
