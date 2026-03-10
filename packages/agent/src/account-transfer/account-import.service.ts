@@ -7,6 +7,7 @@ import { UserPluginRepository } from '../plugins/repositories/user-plugin.reposi
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import { PluginRepository } from '../plugins/repositories/plugin.repository';
 import { UserRepository } from '../database/repositories/user.repository';
+import { DirectoryAdvancedPromptsRepository } from '../database/repositories/directory-advanced-prompts.repository';
 import { GitFacadeService } from '../facades/git.facade';
 import { DataRepository } from '../generators/data-generator/data-repository';
 import { Directory } from '../entities/directory.entity';
@@ -36,6 +37,7 @@ export class AccountImportService {
         private readonly directoryPluginRepository: DirectoryPluginRepository,
         private readonly pluginRepository: PluginRepository,
         private readonly userRepository: UserRepository,
+        private readonly advancedPromptsRepository: DirectoryAdvancedPromptsRepository,
         private readonly gitFacade: GitFacadeService,
     ) {}
 
@@ -383,6 +385,25 @@ export class AccountImportService {
             } catch (error) {
                 result.warnings.push(
                     `Failed to import custom domain "${cd.domain}": ${error instanceof Error ? error.message : String(error)}`,
+                );
+            }
+        }
+
+        // Import advanced prompts
+        if (dir.advancedPrompts && Object.keys(dir.advancedPrompts).length > 0) {
+            try {
+                await this.advancedPromptsRepository.createOrUpdate(directoryId, {
+                    relevanceAssessment: dir.advancedPrompts.relevanceAssessment,
+                    itemGeneration: dir.advancedPrompts.itemGeneration,
+                    itemExtraction: dir.advancedPrompts.itemExtraction,
+                    searchQuery: dir.advancedPrompts.searchQuery,
+                    categorization: dir.advancedPrompts.categorization,
+                    deduplication: dir.advancedPrompts.deduplication,
+                    sourceValidation: dir.advancedPrompts.sourceValidation,
+                });
+            } catch (error) {
+                result.warnings.push(
+                    `Failed to import advanced prompts for directory "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
                 );
             }
         }

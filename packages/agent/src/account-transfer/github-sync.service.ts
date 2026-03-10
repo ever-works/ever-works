@@ -276,6 +276,7 @@ export class GitHubSyncService {
                 members,
                 customDomains,
                 directoryPlugins,
+                advancedPrompts,
                 items,
                 categories,
                 tags,
@@ -286,6 +287,9 @@ export class GitHubSyncService {
             this.writeJsonFile(path.join(dirPath, 'members.json'), members);
             this.writeJsonFile(path.join(dirPath, 'domains.json'), customDomains);
             this.writeJsonFile(path.join(dirPath, 'plugins.json'), directoryPlugins);
+            if (advancedPrompts && Object.keys(advancedPrompts).length > 0) {
+                this.writeJsonFile(path.join(dirPath, 'prompts.json'), advancedPrompts);
+            }
             if (items && items.length > 0) {
                 this.writeJsonFile(path.join(dirPath, 'items.json'), items);
             }
@@ -331,6 +335,8 @@ export class GitHubSyncService {
                     const directoryPlugins =
                         this.readJsonFile(path.join(dirPath, 'plugins.json')) || [];
 
+                    const advancedPrompts =
+                        this.readJsonFile(path.join(dirPath, 'prompts.json')) || undefined;
                     const items = this.readJsonFile(path.join(dirPath, 'items.json')) || [];
                     const categories =
                         this.readJsonFile(path.join(dirPath, 'categories.json')) || [];
@@ -344,6 +350,7 @@ export class GitHubSyncService {
                         members,
                         customDomains,
                         directoryPlugins,
+                        advancedPrompts,
                         items,
                         categories,
                         tags,

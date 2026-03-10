@@ -5,11 +5,13 @@ import { DirectoryCustomDomainRepository } from '../database/repositories/direct
 import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import { UserRepository } from '../database/repositories/user.repository';
+import { DirectoryAdvancedPromptsRepository } from '../database/repositories/directory-advanced-prompts.repository';
 import { GitFacadeService } from '../facades/git.facade';
 import { DataRepository } from '../generators/data-generator/data-repository';
 import type {
     AccountExportPayload,
     ExportedDirectory,
+    ExportedAdvancedPrompts,
     ExportedDirectoryItem,
     ExportedDirectoryCategory,
     ExportedDirectoryTag,
@@ -29,6 +31,7 @@ export class AccountExportService {
         private readonly userPluginRepository: UserPluginRepository,
         private readonly directoryPluginRepository: DirectoryPluginRepository,
         private readonly userRepository: UserRepository,
+        private readonly advancedPromptsRepository: DirectoryAdvancedPromptsRepository,
         private readonly gitFacade: GitFacadeService,
     ) {}
 
@@ -84,14 +87,29 @@ export class AccountExportService {
         dir: any,
         includeSecrets: boolean,
     ): Promise<ExportedDirectory> {
-        const [members, customDomains, directoryPlugins] = await Promise.all([
+        const [members, customDomains, directoryPlugins, prompts] = await Promise.all([
             this.directoryMemberRepository.findByDirectory(directoryId),
             this.directoryCustomDomainRepository.findByDirectory(directoryId),
             this.directoryPluginRepository.findByDirectory(directoryId),
+            this.advancedPromptsRepository.findByDirectoryId(directoryId),
         ]);
 
         // Fetch items from the data repo
         const { items, categories, tags, collections } = await this.fetchDirectoryItems(dir);
+
+        // Build advanced prompts if any are set
+        let advancedPrompts: ExportedAdvancedPrompts | undefined;
+        if (prompts) {
+            const p: ExportedAdvancedPrompts = {};
+            if (prompts.relevanceAssessment) p.relevanceAssessment = prompts.relevanceAssessment;
+            if (prompts.itemGeneration) p.itemGeneration = prompts.itemGeneration;
+            if (prompts.itemExtraction) p.itemExtraction = prompts.itemExtraction;
+            if (prompts.searchQuery) p.searchQuery = prompts.searchQuery;
+            if (prompts.categorization) p.categorization = prompts.categorization;
+            if (prompts.deduplication) p.deduplication = prompts.deduplication;
+            if (prompts.sourceValidation) p.sourceValidation = prompts.sourceValidation;
+            if (Object.keys(p).length > 0) advancedPrompts = p;
+        }
 
         return {
             name: dir.name,
@@ -131,6 +149,7 @@ export class AccountExportService {
                 }
                 return exported;
             }),
+            advancedPrompts,
             items,
             categories,
             tags,

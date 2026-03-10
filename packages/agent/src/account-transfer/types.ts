@@ -69,6 +69,16 @@ export interface ExportedDirectoryCollection {
     priority?: number;
 }
 
+export interface ExportedAdvancedPrompts {
+    relevanceAssessment?: string | null;
+    itemGeneration?: string | null;
+    itemExtraction?: string | null;
+    searchQuery?: string | null;
+    categorization?: string | null;
+    deduplication?: string | null;
+    sourceValidation?: string | null;
+}
+
 export interface ExportedDirectory {
     name: string;
     slug: string;
@@ -87,6 +97,7 @@ export interface ExportedDirectory {
     members: ExportedDirectoryMember[];
     customDomains: ExportedCustomDomain[];
     directoryPlugins: ExportedDirectoryPlugin[];
+    advancedPrompts?: ExportedAdvancedPrompts;
     items?: ExportedDirectoryItem[];
     categories?: ExportedDirectoryCategory[];
     tags?: ExportedDirectoryTag[];
