@@ -468,7 +468,8 @@ export class AccountImportService {
         const hasItems = dir.items && dir.items.length > 0;
         const hasComparisons = dir.comparisons && dir.comparisons.length > 0;
         const hasSiteConfig = dir.siteConfig && Object.keys(dir.siteConfig).length > 0;
-        const hasMarkdownTemplate = dir.markdownTemplate && (dir.markdownTemplate.header || dir.markdownTemplate.footer);
+        const hasMarkdownTemplate =
+            dir.markdownTemplate && (dir.markdownTemplate.header || dir.markdownTemplate.footer);
 
         if (!hasItems && !hasComparisons && !hasSiteConfig && !hasMarkdownTemplate) {
             return;

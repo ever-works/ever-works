@@ -238,9 +238,7 @@ export class AccountExportService {
                 siteConfig: siteConfig || undefined,
                 comparisons: exportedComparisons,
                 markdownTemplate:
-                    mdTemplate && (mdTemplate.header || mdTemplate.footer)
-                        ? mdTemplate
-                        : undefined,
+                    mdTemplate && (mdTemplate.header || mdTemplate.footer) ? mdTemplate : undefined,
             };
         } catch (error) {
             this.logger.warn(
