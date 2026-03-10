@@ -272,7 +272,16 @@ export class GitHubSyncService {
             const dirPath = path.join(directoriesDir, directory.slug);
             fs.mkdirSync(dirPath, { recursive: true });
 
-            const { members, customDomains, directoryPlugins, items, categories, tags, collections, ...config } = directory;
+            const {
+                members,
+                customDomains,
+                directoryPlugins,
+                items,
+                categories,
+                tags,
+                collections,
+                ...config
+            } = directory;
             this.writeJsonFile(path.join(dirPath, 'config.json'), config);
             this.writeJsonFile(path.join(dirPath, 'members.json'), members);
             this.writeJsonFile(path.join(dirPath, 'domains.json'), customDomains);
@@ -322,12 +331,10 @@ export class GitHubSyncService {
                     const directoryPlugins =
                         this.readJsonFile(path.join(dirPath, 'plugins.json')) || [];
 
-                    const items =
-                        this.readJsonFile(path.join(dirPath, 'items.json')) || [];
+                    const items = this.readJsonFile(path.join(dirPath, 'items.json')) || [];
                     const categories =
                         this.readJsonFile(path.join(dirPath, 'categories.json')) || [];
-                    const tags =
-                        this.readJsonFile(path.join(dirPath, 'tags.json')) || [];
+                    const tags = this.readJsonFile(path.join(dirPath, 'tags.json')) || [];
                     const collections =
                         this.readJsonFile(path.join(dirPath, 'collections.json')) || [];
 
