@@ -214,32 +214,39 @@ export class GitHubSyncService {
         }
 
         const gitOptions = { providerId: PROVIDER_ID, userId };
-        const user = await this.userRepository.findById(userId);
-        const committer = user ? { name: user.username, email: user.email } : undefined;
 
-        const dir = await this.gitFacade.cloneOrPull(
-            { owner: config.repoOwner, repo: config.repoName, committer },
-            gitOptions,
-        );
+        try {
+            const user = await this.userRepository.findById(userId);
+            const committer = user ? { name: user.username, email: user.email } : undefined;
 
-        const payload = this.readExportFiles(dir);
-        if (!payload) {
-            return {
-                success: false,
-                directoriesCreated: 0,
-                directoriesUpdated: 0,
-                directoriesSkipped: 0,
-                userPluginsImported: 0,
-                errors: ['No valid configuration found in repository'],
-                warnings: [],
-            };
+            const dir = await this.gitFacade.cloneOrPull(
+                { owner: config.repoOwner, repo: config.repoName, committer },
+                gitOptions,
+            );
+
+            const payload = this.readExportFiles(dir);
+            if (!payload) {
+                return {
+                    success: false,
+                    directoriesCreated: 0,
+                    directoriesUpdated: 0,
+                    directoriesSkipped: 0,
+                    userPluginsImported: 0,
+                    errors: ['No valid configuration found in repository'],
+                    warnings: [],
+                };
+            }
+
+            const result = await this.importService.applyImport(userId, payload, resolutions);
+            if (result.success) {
+                await this.syncConfigRepository.updateLastPull(userId);
+            }
+            return result;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            await this.syncConfigRepository.updateError(userId, message);
+            throw error;
         }
-
-        const result = await this.importService.applyImport(userId, payload, resolutions);
-        if (result.success) {
-            await this.syncConfigRepository.updateLastPull(userId);
-        }
-        return result;
     }
 
     async removeSyncConfig(userId: string): Promise<void> {
@@ -269,7 +276,12 @@ export class GitHubSyncService {
         fs.mkdirSync(directoriesDir, { recursive: true });
 
         for (const directory of payload.data.directories) {
-            const dirPath = path.join(directoriesDir, directory.slug);
+            const safeName = path.basename(directory.slug);
+            if (safeName !== directory.slug) {
+                this.logger.warn(`Skipping directory with invalid slug: ${directory.slug}`);
+                continue;
+            }
+            const dirPath = path.join(directoriesDir, safeName);
             fs.mkdirSync(dirPath, { recursive: true });
 
             const {

@@ -14,7 +14,7 @@ export class UserSyncConfigRepository {
         return this.repository.findOne({ where: { userId } });
     }
 
-    async upsert(userId: string, data: Partial<UserSyncConfig>): Promise<UserSyncConfig> {
+    async upsert(userId: string, data: Partial<UserSyncConfig>): Promise<UserSyncConfig | null> {
         const existing = await this.findByUser(userId);
         if (existing) {
             await this.repository.update({ userId }, data);

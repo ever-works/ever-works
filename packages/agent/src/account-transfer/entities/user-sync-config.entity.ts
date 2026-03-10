@@ -1,10 +1,5 @@
-import {
-    Entity,
-    Column,
-    PrimaryGeneratedColumn,
-    CreateDateColumn,
-    UpdateDateColumn,
-} from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { TimestampColumn } from '../../entities/_types';
 
 @Entity({ name: 'user_sync_configs' })
 export class UserSyncConfig {
@@ -26,10 +21,10 @@ export class UserSyncConfig {
     @Column({ type: 'boolean', default: false })
     includeSecrets: boolean;
 
-    @Column({ type: 'datetime', nullable: true })
+    @TimestampColumn({ nullable: true })
     lastPushAt?: Date | null;
 
-    @Column({ type: 'datetime', nullable: true })
+    @TimestampColumn({ nullable: true })
     lastPullAt?: Date | null;
 
     @Column({ type: 'varchar', nullable: true })

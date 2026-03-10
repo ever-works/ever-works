@@ -195,7 +195,7 @@ export class AccountImportService {
             // Import directories
             for (const dir of payload.data.directories) {
                 try {
-                    await this.importDirectory(userId, user, dir, resolutionMap, result);
+                    await this.importDirectory(userId, user, dir, resolutionMap, payload.includesSecrets, result);
                 } catch (error) {
                     result.errors.push(
                         `Failed to import directory "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
@@ -254,6 +254,7 @@ export class AccountImportService {
         user: any,
         dir: ExportedDirectory,
         resolutionMap: Map<string, ConflictResolution>,
+        includesSecrets: boolean,
         result: ImportResult,
     ): Promise<void> {
         let slug = dir.slug;
@@ -303,7 +304,7 @@ export class AccountImportService {
                     comparisonsEnabled: dir.comparisonsEnabled,
                 });
 
-                await this.importDirectoryRelations(existing.id, userId, dir, result);
+                await this.importDirectoryRelations(existing.id, userId, dir, includesSecrets, result);
                 await this.importDirectoryRepoData(existing, dir, user, result);
                 result.directoriesUpdated++;
                 return;
@@ -332,7 +333,7 @@ export class AccountImportService {
             user,
         );
 
-        await this.importDirectoryRelations(newDir.id, userId, dir, result);
+        await this.importDirectoryRelations(newDir.id, userId, dir, includesSecrets, result);
         await this.importDirectoryRepoData(newDir, dir, user, result);
         result.directoriesCreated++;
     }
@@ -341,6 +342,7 @@ export class AccountImportService {
         directoryId: string,
         userId: string,
         dir: ExportedDirectory,
+        includesSecrets: boolean,
         result: ImportResult,
     ): Promise<void> {
         // Import members
@@ -448,7 +450,8 @@ export class AccountImportService {
                     enabled: dp.enabled,
                     activeCapability: dp.activeCapability || null,
                     settings: dp.settings || {},
-                    secretSettings: dp.secretSettings || {},
+                    secretSettings:
+                        includesSecrets && dp.secretSettings ? dp.secretSettings : {},
                     priority: dp.priority,
                 });
             } catch (error) {

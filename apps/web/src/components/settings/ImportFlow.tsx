@@ -15,7 +15,6 @@ import type {
 
 interface ImportFlowProps {
     onClose: () => void;
-    initialPayload?: AccountExportPayload;
     initialPreview?: ImportPreview;
     isPullMode?: boolean;
 }
@@ -24,13 +23,12 @@ type ImportStep = 'upload' | 'preview' | 'result';
 
 export function ImportFlow({
     onClose,
-    initialPayload,
     initialPreview,
     isPullMode,
 }: ImportFlowProps) {
     const t = useTranslations('dashboard.settings.data.import');
     const [step, setStep] = useState<ImportStep>(initialPreview ? 'preview' : 'upload');
-    const [payload, setPayload] = useState<AccountExportPayload | null>(initialPayload || null);
+    const [payload, setPayload] = useState<AccountExportPayload | null>(null);
     const [preview, setPreview] = useState<ImportPreview | null>(initialPreview || null);
     const [result, setResult] = useState<ImportResult | null>(null);
     const [resolutions, setResolutions] = useState<Map<string, ConflictResolution>>(() => {
