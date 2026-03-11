@@ -27,6 +27,28 @@ interface DirectoryInfoProps {
     config: DirectoryConfig | null;
 }
 
+// Helper to render visibility icon
+function RepoVisibilityIcon({
+    isPrivate,
+    label,
+}: {
+    isPrivate: boolean | undefined;
+    label: string;
+}) {
+    const t = useTranslations('common.visibility');
+    if (isPrivate === undefined) return null;
+
+    const visibilityLabel = isPrivate ? t('private') : t('public');
+    return (
+        <div
+            className="flex items-center gap-1 text-xs text-text-muted dark:text-text-muted-dark"
+            title={`${label}: ${visibilityLabel}`}
+        >
+            {isPrivate ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+        </div>
+    );
+}
+
 export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
     const t = useTranslations('dashboard.directoryDetail.info');
     const { repoLinks, oauthConnection } = useDirectoryDetail();
@@ -108,42 +130,58 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
             label: t('repositories'),
             active: Boolean(repoLinks),
             value: (
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    {[
-                        {
-                            href: repoLinks?.dataRepo,
-                            label: t('dataRepo'),
-                            visibility: directory.repoVisibility?.data,
-                        },
-                        {
-                            href: repoLinks?.websiteRepo,
-                            label: t('websiteRepo'),
-                            visibility: directory.repoVisibility?.website,
-                        },
-                        {
-                            href: repoLinks?.main,
-                            label: t('mainRepo'),
-                            visibility: directory.repoVisibility?.directory,
-                        },
-                    ].map(({ href, label, visibility }) => (
-                        <span key={label} className="flex items-center gap-1">
-                            {visibility !== undefined &&
-                                (visibility ? (
-                                    <Lock className="w-3 h-3 text-text-muted dark:text-text-muted-dark" />
-                                ) : (
-                                    <Unlock className="w-3 h-3 text-text-muted dark:text-text-muted-dark" />
-                                ))}
-                            <Link
-                                href={href || '#'}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:text-primary-hover"
-                            >
-                                {label}
-                            </Link>
-                        </span>
-                    ))}
-                </div>
+                <ul className="flex gap-2 flex-col list-inside">
+                    <li className="flex gap-1">
+                        {directory.repoVisibility && (
+                            <RepoVisibilityIcon
+                                isPrivate={directory.repoVisibility.data}
+                                label="Data Repo"
+                            />
+                        )}
+                        <Link
+                            href={repoLinks?.dataRepo || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary-hover"
+                        >
+                            {t('dataRepo')}
+                        </Link>
+                    </li>
+
+                    <li className="flex gap-1">
+                        {directory.repoVisibility && (
+                            <RepoVisibilityIcon
+                                isPrivate={directory.repoVisibility.website}
+                                label="Website Repo"
+                            />
+                        )}
+                        <Link
+                            href={repoLinks?.websiteRepo || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary-hover"
+                        >
+                            {t('websiteRepo')}
+                        </Link>
+                    </li>
+
+                    <li className="flex gap-1">
+                        {directory.repoVisibility && (
+                            <RepoVisibilityIcon
+                                isPrivate={directory.repoVisibility.directory}
+                                label="Main Repo"
+                            />
+                        )}
+                        <Link
+                            href={repoLinks?.main || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary-hover"
+                        >
+                            {t('mainRepo')}
+                        </Link>
+                    </li>
+                </ul>
             ),
             icon: <FolderGit2 className="w-3.5 h-3.5" />,
         },
@@ -152,6 +190,12 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
             value: new Date(directory.createdAt),
             icon: <Calendar className="w-3.5 h-3.5" />,
         },
+
+        // {
+        //     label: t('lastUpdated'),
+        //     value: new Date(directory.updatedAt),
+        //     icon: <Calendar className="w-3.5 h-3.5" />,
+        // },
     ];
 
     // Add README config if exists
