@@ -75,11 +75,13 @@ export async function updatePluginSettings(
     }
 }
 
-export async function validatePluginConnection(pluginId: string): Promise<ActionResult<{
-    success: boolean;
-    message: string;
-    details?: Record<string, unknown>;
-}>> {
+export async function validatePluginConnection(pluginId: string): Promise<
+    ActionResult<{
+        success: boolean;
+        message: string;
+        details?: Record<string, unknown>;
+    }>
+> {
     try {
         const result = await pluginsAPI.validateConnection(pluginId);
         return { success: true, data: result };

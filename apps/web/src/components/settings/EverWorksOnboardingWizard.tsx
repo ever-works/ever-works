@@ -69,7 +69,8 @@ export function EverWorksOnboardingWizard({
             },
             {
                 title: 'GitHub',
-                description: 'Authorize GitHub so Ever Works can manage repositories and deployments.',
+                description:
+                    'Authorize GitHub so Ever Works can manage repositories and deployments.',
                 complete: hasGitHub,
                 href: ROUTES.DASHBOARD_PLUGIN_DETAIL('github'),
             },
@@ -81,13 +82,15 @@ export function EverWorksOnboardingWizard({
             },
             {
                 title: 'Vercel',
-                description: 'Save a Vercel API token and verify that deployments can authenticate.',
+                description:
+                    'Save a Vercel API token and verify that deployments can authenticate.',
                 complete: hasVercel,
                 href: ROUTES.DASHBOARD_PLUGIN_DETAIL('vercel'),
             },
             {
                 title: 'Finish',
-                description: 'Run live checks on the required integrations before closing onboarding.',
+                description:
+                    'Run live checks on the required integrations before closing onboarding.',
                 complete: hasClaude && hasGitHub && hasOpenRouter && hasVercel,
                 href: ROUTES.DASHBOARD,
             },
@@ -204,7 +207,9 @@ export function EverWorksOnboardingWizard({
                                     <p className="text-sm text-text-muted dark:text-text-muted-dark">
                                         Status:{' '}
                                         <span className="font-medium text-text dark:text-text-dark">
-                                            {steps[activeStep].complete ? 'Connected' : 'Needs setup'}
+                                            {steps[activeStep].complete
+                                                ? 'Connected'
+                                                : 'Needs setup'}
                                         </span>
                                     </p>
 
@@ -229,7 +234,10 @@ export function EverWorksOnboardingWizard({
                                             </a>
                                         )}
 
-                                        <Button variant="secondary" onClick={() => router.refresh()}>
+                                        <Button
+                                            variant="secondary"
+                                            onClick={() => router.refresh()}
+                                        >
                                             <RefreshCw className="w-4 h-4" />
                                             Refresh status
                                         </Button>

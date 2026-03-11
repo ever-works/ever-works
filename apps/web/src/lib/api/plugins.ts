@@ -146,7 +146,11 @@ export const pluginsAPI = {
     validateConnection: async (
         pluginId: string,
     ): Promise<{ success: boolean; message: string; details?: Record<string, unknown> }> => {
-        return serverMutation<{ success: boolean; message: string; details?: Record<string, unknown> }>({
+        return serverMutation<{
+            success: boolean;
+            message: string;
+            details?: Record<string, unknown>;
+        }>({
             endpoint: `/plugins/${pluginId}/validate-connection`,
             data: {},
             method: 'POST',

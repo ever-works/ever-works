@@ -72,7 +72,9 @@ export function GitHubOrganizationsSettings({
                 },
             });
 
-            setStatus(result.success ? 'Saved organization access.' : result.error || 'Save failed.');
+            setStatus(
+                result.success ? 'Saved organization access.' : result.error || 'Save failed.',
+            );
         });
     };
 
@@ -142,7 +144,9 @@ export function GitHubOrganizationsSettings({
                 </Button>
             </div>
 
-            {status && <p className="text-sm text-text-muted dark:text-text-muted-dark">{status}</p>}
+            {status && (
+                <p className="text-sm text-text-muted dark:text-text-muted-dark">{status}</p>
+            )}
         </div>
     );
 }

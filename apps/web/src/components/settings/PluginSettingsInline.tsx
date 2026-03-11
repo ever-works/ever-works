@@ -159,8 +159,8 @@ export function PluginSettingsInline({
                         {plugin.pluginId === 'openrouter' && !showOpenRouterInputs && (
                             <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
                                 <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                    Keep OpenRouter hidden until you are ready to bring your own
-                                    API key and model configuration.
+                                    Keep OpenRouter hidden until you are ready to bring your own API
+                                    key and model configuration.
                                 </p>
                                 <Button
                                     variant="secondary"

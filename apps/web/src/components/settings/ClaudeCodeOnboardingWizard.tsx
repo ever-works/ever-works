@@ -193,7 +193,10 @@ export function ClaudeCodeOnboardingWizard({
 
                 {step < steps.length - 1 && (
                     <div className="flex justify-end">
-                        <Button variant="secondary" onClick={() => setStep((current) => current + 1)}>
+                        <Button
+                            variant="secondary"
+                            onClick={() => setStep((current) => current + 1)}
+                        >
                             Continue
                             <ArrowRight className="w-4 h-4" />
                         </Button>
