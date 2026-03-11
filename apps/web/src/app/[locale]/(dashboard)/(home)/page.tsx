@@ -22,7 +22,9 @@ export default async function Dashboard() {
         <DashboardClient
             user={user!}
             initialDirectories={directoriesResponse.directories}
-            totalDirectories={statsResponse.totalDirectories}
+            totalDirectories={
+                statsResponse.success ? statsResponse.totalDirectories : directoriesResponse.total
+            }
             totalItems={statsResponse.totalItems}
             activeWebsites={statsResponse.activeWebsites}
         />

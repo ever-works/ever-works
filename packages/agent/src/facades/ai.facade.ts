@@ -339,11 +339,13 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             directoryId: facadeOptions.directoryId,
         });
 
+        const apiKey = this.getSettingTyped<string>(settings, 'apiKey', 'string');
+
         return {
             providerId: plugin.id,
             providerName: plugin.providerName,
             baseUrl: this.getSettingTyped<string>(settings, 'baseUrl', 'string'),
-            apiKey: this.getSettingTyped<string>(settings, 'apiKey', 'string'),
+            apiKey,
             defaultModel: this.getSettingTyped<string>(settings, 'defaultModel', 'string'),
             routing: {
                 simpleModel: this.getSettingTyped<string>(settings, 'simpleModel', 'string'),

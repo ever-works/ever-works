@@ -107,10 +107,10 @@ export function GitProviderSelector({
                             <button
                                 onClick={() => onSelect(provider.id)}
                                 className={cn(
-                                    'w-full flex items-center gap-3 p-3 rounded-lg transition-all',
-                                    'border-2',
+                                    'w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all z-20',
+                                    'border',
                                     isSelected
-                                        ? 'border-primary bg-primary/5'
+                                        ? 'border-primary-500/50 bg-card dark:bg-card-primary-dark/40'
                                         : 'border-border dark:border-border-dark bg-surface dark:bg-surface-dark hover:border-primary/50',
                                 )}
                             >

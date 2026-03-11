@@ -43,8 +43,6 @@ import {
 	getDefaultValues as formDefaults
 } from './form-schema.js';
 import {
-	buildSystemPrompt,
-	buildUserPrompt,
 	buildParentSystemPromptVariables,
 	buildParentUserPromptVariables,
 	DEFAULT_PARENT_SYSTEM_PROMPT,
@@ -464,12 +462,16 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		) as typeof DEFAULT_PARENT_SYSTEM_PROMPT;
 		const systemPrompt = substituteVariables(sysTemplate, buildParentSystemPromptVariables(promptOptions));
 
+		this.context?.logger.log('[System Prompt] ' + systemPrompt);
+
 		const userTemplate = (
 			promptFacade
 				? await promptFacade.getPrompt(PROMPT_KEYS.PARENT_USER, DEFAULT_PARENT_USER_PROMPT, facadeOptions)
 				: DEFAULT_PARENT_USER_PROMPT
 		) as typeof DEFAULT_PARENT_USER_PROMPT;
 		const userPrompt = substituteVariables(userTemplate, buildParentUserPromptVariables(promptOptions));
+
+		this.context?.logger.log('[User Prompt] ' + userPrompt);
 
 		const settings = await resolveSettings(this.context, facadeOptions.userId, directory.id);
 		const maxSteps = (settings.maxSteps as number) || DEFAULT_MAX_STEPS;

@@ -6,6 +6,7 @@ import type { IContentExtractorFacade, FacadeOptions, PluginLogger, IPromptFacad
 import { substituteVariables } from '@ever-works/plugin';
 
 import { chunkContent } from './content-chunker.js';
+import { loadExistingItems, filterChunk } from './chunk-prefilter.js';
 import {
 	buildWorkerSystemPromptVariables,
 	buildChunkUserPromptVariables,
@@ -23,7 +24,9 @@ import {
 	getWorkerContentBudgetRatio,
 	WORKER_PROMPT_OVERHEAD_TOKENS,
 	MIN_CHUNK_CHARS,
-	DEFAULT_CONTEXT_BUDGET_RATIO
+	MAX_CHUNK_CHARS,
+	DEFAULT_CONTEXT_BUDGET_RATIO,
+	getStepsPerChunk
 } from '../types.js';
 import type { TokenUsageAccumulator } from '../types.js';
 import { ToolCircuitBreaker } from '../utils/tool-circuit-breaker.js';
@@ -65,37 +68,45 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 	try {
 		if (signal?.aborted) return { url, files: [], count: 0, error: 'Aborted' };
 
+		let extractionError: string | null = null;
 		const extracted = await contentExtractorFacade.extractContent(url, undefined, facadeOptions).catch((err) => {
-			const errMsg = err instanceof Error ? err.message : String(err);
-			logger.warn(`Worker: content extraction failed for ${url}: ${errMsg}`);
-			// Record failure in breaker but don't throw, allowing for graceful degradation if extraction fails
-			breaker.recordFailure('contentExtractor', errMsg);
+			extractionError = err instanceof Error ? err.message : String(err);
+			logger.warn(`Worker: content extraction threw for ${url}: ${extractionError}`);
+			breaker.recordFailure('contentExtractor', extractionError);
 			return null;
 		});
 
-		if (!extracted?.rawContent) {
-			return { url, files: [], count: 0, error: 'Failed to extract content from URL' };
+		if (!extracted) {
+			if (!extractionError) {
+				logger.warn(`Worker: content extraction returned null for ${url} (no provider or extraction failed)`);
+				breaker.recordFailure('contentExtractor', `extraction returned null for ${url}`);
+			}
+			return { url, files: [], count: 0, error: extractionError ?? `Content extraction failed for URL: ${url}` };
 		}
 
-		// Content extraction succeeded, reset breaker and proceed with processing
+		if (!extracted.rawContent) {
+			logger.warn(`Worker: content extraction returned empty content for ${url}`);
+			return { url, files: [], count: 0, error: 'Content extraction returned empty content' };
+		}
+
 		breaker.recordSuccess('contentExtractor');
 
 		logger.log(`Worker: extracted ${extracted.rawContent.length} chars from ${url}`);
 
 		const contentRatio = getWorkerContentBudgetRatio(maxContextTokens);
-		// Calculate max chars for content chunk based on context budget,
-		// accounting for prompt overhead and leaving room for tools and reasoning.
-		const maxChunkChars = Math.max(
+		const modelBudgetChars = Math.max(
 			Math.floor((maxContextTokens * contentRatio - WORKER_PROMPT_OVERHEAD_TOKENS) * 4),
 			MIN_CHUNK_CHARS
 		);
+		const maxChunkChars = Math.min(modelBudgetChars, MAX_CHUNK_CHARS);
 
 		const { chunks, wasSplit } = await chunkContent(extracted.rawContent, maxChunkChars);
 		if (wasSplit) {
-			logger.log(`Worker: split into ${chunks.length} chunks`);
+			logger.log(
+				`Worker: split ${extracted.rawContent.length} chars into ${chunks.length} chunks (max ${maxChunkChars} chars/chunk)`
+			);
 		}
 
-		// Set up sandbox for tool-based agent
 		const [{ createBashTool }, { Bash, ReadWriteFs }] = await Promise.all([
 			import('bash-tool'),
 			import('just-bash')
@@ -105,7 +116,6 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 		const bashInstance = new Bash({ fs: sandboxFs });
 		const { tools: bashTools } = await createBashTool({ sandbox: bashInstance, destination: '/' });
 
-		// Track created files across all chunks
 		const createdFiles: string[] = [];
 
 		const sandbox = {
@@ -119,7 +129,6 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 			onCreated: async (path, content) => {
 				createdFiles.push(path);
 
-				// Append to existing-items index for cross-worker dedup
 				try {
 					const parsed = JSON.parse(content);
 					await appendFile(
@@ -156,19 +165,45 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 
 		const repairToolCall = createToolCallRepairFn(workerModel, logger);
 
+		const existingItems = await loadExistingItems(workspacePath);
+		if (existingItems.length > 0) {
+			logger.log(`Worker: loaded ${existingItems.length} existing items for chunk pre-filtering`);
+		}
+
 		for (const chunk of chunks) {
 			if (signal?.aborted) break;
+
+			let chunkText = chunk.text;
+			if (existingItems.length > 0) {
+				const filtered = filterChunk(chunk.text, existingItems);
+				if (filtered.skip) {
+					logger.log(
+						`Worker: skipping chunk ${chunk.index + 1}/${chunk.total} — ` +
+							`all ${filtered.removedCount} items already exist`
+					);
+					continue;
+				}
+				if (filtered.removedCount > 0) {
+					logger.log(
+						`Worker: chunk ${chunk.index + 1}/${chunk.total} — ` +
+							`stripped ${filtered.removedCount} existing items, ${filtered.remainingCount} new items to extract`
+					);
+					chunkText = filtered.text;
+				}
+			}
+
+			const chunkStepLimit = getStepsPerChunk(chunkText.length);
 			try {
 				const result = await withToolCallingRetry(
 					() => {
 						return generateText({
 							model: workerModel,
 							system: systemPrompt,
-							timeout: 5 * 60 * 1000, // 5 min per chunk
+							timeout: Math.max(5, Math.ceil(chunkStepLimit / 20)) * 60 * 1000,
 							prompt: substituteVariables(
 								chunkTemplate,
 								buildChunkUserPromptVariables(
-									chunk,
+									{ ...chunk, text: chunkText },
 									url,
 									createdFiles.length > 0 ? createdFiles : undefined
 								)
@@ -181,7 +216,7 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 								updateFile: updateFileTool,
 								validateItemJson: validateItemJsonTool
 							} as ToolSet,
-							stopWhen: stepCountIs(100),
+							stopWhen: stepCountIs(chunkStepLimit),
 							prepareStep: createPrepareStep({
 								maxContextTokens,
 								budgetRatio: DEFAULT_CONTEXT_BUDGET_RATIO,

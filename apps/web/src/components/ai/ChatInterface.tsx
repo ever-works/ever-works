@@ -7,7 +7,7 @@ import { useAIStream } from '@/lib/hooks/use-ai-stream';
 import { useChatContext } from '@/components/ai/ChatProvider';
 import { ChatMessage, generateMessageId } from '@/lib/hooks/use-chat-history';
 import { ROUTES } from '@/lib/constants';
-import { SendHorizonal } from 'lucide-react';
+import { Check, Pencil, SendHorizonal, X } from 'lucide-react';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { Tooltip } from '@/components/ui/tooltip';
 
@@ -27,10 +27,13 @@ export function ChatInterface() {
 
     const [input, setInput] = useState('');
     const [errorMessage, setErrorMessage] = useState<string | null>(historyError);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editingContent, setEditingContent] = useState('');
 
     const pendingMessageRef = useRef<string | null>(null);
     const endRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+    const editTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
     const autoResize = () => {
         const el = textareaRef.current;
@@ -38,6 +41,20 @@ export function ChatInterface() {
         el.style.height = 'auto';
         el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
     };
+
+    const autoResizeEdit = () => {
+        const el = editTextareaRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    };
+
+    useEffect(() => {
+        if (editingId && editTextareaRef.current) {
+            editTextareaRef.current.focus();
+            autoResizeEdit();
+        }
+    }, [editingId]);
 
     useEffect(() => {
         loadHistory();
@@ -98,12 +115,13 @@ export function ChatInterface() {
             }));
             clearPending();
         },
-        onError: (error) => {
-            setErrorMessage(error.message);
+        onError: (_error) => {
+            const streamError = t('errors.unableToSend');
+            setErrorMessage(streamError);
             updatePendingMessage((message) => ({
                 ...message,
                 isStreaming: false,
-                error: error.message,
+                error: streamError,
             }));
             clearPending();
         },
@@ -151,7 +169,76 @@ export function ChatInterface() {
                 providerOverride: selectedProvider ?? undefined,
             });
         } catch (error) {
-            const message = error instanceof Error ? error.message : t('errors.unableToSend');
+            const message = t('errors.unableToSend');
+            setErrorMessage(message);
+            updatePendingMessage((current) => ({
+                ...current,
+                isStreaming: false,
+                error: message,
+            }));
+            clearPending();
+        }
+    };
+
+    const handleEditStart = useCallback(
+        (message: ChatMessage) => {
+            if (isStreaming) return;
+            setEditingId(message.id);
+            setEditingContent(message.content);
+        },
+        [isStreaming],
+    );
+
+    const handleEditCancel = useCallback(() => {
+        setEditingId(null);
+        setEditingContent('');
+    }, []);
+
+    const handleSaveEdit = async () => {
+        if (!editingId || !editingContent.trim() || isStreaming) return;
+        const trimmed = editingContent.trim();
+        const editIndex = messages.findIndex((m) => m.id === editingId);
+        if (editIndex === -1) return;
+
+        setEditingId(null);
+        setEditingContent('');
+        setErrorMessage(null);
+
+        const now = new Date().toISOString();
+        // Preserve the original user message timestamp so edits don't change the displayed send time
+        const originalTimestamp = messages[editIndex].timestamp ?? now;
+        const updatedUserMessage: ChatMessage = {
+            ...messages[editIndex],
+            content: trimmed,
+            // Preserve the original send timestamp but mark as edited
+            timestamp: originalTimestamp,
+            edited: true,
+            editedTimestamp: now,
+        };
+        const assistantMessage: ChatMessage = {
+            id: generateMessageId(),
+            role: 'assistant',
+            content: '',
+            timestamp: now,
+            isStreaming: true,
+        };
+
+        pendingMessageRef.current = assistantMessage.id;
+        let newMessages = [...messages.slice(0, editIndex), updatedUserMessage, assistantMessage];
+        setMessages(newMessages);
+        scrollToBottom('smooth');
+
+        let chatHistory = newMessages
+            .filter((m) => m.content.trim().length > 0)
+            .map((m) => ({ role: m.role, content: m.content }));
+
+        try {
+            await streamMessage(ROUTES.API_AI_CONVERSATIONS_CHAT_STREAM, {
+                messages: chatHistory,
+                providerOverride: selectedProvider ?? undefined,
+            });
+        } catch (error) {
+            const message = t('errors.unableToSend');
             setErrorMessage(message);
             updatePendingMessage((current) => ({
                 ...current,
@@ -273,57 +360,132 @@ export function ChatInterface() {
                 ) : (
                     messages.map((message) => {
                         const isUser = message.role === 'user';
+                        const isEditing = editingId === message.id;
                         return (
                             <div
                                 key={message.id}
-                                className={cn('flex', isUser ? 'justify-end' : 'justify-start')}
+                                className={cn(
+                                    'flex group',
+                                    isUser ? 'justify-end' : 'justify-start',
+                                )}
                             >
                                 <div
                                     className={cn(
                                         'max-w-[90%] rounded-lg px-3 py-2 motion-safe:animate-fade-in',
                                         isUser
-                                            ? 'bg-brand-purple dark:bg-brand-purple/80 text-white'
-                                            : 'bg-surface-tertiary dark:bg-surface-tertiary-dark/50 text-text dark:text-text-dark',
+                                            ? 'bg-primary/10 dark:bg-card-primary-dark text-text dark:text-text-dark'
+                                            : 'bg-surface-secondary dark:bg-surface-tertiary-dark/50 text-text dark:text-text-dark',
                                         message.error &&
                                             'border border-danger/60 text-danger dark:text-danger',
+                                        isEditing && 'w-full max-w-[90%]',
                                     )}
                                 >
-                                    {message.content && (
-                                        <p className="text-xs leading-relaxed whitespace-pre-wrap">
-                                            {message.content}
-                                        </p>
-                                    )}
-
-                                    {message.isStreaming && !message.content && (
-                                        <div className="flex space-x-1 py-1">
-                                            <span className="w-1.5 h-1.5 bg-text-muted dark:bg-text-muted-dark rounded-full animate-bounce" />
-                                            <span
-                                                className="w-1.5 h-1.5 bg-text-muted dark:bg-text-muted-dark rounded-full animate-bounce"
-                                                style={{ animationDelay: '150ms' }}
+                                    {isEditing ? (
+                                        <div className="flex flex-col gap-2">
+                                            <textarea
+                                                ref={editTextareaRef}
+                                                value={editingContent}
+                                                rows={1}
+                                                onChange={(e) => {
+                                                    setEditingContent(e.target.value);
+                                                    autoResizeEdit();
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                        e.preventDefault();
+                                                        handleSaveEdit();
+                                                    }
+                                                    if (e.key === 'Escape') {
+                                                        handleEditCancel();
+                                                    }
+                                                }}
+                                                className={cn(
+                                                    'w-full min-w-48 resize-none rounded-md bg-black/5 dark:bg-white/5 px-2 py-1.5',
+                                                    'text-xs text-text dark:text-white placeholder:text-text-muted dark:placeholder:text-white/40',
+                                                    'focus:outline-none focus:ring-1 focus:ring-primary/30 dark:focus:ring-white/20',
+                                                    'max-h-48 overflow-y-auto',
+                                                )}
                                             />
-                                            <span
-                                                className="w-1.5 h-1.5 bg-text-muted dark:bg-text-muted-dark rounded-full animate-bounce"
-                                                style={{ animationDelay: '300ms' }}
-                                            />
+                                            <div className="flex items-center justify-end gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleEditCancel}
+                                                    className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[11px] text-text-secondary dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/10 hover:text-text dark:hover:text-white transition-colors"
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                    {t('cancelEdit')}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSaveEdit}
+                                                    disabled={!editingContent.trim()}
+                                                    className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[11px] bg-primary/15 dark:bg-white/20 text-primary dark:text-white hover:bg-primary/25 dark:hover:bg-white/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                >
+                                                    <Check className="w-3 h-3" />
+                                                    {t('saveEdit')}
+                                                </button>
+                                            </div>
                                         </div>
-                                    )}
+                                    ) : (
+                                        <>
+                                            {message.content && (
+                                                <p className="text-xs leading-relaxed whitespace-pre-wrap">
+                                                    {message.content}
+                                                </p>
+                                            )}
 
-                                    {message.error && (
-                                        <p className="text-[11px] mt-1 text-danger">
-                                            {message.error}
-                                        </p>
-                                    )}
+                                            {message.isStreaming && !message.content && (
+                                                <div className="flex space-x-1 py-1">
+                                                    <span className="w-1.5 h-1.5 bg-text-muted dark:bg-text-muted-dark rounded-full animate-bounce" />
+                                                    <span
+                                                        className="w-1.5 h-1.5 bg-text-muted dark:bg-text-muted-dark rounded-full animate-bounce"
+                                                        style={{ animationDelay: '150ms' }}
+                                                    />
+                                                    <span
+                                                        className="w-1.5 h-1.5 bg-text-muted dark:bg-text-muted-dark rounded-full animate-bounce"
+                                                        style={{ animationDelay: '300ms' }}
+                                                    />
+                                                </div>
+                                            )}
 
-                                    <p
-                                        className={cn(
-                                            'text-[10px] mt-1',
-                                            isUser
-                                                ? 'text-white/70'
-                                                : 'text-text-muted dark:text-text-muted-dark',
-                                        )}
-                                    >
-                                        {formatTimestamp(message.timestamp)}
-                                    </p>
+                                            {message.error && (
+                                                <p className="text-[11px] mt-1 text-danger">
+                                                    {message.error}
+                                                </p>
+                                            )}
+
+                                            <div className="flex items-center justify-between gap-2 mt-1">
+                                                <p
+                                                    className={cn(
+                                                        'text-[10px] flex items-center gap-1',
+                                                        isUser
+                                                            ? 'text-text-secondary dark:text-white/60'
+                                                            : 'text-text-muted dark:text-text-muted-dark',
+                                                    )}
+                                                >
+                                                    <span>
+                                                        {formatTimestamp(message.timestamp)}
+                                                    </span>
+                                                    {message.edited && (
+                                                        <span className="text-[10px] text-text-muted dark:text-white/40">
+                                                            {' '}
+                                                            {t('edited')}
+                                                        </span>
+                                                    )}
+                                                </p>
+                                                {isUser && !isStreaming && !message.isStreaming && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleEditStart(message)}
+                                                        title={t('editMessage')}
+                                                        className="opacity-0 cursor-pointer group-hover:opacity-100 transition-opacity p-0.5 rounded text-text-secondary dark:text-white/60 hover:bg-black/10 dark:hover:bg-white/20 hover:text-text dark:hover:text-white"
+                                                    >
+                                                        <Pencil className="w-2.5 h-2.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         );

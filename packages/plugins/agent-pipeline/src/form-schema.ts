@@ -1,7 +1,7 @@
 import type { FormFieldDefinition, FormFieldGroup, ValidationResult } from '@ever-works/plugin';
 
 export const DEFAULT_TARGET_ITEMS = 50;
-export const DEFAULT_MAX_PAGES_TO_PROCESS = 10;
+export const DEFAULT_MAX_PAGES_TO_PROCESS = 20;
 
 export function getFormFields(): FormFieldDefinition[] {
 	return [
