@@ -91,6 +91,10 @@
         "./comparison-generator": {
             "types": "./dist/comparison-generator/index.d.ts",
             "default": "./dist/comparison-generator/index.js"
+        },
+        "./account-transfer": {
+            "types": "./dist/account-transfer/index.d.ts",
+            "default": "./dist/account-transfer/index.js"
         }
     },
     "scripts": {

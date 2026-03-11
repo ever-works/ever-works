@@ -21,6 +21,7 @@ import { GitProviderModule } from './plugins-capabilities/git-provider/git-provi
 import { OAuthModule } from './plugins-capabilities/oauth/oauth.module';
 import { DeployModule } from './plugins-capabilities/deploy/deploy.module';
 import { AiConversationModule } from './ai-conversation/ai-conversation.module';
+import { AccountModule } from './account/account.module';
 import {
     PluginsModule as AgentPluginsModule,
     PluginBootstrapService,
@@ -59,6 +60,7 @@ import { CacheFactory } from '@ever-works/agent/cache';
         OAuthModule,
         DeployModule,
         AiConversationModule,
+        AccountModule,
     ],
     providers: [
         {
