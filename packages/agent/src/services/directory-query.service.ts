@@ -440,6 +440,8 @@ export class DirectoryQueryService {
             createdAt: record.createdAt.toISOString(),
             updatedAt: record.updatedAt.toISOString(),
             triggerRunId: record.triggerRunId,
+            activityType: record.activityType,
+            changelog: record.changelog ?? null,
         };
     }
 }

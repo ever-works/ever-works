@@ -2,9 +2,10 @@
 
 import { DirectoryGenerationHistoryEntry } from '@/lib/api/types-only';
 import { useTranslations } from 'next-intl';
+import { Fragment, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { ShowDateTime } from '@/components/ui/show-datetime';
-import { ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 
 interface HistoryTableProps {
     entries: DirectoryGenerationHistoryEntry[];
@@ -79,8 +80,54 @@ function getStatusLabel(status: string, t: ReturnType<typeof useTranslations>) {
     }
 }
 
+function formatActivityLabel(activityType: DirectoryGenerationHistoryEntry['activityType']) {
+    switch (activityType) {
+        case 'item_added':
+            return 'Item Added';
+        case 'item_updated':
+            return 'Item Updated';
+        case 'item_removed':
+            return 'Item Removed';
+        case 'comparison_added':
+            return 'Comparison Added';
+        case 'comparison_removed':
+            return 'Comparison Removed';
+        case 'generation':
+        default:
+            return 'Generation';
+    }
+}
+
+function renderMetricCount(
+    entry: DirectoryGenerationHistoryEntry,
+    value: number,
+    kind: 'new' | 'updated' | 'total',
+) {
+    if (entry.activityType !== 'generation' && kind === 'total' && value === 0) {
+        return '—';
+    }
+
+    if (
+        entry.activityType !== 'generation' &&
+        kind !== 'total' &&
+        value === 0 &&
+        entry.changelog?.entries?.length
+    ) {
+        return '—';
+    }
+
+    return value;
+}
+
 export function HistoryTable({ entries, locale }: HistoryTableProps) {
     const t = useTranslations('dashboard.directoryDetail.history');
+    const [expandedIds, setExpandedIds] = useState<string[]>([]);
+
+    function toggleExpanded(id: string) {
+        setExpandedIds((current) =>
+            current.includes(id) ? current.filter((entryId) => entryId !== id) : [...current, id],
+        );
+    }
 
     return (
         <div className="overflow-hidden rounded-lg border border-border dark:border-border-dark">
@@ -117,48 +164,208 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                     {entries.map((entry) => {
                         const statusKey = entry.status?.toLowerCase?.() ?? 'unknown';
                         const statusClass = statusColor[statusKey] ?? 'bg-gray-100 text-gray-700';
+                        const hasDetails = (entry.changelog?.entries?.length ?? 0) > 0;
+                        const isExpanded = expandedIds.includes(entry.id);
+
+                        const addedEntries =
+                            entry.changelog?.entries?.filter(
+                                (change) => change.action === 'added',
+                            ) ?? [];
+                        const updatedEntries =
+                            entry.changelog?.entries?.filter(
+                                (change) => change.action === 'updated',
+                            ) ?? [];
+                        const removedEntries =
+                            entry.changelog?.entries?.filter(
+                                (change) => change.action === 'removed',
+                            ) ?? [];
 
                         return (
-                            <tr key={entry.id} className="bg-background dark:bg-background-dark">
-                                <td className="px-4 py-4 align-top">
-                                    <div className="flex flex-col gap-2">
-                                        <span
-                                            className={cn(
-                                                'inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-medium capitalize',
-                                                statusClass,
-                                            )}
-                                        >
-                                            {getStatusLabel(statusKey, t)}
-                                        </span>
-                                        {entry.triggerRunId && (
-                                            <a
-                                                href={`https://cloud.trigger.dev/runs/${entry.triggerRunId}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center gap-1 text-xs text-primary hover:underline dark:text-primary-dark"
-                                            >
-                                                <span>Trigger.dev</span>
-                                                <ExternalLink className="h-3 w-3" />
-                                            </a>
+                            <Fragment key={entry.id}>
+                                <tr className="bg-background dark:bg-background-dark">
+                                    <td className="px-4 py-4 align-top">
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex items-start gap-2">
+                                                {hasDetails ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleExpanded(entry.id)}
+                                                        className="mt-0.5 rounded p-0.5 text-text-secondary transition hover:bg-muted dark:text-text-secondary-dark dark:hover:bg-muted/20"
+                                                        aria-label={
+                                                            isExpanded
+                                                                ? 'Collapse changelog details'
+                                                                : 'Expand changelog details'
+                                                        }
+                                                    >
+                                                        {isExpanded ? (
+                                                            <ChevronDown className="h-4 w-4" />
+                                                        ) : (
+                                                            <ChevronRight className="h-4 w-4" />
+                                                        )}
+                                                    </button>
+                                                ) : (
+                                                    <span className="w-5" />
+                                                )}
+                                                <div className="flex flex-col gap-2">
+                                                    <span
+                                                        className={cn(
+                                                            'inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-medium capitalize',
+                                                            statusClass,
+                                                        )}
+                                                    >
+                                                        {getStatusLabel(statusKey, t)}
+                                                    </span>
+                                                    <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                        {formatActivityLabel(entry.activityType)}
+                                                    </span>
+                                                    {entry.changelog?.summary ? (
+                                                        <p className="max-w-sm text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                            {entry.changelog.summary}
+                                                        </p>
+                                                    ) : null}
+                                                    {entry.triggerRunId && (
+                                                        <a
+                                                            href={`https://cloud.trigger.dev/runs/${entry.triggerRunId}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center gap-1 text-xs text-primary hover:underline dark:text-primary-dark"
+                                                        >
+                                                            <span>Trigger.dev</span>
+                                                            <ExternalLink className="h-3 w-3" />
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td className={tdClass}>
+                                        <ShowDateTime value={entry.startedAt ?? entry.createdAt} />
+                                    </td>
+
+                                    <td className={tdClass}>
+                                        {formatDuration(entry.durationInSeconds)}
+                                    </td>
+                                    <td className={tdClass}>
+                                        {renderMetricCount(entry, entry.newItemsCount, 'new')}
+                                    </td>
+                                    <td className={tdClass}>
+                                        {renderMetricCount(
+                                            entry,
+                                            entry.updatedItemsCount,
+                                            'updated',
                                         )}
-                                    </div>
-                                </td>
-
-                                <td className={tdClass}>
-                                    <ShowDateTime value={entry.startedAt ?? entry.createdAt} />
-                                </td>
-
-                                <td className={tdClass}>
-                                    {formatDuration(entry.durationInSeconds)}
-                                </td>
-                                <td className={tdClass}>{entry.newItemsCount}</td>
-                                <td className={tdClass}>{entry.updatedItemsCount}</td>
-                                <td className={tdClass}>{entry.totalItemsCount}</td>
-                                <td className={tdClass}>
-                                    {formatTokens(entry.metrics?.total_tokens_used)}
-                                </td>
-                                {/* <td className={tdClass}>{formatCost(entry.metrics?.total_cost)}</td> */}
-                            </tr>
+                                    </td>
+                                    <td className={tdClass}>
+                                        {renderMetricCount(entry, entry.totalItemsCount, 'total')}
+                                    </td>
+                                    <td className={tdClass}>
+                                        {formatTokens(entry.metrics?.total_tokens_used)}
+                                    </td>
+                                    {/* <td className={tdClass}>{formatCost(entry.metrics?.total_cost)}</td> */}
+                                </tr>
+                                {hasDetails && isExpanded ? (
+                                    <tr className="bg-muted/20 dark:bg-muted/10">
+                                        <td colSpan={7} className="px-4 py-4">
+                                            <div className="grid gap-4 md:grid-cols-3">
+                                                <div>
+                                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
+                                                        Added
+                                                    </p>
+                                                    <div className="space-y-2">
+                                                        {addedEntries.length > 0 ? (
+                                                            addedEntries.map((change) => (
+                                                                <div
+                                                                    key={`${entry.id}-${change.action}-${change.slug ?? change.name}`}
+                                                                    className="rounded-md border border-border bg-background px-3 py-2 text-sm dark:border-border-dark dark:bg-background-dark"
+                                                                >
+                                                                    <div className="font-medium text-text dark:text-text-dark">
+                                                                        {change.name}
+                                                                    </div>
+                                                                    {change.slug ? (
+                                                                        <div className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                                            {change.slug}
+                                                                        </div>
+                                                                    ) : null}
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                                                                —
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
+                                                        Updated
+                                                    </p>
+                                                    <div className="space-y-2">
+                                                        {updatedEntries.length > 0 ? (
+                                                            updatedEntries.map((change) => (
+                                                                <div
+                                                                    key={`${entry.id}-${change.action}-${change.slug ?? change.name}`}
+                                                                    className="rounded-md border border-border bg-background px-3 py-2 text-sm dark:border-border-dark dark:bg-background-dark"
+                                                                >
+                                                                    <div className="font-medium text-text dark:text-text-dark">
+                                                                        {change.name}
+                                                                    </div>
+                                                                    {change.slug ? (
+                                                                        <div className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                                            {change.slug}
+                                                                        </div>
+                                                                    ) : null}
+                                                                    {change.fieldsChanged
+                                                                        ?.length ? (
+                                                                        <div className="mt-1 text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                                            Fields:{' '}
+                                                                            {change.fieldsChanged.join(
+                                                                                ', ',
+                                                                            )}
+                                                                        </div>
+                                                                    ) : null}
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                                                                —
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
+                                                        Removed
+                                                    </p>
+                                                    <div className="space-y-2">
+                                                        {removedEntries.length > 0 ? (
+                                                            removedEntries.map((change) => (
+                                                                <div
+                                                                    key={`${entry.id}-${change.action}-${change.slug ?? change.name}`}
+                                                                    className="rounded-md border border-border bg-background px-3 py-2 text-sm dark:border-border-dark dark:bg-background-dark"
+                                                                >
+                                                                    <div className="font-medium text-text dark:text-text-dark">
+                                                                        {change.name}
+                                                                    </div>
+                                                                    {change.slug ? (
+                                                                        <div className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                                            {change.slug}
+                                                                        </div>
+                                                                    ) : null}
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                                                                —
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : null}
+                            </Fragment>
                         );
                     })}
                 </tbody>

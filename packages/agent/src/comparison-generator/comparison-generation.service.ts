@@ -6,11 +6,13 @@ import { ContentExtractorFacadeService } from '../facades/content-extractor.faca
 import { GitFacadeService, type GitFacadeOptions } from '../facades/git.facade';
 import { PromptFacadeService } from '../facades/prompt.facade';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
+import { DirectoryGenerationHistoryRepository } from '../database/repositories/directory-generation-history.repository';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import type { Directory } from '../entities/directory.entity';
 import type { ComparisonData } from '@ever-works/contracts';
 import type { FacadeOptions } from '@ever-works/plugin';
 import { DataRepository, type IDataConfig } from '../generators/data-generator/data-repository';
+import { GenerateStatusType } from '../entities/types';
 import {
     DEFAULT_COMPARISON_SETTINGS,
     selectNextPair,
@@ -24,6 +26,11 @@ import {
     type ComparisonAiDependencies,
     type ComparisonPromptOptions,
 } from './comparison';
+import {
+    DirectoryHistoryActivityType,
+    type DirectoryHistoryChangeEntry,
+} from '@ever-works/contracts/api';
+import { buildDirectoryChangelog } from '../utils/directory-changelog.utils';
 
 const comparisonStructureSchema = z.object({
     title: z.string(),
@@ -59,8 +66,31 @@ export class ComparisonGenerationService {
         private readonly gitFacade: GitFacadeService,
         private readonly promptFacade: PromptFacadeService,
         private readonly directoryRepository: DirectoryRepository,
+        private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
         private readonly directoryPluginRepository: DirectoryPluginRepository,
     ) {}
+
+    private async recordComparisonHistory(params: {
+        directoryId: string;
+        userId: string;
+        activityType: DirectoryHistoryActivityType;
+        entries: DirectoryHistoryChangeEntry[];
+        summary: string;
+    }): Promise<void> {
+        const now = new Date();
+
+        await this.generationHistoryRepository.createEntry({
+            directoryId: params.directoryId,
+            userId: params.userId,
+            status: GenerateStatusType.GENERATED,
+            startedAt: now,
+            finishedAt: now,
+            durationInSeconds: 0,
+            triggeredBy: 'user',
+            activityType: params.activityType,
+            changelog: buildDirectoryChangelog(params.entries, params.summary),
+        });
+    }
 
     private async findDirectoryOrFail(directoryId: string): Promise<Directory> {
         const directory = await this.directoryRepository.findById(directoryId);
@@ -343,6 +373,21 @@ export class ComparisonGenerationService {
         );
         await this.gitFacade.push({ dir: dest }, gitOptions);
 
+        await this.recordComparisonHistory({
+            directoryId,
+            userId,
+            activityType: DirectoryHistoryActivityType.COMPARISON_REMOVED,
+            entries: [
+                {
+                    entityType: 'comparison',
+                    action: 'removed',
+                    name: slug,
+                    slug,
+                },
+            ],
+            summary: `Comparison removed: ${slug}`,
+        });
+
         return { status: 'success', slug, message: 'Comparison deleted' };
     }
 
@@ -462,6 +507,21 @@ export class ComparisonGenerationService {
         await this.gitFacade.push({ dir: dataRepo.dir }, gitOptions);
 
         this.logger.log(`Comparison generated: ${result.comparison.slug}`);
+
+        await this.recordComparisonHistory({
+            directoryId: directory.id,
+            userId: gitOptions.userId!,
+            activityType: DirectoryHistoryActivityType.COMPARISON_ADDED,
+            entries: [
+                {
+                    entityType: 'comparison',
+                    action: 'added',
+                    name: result.comparison.title,
+                    slug: result.comparison.slug,
+                },
+            ],
+            summary: `Comparison generated: ${pair.itemA.name} vs ${pair.itemB.name}`,
+        });
 
         return {
             status: 'success',

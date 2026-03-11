@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DirectoryGenerationHistory, GenerationMetrics } from '@src/entities';
 import { GenerateStatusType } from '@src/entities/types';
+import { DirectoryHistoryActivityType, type DirectoryChangelog } from '@ever-works/contracts/api';
 
 type HistoryCreateParams = {
     directoryId: string;
@@ -13,6 +14,13 @@ type HistoryCreateParams = {
     startedAt?: Date;
     triggeredBy?: 'user' | 'schedule' | 'api';
     scheduleId?: string | null;
+    activityType?: DirectoryHistoryActivityType;
+    changelog?: DirectoryChangelog | null;
+    finishedAt?: Date | null;
+    durationInSeconds?: number | null;
+    newItemsCount?: number;
+    updatedItemsCount?: number;
+    totalItemsCount?: number;
 };
 
 type HistoryUpdateParams = {
@@ -27,6 +35,8 @@ type HistoryUpdateParams = {
     metrics?: GenerationMetrics | null;
     parameters?: Record<string, any> | null;
     triggerRunId?: string;
+    activityType?: DirectoryHistoryActivityType;
+    changelog?: DirectoryChangelog | null;
 };
 
 @Injectable()
@@ -46,6 +56,13 @@ export class DirectoryGenerationHistoryRepository {
             startedAt: params.startedAt,
             triggeredBy: params.triggeredBy ?? 'user',
             scheduleId: params.scheduleId ?? null,
+            activityType: params.activityType ?? DirectoryHistoryActivityType.GENERATION,
+            changelog: params.changelog ?? null,
+            finishedAt: params.finishedAt ?? null,
+            durationInSeconds: params.durationInSeconds ?? null,
+            newItemsCount: params.newItemsCount ?? 0,
+            updatedItemsCount: params.updatedItemsCount ?? 0,
+            totalItemsCount: params.totalItemsCount ?? 0,
         });
 
         return this.repository.save(record);

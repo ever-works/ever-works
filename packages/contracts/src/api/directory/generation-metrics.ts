@@ -22,6 +22,35 @@ export interface GenerationMetrics {
 	total_cost?: number;
 }
 
+export enum DirectoryHistoryActivityType {
+	GENERATION = 'generation',
+	ITEM_ADDED = 'item_added',
+	ITEM_UPDATED = 'item_updated',
+	ITEM_REMOVED = 'item_removed',
+	COMPARISON_ADDED = 'comparison_added',
+	COMPARISON_REMOVED = 'comparison_removed'
+}
+
+export type DirectoryHistoryChangeEntityType = 'item' | 'comparison';
+
+export type DirectoryHistoryChangeAction = 'added' | 'updated' | 'removed';
+
+export interface DirectoryHistoryChangeEntry {
+	entityType: DirectoryHistoryChangeEntityType;
+	action: DirectoryHistoryChangeAction;
+	name: string;
+	slug?: string;
+	fieldsChanged?: string[];
+}
+
+export interface DirectoryChangelog {
+	summary?: string | null;
+	addedCount: number;
+	updatedCount: number;
+	removedCount: number;
+	entries: DirectoryHistoryChangeEntry[];
+}
+
 /**
  * Entry in directory generation history
  */
@@ -56,6 +85,10 @@ export interface DirectoryGenerationHistoryEntry {
 	updatedAt: string;
 	/** Trigger.dev run ID */
 	triggerRunId?: string;
+	/** History activity type */
+	activityType: DirectoryHistoryActivityType;
+	/** Structured changelog details */
+	changelog?: DirectoryChangelog | null;
 }
 
 /**

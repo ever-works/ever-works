@@ -18,6 +18,7 @@ import { getDirectoryOwner } from '../../utils/directory.utils';
 import pMap from 'p-map';
 import { config } from '../../config';
 import { PipelineOrchestratorService } from '../../pipeline';
+import { buildDirectoryChangelog } from '../../utils/directory-changelog.utils';
 import type {
     DirectoryReference,
     GenerationRequest,
@@ -25,6 +26,7 @@ import type {
     PipelineResult,
     PipelineProgress,
 } from '@ever-works/plugin';
+import type { DirectoryHistoryChangeEntry } from '@ever-works/contracts/api';
 
 const PARALLEL_WRITE_CONCURRENCY = 10;
 
@@ -49,6 +51,7 @@ export type GenerationStats = {
     updatedItemsCount: number;
     totalItemsCount: number;
     metrics?: ItemsGeneratorMetrics;
+    changelog?: ReturnType<typeof buildDirectoryChangelog>;
 };
 
 export type InitializeResult =
@@ -404,6 +407,12 @@ export class DataGeneratorService {
             ).length;
 
             const updatedItemsCount = itemsWithSlugs.length - newItemsCount;
+            const changelogEntries: DirectoryHistoryChangeEntry[] = itemsWithSlugs.map((item) => ({
+                entityType: 'item',
+                action: existingSlugSet.has(item.slug!) ? 'updated' : 'added',
+                name: item.name,
+                slug: item.slug,
+            }));
 
             await pMap(
                 itemsWithSlugs,
@@ -453,6 +462,7 @@ export class DataGeneratorService {
                 updatedItemsCount,
                 totalItemsCount: newItems.length,
                 metrics: this.convertPipelineMetrics(pipelineResult),
+                changelog: buildDirectoryChangelog(changelogEntries),
             };
 
             let prUpdate: PRUpdate | null = null;
