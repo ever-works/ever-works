@@ -67,7 +67,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                                 className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
                                 style={{ width: `${progressPercentage}%` }}
                             >
-                                <div className="h-full bg-gradient-to-r from-primary via-primary to-primary/80 animate-gradient" />
+                                <div className="h-full bg-linear-to-r from-primary via-primary to-primary/80 animate-gradient" />
                             </div>
                         </div>
                     </div>
@@ -101,6 +101,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                                 href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/items`}
                                 variant="secondary"
                                 size="sm"
+                                className='bg-primary-600'
                             >
                                 {t('generated.viewItems')}
                             </Button>
@@ -108,6 +109,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                                 href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
                                 variant="ghost"
                                 size="sm"
+                                className='bg-primary-600'
                             >
                                 {t('generated.regenerate')}
                             </Button>
@@ -142,6 +144,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                             href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
                             variant="primary"
                             size="sm"
+                            className='bg-primary-600'
                         >
                             {t('error.retry')}
                         </Button>
@@ -156,6 +159,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                         href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
                         variant="primary"
                         size="sm"
+                        className='bg-primary-600'
                     >
                         {t('cancelled.restart')}
                     </Button>
@@ -170,27 +174,25 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
 
     return (
         <div className={cn('rounded-lg border', statusStyle.card.borderBg)}>
-            <div className="p-6">
-                <div className="flex items-start gap-4">
-                    <div
+            <div className="p-5">
+                <div className="flex items-start gap-2.5">
+                    <StatusIcon
                         className={cn(
-                            'w-10 h-10 rounded-lg flex items-center justify-center shrink-0',
-                            statusStyle.card.iconBg,
+                            'w-4 h-4 mt-0.5 shrink-0',
                             statusStyle.card.iconColor,
+                            statusStyle.animate && 'animate-spin',
                         )}
-                    >
-                        <StatusIcon
-                            className={cn('w-5 h-5', statusStyle.animate && 'animate-spin')}
-                        />
-                    </div>
+                    />
                     <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-text dark:text-text-dark mb-1">
+                        <h3 className="text-sm font-semibold text-text dark:text-text-dark leading-snug">
                             {config.title}
                         </h3>
-                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark mb-4">
-                            {config.description}
-                        </p>
-                        {config.action}
+                        {config.description && (
+                            <p className="text-sm text-text-muted dark:text-text-muted-dark mt-1">
+                                {config.description}
+                            </p>
+                        )}
+                        {config.action && <div className="mt-3">{config.action}</div>}
                     </div>
                 </div>
             </div>
