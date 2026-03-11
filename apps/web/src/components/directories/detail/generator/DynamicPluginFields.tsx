@@ -2,8 +2,19 @@
 
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Accordion,
+    AccordionItem,
+    AccordionTrigger,
+    AccordionContent,
+} from '@/components/ui/accordion';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import type { FormFieldDefinition, FormFieldGroup } from '@/lib/api/types-only';
@@ -40,9 +51,7 @@ export function DynamicPluginFields({
     // Compute default expanded groups for the accordion
     const defaultExpandedGroups = useMemo(() => {
         if (!groups) return [];
-        return groups
-            .filter((g) => !g.collapsible || !g.collapsed)
-            .map((g) => g.name);
+        return groups.filter((g) => !g.collapsible || !g.collapsed).map((g) => g.name);
     }, [groups]);
 
     const handleFieldChange = useCallback(
@@ -215,11 +224,15 @@ export function DynamicPluginFields({
                                 onValueChange={(val) => handleFieldChange(field.name, val)}
                             >
                                 <SelectTrigger>
-                                    <SelectValue placeholder={field.placeholder || t('selectOption')} />
+                                    <SelectValue
+                                        placeholder={field.placeholder || t('selectOption')}
+                                    />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {!field.validation?.required && (
-                                        <SelectItem value="__none__">{t('selectOption')}</SelectItem>
+                                        <SelectItem value="__none__">
+                                            {t('selectOption')}
+                                        </SelectItem>
                                     )}
                                     {field.options?.map((option) => (
                                         <SelectItem
@@ -282,11 +295,7 @@ export function DynamicPluginFields({
             )}
 
             {/* Render grouped fields */}
-            <Accordion
-                type="multiple"
-                defaultValue={defaultExpandedGroups}
-                className="space-y-3"
-            >
+            <Accordion type="multiple" defaultValue={defaultExpandedGroups} className="space-y-3">
                 {sortedGroups.map((group) => {
                     const groupFields = uniqueFields.filter((f) => f.group === group.name);
                     if (groupFields.length === 0) return null;
@@ -302,9 +311,7 @@ export function DynamicPluginFields({
                             )}
                         >
                             {group.collapsible ? (
-                                <AccordionTrigger
-                                    className="px-5 py-3.5 hover:no-underline hover:bg-surface/50 dark:hover:bg-surface-dark/50"
-                                >
+                                <AccordionTrigger className="px-5 py-3.5 hover:no-underline hover:bg-surface/50 dark:hover:bg-surface-dark/50">
                                     <div>
                                         <h3 className="text-md font-semibold text-text dark:text-text-dark">
                                             {group.title}
@@ -329,9 +336,7 @@ export function DynamicPluginFields({
                                 </div>
                             )}
                             <AccordionContent className="px-5 pb-4 pt-2">
-                                <div className="space-y-4">
-                                    {groupFields.map(renderField)}
-                                </div>
+                                <div className="space-y-4">{groupFields.map(renderField)}</div>
                             </AccordionContent>
                         </AccordionItem>
                     );

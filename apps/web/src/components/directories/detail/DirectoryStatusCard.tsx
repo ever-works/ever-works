@@ -101,7 +101,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                                 href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/items`}
                                 variant="secondary"
                                 size="sm"
-                                className='bg-primary-600'
+                                className="bg-primary-600"
                             >
                                 {t('generated.viewItems')}
                             </Button>
@@ -109,7 +109,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                                 href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
                                 variant="ghost"
                                 size="sm"
-                                className='bg-primary-600'
+                                className="bg-primary-600"
                             >
                                 {t('generated.regenerate')}
                             </Button>
@@ -144,7 +144,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                             href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
                             variant="primary"
                             size="sm"
-                            className='bg-primary-600'
+                            className="bg-primary-600"
                         >
                             {t('error.retry')}
                         </Button>
@@ -159,7 +159,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                         href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
                         variant="primary"
                         size="sm"
-                        className='bg-primary-600'
+                        className="bg-primary-600"
                     >
                         {t('cancelled.restart')}
                     </Button>

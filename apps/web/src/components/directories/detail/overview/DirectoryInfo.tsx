@@ -7,7 +7,20 @@ import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
 import { Link } from '@/i18n/navigation';
-import { Users, UserCircle, Lock, Unlock, ExternalLink, Cloud, Hash, GitBranch, Building2, FolderGit2, Calendar, FileText } from 'lucide-react';
+import {
+    Users,
+    UserCircle,
+    Lock,
+    Unlock,
+    ExternalLink,
+    Cloud,
+    Hash,
+    GitBranch,
+    Building2,
+    FolderGit2,
+    Calendar,
+    FileText,
+} from 'lucide-react';
 
 interface DirectoryInfoProps {
     directory: Directory;
@@ -229,7 +242,7 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
                                 {item.icon}
                                 <span className="text-xs">{item.label}</span>
                             </div>
-                            <div className="flex-1 text-sm text-text dark:text-text-dark">
+                            <div className="flex-1 text-xs text-text dark:text-text-dark">
                                 {item.value instanceof Date ? (
                                     <DisplayDate date={item.value.toISOString()} />
                                 ) : (

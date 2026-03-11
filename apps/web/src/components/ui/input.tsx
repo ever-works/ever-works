@@ -34,9 +34,7 @@ const Input = ({
         const min = input.min !== '' ? Number(input.min) : -Infinity;
         const max = input.max !== '' ? Number(input.max) : Infinity;
         const newValue =
-            direction === 'up'
-                ? Math.min(current + step, max)
-                : Math.max(current - step, min);
+            direction === 'up' ? Math.min(current + step, max) : Math.max(current - step, min);
         const setter = Object.getOwnPropertyDescriptor(
             window.HTMLInputElement.prototype,
             'value',
