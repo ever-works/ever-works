@@ -12,6 +12,7 @@ import { DirectoryModule } from '@ever-works/agent/services';
 import { AuthModule } from '../auth';
 
 import { PluginsController } from './plugins.controller';
+import { PluginValidationService } from './plugin-validation.service';
 
 /**
  * API module for plugin management endpoints.
@@ -26,7 +27,7 @@ import { PluginsController } from './plugins.controller';
         AuthModule,
     ],
     controllers: [PluginsController],
-    providers: [PluginOperationsService, SettingsSchemaValidatorService],
-    exports: [PluginOperationsService, SettingsSchemaValidatorService],
+    providers: [PluginOperationsService, SettingsSchemaValidatorService, PluginValidationService],
+    exports: [PluginOperationsService, SettingsSchemaValidatorService, PluginValidationService],
 })
 export class PluginsModule {}

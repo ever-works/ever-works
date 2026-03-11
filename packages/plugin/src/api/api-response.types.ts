@@ -194,6 +194,8 @@ export interface UserPluginResponse extends PluginResponse {
 	enabled: boolean;
 	/** User-specific settings (masked) */
 	settings?: Record<string, unknown>;
+	/** User-specific metadata (read-only state) */
+	metadata?: Record<string, unknown>;
 	/** User plugin entity ID */
 	userPluginId?: string;
 	/** Whether this plugin is auto-enabled for all directories */

@@ -8,6 +8,9 @@ import { GET_DIRECTORY_LIST_LIMIT, ROUTES } from '@/lib/constants';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import type { Directory } from '@/lib/api';
+import type { UserPlugin } from '@/lib/api/plugins';
+import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';
+import { EverWorksOnboardingWizard } from '@/components/settings/EverWorksOnboardingWizard';
 
 interface DashboardClientProps {
     user: AuthUser;
@@ -15,6 +18,10 @@ interface DashboardClientProps {
     totalDirectories: number;
     totalItems: number;
     activeWebsites: number;
+    claudePlugin: UserPlugin | null;
+    openRouterPlugin: UserPlugin | null;
+    vercelPlugin: UserPlugin | null;
+    gitHubConnection: GitProviderConnectionInfo | null;
 }
 
 export default function DashboardClient({
@@ -23,6 +30,10 @@ export default function DashboardClient({
     totalDirectories,
     totalItems,
     activeWebsites,
+    claudePlugin,
+    openRouterPlugin,
+    vercelPlugin,
+    gitHubConnection,
 }: DashboardClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard');
@@ -30,6 +41,14 @@ export default function DashboardClient({
 
     return (
         <div className="w-full">
+            <EverWorksOnboardingWizard
+                totalDirectories={totalDirectories}
+                claudePlugin={claudePlugin}
+                openRouterPlugin={openRouterPlugin}
+                vercelPlugin={vercelPlugin}
+                gitHubConnection={gitHubConnection}
+            />
+
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-text dark:text-text-dark">
                     {t('header.welcome', { username: user.username })}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { UserPlugin } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
@@ -18,13 +18,15 @@ import {
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import { updatePluginSettings } from '@/app/actions/plugins';
+import { updatePluginSettings, validatePluginConnection } from '@/app/actions/plugins';
 import { PluginIcon } from './PluginIcon';
 import { PluginSettingsFormFields } from './PluginSettingsFormFields';
 import { PluginReadme } from './PluginReadme';
 import { PluginEnablePanel } from './PluginEnablePanel';
 import { PluginDisableWarning } from './PluginDisableWarning';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
+import { ClaudeCodeOnboardingWizard } from '@/components/settings/ClaudeCodeOnboardingWizard';
+import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 import { usePluginToggle } from '@/lib/hooks/use-plugin-toggle';
@@ -36,6 +38,9 @@ interface PluginSettingsProps {
 
 export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps) {
     const t = useTranslations('dashboard.plugins');
+    const [showOpenRouterInputs, setShowOpenRouterInputs] = useState(
+        Boolean(plugin.settings?.apiKey || plugin.settings?.defaultModel),
+    );
 
     const onSave = useCallback(
         async (data: {
@@ -46,6 +51,15 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
             if (!result.success) {
                 throw new Error(result.error);
             }
+
+            if (['claude-code', 'openrouter', 'vercel'].includes(plugin.pluginId)) {
+                const validation = await validatePluginConnection(plugin.pluginId);
+                if (!validation.success) {
+                    return { validationError: validation.error };
+                }
+
+                return { validationSuccess: validation.data?.message };
+            }
         },
         [plugin.pluginId],
     );
@@ -54,6 +68,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
         hasChanges,
         isSaving,
         saveSuccess,
+        saveMessage,
         validationError,
         visibleProperties,
         hasSettings,
@@ -84,6 +99,22 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
         visibility: plugin.visibility,
     });
 
+    const filteredVisibleProperties = useMemo(() => {
+        if (plugin.pluginId !== 'openrouter' || showOpenRouterInputs) {
+            return visibleProperties;
+        }
+
+        const next = { ...visibleProperties };
+        delete next.apiKey;
+        delete next.defaultModel;
+        delete next.simpleModel;
+        delete next.mediumModel;
+        delete next.complexModel;
+        return next;
+    }, [plugin.pluginId, showOpenRouterInputs, visibleProperties]);
+
+    const hasVercelToken = Boolean(plugin.settings?.apiToken);
+
     return (
         <div className="space-y-6">
             {/* Back link */}
@@ -110,7 +141,10 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                             <div className="flex items-start justify-between gap-4">
                                 <div>
                                     <div className="flex items-center gap-2.5 flex-wrap">
-                                        <h1 className="text-xl font-semibold text-text dark:text-text-dark">
+                                        <h1
+                                            className="text-xl font-semibold text-text dark:text-text-dark truncate"
+                                            title={plugin.name}
+                                        >
                                             {plugin.name}
                                         </h1>
                                         <span className="text-xs font-mono text-text-muted dark:text-text-muted-dark bg-surface-secondary dark:bg-surface-secondary-dark px-1.5 py-0.5 rounded">
@@ -234,6 +268,13 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                 />
             )}
 
+            {plugin.pluginId === 'github' && (
+                <GitHubOrganizationsSettings
+                    plugin={plugin}
+                    connected={Boolean(oauthConnection?.connected)}
+                />
+            )}
+
             {/* Settings Form */}
             {hasSettings ? (
                 <div className="bg-surface dark:bg-surface-dark rounded-xl border border-border dark:border-border-dark">
@@ -245,34 +286,100 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                     </div>
 
                     <div className="p-6">
-                        <PluginSettingsFormFields
-                            visibleProperties={visibleProperties}
-                            getFieldValue={getFieldValue}
-                            handleFieldChange={handleFieldChange}
-                            settingsSchema={plugin.settingsSchema}
-                            pluginId={plugin.pluginId}
-                            validationError={validationError}
-                        />
-                    </div>
+                        {plugin.pluginId === 'claude-code' ? (
+                            <ClaudeCodeOnboardingWizard
+                                pluginId={plugin.pluginId}
+                                visibleProperties={visibleProperties}
+                                getFieldValue={getFieldValue}
+                                handleFieldChange={handleFieldChange}
+                                handleSave={handleSave}
+                                isSaving={isSaving}
+                                saveSuccess={saveSuccess}
+                                validationError={validationError}
+                                saveMessage={saveMessage}
+                            />
+                        ) : (
+                            <div className="space-y-5">
+                                {plugin.pluginId === 'openrouter' && !showOpenRouterInputs && (
+                                    <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
+                                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                                            Connect your own OpenRouter key to choose a default
+                                            model and unlock the full model tier configuration.
+                                        </p>
+                                        <Button
+                                            variant="secondary"
+                                            className="mt-3"
+                                            onClick={() => setShowOpenRouterInputs(true)}
+                                        >
+                                            Bring your own key
+                                        </Button>
+                                    </div>
+                                )}
 
-                    <div className="flex items-center gap-3 px-6 py-4 border-t border-border dark:border-border-dark">
-                        <Button
-                            variant="primary"
-                            onClick={handleSave}
-                            disabled={!hasChanges || isSaving}
-                            loading={isSaving}
-                        >
-                            <Save className="w-4 h-4 mr-2" />
-                            {t('saveSettings')}
-                        </Button>
+                                {plugin.pluginId === 'vercel' && !hasVercelToken && (
+                                    <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
+                                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                                            Create a Vercel token first, then paste it below and
+                                            save to run a live verification.
+                                        </p>
+                                        <a
+                                            href="https://vercel.com/account/tokens"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+                                        >
+                                            Get Vercel API token
+                                            <ExternalLink className="w-4 h-4" />
+                                        </a>
+                                    </div>
+                                )}
 
-                        {saveSuccess && (
-                            <span className="inline-flex items-center gap-1 text-sm text-success">
-                                <Check className="w-4 h-4" />
-                                {t('settingsSaved')}
-                            </span>
+                                {plugin.pluginId === 'vercel' && (
+                                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                                        Tokens URL:{' '}
+                                        <a
+                                            href="https://vercel.com/account/tokens"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-primary hover:text-primary-hover underline"
+                                        >
+                                            https://vercel.com/account/tokens
+                                        </a>
+                                    </p>
+                                )}
+
+                                <PluginSettingsFormFields
+                                    visibleProperties={filteredVisibleProperties}
+                                    getFieldValue={getFieldValue}
+                                    handleFieldChange={handleFieldChange}
+                                    settingsSchema={plugin.settingsSchema}
+                                    pluginId={plugin.pluginId}
+                                    validationError={validationError}
+                                />
+                            </div>
                         )}
                     </div>
+
+                    {plugin.pluginId !== 'claude-code' && (
+                        <div className="flex items-center gap-3 px-6 py-4 border-t border-border dark:border-border-dark">
+                            <Button
+                                variant="primary"
+                                onClick={handleSave}
+                                disabled={!hasChanges || isSaving}
+                                loading={isSaving}
+                            >
+                                <Save className="w-4 h-4 mr-2" />
+                                {t('saveSettings')}
+                            </Button>
+
+                            {saveSuccess && (
+                                <span className="inline-flex items-center gap-1 text-sm text-success">
+                                    <Check className="w-4 h-4" />
+                                    {saveMessage || t('settingsSaved')}
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
             ) : null}
 

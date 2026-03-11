@@ -200,6 +200,9 @@ export class UserPluginResponseDto extends PluginResponseDto implements UserPlug
     @ApiPropertyOptional({ description: 'User-specific settings (masked)' })
     settings?: Record<string, unknown>;
 
+    @ApiPropertyOptional({ description: 'User-specific plugin metadata (read-only state)' })
+    metadata?: Record<string, unknown>;
+
     @ApiPropertyOptional({ description: 'User plugin entity ID' })
     userPluginId?: string;
 }

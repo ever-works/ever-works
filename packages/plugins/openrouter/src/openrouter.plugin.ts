@@ -52,7 +52,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'openai/gpt-5.1',
+				default: 'anthropic/claude-sonnet-4.5',
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_DEFAULT_MODEL'
@@ -61,7 +61,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Handles tags, short descriptions, and quick classifications',
-				default: 'openai/gpt-5-nano',
+				default: 'openai/gpt-5-mini',
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_SIMPLE_MODEL'
@@ -70,7 +70,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Handles listings, summaries, and content reformatting',
-				default: 'openai/gpt-4o',
+				default: 'anthropic/claude-sonnet-4.5',
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_MEDIUM_MODEL'
@@ -79,7 +79,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'openai/gpt-5.1',
+				default: 'openai/gpt-5',
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_COMPLEX_MODEL'

@@ -38,12 +38,6 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 				description: 'Your personal Vercel API token. Get one from https://vercel.com/account/tokens',
 				'x-secret': true,
 				'x-scope': 'user'
-			},
-			defaultTeamScope: {
-				type: 'string',
-				title: 'Default Team',
-				description: 'Default Vercel team for deployments (optional, leave empty for personal account)',
-				'x-scope': 'user'
 			}
 		},
 		required: ['apiToken']
@@ -131,9 +125,8 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 	}
 
 	async listProjects(token: string): Promise<DeploymentProject[]> {
-		const settings = await this.getSettings();
 		const projects = await this.apiService.getProjects(token, {
-			teamScope: settings.defaultTeamScope
+			teamScope: undefined
 		});
 		return projects.map((p) => ({
 			id: p.id,
@@ -143,9 +136,8 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 	}
 
 	async getProject(projectId: string, token: string): Promise<DeploymentProject | null> {
-		const settings = await this.getSettings();
 		const projects = await this.apiService.getProjects(token, {
-			teamScope: settings.defaultTeamScope
+			teamScope: undefined
 		});
 		const project = projects.find((p) => p.id === projectId);
 		if (!project) {
@@ -254,7 +246,7 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 				'1. Create a Vercel account at [vercel.com](https://vercel.com)',
 				'2. Generate an API token from [vercel.com/account/tokens](https://vercel.com/account/tokens)',
 				'3. Enter your token in the settings below',
-				'4. Optionally set a default team if you use Vercel Teams'
+				'4. Save settings to verify the token before using it for deployments'
 			].join('\n'),
 			homepage: 'https://vercel.com/account/tokens',
 			icon: {

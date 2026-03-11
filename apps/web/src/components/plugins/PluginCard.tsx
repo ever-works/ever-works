@@ -55,7 +55,10 @@ export function PluginCard({ plugin }: PluginCardProps) {
 
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                            <h3 className="font-medium text-text dark:text-text-dark truncate">
+                            <h3
+                                className="font-medium text-text dark:text-text-dark truncate"
+                                title={plugin.name}
+                            >
                                 {plugin.name}
                             </h3>
                             {plugin.systemPlugin && (

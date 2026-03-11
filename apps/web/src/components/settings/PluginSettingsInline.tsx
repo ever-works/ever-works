@@ -1,16 +1,17 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { UserPlugin } from '@/lib/api/plugins';
 import { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import { Button } from '@/components/ui/button';
 import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { Save, Check, AlertCircle } from 'lucide-react';
-import { updatePluginSettings } from '@/app/actions/plugins';
+import { updatePluginSettings, validatePluginConnection } from '@/app/actions/plugins';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { PluginSettingsField } from '@/components/plugins/form/PluginSettingsField';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
+import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
 import { getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 
@@ -26,6 +27,9 @@ export function PluginSettingsInline({
     defaultExpanded = false,
 }: PluginSettingsInlineProps) {
     const t = useTranslations('dashboard.plugins');
+    const [showOpenRouterInputs, setShowOpenRouterInputs] = useState(
+        Boolean(plugin.settings?.apiKey || plugin.settings?.defaultModel),
+    );
 
     const hasOAuth = plugin.capabilities.includes('oauth') && oauthConnection !== undefined;
 
@@ -38,6 +42,15 @@ export function PluginSettingsInline({
             if (!result.success) {
                 throw new Error(result.error);
             }
+
+            if (['claude-code', 'openrouter', 'vercel'].includes(plugin.pluginId)) {
+                const validation = await validatePluginConnection(plugin.pluginId);
+                if (!validation.success) {
+                    return { validationError: validation.error };
+                }
+
+                return { validationSuccess: validation.data?.message };
+            }
         },
         [plugin.pluginId],
     );
@@ -46,6 +59,7 @@ export function PluginSettingsInline({
         hasChanges,
         isSaving,
         saveSuccess,
+        saveMessage,
         validationError,
         visibleProperties,
         hasSettings,
@@ -60,6 +74,20 @@ export function PluginSettingsInline({
         scope: 'user',
     });
 
+    const filteredVisibleProperties = useMemo(() => {
+        if (plugin.pluginId !== 'openrouter' || showOpenRouterInputs) {
+            return visibleProperties;
+        }
+
+        const next = { ...visibleProperties };
+        delete next.apiKey;
+        delete next.defaultModel;
+        delete next.simpleModel;
+        delete next.mediumModel;
+        delete next.complexModel;
+        return next;
+    }, [plugin.pluginId, showOpenRouterInputs, visibleProperties]);
+
     const headerContent = (
         <div className="flex items-center gap-3 min-w-0">
             <PluginIcon
@@ -70,7 +98,10 @@ export function PluginSettingsInline({
             />
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-semibold text-text dark:text-text-dark">
+                    <span
+                        className="text-sm font-semibold text-text dark:text-text-dark truncate"
+                        title={plugin.name}
+                    >
                         {plugin.name}
                     </span>
                     <span className="text-xs text-text-muted dark:text-text-muted-dark">
@@ -115,11 +146,48 @@ export function PluginSettingsInline({
                     />
                 )}
 
+                {plugin.pluginId === 'github' && (
+                    <GitHubOrganizationsSettings
+                        plugin={plugin}
+                        connected={Boolean(oauthConnection?.connected)}
+                    />
+                )}
+
                 {/* Settings Form */}
                 {hasSettings ? (
                     <div className="space-y-4">
+                        {plugin.pluginId === 'openrouter' && !showOpenRouterInputs && (
+                            <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
+                                <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                                    Keep OpenRouter hidden until you are ready to bring your own
+                                    API key and model configuration.
+                                </p>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="mt-3"
+                                    onClick={() => setShowOpenRouterInputs(true)}
+                                >
+                                    Bring your own key
+                                </Button>
+                            </div>
+                        )}
+
+                        {plugin.pluginId === 'vercel' && !plugin.settings?.apiToken && (
+                            <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
+                                <a
+                                    href="https://vercel.com/account/tokens"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+                                >
+                                    Get Vercel API token
+                                </a>
+                            </div>
+                        )}
+
                         <div className="space-y-3">
-                            {Object.entries(visibleProperties).map(([key, propSchema]) => (
+                            {Object.entries(filteredVisibleProperties).map(([key, propSchema]) => (
                                 <PluginSettingsField
                                     key={key}
                                     name={key}
@@ -156,7 +224,7 @@ export function PluginSettingsInline({
                             {saveSuccess && (
                                 <span className="inline-flex items-center gap-1 text-sm text-success">
                                     <Check className="w-4 h-4" />
-                                    {t('settingsSaved')}
+                                    {saveMessage || t('settingsSaved')}
                                 </span>
                             )}
                         </div>
