@@ -26,6 +26,19 @@ services:
             - ever-works-network
         env_file: .env.compose
 
+    ever-works-mcp:
+        image: ghcr.io/ever-works/ever-works-mcp:latest
+        container_name: ever-works-mcp
+        ports:
+            - '3200:3200'
+        depends_on:
+            - ever-works-api
+        environment:
+            - EVER_WORKS_API_URL=http://ever-works-api:3100
+        networks:
+            - ever-works-network
+        env_file: .env.compose
+
 networks:
     ever-works-network:
         driver: bridge

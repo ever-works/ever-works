@@ -1,0 +1,96 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: ever-works-mcp-stage
+spec:
+  selector:
+    app: ever-works-mcp-stage
+  ports:
+    - name: web
+      protocol: TCP
+      port: 3200
+      targetPort: 3200
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ever-works-mcp-stage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ever-works-mcp-stage
+  template:
+    metadata:
+      labels:
+        app: ever-works-mcp-stage
+    spec:
+      containers:
+        - name: ever-works-mcp-stage
+          image: registry.digitalocean.com/ever/ever-works-mcp-stage:latest
+          imagePullPolicy: Always
+          env:
+            - name: EVER_WORKS_API_URL
+              value: "http://ever-works-api-stage:3100"
+            - name: EVER_WORKS_API_KEY
+              value: "$EVER_WORKS_MCP_API_KEY"
+            - name: EVER_WORKS_MCP_PORT
+              value: "3200"
+
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+
+          ports:
+            - containerPort: 3200
+              protocol: TCP
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3200
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3200
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ever-works-mcp-stage-ing
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: mcpstage.ever.works
+      http:
+        paths:
+          - backend:
+              service:
+                name: ever-works-mcp-stage
+                port:
+                  number: 3200
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - mcpstage.ever.works
+      secretName: mcpstage.ever.works-tls

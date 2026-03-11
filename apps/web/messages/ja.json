@@ -1717,10 +1717,17 @@
         "aiChat": {
             "title": "AI アシスタント",
             "subtitle": "自然言語でディレクトリを作成",
+            "welcomeMessage": "こんにちは！自然言語を使ってディレクトリを作成するお手伝いをします。「アイツールのディレクトリを作成して」などと問いかけてみてください。",
             "newChat": "新しいチャット",
             "loadingConversation": "会話を読み込み中…",
             "inputPlaceholder": "作成したいディレクトリを説明...",
             "sendButton": "送信",
+            "sendHint": "Enterで送信 · Shift+Enterで改行",
+            "providerNotConfigured": "このプロバイダーは設定されていません。プラグインで設定してください。",
+            "editMessage": "メッセージを編集",
+            "saveEdit": "保存して送信",
+            "cancelEdit": "キャンセル",
+            "edited": "(編集済み)",
             "errors": {
                 "unableToSend": "メッセージを送信できませんでした。"
             },

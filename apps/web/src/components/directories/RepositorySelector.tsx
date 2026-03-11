@@ -347,20 +347,26 @@ export function RepositorySelector({ providerId, onSelect, selectedUrl }: Reposi
             try {
                 const result = await getGitProviderOrganizations(providerId);
                 if (result.success) {
-                    setOrganizations(result.organizations as Organization[]);
+                    const orgs = result.organizations as Organization[];
+                    setOrganizations(orgs);
+                    // Default to first organization if available
+                    if (orgs.length > 0) {
+                        const firstOrg = orgs[0].login;
+                        setSelectedOwner(firstOrg);
+                        fetchRepositories(1, '', firstOrg);
+                        return;
+                    }
                 }
             } catch {
                 // Silently fail - user can still use personal repos
             } finally {
                 setOrgsLoading(false);
             }
+            // Fallback: fetch personal repos if no orgs
+            fetchRepositories(1, '', null);
         }
         loadOrganizations();
-    }, [providerId]);
-
-    useEffect(() => {
-        fetchRepositories(1, '', null);
-    }, [fetchRepositories]);
+    }, [providerId, fetchRepositories]);
 
     const handleSearch = (value: string) => {
         setSearch(value);

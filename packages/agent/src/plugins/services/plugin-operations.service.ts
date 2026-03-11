@@ -487,14 +487,16 @@ export class PluginOperationsService {
             await this.validateSettingsOrThrow(cleanedSettings, schema, 'user', registered.plugin);
         }
 
-        // Merge settings and strip null keys to clear them
+        // Strip masked placeholders then merge settings, clearing null keys
         if (settings) {
-            userPlugin.settings = this.stripNullValues({ ...userPlugin.settings, ...settings });
+            const clean = this.stripMaskedValues(settings);
+            userPlugin.settings = this.stripNullValues({ ...userPlugin.settings, ...clean });
         }
         if (secretSettings) {
+            const clean = this.stripMaskedValues(secretSettings);
             userPlugin.secretSettings = this.stripNullValues({
                 ...userPlugin.secretSettings,
-                ...secretSettings,
+                ...clean,
             });
         }
         if (metadata) {
@@ -787,25 +789,27 @@ export class PluginOperationsService {
             );
         }
 
-        // Merge settings and strip null keys to clear them
+        // Strip masked placeholders then merge settings, clearing null keys
         if (settings) {
+            const clean = this.stripMaskedValues(settings);
             directoryPlugin.settings = this.stripNullValues({
                 ...directoryPlugin.settings,
-                ...settings,
+                ...clean,
             });
         }
 
         if (secretSettings) {
+            const clean = this.stripMaskedValues(secretSettings);
             // Update secretSettings
             directoryPlugin.secretSettings = this.stripNullValues({
                 ...directoryPlugin.secretSettings,
-                ...secretSettings,
+                ...clean,
             });
 
             // Cleanup: also remove secret fields from settings if they exist there
             // (handles migration case where secret fields were stored in wrong field)
             const cleanedSettings = { ...directoryPlugin.settings };
-            for (const key of Object.keys(secretSettings)) {
+            for (const key of Object.keys(clean)) {
                 delete cleanedSettings[key];
             }
             directoryPlugin.settings = cleanedSettings;
@@ -1030,13 +1034,15 @@ export class PluginOperationsService {
             hasDirectoryContext: false,
         });
 
+        const mergedSettings = userPlugin
+            ? { ...userPlugin.settings, ...userPlugin.secretSettings }
+            : undefined;
+
         return {
             ...baseResponse,
             installed: !!userPlugin || enabled,
             enabled,
-            settings: userPlugin
-                ? { ...userPlugin.settings, ...userPlugin.secretSettings }
-                : undefined,
+            settings: this.maskSecretSettings(mergedSettings, registered.plugin.settingsSchema),
             userPluginId: userPlugin?.id,
             autoEnableForDirectories: userPlugin?.autoEnableForDirectories ?? false,
         };
@@ -1065,9 +1071,12 @@ export class PluginOperationsService {
                 hasDirectoryContext: true,
             }),
             activeCapability: directoryPlugin?.activeCapability,
-            directorySettings: directoryPlugin
-                ? { ...directoryPlugin.settings, ...directoryPlugin.secretSettings }
-                : undefined,
+            directorySettings: this.maskSecretSettings(
+                directoryPlugin
+                    ? { ...directoryPlugin.settings, ...directoryPlugin.secretSettings }
+                    : undefined,
+                registered.plugin.settingsSchema,
+            ),
             directoryPluginId: directoryPlugin?.id,
             priority: directoryPlugin?.priority,
         };
@@ -1081,6 +1090,35 @@ export class PluginOperationsService {
         if (!icon) return undefined;
 
         return { ...icon };
+    }
+
+    /**
+     * Mask secret values in settings for API responses.
+     * Shows first 4 + '••••' + last 4 chars (or first 2 + '••••' + last 2 for short values).
+     */
+    private maskSecretSettings(
+        settings: Record<string, unknown> | undefined,
+        schema: JsonSchema | undefined,
+    ): Record<string, unknown> | undefined {
+        if (!settings || !schema?.properties) return settings;
+
+        let masked: Record<string, unknown> = { ...settings };
+        for (const [key, value] of Object.entries(masked)) {
+            const propSchema = schema.properties[key];
+            if (propSchema?.['x-secret'] && typeof value === 'string' && value.length > 0) {
+                masked[key] = this.partialReveal(value);
+            }
+        }
+        return masked;
+    }
+
+    private partialReveal(value: string): string {
+        const prefixLen = value.length <= 8 ? 2 : 4;
+        const suffixLen = prefixLen;
+        if (prefixLen + suffixLen >= value.length) {
+            return '••••••••';
+        }
+        return value.slice(0, prefixLen) + '••••' + value.slice(-suffixLen);
     }
 
     /**
@@ -1153,6 +1191,18 @@ export class PluginOperationsService {
      */
     private stripNullValues(obj: Record<string, unknown>): Record<string, unknown> {
         return pickBy(obj, (v) => v !== null) as Record<string, unknown>;
+    }
+
+    /**
+     * Strip masked placeholder values so they are never persisted to the database.
+     * The '••••' (U+2022) pattern is generated by partialReveal() for API responses
+     * and must never be saved back as a real value.
+     */
+    private stripMaskedValues(obj: Record<string, unknown>): Record<string, unknown> {
+        return pickBy(obj, (v) => !(typeof v === 'string' && v.includes('••••'))) as Record<
+            string,
+            unknown
+        >;
     }
 
     /**

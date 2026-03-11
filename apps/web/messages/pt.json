@@ -1717,10 +1717,17 @@
         "aiChat": {
             "title": "Assistente IA",
             "subtitle": "Crie diretórios com linguagem natural",
+            "welcomeMessage": "Olá! Posso ajudá-lo a criar diretórios usando linguagem natural. Pergunte algo como \"Crie um diretório para ferramentas de IA\" ou descreva o que você precisa.",
             "newChat": "Novo chat",
             "loadingConversation": "Carregando conversa…",
             "inputPlaceholder": "Descreva o diretório que deseja criar...",
             "sendButton": "Enviar",
+            "sendHint": "Enter para enviar · Shift+Enter para nova linha",
+            "providerNotConfigured": "Este provedor não está configurado. Configure-o em Plugins.",
+            "editMessage": "Editar mensagem",
+            "saveEdit": "Salvar e enviar",
+            "cancelEdit": "Cancelar",
+            "edited": "(editado)",
             "errors": {
                 "unableToSend": "Não foi possível enviar a mensagem."
             },

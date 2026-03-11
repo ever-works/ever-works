@@ -5,6 +5,10 @@ import {
 	DEFAULT_MAX_STEPS,
 	getWorkerContentBudgetRatio,
 	MAX_URLS_PER_BATCH,
+	MAX_CHUNK_CHARS,
+	getStepsPerChunk,
+	BASE_STEPS_PER_CHUNK,
+	MAX_STEPS_PER_CHUNK,
 	TokenUsageAccumulator
 } from '../types';
 
@@ -53,6 +57,32 @@ describe('types', () => {
 
 		it('should have max URLs per batch', () => {
 			expect(MAX_URLS_PER_BATCH).toBe(10);
+		});
+
+		it('should have a practical max chunk chars cap', () => {
+			expect(MAX_CHUNK_CHARS).toBe(30_000);
+		});
+	});
+
+	describe('getStepsPerChunk', () => {
+		it('should return BASE_STEPS_PER_CHUNK for small chunks', () => {
+			expect(getStepsPerChunk(1000)).toBe(BASE_STEPS_PER_CHUNK);
+			expect(getStepsPerChunk(4000)).toBe(BASE_STEPS_PER_CHUNK);
+		});
+
+		it('should scale steps proportionally for medium chunks', () => {
+			// 20K chars → ~100 estimated items → 100 * 4 = 400 steps
+			expect(getStepsPerChunk(20_000)).toBe(400);
+		});
+
+		it('should scale for large chunks within cap', () => {
+			// 30K chars → ~150 estimated items → 150 * 4 = 600 steps (under cap)
+			expect(getStepsPerChunk(30_000)).toBe(600);
+		});
+
+		it('should cap at MAX_STEPS_PER_CHUNK for very large chunks', () => {
+			expect(getStepsPerChunk(50_000)).toBe(MAX_STEPS_PER_CHUNK);
+			expect(getStepsPerChunk(100_000)).toBe(MAX_STEPS_PER_CHUNK);
 		});
 	});
 

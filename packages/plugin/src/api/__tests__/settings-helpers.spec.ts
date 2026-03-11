@@ -210,4 +210,14 @@ describe('sanitizeSettingsForSave', () => {
 		const result = sanitizeSettingsForSave({ str: 'hello', num: 42, bool: true }, 'user');
 		expect(result).toEqual({ str: 'hello', num: 42, bool: true });
 	});
+
+	it('should strip masked placeholder values containing ••••', () => {
+		const result = sanitizeSettingsForSave({ apiKey: '••••••••', model: 'gpt-4', baseUrl: 'sk-o••••1234' }, 'user');
+		expect(result).toEqual({ model: 'gpt-4' });
+	});
+
+	it('should strip masked values at directory scope too', () => {
+		const result = sanitizeSettingsForSave({ secretField: '••••••••', normalField: 'value' }, 'directory');
+		expect(result).toEqual({ normalField: 'value' });
+	});
 });
