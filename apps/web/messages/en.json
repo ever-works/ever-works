@@ -204,11 +204,24 @@
             "welcome": {
                 "title": "What is Ever Works?",
                 "description": "Ever Works is an open-source directory builder. Create structured content directories — tools, jobs, links, products — and publish them as live websites.",
-                "detail": "Use the steps on the left to get familiar with the platform before you start."
+                "detail": "Let's get you set up. Connect your providers below, then create your first directory.",
+                "feature1": {
+                    "title": "AI-powered content",
+                    "description": "Generate and enrich directory items automatically using your AI provider."
+                },
+                "feature2": {
+                    "title": "Instant publishing",
+                    "description": "Deploy to Vercel with one click — no server configuration needed."
+                },
+                "feature3": {
+                    "title": "Git-backed",
+                    "description": "Every directory is a GitHub repository you own and control."
+                }
             },
             "directory": {
                 "title": "Create your first directory",
                 "description": "A directory is your content hub. Add items, configure the layout, and publish it in one click.",
+                "detail": "You're all set! Create your first directory to start building and publishing content.",
                 "action": "Create a directory"
             },
             "publish": {
@@ -216,6 +229,12 @@
                 "description": "Connect Vercel or GitHub to deploy your directory as a public website — no hosting configuration needed.",
                 "action": "Set up publishing"
             }
+        },
+        "pluginStep": {
+            "saveButton": "Save settings",
+            "savedSuccess": "Settings saved.",
+            "noSettings": "No configuration required for this plugin.",
+            "getTokenPrompt": "Create a token first, then paste it below and save to verify the connection."
         },
         "plugins": {
             "byokDescription": "Connect your own key to unlock the full configuration.",

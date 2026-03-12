@@ -457,6 +457,10 @@ export class DirectoryScheduleService {
 
         switch (cadence) {
             case DirectoryScheduleCadence.HOURLY:
+                // Snap to the start of the current hour, then advance by one hour.
+                // This prevents drift when generation time varies and keeps runs
+                // aligned to clean hour boundaries (e.g. 14:00, 15:00, 16:00).
+                next.setMinutes(0, 0, 0);
                 next.setHours(next.getHours() + 1);
                 break;
             case DirectoryScheduleCadence.DAILY:
