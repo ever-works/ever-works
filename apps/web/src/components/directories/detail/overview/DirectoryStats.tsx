@@ -32,7 +32,7 @@ function StatCard({ title, value, icon, iconColor }: StatCardProps) {
         >
             <div
                 className={cn(
-                    'relative rounded-sm p-5 overflow-hidden',
+                    'relative rounded-sm px-5 py-2 overflow-hidden',
                     'bg-card dark:bg-surface-secondary-dark/30',
                     'border border-card-border dark:border-border-dark',
                 )}
@@ -43,9 +43,7 @@ function StatCard({ title, value, icon, iconColor }: StatCardProps) {
                 </p>
 
                 <div className="absolute top-3 right-3">
-                    <div className={cn('p-2.5 rounded-lg', 'bg-surface dark:bg-surface-dark/50')}>
-                        <span className={iconColor}>{icon}</span>
-                    </div>
+                    <span className={iconColor}>{icon}</span>
                 </div>
             </div>
         </div>
