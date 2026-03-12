@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils/cn';
 import { setActiveCapability } from '@/app/actions/plugins';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
+import { Check } from 'lucide-react';
 
 interface CapabilitySelectorProps {
     directoryId: string;
@@ -46,55 +47,37 @@ export function CapabilitySelector({
     }
 
     return (
-        <div className="flex items-center gap-3 py-2">
-            <div className="w-32 shrink-0">
-                <span className="text-sm font-medium text-text dark:text-text-dark">
+        <div className="flex items-center gap-4 px-5 py-3">
+            <div className="w-36 shrink-0">
+                <code className="text-xs font-mono font-medium text-text-secondary dark:text-text-secondary-dark bg-surface-secondary dark:bg-surface-secondary-dark px-1.5 py-0.5 rounded">
                     {getCapabilityLabel(capability)}
-                </span>
+                </code>
             </div>
 
-            <div className="flex-1 flex flex-wrap gap-2">
+            <div className="flex-1 flex flex-wrap gap-1.5">
                 {plugins.map((plugin) => {
                     const isActive = plugin.pluginId === optimisticActiveId;
                     return (
                         <button
                             key={plugin.pluginId}
                             onClick={() => handleSelect(plugin.pluginId)}
-                            disabled={isPending || isActive}
+                            disabled={isPending}
                             className={cn(
-                                'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors',
-                                'border',
+                                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all duration-150',
+                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                                 isActive
-                                    ? 'border-primary bg-primary/10 text-primary'
-                                    : 'border-border dark:border-border-dark hover:border-primary/50 text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark',
+                                    ? 'border-primary/40 bg-primary/10 text-primary shadow-sm'
+                                    : 'border-border dark:border-border-dark bg-transparent text-text-secondary dark:text-text-secondary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-text dark:hover:text-text-dark hover:border-primary/30',
                                 isPending && 'opacity-50 cursor-wait',
                             )}
                         >
-                            <PluginIcon icon={plugin.icon} name={plugin.name} size={20} />
+                            <PluginIcon icon={plugin.icon} name={plugin.name} size={14} plain />
                             <span>{plugin.name}</span>
-                            {isActive && (
-                                <svg
-                                    className="w-4 h-4 text-primary"
-                                    fill="currentColor"
-                                    viewBox="0 0 20 20"
-                                >
-                                    <path
-                                        fillRule="evenodd"
-                                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                        clipRule="evenodd"
-                                    />
-                                </svg>
-                            )}
+                            {isActive && <Check className="w-3 h-3 ml-0.5" />}
                         </button>
                     );
                 })}
             </div>
-
-            {plugins.length === 0 && (
-                <span className="text-sm text-text-muted dark:text-text-muted-dark italic">
-                    {t('noProvidersAvailable')}
-                </span>
-            )}
         </div>
     );
 }
