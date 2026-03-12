@@ -64,7 +64,7 @@ export class ItemHealthService {
             status: 'success',
             item_slug: item.slug || itemSlug,
             item_name: item.name,
-            message: this.buildManualMessage(item.health?.status ?? 'unchecked'),
+            message: this.buildManualMessage(item.health),
             item,
             health: item.health,
         };
@@ -135,9 +135,9 @@ export class ItemHealthService {
         const checkLinks = await this.loadChecker();
         const uniqueUrls = [...new Set(itemsToCheck.map((item) => item.source_url))];
         const results = await checkLinks(uniqueUrls, {
-            concurrency: 8,
-            timeout: { request: 15000 },
-            retry: { limit: 1 },
+            concurrency: 4,
+            timeout: { request: 30000 },
+            retry: { limit: 2 },
         });
 
         let changedCount = 0;
@@ -193,10 +193,10 @@ export class ItemHealthService {
 
         if (!result) {
             return {
-                status: 'warning',
+                status: 'unknown',
                 checked_at: checkedAt,
                 status_code: null,
-                message: 'No response received for source URL',
+                message: 'Automated check could not verify the source URL',
                 failure_count: previousFailures + 1,
                 checked_via: trigger,
             };
@@ -221,7 +221,7 @@ export class ItemHealthService {
         }
 
         if (result.status === 'invalid') {
-            return 'warning';
+            return 'broken';
         }
 
         const statusCode = result.statusCode;
@@ -230,14 +230,14 @@ export class ItemHealthService {
         }
 
         if (statusCode === 401 || statusCode === 403 || statusCode === 429) {
-            return 'warning';
+            return 'unknown';
         }
 
         if (statusCode && statusCode >= 500) {
-            return 'warning';
+            return 'unknown';
         }
 
-        return 'warning';
+        return 'unknown';
     }
 
     private buildHealthMessage(result: CheckLinkResult, status: ItemHealthStatus): string | null {
@@ -253,7 +253,7 @@ export class ItemHealthService {
             return `Source URL returned HTTP ${result.statusCode}`;
         }
 
-        return 'Source URL is unreachable';
+        return 'Automated check could not verify the source URL';
     }
 
     private buildCommitMessage(trigger: HealthCheckTrigger, itemCount: number): string {
@@ -264,17 +264,23 @@ export class ItemHealthService {
         return `chore: re-check item health for ${itemCount} item${itemCount === 1 ? '' : 's'}`;
     }
 
-    private buildManualMessage(status: ItemHealthStatus): string {
+    private buildManualMessage(health: ItemHealth | undefined): string {
+        const status = health?.status ?? 'unchecked';
+        const suffix = health?.message ? ` ${health.message}` : '';
+
         switch (status) {
             case 'healthy':
-                return 'Item health check completed: source URL is healthy.';
+                return `Item health check completed: source URL is healthy.${suffix}`;
             case 'warning':
-                return 'Item health check completed with a warning.';
+            case 'unknown':
+                return 'Item health check completed.';
+            case 'warning':
+                return 'Item health check completed.';
             case 'broken':
-                return 'Item health check completed: source URL is broken.';
+                return `Item health check completed: source URL is broken.${suffix}`;
             case 'unchecked':
             default:
-                return 'Item health check completed.';
+                return `Item health check completed.${suffix}`;
         }
     }
 

@@ -113,6 +113,7 @@ const ItemCardList = memo(function ItemCardList({
                         {item.description}
                     </p>
                 )}
+                <ItemHealthDetails item={item} />
             </div>
 
             {/* Order badge and Category */}
@@ -213,6 +214,8 @@ const ItemCardGrid = memo(function ItemCardGrid({
                 </p>
             )}
 
+            <ItemHealthDetails item={item} className="mb-3" />
+
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     {item.order !== undefined && item.order !== null && (
@@ -256,27 +259,38 @@ const ItemCardGrid = memo(function ItemCardGrid({
 });
 
 function ItemHealthBadge({ item }: { item: ItemData }) {
-    if (!item.health || item.health.status === 'healthy' || item.health.status === 'unchecked') {
+    if (!item.health || item.health.status !== 'broken') {
         return null;
     }
-
-    const isBroken = item.health.status === 'broken';
-    const label = isBroken ? 'Broken link' : 'Needs review';
-    const tone = isBroken
-        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
 
     return (
         <span
             className={cn(
                 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
-                tone,
+                'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
             )}
-            title={item.health.message || label}
+            title={item.health.message || 'Broken link'}
         >
             <AlertTriangle className="h-3 w-3" />
-            {label}
+            Broken link
         </span>
+    );
+}
+
+function ItemHealthDetails({ item, className }: { item: ItemData; className?: string }) {
+    if (!item.health || item.health.status !== 'broken') {
+        return null;
+    }
+
+    return (
+        <p
+            className={cn(
+                'mt-1 text-xs text-red-700 dark:text-red-300 line-clamp-2',
+                className,
+            )}
+        >
+            {item.health.message || 'Broken link'}
+        </p>
     );
 }
 

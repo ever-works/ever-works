@@ -77,7 +77,7 @@ export interface BadgeEvaluationResult {
 /**
  * Health status for an item's source URL.
  */
-export type ItemHealthStatus = 'unchecked' | 'healthy' | 'warning' | 'broken';
+export type ItemHealthStatus = 'unchecked' | 'healthy' | 'unknown' | 'warning' | 'broken';
 
 /**
  * Result of the latest source URL health check for an item.
