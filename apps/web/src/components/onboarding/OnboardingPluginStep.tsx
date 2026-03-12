@@ -41,14 +41,23 @@ function FieldBasedPluginStep({ plugin }: { plugin: UserPlugin }) {
         [plugin.pluginId, plugin.uiHints?.validateOnSave],
     );
 
-    const { isSaving, saveSuccess, saveMessage, validationError, visibleProperties, hasSettings, handleFieldChange, handleSave, getFieldValue } =
-        usePluginSettings({
-            schema: plugin.settingsSchema,
-            initialSettings: plugin.settings || {},
-            scopes: ['global', 'user'],
-            onSave,
-            scope: 'user',
-        });
+    const {
+        isSaving,
+        saveSuccess,
+        saveMessage,
+        validationError,
+        visibleProperties,
+        hasSettings,
+        handleFieldChange,
+        handleSave,
+        getFieldValue,
+    } = usePluginSettings({
+        schema: plugin.settingsSchema,
+        initialSettings: plugin.settings || {},
+        scopes: ['global', 'user'],
+        onSave,
+        scope: 'user',
+    });
 
     const setupLink = plugin.uiHints?.setupLink;
     const showSetupButton =
@@ -65,7 +74,9 @@ function FieldBasedPluginStep({ plugin }: { plugin: UserPlugin }) {
         <div className="space-y-4">
             {showSetupButton && (
                 <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('getTokenPrompt')}</p>
+                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                        {t('getTokenPrompt')}
+                    </p>
                     <a
                         href={setupLink!.url}
                         target="_blank"
@@ -110,7 +121,11 @@ function FieldBasedPluginStep({ plugin }: { plugin: UserPlugin }) {
     );
 }
 
-export function OnboardingPluginStep({ plugin, oauthConnection, returnPath }: OnboardingPluginStepProps) {
+export function OnboardingPluginStep({
+    plugin,
+    oauthConnection,
+    returnPath,
+}: OnboardingPluginStepProps) {
     const isOAuth = plugin.capabilities.includes('oauth');
 
     if (isOAuth && oauthConnection !== undefined) {

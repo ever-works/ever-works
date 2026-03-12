@@ -30,8 +30,7 @@ export default async function Dashboard() {
     const onboardingPlugins = pluginsResponse.plugins
         .filter((p) => p.uiHints?.includeInOnboarding)
         .sort(
-            (a, b) =>
-                (a.uiHints?.onboardingPriority ?? 99) - (b.uiHints?.onboardingPriority ?? 99),
+            (a, b) => (a.uiHints?.onboardingPriority ?? 99) - (b.uiHints?.onboardingPriority ?? 99),
         );
 
     // Fetch OAuth connection status for any onboarding plugin that uses OAuth

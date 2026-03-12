@@ -31,7 +31,10 @@ type WizardStep =
     | { kind: 'plugin'; plugin: UserPlugin }
     | { kind: 'directory' };
 
-function isPluginConnected(plugin: UserPlugin, oauthConnections: Record<string, OAuthConnectionInfo | null>): boolean {
+function isPluginConnected(
+    plugin: UserPlugin,
+    oauthConnections: Record<string, OAuthConnectionInfo | null>,
+): boolean {
     const isOAuth = plugin.capabilities.includes('oauth');
     if (isOAuth) {
         return oauthConnections[plugin.pluginId]?.connected === true;
@@ -62,7 +65,11 @@ export function EverWorksOnboardingWizard({
     );
 
     const steps = useMemo<WizardStep[]>(
-        () => [{ kind: 'welcome' }, ...plugins.map((p) => ({ kind: 'plugin' as const, plugin: p })), { kind: 'directory' }],
+        () => [
+            { kind: 'welcome' },
+            ...plugins.map((p) => ({ kind: 'plugin' as const, plugin: p })),
+            { kind: 'directory' },
+        ],
         [plugins],
     );
 
@@ -106,7 +113,8 @@ export function EverWorksOnboardingWizard({
 
                                 const label = (() => {
                                     if (step.kind === 'welcome') return t('steps.welcome.title');
-                                    if (step.kind === 'directory') return t('steps.directory.title');
+                                    if (step.kind === 'directory')
+                                        return t('steps.directory.title');
                                     return step.plugin.name;
                                 })();
 
@@ -145,7 +153,12 @@ export function EverWorksOnboardingWizard({
                         </nav>
 
                         <div className="mt-6 pt-4 border-t border-border dark:border-border-dark">
-                            <Button variant="ghost" size="sm" onClick={dismiss} className="w-full text-text-muted dark:text-text-muted-dark">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={dismiss}
+                                className="w-full text-text-muted dark:text-text-muted-dark"
+                            >
                                 {t('skipButton')}
                             </Button>
                         </div>
@@ -215,9 +228,24 @@ export function EverWorksOnboardingWizard({
                                     </p>
                                     <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
                                         {[
-                                            { title: t('steps.welcome.feature1.title'), description: t('steps.welcome.feature1.description') },
-                                            { title: t('steps.welcome.feature2.title'), description: t('steps.welcome.feature2.description') },
-                                            { title: t('steps.welcome.feature3.title'), description: t('steps.welcome.feature3.description') },
+                                            {
+                                                title: t('steps.welcome.feature1.title'),
+                                                description: t(
+                                                    'steps.welcome.feature1.description',
+                                                ),
+                                            },
+                                            {
+                                                title: t('steps.welcome.feature2.title'),
+                                                description: t(
+                                                    'steps.welcome.feature2.description',
+                                                ),
+                                            },
+                                            {
+                                                title: t('steps.welcome.feature3.title'),
+                                                description: t(
+                                                    'steps.welcome.feature3.description',
+                                                ),
+                                            },
                                         ].map((feature) => (
                                             <div
                                                 key={feature.title}
