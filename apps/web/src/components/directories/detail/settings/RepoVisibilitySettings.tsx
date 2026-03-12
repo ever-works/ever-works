@@ -79,17 +79,18 @@ export function RepoVisibilitySettings({ initialRepositories }: RepoVisibilitySe
     };
 
     return (
-        <div className="bg-card dark:bg-card-dark border border-border dark:border-border-dark rounded-lg p-6">
-            <h3 className="text-lg font-medium mb-4">Repository Visibility</h3>
-            <div className="space-y-4">
+        <div className="bg-card dark:bg-card-primary-dark/30 border border-card-border dark:border-card-border-dark rounded-lg overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-card-border dark:border-card-border-dark">
+                <h3 className="text-sm font-semibold text-text dark:text-text-dark">
+                    Repository Visibility
+                </h3>
+            </div>
+            <div className="px-5 py-4 space-y-4">
                 {repositories.map((repo) => (
-                    <div
-                        key={repo.type}
-                        className="flex items-center justify-between p-4 border rounded-lg dark:border-border-dark"
-                    >
+                    <div className="flex items-center justify-between p-3 border rounded-lg border-card-border dark:border-card-border-dark">
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                                <span className="font-medium capitalize">
+                                <span className="text-xs font-medium text-text dark:text-text-dark capitalize">
                                     {repo.type === 'directory'
                                         ? 'Main'
                                         : repo.type === 'data'
@@ -98,19 +99,19 @@ export function RepoVisibilitySettings({ initialRepositories }: RepoVisibilitySe
                                     Repo
                                 </span>
                                 {repo.isPrivate ? (
-                                    <Lock className="h-3 w-3 text-muted-foreground" />
+                                    <Lock className="h-3 w-3 text-text-muted dark:text-text-muted-dark" />
                                 ) : (
-                                    <Unlock className="h-3 w-3 text-muted-foreground" />
+                                    <Unlock className="h-3 w-3 text-text-muted dark:text-text-muted-dark" />
                                 )}
                             </div>
-                            <div className="text-sm text-muted-foreground flex items-center gap-1">
+                            <div className="text-xs text-text-muted dark:text-text-muted-dark flex items-center gap-1">
                                 <GitBranch className="h-3 w-3" />
                                 {repo.name}
                             </div>
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <span className="text-sm font-medium">
+                            <span className="text-xs font-medium text-text dark:text-text-dark">
                                 {repo.isPrivate ? 'Private' : 'Public'}
                             </span>
                             <Switch

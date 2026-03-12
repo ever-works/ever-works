@@ -5,7 +5,12 @@ import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import { Button } from '@/components/ui/button';
-import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
+import {
+    Accordion,
+    AccordionItem,
+    AccordionTrigger,
+    AccordionContent,
+} from '@/components/ui/accordion';
 import { toast } from 'sonner';
 import { getAdvancedPrompts, updateAdvancedPrompts } from '@/app/actions/dashboard/directories';
 import { DirectoryAdvancedPrompts } from '@/lib/api/directory';
@@ -169,41 +174,41 @@ export function AdvancedPromptsSettings({ directoryId }: AdvancedPromptsSettings
         }));
     };
 
-    const cardClasses = cn(
-        'rounded-lg border',
-        'bg-card dark:bg-card-dark',
-        'border-card-border dark:border-card-border-dark',
-    );
+    const handleAccordionChange = (value: string[]) => {
+        const wasStandardClosed = isStandardExpanded && !value.includes('standard');
+        const wasStandardOpened = !isStandardExpanded && value.includes('standard');
+        const wasComparisonClosed = isComparisonExpanded && !value.includes('comparison');
+        const wasComparisonOpened = !isComparisonExpanded && value.includes('comparison');
 
-    const headerClasses =
-        'w-full p-6 flex items-center justify-between text-left hover:bg-muted/50 dark:hover:bg-muted-dark/50 transition-colors rounded-lg';
+        if (wasStandardOpened) setIsStandardExpanded(true);
+        if (wasStandardClosed) setIsStandardExpanded(false);
+        if (wasComparisonOpened) setIsComparisonExpanded(true);
+        if (wasComparisonClosed) setIsComparisonExpanded(false);
+    };
 
     return (
-        <>
+        <Accordion type="multiple" onValueChange={handleAccordionChange} className="space-y-3">
             {/* Standard Pipeline Card */}
-            <div className={cardClasses}>
-                <button
-                    type="button"
-                    onClick={() => setIsStandardExpanded(!isStandardExpanded)}
-                    className={headerClasses}
-                >
-                    <div>
-                        <h3 className="text-lg font-semibold text-text dark:text-text-dark">
+            <AccordionItem
+                value="standard"
+                className={cn(
+                    'rounded-lg border overflow-hidden',
+                    'bg-card dark:bg-card-primary-dark/30',
+                    'border-card-border dark:border-card-border-dark',
+                )}
+            >
+                <AccordionTrigger className="px-5 py-3.5 hover:no-underline hover:bg-surface/50 dark:hover:bg-surface-dark/50">
+                    <div className="text-left">
+                        <span className="text-sm font-semibold text-text dark:text-text-dark">
                             {t('title')}
-                        </h3>
-                        <p className="text-sm text-text-muted dark:text-text-muted-dark mt-1">
+                        </span>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5 font-normal">
                             {t('subtitle')}
                         </p>
                     </div>
-                    {isStandardExpanded ? (
-                        <ChevronUpIcon className="h-5 w-5 text-text-muted dark:text-text-muted-dark" />
-                    ) : (
-                        <ChevronDownIcon className="h-5 w-5 text-text-muted dark:text-text-muted-dark" />
-                    )}
-                </button>
-
-                {isStandardExpanded && (
-                    <div className="px-6 pb-6 space-y-6">
+                </AccordionTrigger>
+                <AccordionContent className="px-5 pb-4 pt-2">
+                    <div className="space-y-4">
                         {isStandardLoading ? (
                             <div className="flex justify-center py-8">
                                 <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
@@ -243,33 +248,30 @@ export function AdvancedPromptsSettings({ directoryId }: AdvancedPromptsSettings
                             </>
                         )}
                     </div>
-                )}
-            </div>
+                </AccordionContent>
+            </AccordionItem>
 
             {/* Comparison Card */}
-            <div className={cardClasses}>
-                <button
-                    type="button"
-                    onClick={() => setIsComparisonExpanded(!isComparisonExpanded)}
-                    className={headerClasses}
-                >
-                    <div>
-                        <h3 className="text-lg font-semibold text-text dark:text-text-dark">
+            <AccordionItem
+                value="comparison"
+                className={cn(
+                    'rounded-lg border overflow-hidden',
+                    'bg-card dark:bg-card-primary-dark/30',
+                    'border-card-border dark:border-card-border-dark',
+                )}
+            >
+                <AccordionTrigger className="px-5 py-3.5 hover:no-underline hover:bg-surface/50 dark:hover:bg-surface-dark/50">
+                    <div className="text-left">
+                        <span className="text-sm font-semibold text-text dark:text-text-dark">
                             {t('comparisonTitle')}
-                        </h3>
-                        <p className="text-sm text-text-muted dark:text-text-muted-dark mt-1">
+                        </span>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5 font-normal">
                             {t('comparisonSubtitle')}
                         </p>
                     </div>
-                    {isComparisonExpanded ? (
-                        <ChevronUpIcon className="h-5 w-5 text-text-muted dark:text-text-muted-dark" />
-                    ) : (
-                        <ChevronDownIcon className="h-5 w-5 text-text-muted dark:text-text-muted-dark" />
-                    )}
-                </button>
-
-                {isComparisonExpanded && (
-                    <div className="px-6 pb-6 space-y-6">
+                </AccordionTrigger>
+                <AccordionContent className="px-5 pb-4 pt-2">
+                    <div className="space-y-4">
                         {isComparisonLoading ? (
                             <div className="flex justify-center py-8">
                                 <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
@@ -307,8 +309,8 @@ export function AdvancedPromptsSettings({ directoryId }: AdvancedPromptsSettings
                             </>
                         )}
                     </div>
-                )}
-            </div>
-        </>
+                </AccordionContent>
+            </AccordionItem>
+        </Accordion>
     );
 }

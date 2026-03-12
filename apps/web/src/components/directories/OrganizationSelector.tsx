@@ -3,6 +3,15 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { GitOrganization } from '@/lib/api';
 import { getGitProviderOrganizations } from '@/app/actions/dashboard/organizations';
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { Loader2, Building2, User } from 'lucide-react';
@@ -68,27 +77,27 @@ export function OrganizationSelector({
         }
     }, [suggestedOwner, organizations, value]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const selectedValue = e.target.value;
+    const handleChange = (selected: string) => {
+        const selectedValue = selected === '__personal__' ? '' : selected;
         onChange(selectedValue, selectedValue !== '');
     };
 
     if (isPending && organizations.length === 0) {
         return (
-            <div className="space-y-2">
-                <label className="block text-sm font-medium text-text dark:text-text-dark">
+            <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-text-muted dark:text-text-muted-dark">
                     {t('organizationSelector.label')}
                 </label>
                 <div
                     className={cn(
                         'flex items-center justify-center py-8',
                         'bg-surface dark:bg-surface-dark',
-                        'border border-border dark:border-border-dark',
+                        'border border-card-border dark:border-card-border-dark',
                         'rounded-lg',
                     )}
                 >
-                    <Loader2 className="animate-spin h-5 w-5 text-text-muted dark:text-text-muted-dark" />
-                    <span className="ml-2 text-sm text-text-muted dark:text-text-muted-dark">
+                    <Loader2 className="animate-spin h-4 w-4 text-text-muted dark:text-text-muted-dark" />
+                    <span className="ml-2 text-xs text-text-muted dark:text-text-muted-dark">
                         {t('organizationSelector.loading')}
                     </span>
                 </div>
@@ -96,41 +105,43 @@ export function OrganizationSelector({
         );
     }
 
+    const selectValue = value === '' ? '__personal__' : value;
+
     return (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
             <label
                 htmlFor="organization"
-                className="block text-sm font-medium text-text dark:text-text-dark"
+                className="block text-xs font-medium text-text-muted dark:text-text-muted-dark"
             >
                 {t('organizationSelector.label')}
             </label>
-            <select
-                id="organization"
-                value={value}
-                onChange={handleChange}
-                disabled={disabled}
-                className={cn(
-                    'w-full px-4 py-2 rounded-lg',
-                    'bg-surface dark:bg-surface-dark',
-                    'border border-border dark:border-border-dark',
-                    'text-text dark:text-text-dark',
-                    'focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark',
-                    'disabled:opacity-50 disabled:cursor-not-allowed',
-                    'transition-colors',
-                )}
-            >
-                <option value="">{t('organizationSelector.personal')}</option>
-                {organizations.length > 0 && (
-                    <optgroup label={t('organizationSelector.organizations')}>
-                        {organizations.map((org) => (
-                            <option key={org.login} value={org.login}>
-                                {org.login}
-                                {org.name && ` - ${org.name.substring(0, 50)}`}
-                            </option>
-                        ))}
-                    </optgroup>
-                )}
-            </select>
+            <Select value={selectValue} onValueChange={handleChange} disabled={disabled}>
+                <SelectTrigger>
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="__personal__">
+                        <span className="flex items-center gap-2">
+                            <User className="w-3.5 h-3.5 text-text-muted dark:text-text-muted-dark" />
+                            {t('organizationSelector.personal')}
+                        </span>
+                    </SelectItem>
+                    {organizations.length > 0 && (
+                        <SelectGroup>
+                            <SelectLabel>{t('organizationSelector.organizations')}</SelectLabel>
+                            {organizations.map((org) => (
+                                <SelectItem key={org.login} value={org.login}>
+                                    <span className="flex items-center gap-2">
+                                        <Building2 className="w-3.5 h-3.5 text-primary dark:text-primary-dark" />
+                                        {org.login}
+                                        {org.name && ` - ${org.name.substring(0, 50)}`}
+                                    </span>
+                                </SelectItem>
+                            ))}
+                        </SelectGroup>
+                    )}
+                </SelectContent>
+            </Select>
             <p className="text-xs text-text-muted dark:text-text-muted-dark">
                 {value === ''
                     ? t('organizationSelector.personalHelp')
@@ -142,20 +153,20 @@ export function OrganizationSelector({
                 className={cn(
                     'flex items-center gap-2 px-3 py-2 rounded-lg',
                     'bg-surface-secondary dark:bg-surface-secondary-dark',
-                    'border border-border dark:border-border-dark',
+                    'border border-card-border dark:border-card-border-dark',
                 )}
             >
                 {value === '' ? (
                     <>
                         <User className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
-                        <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
                             {t('organizationSelector.personalAccount')}
                         </span>
                     </>
                 ) : (
                     <>
                         <Building2 className="w-4 h-4 text-primary dark:text-primary-dark" />
-                        <span className="text-sm text-text dark:text-text-dark font-medium">
+                        <span className="text-xs text-text dark:text-text-dark font-medium">
                             {value}
                         </span>
                     </>
