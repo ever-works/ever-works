@@ -109,9 +109,7 @@ export function OrganizationSelector({
 
     return (
         <div className="space-y-1.5">
-            <label
-                className="block text-xs font-medium text-text-muted dark:text-text-muted-dark"
-            >
+            <label className="block text-xs font-medium text-text-muted dark:text-text-muted-dark">
                 {t('organizationSelector.label')}
             </label>
             <Select value={selectValue} onValueChange={handleChange} disabled={disabled}>
