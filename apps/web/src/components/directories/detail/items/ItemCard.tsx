@@ -259,7 +259,10 @@ const ItemCardGrid = memo(function ItemCardGrid({
 });
 
 function ItemHealthBadge({ item }: { item: ItemData }) {
-    if (!item.health || item.health.status !== 'broken') {
+    if (
+        item.source_validation?.status !== 'broken_source' &&
+        (!item.health || item.health.status !== 'broken')
+    ) {
         return null;
     }
 
@@ -269,7 +272,9 @@ function ItemHealthBadge({ item }: { item: ItemData }) {
                 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
                 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
             )}
-            title={item.health.message || 'Broken link'}
+            title={
+                item.source_validation?.reason || item.health?.message || 'Broken link'
+            }
         >
             <AlertTriangle className="h-3 w-3" />
             Broken link
@@ -278,16 +283,70 @@ function ItemHealthBadge({ item }: { item: ItemData }) {
 }
 
 function ItemHealthDetails({ item, className }: { item: ItemData; className?: string }) {
-    if (
-        !item.health ||
-        item.health.status === 'unchecked' ||
-        (!item.health.checked_at && item.health.status === 'healthy')
-    ) {
+    const validation = item.source_validation;
+    const checkedAtRaw = validation?.checked_at ?? item.health?.checked_at ?? null;
+    const checkedAt = checkedAtRaw ? new Date(checkedAtRaw).toLocaleString() : null;
+    const checkedSuffix = checkedAt ? ` · checked ${checkedAt}` : '';
+
+    if (!validation && !item.health) {
         return null;
     }
 
-    const checkedAt = item.health.checked_at ? new Date(item.health.checked_at).toLocaleString() : null;
-    const checkedSuffix = checkedAt ? ` · checked ${checkedAt}` : '';
+    if (validation?.status === 'valid_source') {
+        return (
+            <p
+                className={cn(
+                    'mt-1 text-xs text-emerald-700 dark:text-emerald-300 line-clamp-2',
+                    className,
+                )}
+            >
+                {`Valid source${checkedSuffix}`}
+            </p>
+        );
+    }
+
+    if (validation?.status === 'generic_source') {
+        return (
+            <p
+                className={cn(
+                    'mt-1 text-xs text-amber-700 dark:text-amber-300 line-clamp-2',
+                    className,
+                )}
+            >
+                {`${validation.reason || 'Generic source'}${checkedSuffix}`}
+            </p>
+        );
+    }
+
+    if (validation?.status === 'weak_source') {
+        return (
+            <p
+                className={cn(
+                    'mt-1 text-xs text-amber-700 dark:text-amber-300 line-clamp-2',
+                    className,
+                )}
+            >
+                {`${validation.reason || 'Weak source'}${checkedSuffix}`}
+            </p>
+        );
+    }
+
+    if (validation?.status === 'unknown') {
+        return (
+            <p
+                className={cn(
+                    'mt-1 text-xs text-text-secondary dark:text-text-secondary-dark line-clamp-2',
+                    className,
+                )}
+            >
+                {`${validation.reason || 'Could not validate source'}${checkedSuffix}`}
+            </p>
+        );
+    }
+
+    if (!item.health || item.health.status === 'unchecked') {
+        return null;
+    }
 
     if (item.health.status === 'healthy') {
         return (
@@ -322,7 +381,7 @@ function ItemHealthDetails({ item, className }: { item: ItemData; className?: st
                 className,
             )}
         >
-            {`${item.health.message || 'Broken link'}${checkedSuffix}`}
+            {`${validation?.reason || item.health.message || 'Broken link'}${checkedSuffix}`}
         </p>
     );
 }

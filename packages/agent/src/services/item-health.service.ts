@@ -1,10 +1,19 @@
 import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { format } from 'date-fns';
-import type { ItemData, ItemHealth, ItemHealthStatus } from '@ever-works/contracts';
+import { z } from 'zod';
+import type {
+    ItemData,
+    ItemHealth,
+    ItemHealthStatus,
+    ItemSourceValidation,
+    ItemSourceValidationStatus,
+} from '@ever-works/contracts';
 import { Directory } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { GitFacadeService } from '../facades/git.facade';
+import { AiFacadeService } from '../facades/ai.facade';
+import { ContentExtractorFacadeService } from '../facades/content-extractor.facade';
 import { DataRepository } from '../generators/data-generator/data-repository';
 import type { CheckItemHealthResponseDto } from '../items-generator/dto';
 
@@ -30,12 +39,48 @@ type DirectoryHealthCheckResult = {
     items: ItemData[];
 };
 
+const sourceValidationSchema = z.object({
+    status: z.enum(['valid_source', 'generic_source', 'weak_source', 'unknown']),
+    confidence_score: z.number().min(0).max(1),
+    is_relevant: z.boolean(),
+    is_specific: z.boolean(),
+    is_official: z.boolean(),
+    reason: z.string(),
+    suggested_source_url: z.string().url().nullable().optional(),
+});
+
+const SOURCE_VALIDATION_PROMPT = `You are validating whether a URL is a good source for a directory item.
+
+Return a judgment about the source quality, not just whether the URL opens.
+
+Item Name: {itemName}
+Item Description: {itemDescription}
+Candidate URL: {candidateUrl}
+HTTP Check Summary: {httpSummary}
+Extracted Page Content (first 2000 chars): {pageContent}
+
+Decide whether this URL is:
+- valid_source: clearly the right, relevant, and specific source for the item
+- generic_source: reachable and relevant, but too generic (homepage/root domain/company home)
+- weak_source: somewhat related, but weak, indirect, or not a good canonical source
+- unknown: not enough evidence to judge confidently
+
+Rules:
+- Prefer official product pages, official documentation, official repositories, or canonical package pages.
+- A generic company homepage is usually generic_source if it does not clearly focus on the item itself.
+- Blog posts, news articles, and third-party reviews are usually weak_source unless they are the only credible source.
+- If the HTTP check already indicates the link is clearly broken, do not return valid_source.
+- Be conservative. If unsure, return unknown.
+`;
+
 @Injectable()
 export class ItemHealthService {
     private readonly logger = new Logger(ItemHealthService.name);
 
     constructor(
         private readonly gitFacade: GitFacadeService,
+        private readonly aiFacade: AiFacadeService,
+        private readonly contentExtractorFacade: ContentExtractorFacadeService,
         @Optional()
         private readonly ownershipService?: DirectoryOwnershipService,
     ) {}
@@ -146,15 +191,22 @@ export class ItemHealthService {
         for (const item of itemsToCheck) {
             const result = results[item.source_url];
             const nextHealth = this.buildItemHealth(item.health, result, options.trigger);
+            const nextSourceValidation = await this.buildSourceValidation(
+                item,
+                nextHealth,
+                directory,
+                user,
+            );
 
             const updatedItem = await data.updateItem(item.slug!, {
                 health: nextHealth,
+                source_validation: nextSourceValidation,
             });
 
             if (updatedItem) {
                 checkedItems.push(updatedItem);
             } else {
-                checkedItems.push({ ...item, health: nextHealth });
+                checkedItems.push({ ...item, health: nextHealth, source_validation: nextSourceValidation });
             }
 
             if (!this.areHealthStatesEqual(item.health, nextHealth)) {
@@ -254,6 +306,118 @@ export class ItemHealthService {
         }
 
         return 'Automated check could not verify the source URL';
+    }
+
+    private async buildSourceValidation(
+        item: ItemData,
+        health: ItemHealth,
+        directory: Directory,
+        user: User,
+    ): Promise<ItemSourceValidation> {
+        const checkedAt = health.checked_at || format(new Date(), 'yyyy-MM-dd HH:mm');
+
+        if (health.status === 'broken') {
+            return {
+                status: 'broken_source',
+                checked_at: checkedAt,
+                confidence_score: 1,
+                is_relevant: false,
+                is_specific: false,
+                is_official: false,
+                reason: health.message || 'Source URL is broken',
+                suggested_source_url: null,
+            };
+        }
+
+        if (!this.aiFacade.isConfigured()) {
+            return {
+                status: 'unknown',
+                checked_at: checkedAt,
+                confidence_score: null,
+                is_relevant: false,
+                is_specific: false,
+                is_official: false,
+                reason: 'AI source validation is not configured',
+                suggested_source_url: null,
+            };
+        }
+
+        const extracted = await this.contentExtractorFacade.extractContent(
+            item.source_url,
+            undefined,
+            {
+                userId: user.id,
+                directoryId: directory.id,
+            },
+        );
+
+        const pageContent = extracted?.rawContent?.slice(0, 2000) || '';
+        const httpSummary = this.buildHttpSummary(health);
+
+        try {
+            const { result } = await this.aiFacade.askJson(
+                SOURCE_VALIDATION_PROMPT,
+                sourceValidationSchema,
+                {
+                    variables: {
+                        itemName: item.name,
+                        itemDescription: item.description || '',
+                        candidateUrl: item.source_url,
+                        httpSummary,
+                        pageContent,
+                    },
+                    routing: {
+                        complexity: 'simple',
+                        autoEscalate: true,
+                    },
+                    temperature: 0,
+                },
+                {
+                    userId: user.id,
+                    directoryId: directory.id,
+                },
+            );
+
+            return {
+                status: result.status,
+                checked_at: checkedAt,
+                confidence_score: result.confidence_score,
+                is_relevant: result.is_relevant,
+                is_specific: result.is_specific,
+                is_official: result.is_official,
+                reason: result.reason,
+                suggested_source_url: result.suggested_source_url ?? null,
+            };
+        } catch (error) {
+            this.logger.warn(
+                `AI source validation failed for ${item.source_url}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+
+            return {
+                status: 'unknown',
+                checked_at: checkedAt,
+                confidence_score: null,
+                is_relevant: false,
+                is_specific: false,
+                is_official: false,
+                reason: 'AI could not validate this source',
+                suggested_source_url: null,
+            };
+        }
+    }
+
+    private buildHttpSummary(health: ItemHealth): string {
+        const parts: string[] = [`status=${health.status}`];
+
+        if (health.status_code) {
+            parts.push(`status_code=${health.status_code}`);
+        }
+
+        if (health.message) {
+            parts.push(`message=${health.message}`);
+        }
+
+        return parts.join(', ');
     }
 
     private buildCommitMessage(trigger: HealthCheckTrigger, itemCount: number): string {

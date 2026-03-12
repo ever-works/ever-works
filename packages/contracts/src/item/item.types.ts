@@ -92,6 +92,30 @@ export interface ItemHealth {
 }
 
 /**
+ * AI-evaluated validation status for whether a source URL is a good source for the item.
+ */
+export type ItemSourceValidationStatus =
+	| 'valid_source'
+	| 'broken_source'
+	| 'generic_source'
+	| 'weak_source'
+	| 'unknown';
+
+/**
+ * Result of validating whether an item's source URL is reachable and appropriate.
+ */
+export interface ItemSourceValidation {
+	readonly status: ItemSourceValidationStatus;
+	readonly checked_at?: string;
+	readonly confidence_score?: number | null;
+	readonly is_relevant?: boolean;
+	readonly is_specific?: boolean;
+	readonly is_official?: boolean;
+	readonly reason?: string | null;
+	readonly suggested_source_url?: string | null;
+}
+
+/**
  * Core item data structure for directory entries
  */
 export interface ItemData {
@@ -110,6 +134,7 @@ export interface ItemData {
 	readonly brand_logo_url?: string | null;
 	readonly images?: readonly string[];
 	readonly health?: ItemHealth;
+	readonly source_validation?: ItemSourceValidation;
 }
 
 /**
@@ -131,6 +156,7 @@ export interface MutableItemData {
 	brand_logo_url?: string | null;
 	images?: string[];
 	health?: ItemHealth;
+	source_validation?: ItemSourceValidation;
 }
 
 /**
