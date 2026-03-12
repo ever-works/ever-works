@@ -9,6 +9,7 @@ import {
 import { HistoryTable } from './HistoryTable';
 import { HistoryEmptyState } from './HistoryEmptyState';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { fetchDirectoryGenerationHistory } from '@/app/actions/dashboard/directories';
 import { toast } from 'sonner';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -17,6 +18,20 @@ interface DirectoryHistoryPageClientProps {
     directoryId: string;
     initialHistory: DirectoryGenerationHistoryResponse | null;
 }
+
+type HistoryActivityFilter =
+    | 'all'
+    | 'generation'
+    | 'items'
+    | 'comparisons'
+    | 'taxonomy'
+    | 'community_pr';
+
+type CachedHistoryPage = {
+    entries: DirectoryGenerationHistoryEntry[];
+    total: number;
+    limit: number;
+};
 
 export function DirectoryHistoryPageClient({
     directoryId,
@@ -31,8 +46,17 @@ export function DirectoryHistoryPageClient({
     const [total, setTotal] = useState(initialHistory?.total ?? 0);
     const [limit, setLimit] = useState(initialHistory?.limit ?? 10);
     const [currentPage, setCurrentPage] = useState(1);
-    const [pageCache, setPageCache] = useState<Record<number, DirectoryGenerationHistoryEntry[]>>(
-        initialHistory?.history ? { 1: initialHistory.history } : {},
+    const [activityFilter, setActivityFilter] = useState<HistoryActivityFilter>('all');
+    const [pageCache, setPageCache] = useState<Record<string, CachedHistoryPage>>(
+        initialHistory?.history
+            ? {
+                  'all:1': {
+                      entries: initialHistory.history,
+                      total: initialHistory.total,
+                      limit: initialHistory.limit,
+                  },
+              }
+            : {},
     );
     const [isPending, startTransition] = useTransition();
 
@@ -42,7 +66,18 @@ export function DirectoryHistoryPageClient({
             setTotal(initialHistory.total);
             setLimit(initialHistory.limit);
             setCurrentPage(1);
-            setPageCache(initialHistory.history ? { 1: initialHistory.history } : {});
+            setActivityFilter('all');
+            setPageCache(
+                initialHistory.history
+                    ? {
+                          'all:1': {
+                              entries: initialHistory.history,
+                              total: initialHistory.total,
+                              limit: initialHistory.limit,
+                          },
+                      }
+                    : {},
+            );
         }
     }, [initialHistory]);
 
@@ -54,15 +89,20 @@ export function DirectoryHistoryPageClient({
         return Math.max(1, Math.ceil(total / limit));
     }, [limit, total]);
 
-    const loadPage = (page: number) => {
+    const getCacheKey = (filter: HistoryActivityFilter, page: number) => `${filter}:${page}`;
+
+    const loadPage = (page: number, filter: HistoryActivityFilter = activityFilter) => {
         if (page < 1 || page > totalPages || isPending) {
             return;
         }
 
-        const cachedEntries = pageCache[page];
-        if (cachedEntries) {
+        const cacheKey = getCacheKey(filter, page);
+        const cachedPage = pageCache[cacheKey];
+        if (cachedPage) {
             setCurrentPage(page);
-            setEntries(cachedEntries);
+            setEntries(cachedPage.entries);
+            setTotal(cachedPage.total);
+            setLimit(cachedPage.limit);
             return;
         }
 
@@ -70,6 +110,7 @@ export function DirectoryHistoryPageClient({
             const result = await fetchDirectoryGenerationHistory(directoryId, {
                 limit,
                 offset: (page - 1) * limit,
+                activityType: filter === 'all' ? undefined : filter,
             });
 
             if (!result.success || !result.data?.history) {
@@ -87,7 +128,55 @@ export function DirectoryHistoryPageClient({
             setCurrentPage(page);
             setPageCache((prev) => ({
                 ...prev,
-                [page]: nextEntries,
+                [cacheKey]: {
+                    entries: nextEntries,
+                    total: payload.total ?? 0,
+                    limit: payload.limit ?? limit,
+                },
+            }));
+        });
+    };
+
+    const handleFilterChange = (value: string) => {
+        const nextFilter = value as HistoryActivityFilter;
+        setActivityFilter(nextFilter);
+        setCurrentPage(1);
+
+        const cacheKey = getCacheKey(nextFilter, 1);
+        const cachedPage = pageCache[cacheKey];
+        if (cachedPage) {
+            setEntries(cachedPage.entries);
+            setTotal(cachedPage.total);
+            setLimit(cachedPage.limit);
+            return;
+        }
+
+        startTransition(async () => {
+            const result = await fetchDirectoryGenerationHistory(directoryId, {
+                limit,
+                offset: 0,
+                activityType: nextFilter === 'all' ? undefined : nextFilter,
+            });
+
+            if (!result.success || !result.data?.history) {
+                console.error('Failed to load filtered history', result.error);
+                toast.error(t('error') ?? 'Failed to load history');
+                return;
+            }
+
+            const payload = result.data;
+            const nextEntries = payload.history ?? [];
+
+            setEntries(nextEntries);
+            setTotal(payload.total ?? 0);
+            setLimit(payload.limit ?? limit);
+            setPageCache((prev) => ({
+                ...prev,
+                [cacheKey]: {
+                    entries: nextEntries,
+                    total: payload.total ?? 0,
+                    limit: payload.limit ?? limit,
+                },
             }));
         });
     };
@@ -104,6 +193,21 @@ export function DirectoryHistoryPageClient({
                 <p className="mt-1 text-text-secondary dark:text-text-secondary-dark">
                     {t('subtitle')}
                 </p>
+            </div>
+
+            <div className="max-w-xs">
+                <Select
+                    value={activityFilter}
+                    onChange={(event) => handleFilterChange(event.target.value)}
+                    label="Activity"
+                >
+                    <option value="all">All activity</option>
+                    <option value="generation">Generation</option>
+                    <option value="items">Items</option>
+                    <option value="comparisons">Comparisons</option>
+                    <option value="taxonomy">Taxonomy</option>
+                    <option value="community_pr">Community PR</option>
+                </Select>
             </div>
 
             {entries.length === 0 ? (

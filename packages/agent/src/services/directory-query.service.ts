@@ -13,6 +13,7 @@ import {
     DirectoryGenerationHistoryListDto,
 } from '@src/dto/directory-generation-history.dto';
 import { DirectoryGenerationHistory } from '@src/entities/directory-generation-history.entity';
+import { DirectoryHistoryActivityType } from '@ever-works/contracts/api';
 
 // Extended directory response type with userRole for API responses
 // Uses Omit to exclude class methods from Directory, then adds userRole
@@ -400,17 +401,23 @@ export class DirectoryQueryService {
     async directoryGenerationHistory(
         directoryId: string,
         user: User,
-        options: { limit?: number; offset?: number } = {},
+        options: { limit?: number; offset?: number; activityType?: string } = {},
     ): Promise<DirectoryGenerationHistoryListDto> {
         // Any access level can view generation history
         const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);
 
         const limit = Math.min(Math.max(options.limit ?? 10, 1), 100);
         const offset = Math.max(options.offset ?? 0, 0);
+        const activityTypes = this.resolveHistoryActivityTypes(options.activityType);
 
         const [history, total] = await Promise.all([
-            this.generationHistoryRepository.findByDirectory(directory.id, limit, offset),
-            this.generationHistoryRepository.countByDirectory(directory.id),
+            this.generationHistoryRepository.findByDirectoryFiltered(
+                directory.id,
+                limit,
+                offset,
+                activityTypes,
+            ),
+            this.generationHistoryRepository.countByDirectory(directory.id, activityTypes),
         ]);
 
         return {
@@ -443,5 +450,35 @@ export class DirectoryQueryService {
             activityType: record.activityType,
             changelog: record.changelog ?? null,
         };
+    }
+
+    private resolveHistoryActivityTypes(
+        activityType?: string,
+    ): DirectoryHistoryActivityType[] | undefined {
+        switch (activityType) {
+            case 'generation':
+                return [DirectoryHistoryActivityType.GENERATION];
+            case 'items':
+                return [
+                    DirectoryHistoryActivityType.ITEM_ADDED,
+                    DirectoryHistoryActivityType.ITEM_UPDATED,
+                    DirectoryHistoryActivityType.ITEM_REMOVED,
+                ];
+            case 'comparisons':
+                return [
+                    DirectoryHistoryActivityType.COMPARISON_ADDED,
+                    DirectoryHistoryActivityType.COMPARISON_REMOVED,
+                ];
+            case 'taxonomy':
+                return [
+                    DirectoryHistoryActivityType.CATEGORY_CHANGE,
+                    DirectoryHistoryActivityType.TAG_CHANGE,
+                    DirectoryHistoryActivityType.COLLECTION_CHANGE,
+                ];
+            case 'community_pr':
+                return [DirectoryHistoryActivityType.COMMUNITY_PR_MERGED];
+            default:
+                return undefined;
+        }
     }
 }

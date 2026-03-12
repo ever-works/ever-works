@@ -106,11 +106,16 @@ export class DataGeneratorService {
             existingCollections: [],
             existingConfig: null,
         };
+        let existingItemsBeforeGeneration: ItemData[] = [];
 
         // Get existing data if available
         // get existing data only if we are in update mode
         if (createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE) {
             existingData = await this.getExistingData(directory, user);
+            existingItemsBeforeGeneration = existingData.existingItems;
+        } else if (createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE) {
+            existingItemsBeforeGeneration = (await this.getExistingData(directory, user))
+                .existingItems;
         }
 
         const existed = existingData.existingItems.length > 0;
@@ -413,6 +418,25 @@ export class DataGeneratorService {
                 name: item.name,
                 slug: item.slug,
             }));
+
+            if (isRecreate && existingItemsBeforeGeneration.length > 0) {
+                const generatedSlugSet = new Set(itemsWithSlugs.map((item) => item.slug!));
+                const removedEntries = existingItemsBeforeGeneration
+                    .filter((item) => {
+                        const slug = slugifyText(item.slug || item.name);
+                        return !generatedSlugSet.has(slug);
+                    })
+                    .map(
+                        (item): DirectoryHistoryChangeEntry => ({
+                            entityType: 'item',
+                            action: 'removed',
+                            name: item.name,
+                            slug: slugifyText(item.slug || item.name),
+                        }),
+                    );
+
+                changelogEntries.push(...removedEntries);
+            }
 
             await pMap(
                 itemsWithSlugs,

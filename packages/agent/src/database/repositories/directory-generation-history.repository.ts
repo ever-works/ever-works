@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { DirectoryGenerationHistory, GenerationMetrics } from '@src/entities';
 import { GenerateStatusType } from '@src/entities/types';
 import { DirectoryHistoryActivityType, type DirectoryChangelog } from '@ever-works/contracts/api';
@@ -88,8 +88,33 @@ export class DirectoryGenerationHistoryRepository {
         });
     }
 
-    async countByDirectory(directoryId: string): Promise<number> {
-        return this.repository.count({ where: { directoryId } });
+    async findByDirectoryFiltered(
+        directoryId: string,
+        limit = 20,
+        offset = 0,
+        activityTypes?: DirectoryHistoryActivityType[],
+    ) {
+        return this.repository.find({
+            where: {
+                directoryId,
+                ...(activityTypes?.length ? { activityType: In(activityTypes) } : {}),
+            },
+            order: { startedAt: 'DESC', createdAt: 'DESC' },
+            take: limit,
+            skip: offset,
+        });
+    }
+
+    async countByDirectory(
+        directoryId: string,
+        activityTypes?: DirectoryHistoryActivityType[],
+    ): Promise<number> {
+        return this.repository.count({
+            where: {
+                directoryId,
+                ...(activityTypes?.length ? { activityType: In(activityTypes) } : {}),
+            },
+        });
     }
 
     async findById(id: string): Promise<DirectoryGenerationHistory | null> {

@@ -560,10 +560,14 @@ export const directoryAPI = {
     },
 
     // Get directory generation history
-    getHistory: async (id: string, options?: { limit?: number; offset?: number }) => {
+    getHistory: async (
+        id: string,
+        options?: { limit?: number; offset?: number; activityType?: string },
+    ) => {
         const params = new URLSearchParams();
         if (options?.limit !== undefined) params.append('limit', String(options.limit));
         if (options?.offset !== undefined) params.append('offset', String(options.offset));
+        if (options?.activityType) params.append('activityType', options.activityType);
         const query = params.toString() ? `?${params.toString()}` : '';
 
         return serverFetch<APIResponse<DirectoryGenerationHistoryResponse>>(

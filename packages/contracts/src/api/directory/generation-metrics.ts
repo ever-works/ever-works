@@ -28,10 +28,14 @@ export enum DirectoryHistoryActivityType {
 	ITEM_UPDATED = 'item_updated',
 	ITEM_REMOVED = 'item_removed',
 	COMPARISON_ADDED = 'comparison_added',
-	COMPARISON_REMOVED = 'comparison_removed'
+	COMPARISON_REMOVED = 'comparison_removed',
+	CATEGORY_CHANGE = 'category_change',
+	TAG_CHANGE = 'tag_change',
+	COLLECTION_CHANGE = 'collection_change',
+	COMMUNITY_PR_MERGED = 'community_pr_merged'
 }
 
-export type DirectoryHistoryChangeEntityType = 'item' | 'comparison';
+export type DirectoryHistoryChangeEntityType = 'item' | 'comparison' | 'category' | 'tag' | 'collection';
 
 export type DirectoryHistoryChangeAction = 'added' | 'updated' | 'removed';
 

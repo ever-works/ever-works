@@ -92,6 +92,14 @@ function formatActivityLabel(activityType: DirectoryGenerationHistoryEntry['acti
             return 'Comparison Added';
         case 'comparison_removed':
             return 'Comparison Removed';
+        case 'category_change':
+            return 'Category Change';
+        case 'tag_change':
+            return 'Tag Change';
+        case 'collection_change':
+            return 'Collection Change';
+        case 'community_pr_merged':
+            return 'Community PR';
         case 'generation':
         default:
             return 'Generation';
