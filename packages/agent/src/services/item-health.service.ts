@@ -274,8 +274,6 @@ export class ItemHealthService {
             case 'warning':
             case 'unknown':
                 return 'Item health check completed.';
-            case 'warning':
-                return 'Item health check completed.';
             case 'broken':
                 return `Item health check completed: source URL is broken.${suffix}`;
             case 'unchecked':
