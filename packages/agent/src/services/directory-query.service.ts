@@ -405,7 +405,7 @@ export class DirectoryQueryService {
         // Any access level can view generation history
         const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);
 
-        const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
+        const limit = Math.min(Math.max(options.limit ?? 10, 1), 100);
         const offset = Math.max(options.offset ?? 0, 0);
 
         const [history, total] = await Promise.all([

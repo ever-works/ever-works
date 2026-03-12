@@ -11,6 +11,7 @@ import { HistoryEmptyState } from './HistoryEmptyState';
 import { Button } from '@/components/ui/button';
 import { fetchDirectoryGenerationHistory } from '@/app/actions/dashboard/directories';
 import { toast } from 'sonner';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface DirectoryHistoryPageClientProps {
     directoryId: string;
@@ -28,9 +29,10 @@ export function DirectoryHistoryPageClient({
         initialHistory?.history ?? [],
     );
     const [total, setTotal] = useState(initialHistory?.total ?? 0);
-    const [limit, setLimit] = useState(initialHistory?.limit ?? 20);
-    const [offset, setOffset] = useState(
-        (initialHistory?.offset ?? 0) + (initialHistory?.history?.length ?? 0),
+    const [limit, setLimit] = useState(initialHistory?.limit ?? 10);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageCache, setPageCache] = useState<Record<number, DirectoryGenerationHistoryEntry[]>>(
+        initialHistory?.history ? { 1: initialHistory.history } : {},
     );
     const [isPending, startTransition] = useTransition();
 
@@ -39,37 +41,59 @@ export function DirectoryHistoryPageClient({
             setEntries(initialHistory.history);
             setTotal(initialHistory.total);
             setLimit(initialHistory.limit);
-            setOffset((initialHistory.offset ?? 0) + (initialHistory.history?.length ?? 0));
+            setCurrentPage(1);
+            setPageCache(initialHistory.history ? { 1: initialHistory.history } : {});
         }
     }, [initialHistory]);
 
-    const hasMore = useMemo(() => entries.length < total, [entries.length, total]);
+    const totalPages = useMemo(() => {
+        if (total <= 0) {
+            return 1;
+        }
 
-    const loadMore = () => {
-        if (!hasMore || isPending) {
+        return Math.max(1, Math.ceil(total / limit));
+    }, [limit, total]);
+
+    const loadPage = (page: number) => {
+        if (page < 1 || page > totalPages || isPending) {
+            return;
+        }
+
+        const cachedEntries = pageCache[page];
+        if (cachedEntries) {
+            setCurrentPage(page);
+            setEntries(cachedEntries);
             return;
         }
 
         startTransition(async () => {
             const result = await fetchDirectoryGenerationHistory(directoryId, {
                 limit,
-                offset,
+                offset: (page - 1) * limit,
             });
 
             if (!result.success || !result.data?.history) {
-                console.error('Failed to load more history entries', result.error);
+                console.error('Failed to load history page', result.error);
                 toast.error(t('error') ?? 'Failed to load history');
                 return;
             }
 
             const payload = result.data;
+            const nextEntries = payload.history ?? [];
 
-            setEntries((prev) => [...prev, ...(payload.history ?? [])]);
+            setEntries(nextEntries);
             setTotal(payload.total ?? 0);
             setLimit(payload.limit ?? limit);
-            setOffset((prev) => prev + (payload.history?.length ?? 0));
+            setCurrentPage(page);
+            setPageCache((prev) => ({
+                ...prev,
+                [page]: nextEntries,
+            }));
         });
     };
+
+    const showingFrom = entries.length === 0 ? 0 : (currentPage - 1) * limit + 1;
+    const showingTo = entries.length === 0 ? 0 : (currentPage - 1) * limit + entries.length;
 
     return (
         <div className="space-y-6">
@@ -85,15 +109,37 @@ export function DirectoryHistoryPageClient({
             {entries.length === 0 ? (
                 <HistoryEmptyState />
             ) : (
-                <HistoryTable entries={entries} locale={locale} />
-            )}
-
-            {hasMore && entries.length > 0 && (
-                <div className="flex justify-center">
-                    <Button onClick={loadMore} disabled={isPending} variant="secondary">
-                        {isPending ? `${t('loadMore')}…` : t('loadMore')}
-                    </Button>
-                </div>
+                <>
+                    <HistoryTable entries={entries} locale={locale} />
+                    {total > limit && (
+                        <div className="flex items-center justify-between">
+                            <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                                Showing {showingFrom}-{showingTo} of {total}
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => loadPage(currentPage - 1)}
+                                    disabled={currentPage <= 1 || isPending}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                                    {currentPage} / {totalPages}
+                                </span>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => loadPage(currentPage + 1)}
+                                    disabled={currentPage >= totalPages || isPending}
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );
