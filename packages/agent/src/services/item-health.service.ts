@@ -237,7 +237,7 @@ export class ItemHealthService {
             return 'warning';
         }
 
-        return 'broken';
+        return 'warning';
     }
 
     private buildHealthMessage(result: CheckLinkResult, status: ItemHealthStatus): string | null {
