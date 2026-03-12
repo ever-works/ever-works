@@ -110,7 +110,6 @@ export function OrganizationSelector({
     return (
         <div className="space-y-1.5">
             <label
-                htmlFor="organization"
                 className="block text-xs font-medium text-text-muted dark:text-text-muted-dark"
             >
                 {t('organizationSelector.label')}
