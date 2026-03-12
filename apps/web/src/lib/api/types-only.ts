@@ -50,6 +50,8 @@ export type {
     SubmitItemDto,
     RemoveItemDto,
     UpdateItemDto,
+    CheckItemHealthDto,
+    CheckItemHealthResponseDto,
     ExtractItemDetailsDto,
     ItemsGeneratorResponse,
     ExtractItemDetailsResponse,

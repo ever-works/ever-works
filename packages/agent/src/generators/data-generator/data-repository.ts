@@ -650,10 +650,7 @@ export class DataRepository {
         await fs.writeFile(filepath, str, 'utf-8');
     }
 
-    async updateItemMetadata(
-        slug: string,
-        updates: Partial<Pick<ItemData, 'featured' | 'order'>>,
-    ): Promise<ItemData | null> {
+    async updateItem(slug: string, updates: Partial<ItemData>): Promise<ItemData | null> {
         const existing = await this.getItem(slug).catch(() => null);
         if (!existing) {
             return null;
@@ -666,6 +663,13 @@ export class DataRepository {
 
         await this.writeItem({ ...next, slug });
         return next;
+    }
+
+    async updateItemMetadata(
+        slug: string,
+        updates: Partial<Pick<ItemData, 'featured' | 'order'>>,
+    ): Promise<ItemData | null> {
+        return this.updateItem(slug, updates);
     }
 
     async writeItemMarkdown(item: ItemData, markdown: string) {

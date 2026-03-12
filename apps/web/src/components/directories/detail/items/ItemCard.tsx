@@ -5,7 +5,7 @@ import { ItemData, ItemBadges } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
-import { ExternalLink, Star, Eye } from 'lucide-react';
+import { ExternalLink, Star, Eye, AlertTriangle } from 'lucide-react';
 import { removeItem } from '@/app/actions/dashboard/items';
 import { toast } from 'sonner';
 import { getCategoryName } from '@/lib/utils/items';
@@ -105,6 +105,7 @@ const ItemCardList = memo(function ItemCardList({
                     <h4 className="font-medium text-text dark:text-text-dark truncate">
                         {item.name}
                     </h4>
+                    <ItemHealthBadge item={item} />
                     <ItemBadgesDisplay badges={item.badges} />
                 </div>
                 {item.description && (
@@ -192,6 +193,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
                     <h4 className="font-medium text-text dark:text-text-dark line-clamp-1">
                         {item.name}
                     </h4>
+                    <ItemHealthBadge item={item} />
                 </div>
                 {canEdit && (
                     <ItemActions
@@ -252,6 +254,31 @@ const ItemCardGrid = memo(function ItemCardGrid({
         </div>
     );
 });
+
+function ItemHealthBadge({ item }: { item: ItemData }) {
+    if (!item.health || item.health.status === 'healthy' || item.health.status === 'unchecked') {
+        return null;
+    }
+
+    const isBroken = item.health.status === 'broken';
+    const label = isBroken ? 'Broken link' : 'Needs review';
+    const tone = isBroken
+        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
+
+    return (
+        <span
+            className={cn(
+                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
+                tone,
+            )}
+            title={item.health.message || label}
+        >
+            <AlertTriangle className="h-3 w-3" />
+            {label}
+        </span>
+    );
+}
 
 const BADGE_STYLES: Record<string, { good: string; bad: string; neutral: string }> = {
     // SOFTWARE badges

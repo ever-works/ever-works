@@ -19,6 +19,7 @@ import { TriggerInternalApiClient } from '../services/trigger-internal-api.clien
 import { createRemoteProxy } from '../remote-proxy';
 import { TriggerGenerationOrchestrator } from '../orchestrators/trigger-generation.orchestrator';
 import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orchestrator';
+import { ItemHealthService } from '@ever-works/agent/services';
 
 @Module({
     imports: [
@@ -54,6 +55,7 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
         SourceRepoAnalyzerService,
         AwesomeReadmeParserService,
         ImportExecutorService,
+        ItemHealthService,
         TriggerGenerationOrchestrator,
         TriggerImportOrchestrator,
     ],

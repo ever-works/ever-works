@@ -365,6 +365,12 @@ export class DataGeneratorService {
                     slugifyText(item.slug || item.name),
                 ),
             );
+            const existingItemsBySlug = new Map(
+                (existingData.existingItems || []).map((item) => [
+                    slugifyText(item.slug || item.name),
+                    item,
+                ]),
+            );
 
             // Prepare items with slugs and count new vs updated
             // Create mutable copies since pipeline returns readonly items
@@ -395,6 +401,7 @@ export class DataGeneratorService {
                     brand: item.brand,
                     brand_logo_url: item.brand_logo_url,
                     images: item.images ? [...item.images] : undefined,
+                    health: existingItemsBySlug.get(slugifyText(item.slug || item.name))?.health,
                 };
                 return mutableItem;
             });
@@ -1369,10 +1376,19 @@ export class DataGeneratorService {
             }
 
             // Prepare items
-            const itemsWithSlugs = importedData.items.map((item) => ({
-                ...item,
-                slug: item.slug || slugifyText(item.name),
-            }));
+            const existingItemsBySlug = new Map<string, ItemData>(
+                existingItems.map((item) => [slugifyText(item.slug || item.name), item] as const),
+            );
+            const itemsWithSlugs = importedData.items.map((item) => {
+                const slug = item.slug || slugifyText(item.name);
+                const existingItem = existingItemsBySlug.get(slug);
+
+                return {
+                    ...item,
+                    slug,
+                    health: existingItem?.health,
+                };
+            });
 
             // Calculate stats
             const newItemsCount = itemsWithSlugs.filter(

@@ -47,6 +47,8 @@ import {
     SubmitItemResponseDto,
     UpdateItemsGeneratorDto,
     UpdateItemDto,
+    CheckItemHealthDto,
+    CheckItemHealthResponseDto,
 } from '@ever-works/agent/items-generator';
 import { BulkCaptureImagesDto, BulkCaptureImagesResponseDto } from '@ever-works/agent/services';
 import {
@@ -63,6 +65,7 @@ import {
     DirectoryAdvancedPromptsService,
     DirectoryTaxonomyService,
     GeneratorFormSchemaService,
+    ItemHealthService,
 } from '@ever-works/agent/services';
 import { ComparisonGenerationService } from '@ever-works/agent/comparison-generator';
 import {
@@ -106,6 +109,7 @@ export class DirectoriesController {
         private readonly directoryAdvancedPromptsService: DirectoryAdvancedPromptsService,
         private readonly directoryTaxonomyService: DirectoryTaxonomyService,
         private readonly generatorFormSchemaService: GeneratorFormSchemaService,
+        private readonly itemHealthService: ItemHealthService,
         private readonly communityPrProcessorService: CommunityPrProcessorService,
         private readonly comparisonGenerationService: ComparisonGenerationService,
         private readonly directoryRepository: DirectoryRepository,
@@ -567,6 +571,29 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         return this.directoryGenerationService.updateItemMetadata(id, updateItemDto, user);
+    }
+
+    @Post('directories/:id/check-item-health')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Check item health',
+        description: 'Run a source URL health check for a single item and persist the result',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Item health checked successfully' })
+    async checkItemHealth(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() checkItemHealthDto: CheckItemHealthDto,
+    ): Promise<CheckItemHealthResponseDto> {
+        const user = await this.authService.getUser(auth.userId);
+        const result = await this.itemHealthService.checkItem(
+            id,
+            checkItemHealthDto.item_slug,
+            user,
+        );
+        await this.cacheManager.del(`directory-items-${id}-${auth.userId}`);
+        return result;
     }
 
     @Post('extract-item-details')

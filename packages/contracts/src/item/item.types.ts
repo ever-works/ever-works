@@ -75,6 +75,23 @@ export interface BadgeEvaluationResult {
 }
 
 /**
+ * Health status for an item's source URL.
+ */
+export type ItemHealthStatus = 'unchecked' | 'healthy' | 'warning' | 'broken';
+
+/**
+ * Result of the latest source URL health check for an item.
+ */
+export interface ItemHealth {
+	readonly status: ItemHealthStatus;
+	readonly checked_at?: string;
+	readonly status_code?: number | null;
+	readonly message?: string | null;
+	readonly failure_count?: number;
+	readonly checked_via?: 'manual' | 'schedule';
+}
+
+/**
  * Core item data structure for directory entries
  */
 export interface ItemData {
@@ -92,6 +109,7 @@ export interface ItemData {
 	readonly brand?: string | Brand;
 	readonly brand_logo_url?: string | null;
 	readonly images?: readonly string[];
+	readonly health?: ItemHealth;
 }
 
 /**
@@ -112,6 +130,7 @@ export interface MutableItemData {
 	brand?: string | Brand;
 	brand_logo_url?: string | null;
 	images?: string[];
+	health?: ItemHealth;
 }
 
 /**

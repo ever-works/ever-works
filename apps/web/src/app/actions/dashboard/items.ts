@@ -173,6 +173,45 @@ export async function updateItem(directoryId: string, data: UpdateItemDto) {
     }
 }
 
+export async function checkItemHealth(directoryId: string, itemSlug: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('dashboard.directoryDetail.items');
+
+    try {
+        const response = await itemsGeneratorAPI.checkItemHealth(directoryId, {
+            item_slug: itemSlug,
+        });
+
+        if (response.status === 'success') {
+            revalidatePath(`/directories/${directoryId}/items`);
+            revalidatePath(`/directories/${directoryId}`);
+        }
+
+        return {
+            status: response.status,
+            message:
+                response.message ||
+                (response.status === 'success'
+                    ? 'Item health check completed'
+                    : 'Item health check failed'),
+            item: response.item,
+        };
+    } catch (error) {
+        console.error('Check item health error:', error);
+        return {
+            status: 'error' as const,
+            message:
+                error instanceof Error
+                    ? error.message
+                    : t('updateError', { defaultValue: 'Failed to update item' }),
+        };
+    }
+}
+
 export async function captureScreenshot(sourceUrl: string) {
     const user = await getAuthFromCookie();
     if (!user) {
