@@ -6,6 +6,13 @@ import { ItemData } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { useTranslations } from 'next-intl';
 import { Grid as GridIcon, List as ListIcon } from 'lucide-react';
 import { ItemCard } from './ItemCard';
@@ -137,23 +144,22 @@ export function ItemsList({ items: initialItems, addItemRef }: ItemsListProps) {
                 </div>
 
                 <div className="flex gap-2">
-                    <select
-                        value={selectedCategory || ''}
-                        onChange={(e) => setSelectedCategory(e.target.value || null)}
-                        className={cn(
-                            'px-3 py-2 rounded-lg border text-sm',
-                            'bg-surface dark:bg-surface-dark',
-                            'border-border dark:border-border-dark',
-                            'text-text dark:text-text-dark',
-                        )}
+                    <Select
+                        value={selectedCategory || '__all__'}
+                        onValueChange={(val) => setSelectedCategory(val === '__all__' ? null : val)}
                     >
-                        <option value="">{t('allCategories')}</option>
-                        {categories.map((cat) => (
-                            <option key={cat} value={cat}>
-                                {UnSlug(cat)}
-                            </option>
-                        ))}
-                    </select>
+                        <SelectTrigger size="sm" className="w-auto min-w-36">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="__all__">{t('allCategories')}</SelectItem>
+                            {categories.map((cat) => (
+                                <SelectItem key={cat} value={cat}>
+                                    {UnSlug(cat)}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
 
                     <div className="flex rounded-lg border border-border dark:border-border-dark">
                         <Button

@@ -23,6 +23,13 @@ import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     Dialog,
     DialogContent,
     DialogHeader,
@@ -360,56 +367,57 @@ export function ComparisonsPageClient({
                                     <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
                                         {t('aiModel.provider')}
                                     </label>
-                                    <select
-                                        value={aiProvider}
-                                        onChange={(e) => handleProviderChange(e.target.value)}
-                                        className={cn(
-                                            'w-full rounded-lg border border-border dark:border-border-dark',
-                                            'bg-surface dark:bg-surface-dark',
-                                            'px-3 py-2 text-sm text-text dark:text-text-dark',
-                                            'focus:border-primary dark:focus:border-primary-dark',
-                                            'focus:ring-2 focus:ring-primary/20 focus:outline-none',
-                                        )}
+                                    <Select
+                                        value={aiProvider || '__default__'}
+                                        onValueChange={(val) =>
+                                            handleProviderChange(val === '__default__' ? '' : val)
+                                        }
                                     >
-                                        <option value="">{t('aiModel.default')}</option>
-                                        {availableProviders.map((p) => (
-                                            <option key={p.id} value={p.id}>
-                                                {p.name}
-                                                {p.isDefault
-                                                    ? ` ${t('aiModel.defaultSuffix')}`
-                                                    : ''}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__default__">
+                                                {t('aiModel.default')}
+                                            </SelectItem>
+                                            {availableProviders.map((p) => (
+                                                <SelectItem key={p.id} value={p.id}>
+                                                    {p.name}
+                                                    {p.isDefault
+                                                        ? ` ${t('aiModel.defaultSuffix')}`
+                                                        : ''}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                                 <div className="flex-1">
                                     <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
                                         {t('aiModel.model')}
                                     </label>
-                                    <select
-                                        value={aiModel}
-                                        onChange={(e) => setAiModel(e.target.value)}
+                                    <Select
+                                        value={aiModel || '__provider_default__'}
+                                        onValueChange={(val) =>
+                                            setAiModel(val === '__provider_default__' ? '' : val)
+                                        }
                                         disabled={!aiProvider || isLoadingModels}
-                                        className={cn(
-                                            'w-full rounded-lg border border-border dark:border-border-dark',
-                                            'bg-surface dark:bg-surface-dark',
-                                            'px-3 py-2 text-sm text-text dark:text-text-dark',
-                                            'focus:border-primary dark:focus:border-primary-dark',
-                                            'focus:ring-2 focus:ring-primary/20 focus:outline-none',
-                                            'disabled:opacity-50 disabled:cursor-not-allowed',
-                                        )}
                                     >
-                                        <option value="">
-                                            {isLoadingModels
-                                                ? t('aiModel.loadingModels')
-                                                : t('aiModel.providerDefault')}
-                                        </option>
-                                        {availableModels.map((m) => (
-                                            <option key={m.id} value={m.id}>
-                                                {m.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__provider_default__">
+                                                {isLoadingModels
+                                                    ? t('aiModel.loadingModels')
+                                                    : t('aiModel.providerDefault')}
+                                            </SelectItem>
+                                            {availableModels.map((m) => (
+                                                <SelectItem key={m.id} value={m.id}>
+                                                    {m.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                                 <Button
                                     size="sm"

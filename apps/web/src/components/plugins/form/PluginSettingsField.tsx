@@ -4,6 +4,13 @@
 import { useTranslations } from 'next-intl';
 import { PluginSettingsSchemaProperty } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Eye, EyeOff, Pencil, X, KeyRound } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { PluginModelSelect } from './PluginModelSelect';
@@ -121,25 +128,24 @@ export function PluginSettingsField({
 
         // Enum - select (works for any type)
         if (schema.enum && schema.enum.length > 0) {
+            const currentValue = String(value ?? schema.default ?? '') || '__none__';
             return (
-                <select
-                    value={String(value ?? schema.default ?? '')}
-                    onChange={(e) => onChange(e.target.value || null)}
-                    required={required}
-                    className={cn(
-                        'w-full px-3 py-2 rounded-lg border border-border dark:border-border-dark',
-                        'bg-surface-secondary dark:bg-surface-secondary-dark',
-                        'text-text dark:text-text-dark',
-                        'focus:outline-none focus:ring-2 focus:ring-primary/50',
-                    )}
+                <Select
+                    value={currentValue}
+                    onValueChange={(v) => onChange(v === '__none__' ? null : v)}
                 >
-                    <option value="">{t('selectPlaceholder')}</option>
-                    {schema.enum.map((opt) => (
-                        <option key={String(opt)} value={String(opt)}>
-                            {String(opt)}
-                        </option>
-                    ))}
-                </select>
+                    <SelectTrigger>
+                        <SelectValue placeholder={t('selectPlaceholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="__none__">{t('selectPlaceholder')}</SelectItem>
+                        {schema.enum.map((opt) => (
+                            <SelectItem key={String(opt)} value={String(opt)}>
+                                {String(opt)}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
             );
         }
 

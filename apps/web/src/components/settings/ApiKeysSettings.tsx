@@ -4,6 +4,13 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     Dialog,
     DialogContent,
     DialogHeader,
@@ -262,17 +269,21 @@ export function ApiKeysSettings({ initialKeys }: ApiKeysSettingsProps) {
                                 <label className="block text-sm font-medium text-text dark:text-text-dark mb-1.5">
                                     {t('dialog.expirationLabel')}
                                 </label>
-                                <select
+                                <Select
                                     value={newKeyExpiration}
-                                    onChange={(e) => setNewKeyExpiration(e.target.value)}
-                                    className="w-full rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm text-text dark:text-text-dark"
+                                    onValueChange={setNewKeyExpiration}
                                 >
-                                    {EXPIRATION_OPTIONS.map((opt) => (
-                                        <option key={opt.value} value={opt.value}>
-                                            {opt.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {EXPIRATION_OPTIONS.map((opt) => (
+                                            <SelectItem key={opt.value} value={opt.value}>
+                                                {opt.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
 
                             <DialogFooter>
