@@ -78,27 +78,31 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
         <>
             <div
                 className={cn(
-                    'rounded-lg border-2 p-6',
+                    'rounded-lg border overflow-hidden',
                     'bg-red-50 dark:bg-red-950/30',
                     'border-red-200 dark:border-red-900',
                 )}
             >
-                <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
+                <div className="px-5 py-3.5 border-b border-red-200 dark:border-red-900">
+                    <h3 className="text-sm font-semibold text-red-800 dark:text-red-200">
                         {t('dangerZone')}
                     </h3>
-                    <p className="text-sm text-red-700 dark:text-red-300">{t('deleteWarning')}</p>
                 </div>
+                <div className="px-5 py-4">
+                    <p className="text-xs text-red-700 dark:text-red-300 mb-4">
+                        {t('deleteWarning')}
+                    </p>
 
-                <Button
-                    onClick={handleOpenDialog}
-                    variant="danger"
-                    className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
-                    title={isGenerating ? t('cantDeleteWhileGenerating') : undefined}
-                    disabled={isPending || isGenerating}
-                >
-                    {t('deleteButton')}
-                </Button>
+                    <Button
+                        onClick={handleOpenDialog}
+                        variant="danger"
+                        className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
+                        title={isGenerating ? t('cantDeleteWhileGenerating') : undefined}
+                        disabled={isPending || isGenerating}
+                    >
+                        {t('deleteButton')}
+                    </Button>
+                </div>
             </div>
 
             <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

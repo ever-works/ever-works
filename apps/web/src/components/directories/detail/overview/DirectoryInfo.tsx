@@ -7,7 +7,20 @@ import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
 import { Link } from '@/i18n/navigation';
-import { Users, UserCircle, Lock, Unlock, ExternalLink, Cloud } from 'lucide-react';
+import {
+    Users,
+    UserCircle,
+    Lock,
+    Unlock,
+    ExternalLink,
+    Cloud,
+    Hash,
+    GitBranch,
+    Building2,
+    FolderGit2,
+    Calendar,
+    FileText,
+} from 'lucide-react';
 
 interface DirectoryInfoProps {
     directory: Directory;
@@ -28,7 +41,7 @@ function RepoVisibilityIcon({
     const visibilityLabel = isPrivate ? t('private') : t('public');
     return (
         <div
-            className="flex items-center gap-1 text-xs text-muted-foreground"
+            className="flex items-center gap-1 text-xs text-text-muted dark:text-text-muted-dark"
             title={`${label}: ${visibilityLabel}`}
         >
             {isPrivate ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
@@ -59,30 +72,12 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
                     {t(`role.${userRole || DirectoryMemberRole.OWNER}`)}
                 </span>
             ),
-            icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                </svg>
-            ),
+            icon: <UserCircle className="w-3.5 h-3.5" />,
         },
         {
             label: t('slug'),
-            value: directory.slug,
-            icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"
-                    />
-                </svg>
-            ),
+            value: <span className="font-mono text-xs">{directory.slug}</span>,
+            icon: <Hash className="w-3.5 h-3.5" />,
         },
         {
             label: t('gitProvider'),
@@ -100,16 +95,7 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
                     )}
                 </div>
             ),
-            icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                    />
-                </svg>
-            ),
+            icon: <GitBranch className="w-3.5 h-3.5" />,
         },
         {
             label: t('deployProvider'),
@@ -133,21 +119,12 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
                     {t('notConfigured')}
                 </span>
             ),
-            icon: <Cloud className="w-4 h-4" />,
+            icon: <Cloud className="w-3.5 h-3.5" />,
         },
         {
             label: t('organization'),
             value: directory.organization ? directory.owner || t('yes') : t('no'),
-            icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                </svg>
-            ),
+            icon: <Building2 className="w-3.5 h-3.5" />,
         },
         {
             label: t('repositories'),
@@ -206,45 +183,18 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
                     </li>
                 </ul>
             ),
-            icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h3m-3-8h7m-7 3h7m-7 3h7m2-10v16m-2-5h.01M7 20h5a2 2 0 002-2v-6a2 2 0 00-2-2H7a2 2 0 00-2 2v6a2 2 0 002 2h5m-2 4h.01"
-                    />
-                </svg>
-            ),
+            icon: <FolderGit2 className="w-3.5 h-3.5" />,
         },
         {
             label: t('created'),
             value: new Date(directory.createdAt),
-            icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                </svg>
-            ),
+            icon: <Calendar className="w-3.5 h-3.5" />,
         },
 
         // {
         //     label: t('lastUpdated'),
         //     value: new Date(directory.updatedAt),
-        //     icon: (
-        //         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        //             <path
-        //                 strokeLinecap="round"
-        //                 strokeLinejoin="round"
-        //                 strokeWidth={2}
-        //                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-        //             />
-        //         </svg>
-        //     ),
+        //     icon: <Calendar className="w-3.5 h-3.5" />,
         // },
     ];
 
@@ -256,16 +206,7 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
                 value: directory.readmeConfig.overwriteDefaultHeader
                     ? t('customOverwrite')
                     : t('custom'),
-                icon: (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                    </svg>
-                ),
+                icon: <FileText className="w-3.5 h-3.5" />,
             });
         }
         if (directory.readmeConfig.footer) {
@@ -274,16 +215,7 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
                 value: directory.readmeConfig.overwriteDefaultFooter
                     ? t('customOverwrite')
                     : t('custom'),
-                icon: (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                    </svg>
-                ),
+                icon: <FileText className="w-3.5 h-3.5" />,
             });
         }
     }
@@ -291,33 +223,31 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
     return (
         <div
             className={cn(
-                'rounded-lg border p-6',
-                'bg-card dark:bg-card-dark',
+                'rounded-lg border overflow-hidden',
+                'bg-card dark:bg-card-primary-dark/30',
                 'border-card-border dark:border-card-border-dark',
             )}
         >
-            <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
-                {t('title')}
-            </h3>
-            <div className="space-y-4">
+            <div className="px-5 py-3.5 border-b border-card-border dark:border-card-border-dark">
+                <h3 className="text-sm font-semibold text-text dark:text-text-dark">
+                    {t('title')}
+                </h3>
+            </div>
+            <div className="divide-y divide-card-border dark:divide-card-border-dark">
                 {infoItems
                     .filter((item) => item.active !== false)
                     .map((item) => (
-                        <div key={item.label} className="flex items-start gap-3">
-                            <div className="mt-0.5 text-text-muted dark:text-text-muted-dark">
+                        <div key={item.label} className="flex items-start gap-3 px-5 py-3">
+                            <div className="flex items-center gap-1.5 w-32 shrink-0 pt-0.5 text-text-muted dark:text-text-muted-dark">
                                 {item.icon}
+                                <span className="text-xs">{item.label}</span>
                             </div>
-                            <div className="flex-1">
-                                <p className="text-xs text-text-muted dark:text-text-muted-dark mb-1">
-                                    {item.label}
-                                </p>
-                                <div className="text-sm font-medium text-text dark:text-text-dark">
-                                    {item.value instanceof Date ? (
-                                        <DisplayDate date={item.value.toISOString()} />
-                                    ) : (
-                                        item.value
-                                    )}
-                                </div>
+                            <div className="flex-1 text-xs text-text dark:text-text-dark">
+                                {item.value instanceof Date ? (
+                                    <DisplayDate date={item.value.toISOString()} />
+                                ) : (
+                                    item.value
+                                )}
                             </div>
                         </div>
                     ))}
