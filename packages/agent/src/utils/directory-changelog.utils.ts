@@ -1,4 +1,8 @@
-import type { DirectoryChangelog, DirectoryHistoryChangeEntry } from '@ever-works/contracts/api';
+import type {
+    DirectoryChangelog,
+    DirectoryHistoryChangeEntityType,
+    DirectoryHistoryChangeEntry,
+} from '@ever-works/contracts/api';
 
 export function buildDirectoryChangelog(
     entries: DirectoryHistoryChangeEntry[],
@@ -28,7 +32,7 @@ function buildDefaultSummary(
     removedCount: number,
 ): string {
     const entityType = entries[0]?.entityType ?? 'item';
-    const label = entityType === 'comparison' ? 'comparison' : 'item';
+    const label = getEntityLabel(entityType);
     const parts: string[] = [];
 
     if (addedCount > 0) {
@@ -44,4 +48,20 @@ function buildDefaultSummary(
     }
 
     return parts.join(', ');
+}
+
+function getEntityLabel(entityType: DirectoryHistoryChangeEntityType): string {
+    switch (entityType) {
+        case 'comparison':
+            return 'comparison';
+        case 'category':
+            return 'category';
+        case 'tag':
+            return 'tag';
+        case 'collection':
+            return 'collection';
+        case 'item':
+        default:
+            return 'item';
+    }
 }
