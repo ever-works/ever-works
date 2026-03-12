@@ -12,8 +12,9 @@
     "dependencies": {
         "@ever-works/contracts": "workspace:*",
         "@ever-works/plugin": "workspace:*",
-        "@lottiefiles/dotlottie-react": "^0.18.3",
         "@headlessui/react": "^2.2.9",
+        "@lottiefiles/dotlottie-react": "^0.18.3",
+        "@radix-ui/react-accordion": "^1.2.12",
         "@tanstack/react-virtual": "^3.13.13",
         "clsx": "^2.1.1",
         "date-fns": "^4.1.0",
@@ -25,6 +26,7 @@
         "next-intl": "^4.6.1",
         "nextjs-toploader": "^3.9.17",
         "path-to-regexp": "^8.3.0",
+        "radix-ui": "^1.4.3",
         "react": "19.2.3",
         "react-dom": "19.2.3",
         "react-markdown": "^10.1.0",
