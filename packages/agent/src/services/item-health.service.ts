@@ -315,10 +315,9 @@ export class ItemHealthService {
         user: User,
     ): Promise<ItemSourceValidation> {
         const checkedAt = health.checked_at || format(new Date(), 'yyyy-MM-dd HH:mm');
+        const baseReachabilityStatus = this.mapReachabilityStatus(health);
 
-        const reachabilityStatus = this.mapReachabilityStatus(health);
-
-        if (reachabilityStatus === 'broken') {
+        if (baseReachabilityStatus === 'broken') {
             return {
                 reachability_status: 'broken',
                 accuracy_status: 'unknown',
@@ -334,7 +333,7 @@ export class ItemHealthService {
 
         if (!this.aiFacade.isConfigured()) {
             return {
-                reachability_status: reachabilityStatus,
+                reachability_status: baseReachabilityStatus,
                 accuracy_status: 'unknown',
                 checked_at: checkedAt,
                 confidence_score: null,
@@ -356,6 +355,7 @@ export class ItemHealthService {
         );
 
         const pageContent = extracted?.rawContent?.slice(0, 2000) || '';
+        const reachabilityStatus = this.resolveReachabilityStatus(baseReachabilityStatus, pageContent);
         const httpSummary = this.buildHttpSummary(health);
 
         try {
@@ -487,7 +487,7 @@ export class ItemHealthService {
                 return 'Reachability: broken link.';
             case 'unknown':
             default:
-                return 'Reachability: could not verify.';
+                return 'Reachability: automated check was inconclusive.';
         }
     }
 
@@ -503,6 +503,21 @@ export class ItemHealthService {
             default:
                 return 'Source accuracy: unknown.';
         }
+    }
+
+    private resolveReachabilityStatus(
+        baseReachabilityStatus: ItemSourceValidation['reachability_status'],
+        pageContent: string,
+    ): ItemSourceValidation['reachability_status'] {
+        if (baseReachabilityStatus !== 'unknown') {
+            return baseReachabilityStatus;
+        }
+
+        if (pageContent.trim().length > 0) {
+            return 'reachable';
+        }
+
+        return 'unknown';
     }
 
     private areHealthStatesEqual(previous: ItemHealth | undefined, next: ItemHealth): boolean {

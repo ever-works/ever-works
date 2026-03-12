@@ -363,7 +363,7 @@ function getReachabilityText(reachabilityStatus: ItemData['source_validation'] e
             return 'Broken link';
         case 'unknown':
         default:
-            return 'Could not verify reachability';
+            return 'Automated reachability inconclusive';
     }
 }
 
