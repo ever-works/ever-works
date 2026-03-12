@@ -272,6 +272,14 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			autoEnable: false,
 			visibility: 'public',
 			selectableProviderCategories: ['screenshot'],
+			uiHints: {
+				onboardingWizard: true,
+				validateOnSave: true,
+				includeInOnboarding: true,
+				onboardingPriority: 1,
+				completionFields: ['oauthToken', 'apiKey'],
+				onboardingDescription: 'Connect your AI assistant to power content generation across your directories.'
+			},
 			readme: [
 				'# Claude Code Generator Plugin',
 				'',

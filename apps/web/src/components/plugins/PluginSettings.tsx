@@ -38,8 +38,10 @@ interface PluginSettingsProps {
 
 export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps) {
     const t = useTranslations('dashboard.plugins');
-    const [showOpenRouterInputs, setShowOpenRouterInputs] = useState(
-        Boolean(plugin.settings?.apiKey || plugin.settings?.defaultModel),
+    const tOnboarding = useTranslations('onboarding.plugins');
+    const byokTrigger = plugin.uiHints?.byok?.triggerField;
+    const [byokRevealed, setByokRevealed] = useState(
+        !plugin.uiHints?.byok || Boolean(byokTrigger && plugin.settings?.[byokTrigger]),
     );
 
     const onSave = useCallback(
@@ -52,12 +54,11 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                 throw new Error(result.error);
             }
 
-            if (['claude-code', 'openrouter', 'vercel'].includes(plugin.pluginId)) {
+            if (plugin.uiHints?.validateOnSave) {
                 const validation = await validatePluginConnection(plugin.pluginId);
                 if (!validation.success) {
                     return { validationError: validation.error };
                 }
-
                 return { validationSuccess: validation.data?.message };
             }
         },
@@ -100,20 +101,16 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
     });
 
     const filteredVisibleProperties = useMemo(() => {
-        if (plugin.pluginId !== 'openrouter' || showOpenRouterInputs) {
+        if (!plugin.uiHints?.byok || byokRevealed) {
             return visibleProperties;
         }
+        return {};
+    }, [plugin.uiHints?.byok, byokRevealed, visibleProperties]);
 
-        const next = { ...visibleProperties };
-        delete next.apiKey;
-        delete next.defaultModel;
-        delete next.simpleModel;
-        delete next.mediumModel;
-        delete next.complexModel;
-        return next;
-    }, [plugin.pluginId, showOpenRouterInputs, visibleProperties]);
-
-    const hasVercelToken = Boolean(plugin.settings?.apiToken);
+    const setupLink = plugin.uiHints?.setupLink;
+    const showSetupButton =
+        setupLink &&
+        (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !plugin.settings?.[f]));
 
     return (
         <div className="space-y-6">
@@ -268,7 +265,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                 />
             )}
 
-            {plugin.pluginId === 'github' && (
+            {plugin.uiHints?.organizationSettings && (
                 <GitHubOrganizationsSettings
                     plugin={plugin}
                     connected={Boolean(oauthConnection?.connected)}
@@ -286,7 +283,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                     </div>
 
                     <div className="p-6">
-                        {plugin.pluginId === 'claude-code' ? (
+                        {plugin.uiHints?.onboardingWizard ? (
                             <ClaudeCodeOnboardingWizard
                                 pluginId={plugin.pluginId}
                                 visibleProperties={visibleProperties}
@@ -300,50 +297,49 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                             />
                         ) : (
                             <div className="space-y-5">
-                                {plugin.pluginId === 'openrouter' && !showOpenRouterInputs && (
+                                {plugin.uiHints?.byok && !byokRevealed && (
                                     <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
                                         <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                            Connect your own OpenRouter key to choose a default
-                                            model and unlock the full model tier configuration.
+                                            {tOnboarding('byokDescription')}
                                         </p>
                                         <Button
                                             variant="secondary"
                                             className="mt-3"
-                                            onClick={() => setShowOpenRouterInputs(true)}
+                                            onClick={() => setByokRevealed(true)}
                                         >
-                                            Bring your own key
+                                            {plugin.uiHints.byok.buttonLabel ??
+                                                tOnboarding('byokDefaultButton')}
                                         </Button>
                                     </div>
                                 )}
 
-                                {plugin.pluginId === 'vercel' && !hasVercelToken && (
+                                {showSetupButton && (
                                     <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
                                         <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                            Create a Vercel token first, then paste it below and
-                                            save to run a live verification.
+                                            {tOnboarding('setupTokenDescription')}
                                         </p>
                                         <a
-                                            href="https://vercel.com/account/tokens"
+                                            href={setupLink!.url}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="mt-3 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
                                         >
-                                            Get Vercel API token
+                                            {setupLink!.buttonLabel ?? setupLink!.label}
                                             <ExternalLink className="w-4 h-4" />
                                         </a>
                                     </div>
                                 )}
 
-                                {plugin.pluginId === 'vercel' && (
+                                {setupLink && (
                                     <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                        Tokens URL:{' '}
                                         <a
-                                            href="https://vercel.com/account/tokens"
+                                            href={setupLink.url}
                                             target="_blank"
                                             rel="noopener noreferrer"
+                                            aria-label={setupLink.label}
                                             className="text-primary hover:text-primary-hover underline"
                                         >
-                                            https://vercel.com/account/tokens
+                                            {setupLink.url}
                                         </a>
                                     </p>
                                 )}
@@ -360,7 +356,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                         )}
                     </div>
 
-                    {plugin.pluginId !== 'claude-code' && (
+                    {!plugin.uiHints?.onboardingWizard && (
                         <div className="flex items-center gap-3 px-6 py-4 border-t border-border dark:border-border-dark">
                             <Button
                                 variant="primary"

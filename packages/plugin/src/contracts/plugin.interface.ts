@@ -57,6 +57,19 @@ export interface IPlugin {
 	 * @returns Validation result (sync or async)
 	 */
 	validateSettings?(settings: Record<string, unknown>): ValidationResult | Promise<ValidationResult>;
+
+	/**
+	 * Optional: Validate a live connection using the provided settings.
+	 * Called by the backend when the user requests connection verification.
+	 * Implement this in plugins that support connection testing (e.g. verifying an API token).
+	 * @param settings - Fully resolved settings (including secrets) for this user.
+	 * @returns Validation result
+	 */
+	validateConnection?(settings: Record<string, unknown>): Promise<{
+		success: boolean;
+		message: string;
+		details?: Record<string, unknown>;
+	}>;
 }
 
 /**

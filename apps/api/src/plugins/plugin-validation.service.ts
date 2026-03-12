@@ -32,69 +32,44 @@ export class PluginValidationService {
 
         const plugin = registered.plugin as unknown as Record<string, unknown>;
 
-        if (pluginId === 'vercel') {
-            const token = settings.apiToken as unknown as string | undefined;
-            if (!token) {
-                throw new BadRequestException('Enter a Vercel API token before validating.');
+        // Prefer validateConnection() — plugins self-describe their validation logic
+        const validateConnection = plugin.validateConnection as
+            | ((s: Record<string, unknown>) => Promise<PluginConnectionValidationResult>)
+            | undefined;
+
+        if (typeof validateConnection === 'function') {
+            const result = await validateConnection.call(plugin, settings);
+            if (!result.success) {
+                throw new BadRequestException(result.message);
             }
-
-            const validateToken = plugin.validateToken as
-                | ((token: string) => Promise<boolean>)
-                | undefined;
-            const getAuthenticatedUser = plugin.getAuthenticatedUser as
-                | ((token: string) => Promise<{ username: string; email?: string } | null>)
-                | undefined;
-
-            const valid = (await validateToken?.(token)) ?? false;
-            if (!valid) {
-                throw new BadRequestException('Vercel rejected the API token.');
-            }
-
-            const user = await getAuthenticatedUser?.(token);
-
-            return {
-                success: true,
-                message: user?.username
-                    ? `Connected to Vercel as ${user.username}.`
-                    : 'Vercel connection verified.',
-                details: user ? { username: user.username, email: user.email } : undefined,
-            };
+            return result;
         }
 
+        // For OAuth / git-provider plugins, validate via the git facade
         if (registered.plugin.capabilities.includes('git-provider')) {
             const user = await this.gitFacade.getUser({ userId, providerId: pluginId });
-
             return {
                 success: true,
                 message: `Connected to ${registered.plugin.name} as ${user.login}.`,
-                details: {
-                    username: user.login,
-                    email: user.email,
-                },
+                details: { username: user.login, email: user.email },
             };
         }
 
+        // Fallback: generic availability check
         const isAvailable = plugin.isAvailable as
-            | ((settings?: Record<string, unknown>) => Promise<boolean>)
+            | ((s?: Record<string, unknown>) => Promise<boolean>)
             | undefined;
 
         if (typeof isAvailable === 'function') {
-            const available = await isAvailable(settings);
+            const available = await isAvailable.call(plugin, settings);
             if (!available) {
                 throw new BadRequestException(
                     `${registered.plugin.name} connection test failed. Check your credentials and try again.`,
                 );
             }
-
-            return {
-                success: true,
-                message: `${registered.plugin.name} connection verified.`,
-            };
+            return { success: true, message: `${registered.plugin.name} connection verified.` };
         }
 
-        return {
-            success: true,
-            message: `${registered.plugin.name} settings saved.`,
-        };
+        return { success: true, message: `${registered.plugin.name} settings saved.` };
     }
 }

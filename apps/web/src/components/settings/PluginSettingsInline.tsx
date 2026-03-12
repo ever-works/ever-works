@@ -27,8 +27,10 @@ export function PluginSettingsInline({
     defaultExpanded = false,
 }: PluginSettingsInlineProps) {
     const t = useTranslations('dashboard.plugins');
-    const [showOpenRouterInputs, setShowOpenRouterInputs] = useState(
-        Boolean(plugin.settings?.apiKey || plugin.settings?.defaultModel),
+    const tOnboarding = useTranslations('onboarding.plugins');
+    const byokTrigger = plugin.uiHints?.byok?.triggerField;
+    const [byokRevealed, setByokRevealed] = useState(
+        !plugin.uiHints?.byok || Boolean(byokTrigger && plugin.settings?.[byokTrigger]),
     );
 
     const hasOAuth = plugin.capabilities.includes('oauth') && oauthConnection !== undefined;
@@ -43,12 +45,11 @@ export function PluginSettingsInline({
                 throw new Error(result.error);
             }
 
-            if (['claude-code', 'openrouter', 'vercel'].includes(plugin.pluginId)) {
+            if (plugin.uiHints?.validateOnSave) {
                 const validation = await validatePluginConnection(plugin.pluginId);
                 if (!validation.success) {
                     return { validationError: validation.error };
                 }
-
                 return { validationSuccess: validation.data?.message };
             }
         },
@@ -75,18 +76,16 @@ export function PluginSettingsInline({
     });
 
     const filteredVisibleProperties = useMemo(() => {
-        if (plugin.pluginId !== 'openrouter' || showOpenRouterInputs) {
+        if (!plugin.uiHints?.byok || byokRevealed) {
             return visibleProperties;
         }
+        return {};
+    }, [plugin.uiHints?.byok, byokRevealed, visibleProperties]);
 
-        const next = { ...visibleProperties };
-        delete next.apiKey;
-        delete next.defaultModel;
-        delete next.simpleModel;
-        delete next.mediumModel;
-        delete next.complexModel;
-        return next;
-    }, [plugin.pluginId, showOpenRouterInputs, visibleProperties]);
+    const setupLink = plugin.uiHints?.setupLink;
+    const showSetupButton =
+        setupLink &&
+        (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !plugin.settings?.[f]));
 
     const headerContent = (
         <div className="flex items-center gap-3 min-w-0">
@@ -146,7 +145,7 @@ export function PluginSettingsInline({
                     />
                 )}
 
-                {plugin.pluginId === 'github' && (
+                {plugin.uiHints?.organizationSettings && (
                     <GitHubOrganizationsSettings
                         plugin={plugin}
                         connected={Boolean(oauthConnection?.connected)}
@@ -156,32 +155,30 @@ export function PluginSettingsInline({
                 {/* Settings Form */}
                 {hasSettings ? (
                     <div className="space-y-4">
-                        {plugin.pluginId === 'openrouter' && !showOpenRouterInputs && (
+                        {plugin.uiHints?.byok && !byokRevealed && (
                             <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
-                                <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                    Keep OpenRouter hidden until you are ready to bring your own API
-                                    key and model configuration.
-                                </p>
                                 <Button
                                     variant="secondary"
                                     size="sm"
                                     className="mt-3"
-                                    onClick={() => setShowOpenRouterInputs(true)}
+                                    onClick={() => setByokRevealed(true)}
                                 >
-                                    Bring your own key
+                                    {plugin.uiHints.byok.buttonLabel ??
+                                        tOnboarding('byokDefaultButton')}
                                 </Button>
                             </div>
                         )}
 
-                        {plugin.pluginId === 'vercel' && !plugin.settings?.apiToken && (
+                        {showSetupButton && (
                             <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
                                 <a
-                                    href="https://vercel.com/account/tokens"
+                                    href={setupLink!.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
+                                    aria-label={setupLink!.label}
                                     className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
                                 >
-                                    Get Vercel API token
+                                    {setupLink!.buttonLabel ?? setupLink!.label}
                                 </a>
                             </div>
                         )}

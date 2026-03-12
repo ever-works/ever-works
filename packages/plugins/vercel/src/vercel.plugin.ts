@@ -113,6 +113,27 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 		};
 	}
 
+	async validateConnection(settings: Record<string, unknown>): Promise<{
+		success: boolean;
+		message: string;
+		details?: Record<string, unknown>;
+	}> {
+		const token = settings.apiToken as string | undefined;
+		if (!token) {
+			return { success: false, message: 'Enter a Vercel API token before validating.' };
+		}
+		const valid = await this.validateToken(token);
+		if (!valid) {
+			return { success: false, message: 'Vercel rejected the API token.' };
+		}
+		const user = await this.getAuthenticatedUser(token);
+		return {
+			success: true,
+			message: user?.username ? `Connected to Vercel as ${user.username}.` : 'Vercel connection verified.',
+			details: user ? { username: user.username, email: user.email } : undefined
+		};
+	}
+
 	async getAuthenticatedUser(token: string): Promise<{ username: string; email?: string } | null> {
 		const user = await this.apiService.validateToken(token);
 		if (!user) {
@@ -249,6 +270,19 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 				'4. Save settings to verify the token before using it for deployments'
 			].join('\n'),
 			homepage: 'https://vercel.com/account/tokens',
+			uiHints: {
+				setupLink: {
+					url: 'https://vercel.com/account/tokens',
+					label: 'Vercel Tokens',
+					buttonLabel: 'Get Vercel API token',
+					showWhenEmpty: ['apiToken']
+				},
+				validateOnSave: true,
+				includeInOnboarding: true,
+				onboardingPriority: 4,
+				completionFields: ['apiToken'],
+				onboardingDescription: 'Add a Vercel token to publish your directories as live websites.'
+			},
 			icon: {
 				type: 'lucide',
 				value: 'Triangle',

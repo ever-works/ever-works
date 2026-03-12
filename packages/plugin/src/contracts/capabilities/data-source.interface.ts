@@ -145,11 +145,6 @@ export interface IDataSourcePlugin extends IPlugin {
 	isAvailable(): Promise<boolean>;
 
 	/**
-	 * Validate connection/credentials
-	 */
-	validateConnection?(): Promise<boolean>;
-
-	/**
 	 * Get supported query filters
 	 */
 	getSupportedFilters?(): readonly string[];

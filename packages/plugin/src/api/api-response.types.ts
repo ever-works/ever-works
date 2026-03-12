@@ -3,7 +3,15 @@
  * These types define the shape of plugin data returned by the API.
  */
 
-import type { PluginCategory, PluginAuthor, PluginIcon, PluginVisibility } from '../contracts/plugin-manifest.types.js';
+import type {
+	PluginCategory,
+	PluginAuthor,
+	PluginIcon,
+	PluginVisibility,
+	PluginUiHints
+} from '../contracts/plugin-manifest.types.js';
+
+export type { PluginUiHints };
 import type { PluginState } from '../contracts/lifecycle.types.js';
 import type { ConfigurationMode } from '../settings/settings.types.js';
 import type { JsonSchema, JsonSchemaType } from '../settings/json-schema.types.js';
@@ -182,6 +190,8 @@ export interface PluginResponse {
 	autoEnable?: boolean;
 	/** Whether this plugin is supplementary (auto-activated; not user-selectable as active provider) */
 	supplementary?: boolean;
+	/** UI behavior hints declared by the plugin. Drives plugin-specific UI without hardcoding IDs. */
+	uiHints?: PluginUiHints;
 }
 
 /**
