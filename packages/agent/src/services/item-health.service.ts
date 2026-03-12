@@ -206,7 +206,11 @@ export class ItemHealthService {
             if (updatedItem) {
                 checkedItems.push(updatedItem);
             } else {
-                checkedItems.push({ ...item, health: nextHealth, source_validation: nextSourceValidation });
+                checkedItems.push({
+                    ...item,
+                    health: nextHealth,
+                    source_validation: nextSourceValidation,
+                });
             }
 
             if (!this.areHealthStatesEqual(item.health, nextHealth)) {
@@ -355,7 +359,10 @@ export class ItemHealthService {
         );
 
         const pageContent = extracted?.rawContent?.slice(0, 2000) || '';
-        const reachabilityStatus = this.resolveReachabilityStatus(baseReachabilityStatus, pageContent);
+        const reachabilityStatus = this.resolveReachabilityStatus(
+            baseReachabilityStatus,
+            pageContent,
+        );
         const httpSummary = this.buildHttpSummary(health);
 
         try {

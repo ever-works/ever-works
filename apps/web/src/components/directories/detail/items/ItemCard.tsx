@@ -272,9 +272,7 @@ function ItemHealthBadge({ item }: { item: ItemData }) {
                 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
                 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
             )}
-            title={
-                item.source_validation?.reason || item.health?.message || 'Broken link'
-            }
+            title={item.source_validation?.reason || item.health?.message || 'Broken link'}
         >
             <AlertTriangle className="h-3 w-3" />
             Broken link
@@ -340,22 +338,19 @@ function ItemHealthDetails({ item, className }: { item: ItemData; className?: st
     }
 
     return (
-        <p
-            className={cn(
-                'mt-1 text-xs text-red-700 dark:text-red-300 line-clamp-2',
-                className,
-            )}
-        >
+        <p className={cn('mt-1 text-xs text-red-700 dark:text-red-300 line-clamp-2', className)}>
             {`${item.health.message || 'Broken link'}${checkedSuffix}`}
         </p>
     );
 }
 
-function getReachabilityText(reachabilityStatus: ItemData['source_validation'] extends infer T
-    ? T extends { reachability_status: infer R }
-        ? R
-        : never
-    : never) {
+function getReachabilityText(
+    reachabilityStatus: ItemData['source_validation'] extends infer T
+        ? T extends { reachability_status: infer R }
+            ? R
+            : never
+        : never,
+) {
     switch (reachabilityStatus) {
         case 'reachable':
             return 'Reachable';
@@ -367,11 +362,13 @@ function getReachabilityText(reachabilityStatus: ItemData['source_validation'] e
     }
 }
 
-function getAccuracyText(accuracyStatus: ItemData['source_validation'] extends infer T
-    ? T extends { accuracy_status: infer A }
-        ? A
-        : never
-    : never) {
+function getAccuracyText(
+    accuracyStatus: ItemData['source_validation'] extends infer T
+        ? T extends { accuracy_status: infer A }
+            ? A
+            : never
+        : never,
+) {
     switch (accuracyStatus) {
         case 'accurate':
             return 'Accurate source';
