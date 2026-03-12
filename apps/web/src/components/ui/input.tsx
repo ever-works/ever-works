@@ -92,6 +92,7 @@ const Input = ({
                         <button
                             type="button"
                             tabIndex={-1}
+                            aria-label="Increment"
                             onMouseDown={(e) => {
                                 e.preventDefault();
                                 handleStep('up');
@@ -110,6 +111,7 @@ const Input = ({
                         <button
                             type="button"
                             tabIndex={-1}
+                            aria-label="Decrement"
                             onMouseDown={(e) => {
                                 e.preventDefault();
                                 handleStep('down');

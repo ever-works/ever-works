@@ -14,7 +14,6 @@
         "@ever-works/plugin": "workspace:*",
         "@headlessui/react": "^2.2.9",
         "@lottiefiles/dotlottie-react": "^0.18.3",
-        "@radix-ui/react-accordion": "^1.2.12",
         "@tanstack/react-virtual": "^3.13.13",
         "clsx": "^2.1.1",
         "date-fns": "^4.1.0",

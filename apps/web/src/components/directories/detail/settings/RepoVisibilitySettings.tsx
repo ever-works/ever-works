@@ -87,7 +87,10 @@ export function RepoVisibilitySettings({ initialRepositories }: RepoVisibilitySe
             </div>
             <div className="px-5 py-4 space-y-4">
                 {repositories.map((repo) => (
-                    <div className="flex items-center justify-between p-3 border rounded-lg border-card-border dark:border-card-border-dark">
+                    <div
+                        key={repo.type}
+                        className="flex items-center justify-between p-3 border rounded-lg border-card-border dark:border-card-border-dark"
+                    >
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-medium text-text dark:text-text-dark capitalize">

@@ -502,12 +502,15 @@ function PipelineOverrideField({
 
     return (
         <FieldCard label={t('fields.pipeline')} helper={t('fields.pipelineHelp')}>
-            <Select value={value ?? ''} onValueChange={(val) => onChange(val || undefined)}>
+            <Select
+                value={value ?? '__inherit__'}
+                onValueChange={(val) => onChange(val === '__inherit__' ? undefined : val)}
+            >
                 <SelectTrigger>
                     <SelectValue placeholder={t('pipeline.inherit')} />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="">{t('pipeline.inherit')}</SelectItem>
+                    <SelectItem value="__inherit__">{t('pipeline.inherit')}</SelectItem>
                     {providers.map((p) => (
                         <SelectItem key={p.id} value={p.id} disabled={!p.configured}>
                             {p.name}

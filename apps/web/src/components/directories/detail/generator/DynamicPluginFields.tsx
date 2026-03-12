@@ -220,8 +220,10 @@ export function DynamicPluginFields({
                                 </label>
                             )}
                             <Select
-                                value={(value as string) || ''}
-                                onValueChange={(val) => handleFieldChange(field.name, val)}
+                                value={(value as string) || '__none__'}
+                                onValueChange={(val) =>
+                                    handleFieldChange(field.name, val === '__none__' ? '' : val)
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue
