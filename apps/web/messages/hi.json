@@ -630,7 +630,39 @@
                 },
                 "loadMore": "अधिक लोड करें",
                 "noMore": "और रिकॉर्ड नहीं",
-                "unknown": "अज्ञात"
+                "unknown": "अज्ञात",
+                "activity": {
+                    "generation": "जनरेशन",
+                    "item_added": "आइटम जोड़ा गया",
+                    "item_updated": "आइटम अपडेट किया गया",
+                    "item_removed": "आइटम हटाया गया",
+                    "comparison_added": "तुलना जोड़ी गई",
+                    "comparison_removed": "तुलना हटाई गई",
+                    "category_change": "श्रेणी परिवर्तन",
+                    "tag_change": "टैग परिवर्तन",
+                    "collection_change": "कलेक्शन परिवर्तन",
+                    "community_pr_merged": "कम्युनिटी PR"
+                },
+                "detail": {
+                    "added": "जोड़े गए",
+                    "updated": "अपडेट किए गए",
+                    "removed": "हटाए गए",
+                    "fields": "फ़ील्ड",
+                    "expand": "चेंजलॉग विवरण फैलाएँ",
+                    "collapse": "चेंजलॉग विवरण समेटें"
+                },
+                "filters": {
+                    "label": "गतिविधि",
+                    "all": "सभी गतिविधि",
+                    "generation": "जनरेशन",
+                    "items": "आइटम",
+                    "comparisons": "तुलनाएँ",
+                    "taxonomy": "वर्गीकरण",
+                    "community_pr": "कम्युनिटी PR"
+                },
+                "pagination": {
+                    "showing": "{total} में से {from}-{to} दिखाया जा रहा है"
+                }
             },
             "info": {
                 "title": "निर्देशिका जानकारी",

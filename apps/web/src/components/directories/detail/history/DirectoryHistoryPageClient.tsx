@@ -199,14 +199,14 @@ export function DirectoryHistoryPageClient({
                 <Select
                     value={activityFilter}
                     onChange={(event) => handleFilterChange(event.target.value)}
-                    label="Activity"
+                    label={t('filters.label')}
                 >
-                    <option value="all">All activity</option>
-                    <option value="generation">Generation</option>
-                    <option value="items">Items</option>
-                    <option value="comparisons">Comparisons</option>
-                    <option value="taxonomy">Taxonomy</option>
-                    <option value="community_pr">Community PR</option>
+                    <option value="all">{t('filters.all')}</option>
+                    <option value="generation">{t('filters.generation')}</option>
+                    <option value="items">{t('filters.items')}</option>
+                    <option value="comparisons">{t('filters.comparisons')}</option>
+                    <option value="taxonomy">{t('filters.taxonomy')}</option>
+                    <option value="community_pr">{t('filters.community_pr')}</option>
                 </Select>
             </div>
 
@@ -218,7 +218,11 @@ export function DirectoryHistoryPageClient({
                     {total > limit && (
                         <div className="flex items-center justify-between">
                             <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                                Showing {showingFrom}-{showingTo} of {total}
+                                {t('pagination.showing', {
+                                    from: showingFrom,
+                                    to: showingTo,
+                                    total,
+                                })}
                             </p>
                             <div className="flex items-center gap-2">
                                 <Button

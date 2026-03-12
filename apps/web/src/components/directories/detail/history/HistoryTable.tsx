@@ -80,29 +80,32 @@ function getStatusLabel(status: string, t: ReturnType<typeof useTranslations>) {
     }
 }
 
-function formatActivityLabel(activityType: DirectoryGenerationHistoryEntry['activityType']) {
+function getActivityLabel(
+    activityType: DirectoryGenerationHistoryEntry['activityType'],
+    t: ReturnType<typeof useTranslations>,
+) {
     switch (activityType) {
         case 'item_added':
-            return 'Item Added';
+            return t('activity.item_added');
         case 'item_updated':
-            return 'Item Updated';
+            return t('activity.item_updated');
         case 'item_removed':
-            return 'Item Removed';
+            return t('activity.item_removed');
         case 'comparison_added':
-            return 'Comparison Added';
+            return t('activity.comparison_added');
         case 'comparison_removed':
-            return 'Comparison Removed';
+            return t('activity.comparison_removed');
         case 'category_change':
-            return 'Category Change';
+            return t('activity.category_change');
         case 'tag_change':
-            return 'Tag Change';
+            return t('activity.tag_change');
         case 'collection_change':
-            return 'Collection Change';
+            return t('activity.collection_change');
         case 'community_pr_merged':
-            return 'Community PR';
+            return t('activity.community_pr_merged');
         case 'generation':
         default:
-            return 'Generation';
+            return t('activity.generation');
     }
 }
 
@@ -201,8 +204,8 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                                         className="mt-0.5 rounded p-0.5 text-text-secondary transition hover:bg-muted dark:text-text-secondary-dark dark:hover:bg-muted/20"
                                                         aria-label={
                                                             isExpanded
-                                                                ? 'Collapse changelog details'
-                                                                : 'Expand changelog details'
+                                                                ? t('detail.collapse')
+                                                                : t('detail.expand')
                                                         }
                                                     >
                                                         {isExpanded ? (
@@ -224,7 +227,7 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                                         {getStatusLabel(statusKey, t)}
                                                     </span>
                                                     <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                                                        {formatActivityLabel(entry.activityType)}
+                                                        {getActivityLabel(entry.activityType, t)}
                                                     </span>
                                                     {entry.changelog?.summary ? (
                                                         <p className="max-w-sm text-xs text-text-secondary dark:text-text-secondary-dark">
@@ -278,7 +281,7 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                             <div className="grid gap-4 md:grid-cols-3">
                                                 <div>
                                                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-                                                        Added
+                                                        {t('detail.added')}
                                                     </p>
                                                     <div className="space-y-2">
                                                         {addedEntries.length > 0 ? (
@@ -306,7 +309,7 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                                 </div>
                                                 <div>
                                                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-                                                        Updated
+                                                        {t('detail.updated')}
                                                     </p>
                                                     <div className="space-y-2">
                                                         {updatedEntries.length > 0 ? (
@@ -326,7 +329,7 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                                                     {change.fieldsChanged
                                                                         ?.length ? (
                                                                         <div className="mt-1 text-xs text-text-secondary dark:text-text-secondary-dark">
-                                                                            Fields:{' '}
+                                                                            {t('detail.fields')}:{' '}
                                                                             {change.fieldsChanged.join(
                                                                                 ', ',
                                                                             )}
@@ -343,7 +346,7 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                                 </div>
                                                 <div>
                                                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-                                                        Removed
+                                                        {t('detail.removed')}
                                                     </p>
                                                     <div className="space-y-2">
                                                         {removedEntries.length > 0 ? (
