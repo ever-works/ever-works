@@ -202,7 +202,7 @@ export class ItemHealthService {
             };
         }
 
-        const status = this.mapHealthStatus(result.status);
+        const status = this.mapHealthStatus(result);
         const failureCount = status === 'healthy' ? 0 : previousFailures + 1;
 
         return {
@@ -215,16 +215,29 @@ export class ItemHealthService {
         };
     }
 
-    private mapHealthStatus(status: CheckLinkResult['status']): ItemHealthStatus {
-        switch (status) {
-            case 'alive':
-                return 'healthy';
-            case 'invalid':
-                return 'warning';
-            case 'dead':
-            default:
-                return 'broken';
+    private mapHealthStatus(result: CheckLinkResult): ItemHealthStatus {
+        if (result.status === 'alive') {
+            return 'healthy';
         }
+
+        if (result.status === 'invalid') {
+            return 'warning';
+        }
+
+        const statusCode = result.statusCode;
+        if (statusCode === 404 || statusCode === 410) {
+            return 'broken';
+        }
+
+        if (statusCode === 401 || statusCode === 403 || statusCode === 429) {
+            return 'warning';
+        }
+
+        if (statusCode && statusCode >= 500) {
+            return 'warning';
+        }
+
+        return 'broken';
     }
 
     private buildHealthMessage(result: CheckLinkResult, status: ItemHealthStatus): string | null {
