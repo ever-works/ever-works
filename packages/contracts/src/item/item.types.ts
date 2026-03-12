@@ -92,20 +92,21 @@ export interface ItemHealth {
 }
 
 /**
- * AI-evaluated validation status for whether a source URL is a good source for the item.
+ * Reachability status for an item's source URL.
  */
-export type ItemSourceValidationStatus =
-	| 'valid_source'
-	| 'broken_source'
-	| 'generic_source'
-	| 'weak_source'
-	| 'unknown';
+export type ItemSourceReachabilityStatus = 'reachable' | 'broken' | 'unknown';
 
 /**
- * Result of validating whether an item's source URL is reachable and appropriate.
+ * AI-evaluated source accuracy status for whether a source URL is a good source for the item.
+ */
+export type ItemSourceAccuracyStatus = 'accurate' | 'generic' | 'weak' | 'unknown';
+
+/**
+ * Result of validating both source URL reachability and source accuracy.
  */
 export interface ItemSourceValidation {
-	readonly status: ItemSourceValidationStatus;
+	readonly reachability_status: ItemSourceReachabilityStatus;
+	readonly accuracy_status: ItemSourceAccuracyStatus;
 	readonly checked_at?: string;
 	readonly confidence_score?: number | null;
 	readonly is_relevant?: boolean;

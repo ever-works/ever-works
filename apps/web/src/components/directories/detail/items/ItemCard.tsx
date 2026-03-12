@@ -260,7 +260,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
 
 function ItemHealthBadge({ item }: { item: ItemData }) {
     if (
-        item.source_validation?.status !== 'broken_source' &&
+        item.source_validation?.reachability_status !== 'broken' &&
         (!item.health || item.health.status !== 'broken')
     ) {
         return null;
@@ -292,56 +292,21 @@ function ItemHealthDetails({ item, className }: { item: ItemData; className?: st
         return null;
     }
 
-    if (validation?.status === 'valid_source') {
-        return (
-            <p
-                className={cn(
-                    'mt-1 text-xs text-emerald-700 dark:text-emerald-300 line-clamp-2',
-                    className,
-                )}
-            >
-                {`Valid source${checkedSuffix}`}
-            </p>
-        );
-    }
+    if (validation) {
+        const reachabilityText = getReachabilityText(validation.reachability_status);
+        const accuracyText = getAccuracyText(validation.accuracy_status);
+        const parts = [reachabilityText, accuracyText].filter(Boolean);
+        const baseText = parts.join(' · ') || 'Source checked';
+        const detailText =
+            validation.reason &&
+            validation.accuracy_status !== 'accurate' &&
+            validation.reachability_status !== 'broken'
+                ? ` ${validation.reason}`
+                : '';
+        const text = `${baseText}${detailText}${checkedSuffix}`;
+        const toneClass = getValidationToneClass(validation);
 
-    if (validation?.status === 'generic_source') {
-        return (
-            <p
-                className={cn(
-                    'mt-1 text-xs text-amber-700 dark:text-amber-300 line-clamp-2',
-                    className,
-                )}
-            >
-                {`${validation.reason || 'Generic source'}${checkedSuffix}`}
-            </p>
-        );
-    }
-
-    if (validation?.status === 'weak_source') {
-        return (
-            <p
-                className={cn(
-                    'mt-1 text-xs text-amber-700 dark:text-amber-300 line-clamp-2',
-                    className,
-                )}
-            >
-                {`${validation.reason || 'Weak source'}${checkedSuffix}`}
-            </p>
-        );
-    }
-
-    if (validation?.status === 'unknown') {
-        return (
-            <p
-                className={cn(
-                    'mt-1 text-xs text-text-secondary dark:text-text-secondary-dark line-clamp-2',
-                    className,
-                )}
-            >
-                {`${validation.reason || 'Could not validate source'}${checkedSuffix}`}
-            </p>
-        );
+        return <p className={cn('mt-1 text-xs line-clamp-2', toneClass, className)}>{text}</p>;
     }
 
     if (!item.health || item.health.status === 'unchecked') {
@@ -381,9 +346,62 @@ function ItemHealthDetails({ item, className }: { item: ItemData; className?: st
                 className,
             )}
         >
-            {`${validation?.reason || item.health.message || 'Broken link'}${checkedSuffix}`}
+            {`${item.health.message || 'Broken link'}${checkedSuffix}`}
         </p>
     );
+}
+
+function getReachabilityText(reachabilityStatus: ItemData['source_validation'] extends infer T
+    ? T extends { reachability_status: infer R }
+        ? R
+        : never
+    : never) {
+    switch (reachabilityStatus) {
+        case 'reachable':
+            return 'Reachable';
+        case 'broken':
+            return 'Broken link';
+        case 'unknown':
+        default:
+            return 'Could not verify reachability';
+    }
+}
+
+function getAccuracyText(accuracyStatus: ItemData['source_validation'] extends infer T
+    ? T extends { accuracy_status: infer A }
+        ? A
+        : never
+    : never) {
+    switch (accuracyStatus) {
+        case 'accurate':
+            return 'Accurate source';
+        case 'generic':
+            return 'Source too generic';
+        case 'weak':
+            return 'Weak source';
+        case 'unknown':
+        default:
+            return 'Source accuracy unknown';
+    }
+}
+
+function getValidationToneClass(validation: NonNullable<ItemData['source_validation']>) {
+    if (validation.reachability_status === 'broken') {
+        return 'text-red-700 dark:text-red-300';
+    }
+
+    if (
+        validation.reachability_status === 'reachable' &&
+        validation.accuracy_status === 'accurate'
+    ) {
+        return 'text-emerald-700 dark:text-emerald-300';
+    }
+
+    if (validation.accuracy_status === 'generic' || validation.accuracy_status === 'weak') {
+        return 'text-amber-700 dark:text-amber-300';
+    }
+
+    return 'text-text-secondary dark:text-text-secondary-dark';
 }
 
 const BADGE_STYLES: Record<string, { good: string; bad: string; neutral: string }> = {

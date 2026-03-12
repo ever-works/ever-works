@@ -402,6 +402,9 @@ export class DataGeneratorService {
                     brand_logo_url: item.brand_logo_url,
                     images: item.images ? [...item.images] : undefined,
                     health: existingItemsBySlug.get(slugifyText(item.slug || item.name))?.health,
+                    source_validation:
+                        existingItemsBySlug.get(slugifyText(item.slug || item.name))
+                            ?.source_validation,
                 };
                 return mutableItem;
             });
@@ -1387,6 +1390,7 @@ export class DataGeneratorService {
                     ...item,
                     slug,
                     health: existingItem?.health,
+                    source_validation: existingItem?.source_validation,
                 };
             });
 

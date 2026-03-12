@@ -6,7 +6,6 @@ import type {
     ItemHealth,
     ItemHealthStatus,
     ItemSourceValidation,
-    ItemSourceValidationStatus,
 } from '@ever-works/contracts';
 import { Directory } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
@@ -40,7 +39,7 @@ type DirectoryHealthCheckResult = {
 };
 
 const sourceValidationSchema = z.object({
-    status: z.enum(['valid_source', 'generic_source', 'weak_source', 'unknown']),
+    accuracy_status: z.enum(['accurate', 'generic', 'weak', 'unknown']),
     confidence_score: z.number().min(0).max(1),
     is_relevant: z.boolean(),
     is_specific: z.boolean(),
@@ -60,16 +59,17 @@ HTTP Check Summary: {httpSummary}
 Extracted Page Content (first 2000 chars): {pageContent}
 
 Decide whether this URL is:
-- valid_source: clearly the right, relevant, and specific source for the item
-- generic_source: reachable and relevant, but too generic (homepage/root domain/company home)
-- weak_source: somewhat related, but weak, indirect, or not a good canonical source
+- accurate: clearly the right, relevant, and specific source for the item
+- generic: reachable and relevant, but too generic (homepage/root domain/company home)
+- weak: somewhat related, but weak, indirect, or not a good canonical source
 - unknown: not enough evidence to judge confidently
 
 Rules:
 - Prefer official product pages, official documentation, official repositories, or canonical package pages.
-- A generic company homepage is usually generic_source if it does not clearly focus on the item itself.
-- Blog posts, news articles, and third-party reviews are usually weak_source unless they are the only credible source.
-- If the HTTP check already indicates the link is clearly broken, do not return valid_source.
+- A generic company homepage is usually generic if it does not clearly focus on the item itself.
+- Blog posts, news articles, and third-party reviews are usually weak unless they are the only credible source.
+- If the item is a product/feature but the URL is only a root domain or broad company homepage, prefer generic instead of accurate.
+- If the HTTP check already indicates the link is clearly broken, do not return accurate.
 - Be conservative. If unsure, return unknown.
 `;
 
@@ -109,7 +109,7 @@ export class ItemHealthService {
             status: 'success',
             item_slug: item.slug || itemSlug,
             item_name: item.name,
-            message: this.buildManualMessage(item.health),
+            message: this.buildManualMessage(item.health, item.source_validation),
             item,
             health: item.health,
         };
@@ -316,9 +316,12 @@ export class ItemHealthService {
     ): Promise<ItemSourceValidation> {
         const checkedAt = health.checked_at || format(new Date(), 'yyyy-MM-dd HH:mm');
 
-        if (health.status === 'broken') {
+        const reachabilityStatus = this.mapReachabilityStatus(health);
+
+        if (reachabilityStatus === 'broken') {
             return {
-                status: 'broken_source',
+                reachability_status: 'broken',
+                accuracy_status: 'unknown',
                 checked_at: checkedAt,
                 confidence_score: 1,
                 is_relevant: false,
@@ -331,7 +334,8 @@ export class ItemHealthService {
 
         if (!this.aiFacade.isConfigured()) {
             return {
-                status: 'unknown',
+                reachability_status: reachabilityStatus,
+                accuracy_status: 'unknown',
                 checked_at: checkedAt,
                 confidence_score: null,
                 is_relevant: false,
@@ -379,7 +383,8 @@ export class ItemHealthService {
             );
 
             return {
-                status: result.status,
+                reachability_status: reachabilityStatus,
+                accuracy_status: result.accuracy_status,
                 checked_at: checkedAt,
                 confidence_score: result.confidence_score,
                 is_relevant: result.is_relevant,
@@ -394,7 +399,8 @@ export class ItemHealthService {
             );
 
             return {
-                status: 'unknown',
+                reachability_status: reachabilityStatus,
+                accuracy_status: 'unknown',
                 checked_at: checkedAt,
                 confidence_score: null,
                 is_relevant: false,
@@ -404,6 +410,18 @@ export class ItemHealthService {
                 suggested_source_url: null,
             };
         }
+    }
+
+    private mapReachabilityStatus(health: ItemHealth): ItemSourceValidation['reachability_status'] {
+        if (health.status === 'healthy') {
+            return 'reachable';
+        }
+
+        if (health.status === 'broken') {
+            return 'broken';
+        }
+
+        return 'unknown';
     }
 
     private buildHttpSummary(health: ItemHealth): string {
@@ -428,21 +446,62 @@ export class ItemHealthService {
         return `chore: re-check item health for ${itemCount} item${itemCount === 1 ? '' : 's'}`;
     }
 
-    private buildManualMessage(health: ItemHealth | undefined): string {
-        const status = health?.status ?? 'unchecked';
-        const suffix = health?.message ? ` ${health.message}` : '';
+    private buildManualMessage(
+        health: ItemHealth | undefined,
+        validation: ItemSourceValidation | undefined,
+    ): string {
+        const parts: string[] = ['Item source check completed.'];
 
-        switch (status) {
-            case 'healthy':
-                return `Item health check completed: source URL is healthy.${suffix}`;
-            case 'warning':
-            case 'unknown':
-                return 'Item health check completed.';
+        if (validation) {
+            parts.push(this.buildReachabilitySummary(validation));
+            parts.push(this.buildAccuracySummary(validation));
+        } else if (health?.status === 'broken') {
+            parts.push('Reachability: broken link.');
+        } else if (health?.status === 'healthy') {
+            parts.push('Reachability: reachable.');
+        } else if (health?.status === 'unknown' || health?.status === 'warning') {
+            parts.push('Reachability: could not verify.');
+        }
+
+        if (validation?.reason && validation.accuracy_status !== 'accurate') {
+            parts.push(validation.reason);
+        }
+
+        if (
+            !validation &&
+            health?.message &&
+            health.status !== 'healthy' &&
+            health.message !== 'Automated check could not verify the source URL'
+        ) {
+            parts.push(health.message);
+        }
+
+        return parts.join(' ');
+    }
+
+    private buildReachabilitySummary(validation: ItemSourceValidation): string {
+        switch (validation.reachability_status) {
+            case 'reachable':
+                return 'Reachability: reachable.';
             case 'broken':
-                return `Item health check completed: source URL is broken.${suffix}`;
-            case 'unchecked':
+                return 'Reachability: broken link.';
+            case 'unknown':
             default:
-                return `Item health check completed.${suffix}`;
+                return 'Reachability: could not verify.';
+        }
+    }
+
+    private buildAccuracySummary(validation: ItemSourceValidation): string {
+        switch (validation.accuracy_status) {
+            case 'accurate':
+                return 'Source accuracy: accurate.';
+            case 'generic':
+                return 'Source accuracy: too generic.';
+            case 'weak':
+                return 'Source accuracy: weak.';
+            case 'unknown':
+            default:
+                return 'Source accuracy: unknown.';
         }
     }
 

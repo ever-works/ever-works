@@ -153,7 +153,7 @@ export const ItemActions = memo(function ItemActions({
                             ) : (
                                 <ShieldAlert className="w-4 h-4" />
                             )}
-                            Re-check health
+                            Re-check source
                         </DropdownMenuItem>
                     )}
                     {item.source_url && screenshotAvailable && (
