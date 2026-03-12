@@ -278,8 +278,41 @@ function ItemHealthBadge({ item }: { item: ItemData }) {
 }
 
 function ItemHealthDetails({ item, className }: { item: ItemData; className?: string }) {
-    if (!item.health || item.health.status !== 'broken') {
+    if (
+        !item.health ||
+        item.health.status === 'unchecked' ||
+        (!item.health.checked_at && item.health.status === 'healthy')
+    ) {
         return null;
+    }
+
+    const checkedAt = item.health.checked_at ? new Date(item.health.checked_at).toLocaleString() : null;
+    const checkedSuffix = checkedAt ? ` · checked ${checkedAt}` : '';
+
+    if (item.health.status === 'healthy') {
+        return (
+            <p
+                className={cn(
+                    'mt-1 text-xs text-emerald-700 dark:text-emerald-300 line-clamp-2',
+                    className,
+                )}
+            >
+                {`Healthy${checkedSuffix}`}
+            </p>
+        );
+    }
+
+    if (item.health.status === 'unknown') {
+        return (
+            <p
+                className={cn(
+                    'mt-1 text-xs text-text-secondary dark:text-text-secondary-dark line-clamp-2',
+                    className,
+                )}
+            >
+                {`Could not verify${checkedSuffix}`}
+            </p>
+        );
     }
 
     return (
@@ -289,7 +322,7 @@ function ItemHealthDetails({ item, className }: { item: ItemData; className?: st
                 className,
             )}
         >
-            {item.health.message || 'Broken link'}
+            {`${item.health.message || 'Broken link'}${checkedSuffix}`}
         </p>
     );
 }
