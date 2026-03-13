@@ -337,6 +337,19 @@ function ItemHealthDetails({ item, className }: { item: ItemData; className?: st
         );
     }
 
+    if (item.health.status === 'warning') {
+        return (
+            <p
+                className={cn(
+                    'mt-1 text-xs text-amber-700 dark:text-amber-300 line-clamp-2',
+                    className,
+                )}
+            >
+                {`${item.health.message || 'Source may have issues'}${checkedSuffix}`}
+            </p>
+        );
+    }
+
     return (
         <p className={cn('mt-1 text-xs text-red-700 dark:text-red-300 line-clamp-2', className)}>
             {`${item.health.message || 'Broken link'}${checkedSuffix}`}

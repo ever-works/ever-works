@@ -1,4 +1,11 @@
-import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import {
+    Inject,
+    Injectable,
+    InternalServerErrorException,
+    Logger,
+    NotFoundException,
+    Optional,
+} from '@nestjs/common';
 import { differenceInMinutes, format, parse } from 'date-fns';
 import { z } from 'zod';
 import type {
@@ -37,6 +44,7 @@ type DirectoryHealthCheckResult = {
     checkedCount: number;
     changedCount: number;
     items: ItemData[];
+    missingReason?: 'not_found' | 'missing_source_url';
 };
 
 const sourceValidationSchema = z.object({
@@ -97,7 +105,9 @@ export class ItemHealthService {
         user: User,
     ): Promise<CheckItemHealthResponseDto> {
         if (!this.ownershipService) {
-            throw new NotFoundException('Item health service is not available for manual checks');
+            throw new InternalServerErrorException(
+                'Item source validation service is not configured for manual checks',
+            );
         }
 
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
@@ -114,6 +124,10 @@ export class ItemHealthService {
 
         const item = result.items[0];
         if (!item) {
+            if (result.missingReason === 'missing_source_url') {
+                throw new NotFoundException(`Item '${itemSlug}' has no source URL to check`);
+            }
+
             throw new NotFoundException(`Item '${itemSlug}' not found`);
         }
 
@@ -179,10 +193,14 @@ export class ItemHealthService {
             .filter((item) => !this.shouldSkipCheck(item, options.trigger));
 
         if (options.itemSlugs?.length && itemsToCheck.length === 0) {
+            const requestedSlug = options.itemSlugs[0];
+            const matchingItem = allItems.find((item) => item?.slug === requestedSlug);
+
             return {
                 checkedCount: 0,
                 changedCount: 0,
                 items: [],
+                missingReason: matchingItem ? 'missing_source_url' : 'not_found',
             };
         }
 
