@@ -192,6 +192,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 
 		const logger = this.context?.logger ?? console;
 		const execContext = options?.execContext;
+		const onLogEntry = options?.onLogEntry;
 
 		if (!execContext) {
 			return this.handleError(
@@ -213,6 +214,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			// ── Step 1: Prepare Context ────────────────────────────────
 			this.setState('prepare-context', 'running');
 			reportProgress(onProgress, 0, 10, 'Prepare Context');
+			this.emitLog(onLogEntry, 'step_started', 'Prepare Context', 0);
 
 			const { providerConfig, modelName } = await this.resolveAiProvider(execContext, facadeOptions);
 			if (!providerConfig || !modelName) {
@@ -239,11 +241,13 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			);
 
 			this.setState('prepare-context', 'completed');
+			this.emitLog(onLogEntry, 'step_completed', 'Prepare Context', 0);
 			if (signal.aborted) return this.handleCancel(startTime);
 
 			// ── Step 2: Generate Items ─────────────────────────────────
 			this.setState('generate-items', 'running');
 			reportProgress(onProgress, 1, 20, 'Generate Items');
+			this.emitLog(onLogEntry, 'step_started', 'Generate Items', 1);
 
 			const { warnings, tokenUsage } = await this.runAgentGeneration(
 				providerConfig,
@@ -261,18 +265,22 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 
 			if (signal.aborted) {
 				this.setState('generate-items', 'failed', 'Cancelled');
+				this.emitLog(onLogEntry, 'step_failed', 'Generate Items: Cancelled', 1, 'warn');
 				return this.handleCancel(startTime);
 			}
 
 			this.setState('generate-items', 'completed');
+			this.emitLog(onLogEntry, 'step_completed', 'Generate Items', 1);
 
 			// ── Step 3: Collect Results ────────────────────────────────
 			this.setState('collect-results', 'running');
 			reportProgress(onProgress, 2, 82, 'Collect Results');
+			this.emitLog(onLogEntry, 'step_started', 'Collect Results', 2);
 
 			const items = await this.collectAndMergeResults(workspacePath, dataSourceItems, logger);
 			const metadata = collectMetadataFromItems(items);
 			this.setState('collect-results', 'completed');
+			this.emitLog(onLogEntry, 'step_completed', 'Collect Results', 2);
 
 			// ── Step 4: Capture Screenshots ────────────────────────────
 			const screenshotWarnings = await this.runScreenshotCapture(
@@ -289,10 +297,12 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			// ── Step 5: Cleanup ────────────────────────────────────────
 			this.setState('cleanup', 'running');
 			reportProgress(onProgress, 4, 95, 'Cleanup');
+			this.emitLog(onLogEntry, 'step_started', 'Cleanup', 4);
 
 			await cleanupWorkspace(userId, directory.id);
 
 			this.setState('cleanup', 'completed');
+			this.emitLog(onLogEntry, 'step_completed', 'Cleanup', 4);
 
 			// ── Build result ───────────────────────────────────────────
 			reportProgress(onProgress, 5, 100, 'Complete');
@@ -312,6 +322,25 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 
 	getState(): PipelineState<AgentPipelineStepId> | null {
 		return this.state;
+	}
+
+	private emitLog(
+		onLogEntry: PipelineExecutionOptions['onLogEntry'],
+		event: 'step_started' | 'step_completed' | 'step_failed' | 'step_skipped' | 'message',
+		message: string,
+		stepIndex?: number,
+		level: 'info' | 'warn' | 'error' | 'debug' = 'info'
+	): void {
+		onLogEntry?.({
+			timestamp: new Date().toISOString(),
+			level,
+			source: 'pipeline',
+			event,
+			message,
+			stepIndex: stepIndex ?? null,
+			stepName: null,
+			durationMs: null
+		});
 	}
 
 	// ── Private helpers ────────────────────────────────────────────────

@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils/cn';
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { getStepProgress, getStepText, getItemsProcessedText } from '@/lib/utils/generator-steps';
+import { Terminal } from 'lucide-react';
+import { TerminalLogViewer } from '../shared/TerminalLogViewer';
 
 interface GenerationProgressProps {
     directory: Directory;
@@ -13,6 +15,7 @@ interface GenerationProgressProps {
 export function GenerationProgress({ directory }: GenerationProgressProps) {
     const t = useTranslations('dashboard.directoryDetail.progress');
     const [dots, setDots] = useState('');
+    const [showLogs, setShowLogs] = useState(false);
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -22,11 +25,12 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
         return () => clearInterval(interval);
     }, []);
 
-    // Get current step and progress (supports both dynamic and legacy)
     const generateStatus = directory.generateStatus;
     const progressPercentage = getStepProgress(generateStatus);
     const stepText = getStepText(generateStatus, t('steps.processing'));
     const itemsText = getItemsProcessedText(generateStatus);
+    const recentLogs = generateStatus?.recentLogs;
+    const hasLogs = recentLogs && recentLogs.length > 0;
 
     return (
         <div className="max-w-2xl mx-auto py-12">
@@ -38,7 +42,7 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
                     'overflow-hidden',
                 )}
             >
-                {/* Header Section */}
+                {/* Header */}
                 <div className="p-8 pb-6 text-center">
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 dark:bg-primary/20 mb-4">
                         <svg
@@ -75,25 +79,52 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
                     )}
                 </div>
 
-                {/* Progress Section */}
+                {/* Progress & Logs */}
                 <div className="px-8 pb-8">
-                    {/* Progress Bar Container */}
+                    {/* Progress Bar */}
                     <div className="mb-6">
                         <div className="flex items-center justify-between text-xs text-text-muted dark:text-text-muted-dark mb-2">
                             <span className="font-medium">{t('progress')}</span>
                             <span className="font-medium">{progressPercentage}%</span>
                         </div>
-                        <div className="relative">
-                            <div className="w-full h-2 bg-surface-tertiary dark:bg-surface-tertiary-dark rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
-                                    style={{ width: `${progressPercentage}%` }}
-                                >
-                                    <div className="h-full bg-gradient-to-r from-primary via-primary to-primary/80 animate-gradient" />
-                                </div>
+                        <div className="w-full h-2 bg-surface-tertiary dark:bg-surface-tertiary-dark rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
+                                style={{ width: `${progressPercentage}%` }}
+                            >
+                                <div className="h-full bg-linear-to-r from-primary via-primary to-primary/80 animate-gradient" />
                             </div>
                         </div>
                     </div>
+
+                    {/* View Logs Toggle */}
+                    {hasLogs && (
+                        <div className="mb-4">
+                            <button
+                                type="button"
+                                onClick={() => setShowLogs((prev) => !prev)}
+                                className={cn(
+                                    'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                                    showLogs
+                                        ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary'
+                                        : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark hover:text-text dark:hover:text-text-dark',
+                                )}
+                            >
+                                <Terminal className="h-3.5 w-3.5" />
+                                {showLogs ? t('hideLogs') : t('showLogs')}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Live Terminal */}
+                    {hasLogs && showLogs && (
+                        <TerminalLogViewer
+                            logs={recentLogs!}
+                            title={t('showLogs')}
+                            showCursor
+                            className="mb-4"
+                        />
+                    )}
 
                     {/* Info Note */}
                     <div className="bg-surface-secondary dark:bg-surface-secondary-dark rounded-lg p-4">

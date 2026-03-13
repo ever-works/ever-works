@@ -15,7 +15,7 @@ import { GenerationMethod } from '@src/items-generator/dto/create-items-generato
 import { GenerateStatusType } from './types';
 import { TimestampColumn } from './_types';
 import { DirectorySchedule } from './directory-schedule.entity';
-import { DirectoryHistoryActivityType, type DirectoryChangelog } from '@ever-works/contracts/api';
+import { DirectoryHistoryActivityType, type DirectoryChangelog, type GenerationStepLog } from '@ever-works/contracts/api';
 
 export type GenerationMetrics = {
     urls_scanned?: number;
@@ -75,6 +75,9 @@ export class DirectoryGenerationHistory {
 
     @Column({ type: 'json', nullable: true })
     changelog?: DirectoryChangelog | null;
+
+    @Column({ type: 'json', nullable: true })
+    logs?: GenerationStepLog[] | null;
 
     @Column({ nullable: true })
     scheduleId?: string | null;

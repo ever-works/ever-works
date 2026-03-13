@@ -6,6 +6,7 @@ import { Fragment, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { ShowDateTime } from '@/components/ui/show-datetime';
 import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
+import { TerminalLogViewer } from '../shared/TerminalLogViewer';
 
 interface HistoryTableProps {
     entries: DirectoryGenerationHistoryEntry[];
@@ -175,7 +176,9 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                     {entries.map((entry) => {
                         const statusKey = entry.status?.toLowerCase?.() ?? 'unknown';
                         const statusClass = statusColor[statusKey] ?? 'bg-gray-100 text-gray-700';
-                        const hasDetails = (entry.changelog?.entries?.length ?? 0) > 0;
+                        const hasDetails =
+                            (entry.changelog?.entries?.length ?? 0) > 0 ||
+                            (entry.logs?.length ?? 0) > 0;
                         const isExpanded = expandedIds.includes(entry.id);
 
                         const addedEntries =
@@ -278,6 +281,21 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                 {hasDetails && isExpanded ? (
                                     <tr className="bg-muted/20 dark:bg-muted/10">
                                         <td colSpan={7} className="px-4 py-4">
+                                            {/* Step Logs */}
+                                            {entry.logs && entry.logs.length > 0 && (
+                                                <div className="mb-4">
+                                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
+                                                        {t('detail.stepLogs')}
+                                                    </p>
+                                                    <TerminalLogViewer
+                                                        logs={entry.logs}
+                                                        title={t('detail.stepLogs')}
+                                                        maxHeight="max-h-60"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* Changelog */}
                                             <div className="grid gap-4 md:grid-cols-3">
                                                 <div>
                                                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
