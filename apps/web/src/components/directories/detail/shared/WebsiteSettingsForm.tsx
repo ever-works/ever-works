@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Select } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Globe, LayoutGrid, PanelTop, PanelBottom, PlusIcon, TrashIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -419,7 +425,7 @@ function CompactLayout({
             </div>
 
             {/* Tab Content */}
-            <div className="min-h-[220px]">{renderTabContent()}</div>
+            <div className="min-h-55">{renderTabContent()}</div>
         </div>
     );
 }
@@ -556,47 +562,75 @@ function FullLayout({
                             label={tSettings('sections.header.themeSelector')}
                         />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-border dark:border-border-dark">
-                        <Select
-                            label={tSettings('sections.header.defaultLayout')}
-                            value={formData.settings.header?.layout_default || 'home1'}
-                            onChange={(e) => updateHeaderSettings('layout_default', e.target.value)}
-                            variant="form"
-                        >
-                            <option value="home1">Home 1</option>
-                            <option value="home2">Home 2</option>
-                            <option value="home3">Home 3</option>
-                        </Select>
-                        <Select
-                            label={tSettings('sections.header.defaultTheme')}
-                            value={formData.settings.header?.theme_default || 'light'}
-                            onChange={(e) => updateHeaderSettings('theme_default', e.target.value)}
-                            variant="form"
-                        >
-                            <option value="light">{tSettings('sections.header.themeLight')}</option>
-                            <option value="dark">{tSettings('sections.header.themeDark')}</option>
-                            <option value="system">
-                                {tSettings('sections.header.themeSystem')}
-                            </option>
-                        </Select>
-                        <Select
-                            label={tSettings('sections.header.defaultPagination')}
-                            value={formData.settings.header?.pagination_default || 'standard'}
-                            onChange={(e) =>
-                                updateHeaderSettings('pagination_default', e.target.value)
-                            }
-                            variant="form"
-                        >
-                            <option value="standard">
-                                {tSettings('sections.header.paginationStandard')}
-                            </option>
-                            <option value="infinite">
-                                {tSettings('sections.header.paginationInfinite')}
-                            </option>
-                            <option value="loadmore">
-                                {tSettings('sections.header.paginationLoadMore')}
-                            </option>
-                        </Select>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-card-border dark:border-card-border-dark">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                                {tSettings('sections.header.defaultLayout')}
+                            </label>
+                            <Select
+                                value={formData.settings.header?.layout_default || 'home1'}
+                                onValueChange={(val) => updateHeaderSettings('layout_default', val)}
+                            >
+                                <SelectTrigger size="sm">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="home1">Home 1</SelectItem>
+                                    <SelectItem value="home2">Home 2</SelectItem>
+                                    <SelectItem value="home3">Home 3</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                                {tSettings('sections.header.defaultTheme')}
+                            </label>
+                            <Select
+                                value={formData.settings.header?.theme_default || 'light'}
+                                onValueChange={(val) => updateHeaderSettings('theme_default', val)}
+                            >
+                                <SelectTrigger size="sm">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="light">
+                                        {tSettings('sections.header.themeLight')}
+                                    </SelectItem>
+                                    <SelectItem value="dark">
+                                        {tSettings('sections.header.themeDark')}
+                                    </SelectItem>
+                                    <SelectItem value="system">
+                                        {tSettings('sections.header.themeSystem')}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                                {tSettings('sections.header.defaultPagination')}
+                            </label>
+                            <Select
+                                value={formData.settings.header?.pagination_default || 'standard'}
+                                onValueChange={(val) =>
+                                    updateHeaderSettings('pagination_default', val)
+                                }
+                            >
+                                <SelectTrigger size="sm">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="standard">
+                                        {tSettings('sections.header.paginationStandard')}
+                                    </SelectItem>
+                                    <SelectItem value="infinite">
+                                        {tSettings('sections.header.paginationInfinite')}
+                                    </SelectItem>
+                                    <SelectItem value="loadmore">
+                                        {tSettings('sections.header.paginationLoadMore')}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                 </div>
             </SettingsCard>
@@ -618,35 +652,55 @@ function FullLayout({
                             label={tSettings('sections.homepage.search')}
                         />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border dark:border-border-dark">
-                        <Select
-                            label={tSettings('sections.homepage.defaultView')}
-                            value={formData.settings.homepage?.default_view || 'classic'}
-                            onChange={(e) => updateHomepageSettings('default_view', e.target.value)}
-                            variant="form"
-                        >
-                            <option value="classic">
-                                {tSettings('sections.homepage.viewClassic')}
-                            </option>
-                            <option value="grid">{tSettings('sections.homepage.viewGrid')}</option>
-                            <option value="list">{tSettings('sections.homepage.viewList')}</option>
-                        </Select>
-                        <Select
-                            label={tSettings('sections.homepage.defaultSort')}
-                            value={formData.settings.homepage?.default_sort || 'popularity'}
-                            onChange={(e) => updateHomepageSettings('default_sort', e.target.value)}
-                            variant="form"
-                        >
-                            <option value="popularity">
-                                {tSettings('sections.homepage.sortPopularity')}
-                            </option>
-                            <option value="newest">
-                                {tSettings('sections.homepage.sortNewest')}
-                            </option>
-                            <option value="alphabetical">
-                                {tSettings('sections.homepage.sortAlphabetical')}
-                            </option>
-                        </Select>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-card-border dark:border-card-border-dark">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                                {tSettings('sections.homepage.defaultView')}
+                            </label>
+                            <Select
+                                value={formData.settings.homepage?.default_view || 'classic'}
+                                onValueChange={(val) => updateHomepageSettings('default_view', val)}
+                            >
+                                <SelectTrigger size="sm">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="classic">
+                                        {tSettings('sections.homepage.viewClassic')}
+                                    </SelectItem>
+                                    <SelectItem value="grid">
+                                        {tSettings('sections.homepage.viewGrid')}
+                                    </SelectItem>
+                                    <SelectItem value="list">
+                                        {tSettings('sections.homepage.viewList')}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                                {tSettings('sections.homepage.defaultSort')}
+                            </label>
+                            <Select
+                                value={formData.settings.homepage?.default_sort || 'popularity'}
+                                onValueChange={(val) => updateHomepageSettings('default_sort', val)}
+                            >
+                                <SelectTrigger size="sm">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="popularity">
+                                        {tSettings('sections.homepage.sortPopularity')}
+                                    </SelectItem>
+                                    <SelectItem value="newest">
+                                        {tSettings('sections.homepage.sortNewest')}
+                                    </SelectItem>
+                                    <SelectItem value="alphabetical">
+                                        {tSettings('sections.homepage.sortAlphabetical')}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                 </div>
             </SettingsCard>
@@ -677,7 +731,7 @@ function FullLayout({
             {/* Custom Menu Links Card */}
             {addMenuItem && updateMenuItem && removeMenuItem && (
                 <SettingsCard title={tSettings('sections.customMenu.title')}>
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark mb-4">
                         {tSettings('sections.customMenu.description')}
                     </p>
                     <CustomMenuEditor
@@ -709,7 +763,7 @@ function GeneralFields({
     tSettings: (key: string) => string;
 }) {
     return (
-        <div className="space-y-6">
+        <div className="space-y-5">
             <Input
                 label={tSettings('sections.siteName.label')}
                 value={formData.company_name}
@@ -730,7 +784,7 @@ function GeneralFields({
                 variant="form"
             />
             <div>
-                <p className="text-sm font-medium text-text dark:text-text-dark mb-3">
+                <p className="text-xs font-medium text-text-muted dark:text-text-muted-dark mb-3">
                     {tSettings('sections.global.title')}
                 </p>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1">
@@ -775,9 +829,9 @@ function HeaderFields({
     tSettings: (key: string) => string;
 }) {
     return (
-        <div className="space-y-6">
+        <div className="space-y-5">
             <div>
-                <p className="text-sm font-medium text-text dark:text-text-dark mb-3">
+                <p className="text-xs font-medium text-text-muted dark:text-text-muted-dark mb-3">
                     {tSettings('sections.header.title')}
                 </p>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1">
@@ -809,46 +863,76 @@ function HeaderFields({
                 </div>
             </div>
             <div>
-                <p className="text-sm font-medium text-text dark:text-text-dark mb-3">
+                <p className="text-xs font-medium text-text-muted dark:text-text-muted-dark mb-3">
                     {tSettings('sections.header.defaults')}
                 </p>
                 <div className="grid grid-cols-3 gap-4">
-                    <Select
-                        label={tSettings('sections.header.defaultLayout')}
-                        value={formData.settings.header?.layout_default || 'home1'}
-                        onChange={(e) => updateHeaderSettings('layout_default', e.target.value)}
-                        variant="form"
-                    >
-                        <option value="home1">Home 1</option>
-                        <option value="home2">Home 2</option>
-                        <option value="home3">Home 3</option>
-                    </Select>
-                    <Select
-                        label={tSettings('sections.header.defaultTheme')}
-                        value={formData.settings.header?.theme_default || 'light'}
-                        onChange={(e) => updateHeaderSettings('theme_default', e.target.value)}
-                        variant="form"
-                    >
-                        <option value="light">{tSettings('sections.header.themeLight')}</option>
-                        <option value="dark">{tSettings('sections.header.themeDark')}</option>
-                        <option value="system">{tSettings('sections.header.themeSystem')}</option>
-                    </Select>
-                    <Select
-                        label={tSettings('sections.header.defaultPagination')}
-                        value={formData.settings.header?.pagination_default || 'standard'}
-                        onChange={(e) => updateHeaderSettings('pagination_default', e.target.value)}
-                        variant="form"
-                    >
-                        <option value="standard">
-                            {tSettings('sections.header.paginationStandard')}
-                        </option>
-                        <option value="infinite">
-                            {tSettings('sections.header.paginationInfinite')}
-                        </option>
-                        <option value="loadmore">
-                            {tSettings('sections.header.paginationLoadMore')}
-                        </option>
-                    </Select>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                            {tSettings('sections.header.defaultLayout')}
+                        </label>
+                        <Select
+                            value={formData.settings.header?.layout_default || 'home1'}
+                            onValueChange={(val) => updateHeaderSettings('layout_default', val)}
+                        >
+                            <SelectTrigger size="sm">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="home1">Home 1</SelectItem>
+                                <SelectItem value="home2">Home 2</SelectItem>
+                                <SelectItem value="home3">Home 3</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                            {tSettings('sections.header.defaultTheme')}
+                        </label>
+                        <Select
+                            value={formData.settings.header?.theme_default || 'light'}
+                            onValueChange={(val) => updateHeaderSettings('theme_default', val)}
+                        >
+                            <SelectTrigger size="sm">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="light">
+                                    {tSettings('sections.header.themeLight')}
+                                </SelectItem>
+                                <SelectItem value="dark">
+                                    {tSettings('sections.header.themeDark')}
+                                </SelectItem>
+                                <SelectItem value="system">
+                                    {tSettings('sections.header.themeSystem')}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                            {tSettings('sections.header.defaultPagination')}
+                        </label>
+                        <Select
+                            value={formData.settings.header?.pagination_default || 'standard'}
+                            onValueChange={(val) => updateHeaderSettings('pagination_default', val)}
+                        >
+                            <SelectTrigger size="sm">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="standard">
+                                    {tSettings('sections.header.paginationStandard')}
+                                </SelectItem>
+                                <SelectItem value="infinite">
+                                    {tSettings('sections.header.paginationInfinite')}
+                                </SelectItem>
+                                <SelectItem value="loadmore">
+                                    {tSettings('sections.header.paginationLoadMore')}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
             </div>
         </div>
@@ -865,9 +949,9 @@ function HomepageFields({
     tSettings: (key: string) => string;
 }) {
     return (
-        <div className="space-y-6">
+        <div className="space-y-5">
             <div>
-                <p className="text-sm font-medium text-text dark:text-text-dark mb-3">
+                <p className="text-xs font-medium text-text-muted dark:text-text-muted-dark mb-3">
                     {tSettings('sections.homepage.title')}
                 </p>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1">
@@ -884,36 +968,58 @@ function HomepageFields({
                 </div>
             </div>
             <div>
-                <p className="text-sm font-medium text-text dark:text-text-dark mb-3">
+                <p className="text-xs font-medium text-text-muted dark:text-text-muted-dark mb-3">
                     {tSettings('sections.homepage.defaults')}
                 </p>
                 <div className="grid grid-cols-2 gap-4">
-                    <Select
-                        label={tSettings('sections.homepage.defaultView')}
-                        value={formData.settings.homepage?.default_view || 'classic'}
-                        onChange={(e) => updateHomepageSettings('default_view', e.target.value)}
-                        variant="form"
-                    >
-                        <option value="classic">
-                            {tSettings('sections.homepage.viewClassic')}
-                        </option>
-                        <option value="grid">{tSettings('sections.homepage.viewGrid')}</option>
-                        <option value="list">{tSettings('sections.homepage.viewList')}</option>
-                    </Select>
-                    <Select
-                        label={tSettings('sections.homepage.defaultSort')}
-                        value={formData.settings.homepage?.default_sort || 'popularity'}
-                        onChange={(e) => updateHomepageSettings('default_sort', e.target.value)}
-                        variant="form"
-                    >
-                        <option value="popularity">
-                            {tSettings('sections.homepage.sortPopularity')}
-                        </option>
-                        <option value="newest">{tSettings('sections.homepage.sortNewest')}</option>
-                        <option value="alphabetical">
-                            {tSettings('sections.homepage.sortAlphabetical')}
-                        </option>
-                    </Select>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                            {tSettings('sections.homepage.defaultView')}
+                        </label>
+                        <Select
+                            value={formData.settings.homepage?.default_view || 'classic'}
+                            onValueChange={(val) => updateHomepageSettings('default_view', val)}
+                        >
+                            <SelectTrigger size="sm">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="classic">
+                                    {tSettings('sections.homepage.viewClassic')}
+                                </SelectItem>
+                                <SelectItem value="grid">
+                                    {tSettings('sections.homepage.viewGrid')}
+                                </SelectItem>
+                                <SelectItem value="list">
+                                    {tSettings('sections.homepage.viewList')}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                            {tSettings('sections.homepage.defaultSort')}
+                        </label>
+                        <Select
+                            value={formData.settings.homepage?.default_sort || 'popularity'}
+                            onValueChange={(val) => updateHomepageSettings('default_sort', val)}
+                        >
+                            <SelectTrigger size="sm">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="popularity">
+                                    {tSettings('sections.homepage.sortPopularity')}
+                                </SelectItem>
+                                <SelectItem value="newest">
+                                    {tSettings('sections.homepage.sortNewest')}
+                                </SelectItem>
+                                <SelectItem value="alphabetical">
+                                    {tSettings('sections.homepage.sortAlphabetical')}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
             </div>
         </div>
@@ -931,7 +1037,7 @@ function FooterFields({
 }) {
     return (
         <div>
-            <p className="text-sm font-medium text-text dark:text-text-dark mb-3">
+            <p className="text-xs font-medium text-text-muted dark:text-text-muted-dark mb-3">
                 {tSettings('sections.footer.title')}
             </p>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1">
@@ -1029,7 +1135,7 @@ function MenuLinkList({
     return (
         <div className="space-y-3">
             <div className="flex items-center justify-between">
-                <h5 className="text-sm font-medium text-text dark:text-text-dark">
+                <h5 className="text-xs font-medium text-text dark:text-text-dark">
                     {tSettings(titleKey)}
                 </h5>
                 <Button
@@ -1043,7 +1149,7 @@ function MenuLinkList({
                 </Button>
             </div>
             {items.length === 0 ? (
-                <p className="text-sm text-text-muted dark:text-text-muted-dark italic py-2">
+                <p className="text-xs text-text-muted dark:text-text-muted-dark italic py-2">
                     {tSettings('sections.customMenu.noLinks')}
                 </p>
             ) : (
@@ -1073,18 +1179,21 @@ function MenuLinkList({
                             />
                             <Select
                                 value={item.target || '_self'}
-                                onChange={(e) =>
-                                    updateMenuItem(location, index, 'target', e.target.value)
+                                onValueChange={(val) =>
+                                    updateMenuItem(location, index, 'target', val)
                                 }
-                                variant="form"
-                                className="w-24"
                             >
-                                <option value="_self">
-                                    {tSettings('sections.customMenu.targetSelf')}
-                                </option>
-                                <option value="_blank">
-                                    {tSettings('sections.customMenu.targetBlank')}
-                                </option>
+                                <SelectTrigger size="sm" className="w-24">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="_self">
+                                        {tSettings('sections.customMenu.targetSelf')}
+                                    </SelectItem>
+                                    <SelectItem value="_blank">
+                                        {tSettings('sections.customMenu.targetBlank')}
+                                    </SelectItem>
+                                </SelectContent>
                             </Select>
                             <Button
                                 type="button"
@@ -1119,12 +1228,14 @@ function SettingsCard({
     return (
         <div
             className={cn(
-                'rounded-lg border bg-card dark:bg-card-dark border-card-border dark:border-card-border-dark p-5',
+                'rounded-lg border overflow-hidden bg-card dark:bg-card-primary-dark/30 border-card-border dark:border-card-border-dark',
                 className,
             )}
         >
-            <h4 className="text-sm font-semibold text-text dark:text-text-dark mb-4">{title}</h4>
-            {children}
+            <div className="px-5 py-3.5 border-b border-card-border dark:border-card-border-dark">
+                <h4 className="text-sm font-semibold text-text dark:text-text-dark">{title}</h4>
+            </div>
+            <div className="px-5 py-4">{children}</div>
         </div>
     );
 }

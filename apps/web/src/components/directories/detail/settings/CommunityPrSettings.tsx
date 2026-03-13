@@ -60,19 +60,21 @@ export function CommunityPrSettings() {
     return (
         <div
             className={cn(
-                'rounded-lg border p-6',
-                'bg-card dark:bg-card-dark',
+                'rounded-lg border overflow-hidden',
+                'bg-card dark:bg-card-primary-dark/30',
                 'border-card-border dark:border-card-border-dark',
             )}
         >
-            <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
-                {t('communityPrProcessing')}
-            </h3>
+            <div className="px-5 py-3.5 border-b border-card-border dark:border-card-border-dark">
+                <h3 className="text-sm font-semibold text-text dark:text-text-dark">
+                    {t('communityPrProcessing')}
+                </h3>
+            </div>
 
-            <div className="space-y-4">
+            <div className="px-5 py-4 space-y-4">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h4 className="text-sm font-medium text-text dark:text-text-dark">
+                        <h4 className="text-xs font-medium text-text dark:text-text-dark">
                             {t('communityPrEnableLabel')}
                         </h4>
                         <p className="text-xs text-text-muted dark:text-text-muted-dark">
@@ -95,7 +97,7 @@ export function CommunityPrSettings() {
                 {directory.communityPrEnabled && (
                     <div className="flex items-center justify-between pt-2 border-t border-card-border dark:border-card-border-dark">
                         <div>
-                            <h4 className="text-sm font-medium text-text dark:text-text-dark">
+                            <h4 className="text-xs font-medium text-text dark:text-text-dark">
                                 {t('communityPrAutoCloseLabel')}
                             </h4>
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">

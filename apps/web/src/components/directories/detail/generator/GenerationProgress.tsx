@@ -33,7 +33,7 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
             <div
                 className={cn(
                     'rounded-lg border',
-                    'bg-card dark:bg-card-dark',
+                    'bg-card dark:bg-card-primary-dark/30',
                     'border-card-border dark:border-card-border-dark',
                     'overflow-hidden',
                 )}

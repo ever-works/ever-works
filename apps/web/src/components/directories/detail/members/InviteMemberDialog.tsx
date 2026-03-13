@@ -6,7 +6,13 @@ import { DirectoryMember, AssignableMemberRole } from '@/lib/api';
 import { DirectoryMemberRole } from '@/lib/api/enums';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -111,18 +117,27 @@ export function InviteMemberDialog({
                         disabled={isSubmitting}
                     />
 
-                    <Select
-                        label={t('invite.roleLabel')}
-                        value={role}
-                        onChange={(e) => setRole(e.target.value as AssignableMemberRole)}
-                        disabled={isSubmitting}
-                    >
-                        {roleOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                            </option>
-                        ))}
-                    </Select>
+                    <div className="space-y-1.5">
+                        <label className="block text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                            {t('invite.roleLabel')}
+                        </label>
+                        <Select
+                            value={role}
+                            onValueChange={(val) => setRole(val as AssignableMemberRole)}
+                            disabled={isSubmitting}
+                        >
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {roleOptions.map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
 
                     <div className="text-sm text-text-secondary dark:text-text-secondary-dark bg-surface-secondary dark:bg-surface-secondary-dark p-3 rounded-lg">
                         {roleOptions.find((opt) => opt.value === role)?.desc}

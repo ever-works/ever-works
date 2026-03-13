@@ -537,7 +537,39 @@
                 },
                 "loadMore": "تحميل المزيد",
                 "noMore": "لا توجد سجلات أخرى",
-                "unknown": "غير معروف"
+                "unknown": "غير معروف",
+                "activity": {
+                    "generation": "إنشاء",
+                    "item_added": "تمت إضافة عنصر",
+                    "item_updated": "تم تحديث عنصر",
+                    "item_removed": "تمت إزالة عنصر",
+                    "comparison_added": "تمت إضافة مقارنة",
+                    "comparison_removed": "تمت إزالة مقارنة",
+                    "category_change": "تغيير الفئة",
+                    "tag_change": "تغيير الوسم",
+                    "collection_change": "تغيير المجموعة",
+                    "community_pr_merged": "تم دمج مساهمة المجتمع"
+                },
+                "detail": {
+                    "added": "تمت الإضافة",
+                    "updated": "تم التحديث",
+                    "removed": "تمت الإزالة",
+                    "fields": "الحقول",
+                    "expand": "توسيع تفاصيل سجل التغييرات",
+                    "collapse": "طي تفاصيل سجل التغييرات"
+                },
+                "filters": {
+                    "label": "النشاط",
+                    "all": "كل الأنشطة",
+                    "generation": "الإنشاء",
+                    "items": "العناصر",
+                    "comparisons": "المقارنات",
+                    "taxonomy": "التصنيف",
+                    "community_pr": "مساهمة المجتمع"
+                },
+                "pagination": {
+                    "showing": "عرض {from}-{to} من {total}"
+                }
             },
             "info": {
                 "title": "معلومات الدليل",

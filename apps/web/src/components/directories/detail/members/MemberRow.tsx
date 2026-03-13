@@ -5,7 +5,13 @@ import { useTranslations } from 'next-intl';
 import { DirectoryMember, AssignableMemberRole } from '@/lib/api';
 import { DirectoryMemberRole } from '@/lib/api/enums';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -100,18 +106,19 @@ export function MemberRow({
                     {canManage ? (
                         <Select
                             value={member.role}
-                            onChange={(e) =>
-                                handleRoleChange(e.target.value as AssignableMemberRole)
-                            }
+                            onValueChange={(val) => handleRoleChange(val as AssignableMemberRole)}
                             disabled={isUpdating}
-                            variant="form"
-                            className="w-32"
                         >
-                            {roleOptions.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                </option>
-                            ))}
+                            <SelectTrigger className="w-32">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {roleOptions.map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
                         </Select>
                     ) : (
                         <span className="px-3 py-1.5 text-sm rounded-lg bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">

@@ -630,7 +630,39 @@
                 },
                 "loadMore": "Załaduj więcej",
                 "noMore": "Brak więcej rekordów",
-                "unknown": "Nieznany"
+                "unknown": "Nieznany",
+                "activity": {
+                    "generation": "Generowanie",
+                    "item_added": "Dodano element",
+                    "item_updated": "Zaktualizowano element",
+                    "item_removed": "Usunięto element",
+                    "comparison_added": "Dodano porównanie",
+                    "comparison_removed": "Usunięto porównanie",
+                    "category_change": "Zmiana kategorii",
+                    "tag_change": "Zmiana tagu",
+                    "collection_change": "Zmiana kolekcji",
+                    "community_pr_merged": "PR społeczności"
+                },
+                "detail": {
+                    "added": "Dodane",
+                    "updated": "Zaktualizowane",
+                    "removed": "Usunięte",
+                    "fields": "Pola",
+                    "expand": "Rozwiń szczegóły dziennika zmian",
+                    "collapse": "Zwiń szczegóły dziennika zmian"
+                },
+                "filters": {
+                    "label": "Aktywność",
+                    "all": "Cała aktywność",
+                    "generation": "Generowanie",
+                    "items": "Elementy",
+                    "comparisons": "Porównania",
+                    "taxonomy": "Taksonomia",
+                    "community_pr": "PR społeczności"
+                },
+                "pagination": {
+                    "showing": "Wyświetlanie {from}-{to} z {total}"
+                }
             },
             "info": {
                 "title": "Informacje o katalogu",

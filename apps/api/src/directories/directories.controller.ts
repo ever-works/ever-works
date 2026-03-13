@@ -301,12 +301,19 @@ export class DirectoriesController {
     @ApiParam({ name: 'id', description: 'Directory ID' })
     @ApiQuery({ name: 'limit', required: false, description: 'Maximum number of results' })
     @ApiQuery({ name: 'offset', required: false, description: 'Number of results to skip' })
+    @ApiQuery({
+        name: 'activityType',
+        required: false,
+        description:
+            'Optional history activity filter (generation, items, comparisons, taxonomy, community_pr)',
+    })
     @ApiResponse({ status: 200, description: 'Generation history' })
     async getDirectoryHistory(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
+        @Query('activityType') activityType?: string,
     ) {
         const user = await this.authService.getUser(auth.userId);
 
@@ -316,6 +323,7 @@ export class DirectoriesController {
         const result = await this.directoryQueryService.directoryGenerationHistory(id, user, {
             limit: parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
             offset: parsedOffset && !isNaN(parsedOffset) ? parsedOffset : undefined,
+            activityType,
         });
 
         return {
