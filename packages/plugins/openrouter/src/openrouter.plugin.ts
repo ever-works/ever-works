@@ -52,7 +52,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'openai/gpt-5.1',
+				default: 'anthropic/claude-sonnet-4.5',
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_DEFAULT_MODEL'
@@ -61,7 +61,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Handles tags, short descriptions, and quick classifications',
-				default: 'openai/gpt-5-nano',
+				default: 'openai/gpt-5-mini',
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_SIMPLE_MODEL'
@@ -70,7 +70,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Handles listings, summaries, and content reformatting',
-				default: 'openai/gpt-4o',
+				default: 'anthropic/claude-sonnet-4.5',
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_MEDIUM_MODEL'
@@ -79,7 +79,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'openai/gpt-5.1',
+				default: 'openai/gpt-5',
 				'x-widget': 'model-select',
 				'x-scope': 'global',
 				'x-envVar': 'PLUGIN_OPENROUTER_COMPLEX_MODEL'
@@ -248,6 +248,17 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				'4. Select your preferred models for each task complexity level'
 			].join('\n'),
 			homepage: 'https://openrouter.ai',
+			uiHints: {
+				byok: {
+					buttonLabel: 'Bring your own key',
+					triggerField: 'apiKey'
+				},
+				validateOnSave: true,
+				includeInOnboarding: true,
+				onboardingPriority: 3,
+				completionFields: ['apiKey', 'defaultModel'],
+				onboardingDescription: 'Add an OpenRouter key to access hundreds of AI models from a single account.'
+			},
 			icon: {
 				type: 'svg',
 				value: `<svg width="100%" height="100%" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" class="size-4" fill="currentColor" stroke="currentColor" aria-label="Logo"><g clip-path="url(#clip0_205_3)"><path d="M3 248.945C18 248.945 76 236 106 219C136 202 136 202 198 158C276.497 102.293 332 120.945 423 120.945" stroke-width="90"></path><path d="M511 121.5L357.25 210.268L357.25 32.7324L511 121.5Z"></path><path d="M0 249C15 249 73 261.945 103 278.945C133 295.945 133 295.945 195 339.945C273.497 395.652 329 377 420 377" stroke-width="90"></path><path d="M508 376.445L354.25 287.678L354.25 465.213L508 376.445Z"></path></g><title style="display:none">OpenRouter</title><defs><clipPath id="clip0_205_3"><rect width="512" height="512" fill="white"></rect></clipPath></defs></svg>`,

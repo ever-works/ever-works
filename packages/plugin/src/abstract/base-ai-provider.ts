@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { BasePlugin } from './base-plugin.js';
+import type { ConnectionValidationResult } from '../contracts/plugin.interface.js';
 import type {
 	IAiProviderPlugin,
 	AiProviderType,
@@ -17,33 +18,17 @@ import type { PluginCategory } from '../contracts/plugin-manifest.types.js';
 import type { PluginSettings } from '../settings/settings.types.js';
 import type { AiOperations, AiOperationsConfig } from '../ai/ai-operations.js';
 
-/**
- * Abstract base class for AI provider plugins
- * Provides common functionality and sensible defaults
- */
 export abstract class BaseAiProvider extends BasePlugin implements IAiProviderPlugin {
 	readonly category: PluginCategory = 'ai-provider';
 	readonly capabilities: readonly string[] = ['ai-provider'];
 
-	/** Provider type - must be implemented */
 	abstract readonly providerType: AiProviderType;
-
-	/** Provider display name - must be implemented */
 	abstract readonly providerName: string;
 
-	/** Shared AI operations instance — set by onLoad(), cleared by onUnload() */
 	protected aiOps: AiOperations | null = null;
 
-	/**
-	 * Create a chat completion
-	 * Must be implemented by subclasses
-	 */
 	abstract createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse>;
 
-	/**
-	 * Structured JSON output — delegates to AiOperations.askJson.
-	 * Subclasses inherit this automatically; no override needed.
-	 */
 	async askJson(prompt: string, options?: AskJsonCompletionOptions): Promise<AskJsonCompletionResponse> {
 		if (!this.aiOps) throw new Error('Plugin not loaded');
 		const resolvedConfig = this.resolveConfig(options?.settings);
@@ -54,11 +39,6 @@ export abstract class BaseAiProvider extends BasePlugin implements IAiProviderPl
 		});
 	}
 
-	/**
-	 * Resolve plugin settings into AiOperations config overrides.
-	 * Standard plugins (openai, anthropic, google, groq, ollama) use this directly.
-	 * OpenRouter overrides it to handle provider-specific mapping.
-	 */
 	protected resolveConfig(settings?: PluginSettings): Partial<AiOperationsConfig> {
 		const s = settings ?? {};
 		const config: Partial<AiOperationsConfig> = {};
@@ -70,26 +50,19 @@ export abstract class BaseAiProvider extends BasePlugin implements IAiProviderPl
 		return config;
 	}
 
-	/**
-	 * List available models
-	 * Must be implemented by subclasses
-	 */
 	abstract listModels(settings?: PluginSettings): Promise<readonly AiModel[]>;
 
-	/**
-	 * Get a specific model
-	 * Default implementation uses listModels
-	 */
 	async getModel(modelId: string, settings?: PluginSettings): Promise<AiModel | null> {
 		const models = await this.listModels(settings);
 		return models.find((m) => m.id === modelId) || null;
 	}
 
-	/**
-	 * Check if the provider is available
-	 * Default implementation tries to list models
-	 */
+	/** Uses aiOps.testConnection() when loaded; falls back to listModels(). Override for non-standard auth. */
 	async isAvailable(settings?: PluginSettings): Promise<boolean> {
+		if (this.aiOps) {
+			const result = await this.aiOps.testConnection(this.resolveConfig(settings));
+			return result.success;
+		}
 		try {
 			await this.listModels(settings);
 			return true;
@@ -98,10 +71,6 @@ export abstract class BaseAiProvider extends BasePlugin implements IAiProviderPl
 		}
 	}
 
-	/**
-	 * Get provider capabilities
-	 * Default implementation returns conservative defaults
-	 */
 	getCapabilities(): AiModelCapabilities {
 		return {
 			supportsStructuredOutput: false,
@@ -112,12 +81,8 @@ export abstract class BaseAiProvider extends BasePlugin implements IAiProviderPl
 		};
 	}
 
-	/**
-	 * Create a streaming chat completion
-	 * Optional - subclasses can override if streaming is supported
-	 */
 	async *createStreamingChatCompletion(options: ChatCompletionOptions): AsyncIterable<ChatCompletionChunk> {
-		// Default: fall back to non-streaming and yield single result
+		// Default: fall back to non-streaming
 		const response = await this.createChatCompletion(options);
 		yield {
 			id: response.id,
@@ -131,26 +96,19 @@ export abstract class BaseAiProvider extends BasePlugin implements IAiProviderPl
 		};
 	}
 
-	/**
-	 * Create embeddings
-	 * Optional - subclasses can override if embeddings are supported
-	 */
 	async createEmbedding(_options: EmbeddingOptions): Promise<EmbeddingResponse> {
 		throw new Error('Embeddings not supported by this provider');
 	}
 
-	/**
-	 * Validate API key
-	 * Optional - subclasses can override
-	 */
-	async validateApiKey(settings?: PluginSettings): Promise<boolean> {
-		return this.isAvailable(settings);
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const available = await this.isAvailable(settings);
+		return available
+			? { success: true, message: `${this.providerName} connection verified.` }
+			: {
+					success: false,
+					message: `${this.providerName} connection failed. Check your credentials and try again.`
+				};
 	}
 
-	// Helper methods
-
-	/**
-	 * Get default model ID for this provider
-	 */
 	protected abstract getDefaultModelId(): string;
 }

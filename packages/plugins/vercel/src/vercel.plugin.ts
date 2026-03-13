@@ -10,7 +10,8 @@ import type {
 	DeploymentResult,
 	DeploymentProject,
 	DeploymentDomain,
-	AddDomainResult
+	AddDomainResult,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 import { VercelApiService } from './vercel-api.service.js';
 import type { VercelSettings } from './types.js';
@@ -37,12 +38,6 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 				title: 'Vercel API Token',
 				description: 'Your personal Vercel API token. Get one from https://vercel.com/account/tokens',
 				'x-secret': true,
-				'x-scope': 'user'
-			},
-			defaultTeamScope: {
-				type: 'string',
-				title: 'Default Team',
-				description: 'Default Vercel team for deployments (optional, leave empty for personal account)',
 				'x-scope': 'user'
 			}
 		},
@@ -116,6 +111,23 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 			website: result.website,
 			deploymentState: result.deploymentState,
 			projectId: result.projectId
+		};
+	}
+
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const token = settings.apiToken as string | undefined;
+		if (!token) {
+			return { success: false, message: 'Enter a Vercel API token before validating.' };
+		}
+		const valid = await this.validateToken(token);
+		if (!valid) {
+			return { success: false, message: 'Vercel rejected the API token.' };
+		}
+		const user = await this.getAuthenticatedUser(token);
+		return {
+			success: true,
+			message: user?.username ? `Connected to Vercel as ${user.username}.` : 'Vercel connection verified.',
+			details: user ? { username: user.username, email: user.email } : undefined
 		};
 	}
 
@@ -254,9 +266,22 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 				'1. Create a Vercel account at [vercel.com](https://vercel.com)',
 				'2. Generate an API token from [vercel.com/account/tokens](https://vercel.com/account/tokens)',
 				'3. Enter your token in the settings below',
-				'4. Optionally set a default team if you use Vercel Teams'
+				'4. Save settings to verify the token before using it for deployments'
 			].join('\n'),
 			homepage: 'https://vercel.com/account/tokens',
+			uiHints: {
+				setupLink: {
+					url: 'https://vercel.com/account/tokens',
+					label: 'Vercel Tokens',
+					buttonLabel: 'Get Vercel API token',
+					showWhenEmpty: ['apiToken']
+				},
+				validateOnSave: true,
+				includeInOnboarding: true,
+				onboardingPriority: 4,
+				completionFields: ['apiToken'],
+				onboardingDescription: 'Add a Vercel token to publish your directories as live websites.'
+			},
 			icon: {
 				type: 'lucide',
 				value: 'Triangle',

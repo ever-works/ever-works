@@ -10,7 +10,8 @@ import type {
 	ScreenshotOptions,
 	ScreenshotResult,
 	ScreenshotFormat,
-	ScreenshotValidationResult
+	ScreenshotValidationResult,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 
 import * as screenshotone from 'screenshotone-api-sdk';
@@ -228,9 +229,38 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 	 * Check if the service is available (API key configured)
 	 */
 	async isAvailable(): Promise<boolean> {
-		// This is a quick check - actual availability depends on settings
-		// which are resolved at call time
-		return true;
+		if (!this.context) return false;
+		const settings = await this.context.getSettings();
+		return Boolean(settings?.accessKey);
+	}
+
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const accessKey = settings.accessKey as string | undefined;
+		if (!accessKey) {
+			return { success: false, message: 'ScreenshotOne access key is not configured.' };
+		}
+
+		try {
+			const resolvedSettings = this.mergeSettings(settings);
+			const client = this.createClient(resolvedSettings);
+			const testOptions = screenshotone.TakeOptions.url('https://example.com');
+
+			const url = resolvedSettings.secretKey
+				? await Promise.resolve(client.generateSignedTakeURL(testOptions))
+				: await Promise.resolve(client.generateTakeURL(testOptions));
+
+			const urlString = String(url);
+			if (urlString && urlString.includes('api.screenshotone.com')) {
+				return { success: true, message: 'ScreenshotOne connection verified.' };
+			}
+
+			return { success: false, message: 'ScreenshotOne credentials appear invalid.' };
+		} catch (error) {
+			return {
+				success: false,
+				message: `ScreenshotOne connection failed: ${error instanceof Error ? error.message : String(error)}`
+			};
+		}
 	}
 
 	/**
