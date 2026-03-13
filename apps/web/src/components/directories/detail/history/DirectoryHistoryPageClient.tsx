@@ -9,7 +9,13 @@ import {
 import { HistoryTable } from './HistoryTable';
 import { HistoryEmptyState } from './HistoryEmptyState';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { fetchDirectoryGenerationHistory } from '@/app/actions/dashboard/directories';
 import { toast } from 'sonner';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
