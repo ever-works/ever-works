@@ -126,11 +126,7 @@ export class ItemHealthService {
             health: item.health,
         };
 
-        await this.cacheManager?.set(
-            cacheKey,
-            response,
-            MANUAL_RESPONSE_CACHE_MINUTES * 60 * 1000,
-        );
+        await this.cacheManager?.set(cacheKey, response, MANUAL_RESPONSE_CACHE_MINUTES * 60 * 1000);
 
         return response;
     }
