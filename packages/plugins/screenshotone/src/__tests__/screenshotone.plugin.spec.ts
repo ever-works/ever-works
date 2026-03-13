@@ -232,9 +232,16 @@ describe('ScreenshotOnePlugin', () => {
 	});
 
 	describe('IScreenshotPlugin - isAvailable', () => {
-		it('should return true', async () => {
+		it('should return true when access key is configured', async () => {
+			(mockContext.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({ accessKey: 'test-key' });
+			await plugin.onLoad(mockContext);
 			const available = await plugin.isAvailable();
 			expect(available).toBe(true);
+		});
+
+		it('should return false when not loaded', async () => {
+			const available = await plugin.isAvailable();
+			expect(available).toBe(false);
 		});
 	});
 
