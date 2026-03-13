@@ -931,7 +931,7 @@
                     "sourceTooGeneric": "Fonte troppo generica",
                     "weakSource": "Fonte debole",
                     "sourceAccuracyUnknown": "Accuratezza della fonte sconosciuta",
-                    "useSuggestedSource": "Usa la fonte suggerita",
+                    "useSuggestedSource": "Applica suggerimento",
                     "suggestedSourceApplied": "Fonte suggerita applicata",
                     "failedToUseSuggestedSource": "Impossibile usare la fonte suggerita"
                 }

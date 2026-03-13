@@ -1289,7 +1289,7 @@
                     "sourceTooGeneric": "Source too generic",
                     "weakSource": "Weak source",
                     "sourceAccuracyUnknown": "Source accuracy unknown",
-                    "useSuggestedSource": "Use suggested source",
+                    "useSuggestedSource": "Apply suggestion",
                     "suggestedSourceApplied": "Suggested source applied",
                     "failedToUseSuggestedSource": "Failed to use suggested source"
                 }

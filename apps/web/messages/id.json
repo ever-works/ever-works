@@ -931,7 +931,7 @@
                     "sourceTooGeneric": "Sumber terlalu umum",
                     "weakSource": "Sumber lemah",
                     "sourceAccuracyUnknown": "Keakuratan sumber tidak diketahui",
-                    "useSuggestedSource": "Gunakan sumber yang disarankan",
+                    "useSuggestedSource": "Terapkan saran",
                     "suggestedSourceApplied": "Sumber yang disarankan diterapkan",
                     "failedToUseSuggestedSource": "Gagal menggunakan sumber yang disarankan"
                 }

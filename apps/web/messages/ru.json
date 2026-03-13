@@ -931,7 +931,7 @@
                     "sourceTooGeneric": "Istochnik slishkom obshchiy",
                     "weakSource": "Slabyy istochnik",
                     "sourceAccuracyUnknown": "Tochnost istochnika neizvestna",
-                    "useSuggestedSource": "Использовать предложенный источник",
+                    "useSuggestedSource": "Применить предложение",
                     "suggestedSourceApplied": "Предложенный источник применён",
                     "failedToUseSuggestedSource": "Не удалось использовать предложенный источник"
                 }

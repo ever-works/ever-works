@@ -931,7 +931,7 @@
                     "sourceTooGeneric": "Iztochnikut e tvurde obsht",
                     "weakSource": "Slab iztochnik",
                     "sourceAccuracyUnknown": "Tochnostta na iztochnika e neizvestna",
-                    "useSuggestedSource": "Използвай предложения източник",
+                    "useSuggestedSource": "Приложи предложението",
                     "suggestedSourceApplied": "Предложеният източник беше приложен",
                     "failedToUseSuggestedSource": "Неуспешно използване на предложения източник"
                 }

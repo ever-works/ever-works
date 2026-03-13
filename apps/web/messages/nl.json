@@ -931,7 +931,7 @@
                     "sourceTooGeneric": "Bron te algemeen",
                     "weakSource": "Zwakke bron",
                     "sourceAccuracyUnknown": "Bronnauwkeurigheid onbekend",
-                    "useSuggestedSource": "Voorgestelde bron gebruiken",
+                    "useSuggestedSource": "Suggestie toepassen",
                     "suggestedSourceApplied": "Voorgestelde bron toegepast",
                     "failedToUseSuggestedSource": "Voorgestelde bron kon niet worden gebruikt"
                 }

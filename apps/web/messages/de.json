@@ -835,7 +835,7 @@
                     "sourceTooGeneric": "Quelle zu allgemein",
                     "weakSource": "Schwache Quelle",
                     "sourceAccuracyUnknown": "Quellgenauigkeit unbekannt",
-                    "useSuggestedSource": "Vorgeschlagene Quelle verwenden",
+                    "useSuggestedSource": "Vorschlag übernehmen",
                     "suggestedSourceApplied": "Vorgeschlagene Quelle übernommen",
                     "failedToUseSuggestedSource": "Vorgeschlagene Quelle konnte nicht verwendet werden"
                 }

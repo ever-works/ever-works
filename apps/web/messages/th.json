@@ -931,7 +931,7 @@
                     "sourceTooGeneric": "แหล่งที่มาทั่วไปเกินไป",
                     "weakSource": "แหล่งที่มาอ่อน",
                     "sourceAccuracyUnknown": "ไม่ทราบความแม่นยำของแหล่งที่มา",
-                    "useSuggestedSource": "ใช้แหล่งข้อมูลที่แนะนำ",
+                    "useSuggestedSource": "ใช้คำแนะนำ",
                     "suggestedSourceApplied": "นำแหล่งข้อมูลที่แนะนำมาใช้แล้ว",
                     "failedToUseSuggestedSource": "ไม่สามารถใช้แหล่งข้อมูลที่แนะนำได้"
                 }

@@ -931,7 +931,7 @@
                     "sourceTooGeneric": "ソースが汎用的すぎます",
                     "weakSource": "弱いソース",
                     "sourceAccuracyUnknown": "ソースの正確性は不明です",
-                    "useSuggestedSource": "提案されたソースを使用",
+                    "useSuggestedSource": "提案を適用",
                     "suggestedSourceApplied": "提案されたソースを適用しました",
                     "failedToUseSuggestedSource": "提案されたソースを使用できませんでした"
                 }

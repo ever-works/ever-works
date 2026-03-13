@@ -835,7 +835,7 @@
                     "sourceTooGeneric": "المصدر عام جدا",
                     "weakSource": "مصدر ضعيف",
                     "sourceAccuracyUnknown": "دقة المصدر غير معروفة",
-                    "useSuggestedSource": "استخدم المصدر المقترح",
+                    "useSuggestedSource": "طبّق الاقتراح",
                     "suggestedSourceApplied": "تم تطبيق المصدر المقترح",
                     "failedToUseSuggestedSource": "تعذر استخدام المصدر المقترح"
                 }

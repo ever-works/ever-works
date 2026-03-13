@@ -931,7 +931,7 @@
                     "sourceTooGeneric": "स्रोत बहुत सामान्य है",
                     "weakSource": "कमज़ोर स्रोत",
                     "sourceAccuracyUnknown": "स्रोत की सटीकता अज्ञात है",
-                    "useSuggestedSource": "सुझाया गया स्रोत उपयोग करें",
+                    "useSuggestedSource": "सुझाव लागू करें",
                     "suggestedSourceApplied": "सुझाया गया स्रोत लागू किया गया",
                     "failedToUseSuggestedSource": "सुझाए गए स्रोत का उपयोग नहीं किया जा सका"
                 }

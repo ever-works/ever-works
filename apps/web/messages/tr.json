@@ -931,7 +931,7 @@
                     "sourceTooGeneric": "Kaynak cok genel",
                     "weakSource": "Zayif kaynak",
                     "sourceAccuracyUnknown": "Kaynak dogrulugu bilinmiyor",
-                    "useSuggestedSource": "Önerilen kaynağı kullan",
+                    "useSuggestedSource": "Öneriyi uygula",
                     "suggestedSourceApplied": "Önerilen kaynak uygulandı",
                     "failedToUseSuggestedSource": "Önerilen kaynak kullanılamadı"
                 }

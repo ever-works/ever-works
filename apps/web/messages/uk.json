@@ -931,7 +931,7 @@
                     "sourceTooGeneric": "Dzherelo nadto zahalne",
                     "weakSource": "Slabke dzherelo",
                     "sourceAccuracyUnknown": "Tochnist dzherela nevidoma",
-                    "useSuggestedSource": "Використати запропоноване джерело",
+                    "useSuggestedSource": "Застосувати пропозицію",
                     "suggestedSourceApplied": "Запропоноване джерело застосовано",
                     "failedToUseSuggestedSource": "Не вдалося використати запропоноване джерело"
                 }

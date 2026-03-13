@@ -835,7 +835,7 @@
                     "sourceTooGeneric": "המקור כללי מדי",
                     "weakSource": "מקור חלש",
                     "sourceAccuracyUnknown": "דיוק המקור אינו ידוע",
-                    "useSuggestedSource": "השתמש במקור המוצע",
+                    "useSuggestedSource": "החל הצעה",
                     "suggestedSourceApplied": "המקור המוצע הוחל",
                     "failedToUseSuggestedSource": "לא ניתן להשתמש במקור המוצע"
                 }
