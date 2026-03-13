@@ -10,7 +10,8 @@ import type {
 	DeploymentResult,
 	DeploymentProject,
 	DeploymentDomain,
-	AddDomainResult
+	AddDomainResult,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 import { VercelApiService } from './vercel-api.service.js';
 import type { VercelSettings } from './types.js';
@@ -113,11 +114,7 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 		};
 	}
 
-	async validateConnection(settings: Record<string, unknown>): Promise<{
-		success: boolean;
-		message: string;
-		details?: Record<string, unknown>;
-	}> {
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
 		const token = settings.apiToken as string | undefined;
 		if (!token) {
 			return { success: false, message: 'Enter a Vercel API token before validating.' };

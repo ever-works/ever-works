@@ -13,7 +13,8 @@ import type {
 	SearchResult,
 	RateLimitInfo,
 	ContentExtractionOptions,
-	ContentExtractionResult
+	ContentExtractionResult,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 
 import { Valyu, type SearchOptions as ValyuSearchOptions } from 'valyu-js';
@@ -119,7 +120,27 @@ export class ValyuSearchPlugin implements IPlugin, ISearchPlugin, IContentExtrac
 	}
 
 	async isAvailable(): Promise<boolean> {
-		return true;
+		if (!this.context) return false;
+		const settings = await this.context.getSettings();
+		return Boolean(settings?.apiKey);
+	}
+
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const apiKey = settings.apiKey as string | undefined;
+		if (!apiKey) {
+			return { success: false, message: 'Valyu API key is not configured.' };
+		}
+
+		try {
+			const client = this.getClient(settings);
+			await client.search('test', { maxNumResults: 1, searchType: 'all' });
+			return { success: true, message: 'Valyu connection verified.' };
+		} catch (error) {
+			return {
+				success: false,
+				message: `Valyu connection failed: ${error instanceof Error ? error.message : String(error)}`
+			};
+		}
 	}
 
 	async getRateLimitInfo(): Promise<RateLimitInfo> {

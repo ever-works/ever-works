@@ -5,6 +5,12 @@ import type { JsonSchema } from '../settings/json-schema.types.js';
 import type { ConfigurationMode } from '../settings/settings.types.js';
 import type { ValidationResult } from '../settings/validation.types.js';
 
+export interface ConnectionValidationResult {
+	success: boolean;
+	message: string;
+	details?: Record<string, unknown>;
+}
+
 /**
  * Base plugin interface that all plugins must implement
  */
@@ -65,11 +71,7 @@ export interface IPlugin {
 	 * @param settings - Fully resolved settings (including secrets) for this user.
 	 * @returns Validation result
 	 */
-	validateConnection?(settings: Record<string, unknown>): Promise<{
-		success: boolean;
-		message: string;
-		details?: Record<string, unknown>;
-	}>;
+	validateConnection?(settings: Record<string, unknown>): Promise<ConnectionValidationResult>;
 }
 
 /**

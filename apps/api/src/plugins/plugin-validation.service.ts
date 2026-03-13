@@ -1,12 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PluginRegistryService, PluginSettingsService } from '@ever-works/agent/plugins';
 import { GitFacadeService } from '@ever-works/agent/facades';
-
-export interface PluginConnectionValidationResult {
-    success: boolean;
-    message: string;
-    details?: Record<string, unknown>;
-}
+import { ConnectionValidationResult } from '@ever-works/plugin';
 
 @Injectable()
 export class PluginValidationService {
@@ -19,7 +14,7 @@ export class PluginValidationService {
     async validateUserPluginConnection(
         pluginId: string,
         userId: string,
-    ): Promise<PluginConnectionValidationResult> {
+    ): Promise<ConnectionValidationResult> {
         const registered = this.pluginRegistry.get(pluginId);
         if (!registered || registered.state !== 'loaded') {
             throw new NotFoundException(`Plugin not found or not loaded: ${pluginId}`);
@@ -34,7 +29,7 @@ export class PluginValidationService {
 
         // Prefer validateConnection() — plugins self-describe their validation logic
         const validateConnection = plugin.validateConnection as
-            | ((s: Record<string, unknown>) => Promise<PluginConnectionValidationResult>)
+            | ((s: Record<string, unknown>) => Promise<ConnectionValidationResult>)
             | undefined;
 
         if (typeof validateConnection === 'function') {

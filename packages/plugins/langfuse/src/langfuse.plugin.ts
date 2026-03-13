@@ -8,7 +8,8 @@ import type {
 	PluginManifest,
 	PluginHealthCheck,
 	JsonSchema,
-	PluginSettings
+	PluginSettings,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 
 import { LangfuseClient } from '@langfuse/client';
@@ -133,6 +134,32 @@ export class LangfusePlugin implements IPlugin, IPromptProviderPlugin {
 	isAvailable(settings?: PluginSettings): boolean {
 		if (!settings) return false;
 		return Boolean(settings.secretKey) && Boolean(settings.publicKey);
+	}
+
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const secretKey = settings.secretKey as string | undefined;
+		const publicKey = settings.publicKey as string | undefined;
+		if (!secretKey || !publicKey) {
+			return { success: false, message: 'Langfuse secret key and public key are not configured.' };
+		}
+
+		try {
+			const client = this.createClient(settings as Record<string, unknown>);
+			// Attempt to fetch a non-existent prompt — a 404 means credentials are valid,
+			// while an auth error means they are not.
+			await client.prompt.get('__connection_test__', { label: 'production', type: 'text' });
+			return { success: true, message: 'Langfuse connection verified.' };
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message : String(error);
+			// A "not found" error means the API accepted our credentials
+			if (message.includes('not found') || message.includes('404')) {
+				return { success: true, message: 'Langfuse connection verified.' };
+			}
+			return {
+				success: false,
+				message: `Langfuse connection failed: ${message}`
+			};
+		}
 	}
 
 	async getPrompt(key: string, options?: GetPromptOptions): Promise<PromptProviderResult | null> {

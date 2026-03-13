@@ -11,7 +11,8 @@ import type {
 	ScreenshotOptions,
 	ScreenshotResult,
 	ContentExtractionOptions,
-	ContentExtractionResult
+	ContentExtractionResult,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 
 import { ScrapflyClient, ScrapeConfig } from 'scrapfly-sdk';
@@ -101,7 +102,34 @@ export class ScrapflyPlugin implements IPlugin, IScreenshotPlugin, IContentExtra
 	}
 
 	async isAvailable(): Promise<boolean> {
-		return true;
+		if (!this.context) return false;
+		const settings = await this.context.getSettings();
+		return Boolean(settings?.apiKey);
+	}
+
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const apiKey = settings.apiKey as string | undefined;
+		if (!apiKey) {
+			return { success: false, message: 'Scrapfly API key is not configured.' };
+		}
+
+		try {
+			const response = await fetch(`https://api.scrapfly.io/account?key=${apiKey}`);
+
+			if (!response.ok) {
+				return {
+					success: false,
+					message: `Scrapfly connection failed (${response.status}): ${response.statusText}`
+				};
+			}
+
+			return { success: true, message: 'Scrapfly connection verified.' };
+		} catch (error) {
+			return {
+				success: false,
+				message: `Scrapfly connection failed: ${error instanceof Error ? error.message : String(error)}`
+			};
+		}
 	}
 
 	getMaxDimensions(): { width: number; height: number } {
