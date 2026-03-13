@@ -146,8 +146,9 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 	}
 
 	async listProjects(token: string): Promise<DeploymentProject[]> {
+		const settings = await this.getSettings();
 		const projects = await this.apiService.getProjects(token, {
-			teamScope: undefined
+			teamScope: settings.defaultTeamScope
 		});
 		return projects.map((p) => ({
 			id: p.id,
@@ -157,8 +158,9 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 	}
 
 	async getProject(projectId: string, token: string): Promise<DeploymentProject | null> {
+		const settings = await this.getSettings();
 		const projects = await this.apiService.getProjects(token, {
-			teamScope: undefined
+			teamScope: settings.defaultTeamScope
 		});
 		const project = projects.find((p) => p.id === projectId);
 		if (!project) {

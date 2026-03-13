@@ -347,10 +347,15 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 					}
 				},
 				(res) => {
+					res.resume();
 					resolve((res.statusCode || 500) < 400);
 				}
 			);
 
+			request.setTimeout(10_000, () => {
+				request.destroy();
+				resolve(false);
+			});
 			request.on('error', () => resolve(false));
 			request.write(payload);
 			request.end();

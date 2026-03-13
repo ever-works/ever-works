@@ -53,7 +53,7 @@ export function PluginSettingsInline({
                 return { validationSuccess: validation.data?.message };
             }
         },
-        [plugin.pluginId],
+        [plugin.pluginId, plugin.uiHints?.validateOnSave],
     );
 
     const {

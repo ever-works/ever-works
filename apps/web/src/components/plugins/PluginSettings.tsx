@@ -62,7 +62,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                 return { validationSuccess: validation.data?.message };
             }
         },
-        [plugin.pluginId],
+        [plugin.pluginId, plugin.uiHints?.validateOnSave],
     );
 
     const {
