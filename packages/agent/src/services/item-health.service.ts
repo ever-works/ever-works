@@ -1,5 +1,5 @@
-import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
-import { format } from 'date-fns';
+import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { differenceInMinutes, format, parse } from 'date-fns';
 import { z } from 'zod';
 import type {
     ItemData,
@@ -15,6 +15,7 @@ import { AiFacadeService } from '../facades/ai.facade';
 import { ContentExtractorFacadeService } from '../facades/content-extractor.facade';
 import { DataRepository } from '../generators/data-generator/data-repository';
 import type { CheckItemHealthResponseDto } from '../items-generator/dto';
+import { CACHE_MANAGER, type Cache } from '../cache';
 
 type HealthCheckTrigger = 'manual' | 'schedule';
 
@@ -73,6 +74,10 @@ Rules:
 - Be conservative. If unsure, return unknown.
 `;
 
+const MANUAL_ACCURACY_CACHE_MINUTES = 60;
+const SCHEDULE_RECHECK_CACHE_MINUTES = 24 * 60;
+const MANUAL_RESPONSE_CACHE_MINUTES = 5;
+
 @Injectable()
 export class ItemHealthService {
     private readonly logger = new Logger(ItemHealthService.name);
@@ -81,6 +86,7 @@ export class ItemHealthService {
         private readonly gitFacade: GitFacadeService,
         private readonly aiFacade: AiFacadeService,
         private readonly contentExtractorFacade: ContentExtractorFacadeService,
+        @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
         @Optional()
         private readonly ownershipService?: DirectoryOwnershipService,
     ) {}
@@ -95,6 +101,12 @@ export class ItemHealthService {
         }
 
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
+        const cacheKey = this.buildManualCheckCacheKey(directoryId, itemSlug);
+        const cachedResult = await this.cacheManager?.get<CheckItemHealthResponseDto>(cacheKey);
+        if (cachedResult) {
+            return cachedResult;
+        }
+
         const result = await this.checkDirectoryItems(directory, user, {
             trigger: 'manual',
             itemSlugs: [itemSlug],
@@ -105,7 +117,7 @@ export class ItemHealthService {
             throw new NotFoundException(`Item '${itemSlug}' not found`);
         }
 
-        return {
+        const response: CheckItemHealthResponseDto = {
             status: 'success',
             item_slug: item.slug || itemSlug,
             item_name: item.name,
@@ -113,6 +125,14 @@ export class ItemHealthService {
             item,
             health: item.health,
         };
+
+        await this.cacheManager?.set(
+            cacheKey,
+            response,
+            MANUAL_RESPONSE_CACHE_MINUTES * 60 * 1000,
+        );
+
+        return response;
     }
 
     async runScheduledCheck(directory: Directory, user: User): Promise<void> {
@@ -159,7 +179,8 @@ export class ItemHealthService {
                 }
 
                 return options.itemSlugs.includes(item.slug);
-            });
+            })
+            .filter((item) => !this.shouldSkipCheck(item, options.trigger));
 
         if (options.itemSlugs?.length && itemsToCheck.length === 0) {
             return {
@@ -194,6 +215,7 @@ export class ItemHealthService {
             const nextSourceValidation = await this.buildSourceValidation(
                 item,
                 nextHealth,
+                options.trigger,
                 directory,
                 user,
             );
@@ -315,6 +337,7 @@ export class ItemHealthService {
     private async buildSourceValidation(
         item: ItemData,
         health: ItemHealth,
+        trigger: HealthCheckTrigger,
         directory: Directory,
         user: User,
     ): Promise<ItemSourceValidation> {
@@ -346,6 +369,18 @@ export class ItemHealthService {
                 is_official: false,
                 reason: 'AI source validation is not configured',
                 suggested_source_url: null,
+            };
+        }
+
+        const cachedValidation = this.getReusableAccuracyValidation(item, trigger);
+        if (cachedValidation) {
+            return {
+                ...cachedValidation,
+                reachability_status:
+                    baseReachabilityStatus === 'unknown'
+                        ? cachedValidation.reachability_status
+                        : baseReachabilityStatus,
+                checked_at: checkedAt,
             };
         }
 
@@ -429,6 +464,53 @@ export class ItemHealthService {
         }
 
         return 'unknown';
+    }
+
+    private shouldSkipCheck(item: ItemData, trigger: HealthCheckTrigger): boolean {
+        if (trigger !== 'schedule') {
+            return false;
+        }
+
+        return this.wasCheckedRecently(
+            item.source_validation?.checked_at || item.health?.checked_at,
+            SCHEDULE_RECHECK_CACHE_MINUTES,
+        );
+    }
+
+    private getReusableAccuracyValidation(
+        item: ItemData,
+        trigger: HealthCheckTrigger,
+    ): ItemSourceValidation | null {
+        if (trigger !== 'manual') {
+            return null;
+        }
+
+        const validation = item.source_validation;
+        if (!validation) {
+            return null;
+        }
+
+        if (!this.wasCheckedRecently(validation.checked_at, MANUAL_ACCURACY_CACHE_MINUTES)) {
+            return null;
+        }
+
+        return validation;
+    }
+
+    private wasCheckedRecently(
+        checkedAt: string | undefined,
+        freshnessWindowMinutes: number,
+    ): boolean {
+        if (!checkedAt) {
+            return false;
+        }
+
+        const parsedCheckedAt = parse(checkedAt, 'yyyy-MM-dd HH:mm', new Date());
+        if (Number.isNaN(parsedCheckedAt.getTime())) {
+            return false;
+        }
+
+        return differenceInMinutes(new Date(), parsedCheckedAt) < freshnessWindowMinutes;
     }
 
     private buildHttpSummary(health: ItemHealth): string {
@@ -544,5 +626,9 @@ export class ItemHealthService {
     private async loadChecker(): Promise<CheckLinksFn> {
         const module = (await import('check-links')) as { default: CheckLinksFn };
         return module.default;
+    }
+
+    private buildManualCheckCacheKey(directoryId: string, itemSlug: string): string {
+        return `item-source-check:${directoryId}:${itemSlug}`;
     }
 }
