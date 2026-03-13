@@ -930,7 +930,10 @@
                     "accurateSource": "Sumber akurat",
                     "sourceTooGeneric": "Sumber terlalu umum",
                     "weakSource": "Sumber lemah",
-                    "sourceAccuracyUnknown": "Keakuratan sumber tidak diketahui"
+                    "sourceAccuracyUnknown": "Keakuratan sumber tidak diketahui",
+                    "useSuggestedSource": "Gunakan sumber yang disarankan",
+                    "suggestedSourceApplied": "Sumber yang disarankan diterapkan",
+                    "failedToUseSuggestedSource": "Gagal menggunakan sumber yang disarankan"
                 }
             },
             "generator": {

@@ -930,7 +930,10 @@
                     "accurateSource": "Tochne dzherelo",
                     "sourceTooGeneric": "Dzherelo nadto zahalne",
                     "weakSource": "Slabke dzherelo",
-                    "sourceAccuracyUnknown": "Tochnist dzherela nevidoma"
+                    "sourceAccuracyUnknown": "Tochnist dzherela nevidoma",
+                    "useSuggestedSource": "Використати запропоноване джерело",
+                    "suggestedSourceApplied": "Запропоноване джерело застосовано",
+                    "failedToUseSuggestedSource": "Не вдалося використати запропоноване джерело"
                 }
             },
             "generator": {

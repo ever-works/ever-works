@@ -834,7 +834,10 @@
                     "accurateSource": "Praezise Quelle",
                     "sourceTooGeneric": "Quelle zu allgemein",
                     "weakSource": "Schwache Quelle",
-                    "sourceAccuracyUnknown": "Quellgenauigkeit unbekannt"
+                    "sourceAccuracyUnknown": "Quellgenauigkeit unbekannt",
+                    "useSuggestedSource": "Vorgeschlagene Quelle verwenden",
+                    "suggestedSourceApplied": "Vorgeschlagene Quelle übernommen",
+                    "failedToUseSuggestedSource": "Vorgeschlagene Quelle konnte nicht verwendet werden"
                 }
             },
             "generator": {

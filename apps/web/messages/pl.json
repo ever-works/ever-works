@@ -930,7 +930,10 @@
                     "accurateSource": "Dokladne zrodlo",
                     "sourceTooGeneric": "Zrodlo jest zbyt ogolne",
                     "weakSource": "Slabe zrodlo",
-                    "sourceAccuracyUnknown": "Dokladnosc zrodla nieznana"
+                    "sourceAccuracyUnknown": "Dokladnosc zrodla nieznana",
+                    "useSuggestedSource": "Użyj sugerowanego źródła",
+                    "suggestedSourceApplied": "Zastosowano sugerowane źródło",
+                    "failedToUseSuggestedSource": "Nie udało się użyć sugerowanego źródła"
                 }
             },
             "generator": {

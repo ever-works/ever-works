@@ -34,6 +34,7 @@ import {
     SlidersHorizontal,
     Camera,
     ShieldAlert,
+    Link2,
 } from 'lucide-react';
 import { useItemsContext } from './ItemsContext';
 
@@ -56,6 +57,12 @@ export const ItemActions = memo(function ItemActions({
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);
     const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+    const [isApplyingSuggestedSource, setIsApplyingSuggestedSource] = useState(false);
+    const suggestedSourceUrl =
+        item.source_validation?.suggested_source_url &&
+        item.source_validation.suggested_source_url !== item.source_url
+            ? item.source_validation.suggested_source_url
+            : null;
 
     const handleCaptureScreenshot = async () => {
         if (!item.source_url) {
@@ -114,6 +121,35 @@ export const ItemActions = memo(function ItemActions({
         }
     };
 
+    const handleUseSuggestedSource = async () => {
+        if (!item.slug || !suggestedSourceUrl) {
+            return;
+        }
+
+        setIsApplyingSuggestedSource(true);
+        try {
+            const result = await updateItem(directoryId, {
+                item_slug: item.slug,
+                source_url: suggestedSourceUrl,
+            });
+
+            if (result.status === 'success') {
+                onUpdate?.({
+                    source_url: suggestedSourceUrl,
+                    health: { status: 'unchecked' },
+                    source_validation: undefined,
+                });
+                toast.success(result.message || t('sourceValidation.suggestedSourceApplied'));
+            } else {
+                toast.error(result.message || t('sourceValidation.failedToUseSuggestedSource'));
+            }
+        } catch (error) {
+            toast.error(t('sourceValidation.failedToUseSuggestedSource'));
+        } finally {
+            setIsApplyingSuggestedSource(false);
+        }
+    };
+
     return (
         <>
             <DropdownMenu>
@@ -121,9 +157,17 @@ export const ItemActions = memo(function ItemActions({
                     <Button
                         variant="ghost"
                         size="sm"
-                        disabled={isPending || isCapturingScreenshot || isCheckingHealth}
+                        disabled={
+                            isPending ||
+                            isCapturingScreenshot ||
+                            isCheckingHealth ||
+                            isApplyingSuggestedSource
+                        }
                     >
-                        {isPending || isCapturingScreenshot || isCheckingHealth ? (
+                        {isPending ||
+                        isCapturingScreenshot ||
+                        isCheckingHealth ||
+                        isApplyingSuggestedSource ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                             <MoreVertical className="w-4 h-4" />
@@ -154,6 +198,20 @@ export const ItemActions = memo(function ItemActions({
                                 <ShieldAlert className="w-4 h-4" />
                             )}
                             {t('sourceValidation.recheckSource')}
+                        </DropdownMenuItem>
+                    )}
+                    {suggestedSourceUrl && (
+                        <DropdownMenuItem
+                            onClick={handleUseSuggestedSource}
+                            disabled={isApplyingSuggestedSource}
+                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-primary dark:hover:text-primary focus:bg-surface-secondary dark:focus:bg-surface-secondary-dark transition-colors"
+                        >
+                            {isApplyingSuggestedSource ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Link2 className="w-4 h-4" />
+                            )}
+                            {t('sourceValidation.useSuggestedSource')}
                         </DropdownMenuItem>
                     )}
                     {item.source_url && screenshotAvailable && (

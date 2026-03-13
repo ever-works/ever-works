@@ -930,7 +930,10 @@
                     "accurateSource": "Nguon chinh xac",
                     "sourceTooGeneric": "Nguon qua chung chung",
                     "weakSource": "Nguon yeu",
-                    "sourceAccuracyUnknown": "Do chinh xac cua nguon chua ro"
+                    "sourceAccuracyUnknown": "Do chinh xac cua nguon chua ro",
+                    "useSuggestedSource": "Dùng nguồn được gợi ý",
+                    "suggestedSourceApplied": "Đã áp dụng nguồn được gợi ý",
+                    "failedToUseSuggestedSource": "Không thể dùng nguồn được gợi ý"
                 }
             },
             "generator": {

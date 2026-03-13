@@ -930,7 +930,10 @@
                     "accurateSource": "Fonte precisa",
                     "sourceTooGeneric": "Fonte generica demais",
                     "weakSource": "Fonte fraca",
-                    "sourceAccuracyUnknown": "Precisao da fonte desconhecida"
+                    "sourceAccuracyUnknown": "Precisao da fonte desconhecida",
+                    "useSuggestedSource": "Usar fonte sugerida",
+                    "suggestedSourceApplied": "Fonte sugerida aplicada",
+                    "failedToUseSuggestedSource": "Falha ao usar a fonte sugerida"
                 }
             },
             "generator": {

@@ -930,7 +930,10 @@
                     "accurateSource": "Nauwkeurige bron",
                     "sourceTooGeneric": "Bron te algemeen",
                     "weakSource": "Zwakke bron",
-                    "sourceAccuracyUnknown": "Bronnauwkeurigheid onbekend"
+                    "sourceAccuracyUnknown": "Bronnauwkeurigheid onbekend",
+                    "useSuggestedSource": "Voorgestelde bron gebruiken",
+                    "suggestedSourceApplied": "Voorgestelde bron toegepast",
+                    "failedToUseSuggestedSource": "Voorgestelde bron kon niet worden gebruikt"
                 }
             },
             "generator": {

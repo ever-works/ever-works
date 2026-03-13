@@ -1288,7 +1288,10 @@
                     "accurateSource": "Accurate source",
                     "sourceTooGeneric": "Source too generic",
                     "weakSource": "Weak source",
-                    "sourceAccuracyUnknown": "Source accuracy unknown"
+                    "sourceAccuracyUnknown": "Source accuracy unknown",
+                    "useSuggestedSource": "Use suggested source",
+                    "suggestedSourceApplied": "Suggested source applied",
+                    "failedToUseSuggestedSource": "Failed to use suggested source"
                 }
             },
             "generator": {

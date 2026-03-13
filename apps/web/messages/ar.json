@@ -834,7 +834,10 @@
                     "accurateSource": "مصدر دقيق",
                     "sourceTooGeneric": "المصدر عام جدا",
                     "weakSource": "مصدر ضعيف",
-                    "sourceAccuracyUnknown": "دقة المصدر غير معروفة"
+                    "sourceAccuracyUnknown": "دقة المصدر غير معروفة",
+                    "useSuggestedSource": "استخدم المصدر المقترح",
+                    "suggestedSourceApplied": "تم تطبيق المصدر المقترح",
+                    "failedToUseSuggestedSource": "تعذر استخدام المصدر المقترح"
                 }
             },
             "generator": {

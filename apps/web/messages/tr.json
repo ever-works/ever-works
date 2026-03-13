@@ -930,7 +930,10 @@
                     "accurateSource": "Dogru kaynak",
                     "sourceTooGeneric": "Kaynak cok genel",
                     "weakSource": "Zayif kaynak",
-                    "sourceAccuracyUnknown": "Kaynak dogrulugu bilinmiyor"
+                    "sourceAccuracyUnknown": "Kaynak dogrulugu bilinmiyor",
+                    "useSuggestedSource": "Önerilen kaynağı kullan",
+                    "suggestedSourceApplied": "Önerilen kaynak uygulandı",
+                    "failedToUseSuggestedSource": "Önerilen kaynak kullanılamadı"
                 }
             },
             "generator": {

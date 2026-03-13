@@ -930,7 +930,10 @@
                     "accurateSource": "Tochen iztochnik",
                     "sourceTooGeneric": "Iztochnikut e tvurde obsht",
                     "weakSource": "Slab iztochnik",
-                    "sourceAccuracyUnknown": "Tochnostta na iztochnika e neizvestna"
+                    "sourceAccuracyUnknown": "Tochnostta na iztochnika e neizvestna",
+                    "useSuggestedSource": "Използвай предложения източник",
+                    "suggestedSourceApplied": "Предложеният източник беше приложен",
+                    "failedToUseSuggestedSource": "Неуспешно използване на предложения източник"
                 }
             },
             "generator": {

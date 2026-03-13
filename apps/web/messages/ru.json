@@ -930,7 +930,10 @@
                     "accurateSource": "Tochnyy istochnik",
                     "sourceTooGeneric": "Istochnik slishkom obshchiy",
                     "weakSource": "Slabyy istochnik",
-                    "sourceAccuracyUnknown": "Tochnost istochnika neizvestna"
+                    "sourceAccuracyUnknown": "Tochnost istochnika neizvestna",
+                    "useSuggestedSource": "Использовать предложенный источник",
+                    "suggestedSourceApplied": "Предложенный источник применён",
+                    "failedToUseSuggestedSource": "Не удалось использовать предложенный источник"
                 }
             },
             "generator": {

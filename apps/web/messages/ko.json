@@ -930,7 +930,10 @@
                     "accurateSource": "정확한 소스",
                     "sourceTooGeneric": "소스가 너무 일반적입니다",
                     "weakSource": "약한 소스",
-                    "sourceAccuracyUnknown": "소스 정확도를 알 수 없음"
+                    "sourceAccuracyUnknown": "소스 정확도를 알 수 없음",
+                    "useSuggestedSource": "추천 소스 사용",
+                    "suggestedSourceApplied": "추천 소스를 적용했습니다",
+                    "failedToUseSuggestedSource": "추천 소스를 사용할 수 없습니다"
                 }
             },
             "generator": {

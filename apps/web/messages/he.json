@@ -834,7 +834,10 @@
                     "accurateSource": "מקור מדויק",
                     "sourceTooGeneric": "המקור כללי מדי",
                     "weakSource": "מקור חלש",
-                    "sourceAccuracyUnknown": "דיוק המקור אינו ידוע"
+                    "sourceAccuracyUnknown": "דיוק המקור אינו ידוע",
+                    "useSuggestedSource": "השתמש במקור המוצע",
+                    "suggestedSourceApplied": "המקור המוצע הוחל",
+                    "failedToUseSuggestedSource": "לא ניתן להשתמש במקור המוצע"
                 }
             },
             "generator": {
