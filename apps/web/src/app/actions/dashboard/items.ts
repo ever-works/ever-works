@@ -196,8 +196,8 @@ export async function checkItemHealth(directoryId: string, itemSlug: string) {
             message:
                 response.message ||
                 (response.status === 'success'
-                    ? 'Item health check completed'
-                    : 'Item health check failed'),
+                    ? 'Item source check completed'
+                    : 'Item source check failed'),
             item: response.item,
         };
     } catch (error) {
@@ -207,7 +207,7 @@ export async function checkItemHealth(directoryId: string, itemSlug: string) {
             message:
                 error instanceof Error
                     ? error.message
-                    : t('updateError', { defaultValue: 'Failed to update item' }),
+                    : t('updateError', { defaultValue: 'Failed to check item source' }),
         };
     }
 }
