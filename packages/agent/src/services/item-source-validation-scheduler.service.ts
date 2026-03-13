@@ -6,6 +6,8 @@ import { User } from '@src/entities/user.entity';
 export type ItemSourceValidationSchedulerResult = {
     processed: number;
     skipped: number;
+    itemsChecked: number;
+    itemsChanged: number;
     errors: { directoryId: string; message: string }[];
 };
 
@@ -25,6 +27,8 @@ export class ItemSourceValidationSchedulerService {
         const result: ItemSourceValidationSchedulerResult = {
             processed: 0,
             skipped: 0,
+            itemsChecked: 0,
+            itemsChanged: 0,
             errors: [],
         };
 
@@ -39,8 +43,10 @@ export class ItemSourceValidationSchedulerService {
             }
 
             try {
-                await this.itemHealthService.runScheduledCheck(directory, user);
+                const checkResult = await this.itemHealthService.runScheduledCheck(directory, user);
                 result.processed += 1;
+                result.itemsChecked += checkResult.checkedCount;
+                result.itemsChanged += checkResult.changedCount;
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
                 result.errors.push({ directoryId: directory.id, message });

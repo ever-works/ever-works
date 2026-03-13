@@ -145,13 +145,14 @@ export class ItemHealthService {
         return response;
     }
 
-    async runScheduledCheck(directory: Directory, user: User): Promise<void> {
+    async runScheduledCheck(directory: Directory, user: User): Promise<DirectoryHealthCheckResult> {
         try {
-            await this.checkDirectoryItems(directory, user, { trigger: 'schedule' });
+            return await this.checkDirectoryItems(directory, user, { trigger: 'schedule' });
         } catch (error) {
             this.logger.warn(
                 `Failed scheduled item health check for directory ${directory.slug}: ${error instanceof Error ? error.message : String(error)}`,
             );
+            throw error;
         }
     }
 
