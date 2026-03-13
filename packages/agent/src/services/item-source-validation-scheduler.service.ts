@@ -54,7 +54,11 @@ export class ItemSourceValidationSchedulerService {
                 const now = new Date();
                 await this.scheduleRepository.updateById(schedule.id, {
                     sourceValidationLastRunAt: now,
-                    sourceValidationNextRunAt: this.scheduleService.calculateNextRun(cadence, 0, now),
+                    sourceValidationNextRunAt: this.scheduleService.calculateNextRun(
+                        cadence,
+                        0,
+                        now,
+                    ),
                 });
 
                 result.processed += 1;
