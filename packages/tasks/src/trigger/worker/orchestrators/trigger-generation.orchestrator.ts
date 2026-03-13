@@ -41,9 +41,8 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
     async run({ directory, user, dto, historyId, historyStartedAt }: TriggerGenerationOptions) {
         const startTime = this.resolveStartTime(historyStartedAt);
 
-        const logCollector = new GenerationLogCollector(
-            historyId,
-            (hId, logs) => this.directoryOperations.appendGenerationLogs(hId, logs),
+        const logCollector = new GenerationLogCollector(historyId, (hId, logs) =>
+            this.directoryOperations.appendGenerationLogs(hId, logs),
         );
 
         await Promise.all([
@@ -117,7 +116,11 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
         } catch (error) {
             const endTime = new Date();
 
-            logCollector.message(`Generation failed: ${normalizeGeneratorError(error)}`, 'error', 'orchestrator');
+            logCollector.message(
+                `Generation failed: ${normalizeGeneratorError(error)}`,
+                'error',
+                'orchestrator',
+            );
 
             await Promise.all([
                 this.directoryOperations.recordGenerationFinishTime(directory.id, endTime),

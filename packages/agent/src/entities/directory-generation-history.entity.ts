@@ -15,7 +15,11 @@ import { GenerationMethod } from '@src/items-generator/dto/create-items-generato
 import { GenerateStatusType } from './types';
 import { TimestampColumn } from './_types';
 import { DirectorySchedule } from './directory-schedule.entity';
-import { DirectoryHistoryActivityType, type DirectoryChangelog, type GenerationStepLog } from '@ever-works/contracts/api';
+import {
+    DirectoryHistoryActivityType,
+    type DirectoryChangelog,
+    type GenerationStepLog,
+} from '@ever-works/contracts/api';
 
 export type GenerationMetrics = {
     urls_scanned?: number;

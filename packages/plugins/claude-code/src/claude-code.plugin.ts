@@ -515,57 +515,57 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				const onLogEntry = options?.onLogEntry;
 				const stdoutLineHandler = onLogEntry
 					? (line: string) => {
-						try {
-							const event = JSON.parse(line);
-							if (event.type === 'assistant' && event.message?.content) {
-								const textParts = (event.message.content as Array<{ type: string; text?: string }>)
-									.filter((p: { type: string }) => p.type === 'text')
-									.map((p: { text?: string }) => p.text)
-									.join('');
-								if (textParts) {
+							try {
+								const event = JSON.parse(line);
+								if (event.type === 'assistant' && event.message?.content) {
+									const textParts = (event.message.content as Array<{ type: string; text?: string }>)
+										.filter((p: { type: string }) => p.type === 'text')
+										.map((p: { text?: string }) => p.text)
+										.join('');
+									if (textParts) {
+										onLogEntry({
+											timestamp: new Date().toISOString(),
+											level: 'info',
+											source: 'claude-code',
+											event: 'message',
+											message: textParts.slice(0, 500)
+										});
+									}
+								} else if (event.type === 'tool_use') {
 									onLogEntry({
 										timestamp: new Date().toISOString(),
 										level: 'info',
 										source: 'claude-code',
 										event: 'message',
-										message: textParts.slice(0, 500),
+										message: `Tool: ${event.tool || event.name || 'unknown'}`
+									});
+								} else if (event.type === 'result') {
+									onLogEntry({
+										timestamp: new Date().toISOString(),
+										level: 'info',
+										source: 'claude-code',
+										event: 'step_completed',
+										message: 'Claude Code session completed',
+										stepIndex: 2,
+										stepName: 'Generate Items'
 									});
 								}
-							} else if (event.type === 'tool_use') {
-								onLogEntry({
-									timestamp: new Date().toISOString(),
-									level: 'info',
-									source: 'claude-code',
-									event: 'message',
-									message: `Tool: ${event.tool || event.name || 'unknown'}`,
-								});
-							} else if (event.type === 'result') {
-								onLogEntry({
-									timestamp: new Date().toISOString(),
-									level: 'info',
-									source: 'claude-code',
-									event: 'step_completed',
-									message: 'Claude Code session completed',
-									stepIndex: 2,
-									stepName: 'Generate Items',
-								});
+							} catch {
+								// Not valid JSON — ignore
 							}
-						} catch {
-							// Not valid JSON — ignore
 						}
-					}
 					: undefined;
 
 				const stderrLineHandler = onLogEntry
 					? (line: string) => {
-						onLogEntry({
-							timestamp: new Date().toISOString(),
-							level: 'error',
-							source: 'claude-code',
-							event: 'message',
-							message: line.slice(0, 500),
-						});
-					}
+							onLogEntry({
+								timestamp: new Date().toISOString(),
+								level: 'error',
+								source: 'claude-code',
+								event: 'message',
+								message: line.slice(0, 500)
+							});
+						}
 					: undefined;
 
 				const { promise, kill } = executeClaudeCode({

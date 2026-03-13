@@ -3,7 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { DirectoryGenerationHistory, GenerationMetrics } from '@src/entities';
 import { GenerateStatusType } from '@src/entities/types';
-import { DirectoryHistoryActivityType, type DirectoryChangelog, type GenerationStepLog } from '@ever-works/contracts/api';
+import {
+    DirectoryHistoryActivityType,
+    type DirectoryChangelog,
+    type GenerationStepLog,
+} from '@ever-works/contracts/api';
 
 type HistoryCreateParams = {
     directoryId: string;

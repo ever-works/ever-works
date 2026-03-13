@@ -325,14 +325,29 @@ export class StepPipelineExecutorService {
             );
 
             this.emitStepCompleted(step, stepIndex, totalSteps, metrics.duration ?? 0);
-            this.emitLogEntry(onLogEntry, 'step_completed', step.name, stepIndex, 'info', 'pipeline', durationMs);
+            this.emitLogEntry(
+                onLogEntry,
+                'step_completed',
+                step.name,
+                stepIndex,
+                'info',
+                'pipeline',
+                durationMs,
+            );
         } catch (error) {
             const err = error as Error;
             const metrics = this.createStepMetrics(step, stepStartTime, false, err.message);
             runner.markStepFailed(step.id, err);
 
             this.emitStepFailed(step, stepIndex, totalSteps, err, step.optional ?? false);
-            this.emitLogEntry(onLogEntry, 'step_failed', `${step.name}: ${err.message}`, stepIndex, 'error', 'pipeline');
+            this.emitLogEntry(
+                onLogEntry,
+                'step_failed',
+                `${step.name}: ${err.message}`,
+                stepIndex,
+                'error',
+                'pipeline',
+            );
 
             if (!options?.continueOnError && !step.optional) {
                 throw err;

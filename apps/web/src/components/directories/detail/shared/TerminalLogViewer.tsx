@@ -92,10 +92,7 @@ export function TerminalLogViewer({
             </div>
 
             {/* Terminal Body */}
-            <div
-                ref={scrollRef}
-                className={cn(maxHeight, 'overflow-y-auto bg-[#0d1117] p-4')}
-            >
+            <div ref={scrollRef} className={cn(maxHeight, 'overflow-y-auto bg-[#0d1117] p-4')}>
                 {logs.map((log, i) => (
                     <LogLine key={i} log={log} />
                 ))}
