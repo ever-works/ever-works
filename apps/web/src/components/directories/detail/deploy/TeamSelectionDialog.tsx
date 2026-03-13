@@ -10,7 +10,13 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Select } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -76,21 +82,25 @@ export function TeamSelectionDialog({
                 </DialogHeader>
 
                 <div className="space-y-4">
-                    <Select
-                        label={t('form.deployment.teamSelection.label')}
-                        value={selectedTeamScope}
-                        onChange={(event) => setSelectedTeamScope(event.target.value)}
-                        variant="form"
-                    >
-                        <option value="" disabled>
-                            {t('form.deployment.teamSelection.placeholder')}
-                        </option>
-                        {options.map((team) => (
-                            <option key={team.id} value={team.slug}>
-                                {team.name ? `${team.name} (${team.slug})` : team.slug}
-                            </option>
-                        ))}
-                    </Select>
+                    <div className="space-y-1.5">
+                        <label className="block text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                            {t('form.deployment.teamSelection.label')}
+                        </label>
+                        <Select value={selectedTeamScope} onValueChange={setSelectedTeamScope}>
+                            <SelectTrigger>
+                                <SelectValue
+                                    placeholder={t('form.deployment.teamSelection.placeholder')}
+                                />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {options.map((team) => (
+                                    <SelectItem key={team.id} value={team.slug}>
+                                        {team.name ? `${team.name} (${team.slug})` : team.slug}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
 
                 <DialogFooter>

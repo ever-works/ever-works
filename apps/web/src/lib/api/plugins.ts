@@ -25,7 +25,9 @@ export type {
 
 // Type aliases for backward compatibility
 export type Plugin = PluginResponse;
-export type UserPlugin = UserPluginResponse;
+export type UserPlugin = UserPluginResponse & {
+    metadata?: Record<string, unknown>;
+};
 export type DirectoryPlugin = DirectoryPluginResponse;
 export type PluginListResponse = IPluginListResponse;
 export type DirectoryPluginListResponse = IDirectoryPluginListResponse;
@@ -134,6 +136,24 @@ export const pluginsAPI = {
             endpoint: `/plugins/${pluginId}/settings`,
             data,
             method: 'PATCH',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Validate a user plugin connection after saving credentials.
+     */
+    validateConnection: async (
+        pluginId: string,
+    ): Promise<{ success: boolean; message: string; details?: Record<string, unknown> }> => {
+        return serverMutation<{
+            success: boolean;
+            message: string;
+            details?: Record<string, unknown>;
+        }>({
+            endpoint: `/plugins/${pluginId}/validate-connection`,
+            data: {},
+            method: 'POST',
             wrapInData: false,
         });
     },

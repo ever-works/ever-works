@@ -49,24 +49,28 @@ export const directoryGenerationTask = task({
             return;
         }
 
-        await withWorkerContext('DirectoryGeneration:Cancel', async (appContext) => {
-            const { orchestrator, directory } = await createTaskContext(
-                appContext,
-                payload,
-                TriggerGenerationOrchestrator,
-            );
-            const scheduleService = appContext.get(DirectoryScheduleService);
+        try {
+            await withWorkerContext('DirectoryGeneration:Cancel', async (appContext) => {
+                const { orchestrator, directory } = await createTaskContext(
+                    appContext,
+                    payload,
+                    TriggerGenerationOrchestrator,
+                );
+                const scheduleService = appContext.get(DirectoryScheduleService);
 
-            await orchestrator.handleCancellation({
-                directory,
-                historyId: payload.historyId,
-                historyStartedAt: payload.historyStartedAt,
+                await orchestrator.handleCancellation({
+                    directory,
+                    historyId: payload.historyId,
+                    historyStartedAt: payload.historyStartedAt,
+                });
+
+                if (payload.triggerSource === 'schedule' && payload.scheduleId) {
+                    await scheduleService.markRunFailed(payload.scheduleId, 'cancelled');
+                }
             });
-
-            if (payload.triggerSource === 'schedule' && payload.scheduleId) {
-                await scheduleService.markRunFailed(payload.scheduleId, 'cancelled');
-            }
-        });
+        } catch {
+            // Best-effort — if we can't boot the context, nothing more we can do
+        }
     },
     run: async (payload: DirectoryGenerationPayload) => {
         return withWorkerContext('DirectoryGeneration', async (appContext) => {

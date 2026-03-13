@@ -51,6 +51,8 @@ export const GET_DIRECTORY_LIST_LIMIT = parseInt(
     10,
 );
 
+export const ONBOARDING_STORAGE_KEY = 'ever-works-onboarding';
+
 // App URL
 export const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
 

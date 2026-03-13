@@ -107,15 +107,14 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
                     error: normalizeGeneratorError(error),
                     warnings: generationWarnings,
                 }),
+                this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
+                    status: GenerateStatusType.ERROR,
+                    finishedAt: endTime,
+                    durationInSeconds: calculateDurationSeconds(startTime, endTime),
+                    errorMessage: normalizeGeneratorError(error),
+                    ...buildStatsUpdate(generationStats),
+                }),
             ]);
-
-            await this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
-                status: GenerateStatusType.ERROR,
-                finishedAt: endTime,
-                durationInSeconds: calculateDurationSeconds(startTime, endTime),
-                errorMessage: normalizeGeneratorError(error),
-                ...buildStatsUpdate(generationStats),
-            });
 
             this.logger.error('Generation failed', error as Error);
 

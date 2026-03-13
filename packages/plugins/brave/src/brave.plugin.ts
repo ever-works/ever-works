@@ -9,7 +9,8 @@ import type {
 	SearchOptions,
 	SearchResponse,
 	SearchResult,
-	RateLimitInfo
+	RateLimitInfo,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 
 const MAX_RESULTS_LIMIT = 20;
@@ -164,7 +165,38 @@ export class BraveSearchPlugin implements IPlugin, ISearchPlugin {
 	}
 
 	async isAvailable(): Promise<boolean> {
-		return true;
+		if (!this.context) return false;
+		const settings = await this.context.getSettings();
+		return Boolean(settings?.apiKey);
+	}
+
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const apiKey = settings.apiKey as string | undefined;
+		if (!apiKey) {
+			return { success: false, message: 'Brave Search API key is not configured.' };
+		}
+
+		try {
+			const params = new URLSearchParams({ q: 'test', count: '1' });
+			const response = await fetch(`https://api.search.brave.com/res/v1/web/search?${params.toString()}`, {
+				headers: {
+					'X-Subscription-Token': apiKey,
+					Accept: 'application/json'
+				}
+			});
+
+			if (!response.ok) {
+				const errorText = await response.text();
+				return { success: false, message: `Brave Search connection failed (${response.status}): ${errorText}` };
+			}
+
+			return { success: true, message: 'Brave Search connection verified.' };
+		} catch (error) {
+			return {
+				success: false,
+				message: `Brave Search connection failed: ${error instanceof Error ? error.message : String(error)}`
+			};
+		}
 	}
 
 	async getRateLimitInfo(): Promise<RateLimitInfo> {

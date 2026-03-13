@@ -537,7 +537,39 @@
                 },
                 "loadMore": "加载更多",
                 "noMore": "没有更多记录",
-                "unknown": "未知"
+                "unknown": "未知",
+                "activity": {
+                    "generation": "生成",
+                    "item_added": "已添加条目",
+                    "item_updated": "已更新条目",
+                    "item_removed": "已移除条目",
+                    "comparison_added": "已添加比较",
+                    "comparison_removed": "已移除比较",
+                    "category_change": "分类变更",
+                    "tag_change": "标签变更",
+                    "collection_change": "集合变更",
+                    "community_pr_merged": "社区 PR"
+                },
+                "detail": {
+                    "added": "已添加",
+                    "updated": "已更新",
+                    "removed": "已移除",
+                    "fields": "字段",
+                    "expand": "展开变更日志详情",
+                    "collapse": "收起变更日志详情"
+                },
+                "filters": {
+                    "label": "活动",
+                    "all": "全部活动",
+                    "generation": "生成",
+                    "items": "条目",
+                    "comparisons": "比较",
+                    "taxonomy": "分类",
+                    "community_pr": "社区 PR"
+                },
+                "pagination": {
+                    "showing": "显示 {from}-{to} / 共 {total}"
+                }
             },
             "info": {
                 "title": "目录信息",

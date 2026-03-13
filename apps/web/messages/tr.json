@@ -630,7 +630,39 @@
                 },
                 "loadMore": "Daha fazla yükle",
                 "noMore": "Daha fazla kayıt yok",
-                "unknown": "Bilinmiyor"
+                "unknown": "Bilinmiyor",
+                "activity": {
+                    "generation": "Oluşturma",
+                    "item_added": "Öğe eklendi",
+                    "item_updated": "Öğe güncellendi",
+                    "item_removed": "Öğe kaldırıldı",
+                    "comparison_added": "Karşılaştırma eklendi",
+                    "comparison_removed": "Karşılaştırma kaldırıldı",
+                    "category_change": "Kategori değişikliği",
+                    "tag_change": "Etiket değişikliği",
+                    "collection_change": "Koleksiyon değişikliği",
+                    "community_pr_merged": "Topluluk PR'ı"
+                },
+                "detail": {
+                    "added": "Eklendi",
+                    "updated": "Güncellendi",
+                    "removed": "Kaldırıldı",
+                    "fields": "Alanlar",
+                    "expand": "Değişiklik günlüğü ayrıntılarını genişlet",
+                    "collapse": "Değişiklik günlüğü ayrıntılarını daralt"
+                },
+                "filters": {
+                    "label": "Etkinlik",
+                    "all": "Tüm etkinlikler",
+                    "generation": "Oluşturma",
+                    "items": "Öğeler",
+                    "comparisons": "Karşılaştırmalar",
+                    "taxonomy": "Taksonomi",
+                    "community_pr": "Topluluk PR'ı"
+                },
+                "pagination": {
+                    "showing": "{total} kaydın {from}-{to} arası gösteriliyor"
+                }
             },
             "info": {
                 "title": "Dizin Bilgileri",

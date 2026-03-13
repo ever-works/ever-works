@@ -48,14 +48,10 @@ export abstract class BaseOrchestrator {
         historyStartedAt,
         errorMessage,
     }: OrchestratorFailureOptions): Promise<void> {
-        // If the orchestrator already recorded the failure (with warnings etc.),
-        // do not overwrite it — this handler is only a safety net.
-        const currentStatus = await this.directoryOperations.getGenerateStatus(directory.id);
-        if (currentStatus?.status === GenerateStatusType.ERROR) {
-            await this.directoryOperations.emitGenerationCompleted(directory.id);
-            return;
-        }
-
+        // Always attempt to write the terminal state for both directory and history.
+        // We cannot rely on directory.status === ERROR implying history.status === ERROR:
+        // if the orchestrator's catch block wrote directory=ERROR but then the history
+        // update threw, history stays in GENERATING. Writing ERROR twice is idempotent.
         const finishedAt = new Date();
         const startTime = this.resolveStartTime(historyStartedAt);
         const duration = Math.max(0, calculateDurationSeconds(startTime, finishedAt));

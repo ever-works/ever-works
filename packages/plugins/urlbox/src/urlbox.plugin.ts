@@ -10,7 +10,8 @@ import type {
 	ScreenshotOptions,
 	ScreenshotResult,
 	ScreenshotFormat,
-	ScreenshotValidationResult
+	ScreenshotValidationResult,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 
 import Urlbox, { type RenderOptions } from 'urlbox';
@@ -174,7 +175,33 @@ export class UrlboxPlugin implements IPlugin, IScreenshotPlugin {
 	}
 
 	async isAvailable(): Promise<boolean> {
-		return true;
+		if (!this.context) return false;
+		const settings = await this.context.getSettings();
+		return Boolean(settings?.apiKey);
+	}
+
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const apiKey = settings.apiKey as string | undefined;
+		if (!apiKey) {
+			return { success: false, message: 'Urlbox API key is not configured.' };
+		}
+
+		try {
+			const resolvedSettings = this.mergeSettings(settings);
+			const client = this.createClient(resolvedSettings);
+			const url = client.generateRenderLink({ url: 'https://example.com' });
+
+			if (url && url.includes('api.urlbox.com')) {
+				return { success: true, message: 'Urlbox connection verified.' };
+			}
+
+			return { success: false, message: 'Urlbox credentials appear invalid.' };
+		} catch (error) {
+			return {
+				success: false,
+				message: `Urlbox connection failed: ${error instanceof Error ? error.message : String(error)}`
+			};
+		}
 	}
 
 	async validateCredentials(): Promise<ScreenshotValidationResult> {

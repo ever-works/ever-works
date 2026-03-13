@@ -630,7 +630,39 @@
                 },
                 "loadMore": "Muat lebih banyak",
                 "noMore": "Tidak ada catatan lagi",
-                "unknown": "Tidak diketahui"
+                "unknown": "Tidak diketahui",
+                "activity": {
+                    "generation": "Generasi",
+                    "item_added": "Item ditambahkan",
+                    "item_updated": "Item diperbarui",
+                    "item_removed": "Item dihapus",
+                    "comparison_added": "Perbandingan ditambahkan",
+                    "comparison_removed": "Perbandingan dihapus",
+                    "category_change": "Perubahan kategori",
+                    "tag_change": "Perubahan tag",
+                    "collection_change": "Perubahan koleksi",
+                    "community_pr_merged": "PR komunitas"
+                },
+                "detail": {
+                    "added": "Ditambahkan",
+                    "updated": "Diperbarui",
+                    "removed": "Dihapus",
+                    "fields": "Bidang",
+                    "expand": "Perluas detail changelog",
+                    "collapse": "Ciutkan detail changelog"
+                },
+                "filters": {
+                    "label": "Aktivitas",
+                    "all": "Semua aktivitas",
+                    "generation": "Generasi",
+                    "items": "Item",
+                    "comparisons": "Perbandingan",
+                    "taxonomy": "Taksonomi",
+                    "community_pr": "PR komunitas"
+                },
+                "pagination": {
+                    "showing": "Menampilkan {from}-{to} dari {total}"
+                }
             },
             "info": {
                 "title": "Informasi Direktori",

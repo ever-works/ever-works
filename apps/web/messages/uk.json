@@ -630,7 +630,39 @@
                 },
                 "loadMore": "Завантажити ще",
                 "noMore": "Більше немає записів",
-                "unknown": "Невідомо"
+                "unknown": "Невідомо",
+                "activity": {
+                    "generation": "Генерація",
+                    "item_added": "Елемент додано",
+                    "item_updated": "Елемент оновлено",
+                    "item_removed": "Елемент видалено",
+                    "comparison_added": "Порівняння додано",
+                    "comparison_removed": "Порівняння видалено",
+                    "category_change": "Зміна категорії",
+                    "tag_change": "Зміна тега",
+                    "collection_change": "Зміна колекції",
+                    "community_pr_merged": "PR спільноти"
+                },
+                "detail": {
+                    "added": "Додано",
+                    "updated": "Оновлено",
+                    "removed": "Видалено",
+                    "fields": "Поля",
+                    "expand": "Розгорнути деталі журналу змін",
+                    "collapse": "Згорнути деталі журналу змін"
+                },
+                "filters": {
+                    "label": "Активність",
+                    "all": "Уся активність",
+                    "generation": "Генерація",
+                    "items": "Елементи",
+                    "comparisons": "Порівняння",
+                    "taxonomy": "Таксономія",
+                    "community_pr": "PR спільноти"
+                },
+                "pagination": {
+                    "showing": "Показано {from}-{to} із {total}"
+                }
             },
             "info": {
                 "title": "Інформація про довідник",

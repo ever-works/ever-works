@@ -28,6 +28,7 @@ import {
     SetActiveCapabilityDto,
     SettingsMenuResponseDto,
 } from './dto';
+import { PluginValidationService } from './plugin-validation.service';
 
 @ApiTags('Plugins')
 @ApiBearerAuth('JWT-auth')
@@ -37,6 +38,7 @@ export class PluginsController {
     constructor(
         private readonly pluginsService: PluginOperationsService,
         private readonly ownershipService: DirectoryOwnershipService,
+        private readonly pluginValidationService: PluginValidationService,
     ) {}
 
     // ============================================
@@ -173,6 +175,21 @@ export class PluginsController {
             dto.secretSettings,
             dto.metadata,
         );
+    }
+
+    @Post('plugins/:pluginId/validate-connection')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Validate plugin connection',
+        description: 'Verifies that the current user plugin credentials can connect successfully.',
+    })
+    @ApiParam({ name: 'pluginId', description: 'Plugin ID' })
+    @ApiResponse({ status: 200, description: 'Connection validation result' })
+    async validatePluginConnection(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('pluginId') pluginId: string,
+    ) {
+        return this.pluginValidationService.validateUserPluginConnection(pluginId, auth.userId);
     }
 
     // ============================================

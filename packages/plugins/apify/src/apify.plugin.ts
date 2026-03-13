@@ -10,7 +10,8 @@ import type {
 	ValidationResult,
 	DataSourceQueryOptions,
 	DataSourceQueryResult,
-	DataSourceMetadata
+	DataSourceMetadata,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 import { extractKeywords } from '@ever-works/plugin/keywords';
 import type { FormFieldDefinition, FormFieldGroup, ItemData } from '@ever-works/contracts';
@@ -299,7 +300,34 @@ export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvi
 	 * Returns true if the plugin is properly configured.
 	 */
 	async isAvailable(): Promise<boolean> {
-		return true; // API token is checked at query time
+		if (!this.context) return false;
+		const settings = await this.context.getSettings();
+		return Boolean(settings?.apiToken);
+	}
+
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const apiToken = settings.apiToken as string | undefined;
+		if (!apiToken) {
+			return { success: false, message: 'Apify API token is not configured.' };
+		}
+
+		try {
+			const response = await fetch(`https://api.apify.com/v2/users/me?token=${apiToken}`);
+
+			if (!response.ok) {
+				return {
+					success: false,
+					message: `Apify connection failed (${response.status}): ${response.statusText}`
+				};
+			}
+
+			return { success: true, message: 'Apify connection verified.' };
+		} catch (error) {
+			return {
+				success: false,
+				message: `Apify connection failed: ${error instanceof Error ? error.message : String(error)}`
+			};
+		}
 	}
 
 	// ============================================================================

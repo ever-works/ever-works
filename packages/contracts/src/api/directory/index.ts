@@ -10,6 +10,11 @@ export type {
 } from './directory-schedule.dto.js';
 export type {
 	GenerationMetrics,
+	DirectoryChangelog,
+	DirectoryHistoryChangeEntry,
+	DirectoryHistoryChangeAction,
+	DirectoryHistoryChangeEntityType,
 	DirectoryGenerationHistoryEntry,
 	DirectoryGenerationHistoryResponse
 } from './generation-metrics.js';
+export { DirectoryHistoryActivityType } from './generation-metrics.js';

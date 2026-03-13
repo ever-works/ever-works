@@ -630,7 +630,39 @@
                 },
                 "loadMore": "Carica altro",
                 "noMore": "Nessun'altra voce",
-                "unknown": "Sconosciuto"
+                "unknown": "Sconosciuto",
+                "activity": {
+                    "generation": "Generazione",
+                    "item_added": "Elemento aggiunto",
+                    "item_updated": "Elemento aggiornato",
+                    "item_removed": "Elemento rimosso",
+                    "comparison_added": "Confronto aggiunto",
+                    "comparison_removed": "Confronto rimosso",
+                    "category_change": "Modifica categoria",
+                    "tag_change": "Modifica tag",
+                    "collection_change": "Modifica raccolta",
+                    "community_pr_merged": "PR della community"
+                },
+                "detail": {
+                    "added": "Aggiunti",
+                    "updated": "Aggiornati",
+                    "removed": "Rimossi",
+                    "fields": "Campi",
+                    "expand": "Espandi i dettagli del changelog",
+                    "collapse": "Comprimi i dettagli del changelog"
+                },
+                "filters": {
+                    "label": "Attività",
+                    "all": "Tutta l'attività",
+                    "generation": "Generazione",
+                    "items": "Elementi",
+                    "comparisons": "Confronti",
+                    "taxonomy": "Tassonomia",
+                    "community_pr": "PR della community"
+                },
+                "pagination": {
+                    "showing": "Visualizzazione di {from}-{to} su {total}"
+                }
             },
             "info": {
                 "title": "Informazioni Directory",

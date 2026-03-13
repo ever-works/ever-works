@@ -630,7 +630,39 @@
                 },
                 "loadMore": "もっと読み込む",
                 "noMore": "これ以上の記録はありません",
-                "unknown": "不明"
+                "unknown": "不明",
+                "activity": {
+                    "generation": "生成",
+                    "item_added": "項目を追加",
+                    "item_updated": "項目を更新",
+                    "item_removed": "項目を削除",
+                    "comparison_added": "比較を追加",
+                    "comparison_removed": "比較を削除",
+                    "category_change": "カテゴリ変更",
+                    "tag_change": "タグ変更",
+                    "collection_change": "コレクション変更",
+                    "community_pr_merged": "コミュニティPR"
+                },
+                "detail": {
+                    "added": "追加",
+                    "updated": "更新",
+                    "removed": "削除",
+                    "fields": "項目",
+                    "expand": "変更履歴の詳細を展開",
+                    "collapse": "変更履歴の詳細を折りたたむ"
+                },
+                "filters": {
+                    "label": "アクティビティ",
+                    "all": "すべてのアクティビティ",
+                    "generation": "生成",
+                    "items": "項目",
+                    "comparisons": "比較",
+                    "taxonomy": "分類",
+                    "community_pr": "コミュニティPR"
+                },
+                "pagination": {
+                    "showing": "{total}件中 {from}-{to}件を表示"
+                }
             },
             "info": {
                 "title": "ディレクトリ情報",

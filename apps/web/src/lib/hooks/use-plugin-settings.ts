@@ -23,7 +23,7 @@ interface UsePluginSettingsOptions {
     onSave: (data: {
         settings?: Record<string, unknown>;
         secretSettings?: Record<string, unknown>;
-    }) => Promise<void>;
+    }) => Promise<void | { validationError?: string; validationSuccess?: string }>;
     /** Display-only fallback values shown when a field has no value in initialSettings.
      *  These are NOT saved — only used by getFieldValue for display purposes. */
     fallbackSettings?: Record<string, unknown>;
@@ -44,6 +44,7 @@ interface UsePluginSettingsReturn {
     validationError: string | null;
     visibleProperties: Record<string, PluginSettingsSchemaProperty>;
     hasSettings: boolean;
+    saveMessage: string | null;
     handleFieldChange: (key: string, value: unknown, isSecret: boolean) => void;
     handleSave: () => Promise<void>;
     getFieldValue: (key: string, propSchema: PluginSettingsSchemaProperty) => unknown;
@@ -84,6 +85,7 @@ export function usePluginSettings({
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
+    const [saveMessage, setSaveMessage] = useState<string | null>(null);
     const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const prevInitialRef = useRef(stableInitial);
 
@@ -135,6 +137,7 @@ export function usePluginSettings({
         setHasChanges(true);
         setSaveSuccess(false);
         setValidationError(null);
+        setSaveMessage(null);
     }, []);
 
     const validateConstraints = useCallback((): string[] => {
@@ -167,7 +170,7 @@ export function usePluginSettings({
                     ? sanitizeSettingsForSave(secretSettings, scope)
                     : undefined;
 
-            await onSave({
+            const result = await onSave({
                 settings: sanitizedSettings,
                 secretSettings: sanitizedSecretSettings,
             });
@@ -217,7 +220,11 @@ export function usePluginSettings({
             // Clear modifiedFields so getFieldValue will use inherited values
             setModifiedFields(new Set());
             setHasChanges(false);
-            setSaveSuccess(true);
+            setSaveSuccess(!result?.validationError);
+            setSaveMessage(result?.validationSuccess || null);
+            if (result?.validationError) {
+                setValidationError(result.validationError);
+            }
             router.refresh();
             successTimerRef.current = setTimeout(() => setSaveSuccess(false), 3000);
         } catch (error) {
@@ -275,6 +282,7 @@ export function usePluginSettings({
         validationError,
         visibleProperties,
         hasSettings,
+        saveMessage,
         handleFieldChange,
         handleSave,
         getFieldValue,

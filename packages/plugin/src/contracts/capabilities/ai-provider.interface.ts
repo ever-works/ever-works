@@ -288,11 +288,6 @@ export interface IAiProviderPlugin extends IPlugin {
 	isAvailable(settings?: PluginSettings): Promise<boolean>;
 
 	/**
-	 * Validate API key
-	 */
-	validateApiKey?(settings?: PluginSettings): Promise<boolean>;
-
-	/**
 	 * Get provider capabilities
 	 */
 	getCapabilities(): AiModelCapabilities;
