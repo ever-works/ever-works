@@ -6,9 +6,7 @@ import { ItemSourceValidationSchedulerService } from '@ever-works/agent/services
 export class ItemSourceValidationCronService {
     private readonly logger = new Logger(ItemSourceValidationCronService.name);
 
-    constructor(
-        private readonly sourceValidationScheduler: ItemSourceValidationSchedulerService,
-    ) {}
+    constructor(private readonly sourceValidationScheduler: ItemSourceValidationSchedulerService) {}
 
     @Cron(CronExpression.EVERY_6_HOURS)
     async handleScheduledSourceValidation() {
