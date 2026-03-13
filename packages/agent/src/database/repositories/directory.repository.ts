@@ -445,4 +445,14 @@ export class DirectoryRepository {
             relations: ['user'],
         });
     }
+
+    /**
+     * Find all directories with scheduled updates enabled for standalone source validation.
+     */
+    async findWithScheduledSourceValidationEnabled(): Promise<Directory[]> {
+        return this.repository.find({
+            where: { scheduledUpdatesEnabled: true },
+            relations: ['user'],
+        });
+    }
 }

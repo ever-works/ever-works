@@ -16,6 +16,7 @@ import { DirectoryCleanupService } from './tasks/directory-cleanup.service';
 import { WebsiteTemplateSchedulerService } from './tasks/website-template-scheduler.service';
 import { CommunityPrSchedulerService } from './tasks/community-pr-scheduler.service';
 import { ComparisonSchedulerService } from './tasks/comparison-scheduler.service';
+import { ItemSourceValidationCronService } from './tasks/item-source-validation-scheduler.service';
 
 @Module({
     imports: [
@@ -32,6 +33,7 @@ import { ComparisonSchedulerService } from './tasks/comparison-scheduler.service
         WebsiteTemplateSchedulerService,
         CommunityPrSchedulerService,
         ComparisonSchedulerService,
+        ItemSourceValidationCronService,
     ],
     controllers: [DirectoriesController, MembersController],
 })
