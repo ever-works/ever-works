@@ -500,7 +500,8 @@
                             "paused": "रोका गया",
                             "canceled": "रद्द किया गया",
                             "disabled": "अक्षम"
-                        }
+                        },
+                        "nextSourceValidation": "अगला स्रोत सत्यापन"
                     },
                     "fields": {
                         "automation": "ऑटोमेशन",
@@ -513,7 +514,9 @@
                         "maxFailures": "विफलता सीमा",
                         "maxFailuresHelp": "इतनी विफलताएं होने पर स्वचालित रूप से रोकें।",
                         "createPullRequest": "पुल रिक्वेस्ट बनाएं",
-                        "createPullRequestHelp": "जब सक्षम हो, तो शेड्यूल्ड अपडेट सीधे कमिट करने के बजाय एक पुल रिक्वेस्ट बनाते हैं।"
+                        "createPullRequestHelp": "जब सक्षम हो, तो शेड्यूल्ड अपडेट सीधे कमिट करने के बजाय एक पुल रिक्वेस्ट बनाते हैं।",
+                        "sourceValidationCadence": "स्रोत सत्यापन आवृत्ति",
+                        "sourceValidationCadenceHelp": "डिफ़ॉल्ट रूप से यह आपकी अपडेट आवृत्ति का उपयोग करता है, लेकिन आप इसे धीमा या तेज कर सकते हैं।"
                     },
                     "billing": {
                         "subscription": "सब्सक्रिप्शन",

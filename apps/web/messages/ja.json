@@ -500,7 +500,8 @@
                             "paused": "一時停止中",
                             "canceled": "キャンセル済",
                             "disabled": "無効"
-                        }
+                        },
+                        "nextSourceValidation": "次回のソース検証"
                     },
                     "fields": {
                         "automation": "自動化",
@@ -513,7 +514,9 @@
                         "maxFailures": "失敗制限",
                         "maxFailuresHelp": "この回数だけ失敗すると自動的に一時停止します。",
                         "createPullRequest": "プルリクエストを作成",
-                        "createPullRequestHelp": "有効にすると、スケジュールされた更新は直接コミットする代わりにプルリクエストを作成します。"
+                        "createPullRequestHelp": "有効にすると、スケジュールされた更新は直接コミットする代わりにプルリクエストを作成します。",
+                        "sourceValidationCadence": "ソース検証の頻度",
+                        "sourceValidationCadenceHelp": "既定では更新頻度と同じ設定になりますが、遅くしたり速くしたりできます。"
                     },
                     "billing": {
                         "subscription": "サブスクリプション",

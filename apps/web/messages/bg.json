@@ -500,7 +500,8 @@
                             "paused": "Паузирана",
                             "canceled": "Отменена",
                             "disabled": "Деактивирана"
-                        }
+                        },
+                        "nextSourceValidation": "Следваща проверка на източника"
                     },
                     "fields": {
                         "automation": "Автоматизация",
@@ -513,7 +514,9 @@
                         "maxFailures": "Лимит на грешки",
                         "maxFailuresHelp": "Автоматично паузиране, след като се достигне този брой грешки.",
                         "createPullRequest": "Създаване на Pull Request-и",
-                        "createPullRequestHelp": "Когато е активирано, планираните обновления създават pull request вместо да правят директни подавания."
+                        "createPullRequestHelp": "Когато е активирано, планираните обновления създават pull request вместо да правят директни подавания.",
+                        "sourceValidationCadence": "Честота на проверка на източника",
+                        "sourceValidationCadenceHelp": "По подразбиране използва същата честота като обновяването, но можете да я забавите или ускорите."
                     },
                     "billing": {
                         "subscription": "Абонамент",

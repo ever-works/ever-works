@@ -500,7 +500,8 @@
                             "paused": "หยุดชั่วคราว",
                             "canceled": "ยกเลิกแล้ว",
                             "disabled": "ปิดใช้งาน"
-                        }
+                        },
+                        "nextSourceValidation": "การตรวจสอบแหล่งข้อมูลครั้งถัดไป"
                     },
                     "fields": {
                         "automation": "ระบบอัตโนมัติ",
@@ -513,7 +514,9 @@
                         "maxFailures": "ขีดจำกัดความล้มเหลว",
                         "maxFailuresHelp": "หยุดชั่วคราวโดยอัตโนมัติเมื่อเกิดความล้มเหลวครบจำนวนนี้",
                         "createPullRequest": "สร้าง Pull Requests",
-                        "createPullRequestHelp": "เมื่อเปิดใช้งาน การอัปเดตตามกำหนดการจะสร้าง pull request แทนที่จะ commit โดยตรง"
+                        "createPullRequestHelp": "เมื่อเปิดใช้งาน การอัปเดตตามกำหนดการจะสร้าง pull request แทนที่จะ commit โดยตรง",
+                        "sourceValidationCadence": "ความถี่ในการตรวจสอบแหล่งข้อมูล",
+                        "sourceValidationCadenceHelp": "ค่าเริ่มต้นจะใช้ความถี่เดียวกับการอัปเดตของคุณ แต่คุณสามารถทำให้ช้าลงหรือเร็วขึ้นได้"
                     },
                     "billing": {
                         "subscription": "การสมัครสมาชิก",

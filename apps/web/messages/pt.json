@@ -500,7 +500,8 @@
                             "paused": "Pausada",
                             "canceled": "Cancelada",
                             "disabled": "Desativada"
-                        }
+                        },
+                        "nextSourceValidation": "Próxima validação da fonte"
                     },
                     "fields": {
                         "automation": "Automação",
@@ -513,7 +514,9 @@
                         "maxFailures": "Limite de falhas",
                         "maxFailuresHelp": "Pausar automaticamente após esse número de falhas ocorrer.",
                         "createPullRequest": "Criar Pull Requests",
-                        "createPullRequestHelp": "Quando ativado, atualizações agendadas criam um pull request em vez de fazer commit diretamente."
+                        "createPullRequestHelp": "Quando ativado, atualizações agendadas criam um pull request em vez de fazer commit diretamente.",
+                        "sourceValidationCadence": "Frequência de validação da fonte",
+                        "sourceValidationCadenceHelp": "Por padrão, usa a mesma frequência das suas atualizações, mas você pode deixá-la mais lenta ou mais rápida."
                     },
                     "billing": {
                         "subscription": "Assinatura",

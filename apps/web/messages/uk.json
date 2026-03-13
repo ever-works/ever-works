@@ -500,7 +500,8 @@
                             "paused": "Призупинено",
                             "canceled": "Скасовано",
                             "disabled": "Вимкнено"
-                        }
+                        },
+                        "nextSourceValidation": "Наступна перевірка джерела"
                     },
                     "fields": {
                         "automation": "Автоматизація",
@@ -513,7 +514,9 @@
                         "maxFailures": "Ліміт помилок",
                         "maxFailuresHelp": "Автоматично призупиняти після досягнення цієї кількості помилок.",
                         "createPullRequest": "Створювати Pull Requests",
-                        "createPullRequestHelp": "Якщо увімкнено, заплановані оновлення створюють pull request замість прямого коміту."
+                        "createPullRequestHelp": "Якщо увімкнено, заплановані оновлення створюють pull request замість прямого коміту.",
+                        "sourceValidationCadence": "Частота перевірки джерела",
+                        "sourceValidationCadenceHelp": "За замовчуванням використовується та сама частота, що й для оновлень, але ви можете зробити її рідшою або частішою."
                     },
                     "billing": {
                         "subscription": "Підписка",

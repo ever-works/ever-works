@@ -500,7 +500,8 @@
                             "paused": "Tạm dừng",
                             "canceled": "Đã hủy",
                             "disabled": "Đã tắt"
-                        }
+                        },
+                        "nextSourceValidation": "Lần xác thực nguồn tiếp theo"
                     },
                     "fields": {
                         "automation": "Tự động hóa",
@@ -513,7 +514,9 @@
                         "maxFailures": "Giới hạn lỗi",
                         "maxFailuresHelp": "Tự động tạm dừng khi đạt đến số lượng lỗi này.",
                         "createPullRequest": "Tạo Pull Request",
-                        "createPullRequestHelp": "Khi được bật, các bản cập nhật theo lịch trình sẽ tạo một pull request thay vì commit trực tiếp."
+                        "createPullRequestHelp": "Khi được bật, các bản cập nhật theo lịch trình sẽ tạo một pull request thay vì commit trực tiếp.",
+                        "sourceValidationCadence": "Tần suất xác thực nguồn",
+                        "sourceValidationCadenceHelp": "Mặc định dùng cùng tần suất với lịch cập nhật của bạn, nhưng bạn có thể làm chậm hơn hoặc nhanh hơn."
                     },
                     "billing": {
                         "subscription": "Đăng ký",

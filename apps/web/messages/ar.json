@@ -1262,7 +1262,8 @@
                             "paused": "متوقف مؤقتاً",
                             "canceled": "ملغى",
                             "disabled": "معطل"
-                        }
+                        },
+                        "nextSourceValidation": "التحقق التالي من المصدر"
                     },
                     "fields": {
                         "automation": "الأتمتة",
@@ -1275,7 +1276,9 @@
                         "maxFailures": "حد الإخفاق",
                         "maxFailuresHelp": "إيقاف تلقائي بمجرد حدوث هذا العدد من الإخفاقات.",
                         "createPullRequest": "إنشاء طلبات السحب",
-                        "createPullRequestHelp": "عند التمكين، تنشئ التحديثات المجدولة طلب سحب بدلاً من الالتزام مباشرة."
+                        "createPullRequestHelp": "عند التمكين، تنشئ التحديثات المجدولة طلب سحب بدلاً من الالتزام مباشرة.",
+                        "sourceValidationCadence": "وتيرة التحقق من المصدر",
+                        "sourceValidationCadenceHelp": "يستخدم افتراضيًا نفس وتيرة التحديث لديك، لكن يمكنك تقليلها أو زيادتها."
                     },
                     "billing": {
                         "subscription": "الاشتراك",

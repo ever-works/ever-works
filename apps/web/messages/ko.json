@@ -500,7 +500,8 @@
                             "paused": "일시정지됨",
                             "canceled": "취소됨",
                             "disabled": "비활성화됨"
-                        }
+                        },
+                        "nextSourceValidation": "다음 소스 검증"
                     },
                     "fields": {
                         "automation": "자동화",
@@ -513,7 +514,9 @@
                         "maxFailures": "실패 제한",
                         "maxFailuresHelp": "이 횟수만큼 실패하면 자동으로 일시정지됩니다.",
                         "createPullRequest": "Pull Request 생성",
-                        "createPullRequestHelp": "활성화하면 예약된 업데이트가 직접 커밋하는 대신 Pull Request를 생성합니다."
+                        "createPullRequestHelp": "활성화하면 예약된 업데이트가 직접 커밋하는 대신 Pull Request를 생성합니다.",
+                        "sourceValidationCadence": "소스 검증 주기",
+                        "sourceValidationCadenceHelp": "기본값은 업데이트 주기와 같지만, 더 느리게 또는 더 빠르게 조정할 수 있습니다."
                     },
                     "billing": {
                         "subscription": "구독",

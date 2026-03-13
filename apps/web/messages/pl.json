@@ -500,7 +500,8 @@
                             "paused": "Wstrzymana",
                             "canceled": "Anulowana",
                             "disabled": "Wyłączona"
-                        }
+                        },
+                        "nextSourceValidation": "Następna walidacja źródła"
                     },
                     "fields": {
                         "automation": "Automatyzacja",
@@ -513,7 +514,9 @@
                         "maxFailures": "Limit błędów",
                         "maxFailuresHelp": "Automatycznie wstrzymaj po osiągnięciu tej liczby błędów.",
                         "createPullRequest": "Utwórz Pull Request",
-                        "createPullRequestHelp": "Po włączeniu zaplanowane aktualizacje tworzą pull request zamiast commitować bezpośrednio."
+                        "createPullRequestHelp": "Po włączeniu zaplanowane aktualizacje tworzą pull request zamiast commitować bezpośrednio.",
+                        "sourceValidationCadence": "Częstotliwość walidacji źródła",
+                        "sourceValidationCadenceHelp": "Domyślnie używa tej samej częstotliwości co aktualizacje, ale możesz ją spowolnić lub przyspieszyć."
                     },
                     "billing": {
                         "subscription": "Subskrypcja",

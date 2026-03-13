@@ -500,7 +500,8 @@
                             "paused": "Приостановлена",
                             "canceled": "Отменена",
                             "disabled": "Отключена"
-                        }
+                        },
+                        "nextSourceValidation": "Следующая проверка источника"
                     },
                     "fields": {
                         "automation": "Автоматизация",
@@ -513,7 +514,9 @@
                         "maxFailures": "Лимит сбоев",
                         "maxFailuresHelp": "Автоматически приостанавливать после достижения этого количества сбоев.",
                         "createPullRequest": "Создавать Pull Requests",
-                        "createPullRequestHelp": "При включении запланированные обновления создают pull request вместо прямого коммита."
+                        "createPullRequestHelp": "При включении запланированные обновления создают pull request вместо прямого коммита.",
+                        "sourceValidationCadence": "Частота проверки источника",
+                        "sourceValidationCadenceHelp": "По умолчанию используется та же частота, что и для обновлений, но её можно замедлить или ускорить."
                     },
                     "billing": {
                         "subscription": "Подписка",

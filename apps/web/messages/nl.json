@@ -500,7 +500,8 @@
                             "paused": "Gepauzeerd",
                             "canceled": "Geannuleerd",
                             "disabled": "Uitgeschakeld"
-                        }
+                        },
+                        "nextSourceValidation": "Volgende bronvalidatie"
                     },
                     "fields": {
                         "automation": "Automatisering",
@@ -513,7 +514,9 @@
                         "maxFailures": "Foutlimiet",
                         "maxFailuresHelp": "Automatisch pauzeren zodra dit aantal fouten optreedt.",
                         "createPullRequest": "Pull Requests Aanmaken",
-                        "createPullRequestHelp": "Indien ingeschakeld, maken geplande updates een pull request aan in plaats van direct te committen."
+                        "createPullRequestHelp": "Indien ingeschakeld, maken geplande updates een pull request aan in plaats van direct te committen.",
+                        "sourceValidationCadence": "Frequentie van bronvalidatie",
+                        "sourceValidationCadenceHelp": "Standaard gebruikt dit dezelfde frequentie als je updates, maar je kunt die vertragen of versnellen."
                     },
                     "billing": {
                         "subscription": "Abonnement",

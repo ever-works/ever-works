@@ -500,7 +500,8 @@
                             "paused": "Dijeda",
                             "canceled": "Dibatalkan",
                             "disabled": "Dinonaktifkan"
-                        }
+                        },
+                        "nextSourceValidation": "Validasi sumber berikutnya"
                     },
                     "fields": {
                         "automation": "Otomasi",
@@ -513,7 +514,9 @@
                         "maxFailures": "Batas kegagalan",
                         "maxFailuresHelp": "Jeda otomatis setelah jumlah kegagalan ini tercapai.",
                         "createPullRequest": "Buat Pull Request",
-                        "createPullRequestHelp": "Saat diaktifkan, pembaruan terjadwal membuat pull request alih-alih melakukan commit langsung."
+                        "createPullRequestHelp": "Saat diaktifkan, pembaruan terjadwal membuat pull request alih-alih melakukan commit langsung.",
+                        "sourceValidationCadence": "Frekuensi validasi sumber",
+                        "sourceValidationCadenceHelp": "Secara default mengikuti frekuensi pembaruan Anda, tetapi Anda bisa memperlambat atau mempercepatnya."
                     },
                     "billing": {
                         "subscription": "Langganan",

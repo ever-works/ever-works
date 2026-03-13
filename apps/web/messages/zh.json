@@ -1262,7 +1262,8 @@
                             "paused": "已暂停",
                             "canceled": "已取消",
                             "disabled": "已禁用"
-                        }
+                        },
+                        "nextSourceValidation": "下次来源校验"
                     },
                     "fields": {
                         "automation": "自动化",
@@ -1275,7 +1276,9 @@
                         "maxFailures": "失败限制",
                         "maxFailuresHelp": "发生此数量的失败后自动暂停。",
                         "createPullRequest": "创建 Pull Request",
-                        "createPullRequestHelp": "启用后，计划更新将创建 pull request 而不是直接提交。"
+                        "createPullRequestHelp": "启用后，计划更新将创建 pull request 而不是直接提交。",
+                        "sourceValidationCadence": "来源校验频率",
+                        "sourceValidationCadenceHelp": "默认与更新频率一致，但你也可以将其调慢或调快。"
                     },
                     "billing": {
                         "subscription": "订阅",

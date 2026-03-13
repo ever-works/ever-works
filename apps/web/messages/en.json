@@ -721,7 +721,8 @@
                             "paused": "Paused",
                             "canceled": "Cancelled",
                             "disabled": "Disabled"
-                        }
+                        },
+                        "nextSourceValidation": "Next source validation"
                     },
                     "fields": {
                         "automation": "Automation",
@@ -736,7 +737,9 @@
                         "createPullRequest": "Create Pull Requests",
                         "createPullRequestHelp": "When enabled, scheduled updates create a pull request instead of committing directly.",
                         "pipeline": "Pipeline",
-                        "pipelineHelp": "Override which pipeline runs on schedule. Leave as default to use the same pipeline as your last manual generation."
+                        "pipelineHelp": "Override which pipeline runs on schedule. Leave as default to use the same pipeline as your last manual generation.",
+                        "sourceValidationCadence": "Source validation cadence",
+                        "sourceValidationCadenceHelp": "Defaults to your update cadence, but you can slow it down or speed it up."
                     },
                     "pipeline": {
                         "inherit": "Use last run settings",

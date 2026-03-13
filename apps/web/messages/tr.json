@@ -500,7 +500,8 @@
                             "paused": "Duraklatıldı",
                             "canceled": "İptal Edildi",
                             "disabled": "Devre Dışı"
-                        }
+                        },
+                        "nextSourceValidation": "Sonraki kaynak doğrulaması"
                     },
                     "fields": {
                         "automation": "Otomasyon",
@@ -513,7 +514,9 @@
                         "maxFailures": "Hata limiti",
                         "maxFailuresHelp": "Bu kadar çok hata oluştuğunda otomatik olarak duraklat.",
                         "createPullRequest": "Pull Request Oluştur",
-                        "createPullRequestHelp": "Etkinleştirildiğinde, zamanlanmış güncellemeler doğrudan commit yapmak yerine bir pull request oluşturur."
+                        "createPullRequestHelp": "Etkinleştirildiğinde, zamanlanmış güncellemeler doğrudan commit yapmak yerine bir pull request oluşturur.",
+                        "sourceValidationCadence": "Kaynak doğrulama sıklığı",
+                        "sourceValidationCadenceHelp": "Varsayılan olarak güncelleme sıklığınız kullanılır, ancak bunu yavaşlatabilir veya hızlandırabilirsiniz."
                     },
                     "billing": {
                         "subscription": "Abonelik",

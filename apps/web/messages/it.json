@@ -500,7 +500,8 @@
                             "paused": "In pausa",
                             "canceled": "Annullata",
                             "disabled": "Disabilitata"
-                        }
+                        },
+                        "nextSourceValidation": "Prossima convalida della fonte"
                     },
                     "fields": {
                         "automation": "Automazione",
@@ -513,7 +514,9 @@
                         "maxFailures": "Limite errori",
                         "maxFailuresHelp": "Interrompi automaticamente una volta raggiunto questo numero di errori.",
                         "createPullRequest": "Crea Pull Request",
-                        "createPullRequestHelp": "Se abilitato, gli aggiornamenti pianificati creano una pull request invece di committare direttamente."
+                        "createPullRequestHelp": "Se abilitato, gli aggiornamenti pianificati creano una pull request invece di committare direttamente.",
+                        "sourceValidationCadence": "Frequenza di convalida della fonte",
+                        "sourceValidationCadenceHelp": "Per impostazione predefinita usa la stessa frequenza degli aggiornamenti, ma puoi rallentarla o accelerarla."
                     },
                     "billing": {
                         "subscription": "Abbonamento",

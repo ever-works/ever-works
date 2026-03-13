@@ -201,7 +201,7 @@ function ScheduleForm({
             value: <ShowDateTime value={schedule.nextRunAt} default={t('summary.notScheduled')} />,
         },
         {
-            label: 'Next source validation',
+            label: t('summary.nextSourceValidation'),
             value: (
                 <ShowDateTime
                     value={schedule.sourceValidationNextRunAt}
@@ -415,8 +415,8 @@ function ScheduleForm({
                 </FieldCard>
 
                 <FieldCard
-                    label="Source validation cadence"
-                    helper="Defaults to your update cadence, but you can slow it down or speed it up."
+                    label={t('fields.sourceValidationCadence')}
+                    helper={t('fields.sourceValidationCadenceHelp')}
                 >
                     <Select
                         value={form.sourceValidationCadence}

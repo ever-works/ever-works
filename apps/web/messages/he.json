@@ -1262,7 +1262,8 @@
                             "paused": "מושהה",
                             "canceled": "בוטל",
                             "disabled": "מושבת"
-                        }
+                        },
+                        "nextSourceValidation": "אימות המקור הבא"
                     },
                     "fields": {
                         "automation": "אוטומציה",
@@ -1275,7 +1276,9 @@
                         "maxFailures": "מגבלת כשלים",
                         "maxFailuresHelp": "השהה אוטומטית לאחר מספר זה של כשלים.",
                         "createPullRequest": "צור Pull Requests",
-                        "createPullRequestHelp": "כאשר מופעל, עדכונים מתוזמנים יוצרים בקשת משיכה במקום קומיט ישיר."
+                        "createPullRequestHelp": "כאשר מופעל, עדכונים מתוזמנים יוצרים בקשת משיכה במקום קומיט ישיר.",
+                        "sourceValidationCadence": "תדירות אימות מקור",
+                        "sourceValidationCadenceHelp": "ברירת המחדל היא אותה תדירות כמו לעדכונים שלך, אבל אפשר להאט או להאיץ אותה."
                     },
                     "billing": {
                         "subscription": "מנוי",

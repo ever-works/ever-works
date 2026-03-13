@@ -1262,7 +1262,8 @@
                             "paused": "Pausiert",
                             "canceled": "Abgebrochen",
                             "disabled": "Deaktiviert"
-                        }
+                        },
+                        "nextSourceValidation": "Nächste Quellenprüfung"
                     },
                     "fields": {
                         "automation": "Automatisierung",
@@ -1275,7 +1276,9 @@
                         "maxFailures": "Fehlerlimit",
                         "maxFailuresHelp": "Automatisch pausieren, sobald diese Anzahl von Fehlern auftritt.",
                         "createPullRequest": "Pull Requests erstellen",
-                        "createPullRequestHelp": "Wenn aktiviert, erstellen geplante Aktualisierungen einen Pull Request anstatt direkt zu committen."
+                        "createPullRequestHelp": "Wenn aktiviert, erstellen geplante Aktualisierungen einen Pull Request anstatt direkt zu committen.",
+                        "sourceValidationCadence": "Intervall der Quellenprüfung",
+                        "sourceValidationCadenceHelp": "Standardmäßig wird derselbe Rhythmus wie für deine Aktualisierungen verwendet, du kannst ihn aber verlangsamen oder beschleunigen."
                     },
                     "billing": {
                         "subscription": "Abonnement",
