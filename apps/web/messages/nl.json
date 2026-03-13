@@ -630,7 +630,39 @@
                 },
                 "loadMore": "Meer laden",
                 "noMore": "Geen verdere gegevens",
-                "unknown": "Onbekend"
+                "unknown": "Onbekend",
+                "activity": {
+                    "generation": "Generatie",
+                    "item_added": "Item toegevoegd",
+                    "item_updated": "Item bijgewerkt",
+                    "item_removed": "Item verwijderd",
+                    "comparison_added": "Vergelijking toegevoegd",
+                    "comparison_removed": "Vergelijking verwijderd",
+                    "category_change": "Categorie gewijzigd",
+                    "tag_change": "Tag gewijzigd",
+                    "collection_change": "Collectie gewijzigd",
+                    "community_pr_merged": "Community-PR"
+                },
+                "detail": {
+                    "added": "Toegevoegd",
+                    "updated": "Bijgewerkt",
+                    "removed": "Verwijderd",
+                    "fields": "Velden",
+                    "expand": "Changelogdetails uitklappen",
+                    "collapse": "Changelogdetails inklappen"
+                },
+                "filters": {
+                    "label": "Activiteit",
+                    "all": "Alle activiteit",
+                    "generation": "Generatie",
+                    "items": "Items",
+                    "comparisons": "Vergelijkingen",
+                    "taxonomy": "Taxonomie",
+                    "community_pr": "Community-PR"
+                },
+                "pagination": {
+                    "showing": "{from}-{to} van {total} weergegeven"
+                }
             },
             "info": {
                 "title": "Directory Informatie",

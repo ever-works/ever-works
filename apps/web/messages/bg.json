@@ -630,7 +630,39 @@
                 },
                 "loadMore": "Зареди още",
                 "noMore": "Няма повече записи",
-                "unknown": "Неизвестно"
+                "unknown": "Неизвестно",
+                "activity": {
+                    "generation": "Генериране",
+                    "item_added": "Добавен елемент",
+                    "item_updated": "Обновен елемент",
+                    "item_removed": "Премахнат елемент",
+                    "comparison_added": "Добавено сравнение",
+                    "comparison_removed": "Премахнато сравнение",
+                    "category_change": "Промяна в категория",
+                    "tag_change": "Промяна в етикет",
+                    "collection_change": "Промяна в колекция",
+                    "community_pr_merged": "PR от общността"
+                },
+                "detail": {
+                    "added": "Добавени",
+                    "updated": "Обновени",
+                    "removed": "Премахнати",
+                    "fields": "Полета",
+                    "expand": "Разгъни подробностите за промените",
+                    "collapse": "Свий подробностите за промените"
+                },
+                "filters": {
+                    "label": "Активност",
+                    "all": "Цялата активност",
+                    "generation": "Генериране",
+                    "items": "Елементи",
+                    "comparisons": "Сравнения",
+                    "taxonomy": "Таксономия",
+                    "community_pr": "PR от общността"
+                },
+                "pagination": {
+                    "showing": "Показване на {from}-{to} от {total}"
+                }
             },
             "info": {
                 "title": "Информация за Директорията",

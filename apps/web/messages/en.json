@@ -868,7 +868,39 @@
                 },
                 "loadMore": "Load more",
                 "noMore": "No more records",
-                "unknown": "Unknown"
+                "unknown": "Unknown",
+                "activity": {
+                    "generation": "Generation",
+                    "item_added": "Item Added",
+                    "item_updated": "Item Updated",
+                    "item_removed": "Item Removed",
+                    "comparison_added": "Comparison Added",
+                    "comparison_removed": "Comparison Removed",
+                    "category_change": "Category Change",
+                    "tag_change": "Tag Change",
+                    "collection_change": "Collection Change",
+                    "community_pr_merged": "Community PR"
+                },
+                "detail": {
+                    "added": "Added",
+                    "updated": "Updated",
+                    "removed": "Removed",
+                    "fields": "Fields",
+                    "expand": "Expand changelog details",
+                    "collapse": "Collapse changelog details"
+                },
+                "filters": {
+                    "label": "Activity",
+                    "all": "All activity",
+                    "generation": "Generation",
+                    "items": "Items",
+                    "comparisons": "Comparisons",
+                    "taxonomy": "Taxonomy",
+                    "community_pr": "Community PR"
+                },
+                "pagination": {
+                    "showing": "Showing {from}-{to} of {total}"
+                }
             },
             "info": {
                 "title": "Directory Information",

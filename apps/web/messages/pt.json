@@ -630,7 +630,39 @@
                 },
                 "loadMore": "Carregar mais",
                 "noMore": "Sem mais registros",
-                "unknown": "Desconhecido"
+                "unknown": "Desconhecido",
+                "activity": {
+                    "generation": "Geração",
+                    "item_added": "Item adicionado",
+                    "item_updated": "Item atualizado",
+                    "item_removed": "Item removido",
+                    "comparison_added": "Comparação adicionada",
+                    "comparison_removed": "Comparação removida",
+                    "category_change": "Alteração de categoria",
+                    "tag_change": "Alteração de tag",
+                    "collection_change": "Alteração de coleção",
+                    "community_pr_merged": "PR da comunidade"
+                },
+                "detail": {
+                    "added": "Adicionados",
+                    "updated": "Atualizados",
+                    "removed": "Removidos",
+                    "fields": "Campos",
+                    "expand": "Expandir detalhes do changelog",
+                    "collapse": "Recolher detalhes do changelog"
+                },
+                "filters": {
+                    "label": "Atividade",
+                    "all": "Toda a atividade",
+                    "generation": "Geração",
+                    "items": "Itens",
+                    "comparisons": "Comparações",
+                    "taxonomy": "Taxonomia",
+                    "community_pr": "PR da comunidade"
+                },
+                "pagination": {
+                    "showing": "Mostrando {from}-{to} de {total}"
+                }
             },
             "info": {
                 "title": "Informações do Diretório",

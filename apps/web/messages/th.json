@@ -630,7 +630,39 @@
                 },
                 "loadMore": "โหลดเพิ่ม",
                 "noMore": "ไม่มีบันทึกเพิ่มเติม",
-                "unknown": "ไม่ทราบ"
+                "unknown": "ไม่ทราบ",
+                "activity": {
+                    "generation": "การสร้าง",
+                    "item_added": "เพิ่มรายการ",
+                    "item_updated": "อัปเดตรายการ",
+                    "item_removed": "ลบรายการ",
+                    "comparison_added": "เพิ่มการเปรียบเทียบ",
+                    "comparison_removed": "ลบการเปรียบเทียบ",
+                    "category_change": "เปลี่ยนหมวดหมู่",
+                    "tag_change": "เปลี่ยนแท็ก",
+                    "collection_change": "เปลี่ยนคอลเลกชัน",
+                    "community_pr_merged": "PR ชุมชน"
+                },
+                "detail": {
+                    "added": "เพิ่มแล้ว",
+                    "updated": "อัปเดตแล้ว",
+                    "removed": "ลบแล้ว",
+                    "fields": "ฟิลด์",
+                    "expand": "ขยายรายละเอียดบันทึกการเปลี่ยนแปลง",
+                    "collapse": "ย่อรายละเอียดบันทึกการเปลี่ยนแปลง"
+                },
+                "filters": {
+                    "label": "กิจกรรม",
+                    "all": "กิจกรรมทั้งหมด",
+                    "generation": "การสร้าง",
+                    "items": "รายการ",
+                    "comparisons": "การเปรียบเทียบ",
+                    "taxonomy": "อนุกรมวิธาน",
+                    "community_pr": "PR ชุมชน"
+                },
+                "pagination": {
+                    "showing": "กำลังแสดง {from}-{to} จาก {total}"
+                }
             },
             "info": {
                 "title": "ข้อมูลไดเรกทอรี",
@@ -1725,10 +1757,9 @@
             "sendHint": "Enter เพื่อส่ง · Shift+Enter สำหรับบรรทัดใหม่",
             "providerNotConfigured": "ผู้ให้บริการนี้ยังไม่ได้ตั้งค่า ตั้งค่าใน Plugins",
             "editMessage": "แก้ไขข้อความ",
-            "saveEdit": "บันทึกและส่ง",
+            "saveEdit": "บันทึก & ส่ง",
             "cancelEdit": "ยกเลิก",
             "edited": "(แก้ไขแล้ว)",
-            "saveEdit": "บันทึก & ส่ง",
             "errors": {
                 "unableToSend": "ไม่สามารถส่งข้อความได้"
             },
