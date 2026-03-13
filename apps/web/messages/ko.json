@@ -911,6 +911,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "소스 다시 확인",
+                    "checkCompleted": "소스 확인이 완료되었습니다",
+                    "checkFailed": "소스 확인에 실패했습니다",
+                    "failedToCheckSource": "항목의 소스를 확인하지 못했습니다",
+                    "brokenLink": "깨진 링크",
+                    "healthy": "정상",
+                    "couldNotVerify": "확인할 수 없음",
+                    "sourceMayHaveIssues": "소스에 문제가 있을 수 있습니다",
+                    "sourceChecked": "소스 확인됨",
+                    "reachable": "접근 가능",
+                    "reachabilityInconclusive": "자동 접근성 확인 결과가 불분명합니다",
+                    "accurateSource": "정확한 소스",
+                    "sourceTooGeneric": "소스가 너무 일반적입니다",
+                    "weakSource": "약한 소스",
+                    "sourceAccuracyUnknown": "소스 정확도를 알 수 없음"
                 }
             },
             "generator": {

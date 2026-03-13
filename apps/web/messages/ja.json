@@ -911,6 +911,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "ソースを再確認",
+                    "checkCompleted": "ソース確認が完了しました",
+                    "checkFailed": "ソース確認に失敗しました",
+                    "failedToCheckSource": "項目のソースを確認できませんでした",
+                    "brokenLink": "リンク切れ",
+                    "healthy": "正常",
+                    "couldNotVerify": "確認できませんでした",
+                    "sourceMayHaveIssues": "ソースに問題がある可能性があります",
+                    "sourceChecked": "ソース確認済み",
+                    "reachable": "到達可能",
+                    "reachabilityInconclusive": "自動到達性チェックは結論が出ませんでした",
+                    "accurateSource": "正確なソース",
+                    "sourceTooGeneric": "ソースが汎用的すぎます",
+                    "weakSource": "弱いソース",
+                    "sourceAccuracyUnknown": "ソースの正確性は不明です"
                 }
             },
             "generator": {

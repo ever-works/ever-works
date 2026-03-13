@@ -911,6 +911,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "स्रोत फिर से जाँचें",
+                    "checkCompleted": "स्रोत जाँच पूरी हुई",
+                    "checkFailed": "स्रोत जाँच विफल रही",
+                    "failedToCheckSource": "आइटम स्रोत की जाँच नहीं की जा सकी",
+                    "brokenLink": "टूटा हुआ लिंक",
+                    "healthy": "सही",
+                    "couldNotVerify": "सत्यापित नहीं किया जा सका",
+                    "sourceMayHaveIssues": "स्रोत में समस्याएँ हो सकती हैं",
+                    "sourceChecked": "स्रोत जाँचा गया",
+                    "reachable": "पहुंच योग्य",
+                    "reachabilityInconclusive": "स्वचालित पहुँच जाँच निर्णायक नहीं रही",
+                    "accurateSource": "सटीक स्रोत",
+                    "sourceTooGeneric": "स्रोत बहुत सामान्य है",
+                    "weakSource": "कमज़ोर स्रोत",
+                    "sourceAccuracyUnknown": "स्रोत की सटीकता अज्ञात है"
                 }
             },
             "generator": {

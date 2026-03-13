@@ -911,6 +911,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Kaynagi yeniden kontrol et",
+                    "checkCompleted": "Kaynak kontrolu tamamlandi",
+                    "checkFailed": "Kaynak kontrolu basarisiz oldu",
+                    "failedToCheckSource": "Oge kaynagi kontrol edilemedi",
+                    "brokenLink": "Bozuk baglanti",
+                    "healthy": "Saglikli",
+                    "couldNotVerify": "Dogrulanamadi",
+                    "sourceMayHaveIssues": "Kaynakta sorunlar olabilir",
+                    "sourceChecked": "Kaynak kontrol edildi",
+                    "reachable": "Erisilebilir",
+                    "reachabilityInconclusive": "Otomatik erisilebilirlik kontrolu kesin sonuc vermedi",
+                    "accurateSource": "Dogru kaynak",
+                    "sourceTooGeneric": "Kaynak cok genel",
+                    "weakSource": "Zayif kaynak",
+                    "sourceAccuracyUnknown": "Kaynak dogrulugu bilinmiyor"
                 }
             },
             "generator": {

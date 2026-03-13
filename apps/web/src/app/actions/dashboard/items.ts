@@ -196,8 +196,8 @@ export async function checkItemHealth(directoryId: string, itemSlug: string) {
             message:
                 response.message ||
                 (response.status === 'success'
-                    ? 'Item source check completed'
-                    : 'Item source check failed'),
+                    ? t('sourceValidation.checkCompleted')
+                    : t('sourceValidation.checkFailed')),
             item: response.item,
         };
     } catch (error) {
@@ -205,9 +205,7 @@ export async function checkItemHealth(directoryId: string, itemSlug: string) {
         return {
             status: 'error' as const,
             message:
-                error instanceof Error
-                    ? error.message
-                    : t('updateError', { defaultValue: 'Failed to check item source' }),
+                error instanceof Error ? error.message : t('sourceValidation.failedToCheckSource'),
         };
     }
 }

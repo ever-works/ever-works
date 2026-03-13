@@ -818,6 +818,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "重新检查来源",
+                    "checkCompleted": "来源检查已完成",
+                    "checkFailed": "来源检查失败",
+                    "failedToCheckSource": "无法检查项目来源",
+                    "brokenLink": "失效链接",
+                    "healthy": "正常",
+                    "couldNotVerify": "无法验证",
+                    "sourceMayHaveIssues": "来源可能存在问题",
+                    "sourceChecked": "来源已检查",
+                    "reachable": "可访问",
+                    "reachabilityInconclusive": "自动可达性检查结果不明确",
+                    "accurateSource": "准确来源",
+                    "sourceTooGeneric": "来源过于泛化",
+                    "weakSource": "较弱来源",
+                    "sourceAccuracyUnknown": "来源准确性未知"
                 }
             },
             "generator": {

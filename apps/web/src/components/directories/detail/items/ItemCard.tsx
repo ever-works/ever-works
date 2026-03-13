@@ -259,6 +259,8 @@ const ItemCardGrid = memo(function ItemCardGrid({
 });
 
 function ItemHealthBadge({ item }: { item: ItemData }) {
+    const t = useTranslations('dashboard.directoryDetail.items');
+
     if (
         item.source_validation?.reachability_status !== 'broken' &&
         (!item.health || item.health.status !== 'broken')
@@ -272,15 +274,20 @@ function ItemHealthBadge({ item }: { item: ItemData }) {
                 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
                 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
             )}
-            title={item.source_validation?.reason || item.health?.message || 'Broken link'}
+            title={
+                item.source_validation?.reason ||
+                item.health?.message ||
+                t('sourceValidation.brokenLink')
+            }
         >
             <AlertTriangle className="h-3 w-3" />
-            Broken link
+            {t('sourceValidation.brokenLink')}
         </span>
     );
 }
 
 function ItemHealthDetails({ item, className }: { item: ItemData; className?: string }) {
+    const t = useTranslations('dashboard.directoryDetail.items');
     const validation = item.source_validation;
     const checkedAtRaw = validation?.checked_at ?? item.health?.checked_at ?? null;
     const checkedAt = checkedAtRaw ? new Date(checkedAtRaw).toLocaleString() : null;
@@ -291,10 +298,10 @@ function ItemHealthDetails({ item, className }: { item: ItemData; className?: st
     }
 
     if (validation) {
-        const reachabilityText = getReachabilityText(validation.reachability_status);
-        const accuracyText = getAccuracyText(validation.accuracy_status);
+        const reachabilityText = getReachabilityText(t, validation.reachability_status);
+        const accuracyText = getAccuracyText(t, validation.accuracy_status);
         const parts = [reachabilityText, accuracyText].filter(Boolean);
-        const baseText = parts.join(' · ') || 'Source checked';
+        const baseText = parts.join(' · ') || t('sourceValidation.sourceChecked');
         const detailText =
             validation.reason &&
             validation.accuracy_status !== 'accurate' &&
@@ -319,7 +326,7 @@ function ItemHealthDetails({ item, className }: { item: ItemData; className?: st
                     className,
                 )}
             >
-                {`Healthy${checkedSuffix}`}
+                {`${t('sourceValidation.healthy')}${checkedSuffix}`}
             </p>
         );
     }
@@ -332,7 +339,7 @@ function ItemHealthDetails({ item, className }: { item: ItemData; className?: st
                     className,
                 )}
             >
-                {`Could not verify${checkedSuffix}`}
+                {`${t('sourceValidation.couldNotVerify')}${checkedSuffix}`}
             </p>
         );
     }
@@ -345,19 +352,20 @@ function ItemHealthDetails({ item, className }: { item: ItemData; className?: st
                     className,
                 )}
             >
-                {`${item.health.message || 'Source may have issues'}${checkedSuffix}`}
+                {`${item.health.message || t('sourceValidation.sourceMayHaveIssues')}${checkedSuffix}`}
             </p>
         );
     }
 
     return (
         <p className={cn('mt-1 text-xs text-red-700 dark:text-red-300 line-clamp-2', className)}>
-            {`${item.health.message || 'Broken link'}${checkedSuffix}`}
+            {`${item.health.message || t('sourceValidation.brokenLink')}${checkedSuffix}`}
         </p>
     );
 }
 
 function getReachabilityText(
+    t: ReturnType<typeof useTranslations<'dashboard.directoryDetail.items'>>,
     reachabilityStatus: ItemData['source_validation'] extends infer T
         ? T extends { reachability_status: infer R }
             ? R
@@ -366,16 +374,17 @@ function getReachabilityText(
 ) {
     switch (reachabilityStatus) {
         case 'reachable':
-            return 'Reachable';
+            return t('sourceValidation.reachable');
         case 'broken':
-            return 'Broken link';
+            return t('sourceValidation.brokenLink');
         case 'unknown':
         default:
-            return 'Automated reachability inconclusive';
+            return t('sourceValidation.reachabilityInconclusive');
     }
 }
 
 function getAccuracyText(
+    t: ReturnType<typeof useTranslations<'dashboard.directoryDetail.items'>>,
     accuracyStatus: ItemData['source_validation'] extends infer T
         ? T extends { accuracy_status: infer A }
             ? A
@@ -384,14 +393,14 @@ function getAccuracyText(
 ) {
     switch (accuracyStatus) {
         case 'accurate':
-            return 'Accurate source';
+            return t('sourceValidation.accurateSource');
         case 'generic':
-            return 'Source too generic';
+            return t('sourceValidation.sourceTooGeneric');
         case 'weak':
-            return 'Weak source';
+            return t('sourceValidation.weakSource');
         case 'unknown':
         default:
-            return 'Source accuracy unknown';
+            return t('sourceValidation.sourceAccuracyUnknown');
     }
 }
 

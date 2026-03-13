@@ -818,6 +818,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Quelle erneut pruefen",
+                    "checkCompleted": "Quellenpruefung abgeschlossen",
+                    "checkFailed": "Quellenpruefung fehlgeschlagen",
+                    "failedToCheckSource": "Die Quelle des Eintrags konnte nicht geprueft werden",
+                    "brokenLink": "Defekter Link",
+                    "healthy": "In Ordnung",
+                    "couldNotVerify": "Konnte nicht verifiziert werden",
+                    "sourceMayHaveIssues": "Die Quelle koennte Probleme haben",
+                    "sourceChecked": "Quelle geprueft",
+                    "reachable": "Erreichbar",
+                    "reachabilityInconclusive": "Automatische Erreichbarkeitspruefung war nicht eindeutig",
+                    "accurateSource": "Praezise Quelle",
+                    "sourceTooGeneric": "Quelle zu allgemein",
+                    "weakSource": "Schwache Quelle",
+                    "sourceAccuracyUnknown": "Quellgenauigkeit unbekannt"
                 }
             },
             "generator": {

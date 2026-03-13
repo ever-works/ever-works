@@ -911,6 +911,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Kiem tra lai nguon",
+                    "checkCompleted": "Da hoan tat kiem tra nguon",
+                    "checkFailed": "Kiem tra nguon that bai",
+                    "failedToCheckSource": "Khong the kiem tra nguon cua muc",
+                    "brokenLink": "Lien ket hong",
+                    "healthy": "On",
+                    "couldNotVerify": "Khong the xac minh",
+                    "sourceMayHaveIssues": "Nguon co the co van de",
+                    "sourceChecked": "Da kiem tra nguon",
+                    "reachable": "Co the truy cap",
+                    "reachabilityInconclusive": "Kiem tra kha nang truy cap tu dong chua co ket luan",
+                    "accurateSource": "Nguon chinh xac",
+                    "sourceTooGeneric": "Nguon qua chung chung",
+                    "weakSource": "Nguon yeu",
+                    "sourceAccuracyUnknown": "Do chinh xac cua nguon chua ro"
                 }
             },
             "generator": {

@@ -818,6 +818,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "أعد التحقق من المصدر",
+                    "checkCompleted": "اكتمل التحقق من المصدر",
+                    "checkFailed": "فشل التحقق من المصدر",
+                    "failedToCheckSource": "فشل التحقق من مصدر العنصر",
+                    "brokenLink": "رابط معطل",
+                    "healthy": "سليم",
+                    "couldNotVerify": "تعذر التحقق",
+                    "sourceMayHaveIssues": "قد تكون هناك مشكلات في المصدر",
+                    "sourceChecked": "تم التحقق من المصدر",
+                    "reachable": "يمكن الوصول إليه",
+                    "reachabilityInconclusive": "التحقق التلقائي من إمكانية الوصول غير حاسم",
+                    "accurateSource": "مصدر دقيق",
+                    "sourceTooGeneric": "المصدر عام جدا",
+                    "weakSource": "مصدر ضعيف",
+                    "sourceAccuracyUnknown": "دقة المصدر غير معروفة"
                 }
             },
             "generator": {

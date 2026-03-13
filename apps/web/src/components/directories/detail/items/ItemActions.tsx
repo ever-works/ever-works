@@ -103,12 +103,12 @@ export const ItemActions = memo(function ItemActions({
 
             if (result.status === 'success' && result.item) {
                 onUpdate?.(result.item);
-                toast.success(result.message || 'Item health check completed');
+                toast.success(result.message || t('sourceValidation.checkCompleted'));
             } else {
-                toast.error(result.message || 'Item health check failed');
+                toast.error(result.message || t('sourceValidation.checkFailed'));
             }
         } catch (error) {
-            toast.error('Item health check failed');
+            toast.error(t('sourceValidation.checkFailed'));
         } finally {
             setIsCheckingHealth(false);
         }
@@ -153,7 +153,7 @@ export const ItemActions = memo(function ItemActions({
                             ) : (
                                 <ShieldAlert className="w-4 h-4" />
                             )}
-                            Re-check source
+                            {t('sourceValidation.recheckSource')}
                         </DropdownMenuItem>
                     )}
                     {item.source_url && screenshotAvailable && (

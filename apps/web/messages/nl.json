@@ -911,6 +911,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Bron opnieuw controleren",
+                    "checkCompleted": "Broncontrole voltooid",
+                    "checkFailed": "Broncontrole mislukt",
+                    "failedToCheckSource": "Kan de bron van het item niet controleren",
+                    "brokenLink": "Kapotte link",
+                    "healthy": "In orde",
+                    "couldNotVerify": "Kon niet verifieren",
+                    "sourceMayHaveIssues": "De bron kan problemen hebben",
+                    "sourceChecked": "Bron gecontroleerd",
+                    "reachable": "Bereikbaar",
+                    "reachabilityInconclusive": "Automatische bereikbaarheidscontrole was niet doorslaggevend",
+                    "accurateSource": "Nauwkeurige bron",
+                    "sourceTooGeneric": "Bron te algemeen",
+                    "weakSource": "Zwakke bron",
+                    "sourceAccuracyUnknown": "Bronnauwkeurigheid onbekend"
                 }
             },
             "generator": {

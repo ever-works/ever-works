@@ -911,6 +911,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Proveri iztochnika otnovo",
+                    "checkCompleted": "Proverkata na iztochnika zavurshi",
+                    "checkFailed": "Proverkata na iztochnika beshe neuspeshna",
+                    "failedToCheckSource": "Neuspeshna proverka na iztochnika na elementa",
+                    "brokenLink": "Neraboteshta vruzka",
+                    "healthy": "Izpraven",
+                    "couldNotVerify": "Ne mozha da se potvurdi",
+                    "sourceMayHaveIssues": "Iztochnikut mozhe da ima problemi",
+                    "sourceChecked": "Iztochnikut e proveren",
+                    "reachable": "Dostupen",
+                    "reachabilityInconclusive": "Avtomatichnata proverka za dostupnost e neubeditelna",
+                    "accurateSource": "Tochen iztochnik",
+                    "sourceTooGeneric": "Iztochnikut e tvurde obsht",
+                    "weakSource": "Slab iztochnik",
+                    "sourceAccuracyUnknown": "Tochnostta na iztochnika e neizvestna"
                 }
             },
             "generator": {

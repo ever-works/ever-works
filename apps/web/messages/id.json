@@ -911,6 +911,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Periksa ulang sumber",
+                    "checkCompleted": "Pemeriksaan sumber selesai",
+                    "checkFailed": "Pemeriksaan sumber gagal",
+                    "failedToCheckSource": "Gagal memeriksa sumber item",
+                    "brokenLink": "Tautan rusak",
+                    "healthy": "Baik",
+                    "couldNotVerify": "Tidak dapat diverifikasi",
+                    "sourceMayHaveIssues": "Sumber mungkin memiliki masalah",
+                    "sourceChecked": "Sumber diperiksa",
+                    "reachable": "Dapat dijangkau",
+                    "reachabilityInconclusive": "Pemeriksaan keterjangkauan otomatis tidak meyakinkan",
+                    "accurateSource": "Sumber akurat",
+                    "sourceTooGeneric": "Sumber terlalu umum",
+                    "weakSource": "Sumber lemah",
+                    "sourceAccuracyUnknown": "Keakuratan sumber tidak diketahui"
                 }
             },
             "generator": {

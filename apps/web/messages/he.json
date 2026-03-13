@@ -818,6 +818,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "בדוק שוב את המקור",
+                    "checkCompleted": "בדיקת המקור הושלמה",
+                    "checkFailed": "בדיקת המקור נכשלה",
+                    "failedToCheckSource": "נכשלה בדיקת מקור הפריט",
+                    "brokenLink": "קישור שבור",
+                    "healthy": "תקין",
+                    "couldNotVerify": "לא ניתן היה לאמת",
+                    "sourceMayHaveIssues": "ייתכן שיש בעיות במקור",
+                    "sourceChecked": "המקור נבדק",
+                    "reachable": "נגיש",
+                    "reachabilityInconclusive": "בדיקת הנגישות האוטומטית לא הייתה חד משמעית",
+                    "accurateSource": "מקור מדויק",
+                    "sourceTooGeneric": "המקור כללי מדי",
+                    "weakSource": "מקור חלש",
+                    "sourceAccuracyUnknown": "דיוק המקור אינו ידוע"
                 }
             },
             "generator": {

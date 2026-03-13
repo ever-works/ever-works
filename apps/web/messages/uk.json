@@ -911,6 +911,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Pereviryty dzherelo shche raz",
+                    "checkCompleted": "Perevirku dzherela zaversheno",
+                    "checkFailed": "Ne vdalosya pereviryty dzherelo",
+                    "failedToCheckSource": "Ne vdalosya pereviryty dzherelo elementa",
+                    "brokenLink": "Neroboche posylannya",
+                    "healthy": "Dostupne",
+                    "couldNotVerify": "Ne vdalosya pereviryty",
+                    "sourceMayHaveIssues": "Dzherelo mozhe maty problemy",
+                    "sourceChecked": "Dzherelo perevireno",
+                    "reachable": "Dosyazhne",
+                    "reachabilityInconclusive": "Avtomatychna perevirka dostupnosti bula neperekonlyvoyu",
+                    "accurateSource": "Tochne dzherelo",
+                    "sourceTooGeneric": "Dzherelo nadto zahalne",
+                    "weakSource": "Slabke dzherelo",
+                    "sourceAccuracyUnknown": "Tochnist dzherela nevidoma"
                 }
             },
             "generator": {

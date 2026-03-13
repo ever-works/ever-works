@@ -911,6 +911,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Sprawdz zrodlo ponownie",
+                    "checkCompleted": "Sprawdzanie zrodla zakonczone",
+                    "checkFailed": "Sprawdzanie zrodla nie powiodlo sie",
+                    "failedToCheckSource": "Nie udalo sie sprawdzic zrodla elementu",
+                    "brokenLink": "Uszkodzony link",
+                    "healthy": "Poprawne",
+                    "couldNotVerify": "Nie udalo sie zweryfikowac",
+                    "sourceMayHaveIssues": "Zrodlo moze miec problemy",
+                    "sourceChecked": "Zrodlo sprawdzone",
+                    "reachable": "Osiagalne",
+                    "reachabilityInconclusive": "Automatyczne sprawdzenie osiagalnosci bylo nierozstrzygajace",
+                    "accurateSource": "Dokladne zrodlo",
+                    "sourceTooGeneric": "Zrodlo jest zbyt ogolne",
+                    "weakSource": "Slabe zrodlo",
+                    "sourceAccuracyUnknown": "Dokladnosc zrodla nieznana"
                 }
             },
             "generator": {

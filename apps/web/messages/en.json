@@ -1269,6 +1269,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Re-check source",
+                    "checkCompleted": "Item source check completed",
+                    "checkFailed": "Item source check failed",
+                    "failedToCheckSource": "Failed to check item source",
+                    "brokenLink": "Broken link",
+                    "healthy": "Healthy",
+                    "couldNotVerify": "Could not verify",
+                    "sourceMayHaveIssues": "Source may have issues",
+                    "sourceChecked": "Source checked",
+                    "reachable": "Reachable",
+                    "reachabilityInconclusive": "Automated reachability inconclusive",
+                    "accurateSource": "Accurate source",
+                    "sourceTooGeneric": "Source too generic",
+                    "weakSource": "Weak source",
+                    "sourceAccuracyUnknown": "Source accuracy unknown"
                 }
             },
             "generator": {

@@ -911,6 +911,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "ตรวจสอบแหล่งที่มาอีกครั้ง",
+                    "checkCompleted": "ตรวจสอบแหล่งที่มาเสร็จแล้ว",
+                    "checkFailed": "ตรวจสอบแหล่งที่มาไม่สำเร็จ",
+                    "failedToCheckSource": "ไม่สามารถตรวจสอบแหล่งที่มาของรายการได้",
+                    "brokenLink": "ลิงก์เสีย",
+                    "healthy": "ปกติ",
+                    "couldNotVerify": "ไม่สามารถยืนยันได้",
+                    "sourceMayHaveIssues": "แหล่งที่มาอาจมีปัญหา",
+                    "sourceChecked": "ตรวจสอบแหล่งที่มาแล้ว",
+                    "reachable": "เข้าถึงได้",
+                    "reachabilityInconclusive": "การตรวจสอบการเข้าถึงอัตโนมัติยังไม่ชัดเจน",
+                    "accurateSource": "แหล่งที่มาที่แม่นยำ",
+                    "sourceTooGeneric": "แหล่งที่มาทั่วไปเกินไป",
+                    "weakSource": "แหล่งที่มาอ่อน",
+                    "sourceAccuracyUnknown": "ไม่ทราบความแม่นยำของแหล่งที่มา"
                 }
             },
             "generator": {

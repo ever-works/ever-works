@@ -818,6 +818,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Reverifier la source",
+                    "checkCompleted": "Verification de la source terminee",
+                    "checkFailed": "Echec de la verification de la source",
+                    "failedToCheckSource": "Echec de la verification de la source de l'element",
+                    "brokenLink": "Lien casse",
+                    "healthy": "Valide",
+                    "couldNotVerify": "Impossible a verifier",
+                    "sourceMayHaveIssues": "La source peut avoir des problemes",
+                    "sourceChecked": "Source verifiee",
+                    "reachable": "Accessible",
+                    "reachabilityInconclusive": "Verification automatique de l'accessibilite non concluante",
+                    "accurateSource": "Source precise",
+                    "sourceTooGeneric": "Source trop generique",
+                    "weakSource": "Source faible",
+                    "sourceAccuracyUnknown": "Precision de la source inconnue"
                 }
             },
             "generator": {

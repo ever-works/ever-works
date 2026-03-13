@@ -911,6 +911,23 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Proverit istochnik snova",
+                    "checkCompleted": "Proverka istochnika zavershena",
+                    "checkFailed": "Proverka istochnika ne udalas",
+                    "failedToCheckSource": "Ne udalos proverit istochnik elementa",
+                    "brokenLink": "Bitaya ssylka",
+                    "healthy": "Dostupen",
+                    "couldNotVerify": "Ne udalos proverit",
+                    "sourceMayHaveIssues": "U istochnika mogut byt problemy",
+                    "sourceChecked": "Istochnik proveren",
+                    "reachable": "Dostupen",
+                    "reachabilityInconclusive": "Avtomaticheskaya proverka dostupnosti ne dala odnoznachnogo rezultata",
+                    "accurateSource": "Tochnyy istochnik",
+                    "sourceTooGeneric": "Istochnik slishkom obshchiy",
+                    "weakSource": "Slabyy istochnik",
+                    "sourceAccuracyUnknown": "Tochnost istochnika neizvestna"
                 }
             },
             "generator": {
