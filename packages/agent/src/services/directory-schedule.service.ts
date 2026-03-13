@@ -105,6 +105,9 @@ export class DirectoryScheduleService {
         const cadence =
             dto.cadence || existing?.cadence || this.subscriptionService.getDefaultCadence(plan);
 
+        const sourceValidationCadence =
+            dto.sourceValidationCadence || existing?.sourceValidationCadence || cadence;
+
         if (!cadence) {
             throw new BadRequestException('Cadence is required to enable scheduled updates');
         }
@@ -166,15 +169,22 @@ export class DirectoryScheduleService {
                 ? this.calculateNextRun(cadence)
                 : (existing?.nextRunAt ?? null);
 
+        const sourceValidationNextRunAt =
+            status === DirectoryScheduleStatus.ACTIVE && sourceValidationCadence
+                ? this.calculateNextRun(sourceValidationCadence)
+                : (existing?.sourceValidationNextRunAt ?? null);
+
         const schedule = await this.scheduleRepository.upsert(directory.id, {
             userId: user.id,
             cadence,
+            sourceValidationCadence,
             billingMode,
             status,
             maxFailureBeforePause,
             alwaysCreatePullRequest,
             providerOverrides,
             nextRunAt,
+            sourceValidationNextRunAt,
         });
 
         await this.syncDirectory(directory.id, schedule);
@@ -196,7 +206,9 @@ export class DirectoryScheduleService {
         const updated = await this.scheduleRepository.upsert(directory.id, {
             status: DirectoryScheduleStatus.CANCELED,
             cadence: null,
+            sourceValidationCadence: null,
             nextRunAt: null,
+            sourceValidationNextRunAt: null,
             billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
             alwaysCreatePullRequest: false,
             providerOverrides: null,
@@ -222,12 +234,14 @@ export class DirectoryScheduleService {
         await this.scheduleRepository.updateById(scheduleId, {
             status: DirectoryScheduleStatus.PAUSED,
             nextRunAt: null,
+            sourceValidationNextRunAt: null,
         });
 
         await this.syncDirectory(schedule.directoryId, {
             ...schedule,
             status: DirectoryScheduleStatus.PAUSED,
             nextRunAt: null,
+            sourceValidationNextRunAt: null,
         });
     }
 
@@ -486,9 +500,16 @@ export class DirectoryScheduleService {
         return {
             status: schedule?.status ?? DirectoryScheduleStatus.DISABLED,
             cadence: schedule?.cadence ?? null,
+            sourceValidationCadence: schedule?.sourceValidationCadence ?? schedule?.cadence ?? null,
             billingMode: schedule?.billingMode ?? DirectoryScheduleBillingMode.SUBSCRIPTION,
             nextRunAt: schedule?.nextRunAt ? schedule.nextRunAt.toISOString() : null,
+            sourceValidationNextRunAt: schedule?.sourceValidationNextRunAt
+                ? schedule.sourceValidationNextRunAt.toISOString()
+                : null,
             lastRunAt: schedule?.lastRunAt ? schedule.lastRunAt.toISOString() : null,
+            sourceValidationLastRunAt: schedule?.sourceValidationLastRunAt
+                ? schedule.sourceValidationLastRunAt.toISOString()
+                : null,
             lastRunStatus: schedule?.lastRunStatus ?? null,
             failureCount: schedule?.failureCount ?? 0,
             maxFailureBeforePause:

@@ -12,11 +12,11 @@ export class ItemSourceValidationCronService {
         private readonly cacheEntryRepository: CacheEntryRepository,
     ) {}
 
-    @Cron(CronExpression.EVERY_WEEK)
+    @Cron(CronExpression.EVERY_HOUR)
     async handleScheduledSourceValidation() {
         try {
             this.logger.log('Starting scheduled item source validation');
-            const result = await this.sourceValidationScheduler.processAllDirectories();
+            const result = await this.sourceValidationScheduler.processDueSchedules();
             await this.cacheEntryRepository.typeormAdapter.deleteUnscopedEntriesLike(
                 'directory-items-',
             );

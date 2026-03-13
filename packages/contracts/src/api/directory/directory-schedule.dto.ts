@@ -24,12 +24,18 @@ export interface DirectoryScheduleDto {
 	status: DirectoryScheduleStatus;
 	/** Selected cadence (null if disabled) */
 	cadence: DirectoryScheduleCadence | null;
+	/** Selected source validation cadence (null if disabled) */
+	sourceValidationCadence: DirectoryScheduleCadence | null;
 	/** Billing mode */
 	billingMode: DirectoryScheduleBillingMode;
 	/** Next scheduled run time (ISO string) */
 	nextRunAt: string | null;
+	/** Next scheduled source validation run time (ISO string) */
+	sourceValidationNextRunAt: string | null;
 	/** Last run time (ISO string) */
 	lastRunAt: string | null;
+	/** Last source validation run time (ISO string) */
+	sourceValidationLastRunAt: string | null;
 	/** Status of last run */
 	lastRunStatus: GenerateStatusType | null;
 	/** Number of consecutive failures */
@@ -56,6 +62,8 @@ export interface UpdateDirectorySchedulePayload {
 	enable?: boolean;
 	/** Schedule cadence */
 	cadence?: DirectoryScheduleCadence;
+	/** Source validation cadence */
+	sourceValidationCadence?: DirectoryScheduleCadence;
 	/** Billing mode */
 	billingMode?: DirectoryScheduleBillingMode;
 	/** Max failures before auto-pause */

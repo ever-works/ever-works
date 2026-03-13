@@ -42,6 +42,9 @@ export class DirectorySchedule {
     @Column({ type: 'varchar', nullable: true })
     cadence?: DirectoryScheduleCadence | null;
 
+    @Column({ type: 'varchar', nullable: true })
+    sourceValidationCadence?: DirectoryScheduleCadence | null;
+
     @Column({ type: 'varchar', default: DirectoryScheduleStatus.DISABLED })
     status: DirectoryScheduleStatus;
 
@@ -50,6 +53,12 @@ export class DirectorySchedule {
 
     @TimestampColumn({ nullable: true })
     nextRunAt?: Date | null;
+
+    @TimestampColumn({ nullable: true })
+    sourceValidationNextRunAt?: Date | null;
+
+    @TimestampColumn({ nullable: true })
+    sourceValidationLastRunAt?: Date | null;
 
     @TimestampColumn({ nullable: true })
     lastRunAt?: Date | null;

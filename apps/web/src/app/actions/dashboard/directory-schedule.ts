@@ -21,6 +21,7 @@ const providerOverridesSchema = z
 const updateScheduleSchema = z.object({
     enable: z.boolean(),
     cadence: z.nativeEnum(DirectoryScheduleCadence),
+    sourceValidationCadence: z.nativeEnum(DirectoryScheduleCadence),
     billingMode: z.nativeEnum(DirectoryScheduleBillingMode),
     maxFailureBeforePause: z.number().int().min(1).max(10),
     alwaysCreatePullRequest: z.boolean().optional(),
