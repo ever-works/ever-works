@@ -41,7 +41,7 @@ const Switch = React.forwardRef<HTMLDivElement, SwitchProps>(
                         'focus:outline-none focus:ring-2 focus:ring-ring dark:focus:ring-ring-dark focus:ring-offset-2',
                         'focus:ring-offset-background dark:focus:ring-offset-background-dark',
                         checked
-                            ? 'bg-primary dark:bg-primary-dark'
+                            ? 'bg-primary-500 dark:bg-primary-500'
                             : 'bg-gray-300 dark:bg-gray-600',
                         disabled && 'cursor-not-allowed opacity-50',
                     )}
