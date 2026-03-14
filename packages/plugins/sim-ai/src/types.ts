@@ -31,7 +31,7 @@ export function isSimAiStepId(value: string): value is SimAiStepId {
 
 /** Plugin constants */
 export const SIM_AI_PLUGIN_ID = 'sim-ai';
-export const DEFAULT_BASE_URL = 'https://sim.ai';
+export const DEFAULT_BASE_URL = 'https://www.sim.ai';
 export const DEFAULT_POLLING_INTERVAL_MS = 5000;
 export const DEFAULT_ASYNC_TIMEOUT_MS = 600_000; // 10 minutes
 export const DEFAULT_MAX_RETRIES = 3;
@@ -106,7 +106,6 @@ export interface SimAiSettings {
 	maxRetries: number;
 	eventTriggers?: {
 		onGenerationCompleted?: EventTriggerConfig;
-		onDirectoryDeployed?: EventTriggerConfig;
 	};
 }
 

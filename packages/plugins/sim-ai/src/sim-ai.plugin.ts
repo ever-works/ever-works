@@ -141,14 +141,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 							workflowId: { type: 'string', title: 'Workflow ID' },
 							enabled: { type: 'boolean', default: false }
 						}
-					},
-					onDirectoryDeployed: {
-						type: 'object',
-						title: 'On Directory Deployed',
-						properties: {
-							workflowId: { type: 'string', title: 'Workflow ID' },
-							enabled: { type: 'boolean', default: false }
-						}
 					}
 				}
 			}
@@ -246,7 +238,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			readme: [
 				'# SIM AI Workflows Plugin',
 				'',
-				'Pipeline plugin that delegates the entire directory generation to [SIM AI](https://sim.ai) workflows.',
+				'Pipeline plugin that delegates the entire directory generation to [SIM AI](https://www.sim.ai) workflows.',
 				'SIM AI is an open-source visual workflow builder for building and deploying AI agent workflows.',
 				'',
 				'## How it works',
@@ -272,10 +264,10 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				'- **Inline** (default): Directory metadata and item summary sent in workflow input',
 				'- **GitHub Repo**: Pass a repository URL and access token for large datasets'
 			].join('\n'),
-			homepage: 'https://sim.ai',
+			homepage: 'https://www.sim.ai',
 			icon: {
 				type: 'url',
-				value: 'https://sim.ai/favicon.ico'
+				value: 'https://www.sim.ai/favicon.ico'
 			}
 		};
 	}

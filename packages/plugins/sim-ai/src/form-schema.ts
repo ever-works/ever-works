@@ -70,7 +70,7 @@ export function getFormFields(): FormFieldDefinition[] {
 		},
 		{
 			name: 'repo_access_token',
-			type: 'text',
+			type: 'password',
 			label: 'Repository Access Token',
 			description: 'Read-only access token for the data repository (short-lived recommended)',
 			placeholder: 'ghp_...',
