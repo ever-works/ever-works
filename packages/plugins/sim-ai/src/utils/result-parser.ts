@@ -1,0 +1,169 @@
+import type { ItemData, Category, Tag, Brand } from '@ever-works/plugin';
+import type { SimWorkflowOutput, SimOutputItem } from '../types.js';
+
+export interface ParsedResults {
+	items: ItemData[];
+	categories: Category[];
+	tags: Tag[];
+	brands: Brand[];
+}
+
+/**
+ * Parses and validates the output from a SIM workflow execution.
+ * Transforms SIM output items into Ever Works ItemData format.
+ */
+export function parseSimOutput(raw: unknown): ParsedResults {
+	if (!raw || typeof raw !== 'object') {
+		throw new Error('SIM workflow returned empty or non-object output');
+	}
+
+	const output = normalizeOutput(raw);
+
+	const items = parseItems(output.items);
+	const categories = parseCategories(output.categories, items);
+	const tags = parseTags(output.tags, items);
+	const brands = parseBrands(output.brands, items);
+
+	return { items, categories, tags, brands };
+}
+
+/**
+ * Normalizes the raw SIM output into the expected shape.
+ * Handles cases where items are at the root level or nested.
+ */
+function normalizeOutput(raw: unknown): SimWorkflowOutput {
+	const obj = raw as Record<string, unknown>;
+
+	// If output has an 'items' array, use it directly
+	if (Array.isArray(obj.items)) {
+		return obj as unknown as SimWorkflowOutput;
+	}
+
+	// If output itself is an array, treat it as items
+	if (Array.isArray(raw)) {
+		return { items: raw as SimOutputItem[] };
+	}
+
+	// If output has a nested 'output' field (from async execution)
+	if (obj.output && typeof obj.output === 'object') {
+		return normalizeOutput(obj.output);
+	}
+
+	// If output has a 'data' field
+	if (obj.data && typeof obj.data === 'object') {
+		return normalizeOutput(obj.data);
+	}
+
+	throw new Error(
+		'SIM workflow output does not contain an "items" array. ' +
+			'Expected format: { items: [...] } or a direct array of items.'
+	);
+}
+
+function parseItems(rawItems: SimOutputItem[]): ItemData[] {
+	const items: ItemData[] = [];
+
+	for (const raw of rawItems) {
+		if (!raw || typeof raw !== 'object') continue;
+		if (!raw.name || typeof raw.name !== 'string') continue;
+
+		const item: ItemData = {
+			name: raw.name.trim(),
+			description: typeof raw.description === 'string' ? raw.description.trim() : undefined,
+			source_url: typeof raw.url === 'string' ? raw.url : (typeof raw.source_url === 'string' ? raw.source_url : undefined),
+			content: typeof raw.content === 'string' ? raw.content : undefined,
+			category_name: typeof raw.category === 'string' ? raw.category.trim() : undefined,
+			tags: Array.isArray(raw.tags) ? raw.tags.filter((t): t is string => typeof t === 'string') : undefined,
+			brand_name: typeof raw.brand === 'string' ? raw.brand.trim() : undefined,
+			images: Array.isArray(raw.images) ? raw.images.filter((i): i is string => typeof i === 'string') : undefined
+		};
+
+		items.push(item);
+	}
+
+	return items;
+}
+
+function parseCategories(rawCategories: SimWorkflowOutput['categories'], items: ItemData[]): Category[] {
+	const categoryNames = new Set<string>();
+
+	// From explicit categories in output
+	if (Array.isArray(rawCategories)) {
+		for (const cat of rawCategories) {
+			if (cat && typeof cat.name === 'string' && cat.name.trim()) {
+				categoryNames.add(cat.name.trim());
+			}
+		}
+	}
+
+	// From item category references
+	for (const item of items) {
+		if (item.category_name) {
+			categoryNames.add(item.category_name);
+		}
+	}
+
+	return Array.from(categoryNames).map((name) => {
+		const explicit = rawCategories?.find((c) => c.name === name);
+		return {
+			name,
+			description: explicit?.description
+		};
+	});
+}
+
+function parseTags(rawTags: SimWorkflowOutput['tags'], items: ItemData[]): Tag[] {
+	const tagNames = new Set<string>();
+
+	if (Array.isArray(rawTags)) {
+		for (const tag of rawTags) {
+			if (tag && typeof tag.name === 'string' && tag.name.trim()) {
+				tagNames.add(tag.name.trim());
+			}
+		}
+	}
+
+	for (const item of items) {
+		if (Array.isArray(item.tags)) {
+			for (const t of item.tags) {
+				tagNames.add(t);
+			}
+		}
+	}
+
+	return Array.from(tagNames).map((name) => ({ name }));
+}
+
+function parseBrands(rawBrands: SimWorkflowOutput['brands'], items: ItemData[]): Brand[] {
+	const brandNames = new Set<string>();
+
+	if (Array.isArray(rawBrands)) {
+		for (const brand of rawBrands) {
+			if (brand && typeof brand.name === 'string' && brand.name.trim()) {
+				brandNames.add(brand.name.trim());
+			}
+		}
+	}
+
+	for (const item of items) {
+		if (item.brand_name) {
+			brandNames.add(item.brand_name);
+		}
+	}
+
+	return Array.from(brandNames).map((name) => {
+		const explicit = rawBrands?.find((b) => b.name === name);
+		return {
+			name,
+			url: explicit?.url
+		};
+	});
+}
+
+/**
+ * Deduplicates new items against existing items by name (case-insensitive).
+ */
+export function deduplicateItems(newItems: ItemData[], existingItemNames: string[]): ItemData[] {
+	const existingSet = new Set(existingItemNames.map((n) => n.toLowerCase().trim()));
+	return newItems.filter((item) => !existingSet.has(item.name.toLowerCase().trim()));
+}
