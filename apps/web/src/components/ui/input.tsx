@@ -99,7 +99,7 @@ const Input = ({
                             }}
                             disabled={props.disabled}
                             className={cn(
-                                'flex-1 flex items-center justify-center px-1.5',
+                                'flex-1 flex items-center justify-center px-1',
                                 'text-text-muted dark:text-text-muted-dark',
                                 'hover:bg-primary/10 hover:text-primary',
                                 'disabled:opacity-40 disabled:cursor-not-allowed',
@@ -118,7 +118,7 @@ const Input = ({
                             }}
                             disabled={props.disabled}
                             className={cn(
-                                'flex-1 flex items-center justify-center px-1.5',
+                                'flex-1 flex items-center justify-center px-1',
                                 'text-text-muted dark:text-text-muted-dark',
                                 'hover:bg-primary/10 hover:text-primary',
                                 'disabled:opacity-40 disabled:cursor-not-allowed',

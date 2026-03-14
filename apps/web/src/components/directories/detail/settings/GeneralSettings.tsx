@@ -63,7 +63,13 @@ export function GeneralSettings() {
                     </>
                 )}
 
-                <Button type="submit" disabled={isPending} loading={isPending} variant="primary">
+                <Button
+                    type="submit"
+                    size="sm"
+                    disabled={isPending}
+                    loading={isPending}
+                    variant="primary"
+                >
                     {t('saveChanges')}
                 </Button>
             </form>

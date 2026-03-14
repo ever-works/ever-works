@@ -208,12 +208,12 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                     className={cn(
                         'w-full flex items-center justify-between rounded-lg border text-sm',
                         'transition-colors outline-none text-left cursor-pointer',
-                        'bg-surface dark:bg-surface-dark',
+                        'bg-surface dark:bg-surface-secondary-dark/20',
                         'border-card-border dark:border-card-border-dark',
                         'hover:border-primary/40 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20',
                         'disabled:cursor-not-allowed disabled:opacity-50',
                         open && 'border-primary ring-2 ring-primary/20',
-                        size === 'default' ? 'h-9 px-3 py-2' : 'h-8 px-2 text-xs',
+                        size === 'default' ? 'h-9 px-3 py-2' : 'h-8 px-2 text-sm',
                     )}
                 >
                     <span
@@ -359,11 +359,11 @@ function OptionRow({
                 'flex items-center gap-2 cursor-pointer select-none transition-colors',
                 size === 'default'
                     ? 'px-3 py-2 text-sm mx-1 rounded-sm my-px'
-                    : 'px-2 py-1.5 mx-1 rounded-sm my-px text-xs',
+                    : 'px-2 py-1.5 mx-1 rounded-sm my-px text-sm',
                 indent && 'pl-6',
                 selected
-                    ? 'bg-surface-secondary dark:bg-primary-500/10 font-medium text-text dark:text-text-dark'
-                    : 'text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-primary-500/10',
+                    ? 'bg-surface-secondary dark:bg-card-dark/70 font-medium text-text dark:text-text-dark'
+                    : 'text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-card-dark/70',
                 opt.disabled &&
                     'opacity-50 cursor-not-allowed pointer-events-none text-text-muted dark:text-text-muted-dark',
             )}
