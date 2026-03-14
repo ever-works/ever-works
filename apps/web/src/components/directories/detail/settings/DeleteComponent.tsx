@@ -187,7 +187,12 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
                     </div>
 
                     <DialogFooter>
-                        <Button onClick={handleCloseDialog} disabled={isPending} variant="secondary" size="sm">
+                        <Button
+                            onClick={handleCloseDialog}
+                            disabled={isPending}
+                            variant="secondary"
+                            size="sm"
+                        >
                             {t('cancel')}
                         </Button>
                         <Button
