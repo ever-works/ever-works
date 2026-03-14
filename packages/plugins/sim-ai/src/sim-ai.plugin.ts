@@ -53,7 +53,7 @@ import {
 	validateFormInput as formValidate,
 	getDefaultValues as formDefaults
 } from './form-schema.js';
-import { registerToken, revokeToken, sanitizeTokenForLog } from './utils/token-manager.js';
+import { registerToken, revokeToken, cleanupExpiredTokens, sanitizeTokenForLog } from './utils/token-manager.js';
 
 /**
  * SIM AI Workflows Plugin
@@ -157,8 +157,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	};
 
 	private context: PluginContext | null = null;
-	private state: PipelineState<SimAiStepId> | null = null;
-	private abortController: AbortController | null = null;
 
 	// ── IPlugin lifecycle ──────────────────────────────────────────────
 
@@ -173,6 +171,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {
+		cleanupExpiredTokens();
 		return {
 			status: 'healthy',
 			message: 'SIM AI Workflows plugin is ready',
@@ -305,6 +304,10 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		return STEP_DEFINITIONS;
 	}
 
+	/** Per-execution state — stored for getState() but scoped per call via closures */
+	private _lastState: PipelineState<SimAiStepId> | null = null;
+	private _lastAbortController: AbortController | null = null;
+
 	async execute(
 		directory: DirectoryReference,
 		request: GenerationRequest,
@@ -313,17 +316,42 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		onProgress?: PipelineProgressCallback
 	): Promise<PipelineResult> {
 		const startTime = Date.now();
-		this.abortController = new AbortController();
-		const signal = options?.signal ?? this.abortController.signal;
+		const abortController = new AbortController();
+		const signal = options?.signal ?? abortController.signal;
 
-		this.state = initializeState();
+		let state = initializeState();
+
+		// Expose to getState()/cancel() — last execution wins
+		this._lastState = state;
+		this._lastAbortController = abortController;
+
+		const setState = (stepId: SimAiStepId, status: StepStatus, error?: string): void => {
+			state = updateStepState(state, stepId, status, error);
+			this._lastState = state;
+		};
+
+		const handleError = (error: Error): PipelineResult => {
+			const { result, state: s } = buildErrorResult(state, error, startTime);
+			state = s;
+			this._lastState = state;
+			return result;
+		};
+
+		const handleCancel = (): PipelineResult => {
+			const { result, state: s } = buildCancelledResult(state, startTime);
+			state = s;
+			this._lastState = state;
+			return result;
+		};
 
 		const logger = this.context?.logger ?? console;
 		const userId = directory.user?.id;
 
 		if (!userId) {
-			return this.handleError(new Error('User ID is required'), startTime);
+			return handleError(new Error('User ID is required'));
 		}
+
+		const executionId = `${directory.id}-${Date.now()}`;
 
 		try {
 			const pluginSettings = await resolveSettings(this.context, userId, directory.id);
@@ -333,11 +361,10 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			const workflowId = this.resolveWorkflowId(config, simSettings);
 
 			if (!workflowId) {
-				return this.handleError(
+				return handleError(
 					new Error(
 						'No SIM workflow ID provided. Set it in the generator form or in plugin settings (defaultWorkflowId).'
-					),
-					startTime
+					)
 				);
 			}
 
@@ -348,19 +375,18 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			});
 
 			// ── Step 1: Validate SIM ──────────────────────────────────
-			this.setState('validate-sim', 'running');
+			setState('validate-sim', 'running');
 			reportProgress(onProgress, 0, 5, 'Validate SIM Connection');
 
 			await simClient.validateWorkflow(workflowId);
-			this.setState('validate-sim', 'completed');
+			setState('validate-sim', 'completed');
 
-			if (signal.aborted) return this.handleCancel(startTime);
+			if (signal.aborted) return handleCancel();
 
 			// ── Step 2: Prepare Payload ───────────────────────────────
-			this.setState('prepare-payload', 'running');
+			setState('prepare-payload', 'running');
 			reportProgress(onProgress, 1, 10, 'Prepare Workflow Payload');
 
-			const executionId = `${directory.id}-${Date.now()}`;
 			const payload = buildWorkflowPayload({ directory, request, existing, config });
 
 			// Track repo access tokens for cleanup
@@ -381,12 +407,12 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 					`${payload.existingSummary?.totalItems ?? 0} existing items, ` +
 					`dataSource=${payload.dataSource?.type ?? 'none'}`
 			);
-			this.setState('prepare-payload', 'completed');
+			setState('prepare-payload', 'completed');
 
-			if (signal.aborted) return this.handleCancel(startTime);
+			if (signal.aborted) return handleCancel();
 
 			// ── Step 3: Execute SIM Workflow ──────────────────────────
-			this.setState('execute-workflow', 'running');
+			setState('execute-workflow', 'running');
 			reportProgress(onProgress, 2, 15, 'Execute SIM Workflow', `Starting workflow "${workflowId}"...`);
 
 			const execResult = await simClient.executeWorkflow(
@@ -410,12 +436,12 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				`SIM workflow completed. Polling attempts: ${execResult.pollingAttempts}, ` +
 					`duration: ${execResult.simDuration ?? 'unknown'}ms`
 			);
-			this.setState('execute-workflow', 'completed');
+			setState('execute-workflow', 'completed');
 
-			if (signal.aborted) return this.handleCancel(startTime);
+			if (signal.aborted) return handleCancel();
 
 			// ── Step 4: Collect & Validate Results ────────────────────
-			this.setState('collect-results', 'running');
+			setState('collect-results', 'running');
 			reportProgress(onProgress, 3, 75, 'Collect & Validate Results');
 
 			const parsed = parseSimOutput(execResult.output);
@@ -429,10 +455,11 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 					`${parsed.items.length - items.length} duplicates removed, ` +
 					`${items.length} new items`
 			);
-			this.setState('collect-results', 'completed');
+			setState('collect-results', 'completed');
 
 			// ── Step 5: Capture Screenshots ───────────────────────────
 			const screenshotWarnings = await this.runScreenshotCapture(
+				setState,
 				request,
 				options?.execContext,
 				items,
@@ -444,7 +471,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			);
 
 			// ── Step 6: Cleanup ───────────────────────────────────────
-			this.setState('cleanup', 'running');
+			setState('cleanup', 'running');
 			reportProgress(onProgress, 5, 95, 'Cleanup');
 
 			// Revoke tracked repo access tokens
@@ -453,7 +480,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				logger.log(`Revoked repo access token for ${revokedToken.repoUrl}`);
 			}
 
-			this.setState('cleanup', 'completed');
+			setState('cleanup', 'completed');
 
 			// ── Build result ──────────────────────────────────────────
 			reportProgress(onProgress, 6, 100, 'Complete');
@@ -478,25 +505,32 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				{
 					metrics: buildMetrics(startTime, duration, items.length, simMetrics),
 					duration,
-					stepsCompleted: this.state!.completedSteps.length,
+					stepsCompleted: state.completedSteps.length,
 					totalSteps: SIM_AI_STEP_IDS.length,
-					state: this.state!,
+					state,
 					warnings: screenshotWarnings.length > 0 ? screenshotWarnings : undefined
 				}
 			);
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
 			logger.error(`SIM AI pipeline failed: ${err.message}`);
-			return this.handleError(err, startTime);
+
+			// Ensure token cleanup even on error
+			const revokedToken = revokeToken(executionId);
+			if (revokedToken) {
+				logger.log(`Revoked repo access token for ${revokedToken.repoUrl} (error path)`);
+			}
+
+			return handleError(err);
 		}
 	}
 
 	async cancel(): Promise<void> {
-		this.abortController?.abort();
+		this._lastAbortController?.abort();
 	}
 
 	getState(): PipelineState<SimAiStepId> | null {
-		return this.state;
+		return this._lastState;
 	}
 
 	// ── Private helpers ────────────────────────────────────────────────
@@ -532,6 +566,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	private async runScreenshotCapture(
+		setState: (stepId: SimAiStepId, status: StepStatus, error?: string) => void,
 		request: GenerationRequest,
 		execContext: PipelineExecutionOptions['execContext'],
 		items: ItemData[],
@@ -541,20 +576,20 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		onProgress: PipelineProgressCallback | undefined,
 		logger: { log(...args: unknown[]): void; warn(...args: unknown[]): void }
 	): Promise<string[]> {
-		const shouldCapture = (request.config || {}).capture_screenshots !== false;
+		const shouldCapture = (request.config || {}).capture_screenshots === true;
 		const screenshotFacade = execContext?.screenshotFacade;
 
 		if (!shouldCapture || items.length === 0 || signal.aborted || !screenshotFacade) {
-			this.setState('capture-screenshots', 'skipped' as StepStatus);
+			setState('capture-screenshots', 'skipped' as StepStatus);
 			return [];
 		}
 
 		if (!screenshotFacade.isAvailable()) {
-			this.setState('capture-screenshots', 'skipped' as StepStatus);
+			setState('capture-screenshots', 'skipped' as StepStatus);
 			return ['Screenshot provider is not configured. Enable a screenshot plugin to capture item images.'];
 		}
 
-		this.setState('capture-screenshots', 'running');
+		setState('capture-screenshots', 'running');
 		reportProgress(onProgress, 4, 80, 'Capture Screenshots');
 
 		const { status, errors } = await captureScreenshots(items, {
@@ -563,7 +598,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			signal,
 			logger
 		});
-		this.setState('capture-screenshots', status);
+		setState('capture-screenshots', status);
 
 		if (errors.length > 0) {
 			const providerName = await screenshotFacade.getActiveProviderName?.({ userId, directoryId });
@@ -572,24 +607,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			return [`${label} failed for ${errors.length} item(s): ${unique.join('; ')}`];
 		}
 		return [];
-	}
-
-	private setState(stepId: SimAiStepId, status: StepStatus, error?: string): void {
-		if (this.state) {
-			this.state = updateStepState(this.state, stepId, status, error);
-		}
-	}
-
-	private handleError(error: Error, startTime: number): PipelineResult {
-		const { result, state } = buildErrorResult(this.state, error, startTime);
-		this.state = state;
-		return result;
-	}
-
-	private handleCancel(startTime: number): PipelineResult {
-		const { result, state } = buildCancelledResult(this.state, startTime);
-		this.state = state;
-		return result;
 	}
 }
 

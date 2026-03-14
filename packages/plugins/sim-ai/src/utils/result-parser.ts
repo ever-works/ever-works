@@ -73,9 +73,9 @@ function parseItems(rawItems: SimOutputItem[]): ItemData[] {
 			source_url:
 				typeof raw.url === 'string' ? raw.url : typeof raw.source_url === 'string' ? raw.source_url : undefined,
 			content: typeof raw.content === 'string' ? raw.content : undefined,
-			category_name: typeof raw.category === 'string' ? raw.category.trim() : undefined,
+			category: typeof raw.category === 'string' ? raw.category.trim() : undefined,
 			tags: Array.isArray(raw.tags) ? raw.tags.filter((t): t is string => typeof t === 'string') : undefined,
-			brand_name: typeof raw.brand === 'string' ? raw.brand.trim() : undefined,
+			brand: typeof raw.brand === 'string' ? raw.brand.trim() : undefined,
 			images: Array.isArray(raw.images) ? raw.images.filter((i): i is string => typeof i === 'string') : undefined
 		};
 
@@ -99,8 +99,14 @@ function parseCategories(rawCategories: SimWorkflowOutput['categories'], items: 
 
 	// From item category references
 	for (const item of items) {
-		if (item.category_name) {
-			categoryNames.add(item.category_name);
+		if (item.category) {
+			if (typeof item.category === 'string') {
+				categoryNames.add(item.category);
+			} else if (Array.isArray(item.category)) {
+				for (const c of item.category) {
+					if (typeof c === 'string' && c.trim()) categoryNames.add(c.trim());
+				}
+			}
 		}
 	}
 
@@ -147,8 +153,12 @@ function parseBrands(rawBrands: SimWorkflowOutput['brands'], items: ItemData[]):
 	}
 
 	for (const item of items) {
-		if (item.brand_name) {
-			brandNames.add(item.brand_name);
+		if (item.brand) {
+			if (typeof item.brand === 'string') {
+				brandNames.add(item.brand);
+			} else if (typeof item.brand === 'object' && item.brand.name) {
+				brandNames.add(item.brand.name);
+			}
 		}
 	}
 

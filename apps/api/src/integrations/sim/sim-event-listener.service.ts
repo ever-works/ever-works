@@ -96,11 +96,13 @@ export class SimEventListenerService {
                 `SIM workflow "${onCompleted.workflowId}" triggered successfully ` +
                     `for directory "${directory.id}"`,
             );
-        } catch (error) {
+        } catch (error: unknown) {
             // Event triggers should never crash the main flow — log and swallow
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
             this.logger.error(
-                `Failed to trigger SIM workflow for directory "${directory.id}": ${error.message}`,
-                error.stack,
+                `Failed to trigger SIM workflow for directory "${directory.id}": ${message}`,
+                stack,
             );
         }
     }

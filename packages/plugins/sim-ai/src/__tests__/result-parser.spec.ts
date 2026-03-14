@@ -15,7 +15,7 @@ describe('parseSimOutput', () => {
 		expect(result.items).toHaveLength(2);
 		expect(result.items[0].name).toBe('Item 1');
 		expect(result.items[0].source_url).toBe('https://example.com/1');
-		expect(result.items[0].category_name).toBe('Tools');
+		expect(result.items[0].category).toBe('Tools');
 		expect(result.items[1].tags).toEqual(['tag1', 'tag2']);
 		expect(result.categories).toHaveLength(1);
 		expect(result.tags).toHaveLength(2);
@@ -141,7 +141,7 @@ describe('parseSimOutput', () => {
 		});
 
 		expect(result.items[0].name).toBe('Padded Name');
-		expect(result.items[0].category_name).toBe('Cat');
+		expect(result.items[0].category).toBe('Cat');
 	});
 
 	it('should filter non-string tags', () => {
