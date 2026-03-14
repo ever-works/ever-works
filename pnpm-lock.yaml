@@ -146,6 +146,9 @@ importers:
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
+      simstudio-ts-sdk:
+        specifier: ^0.1.2
+        version: 0.1.2
       superjson:
         specifier: ^1.13.3
         version: 1.13.3
@@ -1398,6 +1401,28 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^3.0.0
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.11)(jiti@2.6.1)(lightningcss@1.31.1)(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(terser@5.46.0)(yaml@2.8.2)
+
+  packages/plugins/sim-ai:
+    dependencies:
+      simstudio-ts-sdk:
+        specifier: ^0.1.2
+        version: 0.1.2
+    devDependencies:
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(@swc/core@1.15.11(@swc/helpers@0.5.18))(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.1
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.11)(jiti@2.6.1)(lightningcss@1.31.1)(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(terser@5.46.0)(yaml@2.8.2)
 
   packages/plugins/standard-pipeline:
@@ -10365,6 +10390,10 @@ packages:
 
   simple-wcswidth@1.1.2:
     resolution: {integrity: sha512-j7piyCjAeTDSjzTSQ7DokZtMNwNlEAyxqSZeCS+CXH7fJ4jx3FuJ/mTW3mE+6JLs4VJBbcll0Kjn+KXI5t21Iw==}
+
+  simstudio-ts-sdk@0.1.2:
+    resolution: {integrity: sha512-BeQWuufTgVB/uAzuM7+GS6xE4mW6juPDXxSFz4sdy32l/AGca4Y1p1rtW61RkCejsc6oQX7lEm5cha/fSzGHVQ==}
+    engines: {node: '>=16'}
 
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
@@ -21903,6 +21932,10 @@ snapshots:
       simple-concat: 1.0.1
 
   simple-wcswidth@1.1.2: {}
+
+  simstudio-ts-sdk@0.1.2:
+    dependencies:
+      node-fetch: 3.3.2
 
   sisteransi@1.0.5: {}
 
