@@ -163,9 +163,11 @@ describe('SimClientWrapper', () => {
 	describe('executeWorkflow - async mode', () => {
 		it('should poll until completion', async () => {
 			mockExecuteWorkflow.mockResolvedValue({ taskId: 'task-1' });
-			mockGetJobStatus
-				.mockResolvedValueOnce({ status: 'processing' })
-				.mockResolvedValueOnce({ status: 'completed', output: { items: [{ name: 'Async Item' }] }, metadata: { duration: 3000 } });
+			mockGetJobStatus.mockResolvedValueOnce({ status: 'processing' }).mockResolvedValueOnce({
+				status: 'completed',
+				output: { items: [{ name: 'Async Item' }] },
+				metadata: { duration: 3000 }
+			});
 
 			const client = createClient();
 			const settings = createSettings({ executionMode: 'async', asyncPollingIntervalMs: 10 });
@@ -201,9 +203,7 @@ describe('SimClientWrapper', () => {
 			const client = createClient();
 			const settings = createSettings({ executionMode: 'async', asyncPollingIntervalMs: 10 });
 
-			await expect(
-				client.executeWorkflow('wf-123', createInput(), settings)
-			).rejects.toThrow('Out of memory');
+			await expect(client.executeWorkflow('wf-123', createInput(), settings)).rejects.toThrow('Out of memory');
 		});
 
 		it('should throw on cancelled status', async () => {
@@ -213,9 +213,7 @@ describe('SimClientWrapper', () => {
 			const client = createClient();
 			const settings = createSettings({ executionMode: 'async', asyncPollingIntervalMs: 10 });
 
-			await expect(
-				client.executeWorkflow('wf-123', createInput(), settings)
-			).rejects.toThrow('was cancelled');
+			await expect(client.executeWorkflow('wf-123', createInput(), settings)).rejects.toThrow('was cancelled');
 		});
 
 		it('should throw on timeout', async () => {
@@ -229,9 +227,7 @@ describe('SimClientWrapper', () => {
 				asyncTimeoutMs: 50
 			});
 
-			await expect(
-				client.executeWorkflow('wf-123', createInput(), settings)
-			).rejects.toThrow('timed out');
+			await expect(client.executeWorkflow('wf-123', createInput(), settings)).rejects.toThrow('timed out');
 		});
 
 		it('should respect abort signal', async () => {

@@ -54,7 +54,8 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'pass_repo_access',
 			type: 'boolean',
 			label: 'Pass Data Repository Access',
-			description: 'Grant the SIM workflow read access to the directory data repository (requires GitHub provider)',
+			description:
+				'Grant the SIM workflow read access to the directory data repository (requires GitHub provider)',
 			defaultValue: false,
 			group: 'data'
 		},
@@ -62,7 +63,8 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'repo_url',
 			type: 'text',
 			label: 'Data Repository URL',
-			description: 'GitHub repository URL containing directory data (required when "Pass Data Repository Access" is enabled)',
+			description:
+				'GitHub repository URL containing directory data (required when "Pass Data Repository Access" is enabled)',
 			placeholder: 'e.g., https://github.com/org/repo',
 			group: 'data'
 		},

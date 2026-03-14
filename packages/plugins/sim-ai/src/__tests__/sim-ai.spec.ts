@@ -11,8 +11,18 @@ vi.mock('simstudio-ts-sdk', () => ({
 			success: true,
 			output: {
 				items: [
-					{ name: 'Test Item 1', description: 'A test item', url: 'https://example.com/1', category: 'Tools' },
-					{ name: 'Test Item 2', description: 'Another test item', url: 'https://example.com/2', tags: ['tag1'] }
+					{
+						name: 'Test Item 1',
+						description: 'A test item',
+						url: 'https://example.com/1',
+						category: 'Tools'
+					},
+					{
+						name: 'Test Item 2',
+						description: 'Another test item',
+						url: 'https://example.com/2',
+						tags: ['tag1']
+					}
 				],
 				categories: [{ name: 'Tools', description: 'Development tools' }],
 				tags: [{ name: 'tag1' }]
@@ -22,8 +32,18 @@ vi.mock('simstudio-ts-sdk', () => ({
 			success: true,
 			output: {
 				items: [
-					{ name: 'Test Item 1', description: 'A test item', url: 'https://example.com/1', category: 'Tools' },
-					{ name: 'Test Item 2', description: 'Another test item', url: 'https://example.com/2', tags: ['tag1'] }
+					{
+						name: 'Test Item 1',
+						description: 'A test item',
+						url: 'https://example.com/1',
+						category: 'Tools'
+					},
+					{
+						name: 'Test Item 2',
+						description: 'Another test item',
+						url: 'https://example.com/2',
+						tags: ['tag1']
+					}
 				],
 				categories: [{ name: 'Tools', description: 'Development tools' }],
 				tags: [{ name: 'tag1' }]
@@ -296,11 +316,7 @@ describe('SimAiPlugin', () => {
 		});
 
 		it('should fail without workflow ID', async () => {
-			const result = await plugin.execute(
-				createDirectory(),
-				createRequest({ config: {} }),
-				createExisting()
-			);
+			const result = await plugin.execute(createDirectory(), createRequest({ config: {} }), createExisting());
 			expect(result.success).toBe(false);
 			expect(result.error).toBeDefined();
 		});

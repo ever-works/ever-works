@@ -183,14 +183,12 @@ export class SimClientWrapper {
 					output: status.output,
 					taskId,
 					pollingAttempts,
-					simDuration: status.metadata?.duration ?? (Date.now() - startTime)
+					simDuration: status.metadata?.duration ?? Date.now() - startTime
 				};
 			}
 
 			if (status.status === 'failed') {
-				throw new Error(
-					`SIM workflow failed: ${status.error || 'Unknown error'}. Task ID: ${taskId}`
-				);
+				throw new Error(`SIM workflow failed: ${status.error || 'Unknown error'}. Task ID: ${taskId}`);
 			}
 
 			if (status.status === 'cancelled') {
@@ -210,9 +208,7 @@ export class SimClientWrapper {
 			case 'RATE_LIMIT_EXCEEDED':
 				return new Error('SIM rate limit exceeded. Please wait and try again.');
 			case 'USAGE_LIMIT_EXCEEDED':
-				return new Error(
-					'SIM usage limit exceeded. Check your SIM account plan and usage limits.'
-				);
+				return new Error('SIM usage limit exceeded. Check your SIM account plan and usage limits.');
 			case 'INVALID_JSON':
 				return new Error('Invalid request sent to SIM. This may be a plugin bug — please report it.');
 			default:

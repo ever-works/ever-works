@@ -70,7 +70,8 @@ function parseItems(rawItems: SimOutputItem[]): ItemData[] {
 		const item: ItemData = {
 			name: raw.name.trim(),
 			description: typeof raw.description === 'string' ? raw.description.trim() : undefined,
-			source_url: typeof raw.url === 'string' ? raw.url : (typeof raw.source_url === 'string' ? raw.source_url : undefined),
+			source_url:
+				typeof raw.url === 'string' ? raw.url : typeof raw.source_url === 'string' ? raw.source_url : undefined,
 			content: typeof raw.content === 'string' ? raw.content : undefined,
 			category_name: typeof raw.category === 'string' ? raw.category.trim() : undefined,
 			tags: Array.isArray(raw.tags) ? raw.tags.filter((t): t is string => typeof t === 'string') : undefined,

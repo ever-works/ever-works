@@ -242,8 +242,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				includeInOnboarding: true,
 				onboardingPriority: 2,
 				completionFields: ['apiKey'],
-				onboardingDescription:
-					'Connect SIM AI to delegate directory generation to visual AI agent workflows.'
+				onboardingDescription: 'Connect SIM AI to delegate directory generation to visual AI agent workflows.'
 			},
 			readme: [
 				'# SIM AI Workflows Plugin',
@@ -518,18 +517,14 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			executionMode: ((config.execution_mode as string) ||
 				(pluginSettings.executionMode as string) ||
 				'async') as 'sync' | 'async',
-			asyncPollingIntervalMs:
-				(pluginSettings.asyncPollingIntervalMs as number) ?? DEFAULT_POLLING_INTERVAL_MS,
+			asyncPollingIntervalMs: (pluginSettings.asyncPollingIntervalMs as number) ?? DEFAULT_POLLING_INTERVAL_MS,
 			asyncTimeoutMs: (pluginSettings.asyncTimeoutMs as number) ?? DEFAULT_ASYNC_TIMEOUT_MS,
 			maxRetries: (pluginSettings.maxRetries as number) ?? DEFAULT_MAX_RETRIES,
 			eventTriggers: pluginSettings.eventTriggers as SimAiSettings['eventTriggers']
 		};
 	}
 
-	private resolveWorkflowId(
-		config: Record<string, unknown>,
-		settings: SimAiSettings
-	): string | undefined {
+	private resolveWorkflowId(config: Record<string, unknown>, settings: SimAiSettings): string | undefined {
 		// Form field takes precedence over default setting
 		const fromConfig = config.workflow_id as string | undefined;
 		if (fromConfig && fromConfig.trim()) return fromConfig.trim();

@@ -153,9 +153,7 @@ describe('buildWorkflowPayload', () => {
 			source_url: `https://example.com/${i + 1}`
 		})) as never[];
 
-		const payload = buildWorkflowPayload(
-			createOptions({ existing: { items, categories: [], tags: [] } })
-		);
+		const payload = buildWorkflowPayload(createOptions({ existing: { items, categories: [], tags: [] } }));
 
 		expect(payload.existingSummary!.sampleItems).toHaveLength(20);
 		expect(payload.existingSummary!.totalItems).toBe(30);

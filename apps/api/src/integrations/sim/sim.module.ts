@@ -12,7 +12,7 @@ import { SimEventListenerService } from './sim-event-listener.service';
  * provided globally by AgentPluginsModule, so no explicit imports are needed.
  */
 @Module({
-	providers: [SimEventListenerService],
-	exports: [SimEventListenerService]
+    providers: [SimEventListenerService],
+    exports: [SimEventListenerService],
 })
 export class SimModule {}
