@@ -3,15 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { GitOrganization } from '@/lib/api';
 import { getGitProviderOrganizations } from '@/app/actions/dashboard/organizations';
-import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectLabel,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { Loader2, Building2, User } from 'lucide-react';
@@ -113,31 +105,17 @@ export function OrganizationSelector({
                 {t('organizationSelector.label')}
             </label>
             <Select value={selectValue} onValueChange={handleChange} disabled={disabled}>
-                <SelectTrigger>
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="__personal__">
-                        <span className="flex items-center gap-2">
-                            <User className="w-3.5 h-3.5 text-text-muted dark:text-text-muted-dark" />
-                            {t('organizationSelector.personal')}
-                        </span>
-                    </SelectItem>
-                    {organizations.length > 0 && (
-                        <SelectGroup>
-                            <SelectLabel>{t('organizationSelector.organizations')}</SelectLabel>
-                            {organizations.map((org) => (
-                                <SelectItem key={org.login} value={org.login}>
-                                    <span className="flex items-center gap-2">
-                                        <Building2 className="w-3.5 h-3.5 text-primary dark:text-primary-dark" />
-                                        {org.login}
-                                        {org.name && ` - ${org.name.substring(0, 50)}`}
-                                    </span>
-                                </SelectItem>
-                            ))}
-                        </SelectGroup>
-                    )}
-                </SelectContent>
+                <option value="__personal__">{t('organizationSelector.personal')}</option>
+                {organizations.length > 0 && (
+                    <optgroup label={t('organizationSelector.organizations')}>
+                        {organizations.map((org) => (
+                            <option key={org.login} value={org.login}>
+                                {org.login}
+                                {org.name && ` - ${org.name.substring(0, 50)}`}
+                            </option>
+                        ))}
+                    </optgroup>
+                )}
             </Select>
             <p className="text-xs text-text-muted dark:text-text-muted-dark">
                 {value === ''

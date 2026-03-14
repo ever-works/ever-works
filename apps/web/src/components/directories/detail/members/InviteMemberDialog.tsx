@@ -6,13 +6,7 @@ import { DirectoryMember, AssignableMemberRole } from '@/lib/api';
 import { DirectoryMemberRole } from '@/lib/api/enums';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Select } from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -126,16 +120,11 @@ export function InviteMemberDialog({
                             onValueChange={(val) => setRole(val as AssignableMemberRole)}
                             disabled={isSubmitting}
                         >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {roleOptions.map((opt) => (
-                                    <SelectItem key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
+                            {roleOptions.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                </option>
+                            ))}
                         </Select>
                     </div>
 

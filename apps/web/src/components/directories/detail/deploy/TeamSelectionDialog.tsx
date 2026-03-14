@@ -10,13 +10,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -87,18 +81,14 @@ export function TeamSelectionDialog({
                             {t('form.deployment.teamSelection.label')}
                         </label>
                         <Select value={selectedTeamScope} onValueChange={setSelectedTeamScope}>
-                            <SelectTrigger>
-                                <SelectValue
-                                    placeholder={t('form.deployment.teamSelection.placeholder')}
-                                />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {options.map((team) => (
-                                    <SelectItem key={team.id} value={team.slug}>
-                                        {team.name ? `${team.name} (${team.slug})` : team.slug}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
+                            <option value="" disabled>
+                                {t('form.deployment.teamSelection.placeholder')}
+                            </option>
+                            {options.map((team) => (
+                                <option key={team.id} value={team.slug}>
+                                    {team.name ? `${team.name} (${team.slug})` : team.slug}
+                                </option>
+                            ))}
                         </Select>
                     </div>
                 </div>

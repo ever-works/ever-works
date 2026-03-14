@@ -4,13 +4,7 @@
 import { useTranslations } from 'next-intl';
 import { PluginSettingsSchemaProperty } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Select } from '@/components/ui/select';
 import { Eye, EyeOff, Pencil, X, KeyRound } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { PluginModelSelect } from './PluginModelSelect';
@@ -134,17 +128,12 @@ export function PluginSettingsField({
                     value={currentValue}
                     onValueChange={(v) => onChange(v === '__none__' ? null : v)}
                 >
-                    <SelectTrigger>
-                        <SelectValue placeholder={t('selectPlaceholder')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="__none__">{t('selectPlaceholder')}</SelectItem>
-                        {schema.enum.map((opt) => (
-                            <SelectItem key={String(opt)} value={String(opt)}>
-                                {String(opt)}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
+                    <option value="__none__">{t('selectPlaceholder')}</option>
+                    {schema.enum.map((opt) => (
+                        <option key={String(opt)} value={String(opt)}>
+                            {String(opt)}
+                        </option>
+                    ))}
                 </Select>
             );
         }

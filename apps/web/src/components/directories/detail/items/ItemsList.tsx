@@ -6,13 +6,7 @@ import { ItemData } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Select } from '@/components/ui/select';
 import { useTranslations } from 'next-intl';
 import { Grid as GridIcon, List as ListIcon } from 'lucide-react';
 import { ItemCard } from './ItemCard';
@@ -147,18 +141,15 @@ export function ItemsList({ items: initialItems, addItemRef }: ItemsListProps) {
                     <Select
                         value={selectedCategory || '__all__'}
                         onValueChange={(val) => setSelectedCategory(val === '__all__' ? null : val)}
+                        size="sm"
+                        className="w-auto min-w-36"
                     >
-                        <SelectTrigger size="sm" className="w-auto min-w-36">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="__all__">{t('allCategories')}</SelectItem>
-                            {categories.map((cat) => (
-                                <SelectItem key={cat} value={cat}>
-                                    {UnSlug(cat)}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
+                        <option value="__all__">{t('allCategories')}</option>
+                        {categories.map((cat) => (
+                            <option key={cat} value={cat}>
+                                {UnSlug(cat)}
+                            </option>
+                        ))}
                     </Select>
 
                     <div className="flex rounded-lg border border-border dark:border-border-dark">

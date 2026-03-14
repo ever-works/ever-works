@@ -3,13 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Select } from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -273,16 +267,11 @@ export function ApiKeysSettings({ initialKeys }: ApiKeysSettingsProps) {
                                     value={newKeyExpiration}
                                     onValueChange={setNewKeyExpiration}
                                 >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {EXPIRATION_OPTIONS.map((opt) => (
-                                            <SelectItem key={opt.value} value={opt.value}>
-                                                {opt.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
+                                    {EXPIRATION_OPTIONS.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </option>
+                                    ))}
                                 </Select>
                             </div>
 
