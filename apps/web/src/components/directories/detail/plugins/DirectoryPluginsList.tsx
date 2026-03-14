@@ -92,7 +92,7 @@ export function DirectoryPluginsList({
                 <label className="flex items-center gap-2.5 text-sm text-text-secondary dark:text-text-secondary-dark cursor-pointer select-none group">
                     <span
                         className={cn(
-                            'relative inline-flex w-8 h-4 rounded-full transition-colors duration-200 shrink-0',
+                            'relative inline-flex w-8 h-4 rounded-full transition-colors duration-200 shrink-0 focus-within:outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-background',
                             showInstalledOnly ? 'bg-primary' : 'bg-border dark:bg-border-dark',
                         )}
                     >

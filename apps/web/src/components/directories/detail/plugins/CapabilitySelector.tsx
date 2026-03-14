@@ -43,7 +43,18 @@ export function CapabilitySelector({
     };
 
     if (plugins.length === 0) {
-        return null;
+        return (
+            <div className="flex items-center gap-4 px-5 py-3">
+                <div className="w-36 shrink-0">
+                    <code className="text-xs font-mono font-medium text-text-secondary dark:text-text-secondary-dark bg-surface-secondary dark:bg-surface-secondary-dark px-1.5 py-0.5 rounded">
+                        {getCapabilityLabel(capability)}
+                    </code>
+                </div>
+                <div className="flex-1 text-xs text-text-secondary dark:text-text-secondary-dark italic">
+                    No providers available
+                </div>
+            </div>
+        );
     }
 
     return (

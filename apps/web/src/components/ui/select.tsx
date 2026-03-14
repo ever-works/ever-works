@@ -1,6 +1,4 @@
-﻿'use client';
-
-import * as React from 'react';
+﻿import * as React from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDownIcon, CheckIcon } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
@@ -139,7 +137,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
 
         const items = React.useMemo(() => parseItems(children), [children]);
         const opts = React.useMemo(() => flatOptions(items), [items]);
-        const selected = opts.find((o) => o.value === value);
+        const selected = opts.find((o) => o.value === value && !o.disabled);
 
         /* close on outside click */
         React.useEffect(() => {
@@ -179,11 +177,6 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
         const pick = (opt: OptionData) => {
             if (opt.disabled) return;
             onValueChange?.(opt.value);
-            if (onChange) {
-                onChange({
-                    target: { value: opt.value },
-                } as React.ChangeEvent<HTMLSelectElement>);
-            }
             setOpen(false);
         };
 
@@ -267,21 +260,21 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                             {items.map((item, idx) =>
                                 item.type === 'option' ? (
                                     <OptionRow
-                                        key={idx}
+                                        key={item.value}
                                         opt={item}
                                         selected={item.value === value}
                                         size={size}
                                         onPick={pick}
                                     />
                                 ) : (
-                                    <div key={idx}>
+                                    <div key={`group-${item.label}-${idx}`}>
                                         {/* group label — mirrors shadcn SelectLabel */}
                                         <p className="px-3 pt-2 pb-1 text-xs font-semibold tracking-wide select-none text-text-muted dark:text-text-muted-dark">
                                             {item.label}
                                         </p>
                                         {item.options.map((opt, j) => (
                                             <OptionRow
-                                                key={j}
+                                                key={opt.value}
                                                 opt={opt}
                                                 selected={opt.value === value}
                                                 size={size}
@@ -316,12 +309,52 @@ function OptionRow({
     onPick: (opt: OptionData) => void;
     indent?: boolean;
 }) {
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (opt.disabled) {
+            return;
+        }
+        switch (event.key) {
+            case 'Enter':
+            case ' ':
+                event.preventDefault();
+                onPick(opt);
+                break;
+            case 'ArrowDown': {
+                event.preventDefault();
+                const current = event.currentTarget as HTMLElement;
+                let next = current.nextElementSibling as HTMLElement | null;
+                while (next && next.getAttribute('aria-disabled') === 'true') {
+                    next = next.nextElementSibling as HTMLElement | null;
+                }
+                if (next) {
+                    next.focus();
+                }
+                break;
+            }
+            case 'ArrowUp': {
+                event.preventDefault();
+                const current = event.currentTarget as HTMLElement;
+                let prev = current.previousElementSibling as HTMLElement | null;
+                while (prev && prev.getAttribute('aria-disabled') === 'true') {
+                    prev = prev.previousElementSibling as HTMLElement | null;
+                }
+                if (prev) {
+                    prev.focus();
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    };
     return (
         <div
             role="option"
             aria-selected={selected}
             aria-disabled={opt.disabled}
             onClick={() => onPick(opt)}
+            onKeyDown={handleKeyDown}
+            tabIndex={opt.disabled ? -1 : 0}
             className={cn(
                 'flex items-center gap-2 cursor-pointer select-none transition-colors',
                 size === 'default'
