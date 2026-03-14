@@ -63,6 +63,7 @@
         "pg": "^8.16.3",
         "reflect-metadata": "^0.2.2",
         "rxjs": "^7.8.2",
+        "simstudio-ts-sdk": "^0.1.2",
         "superjson": "^1.13.3",
         "typeorm": "^0.3.28"
     },
