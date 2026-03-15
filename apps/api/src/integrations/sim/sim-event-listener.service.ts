@@ -73,9 +73,9 @@ export class SimEventListenerService {
                     `for directory "${directory.id}" (event: generation-completed)`,
             );
 
-            // Dynamic import to avoid hard dependency on the SDK at module load time.
-            // The simstudio-ts-sdk package is a dependency of the sim-ai plugin, not
-            // of the API app itself. This lazy import keeps the integration lightweight.
+            // Dynamic import to defer SDK loading until actually needed.
+            // The event listener only fires when SIM triggers are configured,
+            // so lazy-loading avoids loading the SDK for every app startup.
             const { SimStudioClient } = await import('simstudio-ts-sdk');
             const client = new SimStudioClient({ apiKey, baseUrl });
 
