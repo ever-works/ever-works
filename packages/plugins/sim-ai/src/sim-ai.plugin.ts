@@ -185,7 +185,9 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		return { valid: true };
 	}
 
-	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+	async validateConnection(rawSettings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		// Settings may arrive as ResolvedSettings ({ value, source, scope }) — extract plain values
+		const settings = this.flattenSettings(rawSettings);
 		const apiKey = settings.apiKey as string | undefined;
 		if (!apiKey) {
 			return { success: false, message: 'SIM API key is required' };
@@ -264,7 +266,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				'- **Inline** (default): Directory metadata and item summary sent in workflow input',
 				'- **GitHub Repo**: Pass a repository URL and access token for large datasets'
 			].join('\n'),
-			homepage: 'https://www.sim.ai',
+			homepage: 'https://docs.sim.ai',
 			icon: {
 				type: 'url',
 				value: 'https://www.sim.ai/favicon.ico'
@@ -599,6 +601,23 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			return [`${label} failed for ${errors.length} item(s): ${unique.join('; ')}`];
 		}
 		return [];
+	}
+
+	/**
+	 * Flatten a ResolvedSettings map into plain key→value pairs.
+	 * ResolvedSettings stores each key as `{ value, source, scope }`;
+	 * this extracts the raw values so they can be used directly.
+	 */
+	private flattenSettings(settings: Record<string, unknown>): Record<string, unknown> {
+		const flat: Record<string, unknown> = {};
+		for (const [key, entry] of Object.entries(settings)) {
+			if (entry && typeof entry === 'object' && 'value' in entry) {
+				flat[key] = (entry as { value: unknown }).value;
+			} else {
+				flat[key] = entry;
+			}
+		}
+		return flat;
 	}
 }
 
