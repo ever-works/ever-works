@@ -265,6 +265,27 @@
                     "successDefault": "Claude connection verified."
                 }
             }
+        },
+        "simWizard": {
+            "label": "SIM AI setup",
+            "title": "Set up SIM AI in two steps",
+            "subtitle": "Add your SIM AI API key and verify the connection to start delegating directory generation to SIM workflows.",
+            "stepIndex": "Step {index}",
+            "continueButton": "Continue",
+            "steps": {
+                "credentials": {
+                    "title": "Add API key",
+                    "description": "Paste your SIM AI API key from your dashboard. Optionally set a custom base URL if you use a self-hosted instance."
+                },
+                "verify": {
+                    "title": "Verify connection",
+                    "description": "Save your API key and run a live connection check against SIM AI.",
+                    "checkTitle": "Run a live SIM AI validation",
+                    "checkDescription": "Saving here verifies your API key is valid and can connect to SIM AI.",
+                    "button": "Verify and finish setup",
+                    "successDefault": "SIM AI connection verified."
+                }
+            }
         }
     },
     "dashboard": {

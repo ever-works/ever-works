@@ -302,17 +302,16 @@ export function DynamicPluginFields({
                     const groupFields = uniqueFields.filter((f) => f.group === group.name);
                     if (groupFields.length === 0) return null;
 
-                    return (
-                        <AccordionItem
-                            key={group.name}
-                            value={group.name}
-                            className={cn(
-                                'rounded-lg border overflow-hidden',
-                                'bg-card dark:bg-card-primary-dark/30',
-                                'border-card-border dark:border-card-border-dark',
-                            )}
-                        >
-                            {group.collapsible ? (
+                    return group.collapsible ? (
+                            <AccordionItem
+                                key={group.name}
+                                value={group.name}
+                                className={cn(
+                                    'rounded-lg border overflow-hidden',
+                                    'bg-card dark:bg-card-primary-dark/30',
+                                    'border-card-border dark:border-card-border-dark',
+                                )}
+                            >
                                 <AccordionTrigger className="px-5 py-3.5 hover:no-underline hover:bg-surface/50 dark:hover:bg-surface-dark/50">
                                     <div>
                                         <h3 className="text-md font-semibold text-text dark:text-text-dark">
@@ -325,7 +324,21 @@ export function DynamicPluginFields({
                                         )}
                                     </div>
                                 </AccordionTrigger>
-                            ) : (
+                                <AccordionContent className="px-5 pb-4 pt-2">
+                                    <div className="space-y-4">
+                                        {groupFields.map(renderField)}
+                                    </div>
+                                </AccordionContent>
+                            </AccordionItem>
+                        ) : (
+                            <div
+                                key={group.name}
+                                className={cn(
+                                    'rounded-lg border overflow-hidden',
+                                    'bg-card dark:bg-card-primary-dark/30',
+                                    'border-card-border dark:border-card-border-dark',
+                                )}
+                            >
                                 <div className="px-5 py-3.5 border-b border-card-border dark:border-card-border-dark">
                                     <h3 className="text-md font-semibold text-text dark:text-text-dark">
                                         {group.title}
@@ -336,11 +349,12 @@ export function DynamicPluginFields({
                                         </p>
                                     )}
                                 </div>
-                            )}
-                            <AccordionContent className="px-5 pb-4 pt-2">
-                                <div className="space-y-4">{groupFields.map(renderField)}</div>
-                            </AccordionContent>
-                        </AccordionItem>
+                                <div className="px-5 pb-4 pt-2">
+                                    <div className="space-y-4">
+                                        {groupFields.map(renderField)}
+                                    </div>
+                                </div>
+                            </div>
                     );
                 })}
             </Accordion>
