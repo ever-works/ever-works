@@ -79,7 +79,7 @@ export class SimClientWrapper {
 
 		try {
 			if (executionMode === 'sync') {
-				return await this.executeSyncWithRetry(workflowId, input, settings, maxRetries);
+				return await this.executeSyncWithRetry(workflowId, input, settings, maxRetries, signal);
 			} else {
 				return await this.executeAsync(workflowId, input, settings, onPollProgress, signal);
 			}
@@ -95,8 +95,13 @@ export class SimClientWrapper {
 		workflowId: string,
 		input: SimWorkflowInput,
 		settings: SimAiSettings,
-		maxRetries: number
+		maxRetries: number,
+		signal?: AbortSignal
 	): Promise<SimExecutionResult> {
+		if (signal?.aborted) {
+			throw new Error('Pipeline execution was cancelled');
+		}
+
 		const startTime = Date.now();
 
 		const result = await this.client.executeWithRetry(
@@ -170,10 +175,8 @@ export class SimClientWrapper {
 				);
 			}
 
-			await delay(pollingInterval);
-			pollingAttempts++;
-
 			const status = await this.client.getJobStatus(taskId);
+			pollingAttempts++;
 			onPollProgress?.(pollingAttempts, status.status);
 
 			this.logger.log(`Poll #${pollingAttempts}: status=${status.status}`);
@@ -195,7 +198,8 @@ export class SimClientWrapper {
 				throw new Error(`SIM workflow was cancelled. Task ID: ${taskId}`);
 			}
 
-			// 'queued' or 'processing' — continue polling
+			// 'queued' or 'processing' — wait before next poll
+			await delay(pollingInterval);
 		}
 	}
 
