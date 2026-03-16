@@ -599,11 +599,10 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 
 			let generationWarning: string | undefined;
 			if (execResult.exitCode !== 0) {
-				const detail =
-					(execResult.stderr || execResult.stdout).slice(0, 500) || `exit code ${execResult.exitCode}`;
+				const detail = this.extractErrorDetail(execResult);
 
 				logger.warn(`Claude Code exited with code ${execResult.exitCode}: ${detail}`);
-				generationWarning = `Claude Code finished with an error (${detail.split('\n')[0].trim()}).`;
+				generationWarning = `Claude Code finished with an error (${detail}).`;
 			}
 
 			this.setState('generate-items', 'completed');
@@ -720,6 +719,44 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			return [`${label} failed for ${errors.length} item(s): ${unique.join('; ')}`];
 		}
 		return [];
+	}
+
+	private extractErrorDetail(result: ExecuteResult): string {
+		// When stream-json is active, stderr may be empty and stdout is NDJSON.
+		// Try to find the actual error from a result event or stderr.
+		if (result.stderr?.trim()) {
+			return result.stderr.trim().split('\n')[0].slice(0, 500);
+		}
+
+		// Parse NDJSON stdout for a result event with error info
+		if (result.stdout) {
+			const lines = result.stdout.split('\n');
+			for (let i = lines.length - 1; i >= 0; i--) {
+				try {
+					const event = JSON.parse(lines[i]);
+					if (event.type === 'result' && event.is_error) {
+						return (event.error || event.result || 'unknown error').slice(0, 500);
+					}
+					if (event.type === 'error') {
+						return (
+							event.error?.message ||
+							event.message ||
+							JSON.stringify(event.error) ||
+							'unknown error'
+						).slice(0, 500);
+					}
+				} catch {
+					// not JSON
+				}
+			}
+		}
+
+		// No structured error found — use raw stdout as last resort
+		if (result.stdout?.trim()) {
+			return result.stdout.trim().split('\n')[0].slice(0, 500);
+		}
+
+		return `exit code ${result.exitCode}`;
 	}
 
 	private setState(stepId: ClaudeCodeStepId, status: StepStatus, error?: string): void {
