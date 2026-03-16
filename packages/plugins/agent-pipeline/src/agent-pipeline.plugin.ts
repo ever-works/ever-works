@@ -260,7 +260,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				onProgress,
 				signal,
 				logger,
-				tokenAccumulator
+				tokenAccumulator,
+				onLogEntry
 			);
 
 			if (signal.aborted) {
@@ -413,7 +414,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		onProgress: PipelineProgressCallback | undefined,
 		signal: AbortSignal,
 		logger: PluginLogger,
-		tokenAccumulator: TokenUsageAccumulator
+		tokenAccumulator: TokenUsageAccumulator,
+		onLogEntry?: PipelineExecutionOptions['onLogEntry']
 	): Promise<{ warnings: string[]; tokenUsage: TokenUsageBreakdown }> {
 		// Two-model resolution: parent (orchestrator) and worker (extraction)
 		const parentModelName = providerConfig.routing.complexModel || providerConfig.defaultModel;
@@ -426,6 +428,12 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		logger.log(
 			`Using AI provider "${providerConfig.providerName}" — ` +
 				`parent: "${parentModelName}", worker: "${workerModelName}"`
+		);
+		this.emitLog(
+			onLogEntry,
+			'message',
+			`AI provider: ${providerConfig.providerName} (parent: ${parentModelName}, worker: ${workerModelName})`,
+			1
 		);
 
 		const provider = createOpenAICompatible({
@@ -478,7 +486,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			logger,
 			tokenAccumulator,
 			signal,
-			promptFacade: execContext.promptFacade
+			promptFacade: execContext.promptFacade,
+			onLogEntry
 		});
 
 		const promptOptions = { directory, request, existing };
@@ -514,6 +523,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			logger
 		});
 
+		let agentStepIndex = 0;
 		const result = await withToolCallingRetry(
 			() => {
 				return generateText({
@@ -525,7 +535,22 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 					prepareStep,
 					abortSignal: signal,
 					experimental_repairToolCall: repairToolCall,
-					experimental_telemetry: { isEnabled: true }
+					experimental_telemetry: { isEnabled: true },
+					onStepFinish: (step) => {
+						agentStepIndex++;
+						const toolNames = step.toolCalls.map((tc) => tc.toolName);
+						const toolSummary = toolNames.length > 0
+							? `tools: ${toolNames.join(', ')}`
+							: `text: ${step.text.slice(0, 120)}${step.text.length > 120 ? '…' : ''}`;
+						const tokens = step.usage;
+						this.emitLog(
+							onLogEntry,
+							'message',
+							`Agent step ${agentStepIndex}: ${toolSummary} (${tokens.totalTokens} tokens)`,
+							1,
+							'info'
+						);
+					}
 				});
 			},
 			{
@@ -543,14 +568,15 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		const toolNames = [...new Set(result.steps.flatMap((step) => step.toolCalls.map((tc) => tc.toolName)))];
 		const tokenUsage = tokenAccumulator.toBreakdown();
 
-		logger.log(
+		const completionMsg =
 			`Agent completed: ${result.steps.length} steps, ${totalToolCalls} tool calls` +
-				(toolNames.length > 0 ? ` (${toolNames.join(', ')})` : ' (no tools used)') +
-				`, finish=${result.finishReason}` +
-				`, tokens: parent=${tokenUsage.parent.totalTokens}` +
-				`, workers=${tokenUsage.workers.totalTokens}` +
-				`, total=${tokenUsage.total.totalTokens}`
-		);
+			(toolNames.length > 0 ? ` (${toolNames.join(', ')})` : ' (no tools used)') +
+			`, finish=${result.finishReason}` +
+			`, tokens: parent=${tokenUsage.parent.totalTokens}` +
+			`, workers=${tokenUsage.workers.totalTokens}` +
+			`, total=${tokenUsage.total.totalTokens}`;
+		logger.log(completionMsg);
+		this.emitLog(onLogEntry, 'message', completionMsg, 1);
 
 		if (totalToolCalls === 0) {
 			logger.warn(

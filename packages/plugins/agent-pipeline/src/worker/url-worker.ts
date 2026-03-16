@@ -2,7 +2,7 @@ import { appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { generateText, stepCountIs, ToolSet } from 'ai';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
-import type { IContentExtractorFacade, FacadeOptions, PluginLogger, IPromptFacade } from '@ever-works/plugin';
+import type { IContentExtractorFacade, FacadeOptions, PluginLogger, IPromptFacade, PipelineExecutionOptions } from '@ever-works/plugin';
 import { substituteVariables } from '@ever-works/plugin';
 
 import { chunkContent } from './content-chunker.js';
@@ -43,6 +43,7 @@ export interface UrlWorkerContext {
 	tokenAccumulator?: TokenUsageAccumulator;
 	signal?: AbortSignal;
 	promptFacade?: IPromptFacade;
+	onLogEntry?: PipelineExecutionOptions['onLogEntry'];
 }
 
 export interface UrlWorkerResult {
@@ -225,7 +226,22 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 							}),
 							abortSignal: signal,
 							experimental_repairToolCall: repairToolCall,
-							experimental_telemetry: { isEnabled: true }
+							experimental_telemetry: { isEnabled: true },
+							onStepFinish: (step) => {
+								if (ctx.onLogEntry && step.toolCalls.length > 0) {
+									const tools = step.toolCalls.map((tc) => tc.toolName).join(', ');
+									ctx.onLogEntry({
+										timestamp: new Date().toISOString(),
+										level: 'debug',
+										source: 'pipeline',
+										event: 'message',
+										message: `URL worker [${url}]: ${tools} (${step.usage.totalTokens} tokens)`,
+										stepIndex: 1,
+										stepName: null,
+										durationMs: null
+									});
+								}
+							}
 						});
 					},
 					{ providerName: 'worker', modelName: 'url-worker', signal, logger }
