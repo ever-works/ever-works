@@ -1,7 +1,11 @@
 import { GenerationMethod } from '@src/items-generator/dto/create-items-generator.dto';
 import { GenerateStatusType } from '@src/entities/types';
 import { GenerationMetrics } from '@src/entities/directory-generation-history.entity';
-import { DirectoryHistoryActivityType, type DirectoryChangelog } from '@ever-works/contracts/api';
+import {
+    DirectoryHistoryActivityType,
+    type DirectoryChangelog,
+    type GenerationStepLog,
+} from '@ever-works/contracts/api';
 
 export interface DirectoryGenerationHistoryDto {
     id: string;
@@ -21,6 +25,7 @@ export interface DirectoryGenerationHistoryDto {
     triggerRunId?: string;
     activityType: DirectoryHistoryActivityType;
     changelog?: DirectoryChangelog | null;
+    logs?: GenerationStepLog[] | null;
 }
 
 export interface DirectoryGenerationHistoryListDto {

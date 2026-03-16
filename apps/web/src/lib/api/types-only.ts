@@ -31,6 +31,7 @@ export type {
     DirectoryConfig,
     PRUpdate,
     GenerationMetrics,
+    GenerationStepLog,
     DirectoryGenerationHistoryEntry,
     DirectoryGenerationHistoryResponse,
     DirectoryScheduleDto,

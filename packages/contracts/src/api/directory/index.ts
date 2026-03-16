@@ -15,6 +15,9 @@ export type {
 	DirectoryHistoryChangeAction,
 	DirectoryHistoryChangeEntityType,
 	DirectoryGenerationHistoryEntry,
-	DirectoryGenerationHistoryResponse
+	DirectoryGenerationHistoryResponse,
+	GenerationStepLog,
+	GenerationLogLevel,
+	GenerationLogSource
 } from './generation-metrics.js';
 export { DirectoryHistoryActivityType } from './generation-metrics.js';

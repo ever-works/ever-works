@@ -27,6 +27,7 @@ import type {
     PipelineProgress,
 } from '@ever-works/plugin';
 import type { DirectoryHistoryChangeEntry } from '@ever-works/contracts/api';
+import type { GenerationLogCollector } from './generation-log-collector';
 
 const PARALLEL_WRITE_CONCURRENCY = 10;
 
@@ -93,7 +94,7 @@ export class DataGeneratorService {
         directory: Directory,
         user: User,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
-        options?: { tryResume?: boolean },
+        options?: { tryResume?: boolean; logCollector?: GenerationLogCollector },
     ): Promise<InitializeResult> {
         this.logger.debug(
             `Initializing data repository for directory: ${JSON.stringify(createItemsGeneratorDto)}`,
@@ -120,6 +121,8 @@ export class DataGeneratorService {
 
         const existed = existingData.existingItems.length > 0;
 
+        const logCollector = options?.logCollector;
+
         // Execute pipeline to generate items
         const pipelineResult = await this.executePipeline(
             directory,
@@ -127,9 +130,10 @@ export class DataGeneratorService {
             createItemsGeneratorDto,
             existingData,
             (progress) => {
-                this.onGenerationProgress(progress, directory);
+                this.onGenerationProgress(progress, directory, logCollector);
             },
             options?.tryResume,
+            logCollector ? (entry) => logCollector.log(entry) : undefined,
         );
 
         const warnings = pipelineResult.warnings?.slice();
@@ -964,6 +968,7 @@ export class DataGeneratorService {
         },
         onProgress?: (progress: PipelineProgress) => void,
         tryResume?: boolean,
+        onLogEntry?: (log: import('@ever-works/contracts/api').GenerationStepLog) => void,
     ): Promise<PipelineResult> {
         // Handle existing data reset for RECREATE mode
         let existing = { ...existingData };
@@ -1016,20 +1021,22 @@ export class DataGeneratorService {
 
         this.logger.log(`Executing pipeline for directory "${directory.slug}" (user: ${user.id})`);
 
+        const pipelineOptions = onLogEntry ? { onLogEntry } : undefined;
+
         // Execute the pipeline - the orchestrator handles plugin resolution
         return tryResume
             ? this.pipelineOrchestrator.resumeOrExecute(
                   directoryRef,
                   request,
                   pluginExisting,
-                  undefined,
+                  pipelineOptions,
                   onProgress,
               )
             : this.pipelineOrchestrator.execute(
                   directoryRef,
                   request,
                   pluginExisting,
-                  undefined,
+                  pipelineOptions,
                   onProgress,
               );
     }
@@ -1054,7 +1061,13 @@ export class DataGeneratorService {
     /**
      * Callback for generation progress
      */
-    private async onGenerationProgress(progress: PipelineProgress, directory: Directory) {
+    private async onGenerationProgress(
+        progress: PipelineProgress,
+        directory: Directory,
+        logCollector?: GenerationLogCollector,
+    ) {
+        // Note: step_started/completed events are now emitted by pipeline executors
+        // via onLogEntry → logCollector.log(), so we only update the generate status here.
         await this.directoryOperations.updateGenerateStatus(directory.id, {
             status: GenerateStatusType.GENERATING,
             step: progress.message ?? progress.currentStepName,
@@ -1063,6 +1076,7 @@ export class DataGeneratorService {
             totalSteps: progress.totalSteps,
             progress: progress.percent,
             itemsProcessed: progress.itemsProcessed,
+            recentLogs: logCollector?.getRecentLogs(),
         });
     }
 

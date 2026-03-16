@@ -449,6 +449,7 @@ export class DirectoryQueryService {
             triggerRunId: record.triggerRunId,
             activityType: record.activityType,
             changelog: record.changelog ?? null,
+            logs: record.logs ?? null,
         };
     }
 
