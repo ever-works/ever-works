@@ -539,9 +539,10 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 					onStepFinish: (step) => {
 						agentStepIndex++;
 						const toolNames = step.toolCalls.map((tc) => tc.toolName);
-						const toolSummary = toolNames.length > 0
-							? `tools: ${toolNames.join(', ')}`
-							: `text: ${step.text.slice(0, 120)}${step.text.length > 120 ? '…' : ''}`;
+						const toolSummary =
+							toolNames.length > 0
+								? `tools: ${toolNames.join(', ')}`
+								: `text: ${step.text.slice(0, 120)}${step.text.length > 120 ? '…' : ''}`;
 						const tokens = step.usage;
 						this.emitLog(
 							onLogEntry,

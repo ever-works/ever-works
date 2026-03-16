@@ -2,7 +2,13 @@ import { appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { generateText, stepCountIs, ToolSet } from 'ai';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
-import type { IContentExtractorFacade, FacadeOptions, PluginLogger, IPromptFacade, PipelineExecutionOptions } from '@ever-works/plugin';
+import type {
+	IContentExtractorFacade,
+	FacadeOptions,
+	PluginLogger,
+	IPromptFacade,
+	PipelineExecutionOptions
+} from '@ever-works/plugin';
 import { substituteVariables } from '@ever-works/plugin';
 
 import { chunkContent } from './content-chunker.js';

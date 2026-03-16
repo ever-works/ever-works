@@ -105,6 +105,7 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
                     status: GenerateStatusType.GENERATED,
                     step: null,
                     warnings: generationWarnings,
+                    recentLogs: logCollector.getRecentLogs(),
                 }),
                 this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
                     status: GenerateStatusType.GENERATED,
@@ -128,6 +129,7 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
                     status: GenerateStatusType.ERROR,
                     error: normalizeGeneratorError(error),
                     warnings: generationWarnings,
+                    recentLogs: logCollector.getRecentLogs(),
                 }),
                 this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
                     status: GenerateStatusType.ERROR,

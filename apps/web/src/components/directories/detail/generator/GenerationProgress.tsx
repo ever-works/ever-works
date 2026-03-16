@@ -15,7 +15,7 @@ interface GenerationProgressProps {
 export function GenerationProgress({ directory }: GenerationProgressProps) {
     const t = useTranslations('dashboard.directoryDetail.progress');
     const [dots, setDots] = useState('');
-    const [showLogs, setShowLogs] = useState(false);
+    const [showLogs, setShowLogs] = useState(true);
 
     useEffect(() => {
         const interval = setInterval(() => {
