@@ -79,7 +79,7 @@ export function executeClaudeCode(options: ExecuteOptions): {
 		];
 
 		if (options.onStdoutLine) {
-			args.push('--output-format', 'stream-json');
+			args.push('--output-format', 'stream-json', '--verbose');
 		}
 
 		if (options.maxBudgetUsd !== undefined) {
