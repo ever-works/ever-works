@@ -3,7 +3,6 @@ import { DirectoryGenerationPayload } from '@ever-works/agent/tasks';
 import { GenerateStatusType } from '@ever-works/agent/entities';
 import {
     DirectoryScheduleService,
-    ItemHealthService,
     normalizeGeneratorError,
 } from '@ever-works/agent/services';
 import { TriggerGenerationOrchestrator } from '../../trigger/worker/orchestrators/trigger-generation.orchestrator';
@@ -80,7 +79,6 @@ export const directoryGenerationTask = task({
                 TriggerGenerationOrchestrator,
             );
             const scheduleService = appContext.get(DirectoryScheduleService);
-            const itemHealthService = appContext.get(ItemHealthService);
 
             try {
                 await orchestrator.run({
@@ -92,7 +90,6 @@ export const directoryGenerationTask = task({
                 });
 
                 if (payload.triggerSource === 'schedule' && payload.scheduleId) {
-                    await itemHealthService.runScheduledCheck(directory, user);
                     await scheduleService.markRunCompleted({
                         scheduleId: payload.scheduleId,
                         historyId: payload.historyId,
