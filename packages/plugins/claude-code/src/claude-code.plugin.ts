@@ -20,7 +20,8 @@ import type {
 	FormFieldDefinition,
 	FormFieldGroup,
 	ItemData,
-	AiModel
+	AiModel,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 import { buildSuccessPipelineResult, substituteVariables } from '@ever-works/plugin';
 import * as fs from 'fs/promises';
@@ -243,10 +244,15 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 		return CLAUDE_CODE_SUPPORTED_MODELS;
 	}
 
+	private getRealSecret(value: unknown): string | undefined {
+		if (typeof value !== 'string' || !value || value.includes('••••')) return undefined;
+		return value;
+	}
+
 	async isAvailable(settings?: Record<string, unknown>): Promise<boolean> {
 		const resolved = settings || {};
-		const oauthToken = resolved.oauthToken as string | undefined;
-		const apiKey = resolved.apiKey as string | undefined;
+		const oauthToken = this.getRealSecret(resolved.oauthToken);
+		const apiKey = this.getRealSecret(resolved.apiKey);
 		if (!oauthToken && !apiKey) {
 			return false;
 		}
@@ -255,7 +261,33 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			return this.validateApiKey(apiKey, (resolved.model as string | undefined) || 'sonnet');
 		}
 
-		return this.validateCliAuth(resolved);
+		const result = await this.validateCliAuth(resolved);
+		return result.valid;
+	}
+
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const oauthToken = this.getRealSecret(settings.oauthToken);
+		const apiKey = this.getRealSecret(settings.apiKey);
+
+		if (!oauthToken && !apiKey) {
+			return { success: false, message: 'No credentials configured. Set an API key or connect via OAuth.' };
+		}
+
+		if (apiKey) {
+			const model = (settings.model as string | undefined) || 'sonnet';
+			const valid = await this.validateApiKey(apiKey, model);
+			return valid
+				? { success: true, message: 'Anthropic API key verified.' }
+				: { success: false, message: 'Anthropic API key is invalid or the API is unreachable.' };
+		}
+
+		const result = await this.validateCliAuth(settings);
+		return result.valid
+			? { success: true, message: 'OAuth token verified.' }
+			: {
+					success: false,
+					message: `OAuth token validation failed: ${result.detail || 'unknown error'}. Please re-run \`claude setup-token\`.`
+				};
 	}
 
 	getManifest(): PluginManifest {
@@ -362,10 +394,13 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 		});
 	}
 
-	private async validateCliAuth(settings: Record<string, unknown>): Promise<boolean> {
+	private async validateCliAuth(settings: Record<string, unknown>): Promise<{ valid: boolean; detail?: string }> {
+		const oauthToken = settings.oauthToken as string | undefined;
+		if (!oauthToken || oauthToken.length < 20) {
+			return { valid: false, detail: 'Token is missing or too short.' };
+		}
+
 		const version = (settings.version as string) || DEFAULT_CLI_VERSION;
-		const maxTurns = 1;
-		const model = settings.model as string | undefined;
 		let tempDir: string | null = null;
 
 		try {
@@ -375,17 +410,26 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			const { promise } = executeClaudeCode({
 				binaryPath,
 				prompt: 'Reply with OK.',
-				systemPrompt: 'You are validating Claude Code authentication. Reply with OK.',
+				systemPrompt: 'Reply with the single word OK. Nothing else.',
 				cwd: tempDir,
-				env: resolveAuthEnv(settings),
-				maxTurns,
-				model
+				env: { CLAUDE_CODE_OAUTH_TOKEN: oauthToken },
+				maxTurns: 1,
+				model: settings.model as string | undefined
 			});
 
-			const result = await promise;
-			return result.exitCode === 0;
-		} catch {
-			return false;
+			const result = await Promise.race([
+				promise,
+				new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Validation timed out')), 30_000))
+			]);
+
+			if (result.exitCode === 0) {
+				return { valid: true };
+			}
+
+			const detail = this.extractErrorDetail(result);
+			return { valid: false, detail };
+		} catch (err) {
+			return { valid: false, detail: err instanceof Error ? err.message : 'CLI validation failed.' };
 		} finally {
 			if (tempDir) {
 				await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
