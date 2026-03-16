@@ -66,6 +66,10 @@ export class SimClientWrapper {
 	/**
 	 * Executes a workflow in sync or async mode.
 	 * For async mode, polls until completion or timeout.
+	 *
+	 * The SIM Start block maps input fields by name. We wrap the entire
+	 * structured payload as a JSON string in a `message` field so the
+	 * workflow can access it via `<start.message>`.
 	 */
 	async executeWorkflow(
 		workflowId: string,
@@ -77,11 +81,14 @@ export class SimClientWrapper {
 		const executionMode = settings.executionMode || 'async';
 		const maxRetries = settings.maxRetries ?? DEFAULT_MAX_RETRIES;
 
+		// Wrap structured payload into the `message` field expected by the SIM Start block
+		const wrappedInput = { message: JSON.stringify(input) };
+
 		try {
 			if (executionMode === 'sync') {
-				return await this.executeSyncWithRetry(workflowId, input, settings, maxRetries, signal);
+				return await this.executeSyncWithRetry(workflowId, wrappedInput, settings, maxRetries, signal);
 			} else {
-				return await this.executeAsync(workflowId, input, settings, onPollProgress, signal);
+				return await this.executeAsync(workflowId, wrappedInput, settings, onPollProgress, signal);
 			}
 		} catch (error) {
 			if (error instanceof SimStudioError) {
@@ -93,7 +100,7 @@ export class SimClientWrapper {
 
 	private async executeSyncWithRetry(
 		workflowId: string,
-		input: SimWorkflowInput,
+		input: Record<string, unknown>,
 		settings: SimAiSettings,
 		maxRetries: number,
 		signal?: AbortSignal
@@ -133,7 +140,7 @@ export class SimClientWrapper {
 
 	private async executeAsync(
 		workflowId: string,
-		input: SimWorkflowInput,
+		input: Record<string, unknown>,
 		settings: SimAiSettings,
 		onPollProgress?: (attempt: number, status: string) => void,
 		signal?: AbortSignal
@@ -148,17 +155,24 @@ export class SimClientWrapper {
 			async: true
 		});
 
-		// If the result doesn't have a taskId, it may have completed synchronously
-		if (!('taskId' in result)) {
+		this.logger.log(`SIM raw response: ${JSON.stringify(result).slice(0, 2000)}`);
+
+		// SIM returns jobId for async execution, check both jobId and taskId
+		const asyncResult = result as Record<string, unknown>;
+		const jobId = (asyncResult.jobId ?? asyncResult.taskId) as string | undefined;
+
+		// If no job/task ID, the workflow completed synchronously
+		if (!jobId) {
+			const output = asyncResult.output ?? result;
 			return {
-				output: (result as { output?: unknown }).output,
+				output,
 				pollingAttempts: 0,
 				simDuration: Date.now() - startTime
 			};
 		}
 
-		const taskId = result.taskId;
-		this.logger.log(`SIM workflow queued with task ID: ${taskId}`);
+		this.logger.log(`SIM workflow queued with job ID: ${jobId}`);
+		const taskId = jobId;
 
 		// Poll for completion
 		let pollingAttempts = 0;

@@ -127,22 +127,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				minimum: 0,
 				maximum: 10,
 				'x-hidden': true
-			},
-			eventTriggers: {
-				type: 'object',
-				title: 'Event Triggers',
-				description: 'Trigger SIM workflows on Ever Works events',
-				'x-scope': 'directory',
-				properties: {
-					onGenerationCompleted: {
-						type: 'object',
-						title: 'On Generation Completed',
-						properties: {
-							workflowId: { type: 'string', title: 'Workflow ID' },
-							enabled: { type: 'boolean', default: false }
-						}
-					}
-				}
 			}
 		},
 		required: ['apiKey']
@@ -438,6 +422,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			setState('collect-results', 'running');
 			reportProgress(onProgress, 3, 75, 'Collect & Validate Results');
 
+			logger.log(`SIM output type: ${typeof execResult.output}, preview: ${JSON.stringify(execResult.output).slice(0, 500)}`);
 			const parsed = parseSimOutput(execResult.output);
 
 			// Deduplicate against existing items
@@ -548,7 +533,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			asyncPollingIntervalMs: (pluginSettings.asyncPollingIntervalMs as number) ?? DEFAULT_POLLING_INTERVAL_MS,
 			asyncTimeoutMs: (pluginSettings.asyncTimeoutMs as number) ?? DEFAULT_ASYNC_TIMEOUT_MS,
 			maxRetries: (pluginSettings.maxRetries as number) ?? DEFAULT_MAX_RETRIES,
-			eventTriggers: pluginSettings.eventTriggers as SimAiSettings['eventTriggers']
 		};
 	}
 

@@ -17,8 +17,7 @@ export type {
 	SimWorkflowOutput,
 	SimOutputItem,
 	SimAiSettings,
-	SimAiPipelineMetrics,
-	EventTriggerConfig
+	SimAiPipelineMetrics
 } from './types.js';
 export { SIM_AI_STEP_IDS, isSimAiStepId } from './types.js';
 

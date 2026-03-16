@@ -89,12 +89,6 @@ export interface SimOutputItem {
 	metadata?: Record<string, unknown>;
 }
 
-/** Event trigger configuration for a single event */
-export interface EventTriggerConfig {
-	workflowId: string;
-	enabled: boolean;
-}
-
 /** Resolved settings for the SIM AI plugin */
 export interface SimAiSettings {
 	apiKey: string;
@@ -104,9 +98,6 @@ export interface SimAiSettings {
 	asyncPollingIntervalMs: number;
 	asyncTimeoutMs: number;
 	maxRetries: number;
-	eventTriggers?: {
-		onGenerationCompleted?: EventTriggerConfig;
-	};
 }
 
 /** Metrics specific to SIM execution */

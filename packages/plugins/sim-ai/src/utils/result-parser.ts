@@ -29,9 +29,28 @@ export function parseSimOutput(raw: unknown): ParsedResults {
 
 /**
  * Normalizes the raw SIM output into the expected shape.
- * Handles cases where items are at the root level or nested.
+ * SIM workflows can return results in many formats depending on the
+ * block configuration (Agent → Response, direct output, etc.).
  */
 function normalizeOutput(raw: unknown): SimWorkflowOutput {
+	// If raw is a string, it might be JSON (Agent blocks often return stringified JSON)
+	if (typeof raw === 'string') {
+		const parsed = tryParseJson(raw);
+		if (parsed !== null) {
+			return normalizeOutput(parsed);
+		}
+		const preview = raw.length > 200 ? raw.slice(0, 200) + '...' : raw;
+		throw new Error(
+			'SIM workflow returned a string that is not valid JSON. ' +
+				'Ensure the Agent block returns a JSON object with { items: [...] }. ' +
+				`Received: ${preview}`
+		);
+	}
+
+	if (Array.isArray(raw)) {
+		return { items: raw as SimOutputItem[] };
+	}
+
 	const obj = raw as Record<string, unknown>;
 
 	// If output has an 'items' array, use it directly
@@ -39,25 +58,110 @@ function normalizeOutput(raw: unknown): SimWorkflowOutput {
 		return obj as unknown as SimWorkflowOutput;
 	}
 
-	// If output itself is an array, treat it as items
-	if (Array.isArray(raw)) {
-		return { items: raw as SimOutputItem[] };
-	}
-
 	// If output has a nested 'output' field (from async execution)
-	if (obj.output && typeof obj.output === 'object') {
+	if (obj.output != null) {
 		return normalizeOutput(obj.output);
 	}
 
+	// If output has a 'result' field (common in SIM response blocks)
+	if (obj.result != null) {
+		return normalizeOutput(obj.result);
+	}
+
+	// If output has a 'content' field (Agent block text output)
+	if (obj.content != null) {
+		return normalizeOutput(obj.content);
+	}
+
 	// If output has a 'data' field
-	if (obj.data && typeof obj.data === 'object') {
+	if (obj.data != null) {
 		return normalizeOutput(obj.data);
+	}
+
+	// If output has a 'response' field
+	if (obj.response != null) {
+		return normalizeOutput(obj.response);
+	}
+
+	// If output has a 'message' field (sometimes the Agent response goes here)
+	if (obj.message != null && typeof obj.message === 'string') {
+		const parsed = tryParseJson(obj.message);
+		if (parsed !== null) {
+			return normalizeOutput(parsed);
+		}
+	}
+
+	// SIM Response block fields: ResponseDataMode contains the Agent's text output
+	if (obj.ResponseDataMode != null) {
+		return normalizeOutput(obj.ResponseDataMode);
+	}
+	if (obj.ResponseStructure != null) {
+		return normalizeOutput(obj.ResponseStructure);
+	}
+
+	// Last resort: scan all string values for embedded JSON with an "items" array
+	for (const value of Object.values(obj)) {
+		if (typeof value === 'string') {
+			const parsed = tryParseJson(value);
+			if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+				const parsedObj = parsed as Record<string, unknown>;
+				if (Array.isArray(parsedObj.items)) {
+					return normalizeOutput(parsed);
+				}
+			}
+		}
 	}
 
 	throw new Error(
 		'SIM workflow output does not contain an "items" array. ' +
-			'Expected format: { items: [...] } or a direct array of items.'
+			'Expected format: { items: [...] } or a direct array of items. ' +
+			`Received keys: ${Object.keys(obj).join(', ')}`
 	);
+}
+
+/**
+ * Attempts to parse a string as JSON. Returns null on failure.
+ * Handles markdown-wrapped JSON (```json ... ```) from AI agents,
+ * and also extracts JSON blocks embedded within surrounding text.
+ */
+function tryParseJson(str: string): unknown {
+	let trimmed = str.trim();
+
+	// Try direct parse first
+	try {
+		return JSON.parse(trimmed);
+	} catch {
+		// Continue to extraction strategies
+	}
+
+	// Extract JSON from markdown code fences (```json ... ``` or ``` ... ```)
+	const codeFenceMatch = trimmed.match(/```(?:json)?\s*\n([\s\S]*?)\n\s*```/);
+	if (codeFenceMatch) {
+		try {
+			return JSON.parse(codeFenceMatch[1].trim());
+		} catch {
+			// Continue
+		}
+	}
+
+	// Extract the first JSON object or array from the text
+	const jsonStart = trimmed.search(/[\[{]/);
+	if (jsonStart >= 0) {
+		const candidate = trimmed.slice(jsonStart);
+		// Find matching closing bracket by trying progressively shorter substrings
+		const openChar = candidate[0];
+		const closeChar = openChar === '{' ? '}' : ']';
+		let lastClose = candidate.lastIndexOf(closeChar);
+		while (lastClose >= 0) {
+			try {
+				return JSON.parse(candidate.slice(0, lastClose + 1));
+			} catch {
+				lastClose = candidate.lastIndexOf(closeChar, lastClose - 1);
+			}
+		}
+	}
+
+	return null;
 }
 
 function parseItems(rawItems: SimOutputItem[]): ItemData[] {
