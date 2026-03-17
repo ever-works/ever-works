@@ -15,6 +15,9 @@ import {
     type GenerationMetrics,
     type DirectoryGenerationHistoryEntry,
     type DirectoryGenerationHistoryResponse,
+    type SourceValidationSettingsDto,
+    type UpdateSourceValidationPayload,
+    type GenerationStepLog,
 } from '@ever-works/contracts/api';
 import { APIResponse, ItemData, Category, Tag, Collection } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
@@ -25,8 +28,11 @@ export type {
     DirectoryScheduleDto,
     UpdateDirectorySchedulePayload,
     GenerationMetrics,
+    GenerationStepLog,
     DirectoryGenerationHistoryEntry,
     DirectoryGenerationHistoryResponse,
+    SourceValidationSettingsDto,
+    UpdateSourceValidationPayload,
 } from '@ever-works/contracts/api';
 
 export interface MarkdownReadmeConfig {
@@ -90,6 +96,8 @@ export type GenerateStatus = {
     error?: string;
     /** Warnings from degraded services (e.g. circuit breaker tripped) */
     warnings?: string[];
+    /** Recent log entries for live display during generation */
+    recentLogs?: GenerationStepLog[];
 };
 
 export type GetProjectsReadyState =
@@ -560,10 +568,14 @@ export const directoryAPI = {
     },
 
     // Get directory generation history
-    getHistory: async (id: string, options?: { limit?: number; offset?: number }) => {
+    getHistory: async (
+        id: string,
+        options?: { limit?: number; offset?: number; activityType?: string },
+    ) => {
         const params = new URLSearchParams();
         if (options?.limit !== undefined) params.append('limit', String(options.limit));
         if (options?.offset !== undefined) params.append('offset', String(options.offset));
+        if (options?.activityType) params.append('activityType', options.activityType);
         const query = params.toString() ? `?${params.toString()}` : '';
 
         return serverFetch<APIResponse<DirectoryGenerationHistoryResponse>>(
@@ -610,6 +622,19 @@ export const directoryAPI = {
             endpoint: `/directories/${id}/schedule/run`,
             data: {},
             method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    getSourceValidationSettings: async (id: string) => {
+        return serverFetch<SourceValidationSettingsDto>(`/directories/${id}/source-validation`);
+    },
+
+    updateSourceValidationSettings: async (id: string, data: UpdateSourceValidationPayload) => {
+        return serverMutation<SourceValidationSettingsDto>({
+            endpoint: `/directories/${id}/source-validation`,
+            data,
+            method: 'PUT',
             wrapInData: false,
         });
     },

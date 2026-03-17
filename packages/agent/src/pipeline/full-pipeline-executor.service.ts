@@ -12,10 +12,12 @@ import type {
     PipelineCompletedPayload,
     PipelineFailedPayload,
 } from '@ever-works/plugin';
+import type { GenerationStepLog } from '@ever-works/contracts/api';
 import { buildErrorPipelineResult, createEmptyPipelineOutputs } from '@ever-works/plugin';
 import { PipelineEvents } from './step-pipeline-executor.service';
 import { PipelineFacadeService } from './pipeline-facade.service';
 import { validatePipelineResult } from './validators';
+import { PluginContextFactoryService } from '../plugins/services/plugin-context-factory.service';
 
 /**
  * Executor for self-managed pipeline plugins.
@@ -31,6 +33,7 @@ export class FullPipelineExecutorService {
     constructor(
         private readonly eventEmitter: EventEmitter2,
         private readonly facadeService: PipelineFacadeService,
+        private readonly contextFactory: PluginContextFactoryService,
     ) {}
 
     /**
@@ -56,6 +59,24 @@ export class FullPipelineExecutorService {
             pipelineId: plugin.id,
         });
 
+        // Attach a log interceptor so ALL plugin logger calls are captured
+        const onLogEntry = options?.onLogEntry;
+        let removeInterceptor: (() => void) | undefined;
+        if (onLogEntry) {
+            removeInterceptor = this.contextFactory.addLogInterceptor(
+                plugin.id,
+                (level: string, message: string) => {
+                    onLogEntry({
+                        timestamp: new Date().toISOString(),
+                        level: level as GenerationStepLog['level'],
+                        source: 'pipeline',
+                        event: 'message',
+                        message,
+                    });
+                },
+            );
+        }
+
         try {
             // Create execContext for the plugin to use facades
             const execContext = this.facadeService.createStepExecutionContext(
@@ -69,7 +90,7 @@ export class FullPipelineExecutorService {
                 directory,
                 request,
                 existing,
-                { ...options, execContext },
+                { ...options, execContext, onLogEntry: options?.onLogEntry },
                 onProgress,
             );
 
@@ -128,6 +149,8 @@ export class FullPipelineExecutorService {
                     isCancelled: false,
                 },
             });
+        } finally {
+            removeInterceptor?.();
         }
     }
 

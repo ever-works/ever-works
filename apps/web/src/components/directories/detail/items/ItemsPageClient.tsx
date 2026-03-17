@@ -1,22 +1,30 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { ItemData, Category, Collection, Tag } from '@/lib/api/types-only';
+import {
+    ItemData,
+    Category,
+    Collection,
+    Tag,
+    SourceValidationSettingsDto,
+} from '@/lib/api/types-only';
 import { ItemsList } from './ItemsList';
 import { AddItemModal } from './AddItemModal';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
-import { Plus, Package, FolderTree, Tags as TagsIcon, Bookmark } from 'lucide-react';
+import { Plus, Package, FolderTree, Tags as TagsIcon, Bookmark, ShieldCheck } from 'lucide-react';
 import { getCategoryName } from '@/lib/utils/items';
 import { useDirectoryDetail, useDirectoryPermissions } from '../DirectoryDetailContext';
 import { CategoriesTab } from './CategoriesTab';
 import { TagsTab } from './TagsTab';
 import { CollectionsTab } from './CollectionsTab';
+import { SourceValidationSettingsCard } from './SourceValidationSettingsCard';
+import { ItemsEmptyState } from './ItemsEmptyState';
 import { checkScreenshotAvailability } from '@/app/actions/dashboard/items';
 import { ItemsProvider } from './ItemsContext';
 
-type TabType = 'items' | 'categories' | 'tags' | 'collections';
+type TabType = 'items' | 'categories' | 'tags' | 'collections' | 'sourceHealth';
 
 interface ItemsPageClientProps {
     items: ItemData[];
@@ -24,6 +32,7 @@ interface ItemsPageClientProps {
     categories?: Category[];
     tags?: Tag[];
     collections?: Collection[];
+    sourceValidationSettings?: SourceValidationSettingsDto | null;
 }
 
 export function ItemsPageClient({
@@ -32,6 +41,7 @@ export function ItemsPageClient({
     categories: initialCategories = [],
     tags: initialTags = [],
     collections: initialCollections = [],
+    sourceValidationSettings,
 }: ItemsPageClientProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const permissions = useDirectoryPermissions();
@@ -85,6 +95,7 @@ export function ItemsPageClient({
         { id: 'categories' as const, label: t('tabs.categories'), icon: FolderTree },
         { id: 'tags' as const, label: t('tabs.tags'), icon: TagsIcon },
         { id: 'collections' as const, label: t('tabs.collections'), icon: Bookmark },
+        { id: 'sourceHealth' as const, label: t('tabs.sourceHealth'), icon: ShieldCheck },
     ];
 
     return (
@@ -137,7 +148,12 @@ export function ItemsPageClient({
             </div>
 
             {/* Tab Content */}
-            {activeTab === 'items' && <ItemsList items={items} addItemRef={addItemRef} />}
+            {activeTab === 'items' &&
+                (items.length === 0 ? (
+                    <ItemsEmptyState directoryId={directoryId} />
+                ) : (
+                    <ItemsList items={items} addItemRef={addItemRef} />
+                ))}
 
             {activeTab === 'categories' && (
                 <CategoriesTab
@@ -163,6 +179,21 @@ export function ItemsPageClient({
                     initialCollections={initialCollections}
                     items={items}
                     canEdit={permissions.canEdit}
+                />
+            )}
+
+            {activeTab === 'sourceHealth' && (
+                <SourceValidationSettingsCard
+                    directoryId={directoryId}
+                    settings={
+                        sourceValidationSettings ?? {
+                            enabled: false,
+                            cadence: null,
+                            nextRunAt: null,
+                            lastRunAt: null,
+                            allowedCadences: [],
+                        }
+                    }
                 />
             )}
 

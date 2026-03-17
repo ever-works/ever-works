@@ -537,7 +537,39 @@
                 },
                 "loadMore": "加载更多",
                 "noMore": "没有更多记录",
-                "unknown": "未知"
+                "unknown": "未知",
+                "activity": {
+                    "generation": "生成",
+                    "item_added": "已添加条目",
+                    "item_updated": "已更新条目",
+                    "item_removed": "已移除条目",
+                    "comparison_added": "已添加比较",
+                    "comparison_removed": "已移除比较",
+                    "category_change": "分类变更",
+                    "tag_change": "标签变更",
+                    "collection_change": "集合变更",
+                    "community_pr_merged": "社区 PR"
+                },
+                "detail": {
+                    "added": "已添加",
+                    "updated": "已更新",
+                    "removed": "已移除",
+                    "fields": "字段",
+                    "expand": "展开变更日志详情",
+                    "collapse": "收起变更日志详情"
+                },
+                "filters": {
+                    "label": "活动",
+                    "all": "全部活动",
+                    "generation": "生成",
+                    "items": "条目",
+                    "comparisons": "比较",
+                    "taxonomy": "分类",
+                    "community_pr": "社区 PR"
+                },
+                "pagination": {
+                    "showing": "显示 {from}-{to} / 共 {total}"
+                }
             },
             "info": {
                 "title": "目录信息",
@@ -702,7 +734,8 @@
                 "tabs": {
                     "browseItems": "Browse Items",
                     "categories": "Categories",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -786,6 +819,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "重新检查来源",
+                    "checkCompleted": "来源检查已完成",
+                    "checkFailed": "来源检查失败",
+                    "failedToCheckSource": "无法检查项目来源",
+                    "brokenLink": "失效链接",
+                    "healthy": "正常",
+                    "couldNotVerify": "无法验证",
+                    "sourceMayHaveIssues": "来源可能存在问题",
+                    "sourceChecked": "来源已检查",
+                    "reachable": "可访问",
+                    "reachabilityInconclusive": "自动可达性检查结果不明确",
+                    "accurateSource": "准确来源",
+                    "sourceTooGeneric": "来源过于泛化",
+                    "weakSource": "较弱来源",
+                    "sourceAccuracyUnknown": "来源准确性未知",
+                    "useSuggestedSource": "应用建议",
+                    "suggestedSourceApplied": "已应用建议来源",
+                    "failedToUseSuggestedSource": "无法使用建议来源",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {
@@ -1213,7 +1279,8 @@
                             "paused": "已暂停",
                             "canceled": "已取消",
                             "disabled": "已禁用"
-                        }
+                        },
+                        "nextSourceValidation": "下次来源校验"
                     },
                     "fields": {
                         "automation": "自动化",
@@ -1226,7 +1293,9 @@
                         "maxFailures": "失败限制",
                         "maxFailuresHelp": "发生此数量的失败后自动暂停。",
                         "createPullRequest": "创建 Pull Request",
-                        "createPullRequestHelp": "启用后，计划更新将创建 pull request 而不是直接提交。"
+                        "createPullRequestHelp": "启用后，计划更新将创建 pull request 而不是直接提交。",
+                        "sourceValidationCadence": "来源校验频率",
+                        "sourceValidationCadenceHelp": "默认与更新频率一致，但你也可以将其调慢或调快。"
                     },
                     "billing": {
                         "subscription": "订阅",

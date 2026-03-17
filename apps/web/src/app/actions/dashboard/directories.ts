@@ -305,7 +305,7 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
 
 export async function fetchDirectoryGenerationHistory(
     directoryId: string,
-    options: { limit?: number; offset?: number } = {},
+    options: { limit?: number; offset?: number; activityType?: string } = {},
 ) {
     const user = await getAuthFromCookie();
     if (!user) {

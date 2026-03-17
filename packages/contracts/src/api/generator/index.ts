@@ -7,4 +7,5 @@ export type { CreateItemsGeneratorDto, UpdateItemsGeneratorDto } from './create-
 export type { SubmitItemDto } from './submit-item.dto.js';
 export type { RemoveItemDto } from './remove-item.dto.js';
 export type { UpdateItemDto } from './update-item.dto.js';
+export type { CheckItemHealthDto, CheckItemHealthResponseDto } from './check-item-health.dto.js';
 export type { ExtractItemDetailsDto } from './extract-item-details.dto.js';

@@ -7,3 +7,4 @@ export * from './directory-schedule.dto';
 export * from './import-directory.dto';
 export * from './taxonomy.dto';
 export * from './website-settings.dto';
+export * from './update-source-validation.dto';

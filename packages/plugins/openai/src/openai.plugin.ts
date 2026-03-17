@@ -147,14 +147,6 @@ export class OpenAiPlugin extends BaseAiProvider {
 		return this.aiOps.listModels(this.resolveConfig(settings));
 	}
 
-	async isAvailable(settings?: PluginSettings): Promise<boolean> {
-		if (!this.aiOps) {
-			return false;
-		}
-		const result = await this.aiOps.testConnection(this.resolveConfig(settings));
-		return result.success;
-	}
-
 	getCapabilities(): AiModelCapabilities {
 		return {
 			supportsStructuredOutput: true,

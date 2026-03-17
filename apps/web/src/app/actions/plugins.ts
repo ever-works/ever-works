@@ -75,6 +75,25 @@ export async function updatePluginSettings(
     }
 }
 
+export async function validatePluginConnection(pluginId: string): Promise<
+    ActionResult<{
+        success: boolean;
+        message: string;
+        details?: Record<string, unknown>;
+    }>
+> {
+    try {
+        const result = await pluginsAPI.validateConnection(pluginId);
+        return { success: true, data: result };
+    } catch (error) {
+        console.error('Failed to validate plugin connection:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to validate plugin connection',
+        };
+    }
+}
+
 /**
  * Enable a plugin for a directory
  */

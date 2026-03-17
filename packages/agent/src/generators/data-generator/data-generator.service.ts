@@ -18,6 +18,7 @@ import { getDirectoryOwner } from '../../utils/directory.utils';
 import pMap from 'p-map';
 import { config } from '../../config';
 import { PipelineOrchestratorService } from '../../pipeline';
+import { buildDirectoryChangelog } from '../../utils/directory-changelog.utils';
 import type {
     DirectoryReference,
     GenerationRequest,
@@ -25,6 +26,8 @@ import type {
     PipelineResult,
     PipelineProgress,
 } from '@ever-works/plugin';
+import type { DirectoryHistoryChangeEntry } from '@ever-works/contracts/api';
+import type { GenerationLogCollector } from './generation-log-collector';
 
 const PARALLEL_WRITE_CONCURRENCY = 10;
 
@@ -49,6 +52,7 @@ export type GenerationStats = {
     updatedItemsCount: number;
     totalItemsCount: number;
     metrics?: ItemsGeneratorMetrics;
+    changelog?: ReturnType<typeof buildDirectoryChangelog>;
 };
 
 export type InitializeResult =
@@ -90,7 +94,7 @@ export class DataGeneratorService {
         directory: Directory,
         user: User,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
-        options?: { tryResume?: boolean },
+        options?: { tryResume?: boolean; logCollector?: GenerationLogCollector },
     ): Promise<InitializeResult> {
         this.logger.debug(
             `Initializing data repository for directory: ${JSON.stringify(createItemsGeneratorDto)}`,
@@ -103,14 +107,21 @@ export class DataGeneratorService {
             existingCollections: [],
             existingConfig: null,
         };
+        let existingItemsBeforeGeneration: ItemData[] = [];
 
         // Get existing data if available
         // get existing data only if we are in update mode
         if (createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE) {
             existingData = await this.getExistingData(directory, user);
+            existingItemsBeforeGeneration = existingData.existingItems;
+        } else if (createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE) {
+            existingItemsBeforeGeneration = (await this.getExistingData(directory, user))
+                .existingItems;
         }
 
         const existed = existingData.existingItems.length > 0;
+
+        const logCollector = options?.logCollector;
 
         // Execute pipeline to generate items
         const pipelineResult = await this.executePipeline(
@@ -119,9 +130,10 @@ export class DataGeneratorService {
             createItemsGeneratorDto,
             existingData,
             (progress) => {
-                this.onGenerationProgress(progress, directory);
+                this.onGenerationProgress(progress, directory, logCollector);
             },
             options?.tryResume,
+            logCollector ? (entry) => logCollector.log(entry) : undefined,
         );
 
         const warnings = pipelineResult.warnings?.slice();
@@ -365,6 +377,12 @@ export class DataGeneratorService {
                     slugifyText(item.slug || item.name),
                 ),
             );
+            const existingItemsBySlug = new Map(
+                (existingData.existingItems || []).map((item) => [
+                    slugifyText(item.slug || item.name),
+                    item,
+                ]),
+            );
 
             // Prepare items with slugs and count new vs updated
             // Create mutable copies since pipeline returns readonly items
@@ -395,6 +413,9 @@ export class DataGeneratorService {
                     brand: item.brand,
                     brand_logo_url: item.brand_logo_url,
                     images: item.images ? [...item.images] : undefined,
+                    health: existingItemsBySlug.get(slugifyText(item.slug || item.name))?.health,
+                    source_validation: existingItemsBySlug.get(slugifyText(item.slug || item.name))
+                        ?.source_validation,
                 };
                 return mutableItem;
             });
@@ -404,6 +425,31 @@ export class DataGeneratorService {
             ).length;
 
             const updatedItemsCount = itemsWithSlugs.length - newItemsCount;
+            const changelogEntries: DirectoryHistoryChangeEntry[] = itemsWithSlugs.map((item) => ({
+                entityType: 'item',
+                action: existingSlugSet.has(item.slug!) ? 'updated' : 'added',
+                name: item.name,
+                slug: item.slug,
+            }));
+
+            if (isRecreate && existingItemsBeforeGeneration.length > 0) {
+                const generatedSlugSet = new Set(itemsWithSlugs.map((item) => item.slug!));
+                const removedEntries = existingItemsBeforeGeneration
+                    .filter((item) => {
+                        const slug = slugifyText(item.slug || item.name);
+                        return !generatedSlugSet.has(slug);
+                    })
+                    .map(
+                        (item): DirectoryHistoryChangeEntry => ({
+                            entityType: 'item',
+                            action: 'removed',
+                            name: item.name,
+                            slug: slugifyText(item.slug || item.name),
+                        }),
+                    );
+
+                changelogEntries.push(...removedEntries);
+            }
 
             await pMap(
                 itemsWithSlugs,
@@ -453,6 +499,7 @@ export class DataGeneratorService {
                 updatedItemsCount,
                 totalItemsCount: newItems.length,
                 metrics: this.convertPipelineMetrics(pipelineResult),
+                changelog: buildDirectoryChangelog(changelogEntries),
             };
 
             let prUpdate: PRUpdate | null = null;
@@ -930,6 +977,7 @@ export class DataGeneratorService {
         },
         onProgress?: (progress: PipelineProgress) => void,
         tryResume?: boolean,
+        onLogEntry?: (log: import('@ever-works/contracts/api').GenerationStepLog) => void,
     ): Promise<PipelineResult> {
         // Handle existing data reset for RECREATE mode
         let existing = { ...existingData };
@@ -982,20 +1030,22 @@ export class DataGeneratorService {
 
         this.logger.log(`Executing pipeline for directory "${directory.slug}" (user: ${user.id})`);
 
+        const pipelineOptions = onLogEntry ? { onLogEntry } : undefined;
+
         // Execute the pipeline - the orchestrator handles plugin resolution
         return tryResume
             ? this.pipelineOrchestrator.resumeOrExecute(
                   directoryRef,
                   request,
                   pluginExisting,
-                  undefined,
+                  pipelineOptions,
                   onProgress,
               )
             : this.pipelineOrchestrator.execute(
                   directoryRef,
                   request,
                   pluginExisting,
-                  undefined,
+                  pipelineOptions,
                   onProgress,
               );
     }
@@ -1020,7 +1070,13 @@ export class DataGeneratorService {
     /**
      * Callback for generation progress
      */
-    private async onGenerationProgress(progress: PipelineProgress, directory: Directory) {
+    private async onGenerationProgress(
+        progress: PipelineProgress,
+        directory: Directory,
+        logCollector?: GenerationLogCollector,
+    ) {
+        // Note: step_started/completed events are now emitted by pipeline executors
+        // via onLogEntry → logCollector.log(), so we only update the generate status here.
         await this.directoryOperations.updateGenerateStatus(directory.id, {
             status: GenerateStatusType.GENERATING,
             step: progress.message ?? progress.currentStepName,
@@ -1029,6 +1085,7 @@ export class DataGeneratorService {
             totalSteps: progress.totalSteps,
             progress: progress.percent,
             itemsProcessed: progress.itemsProcessed,
+            recentLogs: logCollector?.getRecentLogs(),
         });
     }
 
@@ -1369,10 +1426,20 @@ export class DataGeneratorService {
             }
 
             // Prepare items
-            const itemsWithSlugs = importedData.items.map((item) => ({
-                ...item,
-                slug: item.slug || slugifyText(item.name),
-            }));
+            const existingItemsBySlug = new Map<string, ItemData>(
+                existingItems.map((item) => [slugifyText(item.slug || item.name), item] as const),
+            );
+            const itemsWithSlugs = importedData.items.map((item) => {
+                const slug = item.slug || slugifyText(item.name);
+                const existingItem = existingItemsBySlug.get(slug);
+
+                return {
+                    ...item,
+                    slug,
+                    health: existingItem?.health,
+                    source_validation: existingItem?.source_validation,
+                };
+            });
 
             // Calculate stats
             const newItemsCount = itemsWithSlugs.filter(

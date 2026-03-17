@@ -193,6 +193,80 @@
             }
         }
     },
+    "onboarding": {
+        "label": "Getting started",
+        "title": "Welcome to Ever Works",
+        "subtitle": "Build and publish your first directory in minutes.",
+        "skipButton": "Skip for now",
+        "nextButton": "Next",
+        "stepIndex": "Step {index}",
+        "steps": {
+            "welcome": {
+                "title": "What is Ever Works?",
+                "description": "Ever Works is an open-source directory builder. Create structured content directories — tools, jobs, links, products — and publish them as live websites.",
+                "detail": "Let's get you set up. Connect your providers below, then create your first directory.",
+                "feature1": {
+                    "title": "AI-powered content",
+                    "description": "Generate and enrich directory items automatically using your AI provider."
+                },
+                "feature2": {
+                    "title": "Instant publishing",
+                    "description": "Deploy to Vercel with one click — no server configuration needed."
+                },
+                "feature3": {
+                    "title": "Git-backed",
+                    "description": "Every directory is a GitHub repository you own and control."
+                }
+            },
+            "directory": {
+                "title": "Create your first directory",
+                "description": "A directory is your content hub. Add items, configure the layout, and publish it in one click.",
+                "detail": "You're all set! Create your first directory to start building and publishing content.",
+                "action": "Create a directory"
+            },
+            "publish": {
+                "title": "Go live",
+                "description": "Connect Vercel or GitHub to deploy your directory as a public website — no hosting configuration needed.",
+                "action": "Set up publishing"
+            }
+        },
+        "pluginStep": {
+            "saveButton": "Save settings",
+            "savedSuccess": "Settings saved.",
+            "noSettings": "No configuration required for this plugin.",
+            "getTokenPrompt": "Create a token first, then paste it below and save to verify the connection."
+        },
+        "plugins": {
+            "byokDescription": "Connect your own key to unlock the full configuration.",
+            "byokDefaultButton": "Bring your own key",
+            "setupTokenDescription": "Create a token first, then paste it below and save to verify the connection."
+        },
+        "claudeWizard": {
+            "label": "Claude Code setup",
+            "title": "Set up Claude Code in three steps",
+            "subtitle": "This flow keeps the recommended configuration visible and verifies the connection before you finish.",
+            "stepIndex": "Step {index}",
+            "continueButton": "Continue",
+            "steps": {
+                "model": {
+                    "title": "Pick a model",
+                    "description": "Sonnet is preselected as the recommended balance of quality and speed, but you can switch to any supported model."
+                },
+                "credentials": {
+                    "title": "Add credentials",
+                    "description": "Paste your Claude Code OAuth token or an Anthropic API key. Either one works."
+                },
+                "verify": {
+                    "title": "Verify connection",
+                    "description": "Save settings and run a live connection check against Claude before finishing.",
+                    "checkTitle": "Run a live Claude validation",
+                    "checkDescription": "Saving here runs a Claude API or CLI check depending on which credential you supplied.",
+                    "button": "Verify and finish setup",
+                    "successDefault": "Claude connection verified."
+                }
+            }
+        }
+    },
     "dashboard": {
         "title": "Dashboard",
         "toasts": {
@@ -868,7 +942,40 @@
                 },
                 "loadMore": "Load more",
                 "noMore": "No more records",
-                "unknown": "Unknown"
+                "unknown": "Unknown",
+                "activity": {
+                    "generation": "Generation",
+                    "item_added": "Item Added",
+                    "item_updated": "Item Updated",
+                    "item_removed": "Item Removed",
+                    "comparison_added": "Comparison Added",
+                    "comparison_removed": "Comparison Removed",
+                    "category_change": "Category Change",
+                    "tag_change": "Tag Change",
+                    "collection_change": "Collection Change",
+                    "community_pr_merged": "Community PR"
+                },
+                "detail": {
+                    "added": "Added",
+                    "updated": "Updated",
+                    "removed": "Removed",
+                    "fields": "Fields",
+                    "expand": "Expand details",
+                    "collapse": "Collapse details",
+                    "stepLogs": "Step Logs"
+                },
+                "filters": {
+                    "label": "Activity",
+                    "all": "All activity",
+                    "generation": "Generation",
+                    "items": "Items",
+                    "comparisons": "Comparisons",
+                    "taxonomy": "Taxonomy",
+                    "community_pr": "Community PR"
+                },
+                "pagination": {
+                    "showing": "Showing {from}-{to} of {total}"
+                }
             },
             "info": {
                 "title": "Directory Information",
@@ -1034,7 +1141,8 @@
                     "browseItems": "Browse Items",
                     "categories": "Categories",
                     "tags": "Tags",
-                    "collections": "Collections"
+                    "collections": "Collections",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -1163,6 +1271,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Re-check source",
+                    "checkCompleted": "Item source check completed",
+                    "checkFailed": "Item source check failed",
+                    "failedToCheckSource": "Failed to check item source",
+                    "brokenLink": "Broken link",
+                    "needsReview": "Needs review",
+                    "healthy": "Healthy",
+                    "couldNotVerify": "Could not verify",
+                    "sourceMayHaveIssues": "Source may have issues",
+                    "sourceChecked": "Source checked",
+                    "reachable": "Reachable",
+                    "reachabilityInconclusive": "Automated reachability inconclusive",
+                    "accurateSource": "Accurate source",
+                    "sourceTooGeneric": "Source too generic",
+                    "weakSource": "Weak source",
+                    "sourceAccuracyUnknown": "Source accuracy unknown",
+                    "useSuggestedSource": "Apply suggestion",
+                    "suggestedSourceApplied": "Suggested source applied",
+                    "failedToUseSuggestedSource": "Failed to use suggested source"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {
@@ -1306,7 +1447,9 @@
                     "processing": "Processing..."
                 },
                 "progress": "Progress",
-                "closeNote": "This may take a few minutes. You can close this page and come back later."
+                "closeNote": "This may take a few minutes. You can close this page and come back later.",
+                "showLogs": "Show step logs",
+                "hideLogs": "Hide step logs"
             },
             "settings": {
                 "sourceSettings": "Source Repository",

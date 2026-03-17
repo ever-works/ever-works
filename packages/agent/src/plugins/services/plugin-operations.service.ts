@@ -39,6 +39,7 @@ import {
     SettingsSchemaValidatorService,
     type SettingsScope,
 } from './settings-schema-validator.service';
+import { PluginSettingsService } from './plugin-settings.service';
 import { AiFacadeService } from '../../facades';
 
 @Injectable()
@@ -54,6 +55,7 @@ export class PluginOperationsService {
         private readonly directoryPluginRepository: Repository<DirectoryPluginEntity>,
         private readonly pluginRegistryService: PluginRegistryService,
         private readonly settingsValidator: SettingsSchemaValidatorService,
+        private readonly settingsService: PluginSettingsService,
         private readonly aiFacade: AiFacadeService,
     ) {}
 
@@ -908,10 +910,19 @@ export class PluginOperationsService {
         }
 
         try {
-            return await this.aiFacade.getAvailableModels({
-                providerOverride: pluginId,
+            if (registered.plugin.capabilities.includes('ai-provider')) {
+                return await this.aiFacade.getAvailableModels({
+                    providerOverride: pluginId,
+                    userId,
+                });
+            }
+
+            const settings = await this.settingsService.getResolvedSettings(pluginId, {
                 userId,
+                includeSecrets: true,
             });
+
+            return await plugin.listModels(settings);
         } catch (error) {
             this.logger.warn(
                 `Failed to list models for plugin ${pluginId}: ${(error as Error).message}`,
@@ -1043,6 +1054,7 @@ export class PluginOperationsService {
             installed: !!userPlugin || enabled,
             enabled,
             settings: this.maskSecretSettings(mergedSettings, registered.plugin.settingsSchema),
+            metadata: userPlugin?.metadata ?? {},
             userPluginId: userPlugin?.id,
             autoEnableForDirectories: userPlugin?.autoEnableForDirectories ?? false,
         };

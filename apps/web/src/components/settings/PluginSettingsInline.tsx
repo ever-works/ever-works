@@ -1,16 +1,17 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { UserPlugin } from '@/lib/api/plugins';
 import { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import { Button } from '@/components/ui/button';
 import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { Save, Check, AlertCircle } from 'lucide-react';
-import { updatePluginSettings } from '@/app/actions/plugins';
+import { updatePluginSettings, validatePluginConnection } from '@/app/actions/plugins';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { PluginSettingsField } from '@/components/plugins/form/PluginSettingsField';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
+import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
 import { getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 
@@ -26,6 +27,11 @@ export function PluginSettingsInline({
     defaultExpanded = false,
 }: PluginSettingsInlineProps) {
     const t = useTranslations('dashboard.plugins');
+    const tOnboarding = useTranslations('onboarding.plugins');
+    const byokTrigger = plugin.uiHints?.byok?.triggerField;
+    const [byokRevealed, setByokRevealed] = useState(
+        !plugin.uiHints?.byok || Boolean(byokTrigger && plugin.settings?.[byokTrigger]),
+    );
 
     const hasOAuth = plugin.capabilities.includes('oauth') && oauthConnection !== undefined;
 
@@ -38,14 +44,23 @@ export function PluginSettingsInline({
             if (!result.success) {
                 throw new Error(result.error);
             }
+
+            if (plugin.uiHints?.validateOnSave) {
+                const validation = await validatePluginConnection(plugin.pluginId);
+                if (!validation.success) {
+                    return { validationError: validation.error };
+                }
+                return { validationSuccess: validation.data?.message };
+            }
         },
-        [plugin.pluginId],
+        [plugin.pluginId, plugin.uiHints?.validateOnSave],
     );
 
     const {
         hasChanges,
         isSaving,
         saveSuccess,
+        saveMessage,
         validationError,
         visibleProperties,
         hasSettings,
@@ -60,6 +75,18 @@ export function PluginSettingsInline({
         scope: 'user',
     });
 
+    const filteredVisibleProperties = useMemo(() => {
+        if (!plugin.uiHints?.byok || byokRevealed) {
+            return visibleProperties;
+        }
+        return {};
+    }, [plugin.uiHints?.byok, byokRevealed, visibleProperties]);
+
+    const setupLink = plugin.uiHints?.setupLink;
+    const showSetupButton =
+        setupLink &&
+        (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !plugin.settings?.[f]));
+
     const headerContent = (
         <div className="flex items-center gap-3 min-w-0">
             <PluginIcon
@@ -70,7 +97,10 @@ export function PluginSettingsInline({
             />
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-semibold text-text dark:text-text-dark">
+                    <span
+                        className="text-sm font-semibold text-text dark:text-text-dark truncate"
+                        title={plugin.name}
+                    >
                         {plugin.name}
                     </span>
                     <span className="text-xs text-text-muted dark:text-text-muted-dark">
@@ -115,11 +145,46 @@ export function PluginSettingsInline({
                     />
                 )}
 
+                {plugin.uiHints?.organizationSettings && (
+                    <GitHubOrganizationsSettings
+                        plugin={plugin}
+                        connected={Boolean(oauthConnection?.connected)}
+                    />
+                )}
+
                 {/* Settings Form */}
                 {hasSettings ? (
                     <div className="space-y-4">
+                        {plugin.uiHints?.byok && !byokRevealed && (
+                            <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="mt-3"
+                                    onClick={() => setByokRevealed(true)}
+                                >
+                                    {plugin.uiHints.byok.buttonLabel ??
+                                        tOnboarding('byokDefaultButton')}
+                                </Button>
+                            </div>
+                        )}
+
+                        {showSetupButton && (
+                            <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
+                                <a
+                                    href={setupLink!.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    aria-label={setupLink!.label}
+                                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+                                >
+                                    {setupLink!.buttonLabel ?? setupLink!.label}
+                                </a>
+                            </div>
+                        )}
+
                         <div className="space-y-3">
-                            {Object.entries(visibleProperties).map(([key, propSchema]) => (
+                            {Object.entries(filteredVisibleProperties).map(([key, propSchema]) => (
                                 <PluginSettingsField
                                     key={key}
                                     name={key}
@@ -156,7 +221,7 @@ export function PluginSettingsInline({
                             {saveSuccess && (
                                 <span className="inline-flex items-center gap-1 text-sm text-success">
                                     <Check className="w-4 h-4" />
-                                    {t('settingsSaved')}
+                                    {saveMessage || t('settingsSaved')}
                                 </span>
                             )}
                         </div>

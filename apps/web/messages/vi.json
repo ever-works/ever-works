@@ -500,7 +500,8 @@
                             "paused": "Tạm dừng",
                             "canceled": "Đã hủy",
                             "disabled": "Đã tắt"
-                        }
+                        },
+                        "nextSourceValidation": "Lần xác thực nguồn tiếp theo"
                     },
                     "fields": {
                         "automation": "Tự động hóa",
@@ -513,7 +514,9 @@
                         "maxFailures": "Giới hạn lỗi",
                         "maxFailuresHelp": "Tự động tạm dừng khi đạt đến số lượng lỗi này.",
                         "createPullRequest": "Tạo Pull Request",
-                        "createPullRequestHelp": "Khi được bật, các bản cập nhật theo lịch trình sẽ tạo một pull request thay vì commit trực tiếp."
+                        "createPullRequestHelp": "Khi được bật, các bản cập nhật theo lịch trình sẽ tạo một pull request thay vì commit trực tiếp.",
+                        "sourceValidationCadence": "Tần suất xác thực nguồn",
+                        "sourceValidationCadenceHelp": "Mặc định dùng cùng tần suất với lịch cập nhật của bạn, nhưng bạn có thể làm chậm hơn hoặc nhanh hơn."
                     },
                     "billing": {
                         "subscription": "Đăng ký",
@@ -630,7 +633,39 @@
                 },
                 "loadMore": "Tải thêm",
                 "noMore": "Không còn bản ghi nào",
-                "unknown": "Không xác định"
+                "unknown": "Không xác định",
+                "activity": {
+                    "generation": "Tạo",
+                    "item_added": "Đã thêm mục",
+                    "item_updated": "Đã cập nhật mục",
+                    "item_removed": "Đã xóa mục",
+                    "comparison_added": "Đã thêm so sánh",
+                    "comparison_removed": "Đã xóa so sánh",
+                    "category_change": "Thay đổi danh mục",
+                    "tag_change": "Thay đổi thẻ",
+                    "collection_change": "Thay đổi bộ sưu tập",
+                    "community_pr_merged": "PR cộng đồng"
+                },
+                "detail": {
+                    "added": "Đã thêm",
+                    "updated": "Đã cập nhật",
+                    "removed": "Đã xóa",
+                    "fields": "Trường",
+                    "expand": "Mở rộng chi tiết nhật ký thay đổi",
+                    "collapse": "Thu gọn chi tiết nhật ký thay đổi"
+                },
+                "filters": {
+                    "label": "Hoạt động",
+                    "all": "Tất cả hoạt động",
+                    "generation": "Tạo",
+                    "items": "Mục",
+                    "comparisons": "So sánh",
+                    "taxonomy": "Phân loại",
+                    "community_pr": "PR cộng đồng"
+                },
+                "pagination": {
+                    "showing": "Hiển thị {from}-{to} trên tổng {total}"
+                }
             },
             "info": {
                 "title": "Thông tin Thư mục",
@@ -795,7 +830,8 @@
                 "tabs": {
                     "browseItems": "Browse Items",
                     "categories": "Categories",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -879,6 +915,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Kiem tra lai nguon",
+                    "checkCompleted": "Da hoan tat kiem tra nguon",
+                    "checkFailed": "Kiem tra nguon that bai",
+                    "failedToCheckSource": "Khong the kiem tra nguon cua muc",
+                    "brokenLink": "Lien ket hong",
+                    "healthy": "On",
+                    "couldNotVerify": "Khong the xac minh",
+                    "sourceMayHaveIssues": "Nguon co the co van de",
+                    "sourceChecked": "Da kiem tra nguon",
+                    "reachable": "Co the truy cap",
+                    "reachabilityInconclusive": "Kiem tra kha nang truy cap tu dong chua co ket luan",
+                    "accurateSource": "Nguon chinh xac",
+                    "sourceTooGeneric": "Nguon qua chung chung",
+                    "weakSource": "Nguon yeu",
+                    "sourceAccuracyUnknown": "Do chinh xac cua nguon chua ro",
+                    "useSuggestedSource": "Áp dụng gợi ý",
+                    "suggestedSourceApplied": "Đã áp dụng nguồn được gợi ý",
+                    "failedToUseSuggestedSource": "Không thể dùng nguồn được gợi ý",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {

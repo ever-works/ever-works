@@ -500,7 +500,8 @@
                             "paused": "Приостановлена",
                             "canceled": "Отменена",
                             "disabled": "Отключена"
-                        }
+                        },
+                        "nextSourceValidation": "Следующая проверка источника"
                     },
                     "fields": {
                         "automation": "Автоматизация",
@@ -513,7 +514,9 @@
                         "maxFailures": "Лимит сбоев",
                         "maxFailuresHelp": "Автоматически приостанавливать после достижения этого количества сбоев.",
                         "createPullRequest": "Создавать Pull Requests",
-                        "createPullRequestHelp": "При включении запланированные обновления создают pull request вместо прямого коммита."
+                        "createPullRequestHelp": "При включении запланированные обновления создают pull request вместо прямого коммита.",
+                        "sourceValidationCadence": "Частота проверки источника",
+                        "sourceValidationCadenceHelp": "По умолчанию используется та же частота, что и для обновлений, но её можно замедлить или ускорить."
                     },
                     "billing": {
                         "subscription": "Подписка",
@@ -630,7 +633,39 @@
                 },
                 "loadMore": "Загрузить еще",
                 "noMore": "Больше записей нет",
-                "unknown": "Неизвестно"
+                "unknown": "Неизвестно",
+                "activity": {
+                    "generation": "Генерация",
+                    "item_added": "Элемент добавлен",
+                    "item_updated": "Элемент обновлен",
+                    "item_removed": "Элемент удален",
+                    "comparison_added": "Сравнение добавлено",
+                    "comparison_removed": "Сравнение удалено",
+                    "category_change": "Изменение категории",
+                    "tag_change": "Изменение тега",
+                    "collection_change": "Изменение коллекции",
+                    "community_pr_merged": "PR сообщества"
+                },
+                "detail": {
+                    "added": "Добавлено",
+                    "updated": "Обновлено",
+                    "removed": "Удалено",
+                    "fields": "Поля",
+                    "expand": "Развернуть детали журнала изменений",
+                    "collapse": "Свернуть детали журнала изменений"
+                },
+                "filters": {
+                    "label": "Активность",
+                    "all": "Вся активность",
+                    "generation": "Генерация",
+                    "items": "Элементы",
+                    "comparisons": "Сравнения",
+                    "taxonomy": "Таксономия",
+                    "community_pr": "PR сообщества"
+                },
+                "pagination": {
+                    "showing": "Показаны {from}-{to} из {total}"
+                }
             },
             "info": {
                 "title": "Информация о каталоге",
@@ -795,7 +830,8 @@
                 "tabs": {
                     "browseItems": "Browse Items",
                     "categories": "Categories",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -879,6 +915,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Proverit istochnik snova",
+                    "checkCompleted": "Proverka istochnika zavershena",
+                    "checkFailed": "Proverka istochnika ne udalas",
+                    "failedToCheckSource": "Ne udalos proverit istochnik elementa",
+                    "brokenLink": "Bitaya ssylka",
+                    "healthy": "Dostupen",
+                    "couldNotVerify": "Ne udalos proverit",
+                    "sourceMayHaveIssues": "U istochnika mogut byt problemy",
+                    "sourceChecked": "Istochnik proveren",
+                    "reachable": "Dostupen",
+                    "reachabilityInconclusive": "Avtomaticheskaya proverka dostupnosti ne dala odnoznachnogo rezultata",
+                    "accurateSource": "Tochnyy istochnik",
+                    "sourceTooGeneric": "Istochnik slishkom obshchiy",
+                    "weakSource": "Slabyy istochnik",
+                    "sourceAccuracyUnknown": "Tochnost istochnika neizvestna",
+                    "useSuggestedSource": "Применить предложение",
+                    "suggestedSourceApplied": "Предложенный источник применён",
+                    "failedToUseSuggestedSource": "Не удалось использовать предложенный источник",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {
@@ -1717,7 +1786,7 @@
         "aiChat": {
             "title": "ИИ Ассистент",
             "subtitle": "Создавайте каталоги на естественном языке",
-            "welcomeMessage": "Привет! Я могу помочь вам создавать каталоги на естественном языке. Спросите \u043dапример — \"Создай каталог инструментов ИИ\" или опишите, что вам нужно.",
+            "welcomeMessage": "Привет! Я могу помочь вам создавать каталоги на естественном языке. Спросите например — \"Создай каталог инструментов ИИ\" или опишите, что вам нужно.",
             "newChat": "Новый чат",
             "loadingConversation": "Загрузка диалога…",
             "inputPlaceholder": "Опишите каталог, который вы хотите создать...",

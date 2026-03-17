@@ -171,6 +171,19 @@ export class Directory {
     @TimestampColumn({ nullable: true })
     websiteTemplateLastCheckedAt?: Date | null;
 
+    // Source Validation FIELDS
+    @Column({ type: 'boolean', default: false })
+    sourceValidationEnabled: boolean;
+
+    @Column({ type: 'varchar', nullable: true })
+    sourceValidationCadence?: DirectoryScheduleCadence | null;
+
+    @TimestampColumn({ nullable: true })
+    sourceValidationNextRunAt?: Date | null;
+
+    @TimestampColumn({ nullable: true })
+    sourceValidationLastRunAt?: Date | null;
+
     // Timestamps
     @CreateDateColumn()
     createdAt: Date;

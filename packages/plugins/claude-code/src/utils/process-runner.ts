@@ -20,6 +20,10 @@ export interface ExecuteOptions {
 	readonly model?: string;
 	/** Abort signal for cancellation */
 	readonly signal?: AbortSignal;
+	/** Callback for each stdout line (enables stream-json output format) */
+	readonly onStdoutLine?: (line: string) => void;
+	/** Callback for each stderr line */
+	readonly onStderrLine?: (line: string) => void;
 }
 
 export interface ExecuteResult {
@@ -74,6 +78,10 @@ export function executeClaudeCode(options: ExecuteOptions): {
 			String(options.maxTurns)
 		];
 
+		if (options.onStdoutLine) {
+			args.push('--output-format', 'stream-json', '--verbose');
+		}
+
 		if (options.maxBudgetUsd !== undefined) {
 			args.push('--max-budget-usd', String(options.maxBudgetUsd));
 		}
@@ -97,21 +105,47 @@ export function executeClaudeCode(options: ExecuteOptions): {
 
 		let stdout = '';
 		let stderr = '';
+		let stdoutRemainder = '';
+		let stderrRemainder = '';
 
 		childProcess.stdout?.on('data', (chunk: Buffer) => {
+			const text = chunk.toString('utf-8');
 			if (stdout.length < MAX_BUFFER_SIZE) {
-				stdout += chunk.toString('utf-8');
+				stdout += text;
 				if (stdout.length > MAX_BUFFER_SIZE) {
 					stdout = stdout.slice(0, MAX_BUFFER_SIZE);
+				}
+			}
+
+			if (options.onStdoutLine) {
+				const combined = stdoutRemainder + text;
+				const lines = combined.split('\n');
+				stdoutRemainder = lines.pop() ?? '';
+				for (const line of lines) {
+					if (line.trim()) {
+						options.onStdoutLine(line);
+					}
 				}
 			}
 		});
 
 		childProcess.stderr?.on('data', (chunk: Buffer) => {
+			const text = chunk.toString('utf-8');
 			if (stderr.length < MAX_BUFFER_SIZE) {
-				stderr += chunk.toString('utf-8');
+				stderr += text;
 				if (stderr.length > MAX_BUFFER_SIZE) {
 					stderr = stderr.slice(0, MAX_BUFFER_SIZE);
+				}
+			}
+
+			if (options.onStderrLine) {
+				const combined = stderrRemainder + text;
+				const lines = combined.split('\n');
+				stderrRemainder = lines.pop() ?? '';
+				for (const line of lines) {
+					if (line.trim()) {
+						options.onStderrLine(line);
+					}
 				}
 			}
 		});

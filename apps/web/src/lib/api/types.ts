@@ -8,6 +8,8 @@ export type {
     BadgeEvaluationResult,
     ItemData,
     Collection,
+    ItemSourceReachabilityStatus,
+    ItemSourceAccuracyStatus,
 } from '@ever-works/contracts';
 
 // Web-specific types

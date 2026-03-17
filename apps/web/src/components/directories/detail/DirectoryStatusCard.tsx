@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Directory } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
@@ -9,6 +10,8 @@ import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { getStepProgress, getStepText, getItemsProcessedText } from '@/lib/utils/generator-steps';
+import { Terminal } from 'lucide-react';
+import { TerminalLogViewer } from './shared/TerminalLogViewer';
 
 interface DirectoryStatusCardProps {
     directory: Directory;
@@ -18,6 +21,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
     const router = useRouter();
     const t = useTranslations('dashboard.directoryDetail.statusCard');
     const tProgress = useTranslations('dashboard.directoryDetail.progress');
+    const [showLogs, setShowLogs] = useState(false);
 
     const generateStatus = directory.generateStatus;
     const hasWarnings = !!generateStatus?.warnings?.length;
@@ -53,24 +57,57 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
         const stepText = getStepText(generateStatus, tProgress('steps.processing'));
         const itemsText = getItemsProcessedText(generateStatus);
 
+        const recentLogs = generateStatus.recentLogs;
+        const hasLogs = recentLogs && recentLogs.length > 0;
+        const isGenerating = generateStatus.status === GenerateStatusType.GENERATING;
+
+        const logsSection = hasLogs ? (
+            <>
+                <button
+                    type="button"
+                    onClick={() => setShowLogs((prev) => !prev)}
+                    className={cn(
+                        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                        showLogs
+                            ? 'bg-primary/10 text-primary dark:bg-primary/20'
+                            : 'text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark',
+                    )}
+                >
+                    <Terminal className="h-3 w-3" />
+                    {showLogs ? tProgress('hideLogs') : tProgress('showLogs')}
+                </button>
+                {showLogs && (
+                    <TerminalLogViewer
+                        logs={recentLogs}
+                        title={tProgress('showLogs')}
+                        maxHeight="max-h-48"
+                        showCursor={isGenerating}
+                    />
+                )}
+            </>
+        ) : null;
+
         const configs = {
             [GenerateStatusType.GENERATING]: {
                 title: t('generating.title'),
                 description: itemsText || stepText || t('generating.description'),
                 action: (
-                    <div className="w-full">
-                        <div className="flex items-center justify-between text-xs text-text-muted dark:text-text-muted-dark mb-1">
-                            <span>{t('generating.processing')}</span>
-                            <span className="font-medium">{progressPercentage}%</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-surface-tertiary dark:bg-surface-tertiary-dark rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
-                                style={{ width: `${progressPercentage}%` }}
-                            >
-                                <div className="h-full bg-linear-to-r from-primary via-primary to-primary/80 animate-gradient" />
+                    <div className="w-full space-y-3">
+                        <div>
+                            <div className="flex items-center justify-between text-xs text-text-muted dark:text-text-muted-dark mb-1">
+                                <span>{t('generating.processing')}</span>
+                                <span className="font-medium">{progressPercentage}%</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-surface-tertiary dark:bg-surface-tertiary-dark rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
+                                    style={{ width: `${progressPercentage}%` }}
+                                >
+                                    <div className="h-full bg-linear-to-r from-primary via-primary to-primary/80 animate-gradient" />
+                                </div>
                             </div>
                         </div>
+                        {logsSection}
                     </div>
                 ),
             },
@@ -91,7 +128,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                                             className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5"
                                         >
                                             <span className="shrink-0 mt-0.5">&#x2022;</span>
-                                            <span>{warning}</span>
+                                            <span className="break-words min-w-0">{warning}</span>
                                         </li>
                                     ))}
                                 </ul>
@@ -115,6 +152,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                                 {t('generated.regenerate')}
                             </Button>
                         </div>
+                        {logsSection && <div className="mt-3">{logsSection}</div>}
                     </div>
                 ),
             },
@@ -135,12 +173,13 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                                             className="text-xs text-rose-800 dark:text-rose-300/80 flex items-start gap-1.5"
                                         >
                                             <span className="shrink-0 mt-0.5">&#x2022;</span>
-                                            <span>{warning}</span>
+                                            <span className="break-words min-w-0">{warning}</span>
                                         </li>
                                     ))}
                                 </ul>
                             </div>
                         ) : null}
+                        {logsSection && <div className="mb-3">{logsSection}</div>}
                         <Button
                             href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
                             variant="primary"
