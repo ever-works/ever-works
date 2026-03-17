@@ -8,7 +8,7 @@ import {
 } from '@/lib/api/types-only';
 import { HistoryTable } from './HistoryTable';
 import { HistoryEmptyState } from './HistoryEmptyState';
-import { Button } from '@/components/ui/button';
+import { Button, section } from '@/components/ui/button';
 import { fetchDirectoryGenerationHistory } from '@/app/actions/dashboard/directories';
 import { toast } from 'sonner';
 
