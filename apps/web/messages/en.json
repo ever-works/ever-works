@@ -960,8 +960,9 @@
                     "updated": "Updated",
                     "removed": "Removed",
                     "fields": "Fields",
-                    "expand": "Expand changelog details",
-                    "collapse": "Collapse changelog details"
+                    "expand": "Expand details",
+                    "collapse": "Collapse details",
+                    "stepLogs": "Step Logs"
                 },
                 "filters": {
                     "label": "Activity",
@@ -1445,7 +1446,9 @@
                     "processing": "Processing..."
                 },
                 "progress": "Progress",
-                "closeNote": "This may take a few minutes. You can close this page and come back later."
+                "closeNote": "This may take a few minutes. You can close this page and come back later.",
+                "showLogs": "Show step logs",
+                "hideLogs": "Hide step logs"
             },
             "settings": {
                 "sourceSettings": "Source Repository",

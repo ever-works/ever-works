@@ -3,7 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { DirectoryGenerationHistory, GenerationMetrics } from '@src/entities';
 import { GenerateStatusType } from '@src/entities/types';
-import { DirectoryHistoryActivityType, type DirectoryChangelog } from '@ever-works/contracts/api';
+import {
+    DirectoryHistoryActivityType,
+    type DirectoryChangelog,
+    type GenerationStepLog,
+} from '@ever-works/contracts/api';
 
 type HistoryCreateParams = {
     directoryId: string;
@@ -37,6 +41,7 @@ type HistoryUpdateParams = {
     triggerRunId?: string;
     activityType?: DirectoryHistoryActivityType;
     changelog?: DirectoryChangelog | null;
+    logs?: GenerationStepLog[] | null;
 };
 
 @Injectable()
@@ -119,6 +124,16 @@ export class DirectoryGenerationHistoryRepository {
 
     async findById(id: string): Promise<DirectoryGenerationHistory | null> {
         return this.repository.findOne({ where: { id } });
+    }
+
+    async appendLogs(id: string, newLogs: GenerationStepLog[]): Promise<void> {
+        if (!newLogs.length) return;
+
+        const entry = await this.repository.findOne({ where: { id } });
+        if (!entry) return;
+
+        const existing = entry.logs ?? [];
+        await this.repository.update(id, { logs: [...existing, ...newLogs] });
     }
 
     async deleteEntry(id: string): Promise<void> {

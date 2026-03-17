@@ -47,6 +47,22 @@ export interface DirectoryHistoryChangeEntry {
 	fieldsChanged?: string[];
 }
 
+// ── Generation Step Logs ───────────────────────────────────────────────
+
+export type GenerationLogLevel = 'info' | 'warn' | 'error' | 'debug';
+export type GenerationLogSource = 'pipeline' | 'orchestrator' | 'claude-code' | 'system';
+
+export interface GenerationStepLog {
+	timestamp: string;
+	level: GenerationLogLevel;
+	source: GenerationLogSource;
+	stepIndex?: number | null;
+	stepName?: string | null;
+	event: 'step_started' | 'step_completed' | 'step_failed' | 'step_skipped' | 'message';
+	message: string;
+	durationMs?: number | null;
+}
+
 export interface DirectoryChangelog {
 	summary?: string | null;
 	addedCount: number;
@@ -93,6 +109,8 @@ export interface DirectoryGenerationHistoryEntry {
 	activityType: DirectoryHistoryActivityType;
 	/** Structured changelog details */
 	changelog?: DirectoryChangelog | null;
+	/** Step-level generation logs */
+	logs?: GenerationStepLog[] | null;
 }
 
 /**

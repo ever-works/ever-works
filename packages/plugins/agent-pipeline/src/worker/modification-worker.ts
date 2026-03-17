@@ -1,6 +1,6 @@
 import { generateText, stepCountIs, ToolSet } from 'ai';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
-import type { PluginLogger, IPromptFacade, FacadeOptions } from '@ever-works/plugin';
+import type { PluginLogger, IPromptFacade, FacadeOptions, PipelineExecutionOptions } from '@ever-works/plugin';
 import type { TemplateVariables } from '@ever-works/plugin';
 import { getCurrentDateString, ITEM_SCHEMA_PROMPT_TEXT, substituteVariables } from '@ever-works/plugin';
 
@@ -22,6 +22,7 @@ export interface ModificationWorkerContext {
 	signal?: AbortSignal;
 	promptFacade?: IPromptFacade;
 	facadeOptions?: FacadeOptions;
+	onLogEntry?: PipelineExecutionOptions['onLogEntry'];
 }
 
 export interface ModificationWorkerResult {
@@ -101,7 +102,22 @@ export async function processModification(
 					}),
 					abortSignal: signal,
 					experimental_repairToolCall: repairToolCall,
-					experimental_telemetry: { isEnabled: true }
+					experimental_telemetry: { isEnabled: true },
+					onStepFinish: (step) => {
+						if (ctx.onLogEntry && step.toolCalls.length > 0) {
+							const tools = step.toolCalls.map((tc) => tc.toolName).join(', ');
+							ctx.onLogEntry({
+								timestamp: new Date().toISOString(),
+								level: 'debug',
+								source: 'pipeline',
+								event: 'message',
+								message: `Modification worker: ${tools} (${step.usage.totalTokens} tokens)`,
+								stepIndex: 1,
+								stepName: null,
+								durationMs: null
+							});
+						}
+					}
 				});
 			},
 			{ providerName: 'worker', modelName: 'modification-worker', signal, logger }

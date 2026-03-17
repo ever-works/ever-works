@@ -17,6 +17,7 @@ import {
     type DirectoryGenerationHistoryResponse,
     type SourceValidationSettingsDto,
     type UpdateSourceValidationPayload,
+    type GenerationStepLog,
 } from '@ever-works/contracts/api';
 import { APIResponse, ItemData, Category, Tag, Collection } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
@@ -27,6 +28,7 @@ export type {
     DirectoryScheduleDto,
     UpdateDirectorySchedulePayload,
     GenerationMetrics,
+    GenerationStepLog,
     DirectoryGenerationHistoryEntry,
     DirectoryGenerationHistoryResponse,
     SourceValidationSettingsDto,
@@ -94,6 +96,8 @@ export type GenerateStatus = {
     error?: string;
     /** Warnings from degraded services (e.g. circuit breaker tripped) */
     warnings?: string[];
+    /** Recent log entries for live display during generation */
+    recentLogs?: GenerationStepLog[];
 };
 
 export type GetProjectsReadyState =
