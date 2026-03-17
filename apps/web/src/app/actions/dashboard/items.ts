@@ -2,11 +2,13 @@
 
 import { itemsGeneratorAPI, SubmitItemDto, UpdateItemDto } from '@/lib/api';
 import { screenshotAPI } from '@/lib/api';
+import { directoryAPI } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { revalidatePath } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
+import { DirectoryScheduleCadence } from '@/lib/api/enums';
 
 export async function addItem(directoryId: string, data: SubmitItemDto) {
     const user = await getAuthFromCookie();
@@ -270,5 +272,26 @@ export async function checkScreenshotAvailability() {
         };
     } catch {
         return { available: false };
+    }
+}
+
+export async function updateSourceValidationSettings(
+    directoryId: string,
+    payload: { enabled: boolean; cadence?: DirectoryScheduleCadence },
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        return { status: 'error' as const, message: 'Not authenticated' };
+    }
+
+    try {
+        await directoryAPI.updateSourceValidationSettings(directoryId, payload);
+        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_ITEMS(directoryId));
+        return { status: 'success' as const };
+    } catch (error) {
+        return {
+            status: 'error' as const,
+            message: error instanceof Error ? error.message : 'Failed to update settings',
+        };
     }
 }

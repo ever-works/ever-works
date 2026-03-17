@@ -734,7 +734,8 @@
                 "tabs": {
                     "browseItems": "Parcourir les éléments",
                     "categories": "Catégories",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -838,6 +839,18 @@
                     "useSuggestedSource": "Appliquer la suggestion",
                     "suggestedSourceApplied": "Source suggérée appliquée",
                     "failedToUseSuggestedSource": "Impossible d’utiliser la source suggérée"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {

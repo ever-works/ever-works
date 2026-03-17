@@ -721,8 +721,7 @@
                             "paused": "Paused",
                             "canceled": "Cancelled",
                             "disabled": "Disabled"
-                        },
-                        "nextSourceValidation": "Next source validation"
+                        }
                     },
                     "fields": {
                         "automation": "Automation",
@@ -737,9 +736,7 @@
                         "createPullRequest": "Create Pull Requests",
                         "createPullRequestHelp": "When enabled, scheduled updates create a pull request instead of committing directly.",
                         "pipeline": "Pipeline",
-                        "pipelineHelp": "Override which pipeline runs on schedule. Leave as default to use the same pipeline as your last manual generation.",
-                        "sourceValidationCadence": "Source validation cadence",
-                        "sourceValidationCadenceHelp": "Defaults to your update cadence, but you can slow it down or speed it up."
+                        "pipelineHelp": "Override which pipeline runs on schedule. Leave as default to use the same pipeline as your last manual generation."
                     },
                     "pipeline": {
                         "inherit": "Use last run settings",
@@ -1143,7 +1140,8 @@
                     "browseItems": "Browse Items",
                     "categories": "Categories",
                     "tags": "Tags",
-                    "collections": "Collections"
+                    "collections": "Collections",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -1292,6 +1290,18 @@
                     "useSuggestedSource": "Apply suggestion",
                     "suggestedSourceApplied": "Suggested source applied",
                     "failedToUseSuggestedSource": "Failed to use suggested source"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {

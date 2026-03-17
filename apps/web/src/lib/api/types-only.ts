@@ -39,6 +39,7 @@ export type {
     SyncDirectoryResponse,
     RepositoryStatus,
     RepositoryType,
+    SourceValidationSettingsDto,
     // GenerateStatus now has dynamic step support
 } from './directory';
 

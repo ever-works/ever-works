@@ -31,14 +31,6 @@ export class UpdateDirectoryScheduleDto implements IUpdateDirectorySchedulePaylo
     cadence?: DirectoryScheduleCadence;
 
     @ApiPropertyOptional({
-        description: 'Source validation cadence',
-        enum: DirectoryScheduleCadence,
-    })
-    @IsOptional()
-    @IsEnum(DirectoryScheduleCadence)
-    sourceValidationCadence?: DirectoryScheduleCadence;
-
-    @ApiPropertyOptional({
         description: 'Billing mode for scheduled runs',
         enum: DirectoryScheduleBillingMode,
     })

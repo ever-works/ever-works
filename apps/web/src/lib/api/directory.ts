@@ -15,6 +15,8 @@ import {
     type GenerationMetrics,
     type DirectoryGenerationHistoryEntry,
     type DirectoryGenerationHistoryResponse,
+    type SourceValidationSettingsDto,
+    type UpdateSourceValidationPayload,
 } from '@ever-works/contracts/api';
 import { APIResponse, ItemData, Category, Tag, Collection } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
@@ -27,6 +29,8 @@ export type {
     GenerationMetrics,
     DirectoryGenerationHistoryEntry,
     DirectoryGenerationHistoryResponse,
+    SourceValidationSettingsDto,
+    UpdateSourceValidationPayload,
 } from '@ever-works/contracts/api';
 
 export interface MarkdownReadmeConfig {
@@ -614,6 +618,19 @@ export const directoryAPI = {
             endpoint: `/directories/${id}/schedule/run`,
             data: {},
             method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    getSourceValidationSettings: async (id: string) => {
+        return serverFetch<SourceValidationSettingsDto>(`/directories/${id}/source-validation`);
+    },
+
+    updateSourceValidationSettings: async (id: string, data: UpdateSourceValidationPayload) => {
+        return serverMutation<SourceValidationSettingsDto>({
+            endpoint: `/directories/${id}/source-validation`,
+            data,
+            method: 'PUT',
             wrapInData: false,
         });
     },

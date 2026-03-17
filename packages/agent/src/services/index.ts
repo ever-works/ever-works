@@ -17,3 +17,4 @@ export * from './generator-form-schema.service';
 export * from './utils/error-classification.utils';
 export * from './utils/error.utils';
 export * from './types/trigger-context.types';
+export type { SourceValidationSettingsDto } from '@ever-works/contracts/api';

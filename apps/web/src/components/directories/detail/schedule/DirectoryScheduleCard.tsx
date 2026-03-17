@@ -109,11 +109,6 @@ function ScheduleForm({
             schedule.cadence ??
             allowances.find((item) => item.allowed)?.cadence ??
             DirectoryScheduleCadence.MONTHLY,
-        sourceValidationCadence:
-            schedule.sourceValidationCadence ??
-            schedule.cadence ??
-            allowances.find((item) => item.allowed)?.cadence ??
-            DirectoryScheduleCadence.MONTHLY,
         billingMode: schedule.billingMode ?? DirectoryScheduleBillingMode.SUBSCRIPTION,
         maxFailureBeforePause: schedule.maxFailureBeforePause ?? 3,
         alwaysCreatePullRequest: schedule.alwaysCreatePullRequest ?? false,
@@ -135,7 +130,6 @@ function ScheduleForm({
     }, [
         schedule.status,
         schedule.cadence,
-        schedule.sourceValidationCadence,
         schedule.billingMode,
         schedule.maxFailureBeforePause,
         schedule.alwaysCreatePullRequest,
@@ -174,7 +168,6 @@ function ScheduleForm({
             const result = await updateDirectorySchedule(directoryId, {
                 enable: !form.enable,
                 cadence: form.cadence,
-                sourceValidationCadence: form.sourceValidationCadence,
                 billingMode: form.billingMode,
                 maxFailureBeforePause: form.maxFailureBeforePause,
                 alwaysCreatePullRequest: form.alwaysCreatePullRequest,
@@ -199,15 +192,6 @@ function ScheduleForm({
         {
             label: t('summary.nextRun'),
             value: <ShowDateTime value={schedule.nextRunAt} default={t('summary.notScheduled')} />,
-        },
-        {
-            label: t('summary.nextSourceValidation'),
-            value: (
-                <ShowDateTime
-                    value={schedule.sourceValidationNextRunAt}
-                    default={t('summary.notScheduled')}
-                />
-            ),
         },
         {
             label: t('summary.lastRun'),
@@ -243,7 +227,6 @@ function ScheduleForm({
             const result = await updateDirectorySchedule(directoryId, {
                 enable: form.enable,
                 cadence: form.cadence,
-                sourceValidationCadence: form.sourceValidationCadence,
                 billingMode: form.billingMode,
                 maxFailureBeforePause: form.maxFailureBeforePause,
                 alwaysCreatePullRequest: form.alwaysCreatePullRequest,
@@ -412,39 +395,6 @@ function ScheduleForm({
                             ))}
                         </div>
                     )}
-                </FieldCard>
-
-                <FieldCard
-                    label={t('fields.sourceValidationCadence')}
-                    helper={t('fields.sourceValidationCadenceHelp')}
-                >
-                    <Select
-                        value={form.sourceValidationCadence}
-                        onValueChange={(val) =>
-                            updateForm({
-                                sourceValidationCadence: val as DirectoryScheduleCadence,
-                            })
-                        }
-                    >
-                        <SelectTrigger>
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {cadenceOrder.map((cadence) => (
-                                <SelectItem
-                                    key={`source-${cadence}`}
-                                    value={cadence}
-                                    disabled={
-                                        subscriptionsEnabled &&
-                                        !allowances.find((item) => item.cadence === cadence)
-                                            ?.allowed
-                                    }
-                                >
-                                    {t(`cadence.${cadence}`)}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
                 </FieldCard>
 
                 <FieldCard label={t('fields.maxFailures')} helper={t('fields.maxFailuresHelp')}>

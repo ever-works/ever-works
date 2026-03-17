@@ -830,7 +830,8 @@
                 "tabs": {
                     "browseItems": "Browse Items",
                     "categories": "Categories",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -934,6 +935,18 @@
                     "useSuggestedSource": "Terapkan saran",
                     "suggestedSourceApplied": "Sumber yang disarankan diterapkan",
                     "failedToUseSuggestedSource": "Gagal menggunakan sumber yang disarankan"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {

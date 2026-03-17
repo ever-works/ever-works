@@ -84,18 +84,6 @@ export class DirectoryScheduleRepository {
         });
     }
 
-    async findDueSourceValidation(limit: number): Promise<DirectorySchedule[]> {
-        return this.repository.find({
-            where: {
-                status: DirectoryScheduleStatus.ACTIVE,
-                sourceValidationNextRunAt: LessThanOrEqual(new Date()),
-            },
-            order: { sourceValidationNextRunAt: 'ASC' },
-            take: limit,
-            relations: ['directory', 'user'],
-        });
-    }
-
     async findStuckGenerating(olderThan: Date): Promise<DirectorySchedule[]> {
         return this.repository.find({
             where: {
