@@ -113,7 +113,6 @@ const ItemCardList = memo(function ItemCardList({
                         {item.description}
                     </p>
                 )}
-                <ItemHealthDetails item={item} />
             </div>
 
             {/* Order badge and Category */}
@@ -214,8 +213,6 @@ const ItemCardGrid = memo(function ItemCardGrid({
                 </p>
             )}
 
-            <ItemHealthDetails item={item} className="mb-3" />
-
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     {item.order !== undefined && item.order !== null && (
@@ -259,168 +256,28 @@ const ItemCardGrid = memo(function ItemCardGrid({
 });
 
 function ItemHealthBadge({ item }: { item: ItemData }) {
-    const t = useTranslations('dashboard.directoryDetail.items');
-
-    if (
-        item.source_validation?.reachability_status !== 'broken' &&
-        (!item.health || item.health.status !== 'broken')
-    ) {
+    if (!item.health || item.health.status === 'healthy' || item.health.status === 'unchecked') {
         return null;
     }
+
+    const isBroken = item.health.status === 'broken';
+    const label = isBroken ? 'Broken link' : 'Needs review';
+    const tone = isBroken
+        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
 
     return (
         <span
             className={cn(
                 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
-                'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+                tone,
             )}
-            title={
-                item.source_validation?.reason ||
-                item.health?.message ||
-                t('sourceValidation.brokenLink')
-            }
+            title={item.health.message || label}
         >
             <AlertTriangle className="h-3 w-3" />
-            {t('sourceValidation.brokenLink')}
+            {label}
         </span>
     );
-}
-
-function ItemHealthDetails({ item, className }: { item: ItemData; className?: string }) {
-    const t = useTranslations('dashboard.directoryDetail.items');
-    const validation = item.source_validation;
-    const checkedAtRaw = validation?.checked_at ?? item.health?.checked_at ?? null;
-    const checkedAt = checkedAtRaw ? new Date(checkedAtRaw).toLocaleString() : null;
-    const checkedSuffix = checkedAt ? ` · checked ${checkedAt}` : '';
-
-    if (!validation && !item.health) {
-        return null;
-    }
-
-    if (validation) {
-        const reachabilityText = getReachabilityText(t, validation.reachability_status);
-        const accuracyText = getAccuracyText(t, validation.accuracy_status);
-        const parts = [reachabilityText, accuracyText].filter(Boolean);
-        const baseText = parts.join(' · ') || t('sourceValidation.sourceChecked');
-        const detailText =
-            validation.reason &&
-            validation.accuracy_status !== 'accurate' &&
-            validation.reachability_status !== 'broken'
-                ? ` ${validation.reason}`
-                : '';
-        const text = `${baseText}${detailText}${checkedSuffix}`;
-        const toneClass = getValidationToneClass(validation);
-
-        return <p className={cn('mt-1 text-xs line-clamp-2', toneClass, className)}>{text}</p>;
-    }
-
-    if (!item.health || item.health.status === 'unchecked') {
-        return null;
-    }
-
-    if (item.health.status === 'healthy') {
-        return (
-            <p
-                className={cn(
-                    'mt-1 text-xs text-emerald-700 dark:text-emerald-300 line-clamp-2',
-                    className,
-                )}
-            >
-                {`${t('sourceValidation.healthy')}${checkedSuffix}`}
-            </p>
-        );
-    }
-
-    if (item.health.status === 'unknown') {
-        return (
-            <p
-                className={cn(
-                    'mt-1 text-xs text-text-secondary dark:text-text-secondary-dark line-clamp-2',
-                    className,
-                )}
-            >
-                {`${t('sourceValidation.couldNotVerify')}${checkedSuffix}`}
-            </p>
-        );
-    }
-
-    if (item.health.status === 'warning') {
-        return (
-            <p
-                className={cn(
-                    'mt-1 text-xs text-amber-700 dark:text-amber-300 line-clamp-2',
-                    className,
-                )}
-            >
-                {`${item.health.message || t('sourceValidation.sourceMayHaveIssues')}${checkedSuffix}`}
-            </p>
-        );
-    }
-
-    return (
-        <p className={cn('mt-1 text-xs text-red-700 dark:text-red-300 line-clamp-2', className)}>
-            {`${item.health.message || t('sourceValidation.brokenLink')}${checkedSuffix}`}
-        </p>
-    );
-}
-
-function getReachabilityText(
-    t: ReturnType<typeof useTranslations<'dashboard.directoryDetail.items'>>,
-    reachabilityStatus: ItemData['source_validation'] extends infer T
-        ? T extends { reachability_status: infer R }
-            ? R
-            : never
-        : never,
-) {
-    switch (reachabilityStatus) {
-        case 'reachable':
-            return t('sourceValidation.reachable');
-        case 'broken':
-            return t('sourceValidation.brokenLink');
-        case 'unknown':
-        default:
-            return t('sourceValidation.reachabilityInconclusive');
-    }
-}
-
-function getAccuracyText(
-    t: ReturnType<typeof useTranslations<'dashboard.directoryDetail.items'>>,
-    accuracyStatus: ItemData['source_validation'] extends infer T
-        ? T extends { accuracy_status: infer A }
-            ? A
-            : never
-        : never,
-) {
-    switch (accuracyStatus) {
-        case 'accurate':
-            return t('sourceValidation.accurateSource');
-        case 'generic':
-            return t('sourceValidation.sourceTooGeneric');
-        case 'weak':
-            return t('sourceValidation.weakSource');
-        case 'unknown':
-        default:
-            return t('sourceValidation.sourceAccuracyUnknown');
-    }
-}
-
-function getValidationToneClass(validation: NonNullable<ItemData['source_validation']>) {
-    if (validation.reachability_status === 'broken') {
-        return 'text-red-700 dark:text-red-300';
-    }
-
-    if (
-        validation.reachability_status === 'reachable' &&
-        validation.accuracy_status === 'accurate'
-    ) {
-        return 'text-emerald-700 dark:text-emerald-300';
-    }
-
-    if (validation.accuracy_status === 'generic' || validation.accuracy_status === 'weak') {
-        return 'text-amber-700 dark:text-amber-300';
-    }
-
-    return 'text-text-secondary dark:text-text-secondary-dark';
 }
 
 const BADGE_STYLES: Record<string, { good: string; bad: string; neutral: string }> = {

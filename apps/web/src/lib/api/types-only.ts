@@ -98,6 +98,8 @@ export type {
     Brand,
     ItemData,
     Collection,
+    ItemSourceReachabilityStatus,
+    ItemSourceAccuracyStatus,
 } from './types';
 
 export type {

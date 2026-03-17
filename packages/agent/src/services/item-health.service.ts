@@ -49,7 +49,7 @@ type DirectoryHealthCheckResult = {
 
 const sourceValidationSchema = z.object({
     accuracy_status: z.enum(['accurate', 'generic', 'weak', 'unknown']),
-    confidence_score: z.number().min(0).max(1),
+    confidence_score: z.number().min(0).max(1).nullable(),
     is_relevant: z.boolean(),
     is_specific: z.boolean(),
     is_official: z.boolean(),
@@ -421,11 +421,11 @@ export class ItemHealthService {
                 sourceValidationSchema,
                 {
                     variables: {
-                        itemName: item.name,
-                        itemDescription: item.description || '',
+                        itemName: this.sanitizePromptVariable(item.name, 200),
+                        itemDescription: this.sanitizePromptVariable(item.description || '', 500),
                         candidateUrl: item.source_url,
                         httpSummary,
-                        pageContent,
+                        pageContent: this.sanitizePromptVariable(pageContent, 2000),
                     },
                     routing: {
                         complexity: 'simple',
@@ -617,7 +617,7 @@ export class ItemHealthService {
             return baseReachabilityStatus;
         }
 
-        if (pageContent.trim().length > 0) {
+        if (pageContent.trim().length > 100) {
             return 'reachable';
         }
 
@@ -638,9 +638,22 @@ export class ItemHealthService {
         );
     }
 
+    private sanitizePromptVariable(value: string, maxLength: number): string {
+        return value
+            .replace(/\r?\n|\r/g, ' ')
+            .replace(/\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi, '')
+            .slice(0, maxLength);
+    }
+
     private async loadChecker(): Promise<CheckLinksFn> {
-        const module = (await import('check-links')) as { default: CheckLinksFn };
-        return module.default;
+        try {
+            const module = (await import('check-links')) as { default: CheckLinksFn };
+            return module.default;
+        } catch (error) {
+            throw new Error(
+                `Failed to load check-links module: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
     }
 
     private buildManualCheckCacheKey(directoryId: string, itemSlug: string): string {
