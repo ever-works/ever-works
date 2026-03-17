@@ -40,6 +40,7 @@ export type {
     SyncDirectoryResponse,
     RepositoryStatus,
     RepositoryType,
+    SourceValidationSettingsDto,
     // GenerateStatus now has dynamic step support
 } from './directory';
 
@@ -51,6 +52,8 @@ export type {
     SubmitItemDto,
     RemoveItemDto,
     UpdateItemDto,
+    CheckItemHealthDto,
+    CheckItemHealthResponseDto,
     ExtractItemDetailsDto,
     ItemsGeneratorResponse,
     ExtractItemDetailsResponse,
@@ -97,6 +100,8 @@ export type {
     Brand,
     ItemData,
     Collection,
+    ItemSourceReachabilityStatus,
+    ItemSourceAccuracyStatus,
 } from './types';
 
 export type {

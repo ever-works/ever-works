@@ -500,7 +500,8 @@
                             "paused": "Wstrzymana",
                             "canceled": "Anulowana",
                             "disabled": "Wyłączona"
-                        }
+                        },
+                        "nextSourceValidation": "Następna walidacja źródła"
                     },
                     "fields": {
                         "automation": "Automatyzacja",
@@ -513,7 +514,9 @@
                         "maxFailures": "Limit błędów",
                         "maxFailuresHelp": "Automatycznie wstrzymaj po osiągnięciu tej liczby błędów.",
                         "createPullRequest": "Utwórz Pull Request",
-                        "createPullRequestHelp": "Po włączeniu zaplanowane aktualizacje tworzą pull request zamiast commitować bezpośrednio."
+                        "createPullRequestHelp": "Po włączeniu zaplanowane aktualizacje tworzą pull request zamiast commitować bezpośrednio.",
+                        "sourceValidationCadence": "Częstotliwość walidacji źródła",
+                        "sourceValidationCadenceHelp": "Domyślnie używa tej samej częstotliwości co aktualizacje, ale możesz ją spowolnić lub przyspieszyć."
                     },
                     "billing": {
                         "subscription": "Subskrypcja",
@@ -827,7 +830,8 @@
                 "tabs": {
                     "browseItems": "Browse Items",
                     "categories": "Categories",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -911,6 +915,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Sprawdz zrodlo ponownie",
+                    "checkCompleted": "Sprawdzanie zrodla zakonczone",
+                    "checkFailed": "Sprawdzanie zrodla nie powiodlo sie",
+                    "failedToCheckSource": "Nie udalo sie sprawdzic zrodla elementu",
+                    "brokenLink": "Uszkodzony link",
+                    "healthy": "Poprawne",
+                    "couldNotVerify": "Nie udalo sie zweryfikowac",
+                    "sourceMayHaveIssues": "Zrodlo moze miec problemy",
+                    "sourceChecked": "Zrodlo sprawdzone",
+                    "reachable": "Osiagalne",
+                    "reachabilityInconclusive": "Automatyczne sprawdzenie osiagalnosci bylo nierozstrzygajace",
+                    "accurateSource": "Dokladne zrodlo",
+                    "sourceTooGeneric": "Zrodlo jest zbyt ogolne",
+                    "weakSource": "Slabe zrodlo",
+                    "sourceAccuracyUnknown": "Dokladnosc zrodla nieznana",
+                    "useSuggestedSource": "Zastosuj sugestię",
+                    "suggestedSourceApplied": "Zastosowano sugerowane źródło",
+                    "failedToUseSuggestedSource": "Nie udało się użyć sugerowanego źródła",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {

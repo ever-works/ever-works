@@ -734,7 +734,8 @@
                 "tabs": {
                     "browseItems": "Parcourir les éléments",
                     "categories": "Catégories",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -818,6 +819,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Reverifier la source",
+                    "checkCompleted": "Verification de la source terminee",
+                    "checkFailed": "Echec de la verification de la source",
+                    "failedToCheckSource": "Echec de la verification de la source de l'element",
+                    "brokenLink": "Lien casse",
+                    "healthy": "Valide",
+                    "couldNotVerify": "Impossible a verifier",
+                    "sourceMayHaveIssues": "La source peut avoir des problemes",
+                    "sourceChecked": "Source verifiee",
+                    "reachable": "Accessible",
+                    "reachabilityInconclusive": "Verification automatique de l'accessibilite non concluante",
+                    "accurateSource": "Source precise",
+                    "sourceTooGeneric": "Source trop generique",
+                    "weakSource": "Source faible",
+                    "sourceAccuracyUnknown": "Precision de la source inconnue",
+                    "useSuggestedSource": "Appliquer la suggestion",
+                    "suggestedSourceApplied": "Source suggérée appliquée",
+                    "failedToUseSuggestedSource": "Impossible d’utiliser la source suggérée",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {
@@ -1245,7 +1279,8 @@
                             "paused": "En pause",
                             "canceled": "Annulé",
                             "disabled": "Désactivé"
-                        }
+                        },
+                        "nextSourceValidation": "Prochaine validation de la source"
                     },
                     "fields": {
                         "automation": "Automatisation",
@@ -1258,7 +1293,9 @@
                         "maxFailures": "Limite d'échecs",
                         "maxFailuresHelp": "Mettre automatiquement en pause après ce nombre d'échecs.",
                         "createPullRequest": "Créer des Pull Requests",
-                        "createPullRequestHelp": "Lorsque activé, les mises à jour programmées créent une pull request au lieu de commiter directement."
+                        "createPullRequestHelp": "Lorsque activé, les mises à jour programmées créent une pull request au lieu de commiter directement.",
+                        "sourceValidationCadence": "Fréquence de validation de la source",
+                        "sourceValidationCadenceHelp": "Par défaut, elle reprend la même fréquence que vos mises à jour, mais vous pouvez la ralentir ou l’accélérer."
                     },
                     "billing": {
                         "subscription": "Abonnement",

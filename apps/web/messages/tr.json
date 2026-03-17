@@ -500,7 +500,8 @@
                             "paused": "Duraklatıldı",
                             "canceled": "İptal Edildi",
                             "disabled": "Devre Dışı"
-                        }
+                        },
+                        "nextSourceValidation": "Sonraki kaynak doğrulaması"
                     },
                     "fields": {
                         "automation": "Otomasyon",
@@ -513,7 +514,9 @@
                         "maxFailures": "Hata limiti",
                         "maxFailuresHelp": "Bu kadar çok hata oluştuğunda otomatik olarak duraklat.",
                         "createPullRequest": "Pull Request Oluştur",
-                        "createPullRequestHelp": "Etkinleştirildiğinde, zamanlanmış güncellemeler doğrudan commit yapmak yerine bir pull request oluşturur."
+                        "createPullRequestHelp": "Etkinleştirildiğinde, zamanlanmış güncellemeler doğrudan commit yapmak yerine bir pull request oluşturur.",
+                        "sourceValidationCadence": "Kaynak doğrulama sıklığı",
+                        "sourceValidationCadenceHelp": "Varsayılan olarak güncelleme sıklığınız kullanılır, ancak bunu yavaşlatabilir veya hızlandırabilirsiniz."
                     },
                     "billing": {
                         "subscription": "Abonelik",
@@ -827,7 +830,8 @@
                 "tabs": {
                     "browseItems": "Browse Items",
                     "categories": "Categories",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -911,6 +915,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Kaynagi yeniden kontrol et",
+                    "checkCompleted": "Kaynak kontrolu tamamlandi",
+                    "checkFailed": "Kaynak kontrolu basarisiz oldu",
+                    "failedToCheckSource": "Oge kaynagi kontrol edilemedi",
+                    "brokenLink": "Bozuk baglanti",
+                    "healthy": "Saglikli",
+                    "couldNotVerify": "Dogrulanamadi",
+                    "sourceMayHaveIssues": "Kaynakta sorunlar olabilir",
+                    "sourceChecked": "Kaynak kontrol edildi",
+                    "reachable": "Erisilebilir",
+                    "reachabilityInconclusive": "Otomatik erisilebilirlik kontrolu kesin sonuc vermedi",
+                    "accurateSource": "Dogru kaynak",
+                    "sourceTooGeneric": "Kaynak cok genel",
+                    "weakSource": "Zayif kaynak",
+                    "sourceAccuracyUnknown": "Kaynak dogrulugu bilinmiyor",
+                    "useSuggestedSource": "Öneriyi uygula",
+                    "suggestedSourceApplied": "Önerilen kaynak uygulandı",
+                    "failedToUseSuggestedSource": "Önerilen kaynak kullanılamadı",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {

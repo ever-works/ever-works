@@ -75,6 +75,48 @@ export interface BadgeEvaluationResult {
 }
 
 /**
+ * Health status for an item's source URL.
+ */
+export type ItemHealthStatus = 'unchecked' | 'healthy' | 'unknown' | 'warning' | 'broken';
+
+/**
+ * Result of the latest source URL health check for an item.
+ */
+export interface ItemHealth {
+	readonly status: ItemHealthStatus;
+	readonly checked_at?: string;
+	readonly status_code?: number | null;
+	readonly message?: string | null;
+	readonly failure_count?: number;
+	readonly checked_via?: 'manual' | 'schedule';
+}
+
+/**
+ * Reachability status for an item's source URL.
+ */
+export type ItemSourceReachabilityStatus = 'reachable' | 'broken' | 'unknown';
+
+/**
+ * AI-evaluated source accuracy status for whether a source URL is a good source for the item.
+ */
+export type ItemSourceAccuracyStatus = 'accurate' | 'generic' | 'weak' | 'unknown';
+
+/**
+ * Result of validating both source URL reachability and source accuracy.
+ */
+export interface ItemSourceValidation {
+	readonly reachability_status: ItemSourceReachabilityStatus;
+	readonly accuracy_status: ItemSourceAccuracyStatus;
+	readonly checked_at?: string;
+	readonly confidence_score?: number | null;
+	readonly is_relevant?: boolean;
+	readonly is_specific?: boolean;
+	readonly is_official?: boolean;
+	readonly reason?: string | null;
+	readonly suggested_source_url?: string | null;
+}
+
+/**
  * Core item data structure for directory entries
  */
 export interface ItemData {
@@ -92,6 +134,8 @@ export interface ItemData {
 	readonly brand?: string | Brand;
 	readonly brand_logo_url?: string | null;
 	readonly images?: readonly string[];
+	readonly health?: ItemHealth;
+	readonly source_validation?: ItemSourceValidation;
 }
 
 /**
@@ -112,6 +156,8 @@ export interface MutableItemData {
 	brand?: string | Brand;
 	brand_logo_url?: string | null;
 	images?: string[];
+	health?: ItemHealth;
+	source_validation?: ItemSourceValidation;
 }
 
 /**

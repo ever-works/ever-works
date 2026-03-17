@@ -21,3 +21,4 @@ export type {
 	GenerationLogSource
 } from './generation-metrics.js';
 export { DirectoryHistoryActivityType } from './generation-metrics.js';
+export type { UpdateSourceValidationPayload, SourceValidationSettingsDto } from './source-validation.dto.js';

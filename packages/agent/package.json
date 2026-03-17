@@ -165,6 +165,7 @@
         "ajv": "^8.18.0",
         "ajv-formats": "^3.0.1",
         "cache-manager": "^7.2.7",
+        "check-links": "^3.0.1",
         "class-transformer": "^0.5.1",
         "class-validator": "^0.14.3",
         "date-fns": "^4.1.0",

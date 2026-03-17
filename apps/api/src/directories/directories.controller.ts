@@ -47,6 +47,8 @@ import {
     SubmitItemResponseDto,
     UpdateItemsGeneratorDto,
     UpdateItemDto,
+    CheckItemHealthDto,
+    CheckItemHealthResponseDto,
 } from '@ever-works/agent/items-generator';
 import { BulkCaptureImagesDto, BulkCaptureImagesResponseDto } from '@ever-works/agent/services';
 import {
@@ -63,6 +65,9 @@ import {
     DirectoryAdvancedPromptsService,
     DirectoryTaxonomyService,
     GeneratorFormSchemaService,
+    ItemHealthService,
+    ItemSourceValidationSchedulerService,
+    type SourceValidationSettingsDto,
 } from '@ever-works/agent/services';
 import { ComparisonGenerationService } from '@ever-works/agent/comparison-generator';
 import {
@@ -82,8 +87,9 @@ import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { GenerateDirectoryDetailDto } from './dto/generate-detail.dto';
 import { GenerateManualComparisonDto } from './dto/generate-manual-comparison.dto';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
-import { UpdateDirectoryScheduleDto } from '@ever-works/agent/dto';
+import { UpdateDirectoryScheduleDto, UpdateSourceValidationDto } from '@ever-works/agent/dto';
 import { DirectoryScheduleStatus } from '@ever-works/agent/entities';
+import { SubscriptionService } from '@ever-works/agent/subscriptions';
 
 let CACHE_TTL = 1000 * 60 * 10; // 10 minutes
 
@@ -106,9 +112,12 @@ export class DirectoriesController {
         private readonly directoryAdvancedPromptsService: DirectoryAdvancedPromptsService,
         private readonly directoryTaxonomyService: DirectoryTaxonomyService,
         private readonly generatorFormSchemaService: GeneratorFormSchemaService,
+        private readonly itemHealthService: ItemHealthService,
         private readonly communityPrProcessorService: CommunityPrProcessorService,
         private readonly comparisonGenerationService: ComparisonGenerationService,
         private readonly directoryRepository: DirectoryRepository,
+        private readonly sourceValidationService: ItemSourceValidationSchedulerService,
+        private readonly subscriptionService: SubscriptionService,
     ) {}
 
     @Get('directories')
@@ -575,6 +584,57 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         return this.directoryGenerationService.updateItemMetadata(id, updateItemDto, user);
+    }
+
+    @Post('directories/:id/check-item-health')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Check item health',
+        description: 'Run a source URL health check for a single item and persist the result',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Item health checked successfully' })
+    async checkItemHealth(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() checkItemHealthDto: CheckItemHealthDto,
+    ): Promise<CheckItemHealthResponseDto> {
+        const user = await this.authService.getUser(auth.userId);
+        const result = await this.itemHealthService.checkItem(
+            id,
+            checkItemHealthDto.item_slug,
+            user,
+        );
+        await this.cacheManager.del(`directory-items-${id}-${auth.userId}`);
+        return result;
+    }
+
+    @Get('directories/:id/source-validation')
+    @ApiOperation({ summary: 'Get source validation settings' })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    async getSourceValidationSettings(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+    ): Promise<SourceValidationSettingsDto> {
+        const user = await this.authService.getUser(auth.userId);
+        await this.directoryOwnershipService.ensureAccess(id, user.id);
+        const allowances = await this.subscriptionService.getCadenceAllowances(user);
+        return this.sourceValidationService.getSettings(id, allowances);
+    }
+
+    @Put('directories/:id/source-validation')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Update source validation settings' })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    async updateSourceValidationSettings(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: UpdateSourceValidationDto,
+    ): Promise<SourceValidationSettingsDto> {
+        const user = await this.authService.getUser(auth.userId);
+        await this.directoryOwnershipService.ensureCanEdit(id, user.id);
+        const allowances = await this.subscriptionService.getCadenceAllowances(user);
+        return this.sourceValidationService.updateSettings(id, dto, allowances);
     }
 
     @Post('extract-item-details')
