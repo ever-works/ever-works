@@ -838,7 +838,8 @@
                     "sourceAccuracyUnknown": "Quellgenauigkeit unbekannt",
                     "useSuggestedSource": "Vorschlag übernehmen",
                     "suggestedSourceApplied": "Vorgeschlagene Quelle übernommen",
-                    "failedToUseSuggestedSource": "Vorgeschlagene Quelle konnte nicht verwendet werden"
+                    "failedToUseSuggestedSource": "Vorgeschlagene Quelle konnte nicht verwendet werden",
+                    "needsReview": "Needs review"
                 },
                 "sourceValidationSettings": {
                     "title": "Source Health Checks",

@@ -256,12 +256,14 @@ const ItemCardGrid = memo(function ItemCardGrid({
 });
 
 function ItemHealthBadge({ item }: { item: ItemData }) {
+    const t = useTranslations('dashboard.directoryDetail.items.sourceValidation');
+
     if (!item.health || item.health.status === 'healthy' || item.health.status === 'unchecked') {
         return null;
     }
 
     const isBroken = item.health.status === 'broken';
-    const label = isBroken ? 'Broken link' : 'Needs review';
+    const label = isBroken ? t('brokenLink') : t('needsReview');
     const tone = isBroken
         ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
         : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';

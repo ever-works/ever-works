@@ -934,7 +934,8 @@
                     "sourceAccuracyUnknown": "Tochnist dzherela nevidoma",
                     "useSuggestedSource": "Застосувати пропозицію",
                     "suggestedSourceApplied": "Запропоноване джерело застосовано",
-                    "failedToUseSuggestedSource": "Не вдалося використати запропоноване джерело"
+                    "failedToUseSuggestedSource": "Не вдалося використати запропоноване джерело",
+                    "needsReview": "Needs review"
                 },
                 "sourceValidationSettings": {
                     "title": "Source Health Checks",

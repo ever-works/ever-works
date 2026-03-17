@@ -838,7 +838,8 @@
                     "sourceAccuracyUnknown": "دقة المصدر غير معروفة",
                     "useSuggestedSource": "طبّق الاقتراح",
                     "suggestedSourceApplied": "تم تطبيق المصدر المقترح",
-                    "failedToUseSuggestedSource": "تعذر استخدام المصدر المقترح"
+                    "failedToUseSuggestedSource": "تعذر استخدام المصدر المقترح",
+                    "needsReview": "Needs review"
                 },
                 "sourceValidationSettings": {
                     "title": "Source Health Checks",

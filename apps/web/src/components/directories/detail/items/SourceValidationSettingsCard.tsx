@@ -17,7 +17,7 @@ import { DirectoryScheduleCadence } from '@/lib/api/enums';
 import { updateSourceValidationSettings } from '@/app/actions/dashboard/items';
 import type { SourceValidationSettingsDto } from '@/lib/api/types-only';
 
-const cadenceOrder = [
+const allCadences = [
     DirectoryScheduleCadence.HOURLY,
     DirectoryScheduleCadence.DAILY,
     DirectoryScheduleCadence.WEEKLY,
@@ -34,9 +34,17 @@ export function SourceValidationSettingsCard({
     const t = useTranslations('dashboard.directoryDetail.items.sourceValidationSettings');
     const tCadence = useTranslations('dashboard.directoryDetail.schedule.card');
     const [enabled, setEnabled] = useState(settings.enabled);
-    const [cadence, setCadence] = useState<DirectoryScheduleCadence>(
-        (settings.cadence as DirectoryScheduleCadence) ?? DirectoryScheduleCadence.WEEKLY,
-    );
+    const availableCadences =
+        settings.allowedCadences.length > 0
+            ? allCadences.filter((c) => settings.allowedCadences.some((a) => a.cadence === c))
+            : allCadences;
+
+    const defaultCadence =
+        (settings.cadence as DirectoryScheduleCadence) ??
+        availableCadences[availableCadences.length - 1] ??
+        DirectoryScheduleCadence.WEEKLY;
+
+    const [cadence, setCadence] = useState<DirectoryScheduleCadence>(defaultCadence);
     const [dirty, setDirty] = useState(false);
     const [isSaving, startSaving] = useTransition();
 
@@ -94,7 +102,7 @@ export function SourceValidationSettingsCard({
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                {cadenceOrder.map((c) => (
+                                {availableCadences.map((c) => (
                                     <SelectItem key={c} value={c}>
                                         {tCadence(`cadence.${c}`)}
                                     </SelectItem>

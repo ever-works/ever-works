@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
 import { DirectoryScheduleService } from './directory-schedule.service';
 import { ItemHealthService } from './item-health.service';
@@ -99,6 +99,17 @@ export class ItemSourceValidationSchedulerService {
         }
 
         const cadence = dto.cadence ?? directory.sourceValidationCadence ?? null;
+
+        if (
+            cadence &&
+            allowedCadences.length > 0 &&
+            !allowedCadences.some((a) => a.cadence === cadence)
+        ) {
+            throw new BadRequestException(
+                `Cadence '${cadence}' is not allowed by your subscription plan`,
+            );
+        }
+
         const nextRunAt =
             dto.enabled && cadence ? this.scheduleService.calculateNextRun(cadence) : null;
 

@@ -838,7 +838,8 @@
                     "sourceAccuracyUnknown": "דיוק המקור אינו ידוע",
                     "useSuggestedSource": "החל הצעה",
                     "suggestedSourceApplied": "המקור המוצע הוחל",
-                    "failedToUseSuggestedSource": "לא ניתן להשתמש במקור המוצע"
+                    "failedToUseSuggestedSource": "לא ניתן להשתמש במקור המוצע",
+                    "needsReview": "Needs review"
                 },
                 "sourceValidationSettings": {
                     "title": "Source Health Checks",

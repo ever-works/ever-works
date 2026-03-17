@@ -934,7 +934,8 @@
                     "sourceAccuracyUnknown": "Accuratezza della fonte sconosciuta",
                     "useSuggestedSource": "Applica suggerimento",
                     "suggestedSourceApplied": "Fonte suggerita applicata",
-                    "failedToUseSuggestedSource": "Impossibile usare la fonte suggerita"
+                    "failedToUseSuggestedSource": "Impossibile usare la fonte suggerita",
+                    "needsReview": "Needs review"
                 },
                 "sourceValidationSettings": {
                     "title": "Source Health Checks",

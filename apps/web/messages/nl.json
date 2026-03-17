@@ -934,7 +934,8 @@
                     "sourceAccuracyUnknown": "Bronnauwkeurigheid onbekend",
                     "useSuggestedSource": "Suggestie toepassen",
                     "suggestedSourceApplied": "Voorgestelde bron toegepast",
-                    "failedToUseSuggestedSource": "Voorgestelde bron kon niet worden gebruikt"
+                    "failedToUseSuggestedSource": "Voorgestelde bron kon niet worden gebruikt",
+                    "needsReview": "Needs review"
                 },
                 "sourceValidationSettings": {
                     "title": "Source Health Checks",

@@ -1278,6 +1278,7 @@
                     "checkFailed": "Item source check failed",
                     "failedToCheckSource": "Failed to check item source",
                     "brokenLink": "Broken link",
+                    "needsReview": "Needs review",
                     "healthy": "Healthy",
                     "couldNotVerify": "Could not verify",
                     "sourceMayHaveIssues": "Source may have issues",

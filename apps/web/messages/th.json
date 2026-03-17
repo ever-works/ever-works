@@ -934,7 +934,8 @@
                     "sourceAccuracyUnknown": "ไม่ทราบความแม่นยำของแหล่งที่มา",
                     "useSuggestedSource": "ใช้คำแนะนำ",
                     "suggestedSourceApplied": "นำแหล่งข้อมูลที่แนะนำมาใช้แล้ว",
-                    "failedToUseSuggestedSource": "ไม่สามารถใช้แหล่งข้อมูลที่แนะนำได้"
+                    "failedToUseSuggestedSource": "ไม่สามารถใช้แหล่งข้อมูลที่แนะนำได้",
+                    "needsReview": "Needs review"
                 },
                 "sourceValidationSettings": {
                     "title": "Source Health Checks",

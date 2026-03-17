@@ -838,7 +838,8 @@
                     "sourceAccuracyUnknown": "来源准确性未知",
                     "useSuggestedSource": "应用建议",
                     "suggestedSourceApplied": "已应用建议来源",
-                    "failedToUseSuggestedSource": "无法使用建议来源"
+                    "failedToUseSuggestedSource": "无法使用建议来源",
+                    "needsReview": "Needs review"
                 },
                 "sourceValidationSettings": {
                     "title": "Source Health Checks",

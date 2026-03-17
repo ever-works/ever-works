@@ -617,6 +617,7 @@ export class DirectoriesController {
         @Param('id') id: string,
     ): Promise<SourceValidationSettingsDto> {
         const user = await this.authService.getUser(auth.userId);
+        await this.directoryOwnershipService.ensureAccess(id, user.id);
         const allowances = await this.subscriptionService.getCadenceAllowances(user);
         return this.sourceValidationService.getSettings(id, allowances);
     }

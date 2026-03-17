@@ -1,4 +1,4 @@
-import { IsBoolean, IsInt, IsOptional, IsString, IsUrl, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, IsUrl, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type { UpdateItemDto as IUpdateItemDto } from '@ever-works/contracts/api';
 
@@ -14,6 +14,7 @@ export class UpdateItemDto implements IUpdateItemDto {
 
     @ApiPropertyOptional({ description: 'Source URL for the item' })
     @IsOptional()
+    @IsNotEmpty()
     @IsUrl({ require_protocol: true })
     source_url?: string;
 
