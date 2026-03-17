@@ -295,7 +295,15 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	): Promise<PipelineResult> {
 		const startTime = Date.now();
 		const abortController = new AbortController();
-		const signal = options?.signal ?? abortController.signal;
+		// If an external signal is provided, forward its abort to our internal controller
+		if (options?.signal) {
+			if (options.signal.aborted) {
+				abortController.abort();
+			} else {
+				options.signal.addEventListener('abort', () => abortController.abort(), { once: true });
+			}
+		}
+		const signal = abortController.signal;
 
 		let state = initializeState();
 
@@ -331,6 +339,11 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 		const executionId = `${directory.id}-${Date.now()}`;
 
+		const handleCancelWithCleanup = (): PipelineResult => {
+			revokeToken(executionId);
+			return handleCancel();
+		};
+
 		try {
 			const pluginSettings = await resolveSettings(this.context, userId, directory.id);
 			const config = (request.config || {}) as Record<string, unknown>;
@@ -359,7 +372,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			await simClient.validateWorkflow(workflowId);
 			setState('validate-sim', 'completed');
 
-			if (signal.aborted) return handleCancel();
+			if (signal.aborted) return handleCancelWithCleanup();
 
 			// ── Step 2: Prepare Payload ───────────────────────────────
 			setState('prepare-payload', 'running');
@@ -387,7 +400,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			);
 			setState('prepare-payload', 'completed');
 
-			if (signal.aborted) return handleCancel();
+			if (signal.aborted) return handleCancelWithCleanup();
 
 			// ── Step 3: Execute SIM Workflow ──────────────────────────
 			setState('execute-workflow', 'running');
@@ -416,7 +429,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			);
 			setState('execute-workflow', 'completed');
 
-			if (signal.aborted) return handleCancel();
+			if (signal.aborted) return handleCancelWithCleanup();
 
 			// ── Step 4: Collect & Validate Results ────────────────────
 			setState('collect-results', 'running');
