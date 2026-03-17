@@ -155,8 +155,6 @@ export class SimClientWrapper {
 			async: true
 		});
 
-		this.logger.log(`SIM raw response: ${JSON.stringify(result).slice(0, 2000)}`);
-
 		// SIM returns jobId for async execution, check both jobId and taskId
 		const asyncResult = result as Record<string, unknown>;
 		const jobId = (asyncResult.jobId ?? asyncResult.taskId) as string | undefined;

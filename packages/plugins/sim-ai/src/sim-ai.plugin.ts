@@ -422,7 +422,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			setState('collect-results', 'running');
 			reportProgress(onProgress, 3, 75, 'Collect & Validate Results');
 
-			logger.log(`SIM output type: ${typeof execResult.output}, preview: ${JSON.stringify(execResult.output).slice(0, 500)}`);
 			const parsed = parseSimOutput(execResult.output);
 
 			// Deduplicate against existing items
@@ -532,7 +531,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				'async') as 'sync' | 'async',
 			asyncPollingIntervalMs: (pluginSettings.asyncPollingIntervalMs as number) ?? DEFAULT_POLLING_INTERVAL_MS,
 			asyncTimeoutMs: (pluginSettings.asyncTimeoutMs as number) ?? DEFAULT_ASYNC_TIMEOUT_MS,
-			maxRetries: (pluginSettings.maxRetries as number) ?? DEFAULT_MAX_RETRIES,
+			maxRetries: (pluginSettings.maxRetries as number) ?? DEFAULT_MAX_RETRIES
 		};
 	}
 

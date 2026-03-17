@@ -1,6 +1,5 @@
 import type { FormFieldDefinition, FormFieldGroup, ValidationResult } from '@ever-works/plugin';
-
-export const DEFAULT_TARGET_ITEMS = 50;
+import { DEFAULT_TARGET_ITEMS } from './types.js';
 
 export function getFormFields(): FormFieldDefinition[] {
 	return [

@@ -19,7 +19,16 @@ export function parseSimOutput(raw: unknown): ParsedResults {
 
 	const output = normalizeOutput(raw);
 
-	const items = parseItems(output.items);
+	const items = parseItems(output.items ?? []);
+
+	if (items.length === 0) {
+		throw new Error(
+			'SIM workflow returned a valid response but with no usable items. ' +
+				'The Agent may not be generating content correctly. ' +
+				'Check the Agent block output in the SIM dashboard logs.'
+		);
+	}
+
 	const categories = parseCategories(output.categories, items);
 	const tags = parseTags(output.tags, items);
 	const brands = parseBrands(output.brands, items);
@@ -53,9 +62,10 @@ function normalizeOutput(raw: unknown): SimWorkflowOutput {
 
 	const obj = raw as Record<string, unknown>;
 
-	// If output has an 'items' array, use it directly
-	if (Array.isArray(obj.items)) {
-		return obj as unknown as SimWorkflowOutput;
+	// If output has an 'items' field, use it (handle null/empty as empty array)
+	if ('items' in obj) {
+		const items = Array.isArray(obj.items) ? obj.items : [];
+		return { ...obj, items } as unknown as SimWorkflowOutput;
 	}
 
 	// If output has a nested 'output' field (from async execution)
@@ -121,47 +131,120 @@ function normalizeOutput(raw: unknown): SimWorkflowOutput {
 
 /**
  * Attempts to parse a string as JSON. Returns null on failure.
- * Handles markdown-wrapped JSON (```json ... ```) from AI agents,
- * and also extracts JSON blocks embedded within surrounding text.
+ * Handles markdown-wrapped JSON, embedded JSON blocks, and
+ * common AI output errors (trailing commas, missing values, truncation).
  */
 function tryParseJson(str: string): unknown {
 	let trimmed = str.trim();
 
 	// Try direct parse first
-	try {
-		return JSON.parse(trimmed);
-	} catch {
-		// Continue to extraction strategies
-	}
+	const direct = tryParse(trimmed);
+	if (direct !== null) return direct;
+
+	// Try repairing common AI JSON errors
+	const repaired = tryParse(repairJson(trimmed));
+	if (repaired !== null) return repaired;
 
 	// Extract JSON from markdown code fences (```json ... ``` or ``` ... ```)
 	const codeFenceMatch = trimmed.match(/```(?:json)?\s*\n([\s\S]*?)\n\s*```/);
 	if (codeFenceMatch) {
-		try {
-			return JSON.parse(codeFenceMatch[1].trim());
-		} catch {
-			// Continue
-		}
+		const fenceContent = codeFenceMatch[1].trim();
+		const fenceParsed = tryParse(fenceContent) ?? tryParse(repairJson(fenceContent));
+		if (fenceParsed !== null) return fenceParsed;
 	}
 
 	// Extract the first JSON object or array from the text
 	const jsonStart = trimmed.search(/[\[{]/);
 	if (jsonStart >= 0) {
 		const candidate = trimmed.slice(jsonStart);
-		// Find matching closing bracket by trying progressively shorter substrings
 		const openChar = candidate[0];
 		const closeChar = openChar === '{' ? '}' : ']';
 		let lastClose = candidate.lastIndexOf(closeChar);
 		while (lastClose >= 0) {
-			try {
-				return JSON.parse(candidate.slice(0, lastClose + 1));
-			} catch {
-				lastClose = candidate.lastIndexOf(closeChar, lastClose - 1);
-			}
+			const slice = candidate.slice(0, lastClose + 1);
+			const parsed = tryParse(slice) ?? tryParse(repairJson(slice));
+			if (parsed !== null) return parsed;
+			lastClose = candidate.lastIndexOf(closeChar, lastClose - 1);
 		}
 	}
 
 	return null;
+}
+
+/** Safe JSON.parse wrapper */
+function tryParse(str: string): unknown {
+	try {
+		return JSON.parse(str);
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Attempts to repair common JSON errors produced by AI models:
+ * - Empty values: `"key": ,` or `"key": }` → `"key": null,` / `"key": null}`
+ * - Trailing commas: `[1, 2, ]` → `[1, 2]`
+ * - Truncated output: missing closing brackets
+ * - Single quotes instead of double quotes
+ */
+function repairJson(str: string): string {
+	let repaired = str;
+
+	// Fix empty values: "key": , or "key": } or "key": ]
+	repaired = repaired.replace(/:\s*,/g, ': null,');
+	repaired = repaired.replace(/:\s*}/g, ': null}');
+	repaired = repaired.replace(/:\s*]/g, ': null]');
+
+	// Fix trailing commas before closing brackets
+	repaired = repaired.replace(/,\s*}/g, '}');
+	repaired = repaired.replace(/,\s*]/g, ']');
+
+	// Fix truncated output: count unmatched brackets and close them
+	let openBraces = 0;
+	let openBrackets = 0;
+	let inString = false;
+	let escape = false;
+
+	for (const ch of repaired) {
+		if (escape) {
+			escape = false;
+			continue;
+		}
+		if (ch === '\\' && inString) {
+			escape = true;
+			continue;
+		}
+		if (ch === '"') {
+			inString = !inString;
+			continue;
+		}
+		if (inString) continue;
+
+		if (ch === '{') openBraces++;
+		else if (ch === '}') openBraces--;
+		else if (ch === '[') openBrackets++;
+		else if (ch === ']') openBrackets--;
+	}
+
+	// If we're in an unclosed string, close it
+	if (inString) {
+		repaired += '"';
+	}
+
+	// Remove any trailing comma before we close brackets
+	repaired = repaired.replace(/,\s*$/, '');
+
+	// Close any unclosed brackets/braces
+	while (openBrackets > 0) {
+		repaired += ']';
+		openBrackets--;
+	}
+	while (openBraces > 0) {
+		repaired += '}';
+		openBraces--;
+	}
+
+	return repaired;
 }
 
 function parseItems(rawItems: SimOutputItem[]): ItemData[] {
@@ -178,7 +261,7 @@ function parseItems(rawItems: SimOutputItem[]): ItemData[] {
 				typeof raw.url === 'string' ? raw.url : typeof raw.source_url === 'string' ? raw.source_url : undefined,
 			content: typeof raw.content === 'string' ? raw.content : undefined,
 			category: typeof raw.category === 'string' ? raw.category.trim() : undefined,
-			tags: Array.isArray(raw.tags) ? raw.tags.filter((t): t is string => typeof t === 'string') : undefined,
+			tags: Array.isArray(raw.tags) ? raw.tags.filter((t): t is string => typeof t === 'string') : [],
 			brand: typeof raw.brand === 'string' ? raw.brand.trim() : undefined,
 			images: Array.isArray(raw.images) ? raw.images.filter((i): i is string => typeof i === 'string') : undefined
 		};

@@ -26,13 +26,6 @@ export function registerToken(executionId: string, tokenInfo: TokenInfo): void {
 }
 
 /**
- * Retrieves the active token for an execution.
- */
-export function getActiveToken(executionId: string): TokenInfo | undefined {
-	return activeTokens.get(executionId);
-}
-
-/**
  * Cleans up a token after workflow completion.
  * Called during the cleanup step to remove tracking of tokens that are
  * no longer needed.
@@ -62,13 +55,6 @@ export function cleanupExpiredTokens(): number {
 	}
 
 	return cleaned;
-}
-
-/**
- * Returns the count of active (non-expired) tokens.
- */
-export function getActiveTokenCount(): number {
-	return activeTokens.size;
 }
 
 /**
