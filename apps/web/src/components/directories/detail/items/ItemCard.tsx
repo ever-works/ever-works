@@ -26,7 +26,7 @@ export const ItemCard = memo(function ItemCard({
     onUpdate,
 }: ItemCardProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
-    const { directoryId, canEdit, directoryWebsite } = useItemsContext();
+    const { directoryId } = useItemsContext();
     const [isPending, startTransition] = useTransition();
 
     const handleDelete = () => {
@@ -83,7 +83,7 @@ const ItemCardList = memo(function ItemCardList({
     isPending,
     onUpdate,
 }: ItemCardViewProps) {
-    const { directoryId, canEdit, directoryWebsite } = useItemsContext();
+    const { canEdit, directoryWebsite } = useItemsContext();
     const isFeatured = item.featured === true;
 
     return (
@@ -170,7 +170,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
     isPending,
     onUpdate,
 }: ItemCardViewProps) {
-    const { directoryId, canEdit, directoryWebsite } = useItemsContext();
+    const { canEdit, directoryWebsite } = useItemsContext();
     const t = useTranslations('dashboard.directoryDetail.items');
     const isFeatured = item.featured === true;
 
@@ -325,7 +325,7 @@ const BADGE_STYLES: Record<string, { good: string; bad: string; neutral: string 
     },
 };
 
-function getBadgeVariant(key: string, value: string): 'good' | 'bad' | 'neutral' {
+function getBadgeVariant(_key: string, value: string): 'good' | 'bad' | 'neutral' {
     const goodValues = ['A', 'yes', 'in_stock', 'instant', 'online', 'both', '$'];
     const badValues = ['F', 'no', 'out_of_stock', '$$$'];
     const neutralValues = ['limited', 'in_person', 'contact', '$$'];
