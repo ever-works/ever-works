@@ -27,6 +27,7 @@ import {
     EnableDirectoryPluginDto,
     SetActiveCapabilityDto,
     SettingsMenuResponseDto,
+    SetGlobalPipelineDefaultDto,
 } from './dto';
 import { PluginValidationService } from './plugin-validation.service';
 
@@ -174,6 +175,25 @@ export class PluginsController {
             dto.settings,
             dto.secretSettings,
             dto.metadata,
+        );
+    }
+
+    @Post('plugins/pipeline-default')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Set global pipeline default',
+        description:
+            'Set or clear the global default pipeline for the current user. Optionally enforce it so the generator form cannot override it.',
+    })
+    @ApiResponse({ status: 200, description: 'Global pipeline default updated' })
+    async setGlobalPipelineDefault(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() dto: SetGlobalPipelineDefaultDto,
+    ): Promise<void> {
+        await this.pluginsService.setGlobalPipelineDefault(
+            auth.userId,
+            dto.pluginId ?? null,
+            dto.enforce,
         );
     }
 

@@ -114,8 +114,19 @@ export class GeneratorFormSchemaService {
             defaultValues = { ...defaultValues, ...dsFields.defaultValues };
         }
 
+        // Determine if the pipeline is enforced by the user's global default
+        let isPipelineEnforced = false;
+        if (options?.userId && this.pluginSettingsService) {
+            const globalDefault =
+                await this.pluginSettingsService.getUserGlobalPipelineDefault(options.userId);
+            if (globalDefault?.enforce) {
+                isPipelineEnforced = true;
+            }
+        }
+
         return {
             resolvedPipelineId: pipelinePlugin?.plugin.id,
+            isPipelineEnforced,
             providers,
             pluginFields,
             pluginGroups,
@@ -590,6 +601,21 @@ export class GeneratorFormSchemaService {
         pipelineId?: string,
         options?: FormSchemaOptions,
     ): Promise<RegisteredPlugin | undefined> {
+        // Resolve user's global pipeline default (if any)
+        let userGlobalDefault: { pluginId: string; enforce: boolean } | null = null;
+        if (options?.userId && this.pluginSettingsService) {
+            userGlobalDefault =
+                await this.pluginSettingsService.getUserGlobalPipelineDefault(options.userId);
+        }
+
+        // 0. Enforced user global default — overrides everything including explicit form selection
+        if (userGlobalDefault?.enforce) {
+            const registered = this.pluginRegistry.get(userGlobalDefault.pluginId);
+            if (registered && registered.state === 'loaded') {
+                return registered;
+            }
+        }
+
         // 1. Explicit pipelineId — use it directly
         if (pipelineId) {
             const registered = this.pluginRegistry.get(pipelineId);
@@ -597,6 +623,14 @@ export class GeneratorFormSchemaService {
                 return registered;
             }
             this.logger.warn(`Pipeline plugin not found or not enabled: ${pipelineId}`);
+        }
+
+        // 1.5. Non-enforced user global default — preferred over directory/manifest defaults
+        if (userGlobalDefault && !userGlobalDefault.enforce) {
+            const registered = this.pluginRegistry.get(userGlobalDefault.pluginId);
+            if (registered && registered.state === 'loaded') {
+                return registered;
+            }
         }
 
         // 2. Directory's activeCapability for 'pipeline'

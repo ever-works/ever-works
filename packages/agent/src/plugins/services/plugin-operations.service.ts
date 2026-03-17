@@ -13,6 +13,7 @@ import {
     type JsonSchema,
     type PluginManifest,
     toPluginSettingsSchemaProperty,
+    PLUGIN_CAPABILITIES,
 } from '@ever-works/plugin';
 import type {
     PluginResponse,
@@ -509,6 +510,77 @@ export class PluginOperationsService {
         this.logger.log(`Plugin "${pluginId}" settings updated for user "${userId}"`);
 
         return this.toUserPluginResponse(registered, userPlugin);
+    }
+
+    /**
+     * Set or clear the user's global pipeline default preference.
+     *
+     * Clears `isGlobalPipelineDefault` from all pipeline plugins for this user,
+     * then marks the given plugin (if any) as the global default.
+     *
+     * @param userId - The user to update
+     * @param pluginId - Plugin to set as default, or null to clear
+     * @param enforce - When true, this pipeline is forced in the generator form
+     */
+    async setGlobalPipelineDefault(
+        userId: string,
+        pluginId: string | null,
+        enforce: boolean,
+    ): Promise<void> {
+        const pipelines = this.pluginRegistryService.getByCapability(PLUGIN_CAPABILITIES.PIPELINE);
+
+        // Clear the flag from all pipeline plugins for this user
+        for (const registered of pipelines) {
+            const existing = await this.userPluginRepository.findOne({
+                where: { userId, pluginId: registered.plugin.id },
+            });
+            if (existing && existing.metadata?.isGlobalPipelineDefault) {
+                const newMeta = { ...existing.metadata };
+                delete newMeta.isGlobalPipelineDefault;
+                delete newMeta.globalPipelineDefaultEnforce;
+                await this.userPluginRepository.save({ ...existing, metadata: newMeta });
+            }
+        }
+
+        if (!pluginId) return;
+
+        // Ensure the target plugin exists
+        const target = this.pluginRegistryService.get(pluginId);
+        if (!target) {
+            throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        }
+        if (!target.plugin.capabilities.includes(PLUGIN_CAPABILITIES.PIPELINE)) {
+            throw new BadRequestException(`Plugin "${pluginId}" is not a pipeline plugin`);
+        }
+
+        // Find or create the user plugin record for the target
+        let userPlugin = await this.userPluginRepository.findOne({
+            where: { userId, pluginId },
+        });
+
+        if (!userPlugin) {
+            const pluginEntity = await this.pluginRepository.findOne({ where: { pluginId } });
+            if (!pluginEntity) {
+                throw new NotFoundException(`Plugin entity "${pluginId}" not found`);
+            }
+            userPlugin = this.userPluginRepository.create({
+                userId,
+                pluginId,
+                pluginEntityId: pluginEntity.id,
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            });
+        }
+
+        userPlugin.metadata = {
+            ...userPlugin.metadata,
+            isGlobalPipelineDefault: true,
+            globalPipelineDefaultEnforce: enforce,
+        };
+        await this.userPluginRepository.save(userPlugin);
+        this.logger.log(`Global pipeline default set to "${pluginId}" (enforce=${enforce}) for user "${userId}"`);
     }
 
     // ============================================
