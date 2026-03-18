@@ -11,6 +11,7 @@ function makeItem(slug: string, category: string, opts: Partial<ItemData> = {}):
         category,
         slug,
         tags: [],
+        markdown: '',
         ...opts,
     };
 }
@@ -180,6 +181,52 @@ describe('generateComparison', () => {
         expect(result.comparison.sources).toEqual([
             { title: 'Vercel official source', url: 'https://vercel.example.com' },
             { title: 'Netlify official source', url: 'https://netlify.example.com' },
+        ]);
+    });
+
+    it('should prefer suggested source urls and include markdown links in fallback sources', async () => {
+        const ai = makeAi();
+        const richPair = {
+            ...pair,
+            itemA: makeItem('github-com', 'hosting', {
+                name: 'GitHub Copilot',
+                source_url: 'https://github.com/',
+                markdown:
+                    'See the [GitHub pricing page](https://github.com/pricing) for plan details.',
+                source_validation: {
+                    reachability_status: 'reachable',
+                    accuracy_status: 'accurate',
+                    suggested_source_url: 'https://github.com/features/copilot',
+                },
+            }),
+            itemB: makeItem('gitlab-code-suggestions', 'hosting', {
+                name: 'GitLab Code Suggestions',
+                source_url:
+                    'https://docs.gitlab.com/ee/user/project/repository/code_suggestions.html',
+                markdown:
+                    'Reference: [GitLab Docs](https://docs.gitlab.com/ee/user/project/repository/code_suggestions.html)',
+            }),
+        };
+
+        const result = await generateComparison(richPair, { ...research, sources: [] }, ai);
+
+        expect(result.comparison.sources).toEqual([
+            {
+                title: 'GitHub Copilot official source',
+                url: 'https://github.com/features/copilot',
+            },
+            {
+                title: 'GitHub Copilot original source',
+                url: 'https://github.com/',
+            },
+            {
+                title: 'GitHub pricing page',
+                url: 'https://github.com/pricing',
+            },
+            {
+                title: 'GitLab Code Suggestions official source',
+                url: 'https://docs.gitlab.com/ee/user/project/repository/code_suggestions.html',
+            },
         ]);
     });
 

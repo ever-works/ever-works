@@ -15,6 +15,14 @@ interface ComparisonDetailClientProps {
     extendedAnalysisMarkdown?: string;
 }
 
+function formatComparisonDate(value: string): string {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return value;
+
+    const [, year, month, day] = match;
+    return `${Number(month)}/${Number(day)}/${year}`;
+}
+
 function stripSourcesSection(markdown?: string): string | undefined {
     if (!markdown) return markdown;
 
@@ -97,7 +105,7 @@ export function ComparisonDetailClient({
                     <span className="text-border dark:text-border-dark">|</span>
                     <span>{comparison.category}</span>
                     <span className="text-border dark:text-border-dark">|</span>
-                    <span>{new Date(comparison.generated_at).toLocaleDateString()}</span>
+                    <span>{formatComparisonDate(comparison.generated_at)}</span>
                 </div>
             </div>
 

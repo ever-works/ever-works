@@ -64,6 +64,14 @@ function buildPublicComparisonUrl(websiteUrl: string, comparisonSlug: string): s
     return `${websiteUrl.replace(/\/+$/, '')}/comparisons/${comparisonSlug}`;
 }
 
+function formatComparisonDate(value: string): string {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return value;
+
+    const [, year, month, day] = match;
+    return `${Number(month)}/${Number(day)}/${year}`;
+}
+
 export function ComparisonsPageClient({
     directoryId,
     websiteUrl,
@@ -861,7 +869,7 @@ export function ComparisonsPageClient({
                                         <span>{comparison.category}</span>
                                         <span className="text-border dark:text-border-dark">|</span>
                                         <span>
-                                            {new Date(comparison.generated_at).toLocaleDateString()}
+                                            {formatComparisonDate(comparison.generated_at)}
                                         </span>
                                     </div>
                                     <p className="mt-2 text-sm text-text-secondary dark:text-text-secondary-dark line-clamp-2">

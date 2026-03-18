@@ -18,18 +18,48 @@ interface AiComparisonStructure {
     readonly dimensions: ComparisonDimension[];
 }
 
+function extractMarkdownLinks(markdown?: string): ComparisonSource[] {
+    if (!markdown) return [];
+
+    const matches = markdown.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g);
+    return Array.from(matches, (match) => ({
+        title: match[1].trim(),
+        url: match[2].trim(),
+    }));
+}
+
+function getPreferredItemSource(item: ComparisonPair['itemA']): ComparisonSource[] {
+    const preferredUrl =
+        item.source_validation?.suggested_source_url?.trim() || item.source_url?.trim();
+    const sources: ComparisonSource[] = [];
+
+    if (preferredUrl) {
+        sources.push({
+            title: `${item.name} official source`,
+            url: preferredUrl,
+        });
+    }
+
+    const originalUrl = item.source_url?.trim();
+    if (originalUrl && originalUrl !== preferredUrl) {
+        sources.push({
+            title: `${item.name} original source`,
+            url: originalUrl,
+        });
+    }
+
+    sources.push(...extractMarkdownLinks(item.markdown));
+    return sources;
+}
+
 function normalizeComparisonSources(
     pair: ComparisonPair,
     research: ComparisonResearch,
 ): ComparisonSource[] {
     const candidates: ComparisonSource[] = [
         ...research.sources,
-        ...(pair.itemA.source_url
-            ? [{ title: `${pair.itemA.name} official source`, url: pair.itemA.source_url }]
-            : []),
-        ...(pair.itemB.source_url
-            ? [{ title: `${pair.itemB.name} official source`, url: pair.itemB.source_url }]
-            : []),
+        ...getPreferredItemSource(pair.itemA),
+        ...getPreferredItemSource(pair.itemB),
     ];
 
     const deduped = new Map<string, ComparisonSource>();
