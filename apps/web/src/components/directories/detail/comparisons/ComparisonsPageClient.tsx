@@ -868,9 +868,7 @@ export function ComparisonsPageClient({
                                         <span className="text-border dark:text-border-dark">|</span>
                                         <span>{comparison.category}</span>
                                         <span className="text-border dark:text-border-dark">|</span>
-                                        <span>
-                                            {formatComparisonDate(comparison.generated_at)}
-                                        </span>
+                                        <span>{formatComparisonDate(comparison.generated_at)}</span>
                                     </div>
                                     <p className="mt-2 text-sm text-text-secondary dark:text-text-secondary-dark line-clamp-2">
                                         {comparison.summary}
