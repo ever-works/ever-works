@@ -448,7 +448,16 @@
                 "configure": "Configure",
                 "noPluginsInCategory": "No plugins in this category",
                 "requiredSettingsMissing": "Required settings not configured",
-                "backToCategory": "Back to {category}"
+                "backToCategory": "Back to {category}",
+                "pipelineDefault": {
+                    "title": "Default Pipeline",
+                    "description": "Choose which pipeline is used by default when generating directory items.",
+                    "autoLabel": "Auto",
+                    "autoDescription": "Use the system-resolved pipeline for each directory",
+                    "enforceLabel": "Enforce this default",
+                    "enforceDescription": "The selected pipeline will be pre-selected in the generator form across all directories.",
+                    "saveFailed": "Failed to save pipeline default"
+                }
             },
             "profile": {
                 "title": "Profile Settings",
