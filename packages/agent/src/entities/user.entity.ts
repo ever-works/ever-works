@@ -64,10 +64,10 @@ export class User {
     passwordResetExpires: Date;
 
     // Git committer overrides (optional — fallback to username/email if not set)
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     committerName?: string | null;
 
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     committerEmail?: string | null;
 
     // Timestamps

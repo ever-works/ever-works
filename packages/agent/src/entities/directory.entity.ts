@@ -135,10 +135,10 @@ export class Directory {
     itemsCount?: number;
 
     // Git committer overrides at directory level (optional — fallback to user/default)
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     committerName?: string | null;
 
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     committerEmail?: string | null;
 
     // Import Source FIELDS

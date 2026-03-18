@@ -25,7 +25,8 @@ type DirectoryMethods =
     | 'isCreator'
     | 'getMember'
     | 'hasAccess'
-    | 'getUserRole';
+    | 'getUserRole'
+    | 'resolveCommitter';
 
 export type DirectoryWithRole = Omit<Directory, DirectoryMethods> & {
     userRole: DirectoryMemberRole;
