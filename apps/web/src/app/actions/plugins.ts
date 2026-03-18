@@ -203,3 +203,23 @@ export async function setActiveCapability(
         };
     }
 }
+
+/**
+ * Set or clear the global default pipeline for the current user
+ */
+export async function setGlobalPipelineDefault(
+    pluginId: string | null,
+    enforce: boolean,
+): Promise<ActionResult> {
+    try {
+        await pluginsAPI.setGlobalPipelineDefault(pluginId, enforce);
+        revalidatePath('/settings/plugins/pipeline');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to set global pipeline default:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to set global pipeline default',
+        };
+    }
+}

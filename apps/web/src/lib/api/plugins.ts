@@ -225,6 +225,18 @@ export const pluginsAPI = {
     },
 
     /**
+     * Set or clear the global default pipeline for the current user
+     */
+    setGlobalPipelineDefault: async (pluginId: string | null, enforce: boolean): Promise<void> => {
+        await serverMutation<void>({
+            endpoint: '/plugins/pipeline-default',
+            data: { pluginId, enforce },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
      * Set active capability for a directory plugin
      */
     setActiveCapability: async (

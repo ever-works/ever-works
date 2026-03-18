@@ -716,4 +716,23 @@ export class PluginSettingsService {
         }
         return filtered;
     }
+
+    /**
+     * Get the user's global pipeline default preference.
+     * Returns the pluginId and enforce flag if set, or null if not configured.
+     */
+    async getUserGlobalPipelineDefault(
+        userId: string,
+    ): Promise<{ pluginId: string; enforce: boolean } | null> {
+        const userPlugins = await this.userPluginRepository.findByUser(userId);
+        for (const up of userPlugins) {
+            if (up.metadata?.isGlobalPipelineDefault === true) {
+                return {
+                    pluginId: up.pluginId,
+                    enforce: up.metadata.globalPipelineDefaultEnforce === true,
+                };
+            }
+        }
+        return null;
+    }
 }
