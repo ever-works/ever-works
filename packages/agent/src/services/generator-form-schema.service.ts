@@ -117,8 +117,9 @@ export class GeneratorFormSchemaService {
         // Determine if the pipeline is enforced by the user's global default
         let isPipelineEnforced = false;
         if (options?.userId && this.pluginSettingsService) {
-            const globalDefault =
-                await this.pluginSettingsService.getUserGlobalPipelineDefault(options.userId);
+            const globalDefault = await this.pluginSettingsService.getUserGlobalPipelineDefault(
+                options.userId,
+            );
             if (globalDefault?.enforce) {
                 isPipelineEnforced = true;
             }
@@ -604,8 +605,9 @@ export class GeneratorFormSchemaService {
         // Resolve user's global pipeline default (if any)
         let userGlobalDefault: { pluginId: string; enforce: boolean } | null = null;
         if (options?.userId && this.pluginSettingsService) {
-            userGlobalDefault =
-                await this.pluginSettingsService.getUserGlobalPipelineDefault(options.userId);
+            userGlobalDefault = await this.pluginSettingsService.getUserGlobalPipelineDefault(
+                options.userId,
+            );
         }
 
         // 0. Enforced user global default — overrides everything including explicit form selection

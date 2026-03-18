@@ -227,10 +227,7 @@ export const pluginsAPI = {
     /**
      * Set or clear the global default pipeline for the current user
      */
-    setGlobalPipelineDefault: async (
-        pluginId: string | null,
-        enforce: boolean,
-    ): Promise<void> => {
+    setGlobalPipelineDefault: async (pluginId: string | null, enforce: boolean): Promise<void> => {
         await serverMutation<void>({
             endpoint: '/plugins/pipeline-default',
             data: { pluginId, enforce },

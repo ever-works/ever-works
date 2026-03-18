@@ -580,7 +580,9 @@ export class PluginOperationsService {
             globalPipelineDefaultEnforce: enforce,
         };
         await this.userPluginRepository.save(userPlugin);
-        this.logger.log(`Global pipeline default set to "${pluginId}" (enforce=${enforce}) for user "${userId}"`);
+        this.logger.log(
+            `Global pipeline default set to "${pluginId}" (enforce=${enforce}) for user "${userId}"`,
+        );
     }
 
     // ============================================

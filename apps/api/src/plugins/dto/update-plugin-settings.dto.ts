@@ -132,7 +132,8 @@ export class SetGlobalPipelineDefaultDto {
     pluginId?: string | null;
 
     @ApiProperty({
-        description: 'When true, this pipeline is enforced in the generator form (cannot be overridden)',
+        description:
+            'When true, this pipeline is enforced in the generator form (cannot be overridden)',
         example: false,
     })
     @IsBoolean()
