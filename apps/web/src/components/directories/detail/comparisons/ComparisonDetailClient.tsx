@@ -220,28 +220,6 @@ export function ComparisonDetailClient({
                 </section>
             )}
 
-            {/* Sources */}
-            {comparison.sources && comparison.sources.length > 0 && (
-                <section className="rounded-lg border border-border dark:border-border-dark p-4">
-                    <h2 className="text-lg font-medium text-text dark:text-text-dark mb-2">
-                        {t('detail.sources')}
-                    </h2>
-                    <ul className="space-y-1">
-                        {comparison.sources.map((source, i) => (
-                            <li key={i}>
-                                <a
-                                    href={source}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm text-primary hover:text-primary-hover break-all"
-                                >
-                                    {source}
-                                </a>
-                            </li>
-                        ))}
-                    </ul>
-                </section>
-            )}
         </div>
     );
 }
