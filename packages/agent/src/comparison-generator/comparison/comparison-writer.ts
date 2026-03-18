@@ -18,6 +18,22 @@ interface AiComparisonStructure {
     readonly dimensions: ComparisonDimension[];
 }
 
+function normalizeComparisonSources(pair: ComparisonPair, research: ComparisonResearch): string[] {
+    const candidates = [
+        ...research.sources,
+        pair.itemA.source_url,
+        pair.itemB.source_url
+    ];
+
+    return Array.from(
+        new Set(
+            candidates.filter((source): source is string => {
+                return typeof source === 'string' && source.trim().length > 0;
+            }),
+        ),
+    );
+}
+
 const COMPARISON_JSON_SCHEMA = {
     type: 'object',
     properties: {
@@ -195,6 +211,7 @@ export function buildMarkdownPromptVariables(
     research: ComparisonResearch,
     customPrompt?: string,
 ): TemplateVariables<typeof DEFAULT_MARKDOWN_PROMPT> {
+    const normalizedSources = normalizeComparisonSources(pair, research);
     const dimensionsText = structure.dimensions
         .map(
             (d) =>
@@ -202,7 +219,7 @@ export function buildMarkdownPromptVariables(
         )
         .join('\n\n');
 
-    const sourcesText = research.sources.map((s) => `- ${s}`).join('\n');
+    const sourcesText = normalizedSources.map((s) => `- ${s}`).join('\n');
 
     let customPromptSection = '';
     if (customPrompt?.trim()) {
@@ -402,6 +419,7 @@ export async function generateComparison(
     }
 
     const slug = buildPairKey(slugA, slugB);
+    const normalizedSources = normalizeComparisonSources(pair, research);
 
     return {
         comparison: {
@@ -417,7 +435,7 @@ export async function generateComparison(
             verdict: structure.verdict,
             verdict_winner: structure.verdict_winner,
             dimensions: structure.dimensions,
-            sources: research.sources,
+            sources: normalizedSources,
             generated_at: new Date().toISOString(),
         },
         markdown,

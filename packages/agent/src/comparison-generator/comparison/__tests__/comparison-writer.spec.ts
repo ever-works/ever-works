@@ -158,7 +158,26 @@ describe('generateComparison', () => {
 
         const result = await generateComparison(pair, research, ai);
 
-        expect(result.comparison.sources).toEqual(research.sources);
+        expect(result.comparison.sources).toEqual([
+            ...research.sources,
+            'https://vercel.example.com',
+            'https://netlify.example.com',
+        ]);
+    });
+
+    it('should fall back to item source urls when research sources are empty', async () => {
+        const ai = makeAi();
+        const emptyResearch = {
+            ...research,
+            sources: [],
+        };
+
+        const result = await generateComparison(pair, emptyResearch, ai);
+
+        expect(result.comparison.sources).toEqual([
+            'https://vercel.example.com',
+            'https://netlify.example.com',
+        ]);
     });
 
     it('should set generated_at as ISO string', async () => {

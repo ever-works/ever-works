@@ -15,6 +15,24 @@ interface ComparisonDetailClientProps {
     extendedAnalysisMarkdown?: string;
 }
 
+function stripSourcesSection(markdown?: string): string | undefined {
+    if (!markdown) return markdown;
+
+    return markdown
+        .replace(/\n{2,}#{2,3}\s+Sources\s*[\s\S]*$/i, '')
+        .replace(/\n{3,}$/g, '\n\n')
+        .trim();
+}
+
+function getSourceLabel(source: string): string {
+    try {
+        const url = new URL(source);
+        return url.hostname.replace(/^www\./, '');
+    } catch {
+        return source;
+    }
+}
+
 function WinnerBadge({
     winner,
     itemAName,
@@ -55,6 +73,8 @@ export function ComparisonDetailClient({
 }: ComparisonDetailClientProps) {
     const t = useTranslations('dashboard.directoryDetail.comparisons');
     const [isExtendedOpen, setIsExtendedOpen] = useState(false);
+    const hasStructuredSources = !!comparison.sources?.length;
+    const articleMarkdown = hasStructuredSources ? stripSourcesSection(markdown) : markdown;
 
     return (
         <div className="space-y-8">
@@ -174,14 +194,54 @@ export function ComparisonDetailClient({
             </section>
 
             {/* Markdown article */}
-            {markdown && (
+            {articleMarkdown && (
                 <section>
                     <h2 className="text-lg font-medium text-text dark:text-text-dark mb-4">
                         {t('detail.article')}
                     </h2>
                     <div className="prose prose-sm dark:prose-invert prose-a:text-primary hover:prose-a:text-primary-hover max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
+                        <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                                a: ({ node: _node, ...props }) => (
+                                    <a {...props} target="_blank" rel="noopener noreferrer" />
+                                ),
+                            }}
+                        >
+                            {articleMarkdown}
+                        </ReactMarkdown>
                     </div>
+                </section>
+            )}
+
+            {/* Sources */}
+            {hasStructuredSources && (
+                <section className="rounded-lg border border-border dark:border-border-dark p-4">
+                    <h2 className="text-lg font-medium text-text dark:text-text-dark mb-3">
+                        {t('detail.sources')}
+                    </h2>
+                    <ul className="space-y-2">
+                        {comparison.sources.map((source) => (
+                            <li key={source}>
+                                <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-baseline sm:gap-2">
+                                    <span className="text-text dark:text-text-dark">
+                                        {getSourceLabel(source)}
+                                    </span>
+                                    <span className="hidden text-text-secondary dark:text-text-secondary-dark sm:inline">
+                                        -
+                                    </span>
+                                    <a
+                                        href={source}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="break-all text-primary underline underline-offset-2 hover:text-primary-hover"
+                                    >
+                                        {source}
+                                    </a>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
                 </section>
             )}
 
@@ -211,7 +271,18 @@ export function ComparisonDetailClient({
                     {isExtendedOpen && (
                         <div className="border-t border-border dark:border-border-dark px-4 py-4">
                             <div className="prose prose-sm dark:prose-invert prose-a:text-primary hover:prose-a:text-primary-hover max-w-none">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    components={{
+                                        a: ({ node: _node, ...props }) => (
+                                            <a
+                                                {...props}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            />
+                                        ),
+                                    }}
+                                >
                                     {extendedAnalysisMarkdown}
                                 </ReactMarkdown>
                             </div>
