@@ -219,8 +219,9 @@ export class Directory {
      * Priority: directory-level override → user-level override → user default (username/email)
      */
     resolveCommitter(user: User): { name: string; email: string } {
-        const name = this.committerName || user.asCommitter().name;
-        const email = this.committerEmail || user.asCommitter().email;
+        const userCommitter = user.asCommitter();
+        const name = this.committerName || userCommitter.name;
+        const email = this.committerEmail || userCommitter.email;
         return { name, email };
     }
 
