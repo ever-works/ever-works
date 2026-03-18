@@ -39,12 +39,10 @@ function extractMarkdownLinks(markdown?: string): ComparisonSource[] {
     const matches = markdown.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g);
     return Array.from(matches, (match) => ({
         title: match[1].trim(),
-        url: match[2].trim()
+        url: match[2].trim(),
     })).filter((source) => {
         return (
-            source.title.length > 0 &&
-            !isUrlLikeText(source.title) &&
-            !isLikelyAssetUrl(source.url)
+            source.title.length > 0 && !isUrlLikeText(source.title) && !isLikelyAssetUrl(source.url)
         );
     });
 }
