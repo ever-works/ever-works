@@ -1,4 +1,4 @@
-import type { ComparisonDimension } from '@ever-works/contracts';
+import type { ComparisonDimension, ComparisonSource } from '@ever-works/contracts';
 import { substituteVariables } from '@ever-works/plugin';
 import type { IPromptFacade, FacadeOptions, TemplateVariables } from '@ever-works/plugin';
 import type { ComparisonPair, ComparisonResearch, ComparisonGenerationResult } from './types';
@@ -18,20 +18,29 @@ interface AiComparisonStructure {
     readonly dimensions: ComparisonDimension[];
 }
 
-function normalizeComparisonSources(pair: ComparisonPair, research: ComparisonResearch): string[] {
-    const candidates = [
+function normalizeComparisonSources(
+    pair: ComparisonPair,
+    research: ComparisonResearch,
+): ComparisonSource[] {
+    const candidates: ComparisonSource[] = [
         ...research.sources,
-        pair.itemA.source_url,
-        pair.itemB.source_url
+        ...(pair.itemA.source_url
+            ? [{ title: `${pair.itemA.name} official source`, url: pair.itemA.source_url }]
+            : []),
+        ...(pair.itemB.source_url
+            ? [{ title: `${pair.itemB.name} official source`, url: pair.itemB.source_url }]
+            : []),
     ];
 
-    return Array.from(
-        new Set(
-            candidates.filter((source): source is string => {
-                return typeof source === 'string' && source.trim().length > 0;
-            }),
-        ),
-    );
+    const deduped = new Map<string, ComparisonSource>();
+    for (const candidate of candidates) {
+        if (!candidate.url?.trim()) continue;
+        if (!deduped.has(candidate.url)) {
+            deduped.set(candidate.url, candidate);
+        }
+    }
+
+    return Array.from(deduped.values());
 }
 
 const COMPARISON_JSON_SCHEMA = {
@@ -219,7 +228,13 @@ export function buildMarkdownPromptVariables(
         )
         .join('\n\n');
 
-    const sourcesText = normalizedSources.map((s) => `- ${s}`).join('\n');
+    const sourcesText = normalizedSources
+        .map((source) =>
+            source.note
+                ? `- ${source.title} – ${source.url} (${source.note})`
+                : `- ${source.title} – ${source.url}`,
+        )
+        .join('\n');
 
     let customPromptSection = '';
     if (customPrompt?.trim()) {

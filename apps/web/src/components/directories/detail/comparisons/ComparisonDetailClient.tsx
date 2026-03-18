@@ -24,15 +24,6 @@ function stripSourcesSection(markdown?: string): string | undefined {
         .trim();
 }
 
-function getSourceLabel(source: string): string {
-    try {
-        const url = new URL(source);
-        return url.hostname.replace(/^www\./, '');
-    } catch {
-        return source;
-    }
-}
-
 function WinnerBadge({
     winner,
     itemAName,
@@ -222,22 +213,27 @@ export function ComparisonDetailClient({
                     </h2>
                     <ul className="space-y-2">
                         {comparison.sources.map((source) => (
-                            <li key={source}>
+                            <li key={source.url}>
                                 <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-baseline sm:gap-2">
                                     <span className="text-text dark:text-text-dark">
-                                        {getSourceLabel(source)}
+                                        {source.title}
                                     </span>
                                     <span className="hidden text-text-secondary dark:text-text-secondary-dark sm:inline">
                                         -
                                     </span>
                                     <a
-                                        href={source}
+                                        href={source.url}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="break-all text-primary underline underline-offset-2 hover:text-primary-hover"
                                     >
-                                        {source}
+                                        {source.url}
                                     </a>
+                                    {source.note && (
+                                        <span className="text-text-secondary dark:text-text-secondary-dark">
+                                            ({source.note})
+                                        </span>
+                                    )}
                                 </div>
                             </li>
                         ))}

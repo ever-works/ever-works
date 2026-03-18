@@ -470,6 +470,12 @@ export interface ComparisonDimension {
     winner?: 'item_a' | 'item_b' | 'tie';
 }
 
+export interface ComparisonSource {
+    title: string;
+    url: string;
+    note?: string;
+}
+
 export interface ComparisonData {
     id: string;
     slug: string;
@@ -483,7 +489,7 @@ export interface ComparisonData {
     verdict: string;
     verdict_winner?: 'item_a' | 'item_b' | 'tie';
     dimensions: ComparisonDimension[];
-    sources: string[];
+    sources: ComparisonSource[];
     generated_at: string;
 }
 

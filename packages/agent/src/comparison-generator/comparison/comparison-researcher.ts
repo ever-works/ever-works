@@ -1,5 +1,19 @@
 import type { ComparisonPair, ComparisonResearch } from './types';
 
+function buildSourceTitle(url: string, snippet?: string): string {
+    const cleanedSnippet = snippet?.trim();
+    if (cleanedSnippet) {
+        const firstSentence = cleanedSnippet.split(/(?<=[.!?])\s+/)[0]?.trim();
+        if (firstSentence) return firstSentence;
+    }
+
+    try {
+        return new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+        return url;
+    }
+}
+
 /**
  * Generate search queries for a comparison pair.
  */
@@ -53,11 +67,14 @@ export async function researchPair(
     }
 
     const topResults = allResults.slice(0, maxExtractions);
-    const sources: string[] = [];
+    const sources: ComparisonResearch['sources'] = [];
     const contentParts: string[] = [];
 
     for (const result of topResults) {
-        sources.push(result.url);
+        sources.push({
+            title: buildSourceTitle(result.url, result.snippet),
+            url: result.url,
+        });
 
         try {
             const content = await deps.extractContent(result.url);

@@ -62,7 +62,10 @@ const MOCK_MARKDOWN = '## Introduction\nVercel and Netlify are both excellent ho
 function makeResearch(): ComparisonResearch {
     return {
         content: 'Source: https://review.com\nVercel is fast...',
-        sources: ['https://review.com', 'https://blog.com'],
+        sources: [
+            { title: 'Review.com benchmark', url: 'https://review.com' },
+            { title: 'Blog.com analysis', url: 'https://blog.com', note: 'accessed March 2026' },
+        ],
     };
 }
 
@@ -160,8 +163,8 @@ describe('generateComparison', () => {
 
         expect(result.comparison.sources).toEqual([
             ...research.sources,
-            'https://vercel.example.com',
-            'https://netlify.example.com',
+            { title: 'Vercel official source', url: 'https://vercel.example.com' },
+            { title: 'Netlify official source', url: 'https://netlify.example.com' },
         ]);
     });
 
@@ -175,8 +178,8 @@ describe('generateComparison', () => {
         const result = await generateComparison(pair, emptyResearch, ai);
 
         expect(result.comparison.sources).toEqual([
-            'https://vercel.example.com',
-            'https://netlify.example.com',
+            { title: 'Vercel official source', url: 'https://vercel.example.com' },
+            { title: 'Netlify official source', url: 'https://netlify.example.com' },
         ]);
     });
 
