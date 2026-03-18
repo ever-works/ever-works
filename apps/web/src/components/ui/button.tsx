@@ -12,6 +12,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     href?: string;
     loading?: boolean;
     target?: string;
+    rel?: string;
 }
 
 const buttonVariants = {
@@ -44,6 +45,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             children,
             type,
             target,
+            rel,
             ...props
         },
         ref,
@@ -63,6 +65,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                     href={href}
                     className={cn(variant === 'unstyled' ? '' : classes, className)}
                     target={target}
+                    rel={rel}
                 >
                     {loading && (
                         <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />

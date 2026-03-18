@@ -64,9 +64,13 @@ function normalizeComparisonSources(
 
     const deduped = new Map<string, ComparisonSource>();
     for (const candidate of candidates) {
-        if (!candidate.url?.trim()) continue;
-        if (!deduped.has(candidate.url)) {
-            deduped.set(candidate.url, candidate);
+        const url = candidate.url?.trim();
+        if (!url) continue;
+        if (!deduped.has(url)) {
+            deduped.set(url, {
+                ...candidate,
+                url,
+            });
         }
     }
 

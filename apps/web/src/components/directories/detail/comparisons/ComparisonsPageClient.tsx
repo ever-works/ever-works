@@ -832,6 +832,7 @@ export function ComparisonsPageClient({
                                                         comparison.slug,
                                                     )}
                                                     target="_blank"
+                                                    rel="noopener noreferrer"
                                                     className="text-text-secondary dark:text-text-secondary-dark"
                                                 >
                                                     <ExternalLink className="w-4 h-4" />
