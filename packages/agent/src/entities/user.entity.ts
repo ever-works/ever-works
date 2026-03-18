@@ -63,6 +63,13 @@ export class User {
     @Column({ nullable: true })
     passwordResetExpires: Date;
 
+    // Git committer overrides (optional — fallback to username/email if not set)
+    @Column({ nullable: true })
+    committerName?: string | null;
+
+    @Column({ nullable: true })
+    committerEmail?: string | null;
+
     // Timestamps
     @CreateDateColumn()
     createdAt: Date;
@@ -95,6 +102,9 @@ export class User {
     local: boolean = false;
 
     asCommitter(): { name: string; email: string } {
-        return { name: this.username, email: this.email };
+        return {
+            name: this.committerName || this.username,
+            email: this.committerEmail || this.email,
+        };
     }
 }

@@ -478,6 +478,12 @@
                     "resend": "Resend",
                     "sent": "Verification email sent. Check your inbox.",
                     "sendFailed": "Failed to send verification email. Please try again."
+                },
+                "committer": {
+                    "title": "Git Committer",
+                    "description": "Override the name and email used in git commits. Leave empty to use your account name ({defaultName}) and email ({defaultEmail}).",
+                    "nameLabel": "Committer Name",
+                    "emailLabel": "Committer Email"
                 }
             },
             "security": {
@@ -1680,6 +1686,15 @@
                             "targetBlank": "New tab"
                         }
                     }
+                },
+                "committer": {
+                    "title": "Git Committer",
+                    "description": "Override the committer name and email for git commits in this directory. Leave empty to use your user-level settings or account defaults.",
+                    "nameLabel": "Committer Name",
+                    "emailLabel": "Committer Email",
+                    "save": "Save Committer",
+                    "saved": "Committer settings saved",
+                    "saveFailed": "Failed to save committer settings"
                 }
             },
             "deploy": {

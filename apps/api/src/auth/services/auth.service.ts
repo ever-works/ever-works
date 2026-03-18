@@ -475,10 +475,16 @@ export class AuthService {
         };
 
         // Update user profile
-        await this.userRepository.update(userId, {
-            ...(isNotNull(updateData.username) && { username: updateData.username }),
-            ...(isNotNull(updateData.avatar) && { avatar: updateData.avatar }),
-        });
+        const updateFields: Record<string, any> = {};
+        if (isNotNull(updateData.username)) updateFields.username = updateData.username;
+        if (isNotNull(updateData.avatar)) updateFields.avatar = updateData.avatar;
+        // Allow explicitly setting committer fields to null (to clear them)
+        if (updateData.committerName !== undefined)
+            updateFields.committerName = updateData.committerName || null;
+        if (updateData.committerEmail !== undefined)
+            updateFields.committerEmail = updateData.committerEmail || null;
+
+        await this.userRepository.update(userId, updateFields);
 
         // Return updated profile
         return this.getUserProfile(userId);

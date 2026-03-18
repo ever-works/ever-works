@@ -63,4 +63,14 @@ export class UpdateDirectoryDto {
     @IsOptional()
     @IsBoolean()
     communityPrAutoClose?: boolean;
+
+    @ApiPropertyOptional({ description: 'Custom git committer name for this directory' })
+    @IsString()
+    @IsOptional()
+    committerName?: string | null;
+
+    @ApiPropertyOptional({ description: 'Custom git committer email for this directory' })
+    @IsString()
+    @IsOptional()
+    committerEmail?: string | null;
 }

@@ -27,6 +27,8 @@ export interface UpdatePasswordDto {
 export interface UpdateProfileDto {
     username?: string;
     avatar?: string;
+    committerName?: string | null;
+    committerEmail?: string | null;
 }
 
 // DTOs - Email Verification
@@ -57,6 +59,8 @@ export interface UserProfile {
     email: string;
     avatar?: string;
     emailVerified?: boolean;
+    committerName?: string | null;
+    committerEmail?: string | null;
 }
 
 export interface OAuthUrlResponse {

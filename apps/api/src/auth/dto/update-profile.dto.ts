@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MinLength, IsUrl } from 'class-validator';
+import { IsString, IsOptional, MinLength, IsUrl, IsEmail } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
@@ -15,4 +15,18 @@ export class UpdateProfileDto {
     @IsUrl()
     @IsOptional()
     avatar?: string;
+
+    @ApiPropertyOptional({
+        description: 'Custom git committer name (overrides username for commits)',
+    })
+    @IsString()
+    @IsOptional()
+    committerName?: string | null;
+
+    @ApiPropertyOptional({
+        description: 'Custom git committer email (overrides account email for commits)',
+    })
+    @IsEmail()
+    @IsOptional()
+    committerEmail?: string | null;
 }
