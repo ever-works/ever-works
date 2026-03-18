@@ -51,7 +51,7 @@ export function CapabilitySelector({
                     </code>
                 </div>
                 <div className="flex-1 text-xs text-text-secondary dark:text-text-secondary-dark italic">
-                   {t('noProvidersAvailable')}
+                    {t('noProvidersAvailable')}
                 </div>
             </div>
         );
