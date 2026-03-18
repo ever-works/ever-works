@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { fetchDirectoryGenerationHistory } from '@/app/actions/dashboard/directories';
 import { toast } from 'sonner';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Select } from '@/components/ui/select';
 
 interface DirectoryHistoryPageClientProps {
     directoryId: string;
@@ -195,7 +196,7 @@ export function DirectoryHistoryPageClient({
             </div>
 
             <div className="max-w-xs">
-                <select
+                <Select
                     value={activityFilter}
                     onChange={(e) => handleFilterChange(e.target.value)}
                     aria-label={t('filters.label')}
@@ -206,7 +207,7 @@ export function DirectoryHistoryPageClient({
                     <option value="comparisons">{t('filters.comparisons')}</option>
                     <option value="taxonomy">{t('filters.taxonomy')}</option>
                     <option value="community_pr">{t('filters.community_pr')}</option>
-                </select>
+                </Select>
             </div>
 
             {entries.length === 0 ? (
