@@ -8,10 +8,14 @@ import { DirectoryMemberRole } from '@/lib/api/enums';
 import { Link as IconLink, Users, Zap, Code2, Clock } from 'lucide-react';
 import { useDirectoryDetail, useDirectoryPermissions } from './DirectoryDetailContext';
 import { getStepText, getItemsProcessedText } from '@/lib/utils/generator-steps';
-import { Link } from '@/i18n/navigation';
+import { Link, usePathname } from '@/i18n/navigation';
 
 interface DirectoryHeaderProps {
     directory: Directory;
+}
+
+function buildPublicComparisonUrl(websiteUrl: string, comparisonSlug: string): string {
+    return `${websiteUrl.replace(/\/+$/, '')}/comparisons/${comparisonSlug}`;
 }
 
 export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
@@ -19,6 +23,7 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
     const tProgress = useTranslations('dashboard.directoryDetail.progress');
     const { repoLinks } = useDirectoryDetail();
     const { role } = useDirectoryPermissions();
+    const pathname = usePathname();
 
     const isShared = role && role !== DirectoryMemberRole.OWNER;
 
@@ -27,6 +32,16 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
         hasWarnings,
     });
     const StatusIcon = statusStyle.icon;
+    const pathSegments = pathname.split('/').filter(Boolean);
+    const comparisonsIndex = pathSegments.indexOf('comparisons');
+    const comparisonSlug =
+        comparisonsIndex >= 0 && comparisonsIndex < pathSegments.length - 1
+            ? pathSegments[comparisonsIndex + 1]
+            : null;
+    const externalWebsiteUrl =
+        directory.website && comparisonSlug
+            ? buildPublicComparisonUrl(directory.website, comparisonSlug)
+            : directory.website;
 
     return (
         <div className="mb-8 pb-6 border-b border-border dark:border-border-dark">
@@ -123,9 +138,9 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                     </div>
                 </div>
 
-                {directory.website && (
+                {externalWebsiteUrl && (
                     <div className="ml-6">
-                        <Link href={directory.website} target="_blank" rel="noopener noreferrer">
+                        <Link href={externalWebsiteUrl} target="_blank" rel="noopener noreferrer">
                             <IconLink className="w-4 h-4" />
                         </Link>
                     </div>
