@@ -527,15 +527,13 @@ export class PluginOperationsService {
         pluginId: string | null,
         enforce: boolean,
     ): Promise<void> {
-        const pipelines = this.pluginRegistryService.getByCapability(PLUGIN_CAPABILITIES.PIPELINE);
-
-        // Clear the flag from all pipeline plugins for this user
-        for (const registered of pipelines) {
-            const existing = await this.userPluginRepository.findOne({
-                where: { userId, pluginId: registered.plugin.id },
-            });
-            if (existing && existing.metadata?.isGlobalPipelineDefault) {
-                const newMeta = { ...existing.metadata };
+        // Clear the flag from all user plugins in the DB that have it set.
+        // Querying the DB directly (rather than the registry) ensures stale flags from
+        // previously-registered-but-now-unloaded plugins are also removed.
+        const flaggedPlugins = await this.userPluginRepository.find({ where: { userId } });
+        for (const existing of flaggedPlugins) {
+            if (existing.metadata?.isGlobalPipelineDefault) {
+                let newMeta = { ...existing.metadata };
                 delete newMeta.isGlobalPipelineDefault;
                 delete newMeta.globalPipelineDefaultEnforce;
                 await this.userPluginRepository.save({ ...existing, metadata: newMeta });

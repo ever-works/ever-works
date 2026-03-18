@@ -63,8 +63,14 @@ export class GeneratorFormSchemaService {
         pipelineId?: string,
         options?: FormSchemaOptions,
     ): Promise<GeneratorFormSchema> {
+        // Fetch the user's global pipeline default once and share with resolvePipelinePlugin
+        const userGlobalDefault =
+            options?.userId && this.pluginSettingsService
+                ? await this.pluginSettingsService.getUserGlobalPipelineDefault(options.userId)
+                : null;
+
         // Resolve the selected pipeline plugin
-        const pipelinePlugin = await this.resolvePipelinePlugin(pipelineId, options);
+        const pipelinePlugin = await this.resolvePipelinePlugin(pipelineId, options, userGlobalDefault);
 
         // Get available providers for each capability category (filtered by enable status)
         const providers = await this.getAvailableProviders(options);
@@ -114,16 +120,10 @@ export class GeneratorFormSchemaService {
             defaultValues = { ...defaultValues, ...dsFields.defaultValues };
         }
 
-        // Determine if the pipeline is enforced by the user's global default
-        let isPipelineEnforced = false;
-        if (options?.userId && this.pluginSettingsService) {
-            const globalDefault = await this.pluginSettingsService.getUserGlobalPipelineDefault(
-                options.userId,
-            );
-            if (globalDefault?.enforce) {
-                isPipelineEnforced = true;
-            }
-        }
+        // Only enforce if the stored enforced plugin was actually resolved and loaded
+        const isPipelineEnforced =
+            userGlobalDefault?.enforce === true &&
+            pipelinePlugin?.plugin.id === userGlobalDefault.pluginId;
 
         return {
             resolvedPipelineId: pipelinePlugin?.plugin.id,
@@ -601,10 +601,10 @@ export class GeneratorFormSchemaService {
     private async resolvePipelinePlugin(
         pipelineId?: string,
         options?: FormSchemaOptions,
+        userGlobalDefault?: { pluginId: string; enforce: boolean } | null,
     ): Promise<RegisteredPlugin | undefined> {
-        // Resolve user's global pipeline default (if any)
-        let userGlobalDefault: { pluginId: string; enforce: boolean } | null = null;
-        if (options?.userId && this.pluginSettingsService) {
+        // Resolve user's global pipeline default — use pre-fetched value if provided
+        if (userGlobalDefault === undefined && options?.userId && this.pluginSettingsService) {
             userGlobalDefault = await this.pluginSettingsService.getUserGlobalPipelineDefault(
                 options.userId,
             );

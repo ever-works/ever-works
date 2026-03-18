@@ -25,20 +25,30 @@ export function PipelineDefaultSelector({ plugins }: PipelineDefaultSelectorProp
 
     const handleSelect = (pluginId: string | null) => {
         const newEnforce = pluginId === null ? false : enforce;
+        const prevId = selectedId;
+        const prevEnforce = enforce;
         setSelectedId(pluginId);
         if (pluginId === null) setEnforce(false);
-        save(pluginId, newEnforce);
+        save(pluginId, newEnforce, prevId, prevEnforce);
     };
 
     const handleEnforceToggle = (value: boolean) => {
+        const prevEnforce = enforce;
         setEnforce(value);
-        save(selectedId, value);
+        save(selectedId, value, selectedId, prevEnforce);
     };
 
-    const save = (pluginId: string | null, enforceValue: boolean) => {
+    const save = (
+        pluginId: string | null,
+        enforceValue: boolean,
+        prevId: string | null,
+        prevEnforce: boolean,
+    ) => {
         startTransition(async () => {
             const result = await setGlobalPipelineDefault(pluginId, enforceValue);
             if (!result.success) {
+                setSelectedId(prevId);
+                setEnforce(prevEnforce);
                 toast.error(result.error ?? t('saveFailed'));
             }
         });
