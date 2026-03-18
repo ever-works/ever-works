@@ -70,7 +70,11 @@ export class GeneratorFormSchemaService {
                 : null;
 
         // Resolve the selected pipeline plugin
-        const pipelinePlugin = await this.resolvePipelinePlugin(pipelineId, options, userGlobalDefault);
+        const pipelinePlugin = await this.resolvePipelinePlugin(
+            pipelineId,
+            options,
+            userGlobalDefault,
+        );
 
         // Get available providers for each capability category (filtered by enable status)
         const providers = await this.getAvailableProviders(options);
