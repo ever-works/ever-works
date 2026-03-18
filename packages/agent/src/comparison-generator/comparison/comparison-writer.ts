@@ -18,14 +18,35 @@ interface AiComparisonStructure {
     readonly dimensions: ComparisonDimension[];
 }
 
+function isLikelyAssetUrl(url: string): boolean {
+    const lowerUrl = url.toLowerCase();
+    return (
+        /\.(png|jpe?g|gif|webp|svg|ico)(\?|$)/i.test(lowerUrl) ||
+        lowerUrl.includes('/profile_images/') ||
+        lowerUrl.includes('/repo-images/') ||
+        lowerUrl.includes('storage.googleapis.com') ||
+        lowerUrl.includes('twimg.com')
+    );
+}
+
+function isUrlLikeText(text: string): boolean {
+    return /^https?:\/\//i.test(text.trim());
+}
+
 function extractMarkdownLinks(markdown?: string): ComparisonSource[] {
     if (!markdown) return [];
 
     const matches = markdown.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g);
     return Array.from(matches, (match) => ({
         title: match[1].trim(),
-        url: match[2].trim(),
-    }));
+        url: match[2].trim()
+    })).filter((source) => {
+        return (
+            source.title.length > 0 &&
+            !isUrlLikeText(source.title) &&
+            !isLikelyAssetUrl(source.url)
+        );
+    });
 }
 
 function getPreferredItemSource(item: ComparisonPair['itemA']): ComparisonSource[] {

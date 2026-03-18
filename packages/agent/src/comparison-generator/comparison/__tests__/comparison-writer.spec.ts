@@ -192,7 +192,7 @@ describe('generateComparison', () => {
                 name: 'GitHub Copilot',
                 source_url: 'https://github.com/',
                 markdown:
-                    'See the [GitHub pricing page](https://github.com/pricing) for plan details.',
+                    'See the [GitHub pricing page](https://github.com/pricing) for plan details. [https://storage.googleapis.com/logo.png](https://storage.googleapis.com/logo.png)',
                 source_validation: {
                     reachability_status: 'reachable',
                     accuracy_status: 'accurate',
@@ -204,7 +204,7 @@ describe('generateComparison', () => {
                 source_url:
                     'https://docs.gitlab.com/ee/user/project/repository/code_suggestions.html',
                 markdown:
-                    'Reference: [GitLab Docs](https://docs.gitlab.com/ee/user/project/repository/code_suggestions.html)',
+                    'Reference: [GitLab Docs](https://docs.gitlab.com/ee/user/project/repository/code_suggestions.html) and [https://pbs.twimg.com/profile_images/x.png](https://pbs.twimg.com/profile_images/x.png)',
             }),
         };
 
