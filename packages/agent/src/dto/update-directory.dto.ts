@@ -1,5 +1,12 @@
 import { Type, Transform } from 'class-transformer';
-import { IsOptional, IsString, IsBoolean, IsEmail, ValidateNested, MaxLength } from 'class-validator';
+import {
+    IsOptional,
+    IsString,
+    IsBoolean,
+    IsEmail,
+    ValidateNested,
+    MaxLength,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { MarkdownReadmeConfigDto } from './create-directory.dto';
 import { sanitizeName, sanitizeDescription } from '../utils/sanitize.util';
