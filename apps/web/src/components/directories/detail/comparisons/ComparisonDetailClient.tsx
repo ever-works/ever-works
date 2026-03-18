@@ -219,7 +219,6 @@ export function ComparisonDetailClient({
                     )}
                 </section>
             )}
-
         </div>
     );
 }
