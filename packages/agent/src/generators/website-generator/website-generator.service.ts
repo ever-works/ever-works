@@ -66,7 +66,9 @@ export class WebsiteGeneratorService {
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
-        // Explicitly set default branch to 'main' regardless of the user's GitHub account settings
+        // Explicitly set default branch to 'main' regardless of the user's GitHub account settings.
+        // This is best-effort: downstream syncAllBranchesFromTemplate pushes the 'main' branch
+        // regardless, so the repo content is always correct even if this API call fails.
         await this.gitFacade
             .updateRepository(
                 directory.getRepoOwner(),
@@ -76,7 +78,7 @@ export class WebsiteGeneratorService {
             )
             .catch((error) =>
                 this.logger.warn(
-                    `Failed to set default branch for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}: ${error.message}`,
+                    `Failed to set default branch for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}: ${error instanceof Error ? error.message : String(error)}`,
                 ),
             );
 
@@ -106,7 +108,7 @@ export class WebsiteGeneratorService {
             )
             .catch((error) =>
                 this.logger.warn(
-                    `Failed to set default branch for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}: ${error.message}`,
+                    `Failed to set default branch for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}: ${error instanceof Error ? error.message : String(error)}`,
                 ),
             );
     }
