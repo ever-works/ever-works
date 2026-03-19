@@ -130,6 +130,14 @@ export class DirectoryLifecycleService {
                 updateData.communityPrAutoClose = updateDto.communityPrAutoClose;
             }
 
+            // Handle committer overrides (allow null to clear them)
+            if (updateDto.committerName !== undefined) {
+                updateData.committerName = updateDto.committerName || null;
+            }
+            if (updateDto.committerEmail !== undefined) {
+                updateData.committerEmail = updateDto.committerEmail || null;
+            }
+
             const updatedDirectory = await this.directoryRepository.update(id, updateData);
 
             if (!updatedDirectory) {

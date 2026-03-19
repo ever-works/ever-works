@@ -42,6 +42,8 @@ export const SettingsProvider = ({
             footer: '',
             overwriteDefaultFooter: false,
         },
+        committerName: directory.committerName ?? null,
+        committerEmail: directory.committerEmail ?? null,
     });
 
     const value = useMemo(() => {

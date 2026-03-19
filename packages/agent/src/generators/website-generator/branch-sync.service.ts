@@ -53,7 +53,7 @@ export class BranchSyncService {
                 targetOwner: directory.getRepoOwner(),
                 targetRepo: directory.getWebsiteRepo(),
                 userId: directoryOwner.id,
-                committer: user.asCommitter(),
+                committer: directory.resolveCommitter(user),
                 forcePush: true,
                 branchMapping,
                 providerId: directory.gitProvider,

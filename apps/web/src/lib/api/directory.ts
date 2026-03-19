@@ -64,6 +64,8 @@ export interface UpdateDirectoryDto {
     websiteTemplateUseBeta?: boolean;
     communityPrEnabled?: boolean;
     communityPrAutoClose?: boolean;
+    committerName?: string | null;
+    committerEmail?: string | null;
 }
 
 export interface DeleteDirectoryDto {
@@ -162,6 +164,9 @@ export interface Directory {
     // Import Source FIELDS
     sourceRepository?: SourceRepository;
     repoVisibility?: RepoVisibility;
+    // Git committer overrides
+    committerName?: string | null;
+    committerEmail?: string | null;
 }
 
 export interface DirectoriesResponse {

@@ -162,7 +162,7 @@ export class ItemHealthService {
         options: { trigger: HealthCheckTrigger; itemSlugs?: string[] },
     ): Promise<DirectoryHealthCheckResult> {
         const directoryOwner = directory.user as User;
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
         const repo = directory.getDataRepo();
         const owner = directory.getRepoOwner();
 

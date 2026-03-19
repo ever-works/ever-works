@@ -156,7 +156,7 @@ export class WebsiteUpdateService {
      */
     private async updateFork(directory: Directory, user: User): Promise<boolean> {
         const directoryOwner = getDirectoryOwner(directory);
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
         const websiteRepo = directory.getWebsiteRepo();
 
         try {
@@ -215,7 +215,7 @@ export class WebsiteUpdateService {
                 owner: WEBSITE_TEMPLATE_CONFIG.owner,
                 repo: WEBSITE_TEMPLATE_CONFIG.repo,
                 branch,
-                committer: user.asCommitter(),
+                committer: directory.resolveCommitter(user),
             },
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
@@ -256,7 +256,7 @@ export class WebsiteUpdateService {
         branch: string = WEBSITE_TEMPLATE_CONFIG.branch,
     ): Promise<void> {
         const directoryOwner = getDirectoryOwner(directory);
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
         const websiteRepo = directory.getWebsiteRepo();
 
         // Clone both repositories

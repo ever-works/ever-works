@@ -588,7 +588,7 @@ export class DirectoryImportService {
                 {
                     owner: source.owner,
                     repo: source.repo,
-                    committer: user.asCommitter(),
+                    committer: directory.resolveCommitter(user),
                 },
                 { userId: user.id, providerId: directory.gitProvider },
             );
