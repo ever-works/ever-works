@@ -7,6 +7,7 @@ import remarkGfm from 'remark-gfm';
 import { useTranslations } from 'next-intl';
 import type { ComparisonData } from '@/lib/api/directory';
 import { ROUTES } from '@/lib/constants';
+import { formatComparisonDate } from '@/lib/utils/comparison';
 
 interface ComparisonDetailClientProps {
     directoryId: string;
@@ -15,17 +16,11 @@ interface ComparisonDetailClientProps {
     extendedAnalysisMarkdown?: string;
 }
 
-function formatComparisonDate(value: string): string {
-    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (!match) return value;
-
-    const [, year, month, day] = match;
-    return `${Number(month)}/${Number(day)}/${year}`;
-}
-
 function stripSourcesSection(markdown?: string): string | undefined {
     if (!markdown) return markdown;
 
+    // We intentionally treat "Sources" as the final markdown section because
+    // the structured UI block below is the canonical source presentation.
     return markdown
         .replace(/\n{2,}#{2,3}\s+Sources\s*[\s\S]*$/i, '')
         .replace(/\n{3,}$/g, '\n\n')

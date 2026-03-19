@@ -4,7 +4,7 @@ function buildSourceTitle(url: string, snippet?: string): string {
     const cleanedSnippet = snippet?.trim();
     if (cleanedSnippet) {
         const firstSentence = cleanedSnippet.split(/(?<=[.!?])\s+/)[0]?.trim();
-        if (firstSentence) return firstSentence;
+        if (firstSentence && firstSentence.length <= 80) return firstSentence;
     }
 
     try {

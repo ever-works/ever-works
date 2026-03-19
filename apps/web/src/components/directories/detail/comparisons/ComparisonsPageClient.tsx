@@ -42,6 +42,7 @@ import { toast } from 'sonner';
 import type { ComparisonData } from '@/lib/api/directory';
 import type { ProviderOption } from '@/lib/api/types-only';
 import { ROUTES } from '@/lib/constants';
+import { buildPublicComparisonUrl, formatComparisonDate } from '@/lib/utils/comparison';
 import {
     generateNextComparison,
     generateManualComparison,
@@ -58,18 +59,6 @@ interface ComparisonsPageClientProps {
     items: Array<{ slug: string; name: string; category: string | string[] }>;
     availableProviders: ProviderOption[];
     initialAiConfig: { provider: string | null; model: string | null; extendedAnalysis?: boolean };
-}
-
-function buildPublicComparisonUrl(websiteUrl: string, comparisonSlug: string): string {
-    return `${websiteUrl.replace(/\/+$/, '')}/comparisons/${comparisonSlug}`;
-}
-
-function formatComparisonDate(value: string): string {
-    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (!match) return value;
-
-    const [, year, month, day] = match;
-    return `${Number(month)}/${Number(day)}/${year}`;
 }
 
 export function ComparisonsPageClient({

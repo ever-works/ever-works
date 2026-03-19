@@ -271,9 +271,9 @@ export function buildMarkdownPromptVariables(
     pair: ComparisonPair,
     structure: AiComparisonStructure,
     research: ComparisonResearch,
+    normalizedSources: ComparisonSource[],
     customPrompt?: string,
 ): TemplateVariables<typeof DEFAULT_MARKDOWN_PROMPT> {
-    const normalizedSources = normalizeComparisonSources(pair, research);
     const dimensionsText = structure.dimensions
         .map(
             (d) =>
@@ -310,11 +310,12 @@ function buildMarkdownPrompt(
     pair: ComparisonPair,
     structure: AiComparisonStructure,
     research: ComparisonResearch,
+    normalizedSources: ComparisonSource[],
     customPrompt?: string,
 ): string {
     return substituteVariables(
         DEFAULT_MARKDOWN_PROMPT,
-        buildMarkdownPromptVariables(pair, structure, research, customPrompt),
+        buildMarkdownPromptVariables(pair, structure, research, normalizedSources, customPrompt),
     );
 }
 
@@ -436,6 +437,7 @@ export async function generateComparison(
         structurePrompt,
         COMPARISON_JSON_SCHEMA,
     );
+    const normalizedSources = normalizeComparisonSources(pair, research);
 
     // Resolve markdown prompt
     const markdownTemplate = (
@@ -449,7 +451,13 @@ export async function generateComparison(
     ) as typeof DEFAULT_MARKDOWN_PROMPT;
     const markdownPrompt = substituteVariables(
         markdownTemplate,
-        buildMarkdownPromptVariables(pair, structure, research, directoryContext?.customPrompt),
+        buildMarkdownPromptVariables(
+            pair,
+            structure,
+            research,
+            normalizedSources,
+            directoryContext?.customPrompt,
+        ),
     );
 
     const markdown = await ai.askText(markdownPrompt);
@@ -487,7 +495,6 @@ export async function generateComparison(
     }
 
     const slug = buildPairKey(slugA, slugB);
-    const normalizedSources = normalizeComparisonSources(pair, research);
 
     return {
         comparison: {

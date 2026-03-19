@@ -8,14 +8,11 @@ import { DirectoryMemberRole } from '@/lib/api/enums';
 import { Link as IconLink, Users, Zap, Code2, Clock } from 'lucide-react';
 import { useDirectoryDetail, useDirectoryPermissions } from './DirectoryDetailContext';
 import { getStepText, getItemsProcessedText } from '@/lib/utils/generator-steps';
+import { buildPublicComparisonUrl } from '@/lib/utils/comparison';
 import { Link, usePathname } from '@/i18n/navigation';
 
 interface DirectoryHeaderProps {
     directory: Directory;
-}
-
-function buildPublicComparisonUrl(websiteUrl: string, comparisonSlug: string): string {
-    return `${websiteUrl.replace(/\/+$/, '')}/comparisons/${comparisonSlug}`;
 }
 
 export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
