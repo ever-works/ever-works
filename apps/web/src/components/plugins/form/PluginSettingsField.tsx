@@ -128,22 +128,25 @@ export function PluginSettingsField({
 
         // Enum - select (works for any type)
         if (schema.enum && schema.enum.length > 0) {
+            // Empty string is not a valid SelectItem value (Radix UI constraint), so map it to '__none__'
             const currentValue = String(value ?? schema.default ?? '') || '__none__';
             return (
                 <Select
                     value={currentValue}
-                    onValueChange={(v) => onChange(v === '__none__' ? null : v)}
+                    onValueChange={(v) => onChange(v === '__none__' ? '' : v)}
                 >
                     <SelectTrigger>
                         <SelectValue placeholder={t('selectPlaceholder')} />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="__none__">{t('selectPlaceholder')}</SelectItem>
-                        {schema.enum.map((opt) => (
-                            <SelectItem key={String(opt)} value={String(opt)}>
-                                {String(opt)}
-                            </SelectItem>
-                        ))}
+                        {schema.enum
+                            .filter((opt) => String(opt) !== '')
+                            .map((opt) => (
+                                <SelectItem key={String(opt)} value={String(opt)}>
+                                    {String(opt)}
+                                </SelectItem>
+                            ))}
                     </SelectContent>
                 </Select>
             );
