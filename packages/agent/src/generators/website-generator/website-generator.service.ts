@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
 import { BranchSyncService } from './branch-sync.service';
 import { WebsiteRepositoryCreationMethod } from '../../items-generator/dto/create-items-generator.dto';
@@ -10,8 +10,6 @@ import * as fs from 'node:fs/promises';
 
 @Injectable()
 export class WebsiteGeneratorService {
-    private readonly logger = new Logger(WebsiteGeneratorService.name);
-
     constructor(
         private readonly gitFacade: GitFacadeService,
         private readonly branchSyncService: BranchSyncService,
@@ -66,10 +64,18 @@ export class WebsiteGeneratorService {
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
+        // Explicitly set default branch to 'main' regardless of the user's GitHub account settings
+        await this.gitFacade.updateRepository(
+            directory.getRepoOwner(),
+            directory.getWebsiteRepo(),
+            { defaultBranch: WEBSITE_TEMPLATE_CONFIG.branch },
+            { userId: directoryOwner.id, providerId: directory.gitProvider },
+        );
+
         return templateDir;
     }
 
-    private async createUsingTemplate(directory: Directory, user: User) {
+    private async createUsingTemplate(directory: Directory) {
         const directoryOwner = getDirectoryOwner(directory);
 
         return this.gitFacade.createRepositoryFromTemplate(
@@ -89,26 +95,23 @@ export class WebsiteGeneratorService {
         user: User,
         operation: WebsiteRepositoryCreationMethod = WebsiteRepositoryCreationMethod.DUPLICATE,
     ) {
-        let path: any;
+        let path: string | undefined;
         try {
             if (operation === WebsiteRepositoryCreationMethod.DUPLICATE) {
                 path = await this.duplicate(directory, user);
             } else if (operation === WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE) {
                 try {
-                    path = await this.createUsingTemplate(directory, user);
+                    await this.createUsingTemplate(directory);
                 } catch {
                     path = await this.duplicate(directory, user);
                 }
             } else {
-                // Default to duplicate if an unknown operation is somehow passed
                 path = await this.duplicate(directory, user);
             }
 
-            // Sync all branches from template after initial setup
             await this.syncAllBranchesFromTemplate(directory, user, true);
         } finally {
-            if (path && typeof path === 'string') {
-                // cleanup
+            if (path) {
                 await fs.rm(path, { recursive: true, force: true });
             }
         }
@@ -123,21 +126,13 @@ export class WebsiteGeneratorService {
         return this.branchSyncService.syncFromTemplate(directory, user, cleanupExtraBranches);
     }
 
-    /**
-     * Remove repository for a directory
-     */
-    async removeRepository(directory: Directory, user: User): Promise<void> {
+    async removeRepository(directory: Directory, _user: User): Promise<void> {
         const directoryOwner = getDirectoryOwner(directory);
-        const websiteRepo = directory.getWebsiteRepo();
 
-        try {
-            await this.gitFacade.deleteRepository(directory.getRepoOwner(), websiteRepo, {
-                userId: directoryOwner.id,
-                providerId: directory.gitProvider,
-            });
-        } catch (error) {
-            throw error;
-        }
+        await this.gitFacade.deleteRepository(directory.getRepoOwner(), directory.getWebsiteRepo(), {
+            userId: directoryOwner.id,
+            providerId: directory.gitProvider,
+        });
     }
 
     public cleanup(directory: Directory) {

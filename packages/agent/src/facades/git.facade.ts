@@ -9,6 +9,7 @@ import type {
     GitPullRequest,
     GitPullRequestFile,
     CreateRepoOptions,
+    UpdateRepoOptions,
     CreatePROptions,
     MergeOptions,
     MergeResult,
@@ -291,7 +292,7 @@ export class GitFacadeService implements IGitFacade {
     async updateRepository(
         owner: string,
         repo: string,
-        data: { isPrivate?: boolean; description?: string },
+        data: UpdateRepoOptions,
         options: GitFacadeOptions,
     ): Promise<GitRepository> {
         const { plugin, token } = await this.resolvePluginAndToken(options);

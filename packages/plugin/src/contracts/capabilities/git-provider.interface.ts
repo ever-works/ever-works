@@ -72,6 +72,12 @@ export interface CreateRepoOptions {
 	readonly organization?: string;
 }
 
+export interface UpdateRepoOptions {
+	readonly isPrivate?: boolean;
+	readonly description?: string;
+	readonly defaultBranch?: string;
+}
+
 export interface ForkRepositoryOptions {
 	readonly name?: string;
 	readonly organization?: string;
@@ -203,7 +209,7 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 	updateRepository?(
 		owner: string,
 		repo: string,
-		data: { isPrivate?: boolean; description?: string },
+		data: UpdateRepoOptions,
 		token: string
 	): Promise<GitRepository>;
 
