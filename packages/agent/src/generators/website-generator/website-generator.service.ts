@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
 import { BranchSyncService } from './branch-sync.service';
 import { WebsiteRepositoryCreationMethod } from '../../items-generator/dto/create-items-generator.dto';
@@ -10,6 +10,8 @@ import * as fs from 'node:fs/promises';
 
 @Injectable()
 export class WebsiteGeneratorService {
+    private readonly logger = new Logger(WebsiteGeneratorService.name);
+
     constructor(
         private readonly gitFacade: GitFacadeService,
         private readonly branchSyncService: BranchSyncService,
@@ -65,12 +67,18 @@ export class WebsiteGeneratorService {
         );
 
         // Explicitly set default branch to 'main' regardless of the user's GitHub account settings
-        await this.gitFacade.updateRepository(
-            directory.getRepoOwner(),
-            directory.getWebsiteRepo(),
-            { defaultBranch: WEBSITE_TEMPLATE_CONFIG.branch },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
-        );
+        await this.gitFacade
+            .updateRepository(
+                directory.getRepoOwner(),
+                directory.getWebsiteRepo(),
+                { defaultBranch: WEBSITE_TEMPLATE_CONFIG.branch },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
+            )
+            .catch((error) =>
+                this.logger.warn(
+                    `Failed to set default branch for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}: ${error.message}`,
+                ),
+            );
 
         return templateDir;
     }
@@ -78,7 +86,7 @@ export class WebsiteGeneratorService {
     private async createUsingTemplate(directory: Directory) {
         const directoryOwner = getDirectoryOwner(directory);
 
-        return this.gitFacade.createRepositoryFromTemplate(
+        await this.gitFacade.createRepositoryFromTemplate(
             WEBSITE_TEMPLATE_CONFIG.owner,
             WEBSITE_TEMPLATE_CONFIG.repo,
             {
@@ -88,6 +96,19 @@ export class WebsiteGeneratorService {
             },
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
+
+        await this.gitFacade
+            .updateRepository(
+                directory.getRepoOwner(),
+                directory.getWebsiteRepo(),
+                { defaultBranch: WEBSITE_TEMPLATE_CONFIG.branch },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
+            )
+            .catch((error) =>
+                this.logger.warn(
+                    `Failed to set default branch for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}: ${error.message}`,
+                ),
+            );
     }
 
     async initialize(
@@ -129,10 +150,14 @@ export class WebsiteGeneratorService {
     async removeRepository(directory: Directory, _user: User): Promise<void> {
         const directoryOwner = getDirectoryOwner(directory);
 
-        await this.gitFacade.deleteRepository(directory.getRepoOwner(), directory.getWebsiteRepo(), {
-            userId: directoryOwner.id,
-            providerId: directory.gitProvider,
-        });
+        await this.gitFacade.deleteRepository(
+            directory.getRepoOwner(),
+            directory.getWebsiteRepo(),
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+            },
+        );
     }
 
     public cleanup(directory: Directory) {
