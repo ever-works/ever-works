@@ -19,7 +19,7 @@ export class WebsiteGeneratorService {
 
     private async duplicate(directory: Directory, user: User) {
         const directoryOwner = getDirectoryOwner(directory);
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
 
         await this.cleanup(directory);
 

@@ -14,6 +14,8 @@ interface ProfileSettingsProps {
         username: string;
         email: string;
         emailVerified?: boolean;
+        committerName?: string | null;
+        committerEmail?: string | null;
     };
 }
 
@@ -21,6 +23,8 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
     const [isPending, startTransition] = useTransition();
     const [isResending, startResendTransition] = useTransition();
     const [username, setUsername] = useState(user.username);
+    const [committerName, setCommitterName] = useState(user.committerName || '');
+    const [committerEmail, setCommitterEmail] = useState(user.committerEmail || '');
     const t = useTranslations('dashboard.settings.profile');
 
     const handleResendVerification = () => {
@@ -48,6 +52,8 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
             try {
                 const result = await updateProfile({
                     username: username.trim(),
+                    committerName: committerName.trim() || null,
+                    committerEmail: committerEmail.trim() || null,
                 });
 
                 if (result.success) {
@@ -110,6 +116,35 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
                     disabled
                     helperText={t('fields.emailHelperText')}
                 />
+
+                {/* Git Committer Fields */}
+                <div className="border-t border-border dark:border-border-dark pt-4">
+                    <p className="text-sm font-medium text-text dark:text-text-dark mb-1">
+                        {t('committer.title')}
+                    </p>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark mb-3">
+                        {t('committer.description', {
+                            defaultName: user.username,
+                            defaultEmail: user.email,
+                        })}
+                    </p>
+                    <div className="space-y-3">
+                        <Input
+                            label={t('committer.nameLabel')}
+                            type="text"
+                            value={committerName}
+                            onChange={(e) => setCommitterName(e.target.value)}
+                            placeholder={user.username}
+                        />
+                        <Input
+                            label={t('committer.emailLabel')}
+                            type="email"
+                            value={committerEmail}
+                            onChange={(e) => setCommitterEmail(e.target.value)}
+                            placeholder={user.email}
+                        />
+                    </div>
+                </div>
 
                 {/* Save Button */}
                 <div className="flex justify-end">

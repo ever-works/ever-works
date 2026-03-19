@@ -1,6 +1,6 @@
 'use client';
 
-import React, { InputHTMLAttributes, useId, useRef } from 'react';
+import { InputHTMLAttributes, useId, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 

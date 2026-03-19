@@ -500,7 +500,8 @@
                             "paused": "일시정지됨",
                             "canceled": "취소됨",
                             "disabled": "비활성화됨"
-                        }
+                        },
+                        "nextSourceValidation": "다음 소스 검증"
                     },
                     "fields": {
                         "automation": "자동화",
@@ -513,7 +514,9 @@
                         "maxFailures": "실패 제한",
                         "maxFailuresHelp": "이 횟수만큼 실패하면 자동으로 일시정지됩니다.",
                         "createPullRequest": "Pull Request 생성",
-                        "createPullRequestHelp": "활성화하면 예약된 업데이트가 직접 커밋하는 대신 Pull Request를 생성합니다."
+                        "createPullRequestHelp": "활성화하면 예약된 업데이트가 직접 커밋하는 대신 Pull Request를 생성합니다.",
+                        "sourceValidationCadence": "소스 검증 주기",
+                        "sourceValidationCadenceHelp": "기본값은 업데이트 주기와 같지만, 더 느리게 또는 더 빠르게 조정할 수 있습니다."
                     },
                     "billing": {
                         "subscription": "구독",
@@ -827,7 +830,8 @@
                 "tabs": {
                     "browseItems": "Browse Items",
                     "categories": "Categories",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -911,6 +915,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "소스 다시 확인",
+                    "checkCompleted": "소스 확인이 완료되었습니다",
+                    "checkFailed": "소스 확인에 실패했습니다",
+                    "failedToCheckSource": "항목의 소스를 확인하지 못했습니다",
+                    "brokenLink": "깨진 링크",
+                    "healthy": "정상",
+                    "couldNotVerify": "확인할 수 없음",
+                    "sourceMayHaveIssues": "소스에 문제가 있을 수 있습니다",
+                    "sourceChecked": "소스 확인됨",
+                    "reachable": "접근 가능",
+                    "reachabilityInconclusive": "자동 접근성 확인 결과가 불분명합니다",
+                    "accurateSource": "정확한 소스",
+                    "sourceTooGeneric": "소스가 너무 일반적입니다",
+                    "weakSource": "약한 소스",
+                    "sourceAccuracyUnknown": "소스 정확도를 알 수 없음",
+                    "useSuggestedSource": "제안 적용",
+                    "suggestedSourceApplied": "추천 소스를 적용했습니다",
+                    "failedToUseSuggestedSource": "추천 소스를 사용할 수 없습니다",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {

@@ -117,10 +117,12 @@ export async function serverFetch<T>(
         throw new Error(errorMessage || apiErro);
     }
 
+    const text = await response.text();
+    if (!text) return undefined as T;
     try {
-        return await response.json();
-    } catch (error) {
-        return (await response.text()) as T;
+        return JSON.parse(text) as T;
+    } catch {
+        return text as T;
     }
 }
 

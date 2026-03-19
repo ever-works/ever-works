@@ -734,7 +734,8 @@
                 "tabs": {
                     "browseItems": "Explorar elementos",
                     "categories": "Categorías",
-                    "tags": "Etiquetas"
+                    "tags": "Etiquetas",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -818,6 +819,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Volver a comprobar la fuente",
+                    "checkCompleted": "Comprobacion de la fuente completada",
+                    "checkFailed": "Fallo la comprobacion de la fuente",
+                    "failedToCheckSource": "No se pudo comprobar la fuente del elemento",
+                    "brokenLink": "Enlace roto",
+                    "healthy": "Correcto",
+                    "couldNotVerify": "No se pudo verificar",
+                    "sourceMayHaveIssues": "La fuente puede tener problemas",
+                    "sourceChecked": "Fuente comprobada",
+                    "reachable": "Accesible",
+                    "reachabilityInconclusive": "La comprobacion automatica de accesibilidad no fue concluyente",
+                    "accurateSource": "Fuente precisa",
+                    "sourceTooGeneric": "Fuente demasiado generica",
+                    "weakSource": "Fuente debil",
+                    "sourceAccuracyUnknown": "Precision de la fuente desconocida",
+                    "useSuggestedSource": "Aplicar sugerencia",
+                    "suggestedSourceApplied": "Fuente sugerida aplicada",
+                    "failedToUseSuggestedSource": "No se pudo usar la fuente sugerida",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {
@@ -1245,7 +1279,8 @@
                             "paused": "Pausado",
                             "canceled": "Cancelado",
                             "disabled": "Deshabilitado"
-                        }
+                        },
+                        "nextSourceValidation": "Próxima validación de fuente"
                     },
                     "fields": {
                         "automation": "Automatización",
@@ -1258,7 +1293,9 @@
                         "maxFailures": "Límite de fallos",
                         "maxFailuresHelp": "Pausar automáticamente cuando ocurran esta cantidad de fallos.",
                         "createPullRequest": "Crear Pull Requests",
-                        "createPullRequestHelp": "Cuando está habilitado, las actualizaciones programadas crean un pull request en lugar de hacer commit directamente."
+                        "createPullRequestHelp": "Cuando está habilitado, las actualizaciones programadas crean un pull request en lugar de hacer commit directamente.",
+                        "sourceValidationCadence": "Frecuencia de validación de fuente",
+                        "sourceValidationCadenceHelp": "Por defecto usa la misma frecuencia que tus actualizaciones, pero puedes reducirla o aumentarla."
                     },
                     "billing": {
                         "subscription": "Suscripción",

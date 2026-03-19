@@ -20,7 +20,7 @@ export class PluginValidationService {
             throw new NotFoundException(`Plugin not found or not loaded: ${pluginId}`);
         }
 
-        const settings = await this.pluginSettingsService.getResolvedSettings(pluginId, {
+        const settings = await this.pluginSettingsService.getSettings(pluginId, {
             userId,
             includeSecrets: true,
         });

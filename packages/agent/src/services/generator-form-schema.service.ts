@@ -63,8 +63,18 @@ export class GeneratorFormSchemaService {
         pipelineId?: string,
         options?: FormSchemaOptions,
     ): Promise<GeneratorFormSchema> {
+        // Fetch the user's global pipeline default once and share with resolvePipelinePlugin
+        const userGlobalDefault =
+            options?.userId && this.pluginSettingsService
+                ? await this.pluginSettingsService.getUserGlobalPipelineDefault(options.userId)
+                : null;
+
         // Resolve the selected pipeline plugin
-        const pipelinePlugin = await this.resolvePipelinePlugin(pipelineId, options);
+        const pipelinePlugin = await this.resolvePipelinePlugin(
+            pipelineId,
+            options,
+            userGlobalDefault,
+        );
 
         // Get available providers for each capability category (filtered by enable status)
         const providers = await this.getAvailableProviders(options);
@@ -114,8 +124,14 @@ export class GeneratorFormSchemaService {
             defaultValues = { ...defaultValues, ...dsFields.defaultValues };
         }
 
+        // Only enforce if the stored enforced plugin was actually resolved and loaded
+        const isPipelineEnforced =
+            userGlobalDefault?.enforce === true &&
+            pipelinePlugin?.plugin.id === userGlobalDefault.pluginId;
+
         return {
             resolvedPipelineId: pipelinePlugin?.plugin.id,
+            isPipelineEnforced,
             providers,
             pluginFields,
             pluginGroups,
@@ -589,7 +605,23 @@ export class GeneratorFormSchemaService {
     private async resolvePipelinePlugin(
         pipelineId?: string,
         options?: FormSchemaOptions,
+        userGlobalDefault?: { pluginId: string; enforce: boolean } | null,
     ): Promise<RegisteredPlugin | undefined> {
+        // Resolve user's global pipeline default — use pre-fetched value if provided
+        if (userGlobalDefault === undefined && options?.userId && this.pluginSettingsService) {
+            userGlobalDefault = await this.pluginSettingsService.getUserGlobalPipelineDefault(
+                options.userId,
+            );
+        }
+
+        // 0. Enforced user global default — overrides everything including explicit form selection
+        if (userGlobalDefault?.enforce) {
+            const registered = this.pluginRegistry.get(userGlobalDefault.pluginId);
+            if (registered && registered.state === 'loaded') {
+                return registered;
+            }
+        }
+
         // 1. Explicit pipelineId — use it directly
         if (pipelineId) {
             const registered = this.pluginRegistry.get(pipelineId);
@@ -597,6 +629,14 @@ export class GeneratorFormSchemaService {
                 return registered;
             }
             this.logger.warn(`Pipeline plugin not found or not enabled: ${pipelineId}`);
+        }
+
+        // 1.5. Non-enforced user global default — preferred over directory/manifest defaults
+        if (userGlobalDefault && !userGlobalDefault.enforce) {
+            const registered = this.pluginRegistry.get(userGlobalDefault.pluginId);
+            if (registered && registered.state === 'loaded') {
+                return registered;
+            }
         }
 
         // 2. Directory's activeCapability for 'pipeline'

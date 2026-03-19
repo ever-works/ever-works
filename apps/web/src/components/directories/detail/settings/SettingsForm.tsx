@@ -12,6 +12,7 @@ import { RepoVisibilitySettings } from './RepoVisibilitySettings';
 import { AdvancedPromptsSettings } from './AdvancedPromptsSettings';
 import { CommunityPrSettings } from './CommunityPrSettings';
 import { WebsiteConfigSettings } from './WebsiteConfigSettings';
+import { CommitterSettings } from './CommitterSettings';
 interface SettingsFormProps {
     directory: Directory;
     user: AuthUser;
@@ -44,6 +45,9 @@ export function SettingsForm({ directory, user, initialRepositories }: SettingsF
 
                 {/* Website Configuration Settings */}
                 <WebsiteConfigSettings directoryId={directory.id} />
+
+                {/* Git Committer Settings */}
+                <CommitterSettings />
 
                 {/* Danger Zone */}
                 <DeleteComponent directory={directory} />

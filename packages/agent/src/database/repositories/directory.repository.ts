@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, IsNull, Brackets, Raw } from 'typeorm';
+import { Repository, LessThan, IsNull, Brackets, Raw, LessThanOrEqual } from 'typeorm';
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities';
 import { prepareLikeSearchTerm } from '../utils';
@@ -443,6 +443,35 @@ export class DirectoryRepository {
         return this.repository.find({
             where: { comparisonsEnabled: true },
             relations: ['user'],
+        });
+    }
+
+    /**
+     * Find all directories with scheduled updates enabled for standalone source validation.
+     */
+    async findWithScheduledSourceValidationEnabled(): Promise<Directory[]> {
+        return this.repository.find({
+            where: { scheduledUpdatesEnabled: true },
+            relations: ['user'],
+        });
+    }
+
+    async findDueSourceValidation(limit: number): Promise<Directory[]> {
+        return this.repository.find({
+            where: {
+                sourceValidationEnabled: true,
+                sourceValidationNextRunAt: LessThanOrEqual(new Date()),
+            },
+            order: { sourceValidationNextRunAt: 'ASC' },
+            take: limit,
+            relations: ['user'],
+        });
+    }
+
+    async updateSourceValidationRun(id: string, nextRunAt: Date): Promise<void> {
+        await this.repository.update(id, {
+            sourceValidationLastRunAt: new Date(),
+            sourceValidationNextRunAt: nextRunAt,
         });
     }
 }

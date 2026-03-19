@@ -6,6 +6,7 @@ import { getTranslations } from 'next-intl/server';
 import { getCategoryLabel } from '@/lib/utils/plugin-category-icons';
 import { isPluginCategory } from '@ever-works/plugin';
 import { PluginSettingsInline } from '@/components/settings/PluginSettingsInline';
+import { PipelineDefaultSelector } from '@/components/settings/PipelineDefaultSelector';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -69,6 +70,11 @@ export default async function PluginCategoryPage({ params }: PageProps) {
                     {t('plugins.configure')} {categoryLabel.toLowerCase()}
                 </p>
             </div>
+
+            {/* Default pipeline selector — shown only for the pipeline category */}
+            {category === 'pipeline' && plugins.length > 1 && (
+                <PipelineDefaultSelector plugins={plugins} />
+            )}
 
             <div className="space-y-3">
                 {pluginsWithOAuth.map(({ plugin, oauthConnection }) => (

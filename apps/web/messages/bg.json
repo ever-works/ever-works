@@ -500,7 +500,8 @@
                             "paused": "Паузирана",
                             "canceled": "Отменена",
                             "disabled": "Деактивирана"
-                        }
+                        },
+                        "nextSourceValidation": "Следваща проверка на източника"
                     },
                     "fields": {
                         "automation": "Автоматизация",
@@ -513,7 +514,9 @@
                         "maxFailures": "Лимит на грешки",
                         "maxFailuresHelp": "Автоматично паузиране, след като се достигне този брой грешки.",
                         "createPullRequest": "Създаване на Pull Request-и",
-                        "createPullRequestHelp": "Когато е активирано, планираните обновления създават pull request вместо да правят директни подавания."
+                        "createPullRequestHelp": "Когато е активирано, планираните обновления създават pull request вместо да правят директни подавания.",
+                        "sourceValidationCadence": "Честота на проверка на източника",
+                        "sourceValidationCadenceHelp": "По подразбиране използва същата честота като обновяването, но можете да я забавите или ускорите."
                     },
                     "billing": {
                         "subscription": "Абонамент",
@@ -827,7 +830,8 @@
                 "tabs": {
                     "browseItems": "Преглед на елементи",
                     "categories": "Категории",
-                    "tags": "Етикети"
+                    "tags": "Етикети",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -911,6 +915,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Proveri iztochnika otnovo",
+                    "checkCompleted": "Proverkata na iztochnika zavurshi",
+                    "checkFailed": "Proverkata na iztochnika beshe neuspeshna",
+                    "failedToCheckSource": "Neuspeshna proverka na iztochnika na elementa",
+                    "brokenLink": "Neraboteshta vruzka",
+                    "healthy": "Izpraven",
+                    "couldNotVerify": "Ne mozha da se potvurdi",
+                    "sourceMayHaveIssues": "Iztochnikut mozhe da ima problemi",
+                    "sourceChecked": "Iztochnikut e proveren",
+                    "reachable": "Dostupen",
+                    "reachabilityInconclusive": "Avtomatichnata proverka za dostupnost e neubeditelna",
+                    "accurateSource": "Tochen iztochnik",
+                    "sourceTooGeneric": "Iztochnikut e tvurde obsht",
+                    "weakSource": "Slab iztochnik",
+                    "sourceAccuracyUnknown": "Tochnostta na iztochnika e neizvestna",
+                    "useSuggestedSource": "Приложи предложението",
+                    "suggestedSourceApplied": "Предложеният източник беше приложен",
+                    "failedToUseSuggestedSource": "Неуспешно използване на предложения източник",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {

@@ -425,6 +425,12 @@ export class DirectoryGenerationService {
                 });
 
                 if (!result.pr_number && result.item_name && result.item_slug) {
+                    const fieldsChanged = [
+                        ...(dto.featured !== undefined ? ['featured'] : []),
+                        ...(dto.order !== undefined ? ['order'] : []),
+                        ...(dto.source_url !== undefined ? ['source_url'] : []),
+                    ];
+
                     await this.recordActivityHistory({
                         directoryId: directory.id,
                         userId: user.id,
@@ -436,7 +442,7 @@ export class DirectoryGenerationService {
                                 action: 'updated',
                                 name: result.item_name,
                                 slug: result.item_slug,
-                                fieldsChanged: ['featured', 'order'],
+                                fieldsChanged,
                             },
                         ],
                         summary: `Item updated: ${result.item_name}`,

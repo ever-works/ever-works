@@ -202,19 +202,18 @@ export function DirectoryHistoryPageClient({
             </div>
 
             <div className="max-w-xs">
-                <Select value={activityFilter} onValueChange={handleFilterChange}>
-                    <SelectTrigger aria-label={t('filters.label')}>
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">{t('filters.all')}</SelectItem>
-                        <SelectItem value="generation">{t('filters.generation')}</SelectItem>
-                        <SelectItem value="items">{t('filters.items')}</SelectItem>
-                        <SelectItem value="comparisons">{t('filters.comparisons')}</SelectItem>
-                        <SelectItem value="taxonomy">{t('filters.taxonomy')}</SelectItem>
-                        <SelectItem value="community_pr">{t('filters.community_pr')}</SelectItem>
-                    </SelectContent>
-                </Select>
+                <select
+                    value={activityFilter}
+                    onChange={(e) => handleFilterChange(e.target.value)}
+                    aria-label={t('filters.label')}
+                >
+                    <option value="all">{t('filters.all')}</option>
+                    <option value="generation">{t('filters.generation')}</option>
+                    <option value="items">{t('filters.items')}</option>
+                    <option value="comparisons">{t('filters.comparisons')}</option>
+                    <option value="taxonomy">{t('filters.taxonomy')}</option>
+                    <option value="community_pr">{t('filters.community_pr')}</option>
+                </select>
             </div>
 
             {entries.length === 0 ? (

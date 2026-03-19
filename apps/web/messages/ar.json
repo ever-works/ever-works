@@ -734,7 +734,8 @@
                 "tabs": {
                     "browseItems": "تصفح العناصر",
                     "categories": "الفئات",
-                    "tags": "الوسوم"
+                    "tags": "الوسوم",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -818,6 +819,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "أعد التحقق من المصدر",
+                    "checkCompleted": "اكتمل التحقق من المصدر",
+                    "checkFailed": "فشل التحقق من المصدر",
+                    "failedToCheckSource": "فشل التحقق من مصدر العنصر",
+                    "brokenLink": "رابط معطل",
+                    "healthy": "سليم",
+                    "couldNotVerify": "تعذر التحقق",
+                    "sourceMayHaveIssues": "قد تكون هناك مشكلات في المصدر",
+                    "sourceChecked": "تم التحقق من المصدر",
+                    "reachable": "يمكن الوصول إليه",
+                    "reachabilityInconclusive": "التحقق التلقائي من إمكانية الوصول غير حاسم",
+                    "accurateSource": "مصدر دقيق",
+                    "sourceTooGeneric": "المصدر عام جدا",
+                    "weakSource": "مصدر ضعيف",
+                    "sourceAccuracyUnknown": "دقة المصدر غير معروفة",
+                    "useSuggestedSource": "طبّق الاقتراح",
+                    "suggestedSourceApplied": "تم تطبيق المصدر المقترح",
+                    "failedToUseSuggestedSource": "تعذر استخدام المصدر المقترح",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {
@@ -1245,7 +1279,8 @@
                             "paused": "متوقف مؤقتاً",
                             "canceled": "ملغى",
                             "disabled": "معطل"
-                        }
+                        },
+                        "nextSourceValidation": "التحقق التالي من المصدر"
                     },
                     "fields": {
                         "automation": "الأتمتة",
@@ -1258,7 +1293,9 @@
                         "maxFailures": "حد الإخفاق",
                         "maxFailuresHelp": "إيقاف تلقائي بمجرد حدوث هذا العدد من الإخفاقات.",
                         "createPullRequest": "إنشاء طلبات السحب",
-                        "createPullRequestHelp": "عند التمكين، تنشئ التحديثات المجدولة طلب سحب بدلاً من الالتزام مباشرة."
+                        "createPullRequestHelp": "عند التمكين، تنشئ التحديثات المجدولة طلب سحب بدلاً من الالتزام مباشرة.",
+                        "sourceValidationCadence": "وتيرة التحقق من المصدر",
+                        "sourceValidationCadenceHelp": "يستخدم افتراضيًا نفس وتيرة التحديث لديك، لكن يمكنك تقليلها أو زيادتها."
                     },
                     "billing": {
                         "subscription": "الاشتراك",

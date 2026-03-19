@@ -734,7 +734,8 @@
                 "tabs": {
                     "browseItems": "עיין בפריטים",
                     "categories": "קטגוריות",
-                    "tags": "תגיות"
+                    "tags": "תגיות",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -818,6 +819,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "בדוק שוב את המקור",
+                    "checkCompleted": "בדיקת המקור הושלמה",
+                    "checkFailed": "בדיקת המקור נכשלה",
+                    "failedToCheckSource": "נכשלה בדיקת מקור הפריט",
+                    "brokenLink": "קישור שבור",
+                    "healthy": "תקין",
+                    "couldNotVerify": "לא ניתן היה לאמת",
+                    "sourceMayHaveIssues": "ייתכן שיש בעיות במקור",
+                    "sourceChecked": "המקור נבדק",
+                    "reachable": "נגיש",
+                    "reachabilityInconclusive": "בדיקת הנגישות האוטומטית לא הייתה חד משמעית",
+                    "accurateSource": "מקור מדויק",
+                    "sourceTooGeneric": "המקור כללי מדי",
+                    "weakSource": "מקור חלש",
+                    "sourceAccuracyUnknown": "דיוק המקור אינו ידוע",
+                    "useSuggestedSource": "החל הצעה",
+                    "suggestedSourceApplied": "המקור המוצע הוחל",
+                    "failedToUseSuggestedSource": "לא ניתן להשתמש במקור המוצע",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {
@@ -1245,7 +1279,8 @@
                             "paused": "מושהה",
                             "canceled": "בוטל",
                             "disabled": "מושבת"
-                        }
+                        },
+                        "nextSourceValidation": "אימות המקור הבא"
                     },
                     "fields": {
                         "automation": "אוטומציה",
@@ -1258,7 +1293,9 @@
                         "maxFailures": "מגבלת כשלים",
                         "maxFailuresHelp": "השהה אוטומטית לאחר מספר זה של כשלים.",
                         "createPullRequest": "צור Pull Requests",
-                        "createPullRequestHelp": "כאשר מופעל, עדכונים מתוזמנים יוצרים בקשת משיכה במקום קומיט ישיר."
+                        "createPullRequestHelp": "כאשר מופעל, עדכונים מתוזמנים יוצרים בקשת משיכה במקום קומיט ישיר.",
+                        "sourceValidationCadence": "תדירות אימות מקור",
+                        "sourceValidationCadenceHelp": "ברירת המחדל היא אותה תדירות כמו לעדכונים שלך, אבל אפשר להאט או להאיץ אותה."
                     },
                     "billing": {
                         "subscription": "מנוי",

@@ -25,7 +25,8 @@ type DirectoryMethods =
     | 'isCreator'
     | 'getMember'
     | 'hasAccess'
-    | 'getUserRole';
+    | 'getUserRole'
+    | 'resolveCommitter';
 
 export type DirectoryWithRole = Omit<Directory, DirectoryMethods> & {
     userRole: DirectoryMemberRole;
@@ -449,6 +450,7 @@ export class DirectoryQueryService {
             triggerRunId: record.triggerRunId,
             activityType: record.activityType,
             changelog: record.changelog ?? null,
+            logs: record.logs ?? null,
         };
     }
 

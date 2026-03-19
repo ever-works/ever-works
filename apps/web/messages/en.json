@@ -469,7 +469,16 @@
                 "configure": "Configure",
                 "noPluginsInCategory": "No plugins in this category",
                 "requiredSettingsMissing": "Required settings not configured",
-                "backToCategory": "Back to {category}"
+                "backToCategory": "Back to {category}",
+                "pipelineDefault": {
+                    "title": "Default Pipeline",
+                    "description": "Choose which pipeline is used by default when generating directory items.",
+                    "autoLabel": "Auto",
+                    "autoDescription": "Use the system-resolved pipeline for each directory",
+                    "enforceLabel": "Enforce this default",
+                    "enforceDescription": "The selected pipeline will be pre-selected in the generator form across all directories.",
+                    "saveFailed": "Failed to save pipeline default"
+                }
             },
             "profile": {
                 "title": "Profile Settings",
@@ -499,6 +508,12 @@
                     "resend": "Resend",
                     "sent": "Verification email sent. Check your inbox.",
                     "sendFailed": "Failed to send verification email. Please try again."
+                },
+                "committer": {
+                    "title": "Git Committer",
+                    "description": "Override the name and email used in git commits. Leave empty to use your account name ({defaultName}) and email ({defaultEmail}).",
+                    "nameLabel": "Committer Name",
+                    "emailLabel": "Committer Email"
                 }
             },
             "security": {
@@ -981,8 +996,9 @@
                     "updated": "Updated",
                     "removed": "Removed",
                     "fields": "Fields",
-                    "expand": "Expand changelog details",
-                    "collapse": "Collapse changelog details"
+                    "expand": "Expand details",
+                    "collapse": "Collapse details",
+                    "stepLogs": "Step Logs"
                 },
                 "filters": {
                     "label": "Activity",
@@ -1161,7 +1177,8 @@
                     "browseItems": "Browse Items",
                     "categories": "Categories",
                     "tags": "Tags",
-                    "collections": "Collections"
+                    "collections": "Collections",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -1290,6 +1307,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Re-check source",
+                    "checkCompleted": "Item source check completed",
+                    "checkFailed": "Item source check failed",
+                    "failedToCheckSource": "Failed to check item source",
+                    "brokenLink": "Broken link",
+                    "needsReview": "Needs review",
+                    "healthy": "Healthy",
+                    "couldNotVerify": "Could not verify",
+                    "sourceMayHaveIssues": "Source may have issues",
+                    "sourceChecked": "Source checked",
+                    "reachable": "Reachable",
+                    "reachabilityInconclusive": "Automated reachability inconclusive",
+                    "accurateSource": "Accurate source",
+                    "sourceTooGeneric": "Source too generic",
+                    "weakSource": "Weak source",
+                    "sourceAccuracyUnknown": "Source accuracy unknown",
+                    "useSuggestedSource": "Apply suggestion",
+                    "suggestedSourceApplied": "Suggested source applied",
+                    "failedToUseSuggestedSource": "Failed to use suggested source"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {
@@ -1433,7 +1483,9 @@
                     "processing": "Processing..."
                 },
                 "progress": "Progress",
-                "closeNote": "This may take a few minutes. You can close this page and come back later."
+                "closeNote": "This may take a few minutes. You can close this page and come back later.",
+                "showLogs": "Show step logs",
+                "hideLogs": "Hide step logs"
             },
             "settings": {
                 "sourceSettings": "Source Repository",
@@ -1664,6 +1716,15 @@
                             "targetBlank": "New tab"
                         }
                     }
+                },
+                "committer": {
+                    "title": "Git Committer",
+                    "description": "Override the committer name and email for git commits in this directory. Leave empty to use your user-level settings or account defaults.",
+                    "nameLabel": "Committer Name",
+                    "emailLabel": "Committer Email",
+                    "save": "Save Committer",
+                    "saved": "Committer settings saved",
+                    "saveFailed": "Failed to save committer settings"
                 }
             },
             "deploy": {

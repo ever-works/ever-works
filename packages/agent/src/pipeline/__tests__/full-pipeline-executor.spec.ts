@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
 import { FullPipelineExecutorService } from '../full-pipeline-executor.service';
 import { PipelineFacadeService } from '../pipeline-facade.service';
+import { PluginContextFactoryService } from '../../plugins/services/plugin-context-factory.service';
 import { PipelineEvents } from '../step-pipeline-executor.service';
 
 // Silence logger during tests
@@ -185,6 +186,12 @@ describe('FullPipelineExecutorService', () => {
                             contentExtractor: {},
                             dataSource: {},
                         }),
+                    },
+                },
+                {
+                    provide: PluginContextFactoryService,
+                    useValue: {
+                        addLogInterceptor: jest.fn().mockReturnValue(() => {}),
                     },
                 },
             ],
