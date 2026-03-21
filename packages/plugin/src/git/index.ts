@@ -13,6 +13,7 @@ export type {
 	GitCloneOptions,
 	GitPushOptions,
 	CreateRepoOptions,
+	UpdateRepoOptions,
 	ForkRepositoryOptions,
 	CreatePROptions,
 	MergeOptions,

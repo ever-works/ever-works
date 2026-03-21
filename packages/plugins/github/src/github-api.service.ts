@@ -8,6 +8,7 @@ import type {
 	GitPullRequest,
 	GitPullRequestFile,
 	CreateRepoOptions,
+	UpdateRepoOptions,
 	CreatePROptions,
 	MergeOptions,
 	MergeResult,
@@ -213,7 +214,7 @@ export class GitHubApiService {
 	async updateRepository(
 		owner: string,
 		repo: string,
-		data: { isPrivate?: boolean; description?: string },
+		data: UpdateRepoOptions,
 		token: string,
 		baseUrl?: string
 	): Promise<GitRepository> {
@@ -223,7 +224,8 @@ export class GitHubApiService {
 			owner,
 			repo,
 			private: data.isPrivate,
-			description: data.description ? sanitizeDescription(data.description) : undefined
+			description: data.description ? sanitizeDescription(data.description) : undefined,
+			default_branch: data.defaultBranch
 		});
 
 		return {
