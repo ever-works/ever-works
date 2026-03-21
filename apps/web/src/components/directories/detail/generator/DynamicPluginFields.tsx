@@ -254,6 +254,16 @@ export function DynamicPluginFields({
                         </div>
                     );
 
+                case 'json':
+                    return (
+                        <JsonField
+                            key={field.name}
+                            field={field}
+                            value={value as Record<string, unknown> | undefined}
+                            onChange={(val) => handleFieldChange(field.name, val)}
+                        />
+                    );
+
                 case 'tags':
                     return (
                         <TagsField
@@ -354,6 +364,72 @@ export function DynamicPluginFields({
                     );
                 })}
             </Accordion>
+        </div>
+    );
+}
+
+/**
+ * JSON editor field for key-value parameters.
+ */
+interface JsonFieldProps {
+    field: FormFieldDefinition;
+    value: Record<string, unknown> | undefined;
+    onChange: (value: Record<string, unknown>) => void;
+}
+
+function JsonField({ field, value, onChange }: JsonFieldProps) {
+    const [rawText, setRawText] = useState(() =>
+        value && Object.keys(value).length > 0 ? JSON.stringify(value, null, 2) : '',
+    );
+    const [error, setError] = useState<string | null>(null);
+
+    const handleChange = (text: string) => {
+        setRawText(text);
+
+        if (!text.trim()) {
+            setError(null);
+            onChange({});
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(text);
+            if (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null) {
+                setError('Must be a JSON object');
+                return;
+            }
+            setError(null);
+            onChange(parsed as Record<string, unknown>);
+        } catch {
+            setError('Invalid JSON');
+        }
+    };
+
+    return (
+        <div>
+            <label className="block text-sm font-medium text-text dark:text-text-dark mb-1">
+                {field.label}
+                {field.validation?.required && <span className="text-danger ml-1">*</span>}
+            </label>
+            <textarea
+                value={rawText}
+                onChange={(e) => handleChange(e.target.value)}
+                placeholder={field.placeholder || '{\n  "key": "value"\n}'}
+                className={cn(
+                    'w-full px-3 py-2 rounded-lg border text-sm font-mono resize-none',
+                    'bg-surface dark:bg-surface-dark',
+                    'text-text dark:text-text-dark',
+                    'focus:outline-none focus:ring-2 focus:ring-primary/50',
+                    error ? 'border-danger' : 'border-border dark:border-border-dark',
+                )}
+                rows={4}
+            />
+            {error && <p className="mt-1 text-xs text-danger">{error}</p>}
+            {!error && field.description && (
+                <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
+                    {field.description}
+                </p>
+            )}
         </div>
     );
 }
