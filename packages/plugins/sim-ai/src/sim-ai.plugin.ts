@@ -53,6 +53,7 @@ import {
 	validateFormInput as formValidate,
 	getDefaultValues as formDefaults
 } from './form-schema.js';
+import { README } from './readme.js';
 
 /**
  * SIM AI Workflows Plugin
@@ -217,35 +218,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				completionFields: ['apiKey'],
 				onboardingDescription: 'Connect SIM AI to delegate directory generation to visual AI agent workflows.'
 			},
-			readme: [
-				'# SIM AI Workflows Plugin',
-				'',
-				'Pipeline plugin that delegates the entire directory generation to [SIM AI](https://www.sim.ai) workflows.',
-				'SIM AI is an open-source visual workflow builder for building and deploying AI agent workflows.',
-				'',
-				'## How it works',
-				'',
-				'1. **Validate** - Checks API key and verifies the SIM workflow is deployed',
-				'2. **Prepare Payload** - Builds the input payload with directory context and existing items',
-				'3. **Execute Workflow** - Calls the SIM API (sync or async with polling)',
-				'4. **Collect Results** - Parses and validates the workflow output as directory items',
-				'5. **Capture Screenshots** - Optionally captures screenshots for generated items',
-				'6. **Cleanup** - Releases resources',
-				'',
-				'## Settings',
-				'',
-				'| Setting     | Description                |',
-				'| ----------- | -------------------------- |',
-				'| `apiKey`    | SIM AI API key (required)  |',
-				'| `baseUrl`   | Custom SIM instance URL    |',
-				'',
-				'## Data Passing',
-				'',
-				'The plugin supports two strategies for passing data to SIM workflows:',
-				'',
-				'- **Inline** (default): Directory metadata and item summary sent in workflow input',
-				'- **GitHub Repo**: Pass a repository URL and access token for large datasets'
-			].join('\n'),
+			readme: README,
 			homepage: 'https://docs.sim.ai',
 			icon: {
 				type: 'url',
