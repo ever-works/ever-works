@@ -15,18 +15,6 @@ export function getFormFields(): FormFieldDefinition[] {
 			group: 'workflow'
 		},
 		{
-			name: 'execution_mode',
-			type: 'select',
-			label: 'Execution Mode',
-			description: 'Async is recommended for workflows that take longer than 30 seconds',
-			options: [
-				{ label: 'Async (recommended)', value: 'async' },
-				{ label: 'Sync (fast workflows only)', value: 'sync' }
-			],
-			defaultValue: 'async',
-			group: 'workflow'
-		},
-		{
 			name: 'target_items',
 			type: 'number',
 			label: 'Target Items',

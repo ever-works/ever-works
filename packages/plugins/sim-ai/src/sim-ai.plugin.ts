@@ -95,14 +95,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				description: 'Default SIM workflow to use for this directory',
 				'x-scope': 'directory'
 			},
-			executionMode: {
-				type: 'string',
-				title: 'Execution Mode',
-				enum: ['sync', 'async'],
-				default: 'async',
-				description: 'Sync for fast workflows (<30s), async for long-running workflows',
-				'x-scope': 'directory'
-			},
 			asyncPollingIntervalMs: {
 				type: 'integer',
 				title: 'Polling Interval (ms)',
@@ -306,7 +298,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			const pluginSettings = await resolveSettings(this.context, userId, directory.id);
 			const config = (request.config || {}) as Record<string, unknown>;
 
-			const simSettings = this.resolveSimSettings(pluginSettings, config);
+			const simSettings = this.resolveSimSettings(pluginSettings);
 			const workflowId = this.resolveWorkflowId(config, simSettings);
 
 			if (!workflowId) {
@@ -455,10 +447,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 	// ── Private helpers ────────────────────────────────────────────────
 
-	private resolveSimSettings(
-		pluginSettings: Record<string, unknown>,
-		config: Record<string, unknown>
-	): SimAiSettings {
+	private resolveSimSettings(pluginSettings: Record<string, unknown>): SimAiSettings {
 		const apiKey = pluginSettings.apiKey as string;
 		if (!apiKey) {
 			throw new Error('SIM API key is not configured. Please set it in plugin settings.');
@@ -468,9 +457,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			apiKey,
 			baseUrl: (pluginSettings.baseUrl as string) || DEFAULT_BASE_URL,
 			defaultWorkflowId: pluginSettings.defaultWorkflowId as string | undefined,
-			executionMode: ((config.execution_mode as string) ||
-				(pluginSettings.executionMode as string) ||
-				'async') as 'sync' | 'async',
+			executionMode: 'async',
 			asyncPollingIntervalMs: (pluginSettings.asyncPollingIntervalMs as number) ?? DEFAULT_POLLING_INTERVAL_MS,
 			asyncTimeoutMs: (pluginSettings.asyncTimeoutMs as number) ?? DEFAULT_ASYNC_TIMEOUT_MS,
 			maxRetries: (pluginSettings.maxRetries as number) ?? DEFAULT_MAX_RETRIES
