@@ -90,6 +90,12 @@ export interface ExportedSchedule {
     providerOverrides?: Record<string, any> | null;
 }
 
+export interface ExportedComparisonSource {
+    title: string;
+    url: string;
+    note?: string;
+}
+
 export interface ExportedComparison {
     id: string;
     slug: string;
@@ -110,7 +116,7 @@ export interface ExportedComparison {
         item_b_score?: number;
         winner?: 'item_a' | 'item_b' | 'tie';
     }[];
-    sources: readonly string[];
+    sources: readonly ExportedComparisonSource[];
     generated_at: string;
     markdown?: string;
 }

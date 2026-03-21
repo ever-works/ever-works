@@ -172,6 +172,12 @@ export interface ComparisonDimension {
 	readonly winner?: 'item_a' | 'item_b' | 'tie';
 }
 
+export interface ComparisonSource {
+	readonly title: string;
+	readonly url: string;
+	readonly note?: string;
+}
+
 /**
  * Full comparison data for an "A vs B" comparison page
  */
@@ -188,6 +194,6 @@ export interface ComparisonData {
 	readonly verdict: string;
 	readonly verdict_winner?: 'item_a' | 'item_b' | 'tie';
 	readonly dimensions: readonly ComparisonDimension[];
-	readonly sources: readonly string[];
+	readonly sources: readonly ComparisonSource[];
 	readonly generated_at: string;
 }

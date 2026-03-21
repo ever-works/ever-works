@@ -8,6 +8,7 @@ import {
     ChevronDown,
     ChevronLeft,
     ChevronRight,
+    ExternalLink,
     Grid,
     List,
     Square,
@@ -41,6 +42,7 @@ import { toast } from 'sonner';
 import type { ComparisonData } from '@/lib/api/directory';
 import type { ProviderOption } from '@/lib/api/types-only';
 import { ROUTES } from '@/lib/constants';
+import { buildPublicComparisonUrl, formatComparisonDate } from '@/lib/utils/comparison';
 import {
     generateNextComparison,
     generateManualComparison,
@@ -52,6 +54,7 @@ import {
 
 interface ComparisonsPageClientProps {
     directoryId: string;
+    websiteUrl: string | null;
     initialComparisons: ComparisonData[];
     items: Array<{ slug: string; name: string; category: string | string[] }>;
     availableProviders: ProviderOption[];
@@ -60,6 +63,7 @@ interface ComparisonsPageClientProps {
 
 export function ComparisonsPageClient({
     directoryId,
+    websiteUrl,
     initialComparisons,
     items,
     availableProviders,
@@ -807,27 +811,44 @@ export function ComparisonsPageClient({
                                         <h3 className="font-medium text-text dark:text-text-dark truncate">
                                             {comparison.title}
                                         </h3>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => setDeleteSlug(comparison.slug)}
-                                            disabled={isBusy}
-                                            className="relative z-10 text-text-secondary hover:text-red-600 dark:text-text-secondary-dark dark:hover:text-red-400 ml-2 shrink-0"
-                                        >
-                                            <svg
-                                                className="w-4 h-4"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
+                                        <div className="relative z-10 ml-2 flex shrink-0 items-center gap-1">
+                                            {websiteUrl && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    href={buildPublicComparisonUrl(
+                                                        websiteUrl,
+                                                        comparison.slug,
+                                                    )}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-text-secondary dark:text-text-secondary-dark"
+                                                >
+                                                    <ExternalLink className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setDeleteSlug(comparison.slug)}
+                                                disabled={isBusy}
+                                                className="text-text-secondary hover:text-red-600 dark:text-text-secondary-dark dark:hover:text-red-400"
                                             >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                                />
-                                            </svg>
-                                        </Button>
+                                                <svg
+                                                    className="w-4 h-4"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                    />
+                                                </svg>
+                                            </Button>
+                                        </div>
                                     </div>
                                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-secondary dark:text-text-secondary-dark">
                                         <span>
@@ -837,9 +858,7 @@ export function ComparisonsPageClient({
                                         <span className="text-border dark:text-border-dark">|</span>
                                         <span>{comparison.category}</span>
                                         <span className="text-border dark:text-border-dark">|</span>
-                                        <span>
-                                            {new Date(comparison.generated_at).toLocaleDateString()}
-                                        </span>
+                                        <span>{formatComparisonDate(comparison.generated_at)}</span>
                                     </div>
                                     <p className="mt-2 text-sm text-text-secondary dark:text-text-secondary-dark line-clamp-2">
                                         {comparison.summary}
