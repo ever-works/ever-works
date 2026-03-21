@@ -1,7 +1,4 @@
-/**
- * Step IDs for the SIM AI pipeline.
- * All steps run sequentially.
- */
+/** Step IDs for the SIM AI pipeline. */
 export type SimAiStepId =
 	| 'validate-sim'
 	| 'prepare-payload'
@@ -10,9 +7,6 @@ export type SimAiStepId =
 	| 'capture-screenshots'
 	| 'cleanup';
 
-/**
- * All step IDs as an array for iteration
- */
 export const SIM_AI_STEP_IDS: readonly SimAiStepId[] = [
 	'validate-sim',
 	'prepare-payload',
@@ -21,13 +15,6 @@ export const SIM_AI_STEP_IDS: readonly SimAiStepId[] = [
 	'capture-screenshots',
 	'cleanup'
 ] as const;
-
-/**
- * Type guard for SimAiStepId
- */
-export function isSimAiStepId(value: string): value is SimAiStepId {
-	return (SIM_AI_STEP_IDS as readonly string[]).includes(value);
-}
 
 /** Plugin constants */
 export const DEFAULT_BASE_URL = 'https://www.sim.ai';
@@ -101,10 +88,9 @@ export interface SimAiSettings {
 
 /** Metrics specific to SIM execution */
 export interface SimAiPipelineMetrics {
-	simDuration?: number;
-	pollingAttempts?: number;
-	simCost?: number;
 	workflowId: string;
 	executionMode: 'sync' | 'async';
 	taskId?: string;
+	pollingAttempts?: number;
+	simDuration?: number;
 }

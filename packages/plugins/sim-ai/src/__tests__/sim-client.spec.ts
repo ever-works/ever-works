@@ -15,7 +15,8 @@ vi.mock('simstudio-ts-sdk', () => ({
 		getWorkflowStatus: mockGetWorkflowStatus,
 		executeWithRetry: mockExecuteWithRetry,
 		executeWorkflow: mockExecuteWorkflow,
-		getJobStatus: mockGetJobStatus
+		getJobStatus: mockGetJobStatus,
+		getRateLimitInfo: vi.fn().mockReturnValue(null)
 	})),
 	SimStudioError: class SimStudioError extends Error {
 		code?: string;
@@ -162,7 +163,13 @@ describe('SimClientWrapper', () => {
 
 	describe('executeWorkflow - async mode', () => {
 		it('should poll until completion', async () => {
-			mockExecuteWorkflow.mockResolvedValue({ taskId: 'task-1' });
+			mockExecuteWorkflow.mockResolvedValue({
+				success: true,
+				taskId: 'task-1',
+				status: 'queued',
+				createdAt: '',
+				links: { status: '' }
+			});
 			mockGetJobStatus.mockResolvedValueOnce({ status: 'processing' }).mockResolvedValueOnce({
 				status: 'completed',
 				output: { items: [{ name: 'Async Item' }] },
@@ -184,6 +191,7 @@ describe('SimClientWrapper', () => {
 
 		it('should handle synchronous completion in async mode', async () => {
 			mockExecuteWorkflow.mockResolvedValue({
+				success: true,
 				output: { items: [{ name: 'Quick Item' }] }
 			});
 			const client = createClient();
@@ -197,7 +205,13 @@ describe('SimClientWrapper', () => {
 		});
 
 		it('should throw on failed status', async () => {
-			mockExecuteWorkflow.mockResolvedValue({ taskId: 'task-fail' });
+			mockExecuteWorkflow.mockResolvedValue({
+				success: true,
+				taskId: 'task-fail',
+				status: 'queued',
+				createdAt: '',
+				links: { status: '' }
+			});
 			mockGetJobStatus.mockResolvedValue({ status: 'failed', error: 'Out of memory' });
 
 			const client = createClient();
@@ -207,7 +221,13 @@ describe('SimClientWrapper', () => {
 		});
 
 		it('should throw on cancelled status', async () => {
-			mockExecuteWorkflow.mockResolvedValue({ taskId: 'task-cancel' });
+			mockExecuteWorkflow.mockResolvedValue({
+				success: true,
+				taskId: 'task-cancel',
+				status: 'queued',
+				createdAt: '',
+				links: { status: '' }
+			});
 			mockGetJobStatus.mockResolvedValue({ status: 'cancelled' });
 
 			const client = createClient();
@@ -217,7 +237,13 @@ describe('SimClientWrapper', () => {
 		});
 
 		it('should throw on timeout', async () => {
-			mockExecuteWorkflow.mockResolvedValue({ taskId: 'task-slow' });
+			mockExecuteWorkflow.mockResolvedValue({
+				success: true,
+				taskId: 'task-slow',
+				status: 'queued',
+				createdAt: '',
+				links: { status: '' }
+			});
 			mockGetJobStatus.mockResolvedValue({ status: 'processing' });
 
 			const client = createClient();
@@ -231,7 +257,13 @@ describe('SimClientWrapper', () => {
 		});
 
 		it('should respect abort signal', async () => {
-			mockExecuteWorkflow.mockResolvedValue({ taskId: 'task-abort' });
+			mockExecuteWorkflow.mockResolvedValue({
+				success: true,
+				taskId: 'task-abort',
+				status: 'queued',
+				createdAt: '',
+				links: { status: '' }
+			});
 			mockGetJobStatus.mockResolvedValue({ status: 'processing' });
 
 			const client = createClient();

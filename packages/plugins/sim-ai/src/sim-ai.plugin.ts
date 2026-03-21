@@ -20,7 +20,8 @@ import type {
 	StepStatus,
 	FormFieldDefinition,
 	FormFieldGroup,
-	ItemData
+	ItemData,
+	FacadeOptions
 } from '@ever-works/plugin';
 import { buildSuccessPipelineResult } from '@ever-works/plugin';
 
@@ -37,7 +38,6 @@ import { STEP_DEFINITIONS } from './steps.js';
 import { SimClientWrapper } from './utils/sim-client.js';
 import { buildWorkflowPayload } from './utils/payload-builder.js';
 import { parseSimOutput, deduplicateItems } from './utils/result-parser.js';
-import { captureScreenshots } from './utils/screenshot-capture.js';
 import {
 	initializeState,
 	updateStepState,
@@ -53,7 +53,6 @@ import {
 	validateFormInput as formValidate,
 	getDefaultValues as formDefaults
 } from './form-schema.js';
-import { registerToken, revokeToken, cleanupExpiredTokens, sanitizeTokenForLog } from './utils/token-manager.js';
 
 /**
  * SIM AI Workflows Plugin
@@ -147,7 +146,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {
-		cleanupExpiredTokens();
 		return {
 			status: 'healthy',
 			message: 'SIM AI Workflows plugin is ready',
@@ -170,7 +168,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	async validateConnection(rawSettings: Record<string, unknown>): Promise<ConnectionValidationResult> {
-		// Settings may arrive as ResolvedSettings ({ value, source, scope }) — extract plain values
 		const settings = this.flattenSettings(rawSettings);
 		const apiKey = settings.apiKey as string | undefined;
 		if (!apiKey) {
@@ -185,7 +182,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				logger: this.context?.logger ?? console
 			});
 
-			// If a default workflow ID is set, validate it
 			const workflowId = settings.defaultWorkflowId as string | undefined;
 			if (workflowId) {
 				await client.validateWorkflow(workflowId);
@@ -282,7 +278,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		return STEP_DEFINITIONS;
 	}
 
-	/** Per-execution state — stored for getState() but scoped per call via closures */
 	private _lastState: PipelineState<SimAiStepId> | null = null;
 	private _lastAbortController: AbortController | null = null;
 
@@ -295,7 +290,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	): Promise<PipelineResult> {
 		const startTime = Date.now();
 		const abortController = new AbortController();
-		// If an external signal is provided, forward its abort to our internal controller
 		if (options?.signal) {
 			if (options.signal.aborted) {
 				abortController.abort();
@@ -306,8 +300,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		const signal = abortController.signal;
 
 		let state = initializeState();
-
-		// Expose to getState()/cancel() — last execution wins
 		this._lastState = state;
 		this._lastAbortController = abortController;
 
@@ -337,13 +329,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			return handleError(new Error('User ID is required'));
 		}
 
-		const executionId = `${directory.id}-${Date.now()}`;
-
-		const handleCancelWithCleanup = (): PipelineResult => {
-			revokeToken(executionId);
-			return handleCancel();
-		};
-
 		try {
 			const pluginSettings = await resolveSettings(this.context, userId, directory.id);
 			const config = (request.config || {}) as Record<string, unknown>;
@@ -372,26 +357,13 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			await simClient.validateWorkflow(workflowId);
 			setState('validate-sim', 'completed');
 
-			if (signal.aborted) return handleCancelWithCleanup();
+			if (signal.aborted) return handleCancel();
 
 			// ── Step 2: Prepare Payload ───────────────────────────────
 			setState('prepare-payload', 'running');
 			reportProgress(onProgress, 1, 10, 'Prepare Workflow Payload');
 
 			const payload = buildWorkflowPayload({ directory, request, existing, config });
-
-			// Track repo access tokens for cleanup
-			if (payload.dataSource?.type === 'github-repo' && payload.dataSource.accessToken) {
-				registerToken(executionId, {
-					token: payload.dataSource.accessToken,
-					repoUrl: payload.dataSource.repoUrl || '',
-					expiresAt: Date.now() + 3600_000 // 1 hour
-				});
-				logger.log(
-					`Registered repo access token ${sanitizeTokenForLog(payload.dataSource.accessToken)} ` +
-						`for ${payload.dataSource.repoUrl}`
-				);
-			}
 
 			logger.log(
 				`Payload prepared: ${payload.metadata.targetItems} target items, ` +
@@ -400,7 +372,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			);
 			setState('prepare-payload', 'completed');
 
-			if (signal.aborted) return handleCancelWithCleanup();
+			if (signal.aborted) return handleCancel();
 
 			// ── Step 3: Execute SIM Workflow ──────────────────────────
 			setState('execute-workflow', 'running');
@@ -429,7 +401,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			);
 			setState('execute-workflow', 'completed');
 
-			if (signal.aborted) return handleCancelWithCleanup();
+			if (signal.aborted) return handleCancel();
 
 			// ── Step 4: Collect & Validate Results ────────────────────
 			setState('collect-results', 'running');
@@ -437,7 +409,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 			const parsed = parseSimOutput(execResult.output);
 
-			// Deduplicate against existing items
 			const existingNames = existing.items.map((i) => i.name);
 			const items = deduplicateItems(parsed.items, existingNames);
 
@@ -449,13 +420,12 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			setState('collect-results', 'completed');
 
 			// ── Step 5: Capture Screenshots ───────────────────────────
-			const screenshotWarnings = await this.runScreenshotCapture(
+			const screenshotWarnings = await this.captureScreenshots(
 				setState,
 				request,
 				options?.execContext,
 				items,
-				userId,
-				directory.id,
+				{ userId, directoryId: directory.id },
 				signal,
 				onProgress,
 				logger
@@ -464,13 +434,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			// ── Step 6: Cleanup ───────────────────────────────────────
 			setState('cleanup', 'running');
 			reportProgress(onProgress, 5, 95, 'Cleanup');
-
-			// Revoke tracked repo access tokens
-			const revokedToken = revokeToken(executionId);
-			if (revokedToken) {
-				logger.log(`Revoked repo access token for ${revokedToken.repoUrl}`);
-			}
-
 			setState('cleanup', 'completed');
 
 			// ── Build result ──────────────────────────────────────────
@@ -505,13 +468,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
 			logger.error(`SIM AI pipeline failed: ${err.message}`);
-
-			// Ensure token cleanup even on error
-			const revokedToken = revokeToken(executionId);
-			if (revokedToken) {
-				logger.log(`Revoked repo access token for ${revokedToken.repoUrl} (error path)`);
-			}
-
 			return handleError(err);
 		}
 	}
@@ -549,19 +505,17 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	private resolveWorkflowId(config: Record<string, unknown>, settings: SimAiSettings): string | undefined {
-		// Form field takes precedence over default setting
 		const fromConfig = config.workflow_id as string | undefined;
 		if (fromConfig && fromConfig.trim()) return fromConfig.trim();
 		return settings.defaultWorkflowId;
 	}
 
-	private async runScreenshotCapture(
+	private async captureScreenshots(
 		setState: (stepId: SimAiStepId, status: StepStatus, error?: string) => void,
 		request: GenerationRequest,
 		execContext: PipelineExecutionOptions['execContext'],
 		items: ItemData[],
-		userId: string,
-		directoryId: string,
+		facadeOptions: FacadeOptions,
 		signal: AbortSignal,
 		onProgress: PipelineProgressCallback | undefined,
 		logger: { log(...args: unknown[]): void; warn(...args: unknown[]): void }
@@ -582,16 +536,37 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		setState('capture-screenshots', 'running');
 		reportProgress(onProgress, 4, 80, 'Capture Screenshots');
 
-		const { status, errors } = await captureScreenshots(items, {
-			screenshotFacade,
-			facadeOptions: { userId, directoryId },
-			signal,
-			logger
-		});
-		setState('capture-screenshots', status);
+		const errors: string[] = [];
+		const itemsNeedingImages = items.filter(
+			(item) => item.source_url && (!item.images || item.images.length === 0)
+		);
+
+		for (const item of itemsNeedingImages) {
+			if (signal.aborted) break;
+
+			try {
+				const result = await screenshotFacade.getSmartImage(
+					{ url: item.source_url, itemName: item.name },
+					facadeOptions
+				);
+
+				if (result.primaryImage) {
+					(item as { images?: string[] }).images = [result.primaryImage, ...(item.images || [])];
+				}
+			} catch (error) {
+				const reason = error instanceof Error ? error.message : 'Unknown error';
+				logger.warn(`Failed to capture image for ${item.name}: ${reason}`);
+				errors.push(reason);
+			}
+		}
+
+		setState(
+			'capture-screenshots',
+			errors.length > 0 && errors.length === itemsNeedingImages.length ? 'failed' : 'completed'
+		);
 
 		if (errors.length > 0) {
-			const providerName = await screenshotFacade.getActiveProviderName?.({ userId, directoryId });
+			const providerName = await screenshotFacade.getActiveProviderName?.(facadeOptions);
 			const label = providerName ? `Screenshot capture (${providerName})` : 'Screenshot capture';
 			const unique = [...new Set(errors)];
 			return [`${label} failed for ${errors.length} item(s): ${unique.join('; ')}`];
@@ -600,9 +575,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	/**
-	 * Flatten a ResolvedSettings map into plain key→value pairs.
-	 * ResolvedSettings stores each key as `{ value, source, scope }`;
-	 * this extracts the raw values so they can be used directly.
+	 * Flatten a ResolvedSettings map into plain key->value pairs.
 	 */
 	private flattenSettings(settings: Record<string, unknown>): Record<string, unknown> {
 		const flat: Record<string, unknown> = {};

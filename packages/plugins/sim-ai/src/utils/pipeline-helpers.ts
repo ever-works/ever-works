@@ -39,26 +39,21 @@ export function updateStepState(
 	if (!existing) return state;
 
 	const now = Date.now();
-	const updated: StepState<SimAiStepId> = {
+	const steps = new Map(state.steps);
+	steps.set(stepId, {
 		...existing,
 		status,
 		startedAt: status === 'running' ? now : existing.startedAt,
 		completedAt: status === 'completed' || status === 'failed' ? now : undefined,
 		error: error ?? existing.error
-	};
-
-	const steps = new Map(state.steps);
-	steps.set(stepId, updated);
-
-	const completedSteps = status === 'completed' ? [...state.completedSteps, stepId] : state.completedSteps;
-	const failedSteps = status === 'failed' ? [...state.failedSteps, stepId] : state.failedSteps;
+	});
 
 	return {
 		...state,
 		steps,
 		currentStep: status === 'running' ? stepId : state.currentStep,
-		completedSteps,
-		failedSteps
+		completedSteps: status === 'completed' ? [...state.completedSteps, stepId] : state.completedSteps,
+		failedSteps: status === 'failed' ? [...state.failedSteps, stepId] : state.failedSteps
 	};
 }
 
@@ -78,6 +73,7 @@ export function reportProgress(
 	});
 }
 
+/** Merges user and directory-level settings (directory overrides user). */
 export async function resolveSettings(
 	context: PluginContext | null,
 	userId: string,
@@ -125,6 +121,7 @@ export function buildErrorResult(
 ): { result: PipelineResult; state: PipelineState<SimAiStepId> } {
 	let currentState = state ?? initializeState();
 
+	// Mark the currently running step as failed
 	for (const [stepId, stepState] of currentState.steps) {
 		if (stepState.status === 'running') {
 			currentState = updateStepState(currentState, stepId, 'failed', error.message);
@@ -149,10 +146,8 @@ export function buildCancelledResult(
 	state: PipelineState<SimAiStepId> | null,
 	startTime: number
 ): { result: PipelineResult; state: PipelineState<SimAiStepId> } {
-	let currentState = state ?? initializeState();
-
-	currentState = {
-		...currentState,
+	const currentState: PipelineState<SimAiStepId> = {
+		...(state ?? initializeState()),
 		isRunning: false,
 		isCancelled: true,
 		completedAt: Date.now()
@@ -168,8 +163,4 @@ export function buildCancelledResult(
 			state: currentState
 		})
 	};
-}
-
-export function delay(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
 }

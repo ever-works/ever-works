@@ -11,15 +11,7 @@
 export { SimAiPlugin } from './sim-ai.plugin.js';
 
 // Types
-export type {
-	SimAiStepId,
-	SimWorkflowInput,
-	SimWorkflowOutput,
-	SimOutputItem,
-	SimAiSettings,
-	SimAiPipelineMetrics
-} from './types.js';
-export { SIM_AI_STEP_IDS, isSimAiStepId } from './types.js';
+export type { SimAiStepId, SimWorkflowInput, SimWorkflowOutput, SimOutputItem, SimAiSettings } from './types.js';
 
 // Default export for plugin loader
 export { default } from './sim-ai.plugin.js';

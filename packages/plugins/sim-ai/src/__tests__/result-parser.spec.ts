@@ -86,7 +86,7 @@ describe('parseSimOutput', () => {
 		});
 
 		expect(result.brands).toHaveLength(2);
-		expect(result.brands.find((b) => b.name === 'Brand A')?.url).toBe('https://branda.com');
+		expect(result.brands.find((b) => b.name === 'Brand A')?.website).toBe('https://branda.com');
 	});
 
 	it('should skip items without a name', () => {
