@@ -24,6 +24,15 @@ export function getFormFields(): FormFieldDefinition[] {
 			group: 'workflow'
 		},
 		{
+			name: 'workflow_timeout',
+			type: 'number',
+			label: 'Workflow Timeout (minutes)',
+			description: 'Maximum time to wait for the SIM workflow to complete',
+			defaultValue: 60,
+			validation: { min: 1, max: 120 },
+			group: 'workflow'
+		},
+		{
 			name: 'pass_existing_items',
 			type: 'boolean',
 			label: 'Pass Existing Items Summary',

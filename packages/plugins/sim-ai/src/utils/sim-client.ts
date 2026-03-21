@@ -5,7 +5,7 @@ import {
 	type AsyncExecutionResult
 } from 'simstudio-ts-sdk';
 import type { SimAiSettings, SimWorkflowInput } from '../types.js';
-import { DEFAULT_POLLING_INTERVAL_MS, DEFAULT_ASYNC_TIMEOUT_MS, DEFAULT_MAX_RETRIES } from '../types.js';
+import { DEFAULT_POLLING_INTERVAL_MS, DEFAULT_MAX_RETRIES } from '../types.js';
 
 export interface SimExecutionResult {
 	output: unknown;
@@ -130,7 +130,7 @@ export class SimClientWrapper {
 		const result = await this.client.executeWithRetry(
 			workflowId,
 			input,
-			{ timeout: settings.asyncTimeoutMs ?? DEFAULT_ASYNC_TIMEOUT_MS, stream: false, async: false },
+			{ timeout: settings.asyncTimeoutMs, stream: false, async: false },
 			{ maxRetries, initialDelay: 1000, maxDelay: 30000, backoffMultiplier: 2 }
 		);
 
@@ -156,7 +156,7 @@ export class SimClientWrapper {
 	): Promise<SimExecutionResult> {
 		const startTime = Date.now();
 		const pollingInterval = settings.asyncPollingIntervalMs ?? DEFAULT_POLLING_INTERVAL_MS;
-		const timeout = settings.asyncTimeoutMs ?? DEFAULT_ASYNC_TIMEOUT_MS;
+		const timeout = settings.asyncTimeoutMs;
 
 		this.logger.log(`Executing workflow "${workflowId}" in async mode`);
 

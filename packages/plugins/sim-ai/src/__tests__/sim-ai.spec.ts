@@ -130,8 +130,7 @@ function createRequest(overrides?: Partial<GenerationRequest>): GenerationReques
 		generationMethod: 'create-update',
 		config: {
 			workflow_id: 'wf-test-123',
-			target_items: 50,
-			execution_mode: 'sync'
+			target_items: 50
 		},
 		...overrides
 	};
@@ -254,11 +253,10 @@ describe('SimAiPlugin', () => {
 			expect(targetField!.defaultValue).toBe(50);
 		});
 
-		it('should include execution_mode field', () => {
+		it('should not include execution_mode field', () => {
 			const fields = plugin.getFormFields();
 			const modeField = fields.find((f) => f.name === 'execution_mode');
-			expect(modeField).toBeDefined();
-			expect(modeField!.defaultValue).toBe('async');
+			expect(modeField).toBeUndefined();
 		});
 	});
 
@@ -392,7 +390,7 @@ describe('SimAiPlugin', () => {
 		it('should execute async workflow successfully', async () => {
 			const result = await plugin.execute(
 				createDirectory(),
-				createRequest({ config: { workflow_id: 'wf-async', execution_mode: 'async' } }),
+				createRequest({ config: { workflow_id: 'wf-async' } }),
 				createExisting()
 			);
 

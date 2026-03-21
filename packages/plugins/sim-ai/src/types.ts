@@ -19,7 +19,6 @@ export const SIM_AI_STEP_IDS: readonly SimAiStepId[] = [
 /** Plugin constants */
 export const DEFAULT_BASE_URL = 'https://www.sim.ai';
 export const DEFAULT_POLLING_INTERVAL_MS = 5000;
-export const DEFAULT_ASYNC_TIMEOUT_MS = 900_000; // 15 minutes
 export const DEFAULT_MAX_RETRIES = 3;
 export const DEFAULT_TARGET_ITEMS = 50;
 
