@@ -9,8 +9,7 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'workflow_id',
 			type: 'text',
 			label: 'SIM Workflow ID',
-			description: 'The deployed SIM workflow to execute for item generation',
-			validation: { required: true },
+			description: 'Override the default workflow for this generation (optional if set in plugin settings)',
 			placeholder: 'e.g., wf_abc123...',
 			group: 'workflow'
 		},
@@ -132,10 +131,6 @@ export function getFormGroups(): FormFieldGroup[] {
 }
 
 export function validateFormInput(values: Record<string, unknown>): ValidationResult {
-	if (!values.workflow_id || typeof values.workflow_id !== 'string' || values.workflow_id.trim() === '') {
-		return { valid: false, errors: [{ path: 'workflow_id', message: 'SIM Workflow ID is required' }] };
-	}
-
 	if (values.pass_repo_access) {
 		if (!values.repo_url || typeof values.repo_url !== 'string' || values.repo_url.trim() === '') {
 			return {

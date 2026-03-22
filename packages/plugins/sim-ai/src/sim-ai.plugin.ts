@@ -91,8 +91,8 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			defaultWorkflowId: {
 				type: 'string',
 				title: 'Default Workflow ID',
-				description: 'Default SIM workflow to use for this directory',
-				'x-scope': 'directory'
+				description: 'Default SIM workflow to use when not specified in the generator form',
+				'x-scope': 'user'
 			},
 			asyncPollingIntervalMs: {
 				type: 'integer',

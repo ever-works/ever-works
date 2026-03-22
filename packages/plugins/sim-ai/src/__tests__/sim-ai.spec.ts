@@ -239,11 +239,11 @@ describe('SimAiPlugin', () => {
 	});
 
 	describe('getFormFields', () => {
-		it('should include workflow_id field', () => {
+		it('should include workflow_id field as optional', () => {
 			const fields = plugin.getFormFields();
 			const workflowField = fields.find((f) => f.name === 'workflow_id');
 			expect(workflowField).toBeDefined();
-			expect(workflowField!.validation?.required).toBe(true);
+			expect(workflowField!.validation?.required).toBeUndefined();
 		});
 
 		it('should include target_items with default of 50', () => {
@@ -261,13 +261,8 @@ describe('SimAiPlugin', () => {
 	});
 
 	describe('validateFormInput', () => {
-		it('should fail without workflow_id', () => {
+		it('should pass without workflow_id (falls back to plugin settings)', () => {
 			const result = plugin.validateFormInput({});
-			expect(result.valid).toBe(false);
-		});
-
-		it('should pass with workflow_id', () => {
-			const result = plugin.validateFormInput({ workflow_id: 'wf-123' });
 			expect(result.valid).toBe(true);
 		});
 

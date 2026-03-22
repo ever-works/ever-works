@@ -35,6 +35,7 @@ export function SimAiOnboardingWizard({
 
     const apiKeySchema = visibleProperties.apiKey;
     const baseUrlSchema = visibleProperties.baseUrl;
+    const defaultWorkflowIdSchema = visibleProperties.defaultWorkflowId;
 
     const steps = useMemo(
         () => [
@@ -99,6 +100,17 @@ export function SimAiOnboardingWizard({
                                 schema={apiKeySchema}
                                 value={getFieldValue('apiKey', apiKeySchema)}
                                 onChange={(value) => handleFieldChange('apiKey', value, true)}
+                                pluginId={pluginId}
+                            />
+                        )}
+                        {defaultWorkflowIdSchema && (
+                            <PluginSettingsField
+                                name="defaultWorkflowId"
+                                schema={defaultWorkflowIdSchema}
+                                value={getFieldValue('defaultWorkflowId', defaultWorkflowIdSchema)}
+                                onChange={(value) =>
+                                    handleFieldChange('defaultWorkflowId', value, false)
+                                }
                                 pluginId={pluginId}
                             />
                         )}
