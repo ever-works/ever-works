@@ -5,7 +5,7 @@ import {
 	type AsyncExecutionResult
 } from 'simstudio-ts-sdk';
 import type { SimAiSettings, SimWorkflowInput } from '../types.js';
-import { DEFAULT_POLLING_INTERVAL_MS, DEFAULT_MAX_RETRIES } from '../types.js';
+import { DEFAULT_POLLING_INTERVAL_MS } from '../types.js';
 
 export interface SimExecutionResult {
 	output: unknown;
@@ -90,7 +90,7 @@ export class SimClientWrapper {
 	}
 
 	/**
-	 * Executes a workflow in sync or async mode.
+	 * Executes a workflow asynchronously with polling.
 	 * The payload is wrapped as a JSON string in a `message` field
 	 * so the SIM Start block can access it via `<start.message>`.
 	 */
@@ -104,114 +104,68 @@ export class SimClientWrapper {
 		const wrappedInput = { message: JSON.stringify(input) };
 
 		try {
-			if (settings.executionMode === 'sync') {
-				return await this.executeSyncWithRetry(workflowId, wrappedInput, settings, signal);
+			const startTime = Date.now();
+			const pollingInterval = settings.asyncPollingIntervalMs ?? DEFAULT_POLLING_INTERVAL_MS;
+			const timeout = settings.asyncTimeoutMs;
+
+			this.logger.log(`Executing workflow "${workflowId}" asynchronously`);
+
+			const result = await this.client.executeWorkflow(workflowId, wrappedInput, { async: true });
+
+			// If workflow completed synchronously despite async request
+			if (!isAsyncResult(result)) {
+				return { output: result.output, pollingAttempts: 0, simDuration: Date.now() - startTime };
 			}
-			return await this.executeAsync(workflowId, wrappedInput, settings, onPollProgress, signal);
+
+			const taskId = result.taskId;
+			this.logger.log(`Workflow queued with task ID: ${taskId}`);
+
+			let pollingAttempts = 0;
+
+			while (true) {
+				if (signal?.aborted) throw new Error('Pipeline execution was cancelled');
+
+				if (Date.now() - startTime > timeout) {
+					throw new Error(
+						`SIM workflow timed out after ${Math.round(timeout / 1000)}s. ` +
+							`Task ID: ${taskId}. Check status in the SIM dashboard.`
+					);
+				}
+
+				const status = (await this.client.getJobStatus(taskId)) as JobStatus;
+				pollingAttempts++;
+				onPollProgress?.(pollingAttempts, status.status);
+				this.logger.log(`Poll #${pollingAttempts}: status=${status.status}`);
+
+				if (status.status === 'completed') {
+					return {
+						output: status.output,
+						taskId,
+						pollingAttempts,
+						simDuration: status.metadata?.duration ?? Date.now() - startTime
+					};
+				}
+
+				if (status.status === 'failed') {
+					throw new Error(`SIM workflow failed: ${status.error || 'Unknown error'}. Task ID: ${taskId}`);
+				}
+
+				if (status.status === 'cancelled') {
+					throw new Error(`SIM workflow was cancelled. Task ID: ${taskId}`);
+				}
+
+				await delay(pollingInterval);
+			}
 		} catch (error) {
 			if (error instanceof SimStudioError) throw this.wrapSimError(error);
 			throw error;
 		}
 	}
 
-	private async executeSyncWithRetry(
-		workflowId: string,
-		input: Record<string, unknown>,
-		settings: SimAiSettings,
-		signal?: AbortSignal
-	): Promise<SimExecutionResult> {
-		if (signal?.aborted) throw new Error('Pipeline execution was cancelled');
-
-		const startTime = Date.now();
-		const maxRetries = settings.maxRetries ?? DEFAULT_MAX_RETRIES;
-
-		// Use executeWorkflowSync for clean WorkflowExecutionResult type (no union)
-		// then wrap with retry logic via executeWithRetry
-		const result = await this.client.executeWithRetry(
-			workflowId,
-			input,
-			{ timeout: settings.asyncTimeoutMs, stream: false, async: false },
-			{ maxRetries, initialDelay: 1000, maxDelay: 30000, backoffMultiplier: 2 }
-		);
-
-		// With async: false, result is always WorkflowExecutionResult
-		const syncResult = result as WorkflowExecutionResult;
-		if (!syncResult.success) {
-			throw new Error(syncResult.error || 'SIM workflow execution failed');
-		}
-
-		return {
-			output: syncResult.output,
-			pollingAttempts: 0,
-			simDuration: Date.now() - startTime
-		};
-	}
-
-	private async executeAsync(
-		workflowId: string,
-		input: Record<string, unknown>,
-		settings: SimAiSettings,
-		onPollProgress?: (attempt: number, status: string) => void,
-		signal?: AbortSignal
-	): Promise<SimExecutionResult> {
-		const startTime = Date.now();
-		const pollingInterval = settings.asyncPollingIntervalMs ?? DEFAULT_POLLING_INTERVAL_MS;
-		const timeout = settings.asyncTimeoutMs;
-
-		this.logger.log(`Executing workflow "${workflowId}" in async mode`);
-
-		const result = await this.client.executeWorkflow(workflowId, input, { async: true });
-
-		// If workflow completed synchronously despite async request
-		if (!isAsyncResult(result)) {
-			return { output: result.output, pollingAttempts: 0, simDuration: Date.now() - startTime };
-		}
-
-		const taskId = result.taskId;
-		this.logger.log(`Workflow queued with task ID: ${taskId}`);
-
-		let pollingAttempts = 0;
-
-		while (true) {
-			if (signal?.aborted) throw new Error('Pipeline execution was cancelled');
-
-			if (Date.now() - startTime > timeout) {
-				throw new Error(
-					`SIM workflow timed out after ${Math.round(timeout / 1000)}s. ` +
-						`Task ID: ${taskId}. Check status in the SIM dashboard.`
-				);
-			}
-
-			const status = (await this.client.getJobStatus(taskId)) as JobStatus;
-			pollingAttempts++;
-			onPollProgress?.(pollingAttempts, status.status);
-			this.logger.log(`Poll #${pollingAttempts}: status=${status.status}`);
-
-			if (status.status === 'completed') {
-				return {
-					output: status.output,
-					taskId,
-					pollingAttempts,
-					simDuration: status.metadata?.duration ?? Date.now() - startTime
-				};
-			}
-
-			if (status.status === 'failed') {
-				throw new Error(`SIM workflow failed: ${status.error || 'Unknown error'}. Task ID: ${taskId}`);
-			}
-
-			if (status.status === 'cancelled') {
-				throw new Error(`SIM workflow was cancelled. Task ID: ${taskId}`);
-			}
-
-			await delay(pollingInterval);
-		}
-	}
-
 	private wrapSimError(error: SimStudioError): Error {
 		const messages: Record<string, string> = {
 			UNAUTHORIZED: 'Invalid SIM API key. Please update your API key in plugin settings.',
-			TIMEOUT: 'SIM workflow execution timed out. Try increasing the timeout or using async mode.',
+			TIMEOUT: 'SIM workflow execution timed out. Try increasing the workflow timeout setting.',
 			RATE_LIMIT_EXCEEDED: 'SIM rate limit exceeded. Please wait and try again.',
 			USAGE_LIMIT_EXCEEDED: 'SIM usage limit exceeded. Check your SIM account plan and usage limits.',
 			INVALID_JSON: 'Invalid request sent to SIM. This may be a plugin bug — please report it.'

@@ -79,7 +79,6 @@ export interface SimAiSettings {
 	apiKey: string;
 	baseUrl: string;
 	defaultWorkflowId?: string;
-	executionMode: 'sync' | 'async';
 	asyncPollingIntervalMs: number;
 	asyncTimeoutMs: number;
 	maxRetries: number;
@@ -88,7 +87,6 @@ export interface SimAiSettings {
 /** Metrics specific to SIM execution */
 export interface SimAiPipelineMetrics {
 	workflowId: string;
-	executionMode: 'sync' | 'async';
 	taskId?: string;
 	pollingAttempts?: number;
 	simDuration?: number;

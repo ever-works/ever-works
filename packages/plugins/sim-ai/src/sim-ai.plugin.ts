@@ -397,7 +397,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			const duration = Date.now() - startTime;
 			const simMetrics: SimAiPipelineMetrics = {
 				workflowId,
-				executionMode: simSettings.executionMode,
 				taskId: execResult.taskId,
 				pollingAttempts: execResult.pollingAttempts,
 				simDuration: execResult.simDuration
@@ -451,7 +450,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			apiKey,
 			baseUrl: (pluginSettings.baseUrl as string) || DEFAULT_BASE_URL,
 			defaultWorkflowId: pluginSettings.defaultWorkflowId as string | undefined,
-			executionMode: 'async',
 			asyncPollingIntervalMs: (pluginSettings.asyncPollingIntervalMs as number) ?? DEFAULT_POLLING_INTERVAL_MS,
 			asyncTimeoutMs: timeoutMinutes * 60 * 1000,
 			maxRetries: (pluginSettings.maxRetries as number) ?? DEFAULT_MAX_RETRIES

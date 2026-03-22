@@ -62,8 +62,13 @@ function normalizeOutput(raw: unknown): SimWorkflowOutput {
 	const obj = raw as Record<string, unknown>;
 
 	if ('items' in obj) {
-		const items = Array.isArray(obj.items) ? obj.items : [];
-		return { ...obj, items } as unknown as SimWorkflowOutput;
+		const items: SimOutputItem[] = Array.isArray(obj.items) ? obj.items : [];
+		return {
+			items,
+			categories: obj.categories as SimWorkflowOutput['categories'],
+			tags: obj.tags as SimWorkflowOutput['tags'],
+			brands: obj.brands as SimWorkflowOutput['brands']
+		};
 	}
 
 	// Unwrap common nested fields from SIM response shapes

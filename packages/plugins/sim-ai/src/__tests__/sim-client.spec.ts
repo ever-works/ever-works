@@ -5,7 +5,6 @@ import type { SimAiSettings, SimWorkflowInput } from '../types.js';
 // Track mock instances
 const mockValidateWorkflow = vi.fn();
 const mockGetWorkflowStatus = vi.fn();
-const mockExecuteWithRetry = vi.fn();
 const mockExecuteWorkflow = vi.fn();
 const mockGetJobStatus = vi.fn();
 
@@ -13,7 +12,6 @@ vi.mock('simstudio-ts-sdk', () => ({
 	SimStudioClient: vi.fn().mockImplementation(() => ({
 		validateWorkflow: mockValidateWorkflow,
 		getWorkflowStatus: mockGetWorkflowStatus,
-		executeWithRetry: mockExecuteWithRetry,
 		executeWorkflow: mockExecuteWorkflow,
 		getJobStatus: mockGetJobStatus,
 		getRateLimitInfo: vi.fn().mockReturnValue(null)
@@ -43,7 +41,6 @@ function createSettings(overrides?: Partial<SimAiSettings>): SimAiSettings {
 	return {
 		apiKey: 'test-key',
 		baseUrl: 'https://sim.test',
-		executionMode: 'sync',
 		asyncPollingIntervalMs: 100,
 		asyncTimeoutMs: 5000,
 		maxRetries: 2,
@@ -117,51 +114,7 @@ describe('SimClientWrapper', () => {
 		});
 	});
 
-	describe('executeWorkflow - sync mode', () => {
-		it('should execute with retry and return result', async () => {
-			mockExecuteWithRetry.mockResolvedValue({
-				success: true,
-				output: { items: [{ name: 'Item 1' }] }
-			});
-			const client = createClient();
-			const settings = createSettings({ executionMode: 'sync' });
-
-			const result = await client.executeWorkflow('wf-123', createInput(), settings);
-
-			expect(result.pollingAttempts).toBe(0);
-			expect(result.output).toEqual({ items: [{ name: 'Item 1' }] });
-			expect(result.simDuration).toBeGreaterThanOrEqual(0);
-			expect(mockExecuteWithRetry).toHaveBeenCalledWith(
-				'wf-123',
-				expect.any(Object),
-				expect.objectContaining({ stream: false }),
-				expect.objectContaining({ maxRetries: 2 })
-			);
-		});
-
-		it('should throw on unsuccessful sync result', async () => {
-			mockExecuteWithRetry.mockResolvedValue({
-				success: false,
-				error: 'Workflow crashed'
-			});
-			const client = createClient();
-
-			await expect(
-				client.executeWorkflow('wf-123', createInput(), createSettings({ executionMode: 'sync' }))
-			).rejects.toThrow('Workflow crashed');
-		});
-
-		it('should throw generic message when no error detail', async () => {
-			mockExecuteWithRetry.mockResolvedValue({ success: false });
-			const client = createClient();
-
-			await expect(
-				client.executeWorkflow('wf-123', createInput(), createSettings({ executionMode: 'sync' }))
-			).rejects.toThrow('SIM workflow execution failed');
-		});
-	});
-
-	describe('executeWorkflow - async mode', () => {
+	describe('executeWorkflow', () => {
 		it('should poll until completion', async () => {
 			mockExecuteWorkflow.mockResolvedValue({
 				success: true,
@@ -177,7 +130,7 @@ describe('SimClientWrapper', () => {
 			});
 
 			const client = createClient();
-			const settings = createSettings({ executionMode: 'async', asyncPollingIntervalMs: 10 });
+			const settings = createSettings({ asyncPollingIntervalMs: 10 });
 			const onProgress = vi.fn();
 
 			const result = await client.executeWorkflow('wf-123', createInput(), settings, onProgress);
@@ -189,15 +142,14 @@ describe('SimClientWrapper', () => {
 			expect(onProgress).toHaveBeenCalledTimes(2);
 		});
 
-		it('should handle synchronous completion in async mode', async () => {
+		it('should handle synchronous completion', async () => {
 			mockExecuteWorkflow.mockResolvedValue({
 				success: true,
 				output: { items: [{ name: 'Quick Item' }] }
 			});
 			const client = createClient();
-			const settings = createSettings({ executionMode: 'async' });
 
-			const result = await client.executeWorkflow('wf-123', createInput(), settings);
+			const result = await client.executeWorkflow('wf-123', createInput(), createSettings());
 
 			expect(result.pollingAttempts).toBe(0);
 			expect(result.output).toEqual({ items: [{ name: 'Quick Item' }] });
@@ -215,7 +167,7 @@ describe('SimClientWrapper', () => {
 			mockGetJobStatus.mockResolvedValue({ status: 'failed', error: 'Out of memory' });
 
 			const client = createClient();
-			const settings = createSettings({ executionMode: 'async', asyncPollingIntervalMs: 10 });
+			const settings = createSettings({ asyncPollingIntervalMs: 10 });
 
 			await expect(client.executeWorkflow('wf-123', createInput(), settings)).rejects.toThrow('Out of memory');
 		});
@@ -231,7 +183,7 @@ describe('SimClientWrapper', () => {
 			mockGetJobStatus.mockResolvedValue({ status: 'cancelled' });
 
 			const client = createClient();
-			const settings = createSettings({ executionMode: 'async', asyncPollingIntervalMs: 10 });
+			const settings = createSettings({ asyncPollingIntervalMs: 10 });
 
 			await expect(client.executeWorkflow('wf-123', createInput(), settings)).rejects.toThrow('was cancelled');
 		});
@@ -248,7 +200,6 @@ describe('SimClientWrapper', () => {
 
 			const client = createClient();
 			const settings = createSettings({
-				executionMode: 'async',
 				asyncPollingIntervalMs: 10,
 				asyncTimeoutMs: 50
 			});
@@ -267,7 +218,7 @@ describe('SimClientWrapper', () => {
 			mockGetJobStatus.mockResolvedValue({ status: 'processing' });
 
 			const client = createClient();
-			const settings = createSettings({ executionMode: 'async', asyncPollingIntervalMs: 10 });
+			const settings = createSettings({ asyncPollingIntervalMs: 10 });
 			const abortController = new AbortController();
 			abortController.abort();
 
@@ -279,66 +230,66 @@ describe('SimClientWrapper', () => {
 
 	describe('error wrapping', () => {
 		it('should wrap UNAUTHORIZED error', async () => {
-			mockExecuteWithRetry.mockRejectedValue(new SimStudioError('Auth failed', 'UNAUTHORIZED'));
+			mockExecuteWorkflow.mockRejectedValue(new SimStudioError('Auth failed', 'UNAUTHORIZED'));
 			const client = createClient();
 
-			await expect(
-				client.executeWorkflow('wf-123', createInput(), createSettings({ executionMode: 'sync' }))
-			).rejects.toThrow('Invalid SIM API key');
+			await expect(client.executeWorkflow('wf-123', createInput(), createSettings())).rejects.toThrow(
+				'Invalid SIM API key'
+			);
 		});
 
 		it('should wrap TIMEOUT error', async () => {
-			mockExecuteWithRetry.mockRejectedValue(new SimStudioError('Timed out', 'TIMEOUT'));
+			mockExecuteWorkflow.mockRejectedValue(new SimStudioError('Timed out', 'TIMEOUT'));
 			const client = createClient();
 
-			await expect(
-				client.executeWorkflow('wf-123', createInput(), createSettings({ executionMode: 'sync' }))
-			).rejects.toThrow('timed out');
+			await expect(client.executeWorkflow('wf-123', createInput(), createSettings())).rejects.toThrow(
+				'timed out'
+			);
 		});
 
 		it('should wrap RATE_LIMIT_EXCEEDED error', async () => {
-			mockExecuteWithRetry.mockRejectedValue(new SimStudioError('Rate limited', 'RATE_LIMIT_EXCEEDED'));
+			mockExecuteWorkflow.mockRejectedValue(new SimStudioError('Rate limited', 'RATE_LIMIT_EXCEEDED'));
 			const client = createClient();
 
-			await expect(
-				client.executeWorkflow('wf-123', createInput(), createSettings({ executionMode: 'sync' }))
-			).rejects.toThrow('rate limit exceeded');
+			await expect(client.executeWorkflow('wf-123', createInput(), createSettings())).rejects.toThrow(
+				'rate limit exceeded'
+			);
 		});
 
 		it('should wrap USAGE_LIMIT_EXCEEDED error', async () => {
-			mockExecuteWithRetry.mockRejectedValue(new SimStudioError('Usage limit', 'USAGE_LIMIT_EXCEEDED'));
+			mockExecuteWorkflow.mockRejectedValue(new SimStudioError('Usage limit', 'USAGE_LIMIT_EXCEEDED'));
 			const client = createClient();
 
-			await expect(
-				client.executeWorkflow('wf-123', createInput(), createSettings({ executionMode: 'sync' }))
-			).rejects.toThrow('usage limit exceeded');
+			await expect(client.executeWorkflow('wf-123', createInput(), createSettings())).rejects.toThrow(
+				'usage limit exceeded'
+			);
 		});
 
 		it('should wrap INVALID_JSON error', async () => {
-			mockExecuteWithRetry.mockRejectedValue(new SimStudioError('Bad JSON', 'INVALID_JSON'));
+			mockExecuteWorkflow.mockRejectedValue(new SimStudioError('Bad JSON', 'INVALID_JSON'));
 			const client = createClient();
 
-			await expect(
-				client.executeWorkflow('wf-123', createInput(), createSettings({ executionMode: 'sync' }))
-			).rejects.toThrow('Invalid request');
+			await expect(client.executeWorkflow('wf-123', createInput(), createSettings())).rejects.toThrow(
+				'Invalid request'
+			);
 		});
 
 		it('should wrap unknown SIM errors with generic message', async () => {
-			mockExecuteWithRetry.mockRejectedValue(new SimStudioError('Something broke', 'UNKNOWN'));
+			mockExecuteWorkflow.mockRejectedValue(new SimStudioError('Something broke', 'UNKNOWN'));
 			const client = createClient();
 
-			await expect(
-				client.executeWorkflow('wf-123', createInput(), createSettings({ executionMode: 'sync' }))
-			).rejects.toThrow('SIM error: Something broke');
+			await expect(client.executeWorkflow('wf-123', createInput(), createSettings())).rejects.toThrow(
+				'SIM error: Something broke'
+			);
 		});
 
 		it('should re-throw non-SIM errors unchanged', async () => {
-			mockExecuteWithRetry.mockRejectedValue(new TypeError('Cannot read property'));
+			mockExecuteWorkflow.mockRejectedValue(new TypeError('Cannot read property'));
 			const client = createClient();
 
-			await expect(
-				client.executeWorkflow('wf-123', createInput(), createSettings({ executionMode: 'sync' }))
-			).rejects.toThrow('Cannot read property');
+			await expect(client.executeWorkflow('wf-123', createInput(), createSettings())).rejects.toThrow(
+				'Cannot read property'
+			);
 		});
 	});
 });
