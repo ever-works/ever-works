@@ -437,7 +437,10 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 	// ── Private helpers ────────────────────────────────────────────────
 
-	private resolveSimSettings(pluginSettings: Record<string, unknown>, config: Record<string, unknown>): SimAiSettings {
+	private resolveSimSettings(
+		pluginSettings: Record<string, unknown>,
+		config: Record<string, unknown>
+	): SimAiSettings {
 		const apiKey = pluginSettings.apiKey as string;
 		if (!apiKey) {
 			throw new Error('SIM API key is not configured. Please set it in plugin settings.');
