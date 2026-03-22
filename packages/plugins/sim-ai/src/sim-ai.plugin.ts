@@ -339,6 +339,10 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			setState('collect-results', 'running');
 			reportProgress(onProgress, 3, 75, 'Collect & Validate Results');
 
+			logger.log(
+				`Raw SIM output type: ${typeof execResult.output}, value: ${JSON.stringify(execResult.output).substring(0, 500)}`
+			);
+
 			const parsed = parseSimOutput(execResult.output);
 
 			const existingNames = existing.items.map((i) => i.name);

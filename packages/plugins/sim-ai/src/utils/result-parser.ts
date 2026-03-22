@@ -71,9 +71,9 @@ function normalizeOutput(raw: unknown): SimWorkflowOutput {
 		};
 	}
 
-	// Unwrap common nested fields from SIM response shapes
+	// Unwrap common nested fields from SIM response shapes (skip empty strings)
 	for (const key of ['output', 'result', 'content', 'data', 'response', 'ResponseDataMode', 'ResponseStructure']) {
-		if (obj[key] != null) {
+		if (obj[key] != null && obj[key] !== '') {
 			return normalizeOutput(obj[key]);
 		}
 	}
@@ -84,6 +84,17 @@ function normalizeOutput(raw: unknown): SimWorkflowOutput {
 		if (parsed !== null && typeof parsed === 'object') {
 			return normalizeOutput(parsed);
 		}
+	}
+
+	// Detect empty Agent response (content is empty but tokens/toolCalls present)
+	if ('content' in obj && obj.content === '' && 'tokens' in obj) {
+		const tokens = obj.tokens as Record<string, number> | undefined;
+		const inputTokens = tokens?.input ? ` (${tokens.input.toLocaleString()} input tokens)` : '';
+		throw new Error(
+			`SIM workflow Agent returned empty content${inputTokens}. ` +
+				'This usually means the Agent hit a context limit or the response format failed. ' +
+				'Try reducing the input size or simplifying the workflow.'
+		);
 	}
 
 	throw new Error(
