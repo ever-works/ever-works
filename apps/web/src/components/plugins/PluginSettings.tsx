@@ -26,6 +26,7 @@ import { PluginEnablePanel } from './PluginEnablePanel';
 import { PluginDisableWarning } from './PluginDisableWarning';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { ClaudeCodeOnboardingWizard } from '@/components/settings/ClaudeCodeOnboardingWizard';
+import { SimAiOnboardingWizard } from '@/components/settings/SimAiOnboardingWizard';
 import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
@@ -284,17 +285,31 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
 
                     <div className="p-6">
                         {plugin.uiHints?.onboardingWizard ? (
-                            <ClaudeCodeOnboardingWizard
-                                pluginId={plugin.pluginId}
-                                visibleProperties={visibleProperties}
-                                getFieldValue={getFieldValue}
-                                handleFieldChange={handleFieldChange}
-                                handleSave={handleSave}
-                                isSaving={isSaving}
-                                saveSuccess={saveSuccess}
-                                validationError={validationError}
-                                saveMessage={saveMessage}
-                            />
+                            plugin.pluginId === 'sim-ai' ? (
+                                <SimAiOnboardingWizard
+                                    pluginId={plugin.pluginId}
+                                    visibleProperties={visibleProperties}
+                                    getFieldValue={getFieldValue}
+                                    handleFieldChange={handleFieldChange}
+                                    handleSave={handleSave}
+                                    isSaving={isSaving}
+                                    saveSuccess={saveSuccess}
+                                    validationError={validationError}
+                                    saveMessage={saveMessage}
+                                />
+                            ) : (
+                                <ClaudeCodeOnboardingWizard
+                                    pluginId={plugin.pluginId}
+                                    visibleProperties={visibleProperties}
+                                    getFieldValue={getFieldValue}
+                                    handleFieldChange={handleFieldChange}
+                                    handleSave={handleSave}
+                                    isSaving={isSaving}
+                                    saveSuccess={saveSuccess}
+                                    validationError={validationError}
+                                    saveMessage={saveMessage}
+                                />
+                            )
                         ) : (
                             <div className="space-y-5">
                                 {plugin.uiHints?.byok && !byokRevealed && (

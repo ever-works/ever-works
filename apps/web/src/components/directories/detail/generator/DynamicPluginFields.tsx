@@ -254,6 +254,16 @@ export function DynamicPluginFields({
                         </div>
                     );
 
+                case 'json':
+                    return (
+                        <JsonField
+                            key={field.name}
+                            field={field}
+                            value={value as Record<string, unknown> | undefined}
+                            onChange={(val) => handleFieldChange(field.name, val)}
+                        />
+                    );
+
                 case 'tags':
                     return (
                         <TagsField
@@ -302,7 +312,7 @@ export function DynamicPluginFields({
                     const groupFields = uniqueFields.filter((f) => f.group === group.name);
                     if (groupFields.length === 0) return null;
 
-                    return (
+                    return group.collapsible ? (
                         <AccordionItem
                             key={group.name}
                             value={group.name}
@@ -312,38 +322,114 @@ export function DynamicPluginFields({
                                 'border-card-border dark:border-card-border-dark',
                             )}
                         >
-                            {group.collapsible ? (
-                                <AccordionTrigger className="px-5 py-3.5 hover:no-underline hover:bg-surface/50 dark:hover:bg-surface-dark/50">
-                                    <div>
-                                        <h3 className="text-md font-semibold text-text dark:text-text-dark">
-                                            {group.title}
-                                        </h3>
-                                        {group.description && (
-                                            <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5 font-normal">
-                                                {group.description}
-                                            </p>
-                                        )}
-                                    </div>
-                                </AccordionTrigger>
-                            ) : (
-                                <div className="px-5 py-3.5 border-b border-card-border dark:border-card-border-dark">
+                            <AccordionTrigger className="px-5 py-3.5 hover:no-underline hover:bg-surface/50 dark:hover:bg-surface-dark/50">
+                                <div>
                                     <h3 className="text-md font-semibold text-text dark:text-text-dark">
                                         {group.title}
                                     </h3>
                                     {group.description && (
-                                        <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5">
+                                        <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5 font-normal">
                                             {group.description}
                                         </p>
                                     )}
                                 </div>
-                            )}
+                            </AccordionTrigger>
                             <AccordionContent className="px-5 pb-4 pt-2">
                                 <div className="space-y-4">{groupFields.map(renderField)}</div>
                             </AccordionContent>
                         </AccordionItem>
+                    ) : (
+                        <div
+                            key={group.name}
+                            className={cn(
+                                'rounded-lg border overflow-hidden',
+                                'bg-card dark:bg-card-primary-dark/30',
+                                'border-card-border dark:border-card-border-dark',
+                            )}
+                        >
+                            <div className="px-5 py-3.5 border-b border-card-border dark:border-card-border-dark">
+                                <h3 className="text-md font-semibold text-text dark:text-text-dark">
+                                    {group.title}
+                                </h3>
+                                {group.description && (
+                                    <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5">
+                                        {group.description}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="px-5 pb-4 pt-2">
+                                <div className="space-y-4">{groupFields.map(renderField)}</div>
+                            </div>
+                        </div>
                     );
                 })}
             </Accordion>
+        </div>
+    );
+}
+
+/**
+ * JSON editor field for key-value parameters.
+ */
+interface JsonFieldProps {
+    field: FormFieldDefinition;
+    value: Record<string, unknown> | undefined;
+    onChange: (value: Record<string, unknown>) => void;
+}
+
+function JsonField({ field, value, onChange }: JsonFieldProps) {
+    const [rawText, setRawText] = useState(() =>
+        value && Object.keys(value).length > 0 ? JSON.stringify(value, null, 2) : '',
+    );
+    const [error, setError] = useState<string | null>(null);
+
+    const handleChange = (text: string) => {
+        setRawText(text);
+
+        if (!text.trim()) {
+            setError(null);
+            onChange({});
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(text);
+            if (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null) {
+                setError('Must be a JSON object');
+                return;
+            }
+            setError(null);
+            onChange(parsed as Record<string, unknown>);
+        } catch {
+            setError('Invalid JSON');
+        }
+    };
+
+    return (
+        <div>
+            <label className="block text-sm font-medium text-text dark:text-text-dark mb-1">
+                {field.label}
+                {field.validation?.required && <span className="text-danger ml-1">*</span>}
+            </label>
+            <textarea
+                value={rawText}
+                onChange={(e) => handleChange(e.target.value)}
+                placeholder={field.placeholder || '{\n  "key": "value"\n}'}
+                className={cn(
+                    'w-full px-3 py-2 rounded-lg border text-sm font-mono resize-none',
+                    'bg-surface dark:bg-surface-dark',
+                    'text-text dark:text-text-dark',
+                    'focus:outline-none focus:ring-2 focus:ring-primary/50',
+                    error ? 'border-danger' : 'border-border dark:border-border-dark',
+                )}
+                rows={4}
+            />
+            {error && <p className="mt-1 text-xs text-danger">{error}</p>}
+            {!error && field.description && (
+                <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
+                    {field.description}
+                </p>
+            )}
         </div>
     );
 }
