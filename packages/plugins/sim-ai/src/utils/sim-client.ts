@@ -91,8 +91,8 @@ export class SimClientWrapper {
 
 	/**
 	 * Executes a workflow asynchronously with polling.
-	 * The payload is wrapped as a JSON string in a `message` field
-	 * so the SIM Start block can access it via `<start.message>`.
+	 * Input fields are passed directly as top-level properties so the
+	 * SIM Start block can access them via `<start.metadata>`, `<start.existingSummary>`, etc.
 	 */
 	async executeWorkflow(
 		workflowId: string,
@@ -101,8 +101,6 @@ export class SimClientWrapper {
 		onPollProgress?: (attempt: number, status: string) => void,
 		signal?: AbortSignal
 	): Promise<SimExecutionResult> {
-		const wrappedInput = { message: JSON.stringify(input) };
-
 		try {
 			const startTime = Date.now();
 			const pollingInterval = settings.asyncPollingIntervalMs ?? DEFAULT_POLLING_INTERVAL_MS;
@@ -110,7 +108,7 @@ export class SimClientWrapper {
 
 			this.logger.log(`Executing workflow "${workflowId}" asynchronously`);
 
-			const result = await this.client.executeWorkflow(workflowId, wrappedInput, { async: true });
+			const result = await this.client.executeWorkflow(workflowId, input, { async: true });
 
 			// If workflow completed synchronously despite async request
 			if (!isAsyncResult(result)) {

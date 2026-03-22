@@ -111,7 +111,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				'x-hidden': true
 			}
 		},
-		required: ['apiKey']
+		required: ['apiKey', 'defaultWorkflowId']
 	};
 
 	private context: PluginContext | null = null;
@@ -193,11 +193,10 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			visibility: 'public',
 			selectableProviderCategories: ['screenshot'],
 			uiHints: {
-				onboardingWizard: true,
 				validateOnSave: true,
 				includeInOnboarding: true,
 				onboardingPriority: 2,
-				completionFields: ['apiKey'],
+				completionFields: ['apiKey', 'defaultWorkflowId'],
 				onboardingDescription: 'Connect SIM AI to delegate directory generation to visual AI agent workflows.'
 			},
 			readme: README,
