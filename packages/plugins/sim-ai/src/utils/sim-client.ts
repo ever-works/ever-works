@@ -1,15 +1,8 @@
-import {
-	SimStudioClient,
-	SimStudioError,
-	type WorkflowExecutionResult,
-	type AsyncExecutionResult
-} from 'simstudio-ts-sdk';
+import { SimStudioClient, SimStudioError, type WorkflowExecutionResult } from 'simstudio-ts-sdk';
 import type { SimAiSettings, SimWorkflowInput } from '../types.js';
-import { DEFAULT_POLLING_INTERVAL_MS } from '../types.js';
 
 export interface SimExecutionResult {
 	output: unknown;
-	taskId?: string;
 	pollingAttempts: number;
 	simDuration?: number;
 }
@@ -18,26 +11,6 @@ interface SimClientOptions {
 	apiKey: string;
 	baseUrl: string;
 	logger: { log(...args: unknown[]): void; warn(...args: unknown[]): void };
-}
-
-/** Job status shape from SIM API (SDK types it as `any`) */
-interface JobStatus {
-	status: 'completed' | 'failed' | 'cancelled' | 'queued' | 'processing';
-	output?: unknown;
-	error?: string;
-	metadata?: { duration?: number; [key: string]: unknown };
-}
-
-/**
- * Type guard: distinguish async queued result from sync completion.
- * AsyncExecutionResult always has `taskId` and `status: 'queued'`.
- */
-function isAsyncResult(result: WorkflowExecutionResult | AsyncExecutionResult): result is AsyncExecutionResult {
-	return 'taskId' in result && (result as AsyncExecutionResult).status === 'queued';
-}
-
-function delay(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -90,9 +63,13 @@ export class SimClientWrapper {
 	}
 
 	/**
-	 * Executes a workflow asynchronously with polling.
+	 * Executes a workflow synchronously.
 	 * Input fields are passed directly as top-level properties so the
 	 * SIM Start block can access them via `<start.metadata>`, `<start.existingSummary>`, etc.
+	 *
+	 * Uses sync mode because SIM's async mode returns a different output structure
+	 * where structured response format (JSON schema) can fail, producing empty content.
+	 * The plugin already runs inside a background job, so blocking here is fine.
 	 */
 	async executeWorkflow(
 		workflowId: string,
@@ -101,59 +78,29 @@ export class SimClientWrapper {
 		onPollProgress?: (attempt: number, status: string) => void,
 		signal?: AbortSignal
 	): Promise<SimExecutionResult> {
+		if (signal?.aborted) throw new Error('Pipeline execution was cancelled');
+
 		try {
 			const startTime = Date.now();
-			const pollingInterval = settings.asyncPollingIntervalMs ?? DEFAULT_POLLING_INTERVAL_MS;
-			const timeout = settings.asyncTimeoutMs;
 
-			this.logger.log(`Executing workflow "${workflowId}" asynchronously`);
+			this.logger.log(`Executing workflow "${workflowId}"`);
 
-			const result = await this.client.executeWorkflow(workflowId, input, { async: true });
+			const result = await this.client.executeWorkflow(workflowId, input, {
+				timeout: settings.timeoutMs
+			});
 
-			// If workflow completed synchronously despite async request
-			if (!isAsyncResult(result)) {
-				return { output: result.output, pollingAttempts: 0, simDuration: Date.now() - startTime };
+			const syncResult = result as WorkflowExecutionResult;
+			if (!syncResult.success) {
+				throw new Error(syncResult.error || 'SIM workflow execution failed');
 			}
 
-			const taskId = result.taskId;
-			this.logger.log(`Workflow queued with task ID: ${taskId}`);
+			onPollProgress?.(1, 'completed');
 
-			let pollingAttempts = 0;
-
-			while (true) {
-				if (signal?.aborted) throw new Error('Pipeline execution was cancelled');
-
-				if (Date.now() - startTime > timeout) {
-					throw new Error(
-						`SIM workflow timed out after ${Math.round(timeout / 1000)}s. ` +
-							`Task ID: ${taskId}. Check status in the SIM dashboard.`
-					);
-				}
-
-				const status = (await this.client.getJobStatus(taskId)) as JobStatus;
-				pollingAttempts++;
-				onPollProgress?.(pollingAttempts, status.status);
-				this.logger.log(`Poll #${pollingAttempts}: status=${status.status}`);
-
-				if (status.status === 'completed') {
-					return {
-						output: status.output,
-						taskId,
-						pollingAttempts,
-						simDuration: status.metadata?.duration ?? Date.now() - startTime
-					};
-				}
-
-				if (status.status === 'failed') {
-					throw new Error(`SIM workflow failed: ${status.error || 'Unknown error'}. Task ID: ${taskId}`);
-				}
-
-				if (status.status === 'cancelled') {
-					throw new Error(`SIM workflow was cancelled. Task ID: ${taskId}`);
-				}
-
-				await delay(pollingInterval);
-			}
+			return {
+				output: syncResult.output,
+				pollingAttempts: 0,
+				simDuration: Date.now() - startTime
+			};
 		} catch (error) {
 			if (error instanceof SimStudioError) throw this.wrapSimError(error);
 			throw error;

@@ -6,14 +6,12 @@ import type { SimAiSettings, SimWorkflowInput } from '../types.js';
 const mockValidateWorkflow = vi.fn();
 const mockGetWorkflowStatus = vi.fn();
 const mockExecuteWorkflow = vi.fn();
-const mockGetJobStatus = vi.fn();
 
 vi.mock('simstudio-ts-sdk', () => ({
 	SimStudioClient: vi.fn().mockImplementation(() => ({
 		validateWorkflow: mockValidateWorkflow,
 		getWorkflowStatus: mockGetWorkflowStatus,
 		executeWorkflow: mockExecuteWorkflow,
-		getJobStatus: mockGetJobStatus,
 		getRateLimitInfo: vi.fn().mockReturnValue(null)
 	})),
 	SimStudioError: class SimStudioError extends Error {
@@ -41,9 +39,7 @@ function createSettings(overrides?: Partial<SimAiSettings>): SimAiSettings {
 	return {
 		apiKey: 'test-key',
 		baseUrl: 'https://sim.test',
-		asyncPollingIntervalMs: 100,
-		asyncTimeoutMs: 5000,
-		maxRetries: 2,
+		timeoutMs: 60000,
 		...overrides
 	};
 }
@@ -115,115 +111,78 @@ describe('SimClientWrapper', () => {
 	});
 
 	describe('executeWorkflow', () => {
-		it('should poll until completion', async () => {
+		it('should execute workflow and return output', async () => {
 			mockExecuteWorkflow.mockResolvedValue({
 				success: true,
-				taskId: 'task-1',
-				status: 'queued',
-				createdAt: '',
-				links: { status: '' }
-			});
-			mockGetJobStatus.mockResolvedValueOnce({ status: 'processing' }).mockResolvedValueOnce({
-				status: 'completed',
-				output: { items: [{ name: 'Async Item' }] },
-				metadata: { duration: 3000 }
+				output: { items: [{ name: 'Test Item' }] }
 			});
 
 			const client = createClient();
-			const settings = createSettings({ asyncPollingIntervalMs: 10 });
-			const onProgress = vi.fn();
-
-			const result = await client.executeWorkflow('wf-123', createInput(), settings, onProgress);
-
-			expect(result.taskId).toBe('task-1');
-			expect(result.pollingAttempts).toBe(2);
-			expect(result.output).toEqual({ items: [{ name: 'Async Item' }] });
-			expect(result.simDuration).toBe(3000);
-			expect(onProgress).toHaveBeenCalledTimes(2);
-		});
-
-		it('should handle synchronous completion', async () => {
-			mockExecuteWorkflow.mockResolvedValue({
-				success: true,
-				output: { items: [{ name: 'Quick Item' }] }
-			});
-			const client = createClient();
-
 			const result = await client.executeWorkflow('wf-123', createInput(), createSettings());
 
 			expect(result.pollingAttempts).toBe(0);
-			expect(result.output).toEqual({ items: [{ name: 'Quick Item' }] });
-			expect(mockGetJobStatus).not.toHaveBeenCalled();
+			expect(result.output).toEqual({ items: [{ name: 'Test Item' }] });
+			expect(result.simDuration).toBeDefined();
 		});
 
-		it('should throw on failed status', async () => {
-			mockExecuteWorkflow.mockResolvedValue({
-				success: true,
-				taskId: 'task-fail',
-				status: 'queued',
-				createdAt: '',
-				links: { status: '' }
-			});
-			mockGetJobStatus.mockResolvedValue({ status: 'failed', error: 'Out of memory' });
-
+		it('should pass input directly as top-level fields', async () => {
+			mockExecuteWorkflow.mockResolvedValue({ success: true, output: { items: [] } });
 			const client = createClient();
-			const settings = createSettings({ asyncPollingIntervalMs: 10 });
+			const input = createInput();
 
-			await expect(client.executeWorkflow('wf-123', createInput(), settings)).rejects.toThrow('Out of memory');
+			await client.executeWorkflow('wf-123', input, createSettings());
+
+			expect(mockExecuteWorkflow).toHaveBeenCalledWith('wf-123', input, { timeout: 60000 });
 		});
 
-		it('should throw on cancelled status', async () => {
-			mockExecuteWorkflow.mockResolvedValue({
-				success: true,
-				taskId: 'task-cancel',
-				status: 'queued',
-				createdAt: '',
-				links: { status: '' }
-			});
-			mockGetJobStatus.mockResolvedValue({ status: 'cancelled' });
-
+		it('should pass timeoutMs from settings', async () => {
+			mockExecuteWorkflow.mockResolvedValue({ success: true, output: { items: [] } });
 			const client = createClient();
-			const settings = createSettings({ asyncPollingIntervalMs: 10 });
+			const settings = createSettings({ timeoutMs: 120000 });
 
-			await expect(client.executeWorkflow('wf-123', createInput(), settings)).rejects.toThrow('was cancelled');
+			await client.executeWorkflow('wf-123', createInput(), settings);
+
+			expect(mockExecuteWorkflow).toHaveBeenCalledWith('wf-123', expect.anything(), { timeout: 120000 });
 		});
 
-		it('should throw on timeout', async () => {
-			mockExecuteWorkflow.mockResolvedValue({
-				success: true,
-				taskId: 'task-slow',
-				status: 'queued',
-				createdAt: '',
-				links: { status: '' }
-			});
-			mockGetJobStatus.mockResolvedValue({ status: 'processing' });
-
+		it('should call onPollProgress with completed status', async () => {
+			mockExecuteWorkflow.mockResolvedValue({ success: true, output: { items: [] } });
 			const client = createClient();
-			const settings = createSettings({
-				asyncPollingIntervalMs: 10,
-				asyncTimeoutMs: 50
-			});
+			const onProgress = vi.fn();
 
-			await expect(client.executeWorkflow('wf-123', createInput(), settings)).rejects.toThrow('timed out');
+			await client.executeWorkflow('wf-123', createInput(), createSettings(), onProgress);
+
+			expect(onProgress).toHaveBeenCalledWith(1, 'completed');
+		});
+
+		it('should throw when workflow execution fails', async () => {
+			mockExecuteWorkflow.mockResolvedValue({
+				success: false,
+				error: 'Workflow logic error'
+			});
+			const client = createClient();
+
+			await expect(client.executeWorkflow('wf-123', createInput(), createSettings())).rejects.toThrow(
+				'Workflow logic error'
+			);
+		});
+
+		it('should throw generic message when execution fails without error', async () => {
+			mockExecuteWorkflow.mockResolvedValue({ success: false });
+			const client = createClient();
+
+			await expect(client.executeWorkflow('wf-123', createInput(), createSettings())).rejects.toThrow(
+				'SIM workflow execution failed'
+			);
 		});
 
 		it('should respect abort signal', async () => {
-			mockExecuteWorkflow.mockResolvedValue({
-				success: true,
-				taskId: 'task-abort',
-				status: 'queued',
-				createdAt: '',
-				links: { status: '' }
-			});
-			mockGetJobStatus.mockResolvedValue({ status: 'processing' });
-
 			const client = createClient();
-			const settings = createSettings({ asyncPollingIntervalMs: 10 });
 			const abortController = new AbortController();
 			abortController.abort();
 
 			await expect(
-				client.executeWorkflow('wf-123', createInput(), settings, undefined, abortController.signal)
+				client.executeWorkflow('wf-123', createInput(), createSettings(), undefined, abortController.signal)
 			).rejects.toThrow('cancelled');
 		});
 	});

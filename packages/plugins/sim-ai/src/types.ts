@@ -18,8 +18,6 @@ export const SIM_AI_STEP_IDS: readonly SimAiStepId[] = [
 
 /** Plugin constants */
 export const DEFAULT_BASE_URL = 'https://www.sim.ai';
-export const DEFAULT_POLLING_INTERVAL_MS = 5000;
-export const DEFAULT_MAX_RETRIES = 3;
 export const DEFAULT_TARGET_ITEMS = 50;
 
 /** Data source types for passing data to SIM */
@@ -79,15 +77,11 @@ export interface SimAiSettings {
 	apiKey: string;
 	baseUrl: string;
 	defaultWorkflowId?: string;
-	asyncPollingIntervalMs: number;
-	asyncTimeoutMs: number;
-	maxRetries: number;
+	timeoutMs: number;
 }
 
 /** Metrics specific to SIM execution */
 export interface SimAiPipelineMetrics {
 	workflowId: string;
-	taskId?: string;
-	pollingAttempts?: number;
 	simDuration?: number;
 }

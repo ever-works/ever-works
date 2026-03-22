@@ -26,13 +26,7 @@ import type {
 import { buildSuccessPipelineResult } from '@ever-works/plugin';
 
 import type { SimAiStepId, SimAiSettings, SimAiPipelineMetrics } from './types.js';
-import {
-	SIM_AI_STEP_IDS,
-	DEFAULT_BASE_URL,
-	DEFAULT_POLLING_INTERVAL_MS,
-	DEFAULT_MAX_RETRIES,
-	DEFAULT_TARGET_ITEMS
-} from './types.js';
+import { SIM_AI_STEP_IDS, DEFAULT_BASE_URL, DEFAULT_TARGET_ITEMS } from './types.js';
 import { STEP_DEFINITIONS } from './steps.js';
 import { SimClientWrapper } from './utils/sim-client.js';
 import { buildWorkflowPayload } from './utils/payload-builder.js';
@@ -93,22 +87,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				title: 'Default Workflow ID',
 				description: 'Default SIM workflow to use when not specified in the generator form',
 				'x-scope': 'user'
-			},
-			asyncPollingIntervalMs: {
-				type: 'integer',
-				title: 'Polling Interval (ms)',
-				default: DEFAULT_POLLING_INTERVAL_MS,
-				minimum: 1000,
-				maximum: 30000,
-				'x-hidden': true
-			},
-			maxRetries: {
-				type: 'integer',
-				title: 'Max Retries',
-				default: DEFAULT_MAX_RETRIES,
-				minimum: 0,
-				maximum: 10,
-				'x-hidden': true
 			}
 		},
 		required: ['apiKey', 'defaultWorkflowId']
@@ -396,8 +374,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			const duration = Date.now() - startTime;
 			const simMetrics: SimAiPipelineMetrics = {
 				workflowId,
-				taskId: execResult.taskId,
-				pollingAttempts: execResult.pollingAttempts,
 				simDuration: execResult.simDuration
 			};
 
@@ -449,9 +425,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			apiKey,
 			baseUrl: (pluginSettings.baseUrl as string) || DEFAULT_BASE_URL,
 			defaultWorkflowId: pluginSettings.defaultWorkflowId as string | undefined,
-			asyncPollingIntervalMs: (pluginSettings.asyncPollingIntervalMs as number) ?? DEFAULT_POLLING_INTERVAL_MS,
-			asyncTimeoutMs: timeoutMinutes * 60 * 1000,
-			maxRetries: (pluginSettings.maxRetries as number) ?? DEFAULT_MAX_RETRIES
+			timeoutMs: timeoutMinutes * 60 * 1000
 		};
 	}
 

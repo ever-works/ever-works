@@ -28,40 +28,7 @@ vi.mock('simstudio-ts-sdk', () => ({
 				tags: [{ name: 'tag1' }]
 			}
 		}),
-		executeWithRetry: vi.fn().mockResolvedValue({
-			success: true,
-			output: {
-				items: [
-					{
-						name: 'Test Item 1',
-						description: 'A test item',
-						url: 'https://example.com/1',
-						category: 'Tools'
-					},
-					{
-						name: 'Test Item 2',
-						description: 'Another test item',
-						url: 'https://example.com/2',
-						tags: ['tag1']
-					}
-				],
-				categories: [{ name: 'Tools', description: 'Development tools' }],
-				tags: [{ name: 'tag1' }]
-			}
-		}),
-		getJobStatus: vi.fn().mockResolvedValue({
-			status: 'completed',
-			output: {
-				items: [{ name: 'Async Item', description: 'From async' }]
-			},
-			metadata: { duration: 5000 }
-		}),
-		getRateLimitInfo: vi.fn().mockReturnValue(null),
-		getUsageLimits: vi.fn().mockResolvedValue({
-			success: true,
-			rateLimit: { sync: { remaining: 100 }, async: { remaining: 100 } },
-			usage: { currentPeriodCost: 0, limit: 100, plan: 'pro' }
-		})
+		getRateLimitInfo: vi.fn().mockReturnValue(null)
 	})),
 	SimStudioError: class SimStudioError extends Error {
 		code?: string;
@@ -374,23 +341,6 @@ describe('SimAiPlugin', () => {
 			const result = await plugin.validateConnection({});
 			expect(result.success).toBe(false);
 			expect(result.message).toContain('API key');
-		});
-	});
-
-	describe('execute - async mode', () => {
-		beforeEach(async () => {
-			await plugin.onLoad(createMockContext());
-		});
-
-		it('should execute async workflow successfully', async () => {
-			const result = await plugin.execute(
-				createDirectory(),
-				createRequest({ config: { workflow_id: 'wf-async' } }),
-				createExisting()
-			);
-
-			expect(result.success).toBe(true);
-			expect(result.outputs.items.length).toBeGreaterThan(0);
 		});
 	});
 
