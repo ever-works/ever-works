@@ -448,9 +448,13 @@ export class ComparisonGenerationService {
     ): Promise<ComparisonResult> {
         const startedAt = new Date().toISOString();
         const onProgress: ComparisonProgressCallback = (stage) => {
-            this.setProgress(directory.id, stage, pair.itemA.name, pair.itemB.name, startedAt).catch(
-                () => {},
-            );
+            this.setProgress(
+                directory.id,
+                stage,
+                pair.itemA.name,
+                pair.itemB.name,
+                startedAt,
+            ).catch(() => {});
         };
 
         try {
@@ -482,9 +486,7 @@ export class ComparisonGenerationService {
                 },
             };
 
-            this.logger.log(
-                `Researching comparison: ${pair.itemA.name} vs ${pair.itemB.name}`,
-            );
+            this.logger.log(`Researching comparison: ${pair.itemA.name} vs ${pair.itemB.name}`);
             const research = await researchPair(pair, researchDeps);
 
             // 2. Generate comparison via AI
@@ -513,9 +515,7 @@ export class ComparisonGenerationService {
                 },
             };
 
-            this.logger.log(
-                `Generating comparison: ${pair.itemA.name} vs ${pair.itemB.name}`,
-            );
+            this.logger.log(`Generating comparison: ${pair.itemA.name} vs ${pair.itemB.name}`);
             const promptOptions: ComparisonPromptOptions = {
                 promptFacade: this.promptFacade,
                 facadeOptions,

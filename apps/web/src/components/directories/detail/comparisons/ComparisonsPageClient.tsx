@@ -478,10 +478,7 @@ export function ComparisonsPageClient({
             )}
 
             {/* Single generation progress */}
-            <ComparisonGenerationProgress
-                directoryId={directoryId}
-                isGenerating={isPending}
-            />
+            <ComparisonGenerationProgress directoryId={directoryId} isGenerating={isPending} />
 
             {/* Generate All progress bar */}
             {isGeneratingAll && (
