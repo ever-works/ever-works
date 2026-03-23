@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
-import { getComparisonGenerationStatus } from '@/app/actions/dashboard/comparisons';
 
 const STAGES = ['researching', 'analyzing', 'writing', 'writing_extended', 'saving'] as const;
 
@@ -39,8 +38,15 @@ export function ComparisonGenerationProgress({
 
         const poll = async () => {
             try {
-                const result = await getComparisonGenerationStatus(directoryId);
-                setStatus(result);
+                // Use direct fetch to Route Handler instead of server action
+                // to avoid Next.js server action serialization (which would
+                // block this call while the generation server action is running)
+                const res = await fetch(
+                    `/api/directories/${directoryId}/comparisons/generation-status`,
+                );
+                if (res.ok) {
+                    setStatus(await res.json());
+                }
             } catch {
                 // Silently ignore polling errors
             }
