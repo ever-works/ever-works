@@ -95,6 +95,9 @@ export function ImportConfigureStep({
 }: ImportConfigureStepProps) {
     const t = useTranslations('dashboard.directoryCreation.import');
 
+    // Pipeline plugins allowed for import enrichment
+    const ALLOWED_IMPORT_PIPELINES = ['agent-pipeline', 'claude-code'];
+
     // Provider/pipeline selection state
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
     const {
@@ -131,8 +134,18 @@ export function ImportConfigureStep({
                 if (version !== fetchVersionRef.current) return;
                 if (result.success && result.data) {
                     lastFetchedPipelineRef.current = result.data.resolvedPipelineId || pipelineId;
-                    setFormSchema(result.data);
-                    syncResolvedPipeline(result.data);
+                    // Filter pipelines to only allowed ones for import
+                    const filtered = {
+                        ...result.data,
+                        providers: {
+                            ...result.data.providers,
+                            pipeline: result.data.providers.pipeline?.filter((p) =>
+                                ALLOWED_IMPORT_PIPELINES.includes(p.id),
+                            ),
+                        },
+                    };
+                    setFormSchema(filtered);
+                    syncResolvedPipeline(filtered);
                 }
             } catch (error) {
                 if (version !== fetchVersionRef.current) return;
@@ -313,17 +326,16 @@ export function ImportConfigureStep({
                             <Sparkles className="w-6 h-6 mt-0.5 shrink-0 text-primary" />
                             <div className="flex-1">
                                 <h4 className="font-medium text-text dark:text-text-dark">
-                                    {t('research.title', { fallback: 'Import & Research Mode' })}
+                                    {t('research.title')}
                                 </h4>
                                 <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
-                                    {t('research.description', {
-                                        fallback:
-                                            'Items from the source repository will be used as research seeds. The AI pipeline will discover new items, rewrite descriptions, and expand the taxonomy.',
-                                    })}
+                                    {t('research.description')}
                                 </p>
                                 {seedCount > 0 && (
                                     <div className="mt-2 flex gap-4 text-xs text-text-muted dark:text-text-muted-dark">
-                                        <span>~{seedCount} seed items detected</span>
+                                        <span>
+                                            {t('research.seedDetected', { count: seedCount })}
+                                        </span>
                                         <span>
                                             {analysisResult?.owner}/{analysisResult?.repo}
                                         </span>
@@ -338,14 +350,11 @@ export function ImportConfigureStep({
                         <div className="flex items-center gap-2">
                             <Sparkles className="w-4 h-4 text-primary" />
                             <h3 className="font-medium text-text dark:text-text-dark">
-                                {t('research.expansionFactor', { fallback: 'Expansion target' })}
+                                {t('research.expansionFactor')}
                             </h3>
                         </div>
                         <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                            {t('research.expansionDescription', {
-                                fallback:
-                                    'How many times larger should the final collection be compared to the source?',
-                            })}
+                            {t('research.expansionDescription')}
                         </p>
                         <div className="flex flex-wrap gap-2">
                             {EXPANSION_OPTIONS.map((option) => (
@@ -367,7 +376,6 @@ export function ImportConfigureStep({
                         {seedCount > 0 && (
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
                                 {t('research.preview', {
-                                    fallback: `~${seedCount} seed items → target ~${targetCount} final items (~${newItemsTarget} new items to discover)`,
                                     seedCount,
                                     targetCount,
                                     newItems: newItemsTarget,
@@ -379,7 +387,7 @@ export function ImportConfigureStep({
                     {/* Enrichment Options */}
                     <div className="p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark space-y-4">
                         <h3 className="font-medium text-text dark:text-text-dark">
-                            {t('research.enrichmentOptions', { fallback: 'Enrichment options' })}
+                            {t('research.enrichmentOptions')}
                         </h3>
 
                         <div className="flex items-center justify-between">
@@ -387,15 +395,10 @@ export function ImportConfigureStep({
                                 <FileText className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
                                 <div>
                                     <span className="text-sm font-medium text-text dark:text-text-dark">
-                                        {t('research.enrichDescriptions', {
-                                            fallback: 'Rewrite descriptions',
-                                        })}
+                                        {t('research.enrichDescriptions')}
                                     </span>
                                     <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                        {t('research.enrichDescriptionsHint', {
-                                            fallback:
-                                                'AI will rewrite and expand all imported descriptions',
-                                        })}
+                                        {t('research.enrichDescriptionsHint')}
                                     </p>
                                 </div>
                             </div>
@@ -411,15 +414,10 @@ export function ImportConfigureStep({
                                 <Tags className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
                                 <div>
                                     <span className="text-sm font-medium text-text dark:text-text-dark">
-                                        {t('research.expandTaxonomy', {
-                                            fallback: 'Expand categories & tags',
-                                        })}
+                                        {t('research.expandTaxonomy')}
                                     </span>
                                     <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                        {t('research.expandTaxonomyHint', {
-                                            fallback:
-                                                'Generate new categories and tags beyond the source taxonomy',
-                                        })}
+                                        {t('research.expandTaxonomyHint')}
                                     </p>
                                 </div>
                             </div>
@@ -435,15 +433,10 @@ export function ImportConfigureStep({
                                 <GitPullRequest className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
                                 <div>
                                     <span className="text-sm font-medium text-text dark:text-text-dark">
-                                        {t('research.parsePrIssues', {
-                                            fallback: 'Parse PRs & issues',
-                                        })}
+                                        {t('research.parsePrIssues')}
                                     </span>
                                     <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                        {t('research.parsePrIssuesHint', {
-                                            fallback:
-                                                'Extract additional items from pull requests and issues',
-                                        })}
+                                        {t('research.parsePrIssuesHint')}
                                     </p>
                                 </div>
                             </div>
@@ -462,12 +455,10 @@ export function ImportConfigureStep({
                 <div className="flex items-center justify-between p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
                     <div>
                         <h3 className="font-medium text-text dark:text-text-dark">
-                            {t('sync.title', { fallback: 'Keep synchronized' })}
+                            {t('sync.title')}
                         </h3>
                         <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                            {t('sync.description', {
-                                fallback: 'Automatically pull updates from the source repository.',
-                            })}
+                            {t('sync.description')}
                         </p>
                     </div>
                     <Switch checked={sync} onChange={onSyncChange} disabled={isPending} />
@@ -507,11 +498,8 @@ export function ImportConfigureStep({
                 <p className="text-sm text-text-muted dark:text-text-muted-dark">
                     {isAwesomeReadme ? (
                         <>
-                            <strong>{t('research.legalNote', { fallback: 'Note:' })}</strong>{' '}
-                            {t('research.legalDescription', {
-                                fallback:
-                                    'Research mode uses the source repository as input data only. The final collection will consist primarily of newly discovered items with original, AI-generated descriptions. Source content is not copied verbatim.',
-                            })}
+                            <strong>{t('research.legalNote')}</strong>{' '}
+                            {t('research.legalDescription')}
                         </>
                     ) : (
                         <>
@@ -544,16 +532,14 @@ export function ImportConfigureStep({
                 >
                     {isPending ? (
                         isAwesomeReadme ? (
-                            t('research.importingButton', {
-                                fallback: 'Starting research pipeline...',
-                            })
+                            t('research.importingButton')
                         ) : (
                             t('importingButton')
                         )
                     ) : isAwesomeReadme ? (
                         <>
                             <Sparkles className="w-5 h-5" />
-                            {t('research.importButton', { fallback: 'Start Import & Research' })}
+                            {t('research.importButton')}
                         </>
                     ) : (
                         <>

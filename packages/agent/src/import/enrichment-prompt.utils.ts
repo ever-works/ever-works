@@ -19,9 +19,6 @@ export interface ResolvedEnrichmentConfig {
 /** Default pipeline ID — always available internally as a system plugin */
 const DEFAULT_PIPELINE_ID = 'agent-pipeline';
 
-/** Pipeline plugins allowed for the import enrichment flow */
-const ALLOWED_IMPORT_PIPELINES = new Set(['agent-pipeline', 'claude-code']);
-
 /** Hard cap on pages to process */
 const MAX_PIPELINE_PAGES = 1000;
 
@@ -138,10 +135,9 @@ export function buildEnrichmentGenerationDto(options: {
     dto.generation_method = GenerationMethod.CREATE_UPDATE;
     dto.update_with_pull_request = false;
     dto.website_repository_creation_method = WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE;
-    const requestedPipeline = providers?.pipeline ?? DEFAULT_PIPELINE_ID;
     dto.providers = {
         ...providers,
-        pipeline: ALLOWED_IMPORT_PIPELINES.has(requestedPipeline) ? requestedPipeline : DEFAULT_PIPELINE_ID,
+        pipeline: providers?.pipeline ?? DEFAULT_PIPELINE_ID,
     };
     dto.pluginConfig = {
         target_items: Math.max(50, targetNewItems),

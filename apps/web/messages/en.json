@@ -2042,6 +2042,7 @@
                 "research": {
                     "title": "Import & Research Mode",
                     "description": "Items from the source repository will be used as research seeds. The AI pipeline will discover new items, rewrite descriptions, and expand the taxonomy.",
+                    "seedDetected": "~{count} seed items detected",
                     "expansionFactor": "Expansion target",
                     "expansionDescription": "How many times larger should the final collection be compared to the source?",
                     "preview": "~{seedCount} seed items \u2192 target ~{targetCount} final items (~{newItems} new items to discover)",
