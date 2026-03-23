@@ -546,6 +546,15 @@ export async function analyzeRepository(sourceUrl: string, providerId?: string) 
     }
 }
 
+interface ImportEnrichmentConfig {
+    expansionFactor?: number;
+    maxImportProportion?: number;
+    parseIssues?: boolean;
+    parsePullRequests?: boolean;
+    enrichDescriptions?: boolean;
+    expandTaxonomy?: boolean;
+}
+
 interface ImportDirectoryRequest {
     sourceUrl: string;
     sourceType: ImportSourceType;
@@ -557,6 +566,7 @@ interface ImportDirectoryRequest {
     gitProvider?: string;
     deployProvider?: string;
     providers?: Record<string, string>;
+    enrichmentConfig?: ImportEnrichmentConfig;
 }
 
 export async function importDirectory(data: ImportDirectoryRequest) {
@@ -577,6 +587,16 @@ export async function importDirectory(data: ImportDirectoryRequest) {
         gitProvider: z.string().optional(),
         deployProvider: z.string().optional(),
         providers: z.record(z.string()).optional(),
+        enrichmentConfig: z
+            .object({
+                expansionFactor: z.number().min(1.5).max(5).optional(),
+                maxImportProportion: z.number().min(0.1).max(0.5).optional(),
+                parseIssues: z.boolean().optional(),
+                parsePullRequests: z.boolean().optional(),
+                enrichDescriptions: z.boolean().optional(),
+                expandTaxonomy: z.boolean().optional(),
+            })
+            .optional(),
     });
 
     try {
@@ -623,6 +643,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
             gitProvider: providerId,
             deployProvider: validation.data.deployProvider,
             providers: validation.data.providers,
+            enrichmentConfig: validation.data.enrichmentConfig,
         });
 
         return {

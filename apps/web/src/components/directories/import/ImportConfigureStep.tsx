@@ -14,7 +14,17 @@ import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
 import { resolveEffectiveDefault } from '@ever-works/plugin';
 import type { GeneratorFormSchema } from '@/lib/api/types-only';
 import type { ProviderOption } from '@/lib/api/types-only';
-import { Upload, CheckCircle2, FileText, Database, ArrowLeft } from 'lucide-react';
+import type { ImportEnrichmentConfig } from '@/lib/api/directory';
+import {
+    Upload,
+    CheckCircle2,
+    FileText,
+    Database,
+    ArrowLeft,
+    Sparkles,
+    GitPullRequest,
+    Tags,
+} from 'lucide-react';
 
 type DetectedType = 'data_repo' | 'awesome_readme' | 'link_existing' | null;
 
@@ -54,8 +64,19 @@ interface ImportConfigureStepProps {
     owner: string;
     onOwnerChange: (value: string, isOrganization: boolean) => void;
     onBack: () => void;
-    onImport: (providers?: Record<string, string>) => void;
+    onImport: (
+        providers?: Record<string, string>,
+        enrichmentConfig?: ImportEnrichmentConfig,
+    ) => void;
 }
+
+const EXPANSION_OPTIONS = [
+    { value: 1.5, label: '1.5x' },
+    { value: 2, label: '2x' },
+    { value: 2.5, label: '2.5x (recommended)' },
+    { value: 3, label: '3x' },
+    { value: 5, label: '5x' },
+];
 
 export function ImportConfigureStep({
     analysisResult,
@@ -79,10 +100,17 @@ export function ImportConfigureStep({
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
     const [selectedAiProvider, setSelectedAiProvider] = useState<string | null>(null);
 
+    // Enrichment config (for awesome_readme)
+    const [expansionFactor, setExpansionFactor] = useState(2.5);
+    const [parsePullRequests, setParsePullRequests] = useState(false);
+    const [enrichDescriptions, setEnrichDescriptions] = useState(true);
+    const [expandTaxonomy, setExpandTaxonomy] = useState(true);
+
     const effectiveSourceType = analysisResult?.detectedType || manualSourceType;
+    const isAwesomeReadme = effectiveSourceType === 'awesome_readme';
 
     useEffect(() => {
-        if (effectiveSourceType !== 'awesome_readme') return;
+        if (!isAwesomeReadme) return;
         if (formSchema) return;
 
         async function loadSchema() {
@@ -96,13 +124,17 @@ export function ImportConfigureStep({
             }
         }
         loadSchema();
-    }, [effectiveSourceType, formSchema]);
+    }, [isAwesomeReadme, formSchema]);
 
     const aiProviders: ProviderOption[] = formSchema?.providers.ai ?? [];
 
+    const seedCount = analysisResult?.structure?.itemCount ?? 0;
+    const targetCount = Math.ceil(seedCount * expansionFactor);
+    const newItemsTarget = targetCount - seedCount;
+
     const handleImport = () => {
         let providers: Record<string, string> | undefined;
-        if (effectiveSourceType === 'awesome_readme') {
+        if (isAwesomeReadme) {
             if (selectedAiProvider) {
                 const selected = aiProviders.find((p) => p.id === selectedAiProvider);
                 if (selected && !selected.configured) {
@@ -124,9 +156,20 @@ export function ImportConfigureStep({
                     providers = { ai: defaultProvider.id };
                 }
             }
-        }
 
-        onImport(providers);
+            const enrichmentConfig: ImportEnrichmentConfig = {
+                expansionFactor,
+                maxImportProportion: 1 / expansionFactor,
+                parsePullRequests,
+                parseIssues: parsePullRequests,
+                enrichDescriptions,
+                expandTaxonomy,
+            };
+
+            onImport(providers, enrichmentConfig);
+        } else {
+            onImport(providers);
+        }
     };
 
     return (
@@ -138,18 +181,11 @@ export function ImportConfigureStep({
                         'p-4 rounded-lg',
                         analysisResult.detectedType === 'data_repo'
                             ? 'bg-primary/5 border border-primary/20'
-                            : 'bg-warning/5 border border-warning/20',
+                            : 'bg-primary/5 border border-primary/20',
                     )}
                 >
                     <div className="flex items-start gap-3">
-                        <CheckCircle2
-                            className={cn(
-                                'w-6 h-6 mt-0.5 shrink-0',
-                                analysisResult.detectedType === 'data_repo'
-                                    ? 'text-primary'
-                                    : 'text-warning',
-                            )}
-                        />
+                        <CheckCircle2 className="w-6 h-6 mt-0.5 shrink-0 text-primary" />
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                                 <h4 className="font-medium text-text dark:text-text-dark">
@@ -160,9 +196,7 @@ export function ImportConfigureStep({
                                 <span
                                     className={cn(
                                         'px-2 py-0.5 rounded-full text-xs font-medium',
-                                        analysisResult.detectedType === 'data_repo'
-                                            ? 'bg-primary/10 text-primary'
-                                            : 'bg-warning/10 text-warning',
+                                        'bg-primary/10 text-primary',
                                     )}
                                 >
                                     {analysisResult.detectedType === 'data_repo'
@@ -214,11 +248,11 @@ export function ImportConfigureStep({
                                 'p-4 rounded-lg border-2 text-left transition-all',
                                 'bg-card dark:bg-card-dark',
                                 manualSourceType === 'awesome_readme'
-                                    ? 'border-warning shadow-md'
-                                    : 'border-card-border dark:border-card-border-dark hover:border-warning/50',
+                                    ? 'border-primary shadow-md'
+                                    : 'border-card-border dark:border-card-border-dark hover:border-primary/50',
                             )}
                         >
-                            <FileText className="w-6 h-6 text-warning mb-2" />
+                            <FileText className="w-6 h-6 text-primary mb-2" />
                             <h4 className="font-medium text-text dark:text-text-dark">
                                 {t('supportedFormats.awesomeReadme.title')}
                             </h4>
@@ -269,8 +303,161 @@ export function ImportConfigureStep({
                 />
             )}
 
+            {/* Enrichment Config — for awesome_readme imports */}
+            {isAwesomeReadme && (
+                <>
+                    {/* Research Mode Banner */}
+                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                        <div className="flex items-start gap-3">
+                            <Sparkles className="w-6 h-6 mt-0.5 shrink-0 text-primary" />
+                            <div className="flex-1">
+                                <h4 className="font-medium text-text dark:text-text-dark">
+                                    {t('research.title', { fallback: 'Import & Research Mode' })}
+                                </h4>
+                                <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
+                                    {t('research.description', {
+                                        fallback:
+                                            'Items from the source repository will be used as research seeds. The AI pipeline will discover new items, rewrite descriptions, and expand the taxonomy.',
+                                    })}
+                                </p>
+                                {seedCount > 0 && (
+                                    <div className="mt-2 flex gap-4 text-xs text-text-muted dark:text-text-muted-dark">
+                                        <span>~{seedCount} seed items detected</span>
+                                        <span>
+                                            {analysisResult?.owner}/{analysisResult?.repo}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Expansion Factor */}
+                    <div className="p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark space-y-3">
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-primary" />
+                            <h3 className="font-medium text-text dark:text-text-dark">
+                                {t('research.expansionFactor', { fallback: 'Expansion target' })}
+                            </h3>
+                        </div>
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                            {t('research.expansionDescription', {
+                                fallback:
+                                    'How many times larger should the final collection be compared to the source?',
+                            })}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            {EXPANSION_OPTIONS.map((option) => (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => setExpansionFactor(option.value)}
+                                    className={cn(
+                                        'px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+                                        expansionFactor === option.value
+                                            ? 'bg-primary text-white'
+                                            : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-primary/10',
+                                    )}
+                                >
+                                    {option.label}
+                                </button>
+                            ))}
+                        </div>
+                        {seedCount > 0 && (
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('research.preview', {
+                                    fallback: `~${seedCount} seed items → target ~${targetCount} final items (~${newItemsTarget} new items to discover)`,
+                                    seedCount,
+                                    targetCount,
+                                    newItems: newItemsTarget,
+                                })}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Enrichment Options */}
+                    <div className="p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark space-y-4">
+                        <h3 className="font-medium text-text dark:text-text-dark">
+                            {t('research.enrichmentOptions', { fallback: 'Enrichment options' })}
+                        </h3>
+
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
+                                <div>
+                                    <span className="text-sm font-medium text-text dark:text-text-dark">
+                                        {t('research.enrichDescriptions', {
+                                            fallback: 'Rewrite descriptions',
+                                        })}
+                                    </span>
+                                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                        {t('research.enrichDescriptionsHint', {
+                                            fallback:
+                                                'AI will rewrite and expand all imported descriptions',
+                                        })}
+                                    </p>
+                                </div>
+                            </div>
+                            <Switch
+                                checked={enrichDescriptions}
+                                onChange={setEnrichDescriptions}
+                                disabled={isPending}
+                            />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Tags className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
+                                <div>
+                                    <span className="text-sm font-medium text-text dark:text-text-dark">
+                                        {t('research.expandTaxonomy', {
+                                            fallback: 'Expand categories & tags',
+                                        })}
+                                    </span>
+                                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                        {t('research.expandTaxonomyHint', {
+                                            fallback:
+                                                'Generate new categories and tags beyond the source taxonomy',
+                                        })}
+                                    </p>
+                                </div>
+                            </div>
+                            <Switch
+                                checked={expandTaxonomy}
+                                onChange={setExpandTaxonomy}
+                                disabled={isPending}
+                            />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <GitPullRequest className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
+                                <div>
+                                    <span className="text-sm font-medium text-text dark:text-text-dark">
+                                        {t('research.parsePrIssues', {
+                                            fallback: 'Parse PRs & issues',
+                                        })}
+                                    </span>
+                                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                        {t('research.parsePrIssuesHint', {
+                                            fallback:
+                                                'Extract additional items from pull requests and issues',
+                                        })}
+                                    </p>
+                                </div>
+                            </div>
+                            <Switch
+                                checked={parsePullRequests}
+                                onChange={setParsePullRequests}
+                                disabled={isPending}
+                            />
+                        </div>
+                    </div>
+                </>
+            )}
+
             {/* Sync Toggle — only relevant for awesome_readme imports */}
-            {effectiveSourceType === 'awesome_readme' && (
+            {isAwesomeReadme && (
                 <div className="flex items-center justify-between p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
                     <div>
                         <h3 className="font-medium text-text dark:text-text-dark">
@@ -287,7 +474,7 @@ export function ImportConfigureStep({
             )}
 
             {/* AI Provider Selection - only for awesome_readme */}
-            {effectiveSourceType === 'awesome_readme' && aiProviders.length > 0 && (
+            {isAwesomeReadme && aiProviders.length > 0 && (
                 <div className="p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
                     <ProviderSelector
                         label={t('aiProviderSettings')}
@@ -311,7 +498,7 @@ export function ImportConfigureStep({
                 />
             </div>
 
-            {/* Source Attribution Note */}
+            {/* Source Attribution / Legal Note */}
             <div
                 className={cn(
                     'p-4 rounded-lg',
@@ -320,8 +507,20 @@ export function ImportConfigureStep({
                 )}
             >
                 <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                    <strong>{t('attribution.title')}</strong>{' '}
-                    {t('attribution.text', { url: analysisResult?.sourceUrl || sourceUrl })}
+                    {isAwesomeReadme ? (
+                        <>
+                            <strong>{t('research.legalNote', { fallback: 'Note:' })}</strong>{' '}
+                            {t('research.legalDescription', {
+                                fallback:
+                                    'Research mode uses the source repository as input data only. The final collection will consist primarily of newly discovered items with original, AI-generated descriptions. Source content is not copied verbatim.',
+                            })}
+                        </>
+                    ) : (
+                        <>
+                            <strong>{t('attribution.title')}</strong>{' '}
+                            {t('attribution.text', { url: analysisResult?.sourceUrl || sourceUrl })}
+                        </>
+                    )}
                 </p>
             </div>
 
@@ -346,7 +545,18 @@ export function ImportConfigureStep({
                     fullWidth
                 >
                     {isPending ? (
-                        t('importingButton')
+                        isAwesomeReadme ? (
+                            t('research.importingButton', {
+                                fallback: 'Starting research pipeline...',
+                            })
+                        ) : (
+                            t('importingButton')
+                        )
+                    ) : isAwesomeReadme ? (
+                        <>
+                            <Sparkles className="w-5 h-5" />
+                            {t('research.importButton', { fallback: 'Start Import & Research' })}
+                        </>
                     ) : (
                         <>
                             <Upload className="w-5 h-5" />

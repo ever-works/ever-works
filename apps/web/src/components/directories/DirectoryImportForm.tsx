@@ -22,7 +22,7 @@ import {
     LinkExistingConfirm,
     type ImportMode,
 } from './import';
-import type { AnalyzeForLinkingResponseDto } from '@/lib/api/directory';
+import type { AnalyzeForLinkingResponseDto, ImportEnrichmentConfig } from '@/lib/api/directory';
 
 interface DirectoryImportFormProps {
     user: AuthUser;
@@ -96,7 +96,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
             const result = await analyzeRepository(sourceUrl, gitProvider);
 
             if (result.success && result.data) {
-                setAnalysisResult(result.data);
+                setAnalysisResult(result.data as AnalysisResult);
 
                 if (result.data.error) {
                     toast.error(result.data.error);
@@ -125,6 +125,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                     }
 
                     if (result.data.relatedDataRepo) {
+                        // data_repo with link_existing option — show mode selector
                         setStep('choose_mode');
                     } else if (!result.data.detectedType) {
                         if (result.data.structure?.hasReadme) {
@@ -132,8 +133,10 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                         }
                         setStep('configure');
                     } else if (result.data.detectedType === 'data_repo') {
+                        // data_repo with potential link option — show mode selector
                         setStep('choose_mode');
                     } else {
+                        // awesome_readme and others go directly to configure
                         setStep('configure');
                     }
                 }
@@ -209,7 +212,10 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
         });
     };
 
-    const handleImport = async (providers?: Record<string, string>) => {
+    const handleImport = async (
+        providers?: Record<string, string>,
+        enrichmentConfig?: ImportEnrichmentConfig,
+    ) => {
         if (!directoryName.trim()) {
             toast.error(t('errors.nameRequired'));
             return;
@@ -228,12 +234,13 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                 sourceUrl,
                 sourceType,
                 name: directoryName,
-                sync,
+                sync: enrichmentConfig ? false : sync,
                 gitProvider,
                 deployProvider,
                 providers,
                 owner: organization ? owner : undefined,
                 organization,
+                enrichmentConfig,
             });
 
             if (result.success) {

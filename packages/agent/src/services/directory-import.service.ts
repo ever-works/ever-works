@@ -377,6 +377,7 @@ export class DirectoryImportService {
                 enableSync: dto.sync ?? true,
             },
             providers: dto.providers,
+            enrichmentConfig: dto.enrichmentConfig,
         };
 
         const dispatchedId = this.importDispatcher
@@ -442,6 +443,7 @@ export class DirectoryImportService {
                 token,
                 createMissingRepos: dto.createMissingRepos,
                 aiProviderOverride: dto.providers?.ai,
+                enrichmentConfig: dto.enrichmentConfig,
             });
 
             if (!result.success) {

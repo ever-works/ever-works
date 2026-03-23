@@ -21,6 +21,32 @@ export enum ImportSourceTypeEnum {
     LINK_EXISTING = 'link_existing',
 }
 
+export class ImportEnrichmentConfigDto {
+    @IsOptional()
+    @IsNumber()
+    expansionFactor?: number; // default 2.5, target ratio of final/seed items
+
+    @IsOptional()
+    @IsNumber()
+    maxImportProportion?: number; // default 0.35, max share of seed items in final
+
+    @IsOptional()
+    @IsBoolean()
+    parseIssues?: boolean; // default false
+
+    @IsOptional()
+    @IsBoolean()
+    parsePullRequests?: boolean; // default false
+
+    @IsOptional()
+    @IsBoolean()
+    enrichDescriptions?: boolean; // default true
+
+    @IsOptional()
+    @IsBoolean()
+    expandTaxonomy?: boolean; // default true
+}
+
 export class AnalyzeRepositoryDto {
     @IsUrl({}, { message: 'Please provide a valid repository URL' })
     @IsNotEmpty()
@@ -107,6 +133,11 @@ export class ImportDirectoryDto {
     @ValidateNested()
     @Type(() => ImportProvidersDto)
     providers?: ImportProvidersDto;
+
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => ImportEnrichmentConfigDto)
+    enrichmentConfig?: ImportEnrichmentConfigDto;
 }
 
 export class ImportDirectoryResponseDto {

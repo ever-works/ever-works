@@ -6,10 +6,12 @@ import { MarkdownGeneratorService } from '@src/generators/markdown-generator/mar
 import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
 import { SourceRepoAnalyzerService } from './source-repo-analyzer.service';
 import { AwesomeReadmeParserService } from './awesome-readme-parser.service';
+import { ImportEnrichmentService } from './import-enrichment.service';
 import { Directory, ImportSourceType } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
 import { DirectoryImportResult, DirectoryImportErrorCode } from '@src/tasks/directory-import.types';
 import { GIT_TOKEN_NOT_AVAILABLE } from '@src/constants/messages';
+import type { ImportEnrichmentConfigDto } from '@src/dto/import-directory.dto';
 
 export interface ExecuteBySourceTypeOptions {
     directory: Directory;
@@ -21,6 +23,7 @@ export interface ExecuteBySourceTypeOptions {
     token?: string;
     createMissingRepos?: boolean;
     aiProviderOverride?: string;
+    enrichmentConfig?: ImportEnrichmentConfigDto;
 }
 
 export interface ImportFromDataRepoOptions {
@@ -36,6 +39,7 @@ export interface ImportFromAwesomeReadmeOptions {
     sourceUrl: string;
     token?: string;
     aiProviderOverride?: string;
+    enrichmentConfig?: ImportEnrichmentConfigDto;
 }
 
 export interface LinkExistingDataRepoOptions {
@@ -57,6 +61,7 @@ export class ImportExecutorService {
         private readonly websiteGenerator: WebsiteGeneratorService,
         private readonly sourceRepoAnalyzer: SourceRepoAnalyzerService,
         private readonly awesomeReadmeParser: AwesomeReadmeParserService,
+        private readonly importEnrichment: ImportEnrichmentService,
     ) {}
 
     async importFromDataRepo(options: ImportFromDataRepoOptions): Promise<DirectoryImportResult> {
@@ -153,10 +158,22 @@ export class ImportExecutorService {
         }
     }
 
+    /**
+     * Import from an awesome README repository.
+     *
+     * This always runs through the enrichment pipeline:
+     * 1. Parse the README to extract seed items, categories, tags
+     * 2. Pass seed data to the enrichment pipeline which:
+     *    - Discovers new items via web search
+     *    - Rewrites and enriches all descriptions
+     *    - Expands categories and tags
+     *    - Optionally parses PRs/issues for additional items
+     * 3. Returns the enriched result with compliance metrics
+     */
     async importFromAwesomeReadme(
         options: ImportFromAwesomeReadmeOptions,
     ): Promise<DirectoryImportResult> {
-        const { directory, user, sourceUrl, token, aiProviderOverride } = options;
+        const { directory, user, sourceUrl, token, aiProviderOverride, enrichmentConfig } = options;
 
         try {
             const readme = await this.sourceRepoAnalyzer.getReadmeContent(sourceUrl, token);
@@ -180,60 +197,35 @@ export class ImportExecutorService {
             );
 
             this.logger.log(
-                `Parsed ${parsedData.items.length} items, ${parsedData.categories.length} categories`,
+                `Parsed ${parsedData.items.length} seed items, ${parsedData.categories.length} categories — ` +
+                    `passing to enrichment pipeline`,
             );
 
-            const parsed = this.sourceRepoAnalyzer.parseGitUrl(sourceUrl);
-            const initResult = await this.dataGenerator.initializeWithImportedData(
+            // Always run through enrichment pipeline
+            return this.importEnrichment.enrichImport({
                 directory,
                 user,
-                {
-                    items: parsedData.items,
-                    categories: parsedData.categories,
-                    tags: parsedData.tags,
-                    config: {
-                        metadata: {
-                            imported_from: parsed ? `${parsed.owner}/${parsed.repo}` : sourceUrl,
-                            imported_at: new Date().toISOString(),
-                            import_type: 'awesome_readme',
-                        },
-                    },
-                    importRequest: {
-                        sourceUrl,
-                        sourceType: 'awesome_readme' as ImportSourceType,
-                        sourceOwner: parsed?.owner || '',
-                        sourceRepo: parsed?.repo || '',
-                    },
-                },
-            );
-
-            if (initResult.success === false) {
-                return {
-                    success: false,
-                    directoryId: directory.id,
-                    error: initResult.error.message || 'Failed to initialize data repository',
-                    errorCode: DirectoryImportErrorCode.CREATE_REPO_FAILED,
-                };
-            }
-
-            await this.markdownGenerator.initialize(directory, user);
-            await this.websiteGenerator.initialize(directory, user);
-
-            return {
-                success: true,
-                directoryId: directory.id,
-                itemsImported: parsedData.items.length,
-                categoriesImported: parsedData.categories.length,
-                tagsImported: parsedData.tags.length,
-                metrics: parsedData.metrics,
-            };
+                seedItems: parsedData.items,
+                seedCategories: parsedData.categories,
+                seedTags: parsedData.tags,
+                sourceUrl,
+                config: enrichmentConfig,
+                aiProviderOverride,
+                gitFacadeOptions: token
+                    ? {
+                          userId: user.id,
+                          providerId: directory.gitProvider,
+                          token,
+                      }
+                    : undefined,
+            });
         } catch (error) {
             this.logger.error('Failed to import from awesome readme', error);
             return {
                 success: false,
                 directoryId: directory.id,
                 error: (error as Error).message,
-                errorCode: DirectoryImportErrorCode.AI_EXTRACTION_FAILED,
+                errorCode: DirectoryImportErrorCode.ENRICHMENT_FAILED,
             };
         }
     }
@@ -326,6 +318,7 @@ export class ImportExecutorService {
                     sourceUrl: opts.sourceUrl,
                     token,
                     aiProviderOverride: opts.aiProviderOverride,
+                    enrichmentConfig: opts.enrichmentConfig,
                 });
             case 'link_existing': {
                 if (!token) {

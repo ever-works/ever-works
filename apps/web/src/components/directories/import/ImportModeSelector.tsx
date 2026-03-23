@@ -78,6 +78,8 @@ export function ImportModeSelector({
               })
             : t('repository', { owner: repoInfo.owner, repo: repoInfo.repo });
 
+    const optionCount = 1 + (showLinkOption ? 1 : 0);
+
     return (
         <div className="space-y-4">
             <div className="text-center mb-6">
@@ -90,7 +92,7 @@ export function ImportModeSelector({
             <div
                 className={cn(
                     'grid gap-4',
-                    showLinkOption ? 'grid-cols-2' : 'grid-cols-1 max-w-sm mx-auto',
+                    optionCount === 2 ? 'grid-cols-2' : 'grid-cols-1 max-w-sm mx-auto',
                 )}
             >
                 <ModeOption
