@@ -1,7 +1,12 @@
 import type { ComparisonDimension, ComparisonSource } from '@ever-works/contracts';
 import { substituteVariables } from '@ever-works/plugin';
 import type { IPromptFacade, FacadeOptions, TemplateVariables } from '@ever-works/plugin';
-import type { ComparisonPair, ComparisonResearch, ComparisonGenerationResult } from './types';
+import type {
+    ComparisonPair,
+    ComparisonResearch,
+    ComparisonGenerationResult,
+    ComparisonProgressCallback,
+} from './types';
 import { buildPairKey } from './pair-selector';
 import { PROMPT_KEYS } from './prompt-keys';
 
@@ -415,6 +420,7 @@ export async function generateComparison(
         extendedAnalysis?: boolean;
     },
     promptOptions?: ComparisonPromptOptions,
+    onProgress?: ComparisonProgressCallback,
 ): Promise<ComparisonGenerationResult> {
     const { promptFacade, facadeOptions } = promptOptions ?? {};
 
@@ -433,6 +439,7 @@ export async function generateComparison(
         buildStructurePromptVariables(pair, research, directoryContext),
     );
 
+    onProgress?.('analyzing');
     const structure = await ai.askJson<AiComparisonStructure>(
         structurePrompt,
         COMPARISON_JSON_SCHEMA,
@@ -460,6 +467,7 @@ export async function generateComparison(
         ),
     );
 
+    onProgress?.('writing');
     const markdown = await ai.askText(markdownPrompt);
 
     let extendedAnalysisMarkdown: string | undefined;
@@ -483,6 +491,7 @@ export async function generateComparison(
                 directoryContext?.customPrompt,
             ),
         );
+        onProgress?.('writing_extended');
         extendedAnalysisMarkdown = await ai.askText(extendedPrompt);
     }
 

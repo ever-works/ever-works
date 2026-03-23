@@ -311,4 +311,62 @@ describe('generateComparison', () => {
         expect(extendedPrompt).toContain('Vercel');
         expect(extendedPrompt).toContain('Netlify');
     });
+
+    it('should call onProgress at each generation stage', async () => {
+        const ai = makeAi();
+        const onProgress = jest.fn();
+
+        await generateComparison(pair, research, ai, { name: 'Test' }, undefined, onProgress);
+
+        expect(onProgress).toHaveBeenCalledWith('analyzing');
+        expect(onProgress).toHaveBeenCalledWith('writing');
+
+        // Verify order: analyzing before writing
+        const calls = onProgress.mock.calls.map((c: unknown[]) => c[0]);
+        expect(calls.indexOf('analyzing')).toBeLessThan(calls.indexOf('writing'));
+    });
+
+    it('should call onProgress with writing_extended when extended analysis is enabled', async () => {
+        const ai = makeAi();
+        const onProgress = jest.fn();
+
+        await generateComparison(
+            pair,
+            research,
+            ai,
+            { name: 'Test', extendedAnalysis: true },
+            undefined,
+            onProgress,
+        );
+
+        expect(onProgress).toHaveBeenCalledWith('analyzing');
+        expect(onProgress).toHaveBeenCalledWith('writing');
+        expect(onProgress).toHaveBeenCalledWith('writing_extended');
+    });
+
+    it('should not call onProgress with writing_extended when extended analysis is disabled', async () => {
+        const ai = makeAi();
+        const onProgress = jest.fn();
+
+        await generateComparison(
+            pair,
+            research,
+            ai,
+            { name: 'Test', extendedAnalysis: false },
+            undefined,
+            onProgress,
+        );
+
+        expect(onProgress).not.toHaveBeenCalledWith('writing_extended');
+    });
+
+    it('should work without onProgress callback', async () => {
+        const ai = makeAi();
+
+        // Should not throw when no onProgress is provided
+        const result = await generateComparison(pair, research, ai);
+
+        expect(result.comparison).toBeDefined();
+        expect(result.markdown).toBeDefined();
+    });
 });

@@ -35,6 +35,20 @@ export async function getRemainingComparisonCount(directoryId: string) {
     }
 }
 
+export async function getComparisonGenerationStatus(directoryId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        return await directoryAPI.getComparisonGenerationStatus(directoryId);
+    } catch (error) {
+        console.error('Get comparison generation status error:', error);
+        return { generating: false };
+    }
+}
+
 export async function generateNextComparison(directoryId: string) {
     const user = await getAuthFromCookie();
     if (!user) {
