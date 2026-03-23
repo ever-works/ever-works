@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -8,12 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { OrganizationSelector } from '../OrganizationSelector';
-import { ProviderSelector } from '../detail/generator/ProviderSelector';
+import { ProviderSelectionSection } from '../shared/ProviderSelectionSection';
 import { SlugConflictWarning } from './SlugConflictWarning';
 import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
-import { resolveEffectiveDefault } from '@ever-works/plugin';
+import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import type { GeneratorFormSchema } from '@/lib/api/types-only';
-import type { ProviderOption } from '@/lib/api/types-only';
 import type { ImportEnrichmentConfig } from '@/lib/api/directory';
 import {
     Upload,
@@ -96,9 +95,17 @@ export function ImportConfigureStep({
 }: ImportConfigureStepProps) {
     const t = useTranslations('dashboard.directoryCreation.import');
 
-    // AI provider selection
+    // Provider/pipeline selection state
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
-    const [selectedAiProvider, setSelectedAiProvider] = useState<string | null>(null);
+    const {
+        providers: selectedProviders,
+        handleProviderChange,
+        buildSelectedProviders,
+        getUnconfiguredProviders,
+        syncResolvedPipeline,
+    } = useProviderSelection();
+    const fetchVersionRef = useRef(0);
+    const lastFetchedPipelineRef = useRef<string | undefined>(undefined);
 
     // Enrichment config (for awesome_readme)
     const [expansionFactor, setExpansionFactor] = useState(2.5);
@@ -109,53 +116,47 @@ export function ImportConfigureStep({
     const effectiveSourceType = analysisResult?.detectedType || manualSourceType;
     const isAwesomeReadme = effectiveSourceType === 'awesome_readme';
 
+    // Load form schema when pipeline changes (same pattern as DirectoryAICreator)
     useEffect(() => {
         if (!isAwesomeReadme) return;
-        if (formSchema) return;
+
+        const pipelineId = selectedProviders.pipeline || undefined;
+        if (pipelineId === lastFetchedPipelineRef.current && formSchema) return;
+
+        const version = ++fetchVersionRef.current;
 
         async function loadSchema() {
             try {
-                const result = await getGlobalFormSchema();
+                const result = await getGlobalFormSchema(pipelineId);
+                if (version !== fetchVersionRef.current) return;
                 if (result.success && result.data) {
+                    lastFetchedPipelineRef.current = result.data.resolvedPipelineId || pipelineId;
                     setFormSchema(result.data);
+                    syncResolvedPipeline(result.data);
                 }
             } catch (error) {
+                if (version !== fetchVersionRef.current) return;
                 console.error('Failed to load form schema:', error);
             }
         }
         loadSchema();
-    }, [isAwesomeReadme, formSchema]);
-
-    const aiProviders: ProviderOption[] = formSchema?.providers.ai ?? [];
+    }, [isAwesomeReadme, selectedProviders.pipeline, syncResolvedPipeline]);
 
     const seedCount = analysisResult?.structure?.itemCount ?? 0;
     const targetCount = Math.ceil(seedCount * expansionFactor);
     const newItemsTarget = targetCount - seedCount;
 
     const handleImport = () => {
-        let providers: Record<string, string> | undefined;
         if (isAwesomeReadme) {
-            if (selectedAiProvider) {
-                const selected = aiProviders.find((p) => p.id === selectedAiProvider);
-                if (selected && !selected.configured) {
-                    toast.error(t('errors.providerNotConfigured', { provider: selected.name }));
-                    return;
-                }
-
-                providers = { ai: selectedAiProvider };
-            } else if (formSchema) {
-                const defaultProvider = resolveEffectiveDefault(aiProviders);
-                if (defaultProvider && !defaultProvider.configured) {
-                    toast.error(
-                        t('errors.providerNotConfigured', { provider: defaultProvider.name }),
-                    );
-                    return;
-                }
-
-                if (defaultProvider) {
-                    providers = { ai: defaultProvider.id };
-                }
+            const unconfigured = getUnconfiguredProviders(formSchema);
+            if (unconfigured.length > 0) {
+                toast.error(
+                    t('errors.providerNotConfigured', { provider: unconfigured.join(', ') }),
+                );
+                return;
             }
+
+            const providers = buildSelectedProviders(formSchema);
 
             const enrichmentConfig: ImportEnrichmentConfig = {
                 expansionFactor,
@@ -168,7 +169,7 @@ export function ImportConfigureStep({
 
             onImport(providers, enrichmentConfig);
         } else {
-            onImport(providers);
+            onImport();
         }
     };
 
@@ -473,16 +474,13 @@ export function ImportConfigureStep({
                 </div>
             )}
 
-            {/* AI Provider Selection - only for awesome_readme */}
-            {isAwesomeReadme && aiProviders.length > 0 && (
-                <div className="p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
-                    <ProviderSelector
-                        label={t('aiProviderSettings')}
-                        providers={aiProviders}
-                        value={selectedAiProvider}
-                        onChange={setSelectedAiProvider}
-                    />
-                </div>
+            {/* Provider & Pipeline Selection - only for awesome_readme */}
+            {isAwesomeReadme && formSchema && (
+                <ProviderSelectionSection
+                    formSchema={formSchema}
+                    providers={selectedProviders}
+                    onProviderChange={handleProviderChange}
+                />
             )}
 
             {/* Destination Account */}

@@ -217,8 +217,25 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
         return t('updateItems');
     };
 
+    const isImportedAwesome = directory.sourceRepository?.type === 'awesome_readme';
+
     return (
         <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl">
+            {/* Imported source banner */}
+            {isImportedAwesome && directory.sourceRepository && (
+                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        <strong>{t('importedSourceBanner')}</strong>{' '}
+                        {directory.sourceRepository.url}
+                    </p>
+                    {!coreData.prompt && (
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
+                            {t('importedSourceEnrichPrompt')}
+                        </p>
+                    )}
+                </div>
+            )}
+
             {/* Show update fields for existing directories, full fields for new/expanded */}
             {isGenerated && !showAdvancedOptions ? (
                 <UpdateItemsFields

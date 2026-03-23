@@ -442,8 +442,8 @@ export class DirectoryImportService {
                 sourceUrl: dto.sourceUrl,
                 token,
                 createMissingRepos: dto.createMissingRepos,
-                aiProviderOverride: dto.providers?.ai,
                 enrichmentConfig: dto.enrichmentConfig,
+                providers: dto.providers,
             });
 
             if (!result.success) {

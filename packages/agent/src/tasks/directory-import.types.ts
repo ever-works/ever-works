@@ -1,5 +1,6 @@
 import { ImportSourceType } from '@src/entities/directory.entity';
 import type { ImportEnrichmentConfigDto } from '@src/dto/import-directory.dto';
+import type { ProvidersDto } from '@ever-works/contracts/api';
 
 export type DirectoryImportPayload = {
     directoryId: string;
@@ -15,7 +16,7 @@ export type DirectoryImportPayload = {
         createMissingRepos?: boolean;
         enableSync?: boolean;
     };
-    providers?: { ai?: string };
+    providers?: ProvidersDto;
     enrichmentConfig?: ImportEnrichmentConfigDto;
 };
 

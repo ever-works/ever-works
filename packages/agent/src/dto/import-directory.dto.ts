@@ -14,6 +14,7 @@ import {
 } from 'class-validator';
 import { sanitizeName } from '../utils/sanitize.util';
 import { ImportSourceType } from '../entities/directory.entity';
+import { ProvidersDto } from '../items-generator/dto';
 
 export enum ImportSourceTypeEnum {
     DATA_REPO = 'data_repo',
@@ -83,12 +84,6 @@ export class AnalyzeRepositoryResponseDto {
     error?: string;
 }
 
-export class ImportProvidersDto {
-    @IsOptional()
-    @IsString()
-    ai?: string;
-}
-
 export class ImportDirectoryDto {
     @IsUrl({}, { message: 'Please provide a valid repository URL' })
     @IsNotEmpty()
@@ -131,8 +126,8 @@ export class ImportDirectoryDto {
 
     @IsOptional()
     @ValidateNested()
-    @Type(() => ImportProvidersDto)
-    providers?: ImportProvidersDto;
+    @Type(() => ProvidersDto)
+    providers?: ProvidersDto;
 
     @IsOptional()
     @ValidateNested()
