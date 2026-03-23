@@ -129,8 +129,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			author: { name: 'Ever Works Team' },
 			license: 'MIT',
 			builtIn: true,
-			autoEnable: false,
-			systemPlugin: false,
+			autoEnable: true,
+			systemPlugin: true,
 			visibility: 'public',
 			selectableProviderCategories: ['ai-provider', 'search', 'screenshot', 'content-extractor', 'data-source'],
 			readme: [
