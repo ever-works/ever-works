@@ -1460,9 +1460,7 @@
                 "useDirectoryDefault": "Use Directory Default",
                 "default": "Default",
                 "notConfigured": "Not configured",
-                "notConfiguredTooltip": "This provider requires configuration. Visit Settings → Plugins to set it up.",
-                "importedSourceBanner": "Imported from:",
-                "importedSourceEnrichPrompt": "Add a prompt to enrich and expand this imported directory with AI-discovered content."
+                "notConfiguredTooltip": "This provider requires configuration. Visit Settings → Plugins to set it up."
             },
             "progress": {
                 "title": "Generation in Progress",
