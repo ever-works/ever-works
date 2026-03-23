@@ -19,7 +19,7 @@ export class WebsiteGeneratorService {
 
     private async duplicate(directory: Directory, user: User) {
         const directoryOwner = getDirectoryOwner(directory);
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
 
         await this.cleanup(directory);
 
@@ -66,13 +66,29 @@ export class WebsiteGeneratorService {
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
+        // Explicitly set default branch to 'main' regardless of the user's GitHub account settings.
+        // This is best-effort: downstream syncAllBranchesFromTemplate pushes the 'main' branch
+        // regardless, so the repo content is always correct even if this API call fails.
+        await this.gitFacade
+            .updateRepository(
+                directory.getRepoOwner(),
+                directory.getWebsiteRepo(),
+                { defaultBranch: WEBSITE_TEMPLATE_CONFIG.branch },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
+            )
+            .catch((error) =>
+                this.logger.warn(
+                    `Failed to set default branch for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}: ${error instanceof Error ? error.message : String(error)}`,
+                ),
+            );
+
         return templateDir;
     }
 
-    private async createUsingTemplate(directory: Directory, user: User) {
+    private async createUsingTemplate(directory: Directory) {
         const directoryOwner = getDirectoryOwner(directory);
 
-        return this.gitFacade.createRepositoryFromTemplate(
+        await this.gitFacade.createRepositoryFromTemplate(
             WEBSITE_TEMPLATE_CONFIG.owner,
             WEBSITE_TEMPLATE_CONFIG.repo,
             {
@@ -82,6 +98,19 @@ export class WebsiteGeneratorService {
             },
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
+
+        await this.gitFacade
+            .updateRepository(
+                directory.getRepoOwner(),
+                directory.getWebsiteRepo(),
+                { defaultBranch: WEBSITE_TEMPLATE_CONFIG.branch },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
+            )
+            .catch((error) =>
+                this.logger.warn(
+                    `Failed to set default branch for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}: ${error instanceof Error ? error.message : String(error)}`,
+                ),
+            );
     }
 
     async initialize(
@@ -89,26 +118,23 @@ export class WebsiteGeneratorService {
         user: User,
         operation: WebsiteRepositoryCreationMethod = WebsiteRepositoryCreationMethod.DUPLICATE,
     ) {
-        let path: any;
+        let path: string | undefined;
         try {
             if (operation === WebsiteRepositoryCreationMethod.DUPLICATE) {
                 path = await this.duplicate(directory, user);
             } else if (operation === WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE) {
                 try {
-                    path = await this.createUsingTemplate(directory, user);
+                    await this.createUsingTemplate(directory);
                 } catch {
                     path = await this.duplicate(directory, user);
                 }
             } else {
-                // Default to duplicate if an unknown operation is somehow passed
                 path = await this.duplicate(directory, user);
             }
 
-            // Sync all branches from template after initial setup
             await this.syncAllBranchesFromTemplate(directory, user, true);
         } finally {
-            if (path && typeof path === 'string') {
-                // cleanup
+            if (path) {
                 await fs.rm(path, { recursive: true, force: true });
             }
         }
@@ -123,21 +149,17 @@ export class WebsiteGeneratorService {
         return this.branchSyncService.syncFromTemplate(directory, user, cleanupExtraBranches);
     }
 
-    /**
-     * Remove repository for a directory
-     */
-    async removeRepository(directory: Directory, user: User): Promise<void> {
+    async removeRepository(directory: Directory, _user: User): Promise<void> {
         const directoryOwner = getDirectoryOwner(directory);
-        const websiteRepo = directory.getWebsiteRepo();
 
-        try {
-            await this.gitFacade.deleteRepository(directory.getRepoOwner(), websiteRepo, {
+        await this.gitFacade.deleteRepository(
+            directory.getRepoOwner(),
+            directory.getWebsiteRepo(),
+            {
                 userId: directoryOwner.id,
                 providerId: directory.gitProvider,
-            });
-        } catch (error) {
-            throw error;
-        }
+            },
+        );
     }
 
     public cleanup(directory: Directory) {

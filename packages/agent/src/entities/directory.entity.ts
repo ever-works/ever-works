@@ -134,6 +134,13 @@ export class Directory {
     @Column({ nullable: true })
     itemsCount?: number;
 
+    // Git committer overrides at directory level (optional — fallback to user/default)
+    @Column({ type: 'varchar', nullable: true })
+    committerName?: string | null;
+
+    @Column({ type: 'varchar', nullable: true })
+    committerEmail?: string | null;
+
     // Import Source FIELDS
     @Column('simple-json', { nullable: true })
     sourceRepository?: SourceRepository;
@@ -205,6 +212,17 @@ export class Directory {
 
     getRepoOwner(): string {
         return this.owner || this.user?.username || '';
+    }
+
+    /**
+     * Resolve the git committer for this directory.
+     * Priority: directory-level override → user-level override → user default (username/email)
+     */
+    resolveCommitter(user: User): { name: string; email: string } {
+        const userCommitter = user.asCommitter();
+        const name = this.committerName || userCommitter.name;
+        const email = this.committerEmail || userCommitter.email;
+        return { name, email };
     }
 
     /**

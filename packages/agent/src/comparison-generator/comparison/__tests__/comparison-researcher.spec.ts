@@ -96,7 +96,10 @@ describe('researchPair', () => {
 
         // Even though 3 queries each return the same URL, it should appear once
         expect(result.sources).toHaveLength(1);
-        expect(result.sources[0]).toBe('https://example.com/shared');
+        expect(result.sources[0]).toEqual({
+            title: 'shared result',
+            url: 'https://example.com/shared',
+        });
     });
 
     it('should call extractContent for top results', async () => {
@@ -126,7 +129,9 @@ describe('researchPair', () => {
         const result = await researchPair(pair, deps);
 
         // Should not throw, and should still have results from successful queries
-        expect(result.sources).toContain('https://ok.com');
+        expect(result.sources).toEqual(
+            expect.arrayContaining([{ title: 'ok', url: 'https://ok.com' }]),
+        );
     });
 
     it('should fall back to snippet when extraction fails', async () => {
@@ -197,6 +202,10 @@ describe('researchPair', () => {
 
         const result = await researchPair(pair, deps, { maxQueries: 1, maxExtractions: 3 });
 
-        expect(result.sources).toEqual(['https://a.com', 'https://b.com', 'https://c.com']);
+        expect(result.sources).toEqual([
+            { title: 'A', url: 'https://a.com' },
+            { title: 'B', url: 'https://b.com' },
+            { title: 'C', url: 'https://c.com' },
+        ]);
     });
 });

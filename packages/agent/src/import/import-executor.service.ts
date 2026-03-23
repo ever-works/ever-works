@@ -69,7 +69,7 @@ export class ImportExecutorService {
                 {
                     owner: source.owner,
                     repo: source.repo,
-                    committer: user.asCommitter(),
+                    committer: directory.resolveCommitter(user),
                 },
                 { userId: user.id, providerId: directory.gitProvider, token },
             );
@@ -264,7 +264,7 @@ export class ImportExecutorService {
                 {
                     owner: source.owner,
                     repo: source.repo,
-                    committer: user.asCommitter(),
+                    committer: directory.resolveCommitter(user),
                 },
                 { userId: user.id, providerId: directory.gitProvider, token },
             );

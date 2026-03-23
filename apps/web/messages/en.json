@@ -265,6 +265,27 @@
                     "successDefault": "Claude connection verified."
                 }
             }
+        },
+        "simWizard": {
+            "label": "SIM AI setup",
+            "title": "Set up SIM AI in two steps",
+            "subtitle": "Add your SIM AI API key and verify the connection to start delegating directory generation to SIM workflows.",
+            "stepIndex": "Step {index}",
+            "continueButton": "Continue",
+            "steps": {
+                "credentials": {
+                    "title": "Add API key",
+                    "description": "Paste your SIM AI API key from your dashboard. Optionally set a custom base URL if you use a self-hosted instance."
+                },
+                "verify": {
+                    "title": "Verify connection",
+                    "description": "Save your API key and run a live connection check against SIM AI.",
+                    "checkTitle": "Run a live SIM AI validation",
+                    "checkDescription": "Saving here verifies your API key is valid and can connect to SIM AI.",
+                    "button": "Verify and finish setup",
+                    "successDefault": "SIM AI connection verified."
+                }
+            }
         }
     },
     "dashboard": {
@@ -448,7 +469,16 @@
                 "configure": "Configure",
                 "noPluginsInCategory": "No plugins in this category",
                 "requiredSettingsMissing": "Required settings not configured",
-                "backToCategory": "Back to {category}"
+                "backToCategory": "Back to {category}",
+                "pipelineDefault": {
+                    "title": "Default Pipeline",
+                    "description": "Choose which pipeline is used by default when generating directory items.",
+                    "autoLabel": "Auto",
+                    "autoDescription": "Use the system-resolved pipeline for each directory",
+                    "enforceLabel": "Enforce this default",
+                    "enforceDescription": "The selected pipeline will be pre-selected in the generator form across all directories.",
+                    "saveFailed": "Failed to save pipeline default"
+                }
             },
             "profile": {
                 "title": "Profile Settings",
@@ -478,6 +508,12 @@
                     "resend": "Resend",
                     "sent": "Verification email sent. Check your inbox.",
                     "sendFailed": "Failed to send verification email. Please try again."
+                },
+                "committer": {
+                    "title": "Git Committer",
+                    "description": "Override the name and email used in git commits. Leave empty to use your account name ({defaultName}) and email ({defaultEmail}).",
+                    "nameLabel": "Committer Name",
+                    "emailLabel": "Committer Email"
                 }
             },
             "security": {
@@ -1680,6 +1716,15 @@
                             "targetBlank": "New tab"
                         }
                     }
+                },
+                "committer": {
+                    "title": "Git Committer",
+                    "description": "Override the committer name and email for git commits in this directory. Leave empty to use your user-level settings or account defaults.",
+                    "nameLabel": "Committer Name",
+                    "emailLabel": "Committer Email",
+                    "save": "Save Committer",
+                    "saved": "Committer settings saved",
+                    "saveFailed": "Failed to save committer settings"
                 }
             },
             "deploy": {

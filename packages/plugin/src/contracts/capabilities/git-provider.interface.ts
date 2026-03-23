@@ -72,6 +72,12 @@ export interface CreateRepoOptions {
 	readonly organization?: string;
 }
 
+export interface UpdateRepoOptions {
+	readonly isPrivate?: boolean;
+	readonly description?: string;
+	readonly defaultBranch?: string;
+}
+
 export interface ForkRepositoryOptions {
 	readonly name?: string;
 	readonly organization?: string;
@@ -200,12 +206,7 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 	getRepository(owner: string, repo: string, token: string): Promise<GitRepositoryWithPermissions | null>;
 	hasRepositoryAccess?(owner: string, repo: string, token: string): Promise<boolean>;
 	deleteRepository(owner: string, repo: string, token: string): Promise<void>;
-	updateRepository?(
-		owner: string,
-		repo: string,
-		data: { isPrivate?: boolean; description?: string },
-		token: string
-	): Promise<GitRepository>;
+	updateRepository?(owner: string, repo: string, data: UpdateRepoOptions, token: string): Promise<GitRepository>;
 
 	// User & organization
 	getUser(token: string): Promise<GitUser>;

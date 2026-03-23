@@ -64,6 +64,8 @@ export interface UpdateDirectoryDto {
     websiteTemplateUseBeta?: boolean;
     communityPrEnabled?: boolean;
     communityPrAutoClose?: boolean;
+    committerName?: string | null;
+    committerEmail?: string | null;
 }
 
 export interface DeleteDirectoryDto {
@@ -162,6 +164,9 @@ export interface Directory {
     // Import Source FIELDS
     sourceRepository?: SourceRepository;
     repoVisibility?: RepoVisibility;
+    // Git committer overrides
+    committerName?: string | null;
+    committerEmail?: string | null;
 }
 
 export interface DirectoriesResponse {
@@ -470,6 +475,12 @@ export interface ComparisonDimension {
     winner?: 'item_a' | 'item_b' | 'tie';
 }
 
+export interface ComparisonSource {
+    title: string;
+    url: string;
+    note?: string;
+}
+
 export interface ComparisonData {
     id: string;
     slug: string;
@@ -483,7 +494,7 @@ export interface ComparisonData {
     verdict: string;
     verdict_winner?: 'item_a' | 'item_b' | 'tie';
     dimensions: ComparisonDimension[];
-    sources: string[];
+    sources: ComparisonSource[];
     generated_at: string;
 }
 

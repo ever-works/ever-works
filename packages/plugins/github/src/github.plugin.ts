@@ -15,6 +15,7 @@ import type {
 	GitCommit,
 	GitPullRequest,
 	CreateRepoOptions,
+	UpdateRepoOptions,
 	CreatePROptions,
 	MergeOptions,
 	MergeResult,
@@ -150,7 +151,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 	async updateRepository(
 		owner: string,
 		repo: string,
-		data: { isPrivate?: boolean; description?: string },
+		data: UpdateRepoOptions,
 		token: string
 	): Promise<GitRepository> {
 		const settings = await this.getSettings();

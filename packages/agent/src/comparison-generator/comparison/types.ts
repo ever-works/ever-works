@@ -1,4 +1,9 @@
-import type { ItemData, ComparisonData, ComparisonDimension } from '@ever-works/contracts';
+import type {
+    ItemData,
+    ComparisonData,
+    ComparisonDimension,
+    ComparisonSource,
+} from '@ever-works/contracts';
 
 export interface ComparisonPair {
     readonly itemA: ItemData;
@@ -9,7 +14,7 @@ export interface ComparisonPair {
 
 export interface ComparisonResearch {
     readonly content: string;
-    readonly sources: string[];
+    readonly sources: ComparisonSource[];
 }
 
 export interface ComparisonGenerationResult {

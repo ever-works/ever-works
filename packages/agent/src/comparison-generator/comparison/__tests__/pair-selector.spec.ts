@@ -27,6 +27,22 @@ describe('buildPairKey', () => {
     it('should produce different keys for different pairs', () => {
         expect(buildPairKey('a', 'b')).not.toBe(buildPairKey('a', 'c'));
     });
+
+    it('should cap long pair keys with a deterministic hash suffix', () => {
+        const slugA =
+            'computer-vision-and-machine-learning-a-comprehensive-guide-to-open-source-mobile-and-visual-agents';
+        const slugB =
+            'computer-vision-a-survey-of-multimodal-agents-for-open-world-ai-and-operating-systems';
+
+        const keyA = buildPairKey(slugA, slugB);
+        const keyB = buildPairKey(slugB, slugA);
+
+        expect(keyA).toBe(keyB);
+        expect(keyA.length).toBeLessThanOrEqual(120);
+        expect(keyA).toContain('--');
+        expect(keyA).toMatch(/-[a-f0-9]{10}$/);
+        expect(keyA.startsWith('computer-vision-a-survey-of-multimodal-agents')).toBe(true);
+    });
 });
 
 describe('selectNextPair', () => {

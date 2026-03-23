@@ -38,7 +38,7 @@ export class ItemSubmissionService {
             // Use directory owner's credentials (they set up the repos)
             // but use current user as committer for attribution
             const directoryOwner = directory.user as User;
-            const committer = user.asCommitter();
+            const committer = directory.resolveCommitter(user);
 
             const repo = directory.getDataRepo();
             const owner = directory.getRepoOwner();
@@ -176,7 +176,7 @@ export class ItemSubmissionService {
                 provider,
                 dest,
                 `Add ${itemWithMarkdown.name}`,
-                user.asCommitter(),
+                directory.resolveCommitter(user),
             );
 
             // Push changes
@@ -283,7 +283,7 @@ export class ItemSubmissionService {
             // Use directory owner's credentials (they set up the repos)
             // but use current user as committer for attribution
             const directoryOwner = directory.user as User;
-            const committer = user.asCommitter();
+            const committer = directory.resolveCommitter(user);
 
             const repo = directory.getDataRepo();
             const owner = directory.getRepoOwner();
@@ -362,7 +362,12 @@ export class ItemSubmissionService {
             const commitMessage = removeItemDto.reason
                 ? `Remove ${itemData.name} - ${removeItemDto.reason}`
                 : `Remove ${itemData.name}`;
-            await this.gitFacade.commit(provider, dest, commitMessage, user.asCommitter());
+            await this.gitFacade.commit(
+                provider,
+                dest,
+                commitMessage,
+                directory.resolveCommitter(user),
+            );
 
             // Push changes
             await this.gitFacade.push(
@@ -438,7 +443,7 @@ export class ItemSubmissionService {
             // Use directory owner's credentials (they set up the repos)
             // but use current user as committer for attribution
             const directoryOwner = directory.user as User;
-            const committer = user.asCommitter();
+            const committer = directory.resolveCommitter(user);
 
             const repo = directory.getDataRepo();
             const owner = directory.getRepoOwner();
@@ -530,7 +535,12 @@ export class ItemSubmissionService {
             const commitMessage = sourceUrlChanged
                 ? `Update ${updatedItem.name} source`
                 : `Update ${updatedItem.name} metadata`;
-            await this.gitFacade.commit(provider, dest, commitMessage, user.asCommitter());
+            await this.gitFacade.commit(
+                provider,
+                dest,
+                commitMessage,
+                directory.resolveCommitter(user),
+            );
             await this.gitFacade.push(
                 { dir: dest },
                 { userId: directoryOwner.id, providerId: directory.gitProvider },

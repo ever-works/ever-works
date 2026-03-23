@@ -183,7 +183,7 @@ export class DataGeneratorService {
         // Use directory owner's credentials (they set up the repos)
         // but use current user as committer for attribution
         const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
         const owner = directory.getRepoOwner();
         const repo = directory.getDataRepo();
 
@@ -364,7 +364,7 @@ export class DataGeneratorService {
                 provider,
                 data.dir,
                 existed ? 'update items' : 'init repository',
-                user.asCommitter(),
+                directory.resolveCommitter(user),
             );
 
             this.logger.debug('files written and committed.');
@@ -469,7 +469,12 @@ export class DataGeneratorService {
                         ? `add ${newItemsCount} new item${newItemsCount > 1 ? 's' : ''}${updatedItemsCount > 0 ? `, update ${updatedItemsCount}` : ''}`
                         : `update ${updatedItemsCount} item${updatedItemsCount > 1 ? 's' : ''}`;
 
-                await this.gitFacade.commit(provider, data.dir, commitMessage, user.asCommitter());
+                await this.gitFacade.commit(
+                    provider,
+                    data.dir,
+                    commitMessage,
+                    directory.resolveCommitter(user),
+                );
 
                 this.logger.debug(`Batch committed ${newItems.length} items`);
             }
@@ -573,7 +578,7 @@ export class DataGeneratorService {
     ): Promise<UpdateMarkdownTemplateResult> {
         // Use directory owner's credentials (they set up the repos)
         const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
         const owner = directory.getRepoOwner();
         const repo = directory.getDataRepo();
 
@@ -710,7 +715,7 @@ export class DataGeneratorService {
      */
     async saveCategories(directory: Directory, user: User, categories: Category[]) {
         const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
         const repo = directory.getDataRepo();
 
         const dest = await this.gitFacade.cloneOrPull(
@@ -740,7 +745,7 @@ export class DataGeneratorService {
      */
     async saveTags(directory: Directory, user: User, tags: Tag[]) {
         const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
         const repo = directory.getDataRepo();
 
         const dest = await this.gitFacade.cloneOrPull(
@@ -765,7 +770,7 @@ export class DataGeneratorService {
      */
     async saveCollections(directory: Directory, user: User, collections: Collection[]) {
         const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
         const repo = directory.getDataRepo();
 
         const dest = await this.gitFacade.cloneOrPull(
@@ -885,7 +890,7 @@ export class DataGeneratorService {
         companyWebsite?: string,
     ): Promise<void> {
         const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
 
         const data = await this.repositoryData(directory, user);
         const currentConfig = await data.getConfig();
@@ -935,7 +940,7 @@ export class DataGeneratorService {
     private async repositoryData(directory: Directory, user: User) {
         // Use directory owner's credentials (they set up the repos)
         const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
 
         const repo = directory.getDataRepo();
 
@@ -1094,7 +1099,7 @@ export class DataGeneratorService {
      */
     private async getExistingData(directory: Directory, user: User) {
         const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
         const repo = directory.getDataRepo();
 
         try {
@@ -1211,7 +1216,7 @@ export class DataGeneratorService {
             };
         },
     ): Promise<InitializeResult> {
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
 
         try {
             // Create the data repository
@@ -1366,7 +1371,7 @@ export class DataGeneratorService {
             commitMessage?: string;
         } = { updateWithPullRequest: true },
     ): Promise<InitializeResult> {
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
         const repoName = directory.getDataRepo();
         const repoOwner = directory.getRepoOwner();
 

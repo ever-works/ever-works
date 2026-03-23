@@ -987,3 +987,31 @@ export async function updateCommunityPrSettings(
         };
     }
 }
+
+export async function updateCommitterSettings(
+    directoryId: string,
+    settings: {
+        committerName?: string | null;
+        committerEmail?: string | null;
+    },
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await directoryAPI.update(directoryId, settings);
+        revalidatePath(`/directories/${directoryId}/settings`);
+
+        return {
+            success: response.status === 'success',
+        };
+    } catch (error) {
+        console.error('Failed to update committer settings:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to update committer settings',
+        };
+    }
+}
