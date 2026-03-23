@@ -70,8 +70,10 @@ export function ComparisonGenerationProgress({
     const currentStageIndex = currentStage ? STAGES.indexOf(currentStage) : -1;
 
     // Only show stages up to writing_extended if it's active; otherwise hide it
+    // Keep writing_extended visible once it has started or completed,
+    // so the progress bar doesn't shrink when transitioning to saving
     const visibleStages = STAGES.filter(
-        (s) => s !== 'writing_extended' || currentStage === 'writing_extended',
+        (s) => s !== 'writing_extended' || currentStageIndex >= STAGES.indexOf('writing_extended'),
     );
 
     return (
