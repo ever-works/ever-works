@@ -2530,6 +2530,16 @@
         "global": {
             "title": "Something went wrong!",
             "tryAgain": "Try again"
+        },
+        "notFound": {
+            "title": "Page not found",
+            "description": "The page you're looking for doesn't exist or has been moved.",
+            "backHome": "Back to Dashboard"
+        },
+        "dashboard": {
+            "title": "Something went wrong",
+            "description": "An unexpected error occurred. Please try again or contact support if the problem persists.",
+            "tryAgain": "Try again"
         }
     },
     "metadata": {
