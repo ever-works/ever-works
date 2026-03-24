@@ -55,6 +55,7 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
                     onWidthChange={handleSidebarWidthChange}
                     isCollapsed={sidebarCollapsed}
                     onCollapsedChange={handleSidebarCollapsedChange}
+                    onOpenHelp={openHelp}
                 />
 
                 <div className="flex-1 flex flex-col overflow-hidden">

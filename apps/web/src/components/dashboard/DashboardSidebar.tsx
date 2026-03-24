@@ -25,6 +25,8 @@ import {
     HelpCircle,
     MessageSquare,
     Keyboard,
+    ChevronUp,
+    Mail,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -49,6 +51,7 @@ interface DashboardSidebarProps {
     onWidthChange?: (w: number) => void;
     isCollapsed?: boolean;
     onCollapsedChange?: (v: boolean) => void;
+    onOpenHelp?: () => void;
 }
 
 // Only shows tooltip when collapsed — transparent passthrough when expanded
@@ -77,6 +80,7 @@ export function DashboardSidebar({
     onWidthChange,
     isCollapsed = false,
     onCollapsedChange,
+    onOpenHelp,
 }: DashboardSidebarProps) {
     const pathname = usePathname();
     const [activeMode, setActiveMode] = useState<'menu' | 'chat'>('menu');
@@ -386,7 +390,7 @@ export function DashboardSidebar({
                         <DropdownMenu>
                             <DropdownMenuTrigger
                                 className={cn(
-                                    'w-full rounded-lg transition-colors',
+                                    'w-full rounded-lg transition-colors cursor-pointer',
                                     'hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
                                     isCollapsed ? 'p-1 flex justify-center' : 'p-2',
                                 )}
@@ -419,14 +423,17 @@ export function DashboardSidebar({
                                         )}
                                     </div>
                                     {!isCollapsed && (
-                                        <div className="flex-1 min-w-0 text-left">
-                                            <p className="text-sm font-medium text-text dark:text-text-dark truncate">
-                                                {user.username}
-                                            </p>
-                                            <p className="text-xs text-text-muted dark:text-text-muted-dark truncate">
-                                                {user.email}
-                                            </p>
-                                        </div>
+                                        <>
+                                            <div className="flex-1 min-w-0 text-left">
+                                                <p className="text-sm font-medium text-text dark:text-text-dark truncate">
+                                                    {user.username}
+                                                </p>
+                                                <p className="text-xs text-text-muted dark:text-text-muted-dark truncate">
+                                                    {user.email}
+                                                </p>
+                                            </div>
+                                            <ChevronUp className="w-4 h-4 shrink-0 text-text-muted dark:text-text-muted-dark" />
+                                        </>
                                     )}
                                 </div>
                             </DropdownMenuTrigger>
@@ -448,10 +455,7 @@ export function DashboardSidebar({
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                     onClick={() => {
-                                        window.open(
-                                            'https://github.com/ever-works/ever-works-docs',
-                                            '_blank',
-                                        );
+                                        window.open('https://docs.ever.works', '_blank');
                                     }}
                                 >
                                     <HelpCircle className="w-4 h-4 mr-2 shrink-0" />
@@ -459,16 +463,13 @@ export function DashboardSidebar({
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                     onClick={() => {
-                                        window.open(
-                                            'https://github.com/ever-works/ever-works/issues',
-                                            '_blank',
-                                        );
+                                        window.open('mailto:support@ever.works');
                                     }}
                                 >
-                                    <MessageSquare className="w-4 h-4 mr-2 shrink-0" />
+                                    <Mail className="w-4 h-4 mr-2 shrink-0" />
                                     {t('profileMenu.support')}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={onOpenHelp}>
                                     <Keyboard className="w-4 h-4 mr-2 shrink-0" />
                                     {t('profileMenu.keyboardShortcuts')}
                                 </DropdownMenuItem>
