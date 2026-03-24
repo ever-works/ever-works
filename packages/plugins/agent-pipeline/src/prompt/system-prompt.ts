@@ -13,7 +13,7 @@ export interface PromptOptions {
 /**
  * Default template for the parent orchestrator system prompt.
  * Variables: {date}, {existingItemsSection}, {maxPages},
- *   {modificationSection}, {directorySection}
+ *   {modificationSection}, {workflowHint}, {directorySection}
  */
 export const DEFAULT_PARENT_SYSTEM_PROMPT = `You are a research orchestrator for directory content generation. Your job is to find relevant items through web search and dispatch URLs to workers for extraction, or to dispatch modification instructions when the user wants to reorganize existing items.
 
@@ -56,10 +56,7 @@ When creating NEW items:
 - Add 1-3 specific, descriptive tags per item.
 - Maintain category balance — avoid putting most items in a single category.
 
-## Important
-- The user's prompt determines what to do. Read it carefully before choosing a workflow.
-- If the prompt asks to modify, reorganize, or restructure existing items — use the Modification Workflow. Do NOT search the web or create new items.
-- If the prompt asks to generate or find new items — use the Generation Workflow.
+{workflowHint}
 {directorySection}`;
 
 /**
@@ -105,6 +102,20 @@ export function buildParentSystemPromptVariables(
 			'- Use `findItems` to verify items exist before referencing them.\n';
 	}
 
+	let workflowHint: string;
+	if (hasExisting) {
+		workflowHint =
+			'## Important\n' +
+			"- The user's prompt determines what to do. Read it carefully before choosing a workflow.\n" +
+			'- If the prompt asks to modify, reorganize, or restructure existing items — use the Modification Workflow. Do NOT search the web or create new items.\n' +
+			'- If the prompt asks to generate or find new items — use the Generation Workflow.';
+	} else {
+		workflowHint =
+			'## Important\n' +
+			"- The user's prompt determines what to do. Read it carefully before starting.\n" +
+			'- Follow the Generation Workflow above.';
+	}
+
 	let directorySection = '';
 	if (directory.description) {
 		directorySection = `\n## Directory Context\nDirectory: ${directory.name}\nDescription: ${directory.description}`;
@@ -115,6 +126,7 @@ export function buildParentSystemPromptVariables(
 		existingItemsSection,
 		maxPages: String(maxPages),
 		modificationSection,
+		workflowHint,
 		directorySection
 	};
 }
