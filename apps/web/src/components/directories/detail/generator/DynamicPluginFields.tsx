@@ -2,13 +2,7 @@
 
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Select } from '@/components/ui/select';
 import {
     Accordion,
     AccordionItem,
@@ -225,26 +219,16 @@ export function DynamicPluginFields({
                                     handleFieldChange(field.name, val === '__none__' ? '' : val)
                                 }
                             >
-                                <SelectTrigger>
-                                    <SelectValue
-                                        placeholder={field.placeholder || t('selectOption')}
-                                    />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {!field.validation?.required && (
-                                        <SelectItem value="__none__">
-                                            {t('selectOption')}
-                                        </SelectItem>
-                                    )}
-                                    {field.options?.map((option) => (
-                                        <SelectItem
-                                            key={String(option.value)}
-                                            value={String(option.value)}
-                                        >
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
+                                {!field.validation?.required && (
+                                    <option value="__none__">
+                                        {field.placeholder || t('selectOption')}
+                                    </option>
+                                )}
+                                {field.options?.map((option) => (
+                                    <option key={String(option.value)} value={String(option.value)}>
+                                        {option.label}
+                                    </option>
+                                ))}
                             </Select>
                             {field.description && (
                                 <p className="mt-1.5 text-xs text-text-muted dark:text-text-muted-dark">

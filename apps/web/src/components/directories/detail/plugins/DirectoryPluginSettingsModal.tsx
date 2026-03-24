@@ -219,6 +219,7 @@ export function DirectoryPluginSettingsModal({
                             onClick={handleSaveAndClose}
                             disabled={!hasChanges || isSaving}
                             loading={isSaving}
+                            className="bg-primary-600"
                         >
                             <Save className="w-3.5 h-3.5 mr-1" />
                             {t('save')}

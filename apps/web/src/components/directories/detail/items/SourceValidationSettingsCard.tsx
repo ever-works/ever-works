@@ -4,13 +4,7 @@ import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { FieldCard } from '@/components/directories/detail/shared';
 import { DirectoryScheduleCadence } from '@/lib/api/enums';
@@ -98,16 +92,11 @@ export function SourceValidationSettingsCard({
                                 updateForm({ cadence: val as DirectoryScheduleCadence })
                             }
                         >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {availableCadences.map((c) => (
-                                    <SelectItem key={c} value={c}>
-                                        {tCadence(`cadence.${c}`)}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
+                            {availableCadences.map((c) => (
+                                <option key={c} value={c}>
+                                    {tCadence(`cadence.${c}`)}
+                                </option>
+                            ))}
                         </Select>
                     </FieldCard>
                 )}

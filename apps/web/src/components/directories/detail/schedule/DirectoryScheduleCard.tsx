@@ -8,13 +8,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils/cn';
 import {
@@ -344,24 +338,18 @@ function ScheduleForm({
                             })
                         }
                     >
-                        <SelectTrigger>
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {cadenceOrder.map((cadence) => (
-                                <SelectItem
-                                    key={cadence}
-                                    value={cadence}
-                                    disabled={
-                                        subscriptionsEnabled &&
-                                        !allowances.find((item) => item.cadence === cadence)
-                                            ?.allowed
-                                    }
-                                >
-                                    {t(`cadence.${cadence}`)}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
+                        {cadenceOrder.map((cadence) => (
+                            <option
+                                key={cadence}
+                                value={cadence}
+                                disabled={
+                                    subscriptionsEnabled &&
+                                    !allowances.find((item) => item.cadence === cadence)?.allowed
+                                }
+                            >
+                                {t(`cadence.${cadence}`)}
+                            </option>
+                        ))}
                     </Select>
 
                     {subscriptionsEnabled && (
@@ -431,17 +419,12 @@ function ScheduleForm({
                                 })
                             }
                         >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={DirectoryScheduleBillingMode.SUBSCRIPTION}>
-                                    {t('billing.subscription')}
-                                </SelectItem>
-                                <SelectItem value={DirectoryScheduleBillingMode.USAGE}>
-                                    {t('billing.usage')}
-                                </SelectItem>
-                            </SelectContent>
+                            <option value={DirectoryScheduleBillingMode.SUBSCRIPTION}>
+                                {t('billing.subscription')}
+                            </option>
+                            <option value={DirectoryScheduleBillingMode.USAGE}>
+                                {t('billing.usage')}
+                            </option>
                         </Select>
                     </FieldCard>
                 )}
@@ -506,18 +489,13 @@ function PipelineOverrideField({
                 value={value ?? '__inherit__'}
                 onValueChange={(val) => onChange(val === '__inherit__' ? undefined : val)}
             >
-                <SelectTrigger>
-                    <SelectValue placeholder={t('pipeline.inherit')} />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="__inherit__">{t('pipeline.inherit')}</SelectItem>
-                    {providers.map((p) => (
-                        <SelectItem key={p.id} value={p.id} disabled={!p.configured}>
-                            {p.name}
-                            {!p.configured ? ` (${t('pipeline.notConfigured')})` : ''}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
+                <option value="__inherit__">{t('pipeline.inherit')}</option>
+                {providers.map((p) => (
+                    <option key={p.id} value={p.id} disabled={!p.configured}>
+                        {p.name}
+                        {!p.configured ? ` (${t('pipeline.notConfigured')})` : ''}
+                    </option>
+                ))}
             </Select>
         </FieldCard>
     );

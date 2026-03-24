@@ -29,7 +29,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
                     id={textareaId}
                     ref={ref}
                     className={cn(
-                        'w-full rounded-lg transition-colors outline-none resize-none',
+                        'w-full rounded-lg transition-colors outline-none resize-none text-sm',
                         'text-text dark:text-text-dark placeholder-text-muted dark:placeholder-text-muted-dark',
                         'border border-border dark:border-border-dark',
                         'focus:border-primary',

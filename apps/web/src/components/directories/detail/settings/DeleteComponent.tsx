@@ -3,7 +3,6 @@ import { DeleteDirectoryDto, Directory } from '@/lib/api/types-only';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
@@ -20,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { useDirectoryPermissions } from '../DirectoryDetailContext';
+import { TriangleAlertIcon } from 'lucide-react';
 
 export function DeleteComponent({ directory }: { directory: Directory }) {
     const permissions = useDirectoryPermissions();
@@ -38,10 +38,6 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
         delete_markdown_repository: false,
         delete_website_repository: false,
     });
-
-    const handleOpenDialog = () => {
-        setShowDeleteDialog(true);
-    };
 
     const handleCloseDialog = () => {
         setShowDeleteDialog(false);
@@ -76,50 +72,59 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
 
     return (
         <>
-            <div
-                className={cn(
-                    'rounded-lg border overflow-hidden',
-                    'bg-red-50 dark:bg-red-950/30',
-                    'border-red-200 dark:border-red-900',
-                )}
-            >
-                <div className="px-5 py-3.5 border-b border-red-200 dark:border-red-900">
-                    <h3 className="text-sm font-semibold text-red-800 dark:text-red-200">
+            {/* Danger zone card */}
+            <div className="rounded-xl border border-red-200 dark:border-red-900/60 overflow-hidden">
+                <div className="flex items-center gap-2.5 px-5 py-3.5 bg-red-50 dark:bg-red-950/20 border-b border-red-200 dark:border-red-900/60">
+                    <TriangleAlertIcon className="size-4 text-red-500 dark:text-red-400 shrink-0" />
+                    <h3 className="text-sm font-semibold text-red-700 dark:text-red-300">
                         {t('dangerZone')}
                     </h3>
                 </div>
-                <div className="px-5 py-4">
-                    <p className="text-xs text-red-700 dark:text-red-300 mb-4">
+
+                <div className="flex items-center justify-between gap-4 px-5 py-4 bg-white dark:bg-surface-dark">
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                         {t('deleteWarning')}
                     </p>
-
                     <Button
-                        onClick={handleOpenDialog}
+                        onClick={() => setShowDeleteDialog(true)}
                         variant="danger"
-                        className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
+                        size="sm"
                         title={isGenerating ? t('cantDeleteWhileGenerating') : undefined}
                         disabled={isPending || isGenerating}
+                        className="shrink-0"
                     >
                         {t('deleteButton')}
                     </Button>
                 </div>
             </div>
 
+            {/* Confirm dialog */}
             <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-lg">
                     <DialogClose onClose={handleCloseDialog} />
                     <DialogHeader>
-                        <DialogTitle className="text-lg font-semibold text-red-800 dark:text-red-200">
-                            {t('deleteConfirm')}
-                        </DialogTitle>
-                        <DialogDescription>{t('deleteConfirmDetail')}</DialogDescription>
+                        <div className="flex items-center gap-3 mb-1">
+                            <span className="flex items-center justify-center size-9 rounded-full bg-red-100 dark:bg-red-950/50 shrink-0">
+                                <TriangleAlertIcon className="size-4 text-red-600 dark:text-red-400" />
+                            </span>
+                            <DialogTitle className="text-base font-semibold text-text dark:text-text-dark">
+                                {t('deleteConfirm')}
+                            </DialogTitle>
+                        </div>
+                        <DialogDescription className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                            {t('deleteConfirmDetail')}
+                        </DialogDescription>
                     </DialogHeader>
 
                     <div className="space-y-4">
-                        {/* Repository deletion options */}
-                        <div className="bg-card dark:bg-card-dark border border-card-border dark:border-card-border-dark rounded-lg p-4">
-                            <p className="text-sm font-medium mb-3">{t('deleteOptions')}</p>
-                            <div className="space-y-2">
+                        {/* Repository options */}
+                        <div className="rounded-lg border border-card-border dark:border-card-border-dark divide-y divide-card-border dark:divide-card-border-dark">
+                            <div className="px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                                    {t('deleteOptions')}
+                                </p>
+                            </div>
+                            <div className="px-4 py-3">
                                 <Checkbox
                                     checked={deleteOptions.delete_data_repository || false}
                                     onChange={(e) =>
@@ -132,6 +137,8 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
                                     description={t('deleteDataRepositoryDescription')}
                                     variant="form"
                                 />
+                            </div>
+                            <div className="px-4 py-3">
                                 <Checkbox
                                     checked={deleteOptions.delete_markdown_repository || false}
                                     onChange={(e) =>
@@ -144,6 +151,8 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
                                     description={t('deleteMarkdownRepositoryDescription')}
                                     variant="form"
                                 />
+                            </div>
+                            <div className="px-4 py-3">
                                 <Checkbox
                                     checked={deleteOptions.delete_website_repository || false}
                                     onChange={(e) =>
@@ -159,12 +168,12 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
                             </div>
                         </div>
 
-                        {/* Name confirmation input */}
-                        <div className="bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded-lg p-4">
-                            <p className="text-sm font-medium text-red-900 dark:text-red-100 mb-2">
+                        {/* Name confirmation */}
+                        <div className="space-y-2">
+                            <p className="text-sm font-medium text-text dark:text-text-dark">
                                 {t('confirmDirectoryName')}
                             </p>
-                            <p className="text-xs text-red-800 dark:text-red-200 mb-3">
+                            <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
                                 {t('confirmDirectoryNameDescription', { name: directory.name })}
                             </p>
                             <Input
@@ -173,7 +182,6 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
                                 onChange={(e) => setConfirmationName(e.target.value)}
                                 placeholder={directory.name}
                                 variant="form"
-                                className="bg-white dark:bg-gray-900"
                             />
                         </div>
                     </div>
@@ -182,8 +190,8 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
                         <Button
                             onClick={handleCloseDialog}
                             disabled={isPending}
-                            variant="ghost"
-                            className="bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600"
+                            variant="secondary"
+                            size="sm"
                         >
                             {t('cancel')}
                         </Button>
@@ -192,7 +200,7 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
                             disabled={isDeleteDisabled}
                             loading={isPending}
                             variant="danger"
-                            className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                            size="sm"
                         >
                             {t('deleteConfirmButton')}
                         </Button>

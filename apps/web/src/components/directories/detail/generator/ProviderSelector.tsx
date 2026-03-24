@@ -7,7 +7,7 @@ import { resolveEffectiveDefault } from '@ever-works/plugin';
 import { useTranslations } from 'next-intl';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { Tooltip } from '@/components/ui/tooltip';
-import { Check } from 'lucide-react';
+import { Check, Network } from 'lucide-react';
 
 interface ProviderSelectorProps {
     label: string;
@@ -36,9 +36,11 @@ export function ProviderSelector({
     }
 
     return (
-        <div className="flex items-center gap-3 py-2">
-            <div className="w-32 shrink-0">
-                <span className="text-xs text-text-muted dark:text-text-muted-dark">{label}</span>
+        <div className="flex items-center gap-4 px-5 py-3">
+            <div className="w-36 shrink-0">
+                <code className="text-xs font-mono font-medium text-text-secondary dark:text-text-secondary-dark bg-surface-secondary dark:bg-surface-secondary-dark px-1.5 py-0.5 rounded">
+                    {label}
+                </code>
             </div>
 
             <div className="flex-1 flex flex-wrap gap-1.5">
@@ -61,10 +63,11 @@ export function ProviderSelector({
                                 provider.id === effectiveDefaultId
                             }
                             className={cn(
-                                'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-all border',
+                                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all duration-150',
+                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                                 isActive
-                                    ? 'border-primary bg-primary/10 text-primary font-medium'
-                                    : 'border-card-border dark:border-card-border-dark bg-card dark:bg-card-dark hover:border-primary/40 text-text dark:text-text-dark',
+                                    ? 'border-primary/40 bg-primary/10 text-primary shadow-sm'
+                                    : 'border-border dark:border-border-dark bg-transparent text-text-secondary dark:text-text-secondary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-text dark:hover:text-text-dark hover:border-primary/30',
                                 !provider.configured && 'opacity-40 cursor-not-allowed',
                                 disabled && 'opacity-50 cursor-not-allowed',
                             )}
@@ -81,7 +84,7 @@ export function ProviderSelector({
                                 {provider.name}
                                 {!provider.configured && ` (${t('notConfigured')})`}
                             </span>
-                            {isActive && <Check className="w-3 h-3" />}
+                            {isActive && <Check className="w-3 h-3 ml-0.5" />}
                         </button>
                     );
 
@@ -116,20 +119,17 @@ export function PipelineModeSelector({
         selectedPipeline ?? pipelineProviders.find((p) => p.isDefault)?.id ?? null;
 
     return (
-        <div
-            className={cn(
-                'rounded-lg border overflow-hidden',
-                'bg-card dark:bg-card-primary-dark/30',
-                'border-card-border dark:border-card-border-dark',
-            )}
-        >
-            <div className="px-4 py-3 border-b border-card-border dark:border-card-border-dark">
-                <h4 className="text-sm font-semibold text-text dark:text-text-dark">
+        <div className="rounded-xl border overflow-hidden border-border dark:border-border-dark bg-surface dark:bg-surface-dark">
+            <div className="px-5 py-3.5 border-b border-border dark:border-border-dark bg-surface-secondary/50 dark:bg-surface-secondary-dark/50 flex items-center gap-3">
+                <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Network className="w-4 h-4 text-primary" />
+                </div>
+                <h4 className="text-sm font-semibold text-text dark:text-text-dark leading-tight">
                     {t('pipelineMode')}
                 </h4>
             </div>
 
-            <div className="divide-y divide-card-border dark:divide-card-border-dark">
+            <div className="divide-y divide-border dark:divide-border-dark">
                 {pipelineProviders.map((provider) => {
                     const isActive = effectiveSelected === provider.id;
                     const row = (
@@ -138,10 +138,10 @@ export function PipelineModeSelector({
                             onClick={() => onChange(provider.id)}
                             disabled={!provider.configured}
                             className={cn(
-                                'w-full flex items-start gap-3 px-4 py-1 text-left transition-colors',
+                                'w-full flex items-start gap-3 px-5 py-3 text-left transition-colors',
                                 isActive
                                     ? 'bg-primary/5 dark:bg-primary/10'
-                                    : 'hover:bg-surface dark:hover:bg-surface-dark',
+                                    : 'hover:bg-surface-secondary/50 dark:hover:bg-surface-secondary-dark/50',
                                 !provider.configured && 'opacity-50 cursor-not-allowed',
                             )}
                         >
@@ -150,7 +150,7 @@ export function PipelineModeSelector({
                                     'mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors',
                                     isActive
                                         ? 'border-primary'
-                                        : 'border-card-border dark:border-card-border-dark',
+                                        : 'border-border dark:border-border-dark',
                                 )}
                             >
                                 {isActive && <div className="w-2 h-2 rounded-full bg-primary" />}

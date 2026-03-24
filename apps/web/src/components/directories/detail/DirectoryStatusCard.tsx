@@ -44,6 +44,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                         }
                         variant="primary"
                         size="sm"
+                        className="dark:bg-primary-600"
                     >
                         {t('notStarted.action')}
                     </Button>

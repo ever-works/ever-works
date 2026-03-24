@@ -1,12 +1,6 @@
 'use client';
 
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { GenerationMethod } from '@/lib/api/enums';
 import { cn } from '@/lib/utils/cn';
@@ -60,17 +54,10 @@ export function UpdateItemsFields({
                             onChange({ generation_method: val as GenerationMethod })
                         }
                     >
-                        <SelectTrigger>
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={GenerationMethod.CREATE_UPDATE}>
-                                {t('methodCreateUpdate')}
-                            </SelectItem>
-                            <SelectItem value={GenerationMethod.RECREATE}>
-                                {t('methodRecreate')}
-                            </SelectItem>
-                        </SelectContent>
+                        <option value={GenerationMethod.CREATE_UPDATE}>
+                            {t('methodCreateUpdate')}
+                        </option>
+                        <option value={GenerationMethod.RECREATE}>{t('methodRecreate')}</option>
                     </Select>
                 </div>
 

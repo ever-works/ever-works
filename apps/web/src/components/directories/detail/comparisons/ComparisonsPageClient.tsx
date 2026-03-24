@@ -23,13 +23,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Select } from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -377,22 +371,15 @@ export function ComparisonsPageClient({
                                             handleProviderChange(val === '__default__' ? '' : val)
                                         }
                                     >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="__default__">
-                                                {t('aiModel.default')}
-                                            </SelectItem>
-                                            {availableProviders.map((p) => (
-                                                <SelectItem key={p.id} value={p.id}>
-                                                    {p.name}
-                                                    {p.isDefault
-                                                        ? ` ${t('aiModel.defaultSuffix')}`
-                                                        : ''}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
+                                        <option value="__default__">{t('aiModel.default')}</option>
+                                        {availableProviders.map((p) => (
+                                            <option key={p.id} value={p.id}>
+                                                {p.name}
+                                                {p.isDefault
+                                                    ? ` ${t('aiModel.defaultSuffix')}`
+                                                    : ''}
+                                            </option>
+                                        ))}
                                     </Select>
                                 </div>
                                 <div className="flex-1">
@@ -406,21 +393,16 @@ export function ComparisonsPageClient({
                                         }
                                         disabled={!aiProvider || isLoadingModels}
                                     >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="__provider_default__">
-                                                {isLoadingModels
-                                                    ? t('aiModel.loadingModels')
-                                                    : t('aiModel.providerDefault')}
-                                            </SelectItem>
-                                            {availableModels.map((m) => (
-                                                <SelectItem key={m.id} value={m.id}>
-                                                    {m.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
+                                        <option value="__provider_default__">
+                                            {isLoadingModels
+                                                ? t('aiModel.loadingModels')
+                                                : t('aiModel.providerDefault')}
+                                        </option>
+                                        {availableModels.map((m) => (
+                                            <option key={m.id} value={m.id}>
+                                                {m.name}
+                                            </option>
+                                        ))}
                                     </Select>
                                 </div>
                                 <Button

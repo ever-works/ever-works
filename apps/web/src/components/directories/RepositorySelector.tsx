@@ -1,15 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectLabel,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -22,8 +14,6 @@ import {
     ChevronDown,
     ChevronUp,
     RefreshCw,
-    Building2,
-    User,
 } from 'lucide-react';
 import { getUserRepositories } from '@/app/actions/dashboard/directories';
 import { getGitProviderOrganizations } from '@/app/actions/dashboard/organizations';
@@ -77,30 +67,18 @@ function OwnerFilter({
                 value={selectedOwner ?? '__personal__'}
                 onValueChange={(val) => onChange(val === '__personal__' ? null : val)}
                 disabled={orgsLoading}
+                size="sm"
             >
-                <SelectTrigger size="sm">
-                    <div className="flex items-center gap-2">
-                        {selectedOwner ? (
-                            <Building2 className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
-                        ) : (
-                            <User className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
-                        )}
-                        <SelectValue />
-                    </div>
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="__personal__">{t('personalAccount')}</SelectItem>
-                    {organizations.length > 0 && (
-                        <SelectGroup>
-                            <SelectLabel>{t('organizations')}</SelectLabel>
-                            {organizations.map((org) => (
-                                <SelectItem key={org.id} value={org.login}>
-                                    {org.login}
-                                </SelectItem>
-                            ))}
-                        </SelectGroup>
-                    )}
-                </SelectContent>
+                <option value="__personal__">{t('personalAccount')}</option>
+                {organizations.length > 0 && (
+                    <optgroup label={t('organizations')}>
+                        {organizations.map((org) => (
+                            <option key={org.id} value={org.login}>
+                                {org.login}
+                            </option>
+                        ))}
+                    </optgroup>
+                )}
             </Select>
         </div>
     );

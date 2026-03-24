@@ -280,7 +280,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                     disabled={isPending}
                     loading={isPending}
                     variant="primary"
-                    size="lg"
+                    size="sm"
                 >
                     {getButtonText()}
                 </Button>
@@ -289,7 +289,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                     onClick={() => router.back()}
                     disabled={isPending}
                     variant="secondary"
-                    size="lg"
+                    size="sm"
                 >
                     {t('cancel')}
                 </Button>
@@ -314,6 +314,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                         <Button
                             type="button"
                             variant="secondary"
+                            size="sm"
                             onClick={() => setConfirmRecreate(false)}
                             disabled={isPending}
                         >

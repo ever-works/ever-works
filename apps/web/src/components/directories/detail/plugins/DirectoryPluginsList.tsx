@@ -7,6 +7,7 @@ import { DirectoryPluginCard } from './DirectoryPluginCard';
 import { CapabilitySelector } from './CapabilitySelector';
 import { cn } from '@/lib/utils/cn';
 import { HIDDEN_CAPABILITIES } from '@/lib/utils/plugin-category-icons';
+import { Layers } from 'lucide-react';
 
 interface DirectoryPluginsListProps {
     directoryId: string;
@@ -53,15 +54,21 @@ export function DirectoryPluginsList({
         <div className="space-y-6">
             {/* Capability Providers Section */}
             {capabilities.length > 0 && (
-                <div className="bg-surface dark:bg-surface-dark rounded-lg border border-border dark:border-border-dark p-4">
-                    <h3 className="font-medium text-text dark:text-text-dark mb-3">
-                        {t('capabilityProviders')}
-                    </h3>
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
-                        {t('capabilityProvidersDescription')}
-                    </p>
-
-                    <div className="space-y-3">
+                <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark overflow-hidden">
+                    <div className="px-5 py-3.5 border-b border-border dark:border-border-dark bg-surface-secondary/50 dark:bg-surface-secondary-dark/50 flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <Layers className="w-4 h-4 text-primary" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-semibold text-text dark:text-text-dark leading-tight">
+                                {t('capabilityProviders')}
+                            </h3>
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5">
+                                {t('capabilityProvidersDescription')}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="divide-y divide-border dark:divide-border-dark">
                         {capabilities.map((capability) => {
                             const availablePlugins = pluginsByCapability[capability] || [];
                             const activePluginId = capabilityProviders[capability];
@@ -81,15 +88,30 @@ export function DirectoryPluginsList({
             )}
 
             {/* Filters */}
-            <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 text-sm text-text-secondary dark:text-text-secondary-dark cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={showInstalledOnly}
-                        onChange={(e) => setShowInstalledOnly(e.target.checked)}
-                        className="rounded border-border dark:border-border-dark"
-                    />
-                    {t('showInstalledOnly')}
+            <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2.5 text-sm text-text-secondary dark:text-text-secondary-dark cursor-pointer select-none group">
+                    <span
+                        className={cn(
+                            'relative inline-flex w-8 h-4 rounded-full transition-colors duration-200 shrink-0 focus-within:outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-background',
+                            showInstalledOnly ? 'bg-primary' : 'bg-border dark:bg-border-dark',
+                        )}
+                    >
+                        <span
+                            className={cn(
+                                'absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-transform duration-200',
+                                showInstalledOnly ? 'translate-x-4' : 'translate-x-0',
+                            )}
+                        />
+                        <input
+                            type="checkbox"
+                            checked={showInstalledOnly}
+                            onChange={(e) => setShowInstalledOnly(e.target.checked)}
+                            className="sr-only"
+                        />
+                    </span>
+                    <span className="group-hover:text-text dark:group-hover:text-text-dark transition-colors">
+                        {t('showInstalledOnly')}
+                    </span>
                 </label>
             </div>
 
