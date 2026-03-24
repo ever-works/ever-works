@@ -60,10 +60,12 @@ Note: \`_meta/\` files are auto-updated when you create items. Do NOT modify the
 - Add 1-3 specific, descriptive tags.
 
 ## Markdown Rules
+The \`markdown\` field is for detailed product/service information only:
 - Factual, no marketing language.
 - Include ALL features comprehensively.
 - Include Pricing section when applicable.
 - Use ## headings, bullet lists, tables.
+- Do NOT repeat metadata already in other JSON fields (category, tags, brand, source_url).
 
 ## Directory
 {directoryName}{directoryDescription}{requestPrompt}`;

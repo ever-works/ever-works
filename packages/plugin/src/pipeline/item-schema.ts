@@ -16,7 +16,7 @@ Each item must be a JSON file with the following structure:
   "brand": "string - At most one brand/company name per item (optional)",
   "brand_logo_url": "string - Canonical logo URL from official domain, prefer SVG/PNG (optional)",
   "images": ["string"] - Multiple high-quality image URLs (screenshots, product imagery) from official sources (optional),
-  "markdown": "string - Detailed item description in markdown (see Markdown Rules below)"
+  "markdown": "string - Detailed product/service information in markdown: features, pricing, use cases (see Markdown Rules below). Do not repeat category, tags, or other metadata fields."
 }
 
 Required fields: name, description, source_url, category
