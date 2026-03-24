@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils/cn';
 import { ChatInterface } from '@/components/ai/ChatInterface';
 import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ROUTES } from '@/lib/constants';
-import { Link, usePathname } from '@/i18n/navigation';
+import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import {
     Home,
     Folder,
@@ -82,6 +82,7 @@ export function DashboardSidebar({
     onOpenHelp,
 }: DashboardSidebarProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const [activeMode, setActiveMode] = useState<'menu' | 'chat'>('menu');
     const [chatPanelOpen, setChatPanelOpen] = useState(false);
     const [isPending, startTransition] = useTransition();
@@ -400,27 +401,29 @@ export function DashboardSidebar({
                                         isCollapsed && 'justify-center',
                                     )}
                                 >
-                                    <div
-                                        className={cn(
-                                            'relative w-8 h-8 rounded-full shrink-0 flex items-center justify-center overflow-hidden',
-                                            'bg-surface-tertiary dark:bg-surface-tertiary-dark',
-                                        )}
-                                    >
-                                        {user.avatar && !avatarError ? (
-                                            <Image
-                                                src={user.avatar}
-                                                alt={user.username}
-                                                fill
-                                                className="object-cover"
-                                                onError={() => setAvatarError(true)}
-                                                sizes="32px"
-                                            />
-                                        ) : (
-                                            <span className="text-xs font-semibold text-text dark:text-text-dark">
-                                                {user.username.charAt(0).toUpperCase()}
-                                            </span>
-                                        )}
-                                    </div>
+                                    <ConditionalTooltip show={isCollapsed} content={user.username}>
+                                        <div
+                                            className={cn(
+                                                'relative w-8 h-8 rounded-full shrink-0 flex items-center justify-center overflow-hidden',
+                                                'bg-surface-tertiary dark:bg-surface-tertiary-dark',
+                                            )}
+                                        >
+                                            {user.avatar && !avatarError ? (
+                                                <Image
+                                                    src={user.avatar}
+                                                    alt={user.username}
+                                                    fill
+                                                    className="object-cover"
+                                                    onError={() => setAvatarError(true)}
+                                                    sizes="32px"
+                                                />
+                                            ) : (
+                                                <span className="text-xs font-semibold text-text dark:text-text-dark">
+                                                    {user.username.charAt(0).toUpperCase()}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </ConditionalTooltip>
                                     {!isCollapsed && (
                                         <>
                                             <div className="flex-1 min-w-0 text-left">
@@ -445,9 +448,7 @@ export function DashboardSidebar({
                                 </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                    onClick={() => {
-                                        window.location.href = ROUTES.DASHBOARD_SETTINGS;
-                                    }}
+                                    onClick={() => router.push(ROUTES.DASHBOARD_SETTINGS)}
                                 >
                                     <User className="w-4 h-4 mr-2 shrink-0" />
                                     {t('profileMenu.accountSettings')}
@@ -471,7 +472,7 @@ export function DashboardSidebar({
                                     <MessageSquare className="w-4 h-4 mr-2 shrink-0" />
                                     {t('profileMenu.support')}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={onOpenHelp}>
+                                <DropdownMenuItem onClick={onOpenHelp} disabled={!onOpenHelp}>
                                     <Keyboard className="w-4 h-4 mr-2 shrink-0" />
                                     {t('profileMenu.keyboardShortcuts')}
                                 </DropdownMenuItem>
