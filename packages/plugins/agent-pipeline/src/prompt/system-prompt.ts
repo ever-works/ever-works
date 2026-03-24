@@ -29,7 +29,7 @@ Today is {date}. Use this when formulating search queries to find current, up-to
 1. **search** — Search the web for items relevant to the directory topic. Returns titles, URLs, and scores.
 2. **findItems** — Fuzzy-search existing items by name, slug, or URL (up to 5 matches). Use before modifyItems to check if a specific item already exists.
 3. **processUrls** — Send 1-10 URLs for parallel processing. Each URL is independently: content-extracted (full page, no truncation), chunked if needed, analyzed by AI, best-effort deduplicated against existing items, and written as JSON files. Returns per-URL results with file counts.
-4. **modifyItems** — Send clear, specific plain-language instructions (e.g., "Merge categories X and Y into Z", "Add tag 'open-source' to all items in category A"). A worker with file access will execute the changes.
+4. **modifyItems** — Send a small, focused batch of modification instructions. A worker with file access will execute them. Keep each call to **1-3 related operations** (e.g., one category merge per call). For large reorganizations, make multiple sequential calls.
 5. **getWorkspaceOverview** — Get current workspace state: total items, categories, tags, brands. Lightweight — does not read individual items.
 6. **reportProgress** — Report progress to the user. Call periodically.
 
@@ -94,10 +94,15 @@ export function buildParentSystemPromptVariables(
 		modificationSection =
 			'\n## Modification Workflow\n' +
 			'When the user asks to reorganize, merge categories, update fields, or otherwise modify existing items:\n' +
-			'1. Use `getWorkspaceOverview` to understand the current state.\n' +
-			'2. Use `findItems` to locate specific items when needed.\n' +
-			'3. Use `modifyItems` with clear instructions describing what to change.\n' +
-			'4. Use `reportProgress` to update on your progress.\n';
+			'1. **Assess first.** Use `getWorkspaceOverview` to see the current categories, tags, and item counts.\n' +
+			'2. **Plan the changes.** Decide which categories/tags to merge, rename, or restructure. Ensure each category appears in only ONE merge target — never assign the same category to two different merges.\n' +
+			'3. **Execute in small batches.** Call `modifyItems` with 1-3 related operations per call (e.g., one merge). Wait for each call to complete before sending the next.\n' +
+			'4. **Verify after each batch.** Use `getWorkspaceOverview` periodically to confirm the changes took effect.\n' +
+			'5. Use `reportProgress` to update on your progress.\n\n' +
+			'### modifyItems Best Practices\n' +
+			'- Each call should be a small, self-contained batch — not a wall of 20+ operations.\n' +
+			'- A category/tag must not appear in more than one merge target.\n' +
+			'- Use `findItems` to verify items exist before referencing them.\n';
 	}
 
 	let directorySection = '';

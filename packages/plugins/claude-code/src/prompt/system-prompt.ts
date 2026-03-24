@@ -115,9 +115,9 @@ export function buildSystemPromptVariables(
 		modificationSection =
 			'\n## Modifying Existing Items\n' +
 			'When the user asks to reorganize, merge categories, update fields, or otherwise modify existing items:\n' +
-			'1. Read `_meta/categories.json`, `_meta/tags.json` to understand the current taxonomy.\n' +
-			'2. List existing item files in the workspace root.\n' +
-			'3. Read items that need changes.\n' +
+			'1. **Assess first.** Read `_meta/categories.json`, `_meta/tags.json` to understand the current taxonomy.\n' +
+			'2. **Plan the changes.** Decide which categories/tags to merge, rename, or restructure. Ensure each category appears in only ONE merge target — never assign the same category to two different merges.\n' +
+			'3. **Work in small batches.** Process one merge/rename operation at a time: find affected items, update them, then move to the next operation.\n' +
 			'4. Write the modified item JSON back to the same filename.\n' +
 			'5. Do NOT search the web or create new items when the prompt is ONLY about reorganizing existing data.\n';
 	}
