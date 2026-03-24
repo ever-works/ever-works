@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
@@ -12,20 +12,30 @@ export default function DashboardError({
     reset: () => void;
 }) {
     const t = useTranslations('errors.dashboard');
+    const [ready, setReady] = useState(false);
 
     useEffect(() => {
         console.error('Dashboard error:', error);
-        // Ensure dark mode is applied in case theme class was lost
+    }, [error]);
+
+    // Apply theme then reveal — keeps page invisible until dark class is set
+    useLayoutEffect(() => {
         const theme = localStorage.getItem('theme');
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         if (theme === 'dark' || (!theme && prefersDark)) {
             document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
         }
-    }, [error]);
+        setReady(true);
+    }, []);
 
     return (
-        <div className="flex flex-1 items-center justify-center p-8">
-            <div className="text-center max-w-md animate-fade-in">
+        <div
+            className="flex flex-1 items-center justify-center p-8 transition-opacity duration-150"
+            style={{ opacity: ready ? 1 : 0 }}
+        >
+            <div className="text-center max-w-md">
                 <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-danger/10">
                     <AlertTriangle className="h-8 w-8 text-danger" />
                 </div>

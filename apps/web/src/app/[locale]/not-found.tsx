@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -9,20 +9,26 @@ import { ROUTES } from '@/lib/constants';
 export default function NotFound() {
     const t = useTranslations('errors.notFound');
     const router = useRouter();
+    const [ready, setReady] = useState(false);
 
-    // Ensure dark mode is applied — the layout's inline script may not
-    // run on not-found render paths in some Next.js scenarios.
-    useEffect(() => {
+    // Apply theme then reveal — keeps page invisible until dark class is set
+    useLayoutEffect(() => {
         const theme = localStorage.getItem('theme');
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         if (theme === 'dark' || (!theme && prefersDark)) {
             document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
         }
+        setReady(true);
     }, []);
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-background dark:bg-background-dark px-4">
-            <div className="text-center max-w-lg animate-fade-in">
+        <div
+            className="flex min-h-screen items-center justify-center bg-background dark:bg-background-dark px-4 transition-opacity duration-150"
+            style={{ opacity: ready ? 1 : 0 }}
+        >
+            <div className="text-center max-w-lg">
                 {/* Decorative 404 */}
                 <div className="relative mb-8">
                     <p className="text-[10rem] leading-none font-bold text-border dark:text-border-dark select-none">
