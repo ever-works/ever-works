@@ -476,7 +476,7 @@
                     "autoLabel": "Auto",
                     "autoDescription": "Use the system-resolved pipeline for each directory",
                     "enforceLabel": "Enforce this default",
-                    "enforceDescription": "The selected pipeline will be pre-selected in the generator form across all directories.",
+                    "enforceDescription": "Always pre-select this pipeline, even when a directory has its own pipeline configured. You can still switch pipelines manually in the form.",
                     "saveFailed": "Failed to save pipeline default"
                 }
             },
