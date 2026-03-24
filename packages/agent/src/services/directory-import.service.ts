@@ -15,7 +15,6 @@ import { MarkdownGeneratorService } from '@src/generators/markdown-generator/mar
 import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
 import { GitFacadeService } from '@src/facades/git.facade';
 import { SourceRepoAnalyzerService } from '@src/import/source-repo-analyzer.service';
-import { AwesomeReadmeParserService } from '@src/import/awesome-readme-parser.service';
 import { ImportExecutorService } from '@src/import/import-executor.service';
 import {
     AnalyzeRepositoryDto,
@@ -62,7 +61,6 @@ export class DirectoryImportService {
         private readonly websiteGenerator: WebsiteGeneratorService,
         private readonly gitFacade: GitFacadeService,
         private readonly sourceRepoAnalyzer: SourceRepoAnalyzerService,
-        private readonly awesomeReadmeParser: AwesomeReadmeParserService,
         private readonly importExecutor: ImportExecutorService,
         private readonly directoryScheduleService: DirectoryScheduleService,
         private readonly generatorFormSchemaService: GeneratorFormSchemaService,
@@ -442,7 +440,7 @@ export class DirectoryImportService {
                 sourceUrl: dto.sourceUrl,
                 token,
                 createMissingRepos: dto.createMissingRepos,
-                enrichmentConfig: dto.enrichmentConfig,
+                expansionFactor: dto.enrichmentConfig?.expansionFactor,
                 providers: dto.providers,
             });
 
@@ -652,75 +650,12 @@ export class DirectoryImportService {
         user: User,
         sourceUrl: string,
     ): Promise<DirectoryImportResult> {
-        const providerId = this.getProviderFromUrl(sourceUrl);
-        const token = await this.getProviderToken(user, providerId);
-
-        try {
-            const readme = await this.sourceRepoAnalyzer.getReadmeContent(sourceUrl, token);
-            if (!readme) {
-                return {
-                    success: false,
-                    directoryId: directory.id,
-                    error: 'README.md not found in repository',
-                    errorCode: DirectoryImportErrorCode.PARSE_FAILED,
-                };
-            }
-
-            const parsedData = await this.awesomeReadmeParser.parseReadme(readme.content, {
-                userId: user.id,
-                directoryId: directory.id,
-            });
-
-            const syncResult = await this.dataGenerator.updateWithImportedData(
-                directory,
-                user,
-                {
-                    items: parsedData.items,
-                    categories: parsedData.categories,
-                    tags: parsedData.tags,
-                },
-                { updateWithPullRequest: true },
-            );
-
-            if (syncResult.success === false) {
-                return {
-                    success: false,
-                    directoryId: directory.id,
-                    error: syncResult.error.message,
-                    errorCode: DirectoryImportErrorCode.GENERATION_FAILED,
-                };
-            }
-
-            // Regenerate markdown and website if there were changes
-            if (syncResult.stats.newItemsCount > 0 || syncResult.stats.updatedItemsCount > 0) {
-                await this.markdownGenerator.initialize(directory, user, {
-                    generation_method: GenerationMethod.CREATE_UPDATE,
-                    pr_update: syncResult.prUpdate
-                        ? {
-                              branch: syncResult.prUpdate.branch,
-                              title: syncResult.prUpdate.title,
-                              body: syncResult.prUpdate.body,
-                          }
-                        : undefined,
-                });
-                await this.websiteGenerator.initialize(directory, user);
-            }
-
-            return {
-                success: true,
-                directoryId: directory.id,
-                itemsImported: syncResult.stats.newItemsCount,
-                stats: syncResult.stats,
-                metrics: parsedData.metrics,
-            };
-        } catch (error) {
-            return {
-                success: false,
-                directoryId: directory.id,
-                error: error.message,
-                errorCode: DirectoryImportErrorCode.AI_EXTRACTION_FAILED,
-            };
-        }
+        return this.importExecutor.importFromAwesomeReadme({
+            directory,
+            user,
+            sourceUrl,
+            updateWithPullRequest: true,
+        });
     }
 
     private async cleanupFailedImport(directoryId: string, historyId: string): Promise<void> {

@@ -25,27 +25,7 @@ export enum ImportSourceTypeEnum {
 export class ImportEnrichmentConfigDto {
     @IsOptional()
     @IsNumber()
-    expansionFactor?: number; // default 2.5, target ratio of final/seed items
-
-    @IsOptional()
-    @IsNumber()
-    maxImportProportion?: number; // default 0.35, max share of seed items in final
-
-    @IsOptional()
-    @IsBoolean()
-    parseIssues?: boolean; // default false
-
-    @IsOptional()
-    @IsBoolean()
-    parsePullRequests?: boolean; // default false
-
-    @IsOptional()
-    @IsBoolean()
-    enrichDescriptions?: boolean; // default true
-
-    @IsOptional()
-    @IsBoolean()
-    expandTaxonomy?: boolean; // default true
+    expansionFactor?: number; // target ratio of final/seed items (default 2.5)
 }
 
 export class AnalyzeRepositoryDto {

@@ -344,11 +344,6 @@ export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing';
 
 export interface ImportEnrichmentConfig {
     expansionFactor?: number;
-    maxImportProportion?: number;
-    parseIssues?: boolean;
-    parsePullRequests?: boolean;
-    enrichDescriptions?: boolean;
-    expandTaxonomy?: boolean;
 }
 
 export interface AnalyzeRepositoryDto {

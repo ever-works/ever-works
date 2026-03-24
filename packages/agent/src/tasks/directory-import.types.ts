@@ -31,26 +31,6 @@ export type DirectoryImportStats = {
     totalItemsCount: number;
 };
 
-export type EnrichmentComplianceReport = {
-    importProportion: number;
-    withinTarget: boolean;
-    enrichedDescriptions: number;
-    newCategoriesAdded: number;
-    newTagsAdded: number;
-};
-
-export type EnrichmentMetrics = {
-    seedItemCount: number;
-    finalItemCount: number;
-    expansionRatio: number;
-    seedCategoryCount: number;
-    finalCategoryCount: number;
-    seedTagCount: number;
-    finalTagCount: number;
-    itemsFromPrIssues?: number;
-    complianceReport: EnrichmentComplianceReport;
-};
-
 export type DirectoryImportResult = {
     success: boolean;
     directoryId: string;
@@ -59,7 +39,6 @@ export type DirectoryImportResult = {
     tagsImported?: number;
     metrics?: DirectoryImportMetrics;
     stats?: DirectoryImportStats;
-    enrichmentMetrics?: EnrichmentMetrics;
     error?: string;
     errorCode?: DirectoryImportErrorCode;
 };
@@ -73,7 +52,6 @@ export enum DirectoryImportErrorCode {
     CLONE_FAILED = 'CLONE_FAILED',
     CREATE_REPO_FAILED = 'CREATE_REPO_FAILED',
     GENERATION_FAILED = 'GENERATION_FAILED',
-    AI_EXTRACTION_FAILED = 'AI_EXTRACTION_FAILED',
     ENRICHMENT_FAILED = 'ENRICHMENT_FAILED',
     UNKNOWN_ERROR = 'UNKNOWN_ERROR',
 }

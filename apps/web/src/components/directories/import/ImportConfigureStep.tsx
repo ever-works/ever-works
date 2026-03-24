@@ -14,16 +14,7 @@ import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
 import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import type { GeneratorFormSchema } from '@/lib/api/types-only';
 import type { ImportEnrichmentConfig } from '@/lib/api/directory';
-import {
-    Upload,
-    CheckCircle2,
-    FileText,
-    Database,
-    ArrowLeft,
-    Sparkles,
-    GitPullRequest,
-    Tags,
-} from 'lucide-react';
+import { Upload, CheckCircle2, FileText, Database, ArrowLeft, Sparkles } from 'lucide-react';
 
 type DetectedType = 'data_repo' | 'awesome_readme' | 'link_existing' | null;
 
@@ -112,9 +103,6 @@ export function ImportConfigureStep({
 
     // Enrichment config (for awesome_readme)
     const [expansionFactor, setExpansionFactor] = useState(2.5);
-    const [parsePullRequests, setParsePullRequests] = useState(false);
-    const [enrichDescriptions, setEnrichDescriptions] = useState(true);
-    const [expandTaxonomy, setExpandTaxonomy] = useState(true);
 
     const effectiveSourceType = analysisResult?.detectedType || manualSourceType;
     const isAwesomeReadme = effectiveSourceType === 'awesome_readme';
@@ -173,11 +161,6 @@ export function ImportConfigureStep({
 
             const enrichmentConfig: ImportEnrichmentConfig = {
                 expansionFactor,
-                maxImportProportion: 1 / expansionFactor,
-                parsePullRequests,
-                parseIssues: parsePullRequests,
-                enrichDescriptions,
-                expandTaxonomy,
             };
 
             onImport(providers, enrichmentConfig);
@@ -382,70 +365,6 @@ export function ImportConfigureStep({
                                 })}
                             </p>
                         )}
-                    </div>
-
-                    {/* Enrichment Options */}
-                    <div className="p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark space-y-4">
-                        <h3 className="font-medium text-text dark:text-text-dark">
-                            {t('research.enrichmentOptions')}
-                        </h3>
-
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <FileText className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
-                                <div>
-                                    <span className="text-sm font-medium text-text dark:text-text-dark">
-                                        {t('research.enrichDescriptions')}
-                                    </span>
-                                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                        {t('research.enrichDescriptionsHint')}
-                                    </p>
-                                </div>
-                            </div>
-                            <Switch
-                                checked={enrichDescriptions}
-                                onChange={setEnrichDescriptions}
-                                disabled={isPending}
-                            />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Tags className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
-                                <div>
-                                    <span className="text-sm font-medium text-text dark:text-text-dark">
-                                        {t('research.expandTaxonomy')}
-                                    </span>
-                                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                        {t('research.expandTaxonomyHint')}
-                                    </p>
-                                </div>
-                            </div>
-                            <Switch
-                                checked={expandTaxonomy}
-                                onChange={setExpandTaxonomy}
-                                disabled={isPending}
-                            />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <GitPullRequest className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
-                                <div>
-                                    <span className="text-sm font-medium text-text dark:text-text-dark">
-                                        {t('research.parsePrIssues')}
-                                    </span>
-                                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                        {t('research.parsePrIssuesHint')}
-                                    </p>
-                                </div>
-                            </div>
-                            <Switch
-                                checked={parsePullRequests}
-                                onChange={setParsePullRequests}
-                                disabled={isPending}
-                            />
-                        </div>
                     </div>
                 </>
             )}
