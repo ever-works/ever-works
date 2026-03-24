@@ -158,9 +158,11 @@ export const DEFAULT_MODIFICATION_SYSTEM_PROMPT = `You are a directory item modi
 - When merging categories, update ALL items that reference the old category name.
 
 ## Markdown Rules
+The \`markdown\` field is for detailed product/service information only:
 - Factual, no marketing language.
 - Use ## headings, bullet lists, tables.
 - Include Pricing section when applicable.
+- Do NOT repeat metadata already in other JSON fields (category, tags, brand, source_url).
 
 ## Workflow
 1. Read \`_meta/categories.json\`, \`_meta/tags.json\` for current taxonomy.

@@ -13,7 +13,7 @@ export interface PromptOptions {
 /**
  * Default template for the parent orchestrator system prompt.
  * Variables: {date}, {existingItemsSection}, {maxPages},
- *   {modificationSection}, {targetItems}, {targetSuffix}, {directorySection}
+ *   {modificationSection}, {workflowHint}, {directorySection}
  */
 export const DEFAULT_PARENT_SYSTEM_PROMPT = `You are a research orchestrator for directory content generation. Your job is to find relevant items through web search and dispatch URLs to workers for extraction, or to dispatch modification instructions when the user wants to reorganize existing items.
 
@@ -29,7 +29,7 @@ Today is {date}. Use this when formulating search queries to find current, up-to
 1. **search** — Search the web for items relevant to the directory topic. Returns titles, URLs, and scores.
 2. **findItems** — Fuzzy-search existing items by name, slug, or URL (up to 5 matches). Use before modifyItems to check if a specific item already exists.
 3. **processUrls** — Send 1-10 URLs for parallel processing. Each URL is independently: content-extracted (full page, no truncation), chunked if needed, analyzed by AI, best-effort deduplicated against existing items, and written as JSON files. Returns per-URL results with file counts.
-4. **modifyItems** — Send clear, specific plain-language instructions (e.g., "Merge categories X and Y into Z", "Add tag 'open-source' to all items in category A"). A worker with file access will execute the changes.
+4. **modifyItems** — Send a small, focused batch of modification instructions. A worker with file access will execute them. Keep each call to **1-3 related operations** (e.g., one category merge per call). For large reorganizations, make multiple sequential calls.
 5. **getWorkspaceOverview** — Get current workspace state: total items, categories, tags, brands. Lightweight — does not read individual items.
 6. **reportProgress** — Report progress to the user. Call periodically.
 
@@ -56,8 +56,7 @@ When creating NEW items:
 - Add 1-3 specific, descriptive tags per item.
 - Maintain category balance — avoid putting most items in a single category.
 
-## Generation Target
-Aim to generate at least **{targetItems}** new items. This is a minimum target, not a cap — if the source content contains more items, keep extracting until ALL relevant items are processed. When the user provides a specific URL or list, extract EVERY item from it regardless of this number. Do not stop early just because you reached the target count.{targetSuffix}
+{workflowHint}
 {directorySection}`;
 
 /**
@@ -69,7 +68,6 @@ export function buildParentSystemPromptVariables(
 	const { directory, request, existing } = options;
 	const existingCount = existing.items.length;
 	const hasExisting = existingCount > 0;
-	const targetItems = ((request.config || {}).target_items as number) || DEFAULT_TARGET_ITEMS;
 	const maxPages = ((request.config || {}).max_pages_to_process as number) || DEFAULT_MAX_PAGES_TO_PROCESS;
 
 	let existingItemsSection = '';
@@ -93,21 +91,34 @@ export function buildParentSystemPromptVariables(
 		modificationSection =
 			'\n## Modification Workflow\n' +
 			'When the user asks to reorganize, merge categories, update fields, or otherwise modify existing items:\n' +
-			'1. Use `findItems` to check if the target item exists.\n' +
-			'   - Found → use `modifyItems` with the slug for precision (e.g., "update gauzy.json: set featured=true").\n' +
-			'   - Not found → use `search` + `processUrls` to create it, then `modifyItems`.\n' +
-			'2. Use `modifyItems` with clear instructions describing what to change.\n' +
-			'3. Use `reportProgress` to update on your progress.\n\n' +
-			'Do NOT search the web or create new items when the prompt is ONLY about reorganizing existing data.\n';
+			'1. **Assess first.** Use `getWorkspaceOverview` to see the current categories, tags, and item counts.\n' +
+			'2. **Plan the changes.** Decide which categories/tags to merge, rename, or restructure. Ensure each category appears in only ONE merge target — never assign the same category to two different merges.\n' +
+			'3. **Execute in small batches.** Call `modifyItems` with 1-3 related operations per call (e.g., one merge). Wait for each call to complete before sending the next.\n' +
+			'4. **Verify after each batch.** Use `getWorkspaceOverview` periodically to confirm the changes took effect.\n' +
+			'5. Use `reportProgress` to update on your progress.\n\n' +
+			'### modifyItems Best Practices\n' +
+			'- Each call should be a small, self-contained batch — not a wall of 20+ operations.\n' +
+			'- A category/tag must not appear in more than one merge target.\n' +
+			'- Use `findItems` to verify items exist before referencing them.\n';
 	}
 
-	const targetSuffix = hasExisting
-		? ` Do not count existing items toward this target. The ${existingCount} seed items are research input — you must discover at least this many NEW items on top of them.`
-		: '';
+	let workflowHint: string;
+	if (hasExisting) {
+		workflowHint =
+			'## Important\n' +
+			"- The user's prompt determines what to do. Read it carefully before choosing a workflow.\n" +
+			'- If the prompt asks to modify, reorganize, or restructure existing items — use the Modification Workflow. Do NOT search the web or create new items.\n' +
+			'- If the prompt asks to generate or find new items — use the Generation Workflow.';
+	} else {
+		workflowHint =
+			'## Important\n' +
+			"- The user's prompt determines what to do. Read it carefully before starting.\n" +
+			'- Follow the Generation Workflow above.';
+	}
 
 	let directorySection = '';
 	if (directory.description) {
-		directorySection = `## Directory Context\nDirectory: ${directory.name}\nDescription: ${directory.description}`;
+		directorySection = `\n## Directory Context\nDirectory: ${directory.name}\nDescription: ${directory.description}`;
 	}
 
 	return {
@@ -115,8 +126,7 @@ export function buildParentSystemPromptVariables(
 		existingItemsSection,
 		maxPages: String(maxPages),
 		modificationSection,
-		targetItems: String(targetItems),
-		targetSuffix,
+		workflowHint,
 		directorySection
 	};
 }
@@ -133,11 +143,9 @@ export function buildSystemPrompt(options: PromptOptions): string {
 
 /**
  * Default template for the parent orchestrator user prompt.
- * Variables: {userInstruction}, {directoryDescription}, {workflowInstructions}, {targetItems}
+ * Variables: {userInstruction}, {directoryDescription}, {workflowInstructions}
  */
-export const DEFAULT_PARENT_USER_PROMPT = `{userInstruction}{directoryDescription}{workflowInstructions}
-
-Target: generate at least {targetItems} new items. If the source contains more, extract ALL of them.`;
+export const DEFAULT_PARENT_USER_PROMPT = `{userInstruction}{directoryDescription}{workflowInstructions}`;
 
 /**
  * Build variables for the parent user prompt template.
@@ -166,28 +174,22 @@ export function buildParentUserPromptVariables(
 	let workflowInstructions: string;
 	if (hasExisting) {
 		workflowInstructions =
-			'\nThe workspace has existing seed items. Your default workflow should be:\n' +
-			'1. First, use `search` to discover NEW items in the same domain — look broadly for alternatives, competitors, and related projects.\n' +
-			'2. Use `processUrls` to extract and create the new items found.\n' +
-			'3. Use `modifyItems` to rewrite and enrich ALL existing item descriptions.\n' +
-			'4. Use `getWorkspaceOverview` to review the taxonomy, then use `modifyItems` to expand categories and tags.\n' +
-			"If the user's prompt asks for something different (e.g., only reorganizing), follow their instructions instead.\n" +
+			`\nThe workspace has existing items. If your task involves creating NEW items, ` +
+			`aim for at least ${targetItems} new items.\n` +
 			'Use reportProgress to update on your progress.';
 	} else if (request.prompt?.includes('## Step')) {
-		// Import prompts already contain a numbered workflow (## Step 1 … ## Step 4).
-		// Avoid redundant "Follow the Generation Workflow" instruction.
 		workflowInstructions = '\nUse reportProgress to update on your progress.';
 	} else {
 		workflowInstructions =
-			'\nFollow the Generation Workflow in your instructions. ' +
+			`\nTarget: generate at least ${targetItems} new items. If the source contains more, extract ALL of them.\n` +
+			'Follow the Generation Workflow in your instructions. ' +
 			'Use reportProgress to update on your progress.';
 	}
 
 	return {
 		userInstruction,
 		directoryDescription,
-		workflowInstructions,
-		targetItems: String(targetItems)
+		workflowInstructions
 	};
 }
 

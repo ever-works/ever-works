@@ -171,7 +171,7 @@ export interface IGitOperations {
 	pull(dir: string, token: string, committer?: GitCommitter): Promise<void>;
 	add(dir: string, paths: string | string[]): Promise<void>;
 	addAll(dir: string): Promise<void>;
-	commit(dir: string, message: string, committer?: GitCommitter): Promise<string>;
+	commit(dir: string, message: string, committer?: GitCommitter): Promise<string | null>;
 	push(options: GitPushOptions): Promise<void>;
 	getCurrentBranch(dir: string): Promise<string | null>;
 	getMainBranch(dir: string): Promise<string | null>;

@@ -317,7 +317,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 		return this.gitOps!.addAll(dir);
 	}
 
-	async commit(dir: string, message: string, committer?: GitCommitter): Promise<string> {
+	async commit(dir: string, message: string, committer?: GitCommitter): Promise<string | null> {
 		this.ensureGitOps();
 		return this.gitOps!.commit(dir, message, committer);
 	}

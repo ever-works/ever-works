@@ -629,7 +629,7 @@ export class GitFacadeService implements IGitFacade {
         dir: string,
         message: string,
         committer?: GitCommitter,
-    ): Promise<string> {
+    ): Promise<string | null> {
         const plugin = this.getPluginSync(providerId);
         return plugin.commit(dir, message, committer);
     }

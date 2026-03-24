@@ -66,12 +66,13 @@ When setting \`category\`, \`tags\`, and \`brands\` fields in your item JSON fil
 - Maintain category balance — avoid putting most items in a single category.
 
 ## Markdown Rules
-The \`markdown\` field should contain a detailed, factual description:
+The \`markdown\` field is for detailed product/service information only:
 - Extract only relevant, factual information — no marketing language or testimonials.
 - Include ALL features comprehensively, not just key highlights.
 - Include a Pricing section with all available plans when applicable.
 - Do not include support/contact info for products.
 - Use structured markdown: ## headings, bullet lists, tables where appropriate.
+- Do NOT repeat metadata already in other JSON fields (category, tags, brand, source_url).
 {existingItemsSection}{modificationSection}
 ## Generation Target
 Aim to generate approximately **{targetItems}** new items. This is a target — prioritize quality and relevance over hitting the exact number, but do not stop early if there are more relevant items to find. Do not count existing items toward this target.
@@ -114,9 +115,9 @@ export function buildSystemPromptVariables(
 		modificationSection =
 			'\n## Modifying Existing Items\n' +
 			'When the user asks to reorganize, merge categories, update fields, or otherwise modify existing items:\n' +
-			'1. Read `_meta/categories.json`, `_meta/tags.json` to understand the current taxonomy.\n' +
-			'2. List existing item files in the workspace root.\n' +
-			'3. Read items that need changes.\n' +
+			'1. **Assess first.** Read `_meta/categories.json`, `_meta/tags.json` to understand the current taxonomy.\n' +
+			'2. **Plan the changes.** Decide which categories/tags to merge, rename, or restructure. Ensure each category appears in only ONE merge target — never assign the same category to two different merges.\n' +
+			'3. **Work in small batches.** Process one merge/rename operation at a time: find affected items, update them, then move to the next operation.\n' +
 			'4. Write the modified item JSON back to the same filename.\n' +
 			'5. Do NOT search the web or create new items when the prompt is ONLY about reorganizing existing data.\n';
 	}
