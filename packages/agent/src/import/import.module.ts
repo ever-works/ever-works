@@ -4,12 +4,11 @@ import { DataGeneratorModule } from '../generators/data-generator/data-generator
 import { MarkdownGeneratorModule } from '../generators/markdown-generator/markdown-generator.module';
 import { WebsiteGeneratorModule } from '../generators/website-generator/website-generator.module';
 import { SourceRepoAnalyzerService } from './source-repo-analyzer.service';
-import { AwesomeReadmeParserService } from './awesome-readme-parser.service';
 import { ImportExecutorService } from './import-executor.service';
 
 @Module({
     imports: [FacadesModule, DataGeneratorModule, MarkdownGeneratorModule, WebsiteGeneratorModule],
-    providers: [SourceRepoAnalyzerService, AwesomeReadmeParserService, ImportExecutorService],
-    exports: [SourceRepoAnalyzerService, AwesomeReadmeParserService, ImportExecutorService],
+    providers: [SourceRepoAnalyzerService, ImportExecutorService],
+    exports: [SourceRepoAnalyzerService, ImportExecutorService],
 })
 export class ImportModule {}

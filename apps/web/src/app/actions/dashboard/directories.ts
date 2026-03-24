@@ -546,6 +546,10 @@ export async function analyzeRepository(sourceUrl: string, providerId?: string) 
     }
 }
 
+interface ImportEnrichmentConfig {
+    expansionFactor?: number;
+}
+
 interface ImportDirectoryRequest {
     sourceUrl: string;
     sourceType: ImportSourceType;
@@ -557,6 +561,7 @@ interface ImportDirectoryRequest {
     gitProvider?: string;
     deployProvider?: string;
     providers?: Record<string, string>;
+    enrichmentConfig?: ImportEnrichmentConfig;
 }
 
 export async function importDirectory(data: ImportDirectoryRequest) {
@@ -577,6 +582,11 @@ export async function importDirectory(data: ImportDirectoryRequest) {
         gitProvider: z.string().optional(),
         deployProvider: z.string().optional(),
         providers: z.record(z.string()).optional(),
+        enrichmentConfig: z
+            .object({
+                expansionFactor: z.number().min(1.5).max(5).optional(),
+            })
+            .optional(),
     });
 
     try {
@@ -623,6 +633,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
             gitProvider: providerId,
             deployProvider: validation.data.deployProvider,
             providers: validation.data.providers,
+            enrichmentConfig: validation.data.enrichmentConfig,
         });
 
         return {

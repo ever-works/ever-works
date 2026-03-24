@@ -342,6 +342,10 @@ export interface SyncDirectoryResponse {
 // Import types
 export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing';
 
+export interface ImportEnrichmentConfig {
+    expansionFactor?: number;
+}
+
 export interface AnalyzeRepositoryDto {
     sourceUrl: string;
     gitProvider?: string;
@@ -383,6 +387,7 @@ export interface ImportDirectoryDto {
     gitProvider: string;
     deployProvider?: string;
     providers?: Record<string, string>;
+    enrichmentConfig?: ImportEnrichmentConfig;
 }
 
 export interface ImportDirectoryResponseDto {

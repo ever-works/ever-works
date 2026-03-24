@@ -1259,9 +1259,7 @@ export class DataGeneratorService {
             const initialPrompt = `Directory imported from ${importedData.importRequest?.sourceOwner || 'external'}/${importedData.importRequest?.sourceRepo || 'source'}. Contains ${importedData.items.length} items across ${importedData.categories.length} categories.`;
 
             // Preserve existing metadata from imported config (data_repo/link_existing already have config)
-            // For awesome_readme imports, we don't need last_request_data (sync will be used)
             const existingMetadata = importedData.config?.metadata || {};
-            const isAwesomeReadme = importedData.importRequest?.sourceType === 'awesome_readme';
 
             const configData = {
                 ...importedData.config,
@@ -1272,10 +1270,8 @@ export class DataGeneratorService {
                 },
             };
 
-            // Only create default last_request_data if:
-            // 1. Not an awesome_readme import (they use sync, not AI)
-            // 2. The imported config doesn't already have one
-            if (!isAwesomeReadme && !existingMetadata.last_request_data) {
+            // Only create default last_request_data if the imported config doesn't already have one
+            if (!existingMetadata.last_request_data) {
                 // Store minimal request data - plugin-specific defaults come from plugins
                 const initialRequestData: Partial<CreateItemsGeneratorDto> = {
                     name: directory.name,

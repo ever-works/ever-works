@@ -75,8 +75,16 @@ export function buildParentSystemPromptVariables(
 	let existingItemsSection = '';
 	if (hasExisting) {
 		existingItemsSection =
-			`\n## Existing Items\n` +
+			`\n## Existing Items — Research Seeds\n` +
 			`The workspace already contains **${existingCount}** existing items. ` +
+			`These are **research seeds** — treat them as starting-point input, NOT as final content.\n\n` +
+			`### Enrichment Rules (IMPORTANT)\n` +
+			`1. **Never copy seed content verbatim.** Descriptions, categories, and tags from seeds are input for research only.\n` +
+			`2. **Expand significantly.** Discover NEW items via \`search\` + \`processUrls\` so that seed items represent at most ~30-40% of the final collection. ` +
+			`Search broadly: look for alternatives, competitors, and related projects NOT in the seed list.\n` +
+			`3. **Rewrite all descriptions.** Use \`modifyItems\` to rewrite every existing item description — add what the tool/project does (2-3 sentences), key features, use cases, and comparisons to alternatives. Do NOT keep original descriptions as-is.\n` +
+			`4. **Expand taxonomy.** Propose new categories beyond the existing ones — seed categories should be ~30% of the final taxonomy. Add descriptive tags that help users filter and discover items.\n` +
+			`5. **Add images.** When rewriting descriptions, include screenshots or logos where available.\n\n` +
 			'Workers perform best-effort deduplication, and the pipeline applies a final deterministic deduplication pass.\n';
 	}
 
@@ -90,10 +98,12 @@ export function buildParentSystemPromptVariables(
 			'   - Not found → use `search` + `processUrls` to create it, then `modifyItems`.\n' +
 			'2. Use `modifyItems` with clear instructions describing what to change.\n' +
 			'3. Use `reportProgress` to update on your progress.\n\n' +
-			'Do NOT search the web or create new items when the prompt is about reorganizing existing data.\n';
+			'Do NOT search the web or create new items when the prompt is ONLY about reorganizing existing data.\n';
 	}
 
-	const targetSuffix = hasExisting ? ' Do not count existing items toward this target.' : '';
+	const targetSuffix = hasExisting
+		? ` Do not count existing items toward this target. The ${existingCount} seed items are research input — you must discover at least this many NEW items on top of them.`
+		: '';
 
 	let directorySection = '';
 	if (directory.description) {
@@ -156,10 +166,17 @@ export function buildParentUserPromptVariables(
 	let workflowInstructions: string;
 	if (hasExisting) {
 		workflowInstructions =
-			'\nFollow the appropriate workflow based on the nature of this request. ' +
-			'If the request involves creating new items, use processUrls (and search if needed). ' +
-			'If the request involves modifying existing items (e.g., merging categories), use getWorkspaceOverview and modifyItems. ' +
+			'\nThe workspace has existing seed items. Your default workflow should be:\n' +
+			'1. First, use `search` to discover NEW items in the same domain — look broadly for alternatives, competitors, and related projects.\n' +
+			'2. Use `processUrls` to extract and create the new items found.\n' +
+			'3. Use `modifyItems` to rewrite and enrich ALL existing item descriptions.\n' +
+			'4. Use `getWorkspaceOverview` to review the taxonomy, then use `modifyItems` to expand categories and tags.\n' +
+			"If the user's prompt asks for something different (e.g., only reorganizing), follow their instructions instead.\n" +
 			'Use reportProgress to update on your progress.';
+	} else if (request.prompt?.includes('## Step')) {
+		// Import prompts already contain a numbered workflow (## Step 1 … ## Step 4).
+		// Avoid redundant "Follow the Generation Workflow" instruction.
+		workflowInstructions = '\nUse reportProgress to update on your progress.';
 	} else {
 		workflowInstructions =
 			'\nFollow the Generation Workflow in your instructions. ' +

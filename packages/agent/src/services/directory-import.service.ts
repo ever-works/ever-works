@@ -15,7 +15,6 @@ import { MarkdownGeneratorService } from '@src/generators/markdown-generator/mar
 import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
 import { GitFacadeService } from '@src/facades/git.facade';
 import { SourceRepoAnalyzerService } from '@src/import/source-repo-analyzer.service';
-import { AwesomeReadmeParserService } from '@src/import/awesome-readme-parser.service';
 import { ImportExecutorService } from '@src/import/import-executor.service';
 import {
     AnalyzeRepositoryDto,
@@ -62,7 +61,6 @@ export class DirectoryImportService {
         private readonly websiteGenerator: WebsiteGeneratorService,
         private readonly gitFacade: GitFacadeService,
         private readonly sourceRepoAnalyzer: SourceRepoAnalyzerService,
-        private readonly awesomeReadmeParser: AwesomeReadmeParserService,
         private readonly importExecutor: ImportExecutorService,
         private readonly directoryScheduleService: DirectoryScheduleService,
         private readonly generatorFormSchemaService: GeneratorFormSchemaService,
@@ -377,6 +375,7 @@ export class DirectoryImportService {
                 enableSync: dto.sync ?? true,
             },
             providers: dto.providers,
+            enrichmentConfig: dto.enrichmentConfig,
         };
 
         const dispatchedId = this.importDispatcher
@@ -441,7 +440,8 @@ export class DirectoryImportService {
                 sourceUrl: dto.sourceUrl,
                 token,
                 createMissingRepos: dto.createMissingRepos,
-                aiProviderOverride: dto.providers?.ai,
+                expansionFactor: dto.enrichmentConfig?.expansionFactor,
+                providers: dto.providers,
             });
 
             if (!result.success) {
@@ -650,75 +650,12 @@ export class DirectoryImportService {
         user: User,
         sourceUrl: string,
     ): Promise<DirectoryImportResult> {
-        const providerId = this.getProviderFromUrl(sourceUrl);
-        const token = await this.getProviderToken(user, providerId);
-
-        try {
-            const readme = await this.sourceRepoAnalyzer.getReadmeContent(sourceUrl, token);
-            if (!readme) {
-                return {
-                    success: false,
-                    directoryId: directory.id,
-                    error: 'README.md not found in repository',
-                    errorCode: DirectoryImportErrorCode.PARSE_FAILED,
-                };
-            }
-
-            const parsedData = await this.awesomeReadmeParser.parseReadme(readme.content, {
-                userId: user.id,
-                directoryId: directory.id,
-            });
-
-            const syncResult = await this.dataGenerator.updateWithImportedData(
-                directory,
-                user,
-                {
-                    items: parsedData.items,
-                    categories: parsedData.categories,
-                    tags: parsedData.tags,
-                },
-                { updateWithPullRequest: true },
-            );
-
-            if (syncResult.success === false) {
-                return {
-                    success: false,
-                    directoryId: directory.id,
-                    error: syncResult.error.message,
-                    errorCode: DirectoryImportErrorCode.GENERATION_FAILED,
-                };
-            }
-
-            // Regenerate markdown and website if there were changes
-            if (syncResult.stats.newItemsCount > 0 || syncResult.stats.updatedItemsCount > 0) {
-                await this.markdownGenerator.initialize(directory, user, {
-                    generation_method: GenerationMethod.CREATE_UPDATE,
-                    pr_update: syncResult.prUpdate
-                        ? {
-                              branch: syncResult.prUpdate.branch,
-                              title: syncResult.prUpdate.title,
-                              body: syncResult.prUpdate.body,
-                          }
-                        : undefined,
-                });
-                await this.websiteGenerator.initialize(directory, user);
-            }
-
-            return {
-                success: true,
-                directoryId: directory.id,
-                itemsImported: syncResult.stats.newItemsCount,
-                stats: syncResult.stats,
-                metrics: parsedData.metrics,
-            };
-        } catch (error) {
-            return {
-                success: false,
-                directoryId: directory.id,
-                error: error.message,
-                errorCode: DirectoryImportErrorCode.AI_EXTRACTION_FAILED,
-            };
-        }
+        return this.importExecutor.importFromAwesomeReadme({
+            directory,
+            user,
+            sourceUrl,
+            updateWithPullRequest: true,
+        });
     }
 
     private async cleanupFailedImport(directoryId: string, historyId: string): Promise<void> {
@@ -755,62 +692,30 @@ export class DirectoryImportService {
             return slug;
         }
 
-        const providerId = gitProvider;
-        const repoNames = [slug, `${slug}-data`, `${slug}-website`];
-        let hasConflict = false;
+        const conflict = await this.sourceRepoAnalyzer.checkSlugConflicts(
+            repoOwner,
+            slug,
+            token,
+            gitProvider,
+        );
 
-        for (const repoName of repoNames) {
-            try {
-                const exists = await this.gitFacade.repositoryExists(repoOwner, repoName, {
-                    token,
-                    providerId,
-                });
-                if (exists) {
-                    hasConflict = true;
-                    break;
-                }
-            } catch {
-                // ignore
-            }
-        }
-
-        if (!hasConflict) {
+        if (!conflict.hasConflict) {
             return slug;
         }
 
-        // Try slug-2 through slug-10
-        for (let i = 2; i <= 10; i++) {
-            const candidate = `${slug}-${i}`;
-            const candidateRepos = [candidate, `${candidate}-data`, `${candidate}-website`];
-            let candidateConflicts = false;
-
-            for (const repo of candidateRepos) {
-                try {
-                    const exists = await this.gitFacade.repositoryExists(repoOwner, repo, {
-                        token,
-                        providerId,
-                    });
-                    if (exists) {
-                        candidateConflicts = true;
-                        break;
-                    }
-                } catch {
-                    // ignore
-                }
-            }
-
-            if (!candidateConflicts) {
-                const dbExists = await this.directoryRepository.findByOwnerAndSlug({
-                    userId: user.id,
-                    owner: repoOwner,
-                    slug: candidate,
-                });
-                if (!dbExists) {
-                    this.logger.log(
-                        `Slug conflict resolved: "${slug}" → "${candidate}" for ${repoOwner}`,
-                    );
-                    return candidate;
-                }
+        // Verify the suggested slug isn't already in our DB before accepting it
+        const suggested = conflict.suggestedSlug;
+        if (suggested !== slug) {
+            const dbExists = await this.directoryRepository.findByOwnerAndSlug({
+                userId: user.id,
+                owner: repoOwner,
+                slug: suggested,
+            });
+            if (!dbExists) {
+                this.logger.log(
+                    `Slug conflict resolved: "${slug}" → "${suggested}" for ${repoOwner}`,
+                );
+                return suggested;
             }
         }
 

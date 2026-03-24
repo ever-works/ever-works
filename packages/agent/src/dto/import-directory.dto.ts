@@ -14,11 +14,18 @@ import {
 } from 'class-validator';
 import { sanitizeName } from '../utils/sanitize.util';
 import { ImportSourceType } from '../entities/directory.entity';
+import { ProvidersDto } from '../items-generator/dto';
 
 export enum ImportSourceTypeEnum {
     DATA_REPO = 'data_repo',
     AWESOME_README = 'awesome_readme',
     LINK_EXISTING = 'link_existing',
+}
+
+export class ImportEnrichmentConfigDto {
+    @IsOptional()
+    @IsNumber()
+    expansionFactor?: number; // target ratio of final/seed items (default 2.5)
 }
 
 export class AnalyzeRepositoryDto {
@@ -55,12 +62,6 @@ export class AnalyzeRepositoryResponseDto {
     };
     hasDataRepoWriteAccess?: boolean;
     error?: string;
-}
-
-export class ImportProvidersDto {
-    @IsOptional()
-    @IsString()
-    ai?: string;
 }
 
 export class ImportDirectoryDto {
@@ -105,8 +106,13 @@ export class ImportDirectoryDto {
 
     @IsOptional()
     @ValidateNested()
-    @Type(() => ImportProvidersDto)
-    providers?: ImportProvidersDto;
+    @Type(() => ProvidersDto)
+    providers?: ProvidersDto;
+
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => ImportEnrichmentConfigDto)
+    enrichmentConfig?: ImportEnrichmentConfigDto;
 }
 
 export class ImportDirectoryResponseDto {

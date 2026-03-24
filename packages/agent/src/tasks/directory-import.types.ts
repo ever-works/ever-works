@@ -1,4 +1,6 @@
 import { ImportSourceType } from '@src/entities/directory.entity';
+import type { ImportEnrichmentConfigDto } from '@src/dto/import-directory.dto';
+import type { ProvidersDto } from '@ever-works/contracts/api';
 
 export type DirectoryImportPayload = {
     directoryId: string;
@@ -14,7 +16,8 @@ export type DirectoryImportPayload = {
         createMissingRepos?: boolean;
         enableSync?: boolean;
     };
-    providers?: { ai?: string };
+    providers?: ProvidersDto;
+    enrichmentConfig?: ImportEnrichmentConfigDto;
 };
 
 export type DirectoryImportMetrics = {
@@ -49,6 +52,6 @@ export enum DirectoryImportErrorCode {
     CLONE_FAILED = 'CLONE_FAILED',
     CREATE_REPO_FAILED = 'CREATE_REPO_FAILED',
     GENERATION_FAILED = 'GENERATION_FAILED',
-    AI_EXTRACTION_FAILED = 'AI_EXTRACTION_FAILED',
+    ENRICHMENT_FAILED = 'ENRICHMENT_FAILED',
     UNKNOWN_ERROR = 'UNKNOWN_ERROR',
 }

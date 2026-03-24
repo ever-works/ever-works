@@ -133,7 +133,7 @@ export class SetGlobalPipelineDefaultDto {
 
     @ApiProperty({
         description:
-            'When true, this pipeline is enforced in the generator form (cannot be overridden)',
+            'When true, this pipeline is pre-selected in the generator form across all directories, overriding directory-level defaults. The user can still change the selection manually.',
         example: false,
     })
     @IsBoolean()

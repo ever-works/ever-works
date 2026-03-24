@@ -476,7 +476,7 @@
                     "autoLabel": "Auto",
                     "autoDescription": "Use the system-resolved pipeline for each directory",
                     "enforceLabel": "Enforce this default",
-                    "enforceDescription": "The selected pipeline will be pre-selected in the generator form across all directories.",
+                    "enforceDescription": "Always pre-select this pipeline, even when a directory has its own pipeline configured. You can still switch pipelines manually in the form.",
                     "saveFailed": "Failed to save pipeline default"
                 }
             },
@@ -2046,6 +2046,25 @@
                     "title": "Source Attribution:",
                     "text": "This directory will reference {url} as its source"
                 },
+                "research": {
+                    "title": "Import & Research Mode",
+                    "description": "Items from the source repository will be used as research seeds. The AI pipeline will discover new items, rewrite descriptions, and expand the taxonomy.",
+                    "seedDetected": "~{count} seed items detected",
+                    "expansionFactor": "Expansion target",
+                    "expansionDescription": "How many times larger should the final collection be compared to the source?",
+                    "preview": "~{seedCount} seed items \u2192 target ~{targetCount} final items (~{newItems} new items to discover)",
+                    "enrichmentOptions": "Enrichment options",
+                    "enrichDescriptions": "Rewrite descriptions",
+                    "enrichDescriptionsHint": "AI will rewrite and expand all imported descriptions",
+                    "expandTaxonomy": "Expand categories & tags",
+                    "expandTaxonomyHint": "Generate new categories and tags beyond the source taxonomy",
+                    "parsePrIssues": "Parse PRs & issues",
+                    "parsePrIssuesHint": "Extract additional items from pull requests and issues",
+                    "legalNote": "Note:",
+                    "legalDescription": "Research mode uses the source repository as input data only. The final collection will consist primarily of newly discovered items with original, AI-generated descriptions. Source content is not copied verbatim.",
+                    "importButton": "Start Import & Research",
+                    "importingButton": "Starting research pipeline..."
+                },
                 "analyzeButton": "Analyze Repository",
                 "importButton": "Import Directory",
                 "importingButton": "Importing...",
@@ -2090,6 +2109,10 @@
                     "linkExisting": {
                         "title": "Link Existing",
                         "description": "Use your existing repository directly. No copying, changes sync automatically."
+                    },
+                    "research": {
+                        "title": "Import & Research",
+                        "description": "Use as research seed, auto-discover new items and enrich content with AI."
                     },
                     "back": "Back"
                 },
