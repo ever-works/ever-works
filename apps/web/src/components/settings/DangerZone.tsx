@@ -129,7 +129,7 @@ export function DangerZone({ user }: DangerZoneProps) {
                                 onClick={handleDeleteAccount}
                                 disabled={isPending || confirmEmail !== user.email}
                                 className={cn(
-                                    'px-6 py-2 rounded-lg font-medium transition-colors',
+                                    'px-6 py-2 rounded-lg font-medium transition-colors text-sm',
                                     'bg-danger text-white',
                                     confirmEmail === user.email
                                         ? 'hover:bg-danger/90'
@@ -145,7 +145,7 @@ export function DangerZone({ user }: DangerZoneProps) {
                                 }}
                                 disabled={isPending}
                                 className={cn(
-                                    'px-6 py-2 rounded-lg font-medium transition-colors',
+                                    'px-6 py-2 rounded-lg font-medium transition-colors text-sm',
                                     'bg-surface-secondary dark:bg-surface-secondary-dark',
                                     'text-text dark:text-text-dark',
                                     'hover:bg-surface dark:hover:bg-surface-dark',

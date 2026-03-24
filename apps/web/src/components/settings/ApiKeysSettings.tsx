@@ -124,17 +124,17 @@ export function ApiKeysSettings({ initialKeys }: ApiKeysSettingsProps) {
 
     return (
         <div className="space-y-8">
-            <div>
-                <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
+            <div className='flex justify-between items-start'>
+                <div>
+                    <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
                     {t('title')}
-                </h2>
-                <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
-            </div>
+                    </h2>
+                    <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
+                </div>
 
-            {/* Create Button */}
-            <div className="flex justify-end">
-                <Button onClick={() => setShowCreateDialog(true)}>
-                    <Key className="w-4 h-4 mr-2" />
+                {/* Create Button */}
+                <Button onClick={() => setShowCreateDialog(true)} className='text-sm'>
+                    <Key className="w-4 h-4" />
                     {t('create')}
                 </Button>
             </div>
@@ -276,10 +276,10 @@ export function ApiKeysSettings({ initialKeys }: ApiKeysSettingsProps) {
                             </div>
 
                             <DialogFooter>
-                                <Button variant="secondary" onClick={closeCreateDialog}>
+                                <Button size='sm' variant="secondary" onClick={closeCreateDialog}>
                                     {t('dialog.cancel')}
                                 </Button>
-                                <Button onClick={handleCreate} loading={isPending}>
+                                <Button size='sm' onClick={handleCreate} loading={isPending}>
                                     {t('dialog.createButton')}
                                 </Button>
                             </DialogFooter>

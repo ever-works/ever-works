@@ -116,7 +116,7 @@ export function GitHubSync() {
     if (!status.hasOAuth) {
         return (
             <div className="p-4 rounded-lg border border-border dark:border-border-dark">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center mb-2">
                     <Github className="w-5 h-5" />
                     <span className="font-medium text-text dark:text-text-dark">
                         {t('connectGitHub')}
@@ -149,7 +149,7 @@ export function GitHubSync() {
             <div className="space-y-4">
                 {!showConfigure ? (
                     <Button variant="secondary" onClick={() => setShowConfigure(true)} size="sm">
-                        <Github className="w-4 h-4 mr-2" />
+                        <Github className="w-4 h-4" />
                         {t('setupSync')}
                     </Button>
                 ) : (

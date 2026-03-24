@@ -59,7 +59,7 @@ const Input = ({
                 // Variant-specific styles
                 variant === 'form' && ['px-4 py-2', 'bg-white dark:bg-input-bg-dark'],
                 variant === 'default' && [
-                    'px-4 py-3',
+                    'px-4 py-2',
                     'bg-white dark:bg-input-bg-dark',
                     'focus:ring-2 focus:ring-primary-800/20',
                     'hover:border-border-secondary dark:hover:border-border-secondary-dark',
