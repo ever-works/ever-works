@@ -2,6 +2,7 @@ import 'server-only';
 import { API_URL, WEB_URL } from '../constants';
 import { headers } from 'next/headers';
 import { getAuthAccessCookie } from '../auth/cookies';
+import { refreshAccessToken } from '../auth/refresh';
 import { getTranslations } from 'next-intl/server';
 
 export async function handleServerError(error: unknown): Promise<never> {
@@ -40,34 +41,40 @@ export async function serverFetch<T>(
     endpoint: string,
     options: ServerFetchOptions = {},
 ): Promise<T> {
-    const token = await getAuthAccessCookie();
     const frontendUrl = await getFrontendUrl();
     const t = await getTranslations('api.errors');
-
     const { rawResponse, ...fetchOptions } = options;
 
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'X-Frontend-URL': frontendUrl,
-        ...((fetchOptions.headers as Record<string, string>) || {}),
+    const doFetch = async (authToken?: string) => {
+        const reqHeaders: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'X-Frontend-URL': frontendUrl,
+            ...((fetchOptions.headers as Record<string, string>) || {}),
+        };
+
+        if (authToken) {
+            reqHeaders['Authorization'] = `Bearer ${authToken}`;
+        }
+
+        return fetch(`${API_URL}${endpoint}`, {
+            ...fetchOptions,
+            headers: reqHeaders,
+            cache: 'no-store',
+            next: { revalidate: 0 },
+        });
     };
 
-    // Add authentication header if token exists
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
+    const token = await getAuthAccessCookie();
+    let response = await doFetch(token);
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
-        ...fetchOptions,
-        headers,
-        // Enable caching for GET requests by default
-        // next: {
-        //     revalidate: fetchOptions.method === "GET" ? 3600 : 0, // Cache for 1 hour
-        //     tags: [endpoint.split("/")[1] || "api"], // Tag based on resource type
-        // },
-        cache: 'no-store',
-        next: { revalidate: 0 },
-    });
+    // On 401, attempt a single token refresh and retry
+    if (response.status === 401 && token) {
+        const refreshed = await refreshAccessToken();
+        if (refreshed) {
+            const newToken = await getAuthAccessCookie();
+            response = await doFetch(newToken);
+        }
+    }
 
     // Return raw response for streaming
     if (rawResponse) {
