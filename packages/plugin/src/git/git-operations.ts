@@ -125,7 +125,15 @@ export class GitOperations implements IGitOperations {
 		}
 	}
 
-	async commit(dir: string, message: string, committer?: GitCommitter): Promise<string> {
+	async commit(dir: string, message: string, committer?: GitCommitter): Promise<string | null> {
+		// Skip commit when there are no staged changes to avoid empty commits
+		// that cause "unpack" errors on push
+		const statusMatrix = await git.statusMatrix({ fs, dir });
+		const hasStagedChanges = statusMatrix.some(([, headStatus, , stageStatus]) => headStatus !== stageStatus);
+		if (!hasStagedChanges) {
+			return null;
+		}
+
 		const resolvedCommitter = this.mergeCommitter(committer);
 
 		return git.commit({
@@ -161,6 +169,11 @@ export class GitOperations implements IGitOperations {
 				const err = error as Error;
 				lastError = err;
 				const errorMessage = err?.message || '';
+
+				// Empty unpack response means nothing to push (local and remote are in sync)
+				if (errorMessage.includes('Expected "unpack ok"') && errorMessage.includes('but received ""')) {
+					return;
+				}
 
 				const isRetryable =
 					errorMessage.includes('cannot lock ref') ||
