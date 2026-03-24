@@ -873,6 +873,16 @@ export const directoryAPI = {
         return serverFetch<{ count: number }>(`/directories/${id}/comparisons/remaining-count`);
     },
 
+    getComparisonGenerationStatus: async (id: string) => {
+        return serverFetch<{
+            generating: boolean;
+            stage?: string;
+            itemAName?: string;
+            itemBName?: string;
+            startedAt?: string;
+        }>(`/directories/${id}/comparisons/generation-status`);
+    },
+
     generateNextComparison: async (id: string) => {
         return serverMutation<ComparisonResult>({
             endpoint: `/directories/${id}/comparisons/generate`,

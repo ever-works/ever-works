@@ -41,4 +41,20 @@ export const DEFAULT_COMPARISON_SETTINGS: ComparisonPluginSettings = {
     min_items_for_comparison: 3,
 };
 
+export type ComparisonProgressStage =
+    | 'researching'
+    | 'analyzing'
+    | 'writing'
+    | 'writing_extended'
+    | 'saving';
+
+export type ComparisonProgressCallback = (stage: ComparisonProgressStage) => void;
+
+export interface ComparisonProgressInfo {
+    readonly stage: ComparisonProgressStage;
+    readonly itemAName: string;
+    readonly itemBName: string;
+    readonly startedAt: string;
+}
+
 export type { ComparisonData, ComparisonDimension };

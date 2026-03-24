@@ -915,7 +915,14 @@
                     "generating": "Generating comparisons: {completed} / {total} complete",
                     "error": "{count, plural, one {# error} other {# errors}}",
                     "stopped": "Stopped. Generated {count, plural, one {# comparison} other {# comparisons}} with {errors, plural, one {# error} other {# errors}}.",
-                    "done": "Done! Generated {count, plural, one {# comparison} other {# comparisons}}."
+                    "done": "Done! Generated {count, plural, one {# comparison} other {# comparisons}}.",
+                    "stages": {
+                        "researching": "Researching {itemA} vs {itemB}...",
+                        "analyzing": "Analyzing comparison data...",
+                        "writing": "Writing comparison article...",
+                        "writing_extended": "Writing extended analysis...",
+                        "saving": "Saving and publishing..."
+                    }
                 },
                 "pagination": {
                     "showing": "Showing {from}–{to} of {total}"

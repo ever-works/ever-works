@@ -1059,6 +1059,21 @@ export class DirectoriesController {
         return { count };
     }
 
+    @Get('directories/:id/comparisons/generation-status')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get comparison generation status',
+        description: 'Check the current progress of an in-flight comparison generation',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    async getComparisonGenerationStatus(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+    ) {
+        await this.authService.getUser(auth.userId);
+        return this.comparisonGenerationService.getGenerationStatus(id);
+    }
+
     @Get('directories/:id/comparisons/:slug')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Get comparison', description: 'Get a single comparison by slug' })

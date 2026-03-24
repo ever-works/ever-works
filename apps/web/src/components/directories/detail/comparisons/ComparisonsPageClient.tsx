@@ -44,7 +44,9 @@ import {
     getRemainingComparisonCount,
     saveComparisonAiConfig,
     getAiProviderModels,
+    listComparisons,
 } from '@/app/actions/dashboard/comparisons';
+import { ComparisonGenerationProgress } from './ComparisonGenerationProgress';
 
 interface ComparisonsPageClientProps {
     directoryId: string;
@@ -141,14 +143,23 @@ export function ComparisonsPageClient({
         .filter((item) => item.slug !== selectedItemA)
         .filter((item) => queryB === '' || item.name.toLowerCase().includes(queryB.toLowerCase()));
 
+    const refreshComparisons = async () => {
+        try {
+            const updated = await listComparisons(directoryId);
+            setComparisons(updated);
+        } catch {
+            // Fallback: reload if fetch fails
+            window.location.reload();
+        }
+    };
+
     const handleGenerateNext = () => {
         startTransition(async () => {
             const result = await generateNextComparison(directoryId);
 
             if (result.status === 'success') {
                 toast.success(result.message);
-                // Refresh comparisons list
-                window.location.reload();
+                await refreshComparisons();
             } else if (result.status === 'skipped') {
                 toast.info(result.message);
             } else {
@@ -177,7 +188,7 @@ export function ComparisonsPageClient({
 
             if (result.status === 'success') {
                 toast.success(result.message);
-                window.location.reload();
+                await refreshComparisons();
             } else if (result.status === 'skipped') {
                 toast.info(result.message);
             } else {
@@ -258,7 +269,7 @@ export function ComparisonsPageClient({
             toast.success(t('progress.done', { count: completed }));
         }
 
-        window.location.reload();
+        await refreshComparisons();
     }, [directoryId, remainingCount]);
 
     const handleStopGenerateAll = () => {
@@ -447,6 +458,9 @@ export function ComparisonsPageClient({
                     )}
                 </div>
             )}
+
+            {/* Single generation progress */}
+            <ComparisonGenerationProgress directoryId={directoryId} isGenerating={isPending} />
 
             {/* Generate All progress bar */}
             {isGeneratingAll && (

@@ -10,5 +10,8 @@ export type {
     ComparisonResearch,
     ComparisonGenerationResult,
     ComparisonPluginSettings,
+    ComparisonProgressStage,
+    ComparisonProgressCallback,
+    ComparisonProgressInfo,
 } from './types';
 export { DEFAULT_COMPARISON_SETTINGS } from './types';
