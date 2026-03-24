@@ -31,6 +31,11 @@ export async function getAuthFromAPI() {
         if (!refreshed) {
             return null;
         }
+        // Re-verify the refreshed token is valid before making the API call
+        const freshAuth = await getAuthFromRequest();
+        if (!freshAuth.isAuthenticated || freshAuth.isExpired) {
+            return null;
+        }
     }
 
     try {
