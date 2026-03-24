@@ -26,7 +26,6 @@ import {
     MessageSquare,
     Keyboard,
     ChevronUp,
-    Mail,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -463,10 +462,13 @@ export function DashboardSidebar({
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                     onClick={() => {
-                                        window.open('mailto:support@ever.works');
+                                        window.open(
+                                            'https://github.com/ever-works/ever-works/issues',
+                                            '_blank',
+                                        );
                                     }}
                                 >
-                                    <Mail className="w-4 h-4 mr-2 shrink-0" />
+                                    <MessageSquare className="w-4 h-4 mr-2 shrink-0" />
                                     {t('profileMenu.support')}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={onOpenHelp}>
