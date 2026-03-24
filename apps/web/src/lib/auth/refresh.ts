@@ -1,11 +1,12 @@
 import 'server-only';
+import { cache } from 'react';
 import { API_URL } from '../constants';
 import { getRefreshCookie, setAuthCookies, removeAuthAccessCookies } from './cookies';
 
-// Deduplicate concurrent refresh attempts within the same request lifecycle.
-// Multiple server actions or fetches hitting an expired token simultaneously
-// will share a single in-flight refresh call instead of racing.
-let pendingRefresh: Promise<boolean> | null = null;
+// React.cache() scopes this per-request in Next.js App Router, so concurrent
+// server components within the same render share one refresh call without
+// leaking state across different users' requests.
+const getRefreshState = cache(() => ({ pending: null as Promise<boolean> | null }));
 
 /**
  * Attempts to refresh the access token using the stored refresh token.
@@ -15,16 +16,17 @@ let pendingRefresh: Promise<boolean> | null = null;
  * Returns true if refresh succeeded, false otherwise.
  */
 export async function refreshAccessToken(): Promise<boolean> {
-    if (pendingRefresh) {
-        return pendingRefresh;
+    const state = getRefreshState();
+    if (state.pending) {
+        return state.pending;
     }
 
-    pendingRefresh = doRefresh();
+    state.pending = doRefresh();
 
     try {
-        return await pendingRefresh;
+        return await state.pending;
     } finally {
-        pendingRefresh = null;
+        state.pending = null;
     }
 }
 
@@ -57,8 +59,10 @@ async function doRefresh(): Promise<boolean> {
 
         await setAuthCookies(data.access_token, data.refresh_token);
         return true;
-    } catch {
-        await removeAuthAccessCookies();
+    } catch (error) {
+        // Only log on transient/network errors — leave cookies intact so the
+        // user is not forced to re-authenticate on a temporary failure.
+        console.error('Token refresh failed unexpectedly:', error);
         return false;
     }
 }
