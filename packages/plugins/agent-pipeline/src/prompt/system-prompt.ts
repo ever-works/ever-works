@@ -173,6 +173,10 @@ export function buildParentUserPromptVariables(
 			'4. Use `getWorkspaceOverview` to review the taxonomy, then use `modifyItems` to expand categories and tags.\n' +
 			"If the user's prompt asks for something different (e.g., only reorganizing), follow their instructions instead.\n" +
 			'Use reportProgress to update on your progress.';
+	} else if (request.prompt?.includes('## Step')) {
+		// Import prompts already contain a numbered workflow (## Step 1 … ## Step 4).
+		// Avoid redundant "Follow the Generation Workflow" instruction.
+		workflowInstructions = '\nUse reportProgress to update on your progress.';
 	} else {
 		workflowInstructions =
 			'\nFollow the Generation Workflow in your instructions. ' +

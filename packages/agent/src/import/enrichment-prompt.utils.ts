@@ -9,6 +9,9 @@ import type { Directory } from '@src/entities/directory.entity';
 const DEFAULT_PIPELINE_ID = 'agent-pipeline';
 const DEFAULT_EXPANSION_FACTOR = 2.5;
 const MAX_PIPELINE_PAGES = 1000;
+// Generous fixed target — we don't know source size ahead of time.
+// The pipeline stops when content is exhausted, not when it hits this number.
+const DEFAULT_TARGET_ITEMS = 500;
 
 /**
  * Build a generation DTO for importing from an awesome list URL.
@@ -35,9 +38,6 @@ export function buildImportGenerationDto(options: {
 
     // Source items should be at most this % of the final collection
     const maxSourcePct = Math.round(100 / expansionFactor);
-    // If source has N items, we need to discover at least (expansionFactor-1)*N more
-    // Use a high target so the pipeline doesn't stop too early
-    const targetItems = Math.max(100, Math.round(100 * expansionFactor));
 
     const prompt = [
         `Build a comprehensive directory using this awesome list as your research starting point: ${sourceUrl}`,
@@ -65,8 +65,8 @@ export function buildImportGenerationDto(options: {
         `The source's categories/tags should be at most 30% of the final taxonomy.`,
         `Add descriptive tags that help users filter and discover items.`,
         ``,
-        `Overall target: at least ${targetItems} total items.`,
-        `Do not stop early — if more relevant content exists, keep extracting.`,
+        `Extract ALL items from the source list, then discover significantly more beyond it.`,
+        `Do not stop early — keep going until all relevant content in the domain is exhausted.`,
     ].join('\n');
 
     const dto = new CreateItemsGeneratorDto();
@@ -80,8 +80,8 @@ export function buildImportGenerationDto(options: {
         pipeline: providers?.pipeline ?? DEFAULT_PIPELINE_ID,
     };
     dto.pluginConfig = {
-        target_items: targetItems,
-        max_pages_to_process: Math.min(MAX_PIPELINE_PAGES, Math.max(100, targetItems * 3)),
+        target_items: DEFAULT_TARGET_ITEMS,
+        max_pages_to_process: MAX_PIPELINE_PAGES,
         capture_screenshots: true,
     };
 

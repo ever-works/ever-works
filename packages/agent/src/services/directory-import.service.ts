@@ -692,62 +692,30 @@ export class DirectoryImportService {
             return slug;
         }
 
-        const providerId = gitProvider;
-        const repoNames = [slug, `${slug}-data`, `${slug}-website`];
-        let hasConflict = false;
+        const conflict = await this.sourceRepoAnalyzer.checkSlugConflicts(
+            repoOwner,
+            slug,
+            token,
+            gitProvider,
+        );
 
-        for (const repoName of repoNames) {
-            try {
-                const exists = await this.gitFacade.repositoryExists(repoOwner, repoName, {
-                    token,
-                    providerId,
-                });
-                if (exists) {
-                    hasConflict = true;
-                    break;
-                }
-            } catch {
-                // ignore
-            }
-        }
-
-        if (!hasConflict) {
+        if (!conflict.hasConflict) {
             return slug;
         }
 
-        // Try slug-2 through slug-10
-        for (let i = 2; i <= 10; i++) {
-            const candidate = `${slug}-${i}`;
-            const candidateRepos = [candidate, `${candidate}-data`, `${candidate}-website`];
-            let candidateConflicts = false;
-
-            for (const repo of candidateRepos) {
-                try {
-                    const exists = await this.gitFacade.repositoryExists(repoOwner, repo, {
-                        token,
-                        providerId,
-                    });
-                    if (exists) {
-                        candidateConflicts = true;
-                        break;
-                    }
-                } catch {
-                    // ignore
-                }
-            }
-
-            if (!candidateConflicts) {
-                const dbExists = await this.directoryRepository.findByOwnerAndSlug({
-                    userId: user.id,
-                    owner: repoOwner,
-                    slug: candidate,
-                });
-                if (!dbExists) {
-                    this.logger.log(
-                        `Slug conflict resolved: "${slug}" → "${candidate}" for ${repoOwner}`,
-                    );
-                    return candidate;
-                }
+        // Verify the suggested slug isn't already in our DB before accepting it
+        const suggested = conflict.suggestedSlug;
+        if (suggested !== slug) {
+            const dbExists = await this.directoryRepository.findByOwnerAndSlug({
+                userId: user.id,
+                owner: repoOwner,
+                slug: suggested,
+            });
+            if (!dbExists) {
+                this.logger.log(
+                    `Slug conflict resolved: "${slug}" → "${suggested}" for ${repoOwner}`,
+                );
+                return suggested;
             }
         }
 
