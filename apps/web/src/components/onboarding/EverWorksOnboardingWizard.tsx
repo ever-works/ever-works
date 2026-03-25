@@ -193,7 +193,7 @@ export function EverWorksOnboardingWizard({
                         </nav>
 
                         {/* Skip button */}
-                        <div className="px-3 py-2 h-10 mt-auto border-t border-border dark:border-border-dark">
+                        <div className="px-3 py-2 mt-auto border-t border-border dark:border-border-dark">
                             <Button
                                 variant="ghost"
                                 size="sm"
