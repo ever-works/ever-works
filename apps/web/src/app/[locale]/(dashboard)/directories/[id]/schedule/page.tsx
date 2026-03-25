@@ -57,12 +57,14 @@ export default async function DirectorySchedulePage({ params }: Params) {
     let configRes;
 
     try {
-        const [directoryResult, scheduleResult, formSchemaResult, configResult] = await Promise.all([
-            directoryAPI.get(id),
-            directoryAPI.getSchedule(id).catch(() => null),
-            itemsGeneratorAPI.getFormSchema(id).catch(() => null),
-            directoryAPI.getConfig(id).catch(() => null),
-        ]);
+        const [directoryResult, scheduleResult, formSchemaResult, configResult] = await Promise.all(
+            [
+                directoryAPI.get(id),
+                directoryAPI.getSchedule(id).catch(() => null),
+                itemsGeneratorAPI.getFormSchema(id).catch(() => null),
+                directoryAPI.getConfig(id).catch(() => null),
+            ],
+        );
 
         directory = directoryResult.directory;
         scheduleRes = scheduleResult;
