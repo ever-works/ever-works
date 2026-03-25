@@ -46,12 +46,12 @@ export default function GlobalError({
                         </div>
 
                         <h1 className="text-2xl font-semibold mb-3">Something went wrong</h1>
-                        <p className="text-[#94a3b8] dark:text-[#64748b] mb-8 leading-relaxed">
+                        <p className="text-[#94a3b8] dark:text-[#cbd5e1] mb-8 leading-relaxed">
                             An unexpected error occurred. Please try again or contact support if the
                             problem persists.
                         </p>
                         {error.digest && (
-                            <p className="text-xs text-[#94a3b8] dark:text-[#64748b] mb-6 font-mono bg-[#f1f5f9] dark:bg-[#1e293b] px-3 py-1.5 rounded-md inline-block">
+                            <p className="text-xs text-[#94a3b8] dark:text-[#cbd5e1] mb-6 font-mono bg-[#f1f5f9] dark:bg-[#1e293b] px-3 py-1.5 rounded-md inline-block">
                                 Error ID: {error.digest}
                             </p>
                         )}
