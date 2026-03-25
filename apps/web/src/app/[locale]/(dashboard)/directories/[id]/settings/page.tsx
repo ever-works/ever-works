@@ -18,8 +18,14 @@ export default async function DirectorySettingsPage({ params }: Params) {
     const { id } = await params;
 
     const user = await getAuthFromCookie();
-    const res = await directoryAPI.get(id);
-    const directory = res.directory;
+
+    let directory;
+    try {
+        const res = await directoryAPI.get(id);
+        directory = res.directory;
+    } catch {
+        notFound();
+    }
 
     // Server-side permission check: only managers and owners can access settings
     if (!canAccessSettings(directory.userRole)) {

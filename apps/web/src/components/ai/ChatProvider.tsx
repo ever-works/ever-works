@@ -6,6 +6,7 @@ import { useChatHistory, UseChatHistoryValue } from '@/lib/hooks/use-chat-histor
 import type { ProviderOption } from '@/lib/api/types-only';
 import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
 import { resolveEffectiveDefault } from '@ever-works/plugin';
+import { toast } from 'sonner';
 
 interface ChatContextValue extends UseChatHistoryValue {
     providers: ProviderOption[];
@@ -20,22 +21,29 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const chatHistory = useChatHistory({ initialMessage: t('welcomeMessage') });
     const [providers, setProviders] = useState<ProviderOption[]>([]);
     const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
-
     useEffect(() => {
         let cancelled = false;
 
         async function fetchProviders() {
-            const result = await getGlobalFormSchema();
-            if (cancelled) return;
+            try {
+                const result = await getGlobalFormSchema();
+                if (cancelled) return;
 
-            if (result.success && result.data) {
-                const aiProviders = result.data.providers.ai ?? [];
-                setProviders(aiProviders);
+                if (result.success && result.data) {
+                    const aiProviders = result.data.providers.ai ?? [];
+                    setProviders(aiProviders);
 
-                const defaultProvider = resolveEffectiveDefault(aiProviders);
-                if (defaultProvider) {
-                    setSelectedProvider(defaultProvider.id);
+                    const defaultProvider = resolveEffectiveDefault(aiProviders);
+                    if (defaultProvider) {
+                        setSelectedProvider(defaultProvider.id);
+                    }
+                } else {
+                    toast.error(t('providersError'));
                 }
+            } catch (error) {
+                if (cancelled) return;
+                console.error('Failed to load AI providers:', error);
+                toast.error(t('providersError'));
             }
         }
 
@@ -44,7 +52,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [t]);
 
     const handleSetSelectedProvider = useCallback((id: string | null) => {
         setSelectedProvider(id);

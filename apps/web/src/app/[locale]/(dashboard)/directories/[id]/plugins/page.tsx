@@ -16,15 +16,25 @@ export default async function DirectoryPluginsPage({ params }: Params) {
     const { id } = await params;
     const t = await getTranslations('dashboard.directoryPlugins');
 
-    const res = await directoryAPI.get(id);
-    const directory = res.directory;
+    let directory;
+    let pluginsData;
+
+    try {
+        const [res, pluginsResult] = await Promise.all([
+            directoryAPI.get(id),
+            pluginsAPI.listForDirectory(id),
+        ]);
+
+        directory = res.directory;
+        pluginsData = pluginsResult;
+    } catch {
+        notFound();
+    }
 
     // Server-side permission check: only managers and owners can access settings
     if (!canAccessSettings(directory.userRole)) {
         notFound();
     }
-
-    const pluginsData = await pluginsAPI.listForDirectory(id);
 
     return (
         <div className="w-full">
