@@ -106,7 +106,7 @@ export function EverWorksOnboardingWizard({
                     />
                 </div>
 
-                <div className="grid gap-0 md:grid-cols-[260px_1fr] min-h-[95dvh]">
+                <div className="grid gap-0 md:grid-cols-[260px_1fr] min-h-[90dvh]">
                     {/* ── Sidebar ── */}
                     <aside className="relative flex flex-col bg-surface-secondary/50 dark:bg-surface-secondary-dark/60 border-r border-border dark:border-border-dark">
                         {/* Brand header */}
