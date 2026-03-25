@@ -12,7 +12,6 @@ interface ChatContextValue extends UseChatHistoryValue {
     providers: ProviderOption[];
     selectedProvider: string | null;
     setSelectedProvider: (id: string | null) => void;
-    providersError: boolean;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -22,8 +21,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const chatHistory = useChatHistory({ initialMessage: t('welcomeMessage') });
     const [providers, setProviders] = useState<ProviderOption[]>([]);
     const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
-    const [providersError, setProvidersError] = useState(false);
-
     useEffect(() => {
         let cancelled = false;
 
@@ -41,13 +38,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                         setSelectedProvider(defaultProvider.id);
                     }
                 } else {
-                    setProvidersError(true);
                     toast.error(t('providersError'));
                 }
             } catch (error) {
                 if (cancelled) return;
                 console.error('Failed to load AI providers:', error);
-                setProvidersError(true);
                 toast.error(t('providersError'));
             }
         }
@@ -68,7 +63,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         providers,
         selectedProvider,
         setSelectedProvider: handleSetSelectedProvider,
-        providersError,
     };
 
     return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
