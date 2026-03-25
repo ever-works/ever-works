@@ -79,7 +79,10 @@ export async function serverFetch<T>(
         try {
             const errorData = await response.json();
 
-            console.error('API Error:', errorData);
+            // Only log unexpected errors — 404s are expected for missing resources
+            if (response.status !== 404) {
+                console.error('API Error:', errorData);
+            }
 
             if (errorData?.message) {
                 errorMessage = Array.isArray(errorData.message)
