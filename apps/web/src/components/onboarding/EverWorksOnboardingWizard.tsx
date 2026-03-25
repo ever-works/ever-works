@@ -74,7 +74,6 @@ export function EverWorksOnboardingWizard({
     );
 
     const shouldOpen = totalDirectories === 0 && !storedState.dismissed;
-    // const shouldOpen = true;
     const activeStep = Math.min(storedState.step, steps.length - 1);
     const isLastStep = activeStep === steps.length - 1;
 

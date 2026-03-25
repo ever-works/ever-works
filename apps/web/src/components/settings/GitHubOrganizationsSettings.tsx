@@ -142,7 +142,7 @@ export function GitHubOrganizationsSettings({
                     <Button
                         onClick={saveOrganizations}
                         loading={isPending}
-                        className="text-sm py-2"
+                        size='sm'
                     >
                         <Save className="w-4 h-4" />
                         Save organizations
