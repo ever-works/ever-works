@@ -139,11 +139,7 @@ export function GitHubOrganizationsSettings({
                         <Plus className="w-4 h-4" />
                         Add organization
                     </Button>
-                    <Button
-                        onClick={saveOrganizations}
-                        loading={isPending}
-                        size='sm'
-                    >
+                    <Button onClick={saveOrganizations} loading={isPending} size="sm">
                         <Save className="w-4 h-4" />
                         Save organizations
                     </Button>
