@@ -128,20 +128,22 @@ export function GitHubOrganizationsSettings({
                 )}
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3">
                 <Input
                     value={draftOrganization}
                     onChange={(event) => setDraftOrganization(event.target.value)}
                     placeholder="Add organization by login"
                 />
-                <Button variant="secondary" onClick={addOrganization}>
-                    <Plus className="w-4 h-4" />
-                    Add organization
-                </Button>
-                <Button onClick={saveOrganizations} loading={isPending}>
-                    <Save className="w-4 h-4" />
-                    Save organizations
-                </Button>
+                <div className="flex gap-3 items-center">
+                    <Button variant="secondary" onClick={addOrganization} className='text-sm'>
+                        <Plus className="w-4 h-4" />
+                        Add organization
+                    </Button>
+                    <Button onClick={saveOrganizations} loading={isPending} className='text-sm py-2'>
+                        <Save className="w-4 h-4" />
+                        Save organizations
+                    </Button>
+                </div>
             </div>
 
             {status && (
