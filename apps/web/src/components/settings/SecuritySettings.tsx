@@ -136,7 +136,11 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
 
                     {/* Update Button */}
                     <div className="flex justify-end">
-                        <Button onClick={handleUpdatePassword} loading={isPending}>
+                        <Button
+                            onClick={handleUpdatePassword}
+                            loading={isPending}
+                            className="text-sm"
+                        >
                             {t('changePassword.actions.update')}
                         </Button>
                     </div>

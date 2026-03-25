@@ -171,10 +171,11 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                                     <Button
                                         variant={optimisticEnabled ? 'ghost' : 'primary'}
                                         onClick={handleToggle}
+                                        size="sm"
                                         disabled={isPending}
                                         loading={isPending}
                                         className={cn(
-                                            'shrink-0',
+                                            'shrink-0 gap-2',
                                             optimisticEnabled &&
                                                 'text-danger hover:text-danger hover:bg-danger/10',
                                         )}
@@ -403,7 +404,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                             {t('about')}
                         </h2>
                     </div>
-                    <div className="p-6">
+                    <div className="py-10 pl-12 pr-24">
                         <PluginReadme content={plugin.readme} />
                     </div>
                 </div>
