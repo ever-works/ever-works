@@ -10,6 +10,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { getDirectories } from '@/app/actions/dashboard/directories';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 
 const MIN_SEARCH_CHARS = 3;
 const DEBOUNCE_MS = 300;
@@ -69,9 +70,10 @@ export default function DirectoriesClient({
                     setTotal(response.total);
                 }
             } catch (error) {
-                // Only log error if this is still the latest request
+                // Only show error if this is still the latest request
                 if (currentRequestId === requestIdRef.current) {
                     console.error('Failed to search directories:', error);
+                    toast.error(t('searchFailed'));
                 }
             } finally {
                 // Only clear loading if this is still the latest request

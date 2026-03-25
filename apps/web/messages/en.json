@@ -314,7 +314,8 @@
             "subtitle": "Manage your AI-powered directories and track their performance",
             "notifications": {
                 "title": "Notifications",
-                "empty": "No new notifications"
+                "empty": "No new notifications",
+                "fetchFailed": "Failed to load notifications"
             },
             "help": {
                 "title": "Help & Resources",
@@ -350,6 +351,7 @@
             "search": "Search directories...",
             "create": "Create Directory",
             "showing": "Showing {current} of {total} directories",
+            "searchFailed": "Failed to search directories. Please try again.",
             "pagination": {
                 "previous": "Previous",
                 "next": "Next"
@@ -2344,6 +2346,7 @@
             "inputPlaceholder": "Describe the directory you want to create...",
             "sendButton": "Send",
             "sendHint": "Enter to send · Shift+Enter for new line",
+            "providersError": "Failed to load AI providers. Chat may not work correctly.",
             "providerNotConfigured": "This provider is not configured. Set it up in Plugins.",
             "editMessage": "Edit message",
             "saveEdit": "Save & Submit",

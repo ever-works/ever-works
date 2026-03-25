@@ -17,8 +17,17 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Dashboard() {
     const [user, directoriesResponse, statsResponse, pluginsResponse] = await Promise.all([
         getAuthFromCookie(),
-        getDirectories({ limit: GET_DIRECTORY_LIST_LIMIT }),
-        getDirectoryStats(),
+        getDirectories({ limit: GET_DIRECTORY_LIST_LIMIT }).catch(() => ({
+            success: false,
+            directories: [],
+            total: 0,
+        })),
+        getDirectoryStats().catch(() => ({
+            success: false,
+            totalDirectories: 0,
+            totalItems: 0,
+            activeWebsites: 0,
+        })),
         pluginsAPI.list().catch(() => ({ plugins: [] as UserPlugin[], total: 0 })),
     ]);
 

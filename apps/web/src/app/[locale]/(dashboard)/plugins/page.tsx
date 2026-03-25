@@ -10,7 +10,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function PluginsPage() {
     const t = await getTranslations('dashboard.plugins');
-    const pluginsData = await pluginsAPI.list();
+    const pluginsData = await pluginsAPI.list().catch(() => ({
+        plugins: [],
+        categories: [],
+        capabilities: [],
+    }));
 
     return (
         <div className="w-full">

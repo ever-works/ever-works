@@ -15,12 +15,20 @@ type Params = { params: Promise<{ id: string }> };
 export default async function DirectoryMembersPage({ params }: Params) {
     const { id } = await params;
 
-    const [directoryRes, membersRes] = await Promise.all([
-        directoryAPI.get(id),
-        membersAPI.list(id),
-    ]);
+    let directory;
+    let membersRes;
 
-    const directory = directoryRes.directory;
+    try {
+        const [directoryResult, membersResult] = await Promise.all([
+            directoryAPI.get(id),
+            membersAPI.list(id),
+        ]);
+
+        directory = directoryResult.directory;
+        membersRes = membersResult;
+    } catch {
+        notFound();
+    }
 
     if (!canManageMembers(directory.userRole)) {
         notFound();
