@@ -2,7 +2,15 @@
 
 import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, BookOpen, CheckCircle2, FolderPlus, Shield, Sparkles, Zap } from 'lucide-react';
+import {
+    ArrowRight,
+    BookOpen,
+    CheckCircle2,
+    FolderPlus,
+    Shield,
+    Sparkles,
+    Zap,
+} from 'lucide-react';
 import { ONBOARDING_STORAGE_KEY, ROUTES } from '@/lib/constants';
 import { Dialog, DialogContent, DialogDescription, DialogHeader } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -363,4 +371,3 @@ export function EverWorksOnboardingWizard({
         </Dialog>
     );
 }
-
