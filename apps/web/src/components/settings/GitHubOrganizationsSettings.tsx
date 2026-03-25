@@ -135,11 +135,15 @@ export function GitHubOrganizationsSettings({
                     placeholder="Add organization by login"
                 />
                 <div className="flex gap-3 items-center">
-                    <Button variant="secondary" onClick={addOrganization} className='text-sm'>
+                    <Button variant="secondary" onClick={addOrganization} className="text-sm">
                         <Plus className="w-4 h-4" />
                         Add organization
                     </Button>
-                    <Button onClick={saveOrganizations} loading={isPending} className='text-sm py-2'>
+                    <Button
+                        onClick={saveOrganizations}
+                        loading={isPending}
+                        className="text-sm py-2"
+                    >
                         <Save className="w-4 h-4" />
                         Save organizations
                     </Button>

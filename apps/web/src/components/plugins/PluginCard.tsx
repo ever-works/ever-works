@@ -84,7 +84,8 @@ export function PluginCard({ plugin }: PluginCardProps) {
                             onClick={handleToggle}
                             disabled={isPending}
                             loading={isPending}
-                            className={cn('px-2 py-1 text-xs rounded-md gap-0.5',
+                            className={cn(
+                                'px-2 py-1 text-xs rounded-md gap-0.5',
                                 optimisticEnabled &&
                                     'text-danger hover:text-danger hover:bg-danger/10',
                             )}

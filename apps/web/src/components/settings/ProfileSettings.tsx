@@ -148,7 +148,7 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
 
                 {/* Save Button */}
                 <div className="flex justify-end">
-                    <Button onClick={handleSaveProfile} loading={isPending} className='text-sm'>
+                    <Button onClick={handleSaveProfile} loading={isPending} className="text-sm">
                         {t('actions.save')}
                     </Button>
                 </div>
