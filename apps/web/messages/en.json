@@ -2293,6 +2293,12 @@
                 "plugins": "Plugins",
                 "settings": "Settings"
             },
+            "profileMenu": {
+                "accountSettings": "Account Settings",
+                "helpDocs": "Help & Docs",
+                "support": "Support",
+                "keyboardShortcuts": "Keyboard Shortcuts"
+            },
             "signOut": "Sign Out",
             "signingOut": "Signing out..."
         },

@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils/cn';
 import { ChatInterface } from '@/components/ai/ChatInterface';
 import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ROUTES } from '@/lib/constants';
-import { Link, usePathname } from '@/i18n/navigation';
+import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import {
     Home,
     Folder,
@@ -21,10 +21,23 @@ import {
     LayoutList,
     PanelLeftClose,
     PanelLeftOpen,
+    User,
+    HelpCircle,
+    MessageSquare,
+    Keyboard,
+    ChevronUp,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
+import {
+    DropdownMenu,
+    DropdownMenuTrigger,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
 import { LogoEverWork } from '../logos';
 import { useDirectoryDetail } from '../directories/detail/DirectoryDetailContext';
 import { SIDEBAR_WIDTH_MIN, SIDEBAR_WIDTH_MAX } from '@/lib/hooks/use-sidebar-persistence';
@@ -37,6 +50,7 @@ interface DashboardSidebarProps {
     onWidthChange?: (w: number) => void;
     isCollapsed?: boolean;
     onCollapsedChange?: (v: boolean) => void;
+    onOpenHelp?: () => void;
 }
 
 // Only shows tooltip when collapsed — transparent passthrough when expanded
@@ -65,8 +79,10 @@ export function DashboardSidebar({
     onWidthChange,
     isCollapsed = false,
     onCollapsedChange,
+    onOpenHelp,
 }: DashboardSidebarProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const [activeMode, setActiveMode] = useState<'menu' | 'chat'>('menu');
     const [chatPanelOpen, setChatPanelOpen] = useState(false);
     const [isPending, startTransition] = useTransition();
@@ -371,63 +387,106 @@ export function DashboardSidebar({
                             isCollapsed ? 'px-2' : 'px-4',
                         )}
                     >
-                        <div
-                            className={cn(
-                                'flex items-center gap-3',
-                                isCollapsed && 'flex-col gap-2',
-                            )}
-                        >
-                            <ConditionalTooltip show={isCollapsed} content={user.username}>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger
+                                className={cn(
+                                    'w-full rounded-lg transition-colors cursor-pointer',
+                                    'hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
+                                    isCollapsed ? 'p-1 flex justify-center' : 'p-2',
+                                )}
+                            >
                                 <div
                                     className={cn(
-                                        'relative w-8 h-8 rounded-full shrink-0 flex items-center justify-center overflow-hidden cursor-default',
-                                        'bg-surface-tertiary dark:bg-surface-tertiary-dark',
+                                        'flex items-center gap-3',
+                                        isCollapsed && 'justify-center',
                                     )}
                                 >
-                                    {user.avatar && !avatarError ? (
-                                        <Image
-                                            src={user.avatar}
-                                            alt={user.username}
-                                            fill
-                                            className="object-cover"
-                                            onError={() => setAvatarError(true)}
-                                            sizes="32px"
-                                        />
-                                    ) : (
-                                        <span className="text-xs font-semibold text-text dark:text-text-dark">
-                                            {user.username.charAt(0).toUpperCase()}
-                                        </span>
+                                    <ConditionalTooltip show={isCollapsed} content={user.username}>
+                                        <div
+                                            className={cn(
+                                                'relative w-8 h-8 rounded-full shrink-0 flex items-center justify-center overflow-hidden',
+                                                'bg-surface-tertiary dark:bg-surface-tertiary-dark',
+                                            )}
+                                        >
+                                            {user.avatar && !avatarError ? (
+                                                <Image
+                                                    src={user.avatar}
+                                                    alt={user.username}
+                                                    fill
+                                                    className="object-cover"
+                                                    onError={() => setAvatarError(true)}
+                                                    sizes="32px"
+                                                />
+                                            ) : (
+                                                <span className="text-xs font-semibold text-text dark:text-text-dark">
+                                                    {user.username.charAt(0).toUpperCase()}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </ConditionalTooltip>
+                                    {!isCollapsed && (
+                                        <>
+                                            <div className="flex-1 min-w-0 text-left">
+                                                <p className="text-sm font-medium text-text dark:text-text-dark truncate">
+                                                    {user.username}
+                                                </p>
+                                                <p className="text-xs text-text-muted dark:text-text-muted-dark truncate">
+                                                    {user.email}
+                                                </p>
+                                            </div>
+                                            <ChevronUp className="w-4 h-4 shrink-0 text-text-muted dark:text-text-muted-dark" />
+                                        </>
                                     )}
                                 </div>
-                            </ConditionalTooltip>
-                            {!isCollapsed && (
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-text dark:text-text-dark truncate">
-                                        {user.username}
-                                    </p>
-                                    <p className="text-xs text-text-muted dark:text-text-muted-dark truncate">
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent side="top" align="start" className="w-56">
+                                <DropdownMenuLabel>
+                                    <p className="truncate">{user.username}</p>
+                                    <p className="text-xs font-normal text-text-muted dark:text-text-muted-dark truncate">
                                         {user.email}
                                     </p>
-                                </div>
-                            )}
-                            <ConditionalTooltip
-                                show={isCollapsed}
-                                content={isPending ? t('signingOut') : t('signOut')}
-                            >
-                                <button
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                    onClick={() => router.push(ROUTES.DASHBOARD_SETTINGS)}
+                                >
+                                    <User className="w-4 h-4 mr-2 shrink-0" />
+                                    {t('profileMenu.accountSettings')}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        window.open('https://docs.ever.works', '_blank');
+                                    }}
+                                >
+                                    <HelpCircle className="w-4 h-4 mr-2 shrink-0" />
+                                    {t('profileMenu.helpDocs')}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        window.open(
+                                            'https://github.com/ever-works/ever-works/issues',
+                                            '_blank',
+                                        );
+                                    }}
+                                >
+                                    <MessageSquare className="w-4 h-4 mr-2 shrink-0" />
+                                    {t('profileMenu.support')}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={onOpenHelp} disabled={!onOpenHelp}>
+                                    <Keyboard className="w-4 h-4 mr-2 shrink-0" />
+                                    {t('profileMenu.keyboardShortcuts')}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
                                     onClick={handleLogout}
                                     disabled={isPending}
-                                    className={cn(
-                                        'shrink-0 flex items-center justify-center w-8 h-8 rounded-lg transition-colors',
-                                        'text-danger dark:hover:text-danger',
-                                        'hover:bg-danger/8 dark:hover:bg-danger/10',
-                                        'disabled:opacity-50 disabled:cursor-not-allowed',
-                                    )}
+                                    className="text-danger"
                                 >
-                                    <LogOut className="w-4 h-4" />
-                                </button>
-                            </ConditionalTooltip>
-                        </div>
+                                    <LogOut className="w-4 h-4 mr-2 shrink-0" />
+                                    {isPending ? t('signingOut') : t('signOut')}
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 </div>
             </aside>
