@@ -1,5 +1,6 @@
 import { authAPI } from '../api';
 import { getAuthFromRequest } from './middleware';
+import { refreshAccessToken } from './refresh';
 
 export async function getAuthFromCookie() {
     const auth = await getAuthFromRequest();
@@ -8,8 +9,12 @@ export async function getAuthFromCookie() {
     }
 
     if (auth.isExpired) {
-        console.error('Token expired, NEED TO REFRESH (TODO)');
-        return null;
+        const refreshed = await refreshAccessToken();
+        if (!refreshed) {
+            return null;
+        }
+        const freshAuth = await getAuthFromRequest();
+        return freshAuth.user || null;
     }
 
     return auth.user || null;
@@ -22,8 +27,15 @@ export async function getAuthFromAPI() {
     }
 
     if (auth.isExpired) {
-        console.error('Token expired, NEED TO REFRESH (TODO)');
-        return null;
+        const refreshed = await refreshAccessToken();
+        if (!refreshed) {
+            return null;
+        }
+        // Re-verify the refreshed token is valid before making the API call
+        const freshAuth = await getAuthFromRequest();
+        if (!freshAuth.isAuthenticated || freshAuth.isExpired) {
+            return null;
+        }
     }
 
     try {
@@ -35,3 +47,4 @@ export async function getAuthFromAPI() {
 
 export * from './middleware';
 export * from './cookies';
+export { refreshAccessToken } from './refresh';
