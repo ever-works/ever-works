@@ -303,7 +303,7 @@ export function DashboardSidebar({
                                             href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
                                             variant="primary"
                                             size="icon"
-                                            className="w-9 h-9 text-white bg-primary-hover hover:bg-primary-hover/80 shadow-sm rounded-xl"
+                                            className="w-9 h-9 text-white shadow-sm rounded-xl"
                                         >
                                             <Plus className="w-5 h-5" />
                                         </Button>
@@ -314,7 +314,7 @@ export function DashboardSidebar({
                                         variant="primary"
                                         size="lg"
                                         fullWidth
-                                        className="dark:text-white hover:text-white text-primary-hover rounded-xl dark:bg-primary-hover/20 text-sm bg-primary-hover/10 hover:bg-primary-hover/80 shadow-sm ring-1 dark:ring-white/6 dark:border dark:border-primary-hover dark:hover:border-white/12"
+                                        className="text-sm hover:bg-primary-hover/80 shadow-s dark:border"
                                     >
                                         <Plus className="w-5 h-5" />
                                         <span className="font-medium">{t('newDirectory')}</span>
@@ -355,13 +355,13 @@ export function DashboardSidebar({
                                                         href={item.href}
                                                         onClick={() => setChatPanelOpen(false)}
                                                         className={cn(
-                                                            'flex items-center rounded-lg transition-colors border border-transparent',
+                                                            'flex items-center rounded-sm transition-colors border border-transparent',
                                                             isCollapsed
                                                                 ? 'justify-center w-8 h-8 px-0'
                                                                 : 'gap-3 px-4 py-2',
                                                             isActive
-                                                                ? 'border bg-surface-secondary border-surface-tertiary dark:border-primary/10 dark:bg-surface-secondary-dark/50 text-text dark:text-primary'
-                                                                : 'text-text dark:text-text-secondary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark/30 hover:text-text dark:hover:text-text-dark',
+                                                                ? 'border bg-surface-secondary border-surface-tertiary dark:border-transparent dark:bg-card-secondary-dark text-text dark:text-text-dark'
+                                                                : 'text-text dark:text-text-secondary-dark/70 hover:bg-surface-secondary dark:hover:bg-card-primary-dark hover:text-text dark:hover:text-text-dark',
                                                         )}
                                                     >
                                                         <item.icon className="w-5 h-5 shrink-0" />
