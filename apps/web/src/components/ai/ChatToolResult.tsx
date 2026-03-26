@@ -9,24 +9,27 @@ import { ExternalLink, FolderOpen, GitBranch, BarChart3, Compass } from 'lucide-
 interface ToolResultProps {
     toolName: string;
     state: string;
-    result?: unknown;
+    output?: unknown;
 }
 
-export function ChatToolResult({ toolName, state, result }: ToolResultProps) {
+const COMPLETED_STATES = new Set(['output-available', 'result']);
+
+export function ChatToolResult({ toolName, state, output }: ToolResultProps) {
     const t = useTranslations('dashboard.aiChat');
     const router = useRouter();
 
-    // Auto-navigate when navigate tool completes
+    const isComplete = COMPLETED_STATES.has(state);
+
     useEffect(() => {
-        if (toolName === 'navigate' && state === 'result' && result) {
-            const data = result as { url?: string; action?: string };
+        if (toolName === 'navigate' && isComplete && output) {
+            const data = output as { url?: string; action?: string };
             if (data.action === 'navigate' && data.url) {
                 router.push(data.url);
             }
         }
-    }, [toolName, state, result, router]);
+    }, [toolName, isComplete, output, router]);
 
-    if (state !== 'result') {
+    if (!isComplete) {
         return (
             <div className="flex items-center gap-2 mt-1.5 px-2.5 py-2 rounded-lg bg-surface-secondary/60 dark:bg-white/[0.03] text-[11px] text-text-muted dark:text-text-muted-dark">
                 <ToolIcon name={toolName} />
@@ -35,18 +38,17 @@ export function ChatToolResult({ toolName, state, result }: ToolResultProps) {
         );
     }
 
-    // Render different result UIs based on tool
     switch (toolName) {
         case 'listDirectories':
-            return <DirectoryListResult result={result} />;
+            return <DirectoryListResult output={output} />;
         case 'getDirectoryDetails':
-            return <DirectoryDetailResult result={result} />;
+            return <DirectoryDetailResult output={output} />;
         case 'checkGitConnection':
-            return <GitConnectionResult result={result} />;
+            return <GitConnectionResult output={output} />;
         case 'navigate':
-            return null; // Navigation handled by useEffect above
+            return null;
         case 'getDirectoryStats':
-            return <StatsResult result={result} />;
+            return <StatsResult output={output} />;
         default:
             return null;
     }
@@ -62,24 +64,14 @@ function ToolIcon({ name }: { name: string }) {
             return <GitBranch className={cls} />;
         case 'getDirectoryStats':
             return <BarChart3 className={cls} />;
-        case 'navigate':
-            return <Compass className={cls} />;
         default:
             return <Compass className={cls} />;
     }
 }
 
-function DirectoryListResult({ result }: { result: unknown }) {
-    const data = result as {
-        directories?: Array<{
-            id: string;
-            name: string;
-            slug: string;
-            itemsCount: number;
-            status: string;
-            url: string;
-        }>;
-        total?: number;
+function DirectoryListResult({ output }: { output: unknown }) {
+    const data = output as {
+        directories?: Array<{ id: string; name: string; itemsCount: number; url: string }>;
     };
     if (!data?.directories?.length) return null;
 
@@ -110,12 +102,11 @@ function DirectoryListResult({ result }: { result: unknown }) {
     );
 }
 
-function DirectoryDetailResult({ result }: { result: unknown }) {
-    const data = result as {
+function DirectoryDetailResult({ output }: { output: unknown }) {
+    const data = output as {
         name?: string;
         description?: string;
         itemsCount?: number;
-        status?: string;
         url?: string;
     };
     if (!data?.name) return null;
@@ -146,13 +137,8 @@ function DirectoryDetailResult({ result }: { result: unknown }) {
     );
 }
 
-function GitConnectionResult({ result }: { result: unknown }) {
-    const data = result as {
-        connected?: boolean;
-        username?: string;
-        providerId?: string;
-        setupUrl?: string;
-    };
+function GitConnectionResult({ output }: { output: unknown }) {
+    const data = output as { connected?: boolean; username?: string; setupUrl?: string };
     if (!data) return null;
 
     return (
@@ -176,8 +162,8 @@ function GitConnectionResult({ result }: { result: unknown }) {
     );
 }
 
-function StatsResult({ result }: { result: unknown }) {
-    const data = result as {
+function StatsResult({ output }: { output: unknown }) {
+    const data = output as {
         totalDirectories?: number;
         totalItems?: number;
         activeWebsites?: number;

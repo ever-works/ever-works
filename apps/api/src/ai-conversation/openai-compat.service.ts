@@ -63,10 +63,8 @@ export class OpenAiCompatService {
                 resolved,
             );
 
-            let toolCallIndex = 0;
-
             for await (const chunk of stream) {
-                const sseChunk = this.mapToOpenAiStreamChunk(chunk, toolCallIndex);
+                const sseChunk = this.mapToOpenAiStreamChunk(chunk);
                 res.write(`data: ${JSON.stringify(sseChunk)}\n\n`);
 
                 const delta = chunk.choices[0]?.delta;
@@ -75,7 +73,6 @@ export class OpenAiCompatService {
                     hasResponse = true;
                 }
                 if (delta?.toolCalls?.length) {
-                    toolCallIndex += delta.toolCalls.length;
                     hasResponse = true;
                 }
             }
@@ -340,10 +337,7 @@ export class OpenAiCompatService {
         };
     }
 
-    private mapToOpenAiStreamChunk(
-        chunk: ChatCompletionChunk,
-        toolCallBaseIndex: number,
-    ): OpenAiChatCompletionChunkResponse {
+    private mapToOpenAiStreamChunk(chunk: ChatCompletionChunk): OpenAiChatCompletionChunkResponse {
         const choice = chunk.choices[0];
         const delta = choice?.delta;
 
@@ -359,15 +353,36 @@ export class OpenAiCompatService {
         }
 
         if (delta?.toolCalls?.length) {
-            mappedDelta.tool_calls = delta.toolCalls.map((tc, i) => ({
-                index: toolCallBaseIndex + i,
-                ...(tc.id && { id: tc.id }),
-                ...(tc.type && { type: tc.type }),
-                function: {
-                    ...(tc.function.name && { name: tc.function.name }),
-                    ...(tc.function.arguments && { arguments: tc.function.arguments }),
-                },
-            }));
+            // Pass through tool call chunks preserving the index/id/type structure from AiOperations.
+            // The @ai-sdk/openai-compatible parser uses `id == null` to detect continuation chunks
+            // vs new tool calls, so we must NOT add id/type/name to continuation chunks.
+            mappedDelta.tool_calls = delta.toolCalls.map((tc) => {
+                const chunk = tc as {
+                    index?: number;
+                    id?: string;
+                    type?: string;
+                    function: { name?: string; arguments?: string };
+                };
+
+                const entry: {
+                    index: number;
+                    id?: string;
+                    type?: 'function';
+                    function: { name?: string; arguments: string };
+                } = {
+                    index: chunk.index ?? 0,
+                    function: { arguments: chunk.function.arguments ?? '' },
+                };
+
+                // Only include id/type/name on the first chunk of a tool call
+                if (chunk.id) {
+                    entry.id = chunk.id;
+                    entry.type = 'function';
+                    entry.function.name = chunk.function.name ?? '';
+                }
+
+                return entry;
+            });
         }
 
         return {

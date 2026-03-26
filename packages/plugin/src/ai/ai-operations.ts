@@ -157,23 +157,39 @@ export class AiOperations {
 		}
 
 		let hadToolCalls = false;
+		let isFirstChunk = true;
+		const seenToolCallIds = new Map<number, string>();
 
 		for await (const chunk of stream) {
 			const content = typeof chunk.content === 'string' ? chunk.content : '';
 
-			// Extract tool call chunks from streaming response
 			const toolCallChunks = chunk.tool_call_chunks?.length
-				? chunk.tool_call_chunks.map((tc) => ({
-						id: tc.id ?? '',
-						type: 'function' as const,
-						function: {
-							name: tc.name ?? '',
-							arguments: tc.args ?? ''
-						}
-					}))
+				? chunk.tool_call_chunks.map((tc) => {
+						const idx = tc.index ?? seenToolCallIds.size;
+						const isNew = !seenToolCallIds.has(idx);
+						if (isNew && tc.id) seenToolCallIds.set(idx, tc.id);
+
+						return {
+							index: idx,
+							id: isNew ? tc.id || `call_${Date.now()}_${idx}` : undefined,
+							type: isNew ? ('function' as const) : undefined,
+							function: {
+								name: isNew ? (tc.name ?? '') : undefined,
+								arguments: tc.args ?? ''
+							}
+						};
+					})
 				: undefined;
 
 			if (toolCallChunks?.length) hadToolCalls = true;
+
+			const delta: Record<string, unknown> = {};
+			if (isFirstChunk) {
+				delta.role = 'assistant';
+				isFirstChunk = false;
+			}
+			if (content) delta.content = content;
+			if (toolCallChunks?.length) delta.toolCalls = toolCallChunks;
 
 			yield {
 				id: `chatcmpl-${Date.now()}`,
@@ -182,11 +198,7 @@ export class AiOperations {
 				choices: [
 					{
 						index: 0,
-						delta: {
-							role: 'assistant',
-							content,
-							...(toolCallChunks?.length && { toolCalls: toolCallChunks })
-						},
+						delta: delta as Partial<ChatMessage>,
 						finishReason: null
 					}
 				]
@@ -427,28 +439,29 @@ export class AiOperations {
 
 	/**
 	 * Bind tools to a ChatOpenAI model when tool definitions are provided.
-	 * Uses LangChain's bindTools API which correctly formats tool calls for
-	 * each provider (OpenAI, Anthropic, etc.) through the ChatOpenAI interface.
+	 * Uses llm.bind() with OpenAI-format tools to ensure the `type: 'function'`
+	 * wrapper is always present in the API request.
 	 */
 	private bindTools(llm: ChatOpenAI, options?: ChatCompletionOptions, skip?: Set<string>): ChatOpenAI {
 		if (!options?.tools?.length || skip?.has('tools')) {
 			return llm;
 		}
 
-		// Convert ToolDefinition[] to the format LangChain's bindTools expects
 		const tools = options.tools.map((t) => ({
-			name: t.function.name,
-			description: t.function.description ?? '',
-			parameters: t.function.parameters ?? {}
+			type: 'function' as const,
+			function: {
+				name: t.function.name,
+				description: t.function.description ?? '',
+				parameters: t.function.parameters ?? {}
+			}
 		}));
 
-		const toolChoice = options.toolChoice
-			? options.toolChoice === 'required'
-				? 'any'
-				: options.toolChoice
-			: undefined;
+		const bindArgs: Record<string, unknown> = { tools };
+		if (options.toolChoice) {
+			bindArgs.tool_choice = options.toolChoice;
+		}
 
-		return llm.bindTools(tools, { tool_choice: toolChoice }) as unknown as ChatOpenAI;
+		return llm.bind(bindArgs) as unknown as ChatOpenAI;
 	}
 
 	private parseRejectedParam(error: unknown): string | undefined {

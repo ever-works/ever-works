@@ -43,7 +43,7 @@ export function ChatMessageContent({
                             key={i}
                             toolName={toolPart.toolName ?? 'unknown'}
                             state={toolPart.state}
-                            result={toolPart.output}
+                            output={toolPart.output}
                         />
                     );
                 }
