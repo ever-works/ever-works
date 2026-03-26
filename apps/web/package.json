@@ -10,11 +10,14 @@
         "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\""
     },
     "dependencies": {
+        "@ai-sdk/openai-compatible": "^2.0.30",
+        "@ai-sdk/react": "^3.0.140",
         "@ever-works/contracts": "workspace:*",
         "@ever-works/plugin": "workspace:*",
         "@headlessui/react": "^2.2.9",
         "@lottiefiles/dotlottie-react": "^0.18.3",
         "@tanstack/react-virtual": "^3.13.13",
+        "ai": "^6.0.85",
         "clsx": "^2.1.1",
         "date-fns": "^4.1.0",
         "deepmerge": "^4.3.1",

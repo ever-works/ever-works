@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan, IsNull } from 'typeorm';
+import { Repository, MoreThan, IsNull, Not, LessThan } from 'typeorm';
 import { ApiKey } from '../../entities/api-key.entity';
 
 @Injectable()
@@ -54,12 +54,9 @@ export class ApiKeyRepository {
     }
 
     async deleteExpiredKeys(): Promise<number> {
-        const result = await this.repository
-            .createQueryBuilder('k')
-            .delete()
-            .where('k.expiresAt IS NOT NULL')
-            .andWhere('k.expiresAt < :now', { now: Date.now() })
-            .execute();
+        const result = await this.repository.delete({
+            expiresAt: Not(IsNull()) && LessThan(new Date()),
+        });
         return result.affected ?? 0;
     }
 }
