@@ -25,13 +25,13 @@ async function main() {
 					port: parseInt(process.env.DB_PORT || '5432'),
 					username: process.env.DB_USER || 'postgres',
 					password: process.env.DB_PASS || '',
-					database: process.env.DB_NAME || 'ever_works',
+					database: process.env.DB_NAME || 'ever_works'
 				}
 			: {
-					database: process.env.DB_PATH || ':memory:',
+					database: process.env.DB_PATH || ':memory:'
 				}),
 		entities: ENTITIES,
-		synchronize: false,
+		synchronize: false
 	});
 
 	await dataSource.initialize();
@@ -52,9 +52,7 @@ async function main() {
 
 		for (const user of users) {
 			try {
-				const existing = await queryRunner.query('SELECT id FROM ba_user WHERE id = $1', [
-					user.id,
-				]);
+				const existing = await queryRunner.query('SELECT id FROM ba_user WHERE id = $1', [user.id]);
 
 				if (existing.length > 0) {
 					continue; // Already migrated
@@ -70,8 +68,8 @@ async function main() {
 						user.emailVerified || false,
 						user.avatar || null,
 						user.createdAt || new Date(),
-						user.updatedAt || new Date(),
-					],
+						user.updatedAt || new Date()
+					]
 				);
 				usersCreated++;
 			} catch (error: any) {
@@ -89,7 +87,7 @@ async function main() {
 			try {
 				const existing = await queryRunner.query(
 					`SELECT id FROM ba_account WHERE "userId" = $1 AND "providerId" = 'credential'`,
-					[user.id],
+					[user.id]
 				);
 
 				if (existing.length > 0) {
@@ -106,8 +104,8 @@ async function main() {
 						user.id, // accountId = userId for credential provider
 						user.password, // bcrypt hash preserved as-is
 						user.createdAt || new Date(),
-						user.updatedAt || new Date(),
-					],
+						user.updatedAt || new Date()
+					]
 				);
 				accountsCreated++;
 			} catch (error: any) {
@@ -128,7 +126,7 @@ async function main() {
 			try {
 				const existing = await queryRunner.query(
 					`SELECT id FROM ba_account WHERE "userId" = $1 AND "providerId" = $2`,
-					[token.userId, token.provider],
+					[token.userId, token.provider]
 				);
 
 				if (existing.length > 0) {
@@ -138,10 +136,7 @@ async function main() {
 				// Extract accountId from metadata if available
 				let accountId = token.userId;
 				if (token.metadata) {
-					const metadata =
-						typeof token.metadata === 'string'
-							? JSON.parse(token.metadata)
-							: token.metadata;
+					const metadata = typeof token.metadata === 'string' ? JSON.parse(token.metadata) : token.metadata;
 					accountId = metadata?.login || metadata?.sub || token.username || token.userId;
 				}
 
@@ -158,18 +153,15 @@ async function main() {
 						token.refreshToken || null,
 						token.scope || null,
 						token.createdAt || new Date(),
-						token.updatedAt || new Date(),
-					],
+						token.updatedAt || new Date()
+					]
 				);
 				oauthSynced++;
 			} catch (error: any) {
 				if (error.message?.includes('UNIQUE') || error.message?.includes('duplicate')) {
 					continue;
 				}
-				console.error(
-					`Failed to sync OAuth token ${token.id} (${token.provider}):`,
-					error.message,
-				);
+				console.error(`Failed to sync OAuth token ${token.id} (${token.provider}):`, error.message);
 				errors++;
 			}
 		}

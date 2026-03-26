@@ -4,7 +4,9 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { ApiKeyService } from '../services/api-key.service';
 import { BetterAuthService } from '../services/better-auth.service';
 import { UserRepository } from '@ever-works/agent/database';
-import type { AuthenticatedUser } from '../types/jwt.types';
+import { JwtService } from '@nestjs/jwt';
+import { jwtConstants } from '../../config/constants';
+import type { AuthenticatedUser, JwtPayload } from '../types/jwt.types';
 
 const API_KEY_PREFIX = 'ew_live_';
 
@@ -12,6 +14,7 @@ const API_KEY_PREFIX = 'ew_live_';
 export class SessionAuthGuard implements CanActivate {
     private apiKeyService: ApiKeyService;
     private userRepository: UserRepository;
+    private jwtService: JwtService;
 
     constructor(
         private reflector: Reflector,
@@ -37,11 +40,21 @@ export class SessionAuthGuard implements CanActivate {
         }
 
         // 2. Try BetterAuth session authentication
-        return this.authenticateWithSession(request);
+        const sessionResult = await this.tryAuthenticateWithSession(request);
+        if (sessionResult) {
+            return true;
+        }
+
+        // 3. Fall back to legacy JWT authentication (for existing sessions during transition)
+        const jwtResult = await this.tryAuthenticateWithJwt(request);
+        if (jwtResult) {
+            return true;
+        }
+
+        throw new UnauthorizedException('Authentication required');
     }
 
     private async authenticateWithApiKey(request: any, apiKey: string): Promise<boolean> {
-        // Lazily resolve dependencies on first API key request
         if (!this.apiKeyService) {
             this.apiKeyService = this.moduleRef.get(ApiKeyService, { strict: false });
         }
@@ -59,24 +72,11 @@ export class SessionAuthGuard implements CanActivate {
             throw new UnauthorizedException('User account is inactive');
         }
 
-        const authenticatedUser: AuthenticatedUser = {
-            userId: user.id,
-            email: user.email,
-            username: user.username,
-            provider: user.registrationProvider,
-            emailVerified: user.emailVerified,
-            isActive: user.isActive,
-            avatar: user.avatar || null,
-            iat: Math.floor(Date.now() / 1000),
-            iss: 'ever-works',
-            aud: 'ever-works',
-        };
-
-        request.user = authenticatedUser;
+        request.user = this.buildAuthenticatedUser(user);
         return true;
     }
 
-    private async authenticateWithSession(request: any): Promise<boolean> {
+    private async tryAuthenticateWithSession(request: any): Promise<boolean> {
         if (!this.userRepository) {
             this.userRepository = this.moduleRef.get(UserRepository, { strict: false });
         }
@@ -93,47 +93,86 @@ export class SessionAuthGuard implements CanActivate {
             const session = await this.betterAuthService.api.getSession({ headers });
 
             if (!session || !session.user) {
-                throw new UnauthorizedException('Invalid or expired session');
+                return false;
             }
 
-            // Look up the application user from the users table
             const user = await this.userRepository.findById(session.user.id);
             if (!user || !user.isActive) {
-                throw new UnauthorizedException('User account is inactive');
+                return false;
             }
 
-            // Construct the same AuthenticatedUser shape as the JWT guard
+            request.user = this.buildAuthenticatedUser(user);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    private async tryAuthenticateWithJwt(request: any): Promise<boolean> {
+        if (!this.jwtService) {
+            this.jwtService = this.moduleRef.get(JwtService, { strict: false });
+        }
+
+        const authHeader = request.headers?.authorization;
+        if (!authHeader || typeof authHeader !== 'string') {
+            return false;
+        }
+
+        const [scheme, token] = authHeader.split(' ');
+        if (scheme !== 'Bearer' || !token || token.startsWith(API_KEY_PREFIX)) {
+            return false;
+        }
+
+        try {
+            const payload = this.jwtService.verify<JwtPayload>(token, {
+                secret: jwtConstants.secret(),
+            });
+
+            if (!payload?.sub) {
+                return false;
+            }
+
             const authenticatedUser: AuthenticatedUser = {
-                userId: user.id,
-                email: user.email,
-                username: user.username,
-                provider: user.registrationProvider,
-                emailVerified: user.emailVerified,
-                isActive: user.isActive,
-                avatar: user.avatar || null,
-                iat: Math.floor(Date.now() / 1000),
-                iss: 'ever-works',
-                aud: 'ever-works',
+                userId: payload.sub,
+                email: payload.email,
+                username: payload.username,
+                provider: payload.provider,
+                emailVerified: payload.emailVerified,
+                isActive: payload.isActive,
+                avatar: payload.avatar,
+                iat: payload.iat,
+                iss: payload.iss,
+                aud: payload.aud,
             };
 
             request.user = authenticatedUser;
             return true;
-        } catch (error) {
-            if (error instanceof UnauthorizedException) {
-                throw error;
-            }
-            throw new UnauthorizedException('Authentication required');
+        } catch {
+            return false;
         }
     }
 
+    private buildAuthenticatedUser(user: any): AuthenticatedUser {
+        return {
+            userId: user.id,
+            email: user.email,
+            username: user.username,
+            provider: user.registrationProvider,
+            emailVerified: user.emailVerified,
+            isActive: user.isActive,
+            avatar: user.avatar || null,
+            iat: Math.floor(Date.now() / 1000),
+            iss: 'ever-works',
+            aud: 'ever-works',
+        };
+    }
+
     private extractApiKey(request: any): string | null {
-        // Check x-api-key header
         const headerKey = request.headers?.['x-api-key'];
         if (headerKey && typeof headerKey === 'string' && headerKey.startsWith(API_KEY_PREFIX)) {
             return headerKey;
         }
 
-        // Check Authorization: Bearer ew_live_...
         const authHeader = request.headers?.authorization;
         if (authHeader && typeof authHeader === 'string') {
             const [scheme, token] = authHeader.split(' ');

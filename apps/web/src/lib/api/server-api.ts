@@ -55,8 +55,9 @@ export async function serverFetch<T>(
         if (baCookieHeader) {
             // Forward BetterAuth session cookies to the API
             reqHeaders['Cookie'] = baCookieHeader;
-        } else if (authToken) {
-            // Fall back to JWT Bearer token (legacy)
+        }
+        if (authToken) {
+            // Also send JWT Bearer token (legacy fallback — guard tries both)
             reqHeaders['Authorization'] = `Bearer ${authToken}`;
         }
 
@@ -68,12 +69,12 @@ export async function serverFetch<T>(
         });
     };
 
-    // Try BetterAuth session cookies first, fall back to JWT
+    // Send both BetterAuth cookies and JWT token — the guard tries session first, then JWT
     const baCookies = await getBetterAuthCookieHeader();
-    const token = !baCookies ? await getAuthAccessCookie() : undefined;
+    const token = await getAuthAccessCookie();
     let response = await doFetch(token, baCookies);
 
-    // On 401 with legacy JWT, attempt a single token refresh and retry
+    // On 401 with legacy JWT (no BetterAuth session), attempt a single token refresh and retry
     if (response.status === 401 && token && !baCookies) {
         const refreshed = await refreshAccessToken();
         if (refreshed) {
