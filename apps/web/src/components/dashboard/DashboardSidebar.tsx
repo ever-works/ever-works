@@ -18,7 +18,6 @@ import {
     X,
     Plug,
     Bot,
-    LayoutList,
     PanelLeftClose,
     PanelLeftOpen,
     User,
@@ -53,7 +52,6 @@ interface DashboardSidebarProps {
     onOpenHelp?: () => void;
 }
 
-// Only shows tooltip when collapsed — transparent passthrough when expanded
 function ConditionalTooltip({
     show,
     content,
@@ -83,7 +81,6 @@ export function DashboardSidebar({
 }: DashboardSidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
-    const [activeMode, setActiveMode] = useState<'menu' | 'chat'>('menu');
     const [chatPanelOpen, setChatPanelOpen] = useState(false);
     const [isPending, startTransition] = useTransition();
     const [avatarError, setAvatarError] = useState(false);
@@ -91,16 +88,15 @@ export function DashboardSidebar({
     const { config } = useDirectoryDetail();
     const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
-    // When collapsing, close the floating chat panel
     const handleCollapsedChange = (v: boolean) => {
-        if (!v) setChatPanelOpen(false);
+        if (v) setChatPanelOpen(false);
         onCollapsedChange?.(v);
     };
 
     const handleDragStart = (e: React.MouseEvent) => {
         e.preventDefault();
-        const aside = e.currentTarget.closest('aside') as HTMLElement | null;
-        dragRef.current = { startX: e.clientX, startWidth: aside?.offsetWidth ?? width ?? 320 };
+        const panel = e.currentTarget.closest('[data-chat-panel]') as HTMLElement | null;
+        dragRef.current = { startX: e.clientX, startWidth: panel?.offsetWidth ?? 380 };
         const onMouseMove = (ev: MouseEvent) => {
             if (!dragRef.current) return;
             const delta = ev.clientX - dragRef.current.startX;
@@ -129,46 +125,38 @@ export function DashboardSidebar({
         });
     };
 
+    const toggleChatPanel = () => {
+        setChatPanelOpen((prev) => !prev);
+    };
+
     const navigation = [
         { name: t('navigation.dashboard'), href: ROUTES.DASHBOARD, icon: Home },
         { name: t('navigation.directories'), href: ROUTES.DASHBOARD_DIRECTORIES, icon: Folder },
         { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
-        // { name: 'Analytics', href: ROUTES.DASHBOARD_ANALYTICS, icon: ChartIcon },
         { name: t('navigation.settings'), href: ROUTES.DASHBOARD_SETTINGS, icon: Settings },
     ];
+
+    const sidebarWidth = isCollapsed ? 64 : (width ?? 280);
 
     return (
         <ChatProvider>
             <aside
-                style={isCollapsed ? { width: 64 } : width ? { width } : undefined}
+                style={{ width: sidebarWidth }}
                 className={cn(
                     'fixed lg:relative top-0 h-full z-50',
                     'transition-[left,margin,width] duration-300 ease-in-out',
                     'bg-white dark:bg-surface-dark',
                     'border-r border-border dark:border-border-dark',
-                    !width && !isCollapsed && 'w-80',
                     'shrink-0',
                     isOpen ? 'left-0' : '-left-80 lg:-ml-80',
                     'xl:left-0! xl:ml-0!',
                 )}
             >
-                {/* Drag-to-resize handle — only in chat mode when expanded */}
-                {onWidthChange && !isCollapsed && activeMode === 'chat' && (
-                    <div
-                        onMouseDown={handleDragStart}
-                        className={cn(
-                            'absolute right-0 top-0 h-full w-1 z-10',
-                            'cursor-col-resize',
-                            'transition-colors duration-150',
-                            'group/drag',
-                        )}
-                    />
-                )}
                 <div className="flex flex-col h-full">
+                    {/* Logo + collapse controls */}
                     <div
                         className={cn(
                             'h-16 flex items-center shrink-0',
-                            !isCollapsed && 'max-w-80',
                             isCollapsed ? 'justify-center px-2' : 'px-6',
                         )}
                     >
@@ -180,7 +168,6 @@ export function DashboardSidebar({
                                     isCollapsed && 'w-full justify-center',
                                 )}
                             >
-                                {/* Collapse / expand toggle */}
                                 {onCollapsedChange && (
                                     <Tooltip
                                         content={
@@ -223,167 +210,110 @@ export function DashboardSidebar({
                         </div>
                     </div>
 
+                    {/* New directory button */}
                     <div
                         className={cn(
-                            'pb-3 shrink-0 duration-300 ease-in-out',
-                            !isCollapsed && 'max-w-80 duration-300 ease-in-out',
-                            isCollapsed ? 'px-2' : 'px-4',
+                            isCollapsed ? 'px-2 py-4 flex justify-center' : 'px-6 pt-4 pb-10',
                         )}
                     >
-                        <div
-                            className={cn(
-                                'flex items-center rounded-xl duration-300 ease-in-out p-1 gap-0.5 border border-border bg-surface-secondary dark:bg-surface-dark dark:border-surface-tertiary/10',
-                                isCollapsed && 'flex-col',
-                            )}
-                        >
-                            <ConditionalTooltip show={isCollapsed} content={t('menu')}>
-                                <button
-                                    onClick={() => {
-                                        setActiveMode('menu');
-                                        setChatPanelOpen(false);
-                                        onWidthChange?.(320);
-                                    }}
-                                    className={cn(
-                                        'flex items-center cursor-pointer justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200',
-                                        isCollapsed ? 'w-8 h-8 px-0 ' : 'flex-1',
-                                        (isCollapsed ? !chatPanelOpen : activeMode === 'menu')
-                                            ? 'bg-surface-dark/90 text-white shadow-sm ring-1 ring-white/8 dark:bg-white/10 dark:text-white'
-                                            : 'text-text-secondary hover:text-text hover:bg-surface-tertiary/50 dark:text-white/60 dark:hover:text-white dark:hover:bg-white/5',
-                                    )}
+                        {isCollapsed ? (
+                            <ConditionalTooltip show content={t('newDirectory')}>
+                                <Button
+                                    href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
+                                    variant="primary"
+                                    size="icon"
+                                    className="w-9 h-9 text-white bg-primary-hover hover:bg-primary-hover/80 shadow-sm rounded-xl"
                                 >
-                                    <LayoutList className="w-4 h-4 shrink-0" />
-                                    {!isCollapsed && <span>{t('menu')}</span>}
-                                </button>
+                                    <Plus className="w-5 h-5" />
+                                </Button>
                             </ConditionalTooltip>
-                            <ConditionalTooltip show={isCollapsed} content={t('aiChat')}>
-                                <button
-                                    onClick={() => {
-                                        if (isCollapsed) {
-                                            setChatPanelOpen((o) => !o);
-                                        } else {
-                                            setActiveMode('chat');
-                                        }
-                                    }}
-                                    className={cn(
-                                        'flex items-center justify-center cursor-pointer gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200',
-                                        isCollapsed ? 'w-8 h-8 px-0' : 'flex-1',
-                                        (isCollapsed ? chatPanelOpen : activeMode === 'chat')
-                                            ? 'bg-surface-dark/90 text-white shadow-sm ring-1 ring-white/8 dark:bg-white/10 dark:text-white'
-                                            : 'text-text-secondary hover:text-text hover:bg-surface-tertiary/50 dark:text-white/60 dark:hover:text-white dark:hover:bg-white/5',
-                                    )}
-                                >
-                                    <Bot className="w-4 h-4 shrink-0" />
-                                    {!isCollapsed && <span>{t('aiChat')}</span>}
-                                </button>
-                            </ConditionalTooltip>
-                        </div>
+                        ) : (
+                            <Button
+                                href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
+                                variant="primary"
+                                size="lg"
+                                fullWidth
+                                className="dark:text-white hover:text-white text-primary-hover rounded-xl dark:bg-primary-hover/20 text-sm bg-primary-hover/10 hover:bg-primary-hover/80 shadow-sm ring-1 dark:ring-white/6 dark:border dark:border-primary-hover dark:hover:border-white/12"
+                            >
+                                <Plus className="w-5 h-5" />
+                                <span className="font-medium">{t('newDirectory')}</span>
+                            </Button>
+                        )}
                     </div>
 
-                    {!isCollapsed && activeMode === 'chat' ? (
-                        <div className="flex-1 flex flex-col min-h-0 overflow-hidden w-full">
-                            <ChatInterface />
-                        </div>
-                    ) : (
-                        <div
+                    {/* Navigation */}
+                    <nav
+                        className={cn(
+                            'flex-1 min-h-0',
+                            isCollapsed ? 'px-2' : 'px-6 overflow-y-auto',
+                        )}
+                    >
+                        <ul
                             className={cn(
-                                'flex flex-col flex-1 min-h-0',
-                                !isCollapsed && 'max-w-80',
+                                'pb-4',
+                                isCollapsed ? 'space-y-1 flex flex-col items-center' : 'space-y-1',
                             )}
                         >
-                            <div
-                                className={cn(
-                                    isCollapsed
-                                        ? 'px-2 py-4 flex justify-center'
-                                        : 'px-6 pt-4 pb-10',
-                                )}
-                            >
-                                {isCollapsed ? (
-                                    <ConditionalTooltip show content={t('newDirectory')}>
-                                        <Button
-                                            href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
-                                            variant="primary"
-                                            size="icon"
-                                            className="w-9 h-9 text-white bg-primary-hover hover:bg-primary-hover/80 shadow-sm rounded-xl"
-                                        >
-                                            <Plus className="w-5 h-5" />
-                                        </Button>
-                                    </ConditionalTooltip>
-                                ) : (
-                                    <Button
-                                        href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
-                                        variant="primary"
-                                        size="lg"
-                                        fullWidth
-                                        className="dark:text-white hover:text-white text-primary-hover rounded-xl dark:bg-primary-hover/20 text-sm bg-primary-hover/10 hover:bg-primary-hover/80 shadow-sm ring-1 dark:ring-white/6 dark:border dark:border-primary-hover dark:hover:border-white/12"
+                            {navigation.map((item) => {
+                                const isActive =
+                                    pathname === item.href || pathname?.startsWith(item.href + '/');
+                                return (
+                                    <li
+                                        key={item.name}
+                                        className={isCollapsed ? 'w-full flex justify-center' : ''}
                                     >
-                                        <Plus className="w-5 h-5" />
-                                        <span className="font-medium">{t('newDirectory')}</span>
-                                    </Button>
-                                )}
-                            </div>
-
-                            <nav
-                                className={cn(
-                                    'flex-1 min-h-0',
-                                    isCollapsed ? 'px-2' : 'px-6 overflow-y-auto',
-                                )}
-                            >
-                                <ul
-                                    className={cn(
-                                        'pb-4',
-                                        isCollapsed
-                                            ? 'space-y-1 flex flex-col items-center'
-                                            : 'space-y-1',
-                                    )}
-                                >
-                                    {navigation.map((item) => {
-                                        const isActive =
-                                            pathname === item.href ||
-                                            pathname?.startsWith(item.href + '/');
-                                        return (
-                                            <li
-                                                key={item.name}
-                                                className={
-                                                    isCollapsed ? 'w-full flex justify-center' : ''
-                                                }
+                                        <ConditionalTooltip show={isCollapsed} content={item.name}>
+                                            <Link
+                                                href={item.href}
+                                                className={cn(
+                                                    'flex items-center rounded-lg transition-colors border border-transparent',
+                                                    isCollapsed
+                                                        ? 'justify-center w-8 h-8 px-0'
+                                                        : 'gap-3 px-4 py-2',
+                                                    isActive
+                                                        ? 'border bg-surface-secondary border-surface-tertiary dark:border-primary/10 dark:bg-surface-secondary-dark/50 text-text dark:text-primary'
+                                                        : 'text-text dark:text-text-secondary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark/30 hover:text-text dark:hover:text-text-dark',
+                                                )}
                                             >
-                                                <ConditionalTooltip
-                                                    show={isCollapsed}
-                                                    content={item.name}
-                                                >
-                                                    <Link
-                                                        href={item.href}
-                                                        onClick={() => setChatPanelOpen(false)}
-                                                        className={cn(
-                                                            'flex items-center rounded-lg transition-colors border border-transparent',
-                                                            isCollapsed
-                                                                ? 'justify-center w-8 h-8 px-0'
-                                                                : 'gap-3 px-4 py-2',
-                                                            isActive
-                                                                ? 'border bg-surface-secondary border-surface-tertiary dark:border-primary/10 dark:bg-surface-secondary-dark/50 text-text dark:text-primary'
-                                                                : 'text-text dark:text-text-secondary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark/30 hover:text-text dark:hover:text-text-dark',
-                                                        )}
-                                                    >
-                                                        <item.icon className="w-5 h-5 shrink-0" />
-                                                        {!isCollapsed && (
-                                                            <span className="text-sm">
-                                                                {item.name}
-                                                            </span>
-                                                        )}
-                                                    </Link>
-                                                </ConditionalTooltip>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            </nav>
-                        </div>
-                    )}
+                                                <item.icon className="w-5 h-5 shrink-0" />
+                                                {!isCollapsed && (
+                                                    <span className="text-sm">{item.name}</span>
+                                                )}
+                                            </Link>
+                                        </ConditionalTooltip>
+                                    </li>
+                                );
+                            })}
 
+                            {/* AI Chat toggle button — inline with navigation */}
+                            <li className={isCollapsed ? 'w-full flex justify-center' : ''}>
+                                <ConditionalTooltip show={isCollapsed} content={t('aiChat')}>
+                                    <button
+                                        onClick={toggleChatPanel}
+                                        className={cn(
+                                            'flex items-center rounded-lg transition-colors border border-transparent w-full',
+                                            isCollapsed
+                                                ? 'justify-center w-8 h-8 px-0'
+                                                : 'gap-3 px-4 py-2',
+                                            chatPanelOpen
+                                                ? 'border bg-surface-secondary border-surface-tertiary dark:border-primary/10 dark:bg-surface-secondary-dark/50 text-text dark:text-primary'
+                                                : 'text-text dark:text-text-secondary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark/30 hover:text-text dark:hover:text-text-dark',
+                                        )}
+                                    >
+                                        <Bot className="w-5 h-5 shrink-0" />
+                                        {!isCollapsed && (
+                                            <span className="text-sm">{t('aiChat')}</span>
+                                        )}
+                                    </button>
+                                </ConditionalTooltip>
+                            </li>
+                        </ul>
+                    </nav>
+
+                    {/* User menu */}
                     <div
                         className={cn(
                             'mt-auto py-3 shrink-0 border-t border-border dark:border-border-dark',
-                            !isCollapsed && 'max-w-80',
                             isCollapsed ? 'px-2' : 'px-4',
                         )}
                     >
@@ -491,18 +421,27 @@ export function DashboardSidebar({
                 </div>
             </aside>
 
-            {/* Floating AI chat panel — only when sidebar is collapsed */}
-            {isCollapsed && chatPanelOpen && (
+            {/* AI Chat panel — sidebar-of-sidebar, slides from left edge of sidebar */}
+            {chatPanelOpen && (
                 <div
+                    data-chat-panel
+                    style={{ left: sidebarWidth, width: width && !isCollapsed ? width : 380 }}
                     className={cn(
-                        'fixed top-0 left-16 h-full z-40 flex flex-col',
-                        'w-80',
+                        'fixed top-0 h-full z-40 flex flex-col',
                         'bg-white dark:bg-surface-dark',
                         'border-r border-border dark:border-border-dark',
                         'shadow-xl',
                         'animate-in slide-in-from-left-2 duration-200',
                     )}
                 >
+                    {/* Drag-to-resize handle */}
+                    {onWidthChange && (
+                        <div
+                            onMouseDown={handleDragStart}
+                            className="absolute right-0 top-0 h-full w-1 z-10 cursor-col-resize"
+                        />
+                    )}
+
                     {/* Panel header */}
                     <div className="h-12 flex items-center justify-between px-4 border-b border-border dark:border-border-dark shrink-0">
                         <div className="flex items-center gap-2 text-sm font-medium text-text dark:text-text-dark">
@@ -511,20 +450,25 @@ export function DashboardSidebar({
                         </div>
                         <button
                             onClick={() => setChatPanelOpen(false)}
-                            className="flex items-center justify-center w-7 h-7 rounded-lg text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white hover:bg-surface dark:hover:bg-white/5 transition-colors"
+                            className="flex items-center justify-center w-7 h-7 rounded-lg text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white hover:bg-surface dark:hover:bg-white/5 transition-colors cursor-pointer"
                         >
                             <X className="w-4 h-4" />
                         </button>
                     </div>
+
+                    {/* Chat content */}
                     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                         <ChatInterface />
                     </div>
                 </div>
             )}
 
-            {/* Backdrop to close floating panel on outside click */}
-            {isCollapsed && chatPanelOpen && (
-                <div className="fixed inset-0 z-30" onClick={() => setChatPanelOpen(false)} />
+            {/* Backdrop to close chat panel */}
+            {chatPanelOpen && (
+                <div
+                    className="fixed inset-0 z-30 bg-black/10 dark:bg-black/20"
+                    onClick={() => setChatPanelOpen(false)}
+                />
             )}
         </ChatProvider>
     );

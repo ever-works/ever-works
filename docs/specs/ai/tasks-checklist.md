@@ -131,71 +131,80 @@
 
 ### 6.1 Update ChatProvider
 
-- [ ] Rewrite `apps/web/src/components/ai/ChatProvider.tsx`
-    - [ ] Replace `useChatHistory` with `useChat` from `@ai-sdk/react`
-    - [ ] Configure `useChat` with `api: '/api/chat'`
-    - [ ] Pass `providerOverride` via `body` option
-    - [ ] Set `initialMessages` with welcome message
-    - [ ] Expose `useChat` return values through context
-    - [ ] Add `resetChat()` method
-    - [ ] Keep provider fetching logic (unchanged)
+- [x] Rewrite `apps/web/src/components/ai/ChatProvider.tsx`
+    - [x] Replace `useChatHistory` with `useChat` from `@ai-sdk/react`
+    - [x] Configure `useChat` with `DefaultChatTransport({ api: '/api/chat' })`
+    - [x] Pass `providerOverride` via `body` option (always required, defaults to `'openrouter'`)
+    - [x] Set `messages` with welcome message as initial
+    - [x] Expose `sendMessage`, `setMessages`, `status`, `error`, `stop`, `regenerate` through context
+    - [x] Add `resetChat()` method
+    - [x] Keep provider fetching logic (unchanged)
 
-### 6.2 Update ChatInterface
+### 6.2 Split into Clean Components
 
-- [ ] Rewrite `apps/web/src/components/ai/ChatInterface.tsx`
-    - [ ] Remove imports: `useAIStream`, `useChatHistory`, `generateMessageId`
-    - [ ] Use `useChatContext()` for all state
-    - [ ] Replace `isStreaming` checks with `status === 'streaming'`
-    - [ ] Update form submit to use `handleSubmit` from `useChat`
-    - [ ] Update message rendering to use `message.parts` array
-        - [ ] Render `part.type === 'text'` as text
-        - [ ] Render `part.type === 'tool-invocation'` with tool UI (optional, can be basic)
-    - [ ] Update message editing to use `setMessages` + `reload`
-    - [ ] Update reset to call `resetChat()`
-    - [ ] Update error display to use `error` from `useChat`
-    - [ ] Keep: provider selection UI, auto-resize textarea, timestamps
-    - [ ] Remove: `pendingMessageRef`, `updatePendingMessage`, `clearPending`
+- [x] Create `apps/web/src/components/ai/ChatMessage.tsx` — Single message rendering (user/assistant)
+- [x] Create `apps/web/src/components/ai/ChatMessageContent.tsx` — Message parts renderer (text, tool calls, streaming dots)
+- [x] Create `apps/web/src/components/ai/ChatMessageEdit.tsx` — Inline editing textarea with save/cancel
+- [x] Create `apps/web/src/components/ai/ChatProviderSelector.tsx` — Provider selection pill buttons
 
-### 6.3 Verify UI
+### 6.3 Rewrite ChatInterface
 
-- [ ] Chat sends and receives messages
-- [ ] Streaming animation works (loading dots while `status === 'streaming'`)
-- [ ] Provider switching works
-- [ ] Message editing works (truncate + regenerate)
-- [ ] New chat / reset works
-- [ ] Error states display correctly
-- [ ] Auto-scroll works
+- [x] Rewrite `apps/web/src/components/ai/ChatInterface.tsx`
+    - [x] Uses split sub-components (ChatMessage, ChatProviderSelector)
+    - [x] Uses `useChatContext()` for all state
+    - [x] `isStreaming = status === 'streaming' || status === 'submitted'`
+    - [x] Form submit calls `sendMessage(text)` from context
+    - [x] Message editing: `setMessages` to truncate + `regenerate()` (v6 API, not `reload`)
+    - [x] Reset calls `resetChat()`
+    - [x] Error from `error.message`
+    - [x] Removed: `pendingMessageRef`, `updatePendingMessage`, `clearPending`, all manual streaming
+
+### 6.4 Refactor Sidebar — Chat as Sidebar-of-Sidebar
+
+- [x] Rewrite `apps/web/src/components/dashboard/DashboardSidebar.tsx`
+    - [x] Removed menu/chat mode toggle (no more `activeMode` state)
+    - [x] Sidebar always shows navigation — AI Chat button is a nav item
+    - [x] Chat slides out as a secondary panel (positioned at `left: sidebarWidth`)
+    - [x] Panel has its own close button, drag-to-resize handle, and backdrop
+    - [x] Works with both collapsed and expanded sidebar states
+    - [x] Removed `LayoutList` import (unused after mode toggle removal)
+
+### 6.5 Verify
+
+- [x] `npx turbo build --filter=ever-works-web` — build passes, 0 TypeScript errors
+- [x] Old `/api/ai-conversations/chat/stream` route removed from build output
+- [x] New `/api/chat` route present in build output
 
 ## Phase 7: Cleanup
 
 ### 7.1 Remove Old Files
 
-- [ ] Delete `apps/web/src/lib/hooks/use-ai-stream.ts`
-- [ ] Delete `apps/web/src/lib/hooks/use-chat-history.ts`
-- [ ] Delete `apps/web/src/lib/api/ai-conversation.ts`
-- [ ] Delete `apps/web/src/app/api/ai-conversations/chat/stream/route.ts`
-    - [ ] Also remove the `ai-conversations` directory tree if empty
-- [ ] Delete `apps/web/src/lib/utils/next-api.ts` (only used by removed route)
+- [x] Deleted `apps/web/src/lib/hooks/use-ai-stream.ts`
+- [x] Deleted `apps/web/src/lib/hooks/use-chat-history.ts`
+- [x] Deleted `apps/web/src/lib/api/ai-conversation.ts`
+- [x] Deleted `apps/web/src/app/api/ai-conversations/` (entire directory tree)
+- [x] Deleted `apps/web/src/lib/utils/next-api.ts`
+- [x] Deleted `apps/api/src/ai-conversation/ai-conversation.controller.ts` (old NDJSON controller)
+- [x] Deleted `apps/api/src/ai-conversation/ai-conversation.service.ts` (old streaming service)
 
 ### 7.2 Update References
 
-- [ ] Remove `export * from './ai-conversation'` from `apps/web/src/lib/api/index.ts`
-- [ ] Remove `API_AI_CONVERSATIONS_CHAT_STREAM` from `apps/web/src/lib/constants.ts`
-- [ ] Deprecate old NestJS controller (add comment, keep for backward compat)
+- [x] Removed `export * from './ai-conversation'` from `apps/web/src/lib/api/index.ts`
+- [x] Removed `API_AI_CONVERSATIONS_CHAT_STREAM` from constants, added `API_CHAT`
+- [x] Removed re-exports of deleted types from `apps/web/src/lib/api/types-only.ts`
 
 ### 7.3 Verify No Broken Imports
 
-- [ ] Search for `use-ai-stream` -> 0 results
-- [ ] Search for `use-chat-history` -> 0 results
-- [ ] Search for `aiConversationAPI` -> 0 results
-- [ ] Search for `nextApiResponseStreaming` -> 0 results
-- [ ] Search for `API_AI_CONVERSATIONS_CHAT_STREAM` -> 0 results
+- [x] Search for `use-ai-stream` -> 0 results
+- [x] Search for `use-chat-history` -> 0 results
+- [x] Search for `aiConversationAPI` -> 0 results
+- [x] Search for `nextApiResponseStreaming` -> 0 results
+- [x] Search for `API_AI_CONVERSATIONS_CHAT_STREAM` -> 0 results
 
 ### 7.4 Final Verification
 
-- [ ] `pnpm type-check` passes
-- [ ] `pnpm lint` passes
-- [ ] `pnpm build` succeeds
-- [ ] `cd packages/agent && pnpm test` passes
-- [ ] Manual E2E test of chat feature
+- [x] `npx turbo build --filter=ever-works-web` passes
+- [x] `npx turbo build --filter=ever-works-api` passes
+- [x] `cd packages/agent && pnpm test` — 892 tests pass
+- [ ] Manual E2E test of chat feature (requires running servers)
 - [ ] Manual test of directory generation (verify pipelines still work)

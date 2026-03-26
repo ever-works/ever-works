@@ -82,14 +82,6 @@ export type {
 } from './settings';
 
 export type {
-    // From ai-conversation.ts
-    ChatMessage as ConversationMessage,
-    ChatMessageRole,
-    ChatStreamRequestDto,
-    StreamChunk,
-} from './ai-conversation';
-
-export type {
     // From types.ts
     MessageResponse,
     Category,

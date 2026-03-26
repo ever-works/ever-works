@@ -1,14 +1,28 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { useChat, type UIMessage } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
 import { useTranslations } from 'next-intl';
-import { useChatHistory, UseChatHistoryValue } from '@/lib/hooks/use-chat-history';
 import type { ProviderOption } from '@/lib/api/types-only';
 import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
 import { resolveEffectiveDefault } from '@ever-works/plugin';
 import { toast } from 'sonner';
 
-interface ChatContextValue extends UseChatHistoryValue {
+interface ChatContextValue {
+    // Chat state from useChat
+    messages: UIMessage[];
+    setMessages: (messages: UIMessage[] | ((messages: UIMessage[]) => UIMessage[])) => void;
+    status: 'submitted' | 'streaming' | 'ready' | 'error';
+    error: Error | undefined;
+    stop: () => void;
+    regenerate: () => void;
+
+    // Actions
+    sendMessage: (text: string) => void;
+    resetChat: () => void;
+
+    // Provider selection
     providers: ProviderOption[];
     selectedProvider: string | null;
     setSelectedProvider: (id: string | null) => void;
@@ -18,9 +32,26 @@ const ChatContext = createContext<ChatContextValue | null>(null);
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
     const t = useTranslations('dashboard.aiChat');
-    const chatHistory = useChatHistory({ initialMessage: t('welcomeMessage') });
     const [providers, setProviders] = useState<ProviderOption[]>([]);
     const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+
+    const welcomeMessage: UIMessage = {
+        id: 'welcome',
+        role: 'assistant',
+        parts: [{ type: 'text', text: t('welcomeMessage') }],
+    };
+
+    const chat = useChat({
+        messages: [welcomeMessage],
+        transport: new DefaultChatTransport({
+            api: '/api/chat',
+            body: () => ({
+                providerOverride: selectedProvider ?? 'openrouter',
+            }),
+        }),
+    });
+
+    // Fetch available AI providers on mount
     useEffect(() => {
         let cancelled = false;
 
@@ -54,12 +85,38 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         };
     }, [t]);
 
+    const sendMessage = useCallback(
+        (text: string) => {
+            if (!text.trim()) return;
+            chat.sendMessage(
+                { text },
+                {
+                    body: {
+                        providerOverride: selectedProvider ?? 'openrouter',
+                    },
+                },
+            );
+        },
+        [chat.sendMessage, selectedProvider],
+    );
+
+    const resetChat = useCallback(() => {
+        chat.setMessages([welcomeMessage]);
+    }, [chat.setMessages]);
+
     const handleSetSelectedProvider = useCallback((id: string | null) => {
         setSelectedProvider(id);
     }, []);
 
     const value: ChatContextValue = {
-        ...chatHistory,
+        messages: chat.messages,
+        setMessages: chat.setMessages,
+        status: chat.status,
+        error: chat.error,
+        stop: chat.stop,
+        regenerate: chat.regenerate,
+        sendMessage,
+        resetChat,
         providers,
         selectedProvider,
         setSelectedProvider: handleSetSelectedProvider,
