@@ -1,5 +1,11 @@
 export const jwtConstants = {
-    secret: () => process.env.JWT_SECRET || 'aesh4Dai_secret_key_here',
+    secret: () => {
+        const secret = process.env.JWT_SECRET;
+        if (!secret) {
+            throw new Error('JWT_SECRET environment variable is required');
+        }
+        return secret;
+    },
     accessTokenExpiration: (): any => {
         const expiration = process.env.JWT_ACCESS_TOKEN_EXPIRATION;
         // Return undefined to disable expiration

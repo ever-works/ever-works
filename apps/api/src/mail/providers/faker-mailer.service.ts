@@ -6,6 +6,6 @@ export class FakerMailerService {
     private readonly logger = new Logger(FakerMailerService.name);
 
     async sendMail(data: SendMailOptions): Promise<void> {
-        this.logger.debug('FakerMailerService:sendMail', data);
+        this.logger.debug(`FakerMailerService:sendMail to=${data.to} subject="${data.subject}"`);
     }
 }
