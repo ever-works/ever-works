@@ -1,7 +1,7 @@
 import 'server-only';
 import { API_URL, WEB_URL } from '../constants';
 import { headers } from 'next/headers';
-import { getAuthAccessCookie } from '../auth/cookies';
+import { getAuthAccessCookie, getBetterAuthCookieHeader } from '../auth/cookies';
 import { refreshAccessToken } from '../auth/refresh';
 import { getTranslations } from 'next-intl/server';
 
@@ -45,14 +45,18 @@ export async function serverFetch<T>(
     const t = await getTranslations('api.errors');
     const { rawResponse, ...fetchOptions } = options;
 
-    const doFetch = async (authToken?: string) => {
+    const doFetch = async (authToken?: string, baCookieHeader?: string) => {
         const reqHeaders: Record<string, string> = {
             'Content-Type': 'application/json',
             'X-Frontend-URL': frontendUrl,
             ...((fetchOptions.headers as Record<string, string>) || {}),
         };
 
-        if (authToken) {
+        if (baCookieHeader) {
+            // Forward BetterAuth session cookies to the API
+            reqHeaders['Cookie'] = baCookieHeader;
+        } else if (authToken) {
+            // Fall back to JWT Bearer token (legacy)
             reqHeaders['Authorization'] = `Bearer ${authToken}`;
         }
 
@@ -64,11 +68,13 @@ export async function serverFetch<T>(
         });
     };
 
-    const token = await getAuthAccessCookie();
-    let response = await doFetch(token);
+    // Try BetterAuth session cookies first, fall back to JWT
+    const baCookies = await getBetterAuthCookieHeader();
+    const token = !baCookies ? await getAuthAccessCookie() : undefined;
+    let response = await doFetch(token, baCookies);
 
-    // On 401, attempt a single token refresh and retry
-    if (response.status === 401 && token) {
+    // On 401 with legacy JWT, attempt a single token refresh and retry
+    if (response.status === 401 && token && !baCookies) {
         const refreshed = await refreshAccessToken();
         if (refreshed) {
             const newToken = await getAuthAccessCookie();

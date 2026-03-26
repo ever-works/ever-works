@@ -3,7 +3,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
-import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { SessionAuthGuard } from './auth/guards/session-auth.guard';
 import { throttlerConfig } from './config/throttler.config';
 import { DirectoriesModule } from './directories/directories.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -65,7 +65,7 @@ import { CacheFactory } from '@ever-works/agent/cache';
     providers: [
         {
             provide: APP_GUARD,
-            useClass: JwtAuthGuard,
+            useClass: SessionAuthGuard,
         },
         {
             provide: APP_GUARD,

@@ -3,46 +3,48 @@ import { getAuthFromRequest } from './middleware';
 import { refreshAccessToken } from './refresh';
 
 export async function getAuthFromCookie() {
-    const auth = await getAuthFromRequest();
-    if (!auth.isAuthenticated) {
-        return null;
-    }
+	const auth = await getAuthFromRequest();
+	if (!auth.isAuthenticated) {
+		return null;
+	}
 
-    if (auth.isExpired) {
-        const refreshed = await refreshAccessToken();
-        if (!refreshed) {
-            return null;
-        }
-        const freshAuth = await getAuthFromRequest();
-        return freshAuth.user || null;
-    }
+	// BetterAuth sessions auto-refresh, no manual refresh needed
+	if (auth.isExpired) {
+		const refreshed = await refreshAccessToken();
+		if (!refreshed) {
+			return null;
+		}
+		const freshAuth = await getAuthFromRequest();
+		return freshAuth.user || null;
+	}
 
-    return auth.user || null;
+	return auth.user || null;
 }
 
 export async function getAuthFromAPI() {
-    const auth = await getAuthFromRequest();
-    if (!auth.isAuthenticated) {
-        return null;
-    }
+	const auth = await getAuthFromRequest();
+	if (!auth.isAuthenticated) {
+		return null;
+	}
 
-    if (auth.isExpired) {
-        const refreshed = await refreshAccessToken();
-        if (!refreshed) {
-            return null;
-        }
-        // Re-verify the refreshed token is valid before making the API call
-        const freshAuth = await getAuthFromRequest();
-        if (!freshAuth.isAuthenticated || freshAuth.isExpired) {
-            return null;
-        }
-    }
+	// For legacy JWT, handle expiration
+	if (auth.isExpired) {
+		const refreshed = await refreshAccessToken();
+		if (!refreshed) {
+			return null;
+		}
+		// Re-verify the refreshed token is valid before making the API call
+		const freshAuth = await getAuthFromRequest();
+		if (!freshAuth.isAuthenticated || freshAuth.isExpired) {
+			return null;
+		}
+	}
 
-    try {
-        return await authAPI.getFreshProfile();
-    } catch (error) {
-        return null;
-    }
+	try {
+		return await authAPI.getFreshProfile();
+	} catch (error) {
+		return null;
+	}
 }
 
 export * from './middleware';

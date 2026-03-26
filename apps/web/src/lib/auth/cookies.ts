@@ -7,6 +7,8 @@ export const AUTH_COOKIE_NAME = 'everworks_auth_token';
 
 export const REFRESH_COOKIE_NAME = 'everworks_refresh_token';
 
+export const BETTER_AUTH_SESSION_COOKIE = 'better-auth.session_token';
+
 const cookieOptions: Partial<ResponseCookie> = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -77,6 +79,27 @@ export async function setAuthCookies(access_token: string, refresh_token: string
 
 export async function removeAuthAccessCookies() {
     await Promise.all([removeAuthAccessCookie(), removeRefreshCookie()]);
+}
+
+// =================
+// BetterAuth Session
+// =================
+
+export async function getBetterAuthSessionCookie(): Promise<string | undefined> {
+    const cookieStore = await cookies();
+    return cookieStore.get(BETTER_AUTH_SESSION_COOKIE)?.value;
+}
+
+/**
+ * Get all BetterAuth cookie headers for forwarding to the API.
+ * BetterAuth may use multiple cookies (session token + cookie cache).
+ */
+export async function getBetterAuthCookieHeader(): Promise<string | undefined> {
+    const cookieStore = await cookies();
+    const allCookies = cookieStore.getAll();
+    const baCookies = allCookies.filter((c) => c.name.startsWith('better-auth.'));
+    if (baCookies.length === 0) return undefined;
+    return baCookies.map((c) => `${c.name}=${c.value}`).join('; ');
 }
 
 // =================
