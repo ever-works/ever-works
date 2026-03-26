@@ -23,7 +23,7 @@ export function ChatMessage({ message, isStreaming, isLastMessage }: ChatMessage
         <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
             <div
                 className={cn(
-                    'max-w-[85%] rounded-lg px-3 py-2',
+                    'max-w-[90%] rounded-lg px-3 py-2',
                     isUser
                         ? 'bg-primary/10 dark:bg-card-primary-dark text-text dark:text-text-dark'
                         : 'bg-surface-secondary dark:bg-surface-tertiary-dark/50 text-text dark:text-text-dark',

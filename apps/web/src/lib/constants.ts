@@ -41,6 +41,9 @@ export const DEFAULT_LOCALE = (process.env.NEXT_PUBLIC_DEFAULT_LOCALE ||
 const apiUrl = process.env.API_URL || 'http://localhost:3100';
 export const API_URL = apiUrl.endsWith('/api') ? apiUrl : `${apiUrl}/api`;
 
+// Default AI provider used when no provider is explicitly selected
+export const DEFAULT_AI_PROVIDER = 'openrouter';
+
 // Allowed redirect hosts
 export const ALLOWED_REDIRECT_URLS = (process.env.ALLOWED_REDIRECT_URLS || 'localhost,127.0.0.1')
     .split(',')
