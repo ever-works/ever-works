@@ -18,6 +18,7 @@ import { resolveEffectiveDefault } from '@ever-works/plugin';
 import { toast } from 'sonner';
 import { DEFAULT_AI_PROVIDER } from '@/lib/constants';
 import { useLocalStorage } from '@/lib/hooks/use-local-storage';
+
 import type { ConversationSummary } from '@/lib/api/conversations';
 import {
     listConversations,
@@ -26,6 +27,7 @@ import {
     deleteConversation,
 } from '@/app/actions/dashboard/conversations';
 
+const ACTIVE_CONVERSATION_KEY = 'chat-active-conversation';
 interface ChatContextValue {
     messages: UIMessage[];
     setMessages: (messages: UIMessage[] | ((messages: UIMessage[]) => UIMessage[])) => void;
@@ -60,18 +62,48 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     );
     const [conversations, setConversations] = useState<ConversationSummary[]>([]);
     const [conversationsLoading, setConversationsLoading] = useState(false);
-    const [conversationId, setConversationId] = useState<string | null>(null);
+    const [persistedConvId, setPersistedConvId] = useLocalStorage<string>(
+        ACTIVE_CONVERSATION_KEY,
+        '',
+    );
+    const [conversationId, setConversationId] = useState<string | null>(persistedConvId || null);
 
-    // Refs for values needed in callbacks without causing re-renders
-    const conversationIdRef = useRef<string | null>(null);
+    const conversationIdRef = useRef<string | null>(persistedConvId || null);
     const selectedProviderRef = useRef(selectedProvider);
     selectedProviderRef.current = selectedProvider;
 
-    const chat = useChat({ transport });
+    const chat = useChat({ id: 'ever-works-chat', transport });
 
-    // Stable refs for chat methods to avoid dependency churn
     const chatRef = useRef(chat);
     chatRef.current = chat;
+
+    // Restore active conversation on mount if messages are empty
+    const hasRestoredRef = useRef(false);
+    useEffect(() => {
+        if (hasRestoredRef.current) return;
+        hasRestoredRef.current = true;
+
+        const id = conversationIdRef.current;
+        if (!id || chatRef.current.messages.length > 0) return;
+
+        getConversation(id)
+            .then((conv) => {
+                const uiMessages: UIMessage[] = conv.messages
+                    .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
+                    .map((msg) => ({
+                        id: msg.id,
+                        role: msg.role as 'user' | 'assistant',
+                        parts: [{ type: 'text' as const, text: msg.content }],
+                    }));
+                chatRef.current.setMessages(uiMessages);
+            })
+            .catch(() => {
+                // Conversation may have been deleted
+                conversationIdRef.current = null;
+                setConversationId(null);
+                setPersistedConvId('');
+            });
+    }, [setPersistedConvId]);
 
     // Fetch providers on mount
     useEffect(() => {
@@ -106,6 +138,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         };
     }, [t]);
 
+    const updateConversationId = useCallback(
+        (id: string | null) => {
+            conversationIdRef.current = id;
+            setConversationId(id);
+            setPersistedConvId(id ?? '');
+        },
+        [setPersistedConvId],
+    );
+
     const refreshConversations = useCallback(async () => {
         setConversationsLoading(true);
         try {
@@ -129,8 +170,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             if (!conversationIdRef.current) {
                 try {
                     const conv = await createConversation(selectedProviderRef.current);
-                    conversationIdRef.current = conv.id;
-                    setConversationId(conv.id);
+                    updateConversationId(conv.id);
                 } catch {
                     toast.error(t('errors.unableToSend'));
                     return;
@@ -152,17 +192,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const resetChat = useCallback(() => {
         chatRef.current.setMessages([]);
-        conversationIdRef.current = null;
-        setConversationId(null);
+        updateConversationId(null);
         refreshConversations();
-    }, [refreshConversations]);
+    }, [refreshConversations, updateConversationId]);
 
     const loadConversation = useCallback(
         async (id: string) => {
             try {
                 const conv = await getConversation(id);
-                conversationIdRef.current = conv.id;
-                setConversationId(conv.id);
+                updateConversationId(conv.id);
 
                 const uiMessages: UIMessage[] = conv.messages
                     .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
@@ -177,7 +215,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 toast.error(t('errors.unableToSend'));
             }
         },
-        [t],
+        [t, updateConversationId],
     );
 
     const deleteConv = useCallback(
@@ -187,14 +225,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 setConversations((prev) => prev.filter((c) => c.id !== id));
                 if (conversationIdRef.current === id) {
                     chatRef.current.setMessages([]);
-                    conversationIdRef.current = null;
-                    setConversationId(null);
+                    updateConversationId(null);
                 }
             } catch {
                 toast.error(t('errors.unableToSend'));
             }
         },
-        [t],
+        [t, updateConversationId],
     );
 
     const handleSetSelectedProvider = useCallback(

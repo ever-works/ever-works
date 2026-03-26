@@ -119,40 +119,53 @@ export class OpenAiCompatService {
         assistantContent: string,
         facadeOptions: FacadeOptions,
     ): Promise<void> {
-        // Validate user owns this conversation
         const conversation = await this.conversationRepo.findById(conversationId, userId);
         if (!conversation) return;
 
-        const lastUserMsg = [...dto.messages].reverse().find((m) => m.role === 'user');
+        const existingCount = conversation.messages?.length ?? 0;
         const resolvedModel = dto.model === 'auto' ? undefined : (dto.model ?? undefined);
 
-        const messagesToPersist = [];
+        // Persist all messages from the request that aren't already stored.
+        // The SDK sends the full history each call. Skip the first N that match existing DB records.
+        const newMessages = dto.messages.slice(existingCount);
+        const messagesToPersist = newMessages.map((msg) => ({
+            conversationId,
+            role: (msg.role === 'tool' ? 'tool' : msg.role) as
+                | 'user'
+                | 'assistant'
+                | 'system'
+                | 'tool',
+            content: msg.content ?? '',
+            toolCalls: msg.tool_calls?.map((tc) => ({
+                id: tc.id,
+                name: tc.function.name,
+                arguments: tc.function.arguments,
+            })),
+            toolCallId: msg.tool_call_id,
+        }));
 
-        if (lastUserMsg?.content) {
-            messagesToPersist.push({
-                conversationId,
-                role: 'user' as const,
-                content: lastUserMsg.content,
-            });
+        // Persist intermediate messages (user, tool calls, tool results)
+        if (messagesToPersist.length > 0) {
+            await this.conversationRepo.appendMessages(messagesToPersist);
         }
 
-        messagesToPersist.push({
+        // Persist the final assistant response from this streaming round
+        await this.conversationRepo.appendMessage({
             conversationId,
-            role: 'assistant' as const,
+            role: 'assistant',
             content: assistantContent,
             model: resolvedModel,
         });
 
-        await this.conversationRepo.appendMessages(messagesToPersist);
-
-        // First message: set title from user message text
-        if (!conversation.title && lastUserMsg?.content) {
-            const title = this.truncateTitle(lastUserMsg.content);
+        // Title management
+        const firstUserMsg = dto.messages.find((m) => m.role === 'user');
+        if (!conversation.title && firstUserMsg?.content) {
+            const title = this.truncateTitle(firstUserMsg.content);
             await this.conversationRepo.updateTitle(conversationId, userId, title);
         }
 
-        const messageCount = (conversation.messages?.length ?? 0) + messagesToPersist.length;
-        if (messageCount >= 4 && !conversation.metadata?.aiTitle) {
+        const totalMessages = existingCount + messagesToPersist.length;
+        if (totalMessages >= 4 && !conversation.metadata?.aiTitle) {
             this.generateAiTitle(
                 conversationId,
                 userId,

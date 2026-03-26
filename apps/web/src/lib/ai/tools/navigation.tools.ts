@@ -54,7 +54,7 @@ const tabRoutes: Record<(typeof TAB_OPTIONS)[number], (id: string) => string> = 
 
 export const navigate = tool({
     description:
-        'Navigate the user to a specific page in the dashboard. Use this when the user asks to see, view, or go to something.',
+        'Navigate the user to a page. The UI handles the redirect. Do NOT output any text after calling this tool.',
     inputSchema: z.object({
         page: z.enum(PAGE_OPTIONS).describe('The page to navigate to'),
         directoryId: z
@@ -62,9 +62,8 @@ export const navigate = tool({
             .optional()
             .describe('Directory ID (required for directory-specific pages)'),
         tab: z.enum(TAB_OPTIONS).optional().describe('Directory tab to navigate to'),
-        query: z.record(z.string()).optional().describe('Query parameters to append to the URL'),
     }),
-    execute: async ({ page, directoryId, tab, query }) => {
+    execute: async ({ page, directoryId, tab }) => {
         let url = pageRoutes[page] ?? ROUTES.DASHBOARD;
 
         if (directoryId && tab) {
@@ -74,11 +73,6 @@ export const navigate = tool({
             url = ROUTES.DASHBOARD_DIRECTORY(directoryId);
         }
 
-        if (query) {
-            const params = new URLSearchParams(query).toString();
-            if (params) url += `?${params}`;
-        }
-
-        return { url, action: 'navigate' };
+        return { url, navigated: true };
     },
 });

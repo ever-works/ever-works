@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils/cn';
 import type { UIMessage } from '@ai-sdk/react';
+import { isToolUIPart } from 'ai';
 import { ChatMessageContent } from './ChatMessageContent';
 
 interface ChatMessageProps {
@@ -14,10 +15,19 @@ export function ChatMessage({ message, isStreaming, isLastMessage }: ChatMessage
     const isUser = message.role === 'user';
     const isMessageStreaming = message.role === 'assistant' && isStreaming && isLastMessage;
 
-    const text = message.parts
-        .filter((p): p is Extract<typeof p, { type: 'text' }> => p.type === 'text')
-        .map((p) => p.text)
-        .join('');
+    // Check if message has any visible content
+    const hasVisibleContent = message.parts.some(
+        (part) => (part.type === 'text' && part.text?.trim()) || isToolUIPart(part),
+    );
+
+    // Don't render empty assistant messages (e.g., intermediate tool-call-only steps)
+    if (!isUser && !hasVisibleContent && !isMessageStreaming) {
+        return null;
+    }
+
+    const hasText = message.parts.some(
+        (p): p is Extract<typeof p, { type: 'text' }> => p.type === 'text' && !!p.text?.trim(),
+    );
 
     return (
         <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
@@ -33,7 +43,7 @@ export function ChatMessage({ message, isStreaming, isLastMessage }: ChatMessage
                     parts={message.parts}
                     isUser={isUser}
                     isMessageStreaming={isMessageStreaming}
-                    hasText={!!text}
+                    hasText={hasText}
                 />
             </div>
         </div>

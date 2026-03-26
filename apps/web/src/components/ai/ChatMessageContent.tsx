@@ -1,7 +1,7 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
 import type { UIMessage } from '@ai-sdk/react';
+import { getToolName, isToolUIPart } from 'ai';
 import { ChatMarkdown } from './ChatMarkdown';
 import { ChatToolResult } from './ChatToolResult';
 
@@ -20,12 +20,14 @@ export function ChatMessageContent({
     isMessageStreaming,
     hasText,
 }: ChatMessageContentProps) {
-    const t = useTranslations('dashboard.aiChat');
-
     return (
         <>
             {parts.map((part, i) => {
-                if (part.type === 'text' && part.text) {
+                if (part.type === 'step-start') {
+                    return null;
+                }
+
+                if (part.type === 'text' && part.text?.trim()) {
                     if (isUser) {
                         return (
                             <p key={i} className="text-xs leading-relaxed whitespace-pre-wrap">
@@ -36,14 +38,15 @@ export function ChatMessageContent({
                     return <ChatMarkdown key={i} content={part.text} />;
                 }
 
-                if (part.type === 'dynamic-tool' || part.type.startsWith('tool-')) {
-                    const toolPart = part as { toolName?: string; state: string; output?: unknown };
+                if (isToolUIPart(part)) {
+                    const name = getToolName(part);
+                    if (!name) return null;
                     return (
                         <ChatToolResult
-                            key={i}
-                            toolName={toolPart.toolName ?? 'unknown'}
-                            state={toolPart.state}
-                            output={toolPart.output}
+                            key={part.toolCallId}
+                            toolName={name}
+                            state={part.state}
+                            output={part.state === 'output-available' ? part.output : undefined}
                         />
                     );
                 }
