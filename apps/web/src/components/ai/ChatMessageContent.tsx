@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import type { UIMessage } from '@ai-sdk/react';
 import { ChatMarkdown } from './ChatMarkdown';
+import { ChatToolResult } from './ChatToolResult';
 
 type MessagePart = UIMessage['parts'][number];
 
@@ -36,19 +37,14 @@ export function ChatMessageContent({
                 }
 
                 if (part.type === 'dynamic-tool' || part.type.startsWith('tool-')) {
-                    const toolPart = part as { toolName?: string; state: string };
+                    const toolPart = part as { toolName?: string; state: string; output?: unknown };
                     return (
-                        <div
+                        <ChatToolResult
                             key={i}
-                            className="mt-1 px-2 py-1.5 rounded bg-black/5 dark:bg-white/5 text-[11px] text-text-muted dark:text-text-muted-dark"
-                        >
-                            <span className="font-medium">{toolPart.toolName ?? 'tool'}</span>
-                            {toolPart.state === 'result' && (
-                                <span className="ml-1 text-text-secondary dark:text-white/60">
-                                    {t('toolCompleted')}
-                                </span>
-                            )}
-                        </div>
+                            toolName={toolPart.toolName ?? 'unknown'}
+                            state={toolPart.state}
+                            result={toolPart.output}
+                        />
                     );
                 }
 

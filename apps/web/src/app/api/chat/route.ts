@@ -1,5 +1,6 @@
-import { convertToModelMessages, streamText, type UIMessage } from 'ai';
+import { convertToModelMessages, streamText, stepCountIs, type UIMessage } from 'ai';
 import { createBackendProvider } from '@/lib/ai/provider';
+import { chatTools } from '@/lib/ai/tools';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
 import { refreshAccessToken } from '@/lib/auth/refresh';
 import { API_URL } from '@/lib/constants';
@@ -43,7 +44,16 @@ export async function POST(request: Request) {
 
     const result = streamText({
         model: provider.chatModel('auto'),
+        system: [
+            'You are an AI assistant for Ever Works, a directory builder platform.',
+            'You can help users manage their directories, check their setup, and navigate the app.',
+            'When the user asks to see or view something, use the navigate tool.',
+            'When the user wants to create a directory, first check their git connection using checkGitConnection.',
+            'Be concise and helpful. Use markdown for formatting.',
+        ].join(' '),
         messages: await convertToModelMessages(messages),
+        tools: chatTools,
+        stopWhen: stepCountIs(5),
     });
 
     return result.toUIMessageStreamResponse();
