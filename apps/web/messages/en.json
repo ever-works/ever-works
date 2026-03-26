@@ -2374,6 +2374,12 @@
             "historyToday": "Today",
             "historyYesterday": "Yesterday",
             "historyDaysAgo": "{days}d ago",
+            "suggestions": {
+                "s1": "Create a directory of AI tools",
+                "s2": "List top SaaS products in 2026",
+                "s3": "Build a developer resources hub",
+                "s4": "Compare project management tools"
+            },
             "errors": {
                 "unableToSend": "Unable to send message"
             }

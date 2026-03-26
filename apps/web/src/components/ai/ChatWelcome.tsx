@@ -8,12 +8,7 @@ interface ChatWelcomeProps {
     onSuggestion: (text: string) => void;
 }
 
-const suggestions = [
-    'Create a directory of AI tools',
-    'List top SaaS products in 2026',
-    'Build a developer resources hub',
-    'Compare project management tools',
-];
+const suggestionKeys = ['s1', 's2', 's3', 's4'] as const;
 
 type CapabilityKey = 'directoryCreation' | 'webResearch' | 'contentGeneration' | 'smartSuggestions';
 type CapabilityDescKey =
@@ -27,35 +22,19 @@ const capabilities: Array<{
     title: CapabilityKey;
     description: CapabilityDescKey;
 }> = [
-    {
-        icon: FolderSearch,
-        title: 'directoryCreation',
-        description: 'directoryCreationDesc',
-    },
-    {
-        icon: Globe,
-        title: 'webResearch',
-        description: 'webResearchDesc',
-    },
-    {
-        icon: Sparkles,
-        title: 'contentGeneration',
-        description: 'contentGenerationDesc',
-    },
-    {
-        icon: Lightbulb,
-        title: 'smartSuggestions',
-        description: 'smartSuggestionsDesc',
-    },
+    { icon: FolderSearch, title: 'directoryCreation', description: 'directoryCreationDesc' },
+    { icon: Globe, title: 'webResearch', description: 'webResearchDesc' },
+    { icon: Sparkles, title: 'contentGeneration', description: 'contentGenerationDesc' },
+    { icon: Lightbulb, title: 'smartSuggestions', description: 'smartSuggestionsDesc' },
 ];
 
 export function ChatWelcome({ onSuggestion }: ChatWelcomeProps) {
     const t = useTranslations('dashboard.aiChat');
     const tc = useTranslations('dashboard.aiChat.capabilities');
+    const ts = useTranslations('dashboard.aiChat.suggestions');
 
     return (
         <div className="flex flex-col h-full px-5 py-6 overflow-y-auto">
-            {/* Welcome heading */}
             <div className="mb-6">
                 <h2 className="text-lg font-semibold text-text dark:text-white tracking-tight">
                     {t('welcomeTitle')}
@@ -65,30 +44,31 @@ export function ChatWelcome({ onSuggestion }: ChatWelcomeProps) {
                 </p>
             </div>
 
-            {/* Suggestion chips */}
             <div className="flex flex-wrap gap-1.5 mb-6">
-                {suggestions.map((text) => (
-                    <button
-                        key={text}
-                        type="button"
-                        onClick={() => onSuggestion(text)}
-                        className={cn(
-                            'inline-flex items-center px-2.5 py-1.5 rounded-lg text-[11px] font-medium',
-                            'border border-border dark:border-white/8',
-                            'bg-surface-secondary/60 dark:bg-white/[0.04]',
-                            'text-text-secondary dark:text-text-secondary-dark',
-                            'hover:bg-surface-tertiary/60 dark:hover:bg-white/[0.08]',
-                            'hover:text-text dark:hover:text-white',
-                            'hover:border-primary/20 dark:hover:border-white/15',
-                            'transition-all duration-150 cursor-pointer',
-                        )}
-                    >
-                        {text}
-                    </button>
-                ))}
+                {suggestionKeys.map((key) => {
+                    const text = ts(key);
+                    return (
+                        <button
+                            key={key}
+                            type="button"
+                            onClick={() => onSuggestion(text)}
+                            className={cn(
+                                'inline-flex items-center px-2.5 py-1.5 rounded-lg text-[11px] font-medium',
+                                'border border-border dark:border-white/8',
+                                'bg-surface-secondary/60 dark:bg-white/[0.04]',
+                                'text-text-secondary dark:text-text-secondary-dark',
+                                'hover:bg-surface-tertiary/60 dark:hover:bg-white/[0.08]',
+                                'hover:text-text dark:hover:text-white',
+                                'hover:border-primary/20 dark:hover:border-white/15',
+                                'transition-all duration-150 cursor-pointer',
+                            )}
+                        >
+                            {text}
+                        </button>
+                    );
+                })}
             </div>
 
-            {/* Capability cards grid */}
             <div className="grid grid-cols-2 gap-2.5 mt-auto">
                 {capabilities.map((cap) => (
                     <div

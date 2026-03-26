@@ -55,6 +55,7 @@ export class OpenAiCompatService {
         const options = this.mapToInternalOptions(dto);
 
         let assistantContent = '';
+        let hasResponse = false;
 
         try {
             const stream = this.aiFacade.createStreamingChatCompletion(
@@ -71,9 +72,11 @@ export class OpenAiCompatService {
                 const delta = chunk.choices[0]?.delta;
                 if (delta?.content && typeof delta.content === 'string') {
                     assistantContent += delta.content;
+                    hasResponse = true;
                 }
                 if (delta?.toolCalls?.length) {
                     toolCallIndex += delta.toolCalls.length;
+                    hasResponse = true;
                 }
             }
 
@@ -96,8 +99,9 @@ export class OpenAiCompatService {
 
         // Persist messages to the conversation (frontend creates it upfront)
         const conversationId = persistence?.conversationId;
-        if (conversationId && assistantContent) {
-            this.persistMessages(dto, conversationId, assistantContent).catch((err) =>
+        const userId = persistence?.userId;
+        if (conversationId && userId && hasResponse) {
+            this.persistMessages(dto, conversationId, userId, assistantContent).catch((err) =>
                 this.logger.error('Failed to persist messages', err),
             );
         }
@@ -110,8 +114,13 @@ export class OpenAiCompatService {
     private async persistMessages(
         dto: OpenAiChatCompletionRequestDto,
         conversationId: string,
+        userId: string,
         assistantContent: string,
     ): Promise<void> {
+        // Validate user owns this conversation
+        const conversation = await this.conversationRepo.findById(conversationId, userId);
+        if (!conversation) return;
+
         const lastUserMsg = [...dto.messages].reverse().find((m) => m.role === 'user');
         const resolvedModel = dto.model === 'auto' ? undefined : (dto.model ?? undefined);
 
@@ -134,13 +143,10 @@ export class OpenAiCompatService {
 
         await this.conversationRepo.appendMessages(messagesToPersist);
 
-        // Auto-generate title if conversation has no title yet
-        if (lastUserMsg?.content) {
-            const conversation = await this.conversationRepo.findById(conversationId);
-            if (conversation && !conversation.title) {
-                const title = this.generateTitle(lastUserMsg.content);
-                await this.conversationRepo.updateTitle(conversationId, conversation.userId, title);
-            }
+        // Auto-generate title for new conversations
+        if (!conversation.title && lastUserMsg?.content) {
+            const title = this.generateTitle(lastUserMsg.content);
+            await this.conversationRepo.updateTitle(conversationId, userId, title);
         }
     }
 

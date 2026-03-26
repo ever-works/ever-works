@@ -63,6 +63,8 @@ export class ConversationController {
         @Param('id') id: string,
         @Body() body: { title: string },
     ) {
+        const conversation = await this.repo.findById(id, auth.userId);
+        if (!conversation) throw new NotFoundException();
         await this.repo.updateTitle(id, auth.userId, body.title);
     }
 
