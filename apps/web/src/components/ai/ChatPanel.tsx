@@ -21,24 +21,35 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ open, onClose }: ChatPanelProps) {
-    if (!open) return null;
-
     return (
         <div
             className={cn(
-                'relative h-full shrink-0 flex flex-col',
-                'w-[380px]',
-                'bg-white dark:bg-surface-dark',
-                'border-r border-border dark:border-white/6',
+                'relative h-full shrink-0',
+                'transition-[width] duration-250 ease-in-out',
+                open ? 'w-95' : 'w-0',
             )}
         >
-            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                <ChatInterface />
+            {/* Content container — clips content but not the toggle button */}
+            <div
+                className={cn(
+                    'absolute inset-0 flex flex-col overflow-hidden',
+                    'bg-white dark:bg-surface-dark',
+                    'border-r border-border dark:border-white/6',
+                    'transition-opacity duration-250 ease-in-out',
+                    open ? 'opacity-100' : 'opacity-0 pointer-events-none',
+                )}
+            >
+                <div className="flex-1 flex flex-col min-h-0 w-95">
+                    <ChatInterface />
+                </div>
             </div>
 
-            <button onClick={onClose} className={borderToggleClass}>
-                <ChevronLeft className="w-3 h-3" />
-            </button>
+            {/* Toggle button — outside overflow container */}
+            {open && (
+                <button onClick={onClose} className={borderToggleClass}>
+                    <ChevronLeft className="w-3 h-3" />
+                </button>
+            )}
         </div>
     );
 }
