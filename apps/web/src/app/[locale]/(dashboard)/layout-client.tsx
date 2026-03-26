@@ -7,6 +7,7 @@ import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { Footer } from '@/components/footer';
 import { HelpDrawer } from '@/components/dashboard/HelpDrawer';
+import { ConnectGithubModal } from '@/components/auth/connect-github-modal';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { useSidebarPersistence } from '@/lib/hooks/use-sidebar-persistence';
 
@@ -82,6 +83,7 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
             </div>
 
             <HelpDrawer open={helpOpen} onClose={closeHelp} />
+            <ConnectGithubModal hasGithubConnected={user.provider === 'github'} />
         </>
     );
 }
