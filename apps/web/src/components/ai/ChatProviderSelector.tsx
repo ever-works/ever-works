@@ -9,7 +9,7 @@ import type { ProviderOption } from '@/lib/api/types-only';
 
 interface ChatProviderSelectorProps {
     providers: ProviderOption[];
-    selectedProvider: string | null;
+    selectedProvider: string;
     isStreaming: boolean;
     onSelect: (id: string) => void;
 }

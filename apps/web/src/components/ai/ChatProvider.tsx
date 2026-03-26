@@ -17,6 +17,7 @@ import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
 import { resolveEffectiveDefault } from '@ever-works/plugin';
 import { toast } from 'sonner';
 import { DEFAULT_AI_PROVIDER } from '@/lib/constants';
+import { useLocalStorage } from '@/lib/hooks/use-local-storage';
 import type { ConversationSummary } from '@/lib/api/conversations';
 import {
     listConversations,
@@ -35,8 +36,8 @@ interface ChatContextValue {
     sendMessage: (text: string) => void;
     resetChat: () => void;
     providers: ProviderOption[];
-    selectedProvider: string | null;
-    setSelectedProvider: (id: string | null) => void;
+    selectedProvider: string;
+    setSelectedProvider: (id: string) => void;
     conversationId: string | null;
     conversations: ConversationSummary[];
     conversationsLoading: boolean;
@@ -53,14 +54,17 @@ const transport = new DefaultChatTransport({ api: '/api/chat' });
 export function ChatProvider({ children }: { children: React.ReactNode }) {
     const t = useTranslations('dashboard.aiChat');
     const [providers, setProviders] = useState<ProviderOption[]>([]);
-    const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+    const [selectedProvider, setSelectedProvider] = useLocalStorage<string>(
+        'chat-ai-provider',
+        DEFAULT_AI_PROVIDER,
+    );
     const [conversations, setConversations] = useState<ConversationSummary[]>([]);
     const [conversationsLoading, setConversationsLoading] = useState(false);
     const [conversationId, setConversationId] = useState<string | null>(null);
 
     // Refs for values needed in callbacks without causing re-renders
     const conversationIdRef = useRef<string | null>(null);
-    const selectedProviderRef = useRef<string | null>(null);
+    const selectedProviderRef = useRef(selectedProvider);
     selectedProviderRef.current = selectedProvider;
 
     const chat = useChat({ transport });
@@ -79,8 +83,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 if (result.success && result.data) {
                     const aiProviders = result.data.providers.ai ?? [];
                     setProviders(aiProviders);
-                    const defaultProvider = resolveEffectiveDefault(aiProviders);
-                    if (defaultProvider) setSelectedProvider(defaultProvider.id);
+                    // Only set default if no persisted selection or persisted one doesn't exist
+                    const persisted = selectedProviderRef.current;
+                    const persistedExists =
+                        persisted && aiProviders.some((p) => p.id === persisted && p.configured);
+                    if (!persistedExists) {
+                        const defaultProvider = resolveEffectiveDefault(aiProviders);
+                        if (defaultProvider) setSelectedProvider(defaultProvider.id);
+                    }
                 } else {
                     toast.error(t('providersError'));
                 }
@@ -118,9 +128,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
             if (!conversationIdRef.current) {
                 try {
-                    const conv = await createConversation(
-                        selectedProviderRef.current ?? DEFAULT_AI_PROVIDER,
-                    );
+                    const conv = await createConversation(selectedProviderRef.current);
                     conversationIdRef.current = conv.id;
                     setConversationId(conv.id);
                 } catch {
@@ -133,7 +141,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 { text },
                 {
                     body: {
-                        providerOverride: selectedProviderRef.current ?? DEFAULT_AI_PROVIDER,
+                        providerOverride: selectedProviderRef.current,
                         conversationId: conversationIdRef.current,
                     },
                 },
@@ -189,9 +197,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         [t],
     );
 
-    const handleSetSelectedProvider = useCallback((id: string | null) => {
-        setSelectedProvider(id);
-    }, []);
+    const handleSetSelectedProvider = useCallback(
+        (id: string) => setSelectedProvider(id),
+        [setSelectedProvider],
+    );
 
     const value: ChatContextValue = useMemo(
         () => ({

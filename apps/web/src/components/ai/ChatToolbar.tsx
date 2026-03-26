@@ -9,7 +9,7 @@ import type { ProviderOption } from '@/lib/api/types-only';
 interface ChatToolbarProps {
     isStreaming: boolean;
     providers: ProviderOption[];
-    selectedProvider: string | null;
+    selectedProvider: string;
     onSelectProvider: (id: string) => void;
     onNewChat: () => void;
     onOpenHistory: () => void;
