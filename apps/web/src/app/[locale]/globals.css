@@ -12,7 +12,7 @@
 
     /* Light mode colors (default) */
     --color-background: #ffffff;
-    --color-surface: #f8fafc;
+    --color-surface: #fafafa;
     --color-surface-secondary: #f1f5f9;
     --color-surface-tertiary: #e2e8f0;
 
@@ -43,24 +43,28 @@
 
     /* Dark mode colors */
     --color-background-dark: #0f1419;
-    --color-surface-dark: #0b111f;
+    --color-surface-dark: #0a0a0a;
     --color-input-bg-dark: #101827;
-    --color-surface-secondary-dark: #1e293b;
+    --color-surface-secondary-dark: #ffffff08;
     --color-surface-tertiary-dark: #334155;
 
     --color-card-dark: #1e293b;
-    --color-card-primary-dark: #101828;
+    --color-card-primary-dark: #ffffff08;
+    --color-card-secondary-dark: #ffffff17;
     --color-card-navy-dark: #101e46;
-    --color-card-secondary-dark: #28364a;
     --color-card-hover-dark: #334155;
     --color-card-border-dark: #232f43;
 
     --color-text-dark: #e2e8f0;
-    --color-text-secondary-dark: #94a3b8;
-    --color-text-muted-dark: #64748b;
+    --color-text-secondary-dark: #9CA3AF;
+    --color-text-muted-dark: #6B7280;
 
-    --color-border-dark: #1b2434;
-    --color-border-secondary-dark: #28364a;
+    --color-border-dark: #ffffff17;
+    --color-border-secondary-dark: #ffffff17;
+
+    /* Button colors */
+    --color-button-primary-dark: #ededed;
+    --color-button-primary-hover-dark: #ededede6;
 
     /* Brand colors */
     --color-brand-purple: #6209bb;
