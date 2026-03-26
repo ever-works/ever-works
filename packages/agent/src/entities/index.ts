@@ -14,3 +14,7 @@ export * from './usage-ledger-entry.entity';
 export * from './notification.entity';
 export * from './notification.types';
 export * from './types';
+export * from './ba-user.entity';
+export * from './ba-session.entity';
+export * from './ba-account.entity';
+export * from './ba-verification.entity';

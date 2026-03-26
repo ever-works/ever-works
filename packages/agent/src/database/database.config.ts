@@ -16,6 +16,10 @@ import {
     DirectorySchedule,
     UsageLedgerEntry,
     Notification,
+    BaUser,
+    BaSession,
+    BaAccount,
+    BaVerification,
 } from '../entities';
 import { PluginEntity, UserPluginEntity, DirectoryPluginEntity } from '../plugins/entities';
 import { UserSyncConfig } from '../account-transfer/entities/user-sync-config.entity';
@@ -71,6 +75,11 @@ export const ENTITIES = [
     DirectoryPluginEntity,
     // Account transfer entities
     UserSyncConfig,
+    // BetterAuth entities
+    BaUser,
+    BaSession,
+    BaAccount,
+    BaVerification,
 ];
 
 export const databaseConfig = registerAs('database', (): DatabaseConfig => {

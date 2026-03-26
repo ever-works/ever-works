@@ -31,6 +31,9 @@ export enum AuthProvider {
     LOCAL = 'local',
     GITHUB = 'github',
     GOOGLE = 'google',
+    LINKEDIN = 'linkedin',
+    FACEBOOK = 'facebook',
+    TWITTER = 'twitter',
 }
 
 export const config = {
@@ -102,6 +105,24 @@ export const config = {
             const webUrl = config.webAppUrl();
             return process.env.GH_CALLBACK_URL || `${webUrl}/api/oauth/github/callback`;
         },
+    },
+
+    linkedin: {
+        clientId: () => process.env.LINKEDIN_CLIENT_ID,
+        clientSecret: () => process.env.LINKEDIN_CLIENT_SECRET,
+    },
+    facebook: {
+        clientId: () => process.env.FACEBOOK_CLIENT_ID,
+        clientSecret: () => process.env.FACEBOOK_CLIENT_SECRET,
+    },
+    twitter: {
+        clientId: () => process.env.TWITTER_CLIENT_ID,
+        clientSecret: () => process.env.TWITTER_CLIENT_SECRET,
+    },
+
+    betterAuth: {
+        secret: () => process.env.BETTER_AUTH_SECRET || process.env.AUTH_SECRET,
+        url: () => process.env.BETTER_AUTH_URL || 'http://localhost:3100',
     },
 
     directory: {
