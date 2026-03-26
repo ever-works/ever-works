@@ -1,6 +1,14 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import {
+    createContext,
+    useContext,
+    useEffect,
+    useState,
+    useCallback,
+    useRef,
+    useMemo,
+} from 'react';
 import { useChat, type UIMessage } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { useTranslations } from 'next-intl';
@@ -11,30 +19,30 @@ import { toast } from 'sonner';
 import { DEFAULT_AI_PROVIDER } from '@/lib/constants';
 import type { ConversationSummary } from '@/lib/api/conversations';
 import {
-	listConversations,
-	getConversation,
-	createConversation,
-	deleteConversation,
+    listConversations,
+    getConversation,
+    createConversation,
+    deleteConversation,
 } from '@/app/actions/dashboard/conversations';
 
 interface ChatContextValue {
-	messages: UIMessage[];
-	setMessages: (messages: UIMessage[] | ((messages: UIMessage[]) => UIMessage[])) => void;
-	status: 'submitted' | 'streaming' | 'ready' | 'error';
-	error: Error | undefined;
-	stop: () => void;
-	regenerate: () => void;
-	sendMessage: (text: string) => void;
-	resetChat: () => void;
-	providers: ProviderOption[];
-	selectedProvider: string | null;
-	setSelectedProvider: (id: string | null) => void;
-	conversationId: string | null;
-	conversations: ConversationSummary[];
-	conversationsLoading: boolean;
-	loadConversation: (id: string) => Promise<void>;
-	deleteConv: (id: string) => Promise<void>;
-	refreshConversations: () => Promise<void>;
+    messages: UIMessage[];
+    setMessages: (messages: UIMessage[] | ((messages: UIMessage[]) => UIMessage[])) => void;
+    status: 'submitted' | 'streaming' | 'ready' | 'error';
+    error: Error | undefined;
+    stop: () => void;
+    regenerate: () => void;
+    sendMessage: (text: string) => void;
+    resetChat: () => void;
+    providers: ProviderOption[];
+    selectedProvider: string | null;
+    setSelectedProvider: (id: string | null) => void;
+    conversationId: string | null;
+    conversations: ConversationSummary[];
+    conversationsLoading: boolean;
+    loadConversation: (id: string) => Promise<void>;
+    deleteConv: (id: string) => Promise<void>;
+    refreshConversations: () => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -43,181 +51,194 @@ const ChatContext = createContext<ChatContextValue | null>(null);
 const transport = new DefaultChatTransport({ api: '/api/chat' });
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
-	const t = useTranslations('dashboard.aiChat');
-	const [providers, setProviders] = useState<ProviderOption[]>([]);
-	const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
-	const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-	const [conversationsLoading, setConversationsLoading] = useState(false);
-	const [conversationId, setConversationId] = useState<string | null>(null);
+    const t = useTranslations('dashboard.aiChat');
+    const [providers, setProviders] = useState<ProviderOption[]>([]);
+    const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+    const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+    const [conversationsLoading, setConversationsLoading] = useState(false);
+    const [conversationId, setConversationId] = useState<string | null>(null);
 
-	// Refs for values needed in callbacks without causing re-renders
-	const conversationIdRef = useRef<string | null>(null);
-	const selectedProviderRef = useRef<string | null>(null);
-	selectedProviderRef.current = selectedProvider;
+    // Refs for values needed in callbacks without causing re-renders
+    const conversationIdRef = useRef<string | null>(null);
+    const selectedProviderRef = useRef<string | null>(null);
+    selectedProviderRef.current = selectedProvider;
 
-	const chat = useChat({ transport });
+    const chat = useChat({ transport });
 
-	// Stable refs for chat methods to avoid dependency churn
-	const chatRef = useRef(chat);
-	chatRef.current = chat;
+    // Stable refs for chat methods to avoid dependency churn
+    const chatRef = useRef(chat);
+    chatRef.current = chat;
 
-	// Fetch providers on mount
-	useEffect(() => {
-		let cancelled = false;
-		async function fetchProviders() {
-			try {
-				const result = await getGlobalFormSchema();
-				if (cancelled) return;
-				if (result.success && result.data) {
-					const aiProviders = result.data.providers.ai ?? [];
-					setProviders(aiProviders);
-					const defaultProvider = resolveEffectiveDefault(aiProviders);
-					if (defaultProvider) setSelectedProvider(defaultProvider.id);
-				} else {
-					toast.error(t('providersError'));
-				}
-			} catch (error) {
-				if (cancelled) return;
-				console.error('Failed to load AI providers:', error);
-				toast.error(t('providersError'));
-			}
-		}
-		fetchProviders();
-		return () => { cancelled = true; };
-	}, [t]);
+    // Fetch providers on mount
+    useEffect(() => {
+        let cancelled = false;
+        async function fetchProviders() {
+            try {
+                const result = await getGlobalFormSchema();
+                if (cancelled) return;
+                if (result.success && result.data) {
+                    const aiProviders = result.data.providers.ai ?? [];
+                    setProviders(aiProviders);
+                    const defaultProvider = resolveEffectiveDefault(aiProviders);
+                    if (defaultProvider) setSelectedProvider(defaultProvider.id);
+                } else {
+                    toast.error(t('providersError'));
+                }
+            } catch (error) {
+                if (cancelled) return;
+                console.error('Failed to load AI providers:', error);
+                toast.error(t('providersError'));
+            }
+        }
+        fetchProviders();
+        return () => {
+            cancelled = true;
+        };
+    }, [t]);
 
-	const refreshConversations = useCallback(async () => {
-		setConversationsLoading(true);
-		try {
-			const result = await listConversations(50, 0);
-			setConversations(result.conversations);
-		} catch {
-			// Silent fail
-		} finally {
-			setConversationsLoading(false);
-		}
-	}, []);
+    const refreshConversations = useCallback(async () => {
+        setConversationsLoading(true);
+        try {
+            const result = await listConversations(50, 0);
+            setConversations(result.conversations);
+        } catch {
+            // Silent fail
+        } finally {
+            setConversationsLoading(false);
+        }
+    }, []);
 
-	useEffect(() => {
-		refreshConversations();
-	}, [refreshConversations]);
+    useEffect(() => {
+        refreshConversations();
+    }, [refreshConversations]);
 
-	const sendMessage = useCallback(async (text: string) => {
-		if (!text.trim()) return;
+    const sendMessage = useCallback(
+        async (text: string) => {
+            if (!text.trim()) return;
 
-		if (!conversationIdRef.current) {
-			try {
-				const conv = await createConversation(selectedProviderRef.current ?? DEFAULT_AI_PROVIDER);
-				conversationIdRef.current = conv.id;
-				setConversationId(conv.id);
-			} catch {
-				toast.error(t('errors.unableToSend'));
-				return;
-			}
-		}
+            if (!conversationIdRef.current) {
+                try {
+                    const conv = await createConversation(
+                        selectedProviderRef.current ?? DEFAULT_AI_PROVIDER,
+                    );
+                    conversationIdRef.current = conv.id;
+                    setConversationId(conv.id);
+                } catch {
+                    toast.error(t('errors.unableToSend'));
+                    return;
+                }
+            }
 
-		chatRef.current.sendMessage(
-			{ text },
-			{
-				body: {
-					providerOverride: selectedProviderRef.current ?? DEFAULT_AI_PROVIDER,
-					conversationId: conversationIdRef.current,
-				},
-			},
-		);
-	}, [t]);
+            chatRef.current.sendMessage(
+                { text },
+                {
+                    body: {
+                        providerOverride: selectedProviderRef.current ?? DEFAULT_AI_PROVIDER,
+                        conversationId: conversationIdRef.current,
+                    },
+                },
+            );
+        },
+        [t],
+    );
 
-	const resetChat = useCallback(() => {
-		chatRef.current.setMessages([]);
-		conversationIdRef.current = null;
-		setConversationId(null);
-		refreshConversations();
-	}, [refreshConversations]);
+    const resetChat = useCallback(() => {
+        chatRef.current.setMessages([]);
+        conversationIdRef.current = null;
+        setConversationId(null);
+        refreshConversations();
+    }, [refreshConversations]);
 
-	const loadConversation = useCallback(async (id: string) => {
-		try {
-			const conv = await getConversation(id);
-			conversationIdRef.current = conv.id;
-			setConversationId(conv.id);
+    const loadConversation = useCallback(
+        async (id: string) => {
+            try {
+                const conv = await getConversation(id);
+                conversationIdRef.current = conv.id;
+                setConversationId(conv.id);
 
-			const uiMessages: UIMessage[] = conv.messages
-				.filter((msg) => msg.role === 'user' || msg.role === 'assistant')
-				.map((msg) => ({
-					id: msg.id,
-					role: msg.role as 'user' | 'assistant',
-					parts: [{ type: 'text' as const, text: msg.content }],
-				}));
+                const uiMessages: UIMessage[] = conv.messages
+                    .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
+                    .map((msg) => ({
+                        id: msg.id,
+                        role: msg.role as 'user' | 'assistant',
+                        parts: [{ type: 'text' as const, text: msg.content }],
+                    }));
 
-			chatRef.current.setMessages(uiMessages);
-		} catch {
-			toast.error(t('errors.unableToSend'));
-		}
-	}, [t]);
+                chatRef.current.setMessages(uiMessages);
+            } catch {
+                toast.error(t('errors.unableToSend'));
+            }
+        },
+        [t],
+    );
 
-	const deleteConv = useCallback(async (id: string) => {
-		try {
-			await deleteConversation(id);
-			setConversations((prev) => prev.filter((c) => c.id !== id));
-			if (conversationIdRef.current === id) {
-				chatRef.current.setMessages([]);
-				conversationIdRef.current = null;
-				setConversationId(null);
-			}
-		} catch {
-			toast.error(t('errors.unableToSend'));
-		}
-	}, [t]);
+    const deleteConv = useCallback(
+        async (id: string) => {
+            try {
+                await deleteConversation(id);
+                setConversations((prev) => prev.filter((c) => c.id !== id));
+                if (conversationIdRef.current === id) {
+                    chatRef.current.setMessages([]);
+                    conversationIdRef.current = null;
+                    setConversationId(null);
+                }
+            } catch {
+                toast.error(t('errors.unableToSend'));
+            }
+        },
+        [t],
+    );
 
-	const handleSetSelectedProvider = useCallback((id: string | null) => {
-		setSelectedProvider(id);
-	}, []);
+    const handleSetSelectedProvider = useCallback((id: string | null) => {
+        setSelectedProvider(id);
+    }, []);
 
-	const value: ChatContextValue = useMemo(
-		() => ({
-			messages: chat.messages,
-			setMessages: chat.setMessages,
-			status: chat.status,
-			error: chat.error,
-			stop: chat.stop,
-			regenerate: chat.regenerate,
-			sendMessage,
-			resetChat,
-			providers,
-			selectedProvider,
-			setSelectedProvider: handleSetSelectedProvider,
-			conversationId,
-			conversations,
-			conversationsLoading,
-			loadConversation,
-			deleteConv,
-			refreshConversations,
-		}),
-		[
-			chat.messages,
-			chat.setMessages,
-			chat.status,
-			chat.error,
-			chat.stop,
-			chat.regenerate,
-			sendMessage,
-			resetChat,
-			providers,
-			selectedProvider,
-			handleSetSelectedProvider,
-			conversationId,
-			conversations,
-			conversationsLoading,
-			loadConversation,
-			deleteConv,
-			refreshConversations,
-		],
-	);
+    const value: ChatContextValue = useMemo(
+        () => ({
+            messages: chat.messages,
+            setMessages: chat.setMessages,
+            status: chat.status,
+            error: chat.error,
+            stop: chat.stop,
+            regenerate: chat.regenerate,
+            sendMessage,
+            resetChat,
+            providers,
+            selectedProvider,
+            setSelectedProvider: handleSetSelectedProvider,
+            conversationId,
+            conversations,
+            conversationsLoading,
+            loadConversation,
+            deleteConv,
+            refreshConversations,
+        }),
+        [
+            chat.messages,
+            chat.setMessages,
+            chat.status,
+            chat.error,
+            chat.stop,
+            chat.regenerate,
+            sendMessage,
+            resetChat,
+            providers,
+            selectedProvider,
+            handleSetSelectedProvider,
+            conversationId,
+            conversations,
+            conversationsLoading,
+            loadConversation,
+            deleteConv,
+            refreshConversations,
+        ],
+    );
 
-	return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
+    return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }
 
 export function useChatContext(): ChatContextValue {
-	const context = useContext(ChatContext);
-	if (!context) throw new Error('useChatContext must be used within a ChatProvider');
-	return context;
+    const context = useContext(ChatContext);
+    if (!context) throw new Error('useChatContext must be used within a ChatProvider');
+    return context;
 }
