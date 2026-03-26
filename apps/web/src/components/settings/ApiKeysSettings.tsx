@@ -158,13 +158,13 @@ export function ApiKeysSettings({ initialKeys }: ApiKeysSettingsProps) {
                                 <th className="text-left px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark">
                                     {t('columns.key')}
                                 </th>
-                                <th className="text-left px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark hidden sm:table-cell">
+                                <th className="text-left px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark hidden @sm/main:table-cell">
                                     {t('columns.created')}
                                 </th>
-                                <th className="text-left px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark hidden md:table-cell">
+                                <th className="text-left px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark hidden @lg/main:table-cell">
                                     {t('columns.lastUsed')}
                                 </th>
-                                <th className="text-left px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark hidden md:table-cell">
+                                <th className="text-left px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark hidden @lg/main:table-cell">
                                     {t('columns.expires')}
                                 </th>
                                 <th className="text-right px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark">
@@ -186,13 +186,13 @@ export function ApiKeysSettings({ initialKeys }: ApiKeysSettingsProps) {
                                             {key.prefix}...
                                         </code>
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-text-muted dark:text-text-muted-dark hidden sm:table-cell">
+                                    <td className="px-4 py-3 text-sm text-text-muted dark:text-text-muted-dark hidden @sm/main:table-cell">
                                         {formatDate(key.createdAt)}
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-text-muted dark:text-text-muted-dark hidden md:table-cell">
+                                    <td className="px-4 py-3 text-sm text-text-muted dark:text-text-muted-dark hidden @lg/main:table-cell">
                                         {formatDate(key.lastUsedAt)}
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-text-muted dark:text-text-muted-dark hidden md:table-cell">
+                                    <td className="px-4 py-3 text-sm text-text-muted dark:text-text-muted-dark hidden @lg/main:table-cell">
                                         {key.expiresAt
                                             ? formatDate(key.expiresAt)
                                             : t('neverExpires')}

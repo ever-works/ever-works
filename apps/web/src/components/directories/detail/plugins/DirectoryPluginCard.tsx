@@ -155,14 +155,14 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                                 {isEnabled ? (
                                     <>
                                         <PowerOff className="w-4 h-4" />
-                                        <span className="sr-only md:not-sr-only md:ml-1">
+                                        <span className="sr-only @lg/main:not-sr-only @lg/main:ml-1">
                                             {t('disable')}
                                         </span>
                                     </>
                                 ) : (
                                     <>
                                         <Power className="w-4 h-4" />
-                                        <span className="sr-only md:not-sr-only md:ml-1">
+                                        <span className="sr-only @lg/main:not-sr-only @lg/main:ml-1">
                                             {t('enable')}
                                         </span>
                                     </>

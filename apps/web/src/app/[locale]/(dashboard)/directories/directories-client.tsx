@@ -127,7 +127,7 @@ export default function DirectoriesClient({
             </div>
 
             {/* Search and Actions Bar */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+            <div className="flex flex-col @sm/main:flex-row gap-4 mb-8">
                 <div className="flex-1">
                     <div className="relative">
                         <input

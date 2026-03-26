@@ -23,7 +23,7 @@ const GRID_ROW_HEIGHT = 200; // Approximate height for grid cards
 const LIST_ITEM_HEIGHT = 80; // Approximate height for list items
 const GAP = 16; // Gap between items (gap-4 = 16px)
 
-// Hook to get responsive column count
+// Hook to get responsive column count based on main content container width
 function useColumnCount(viewMode: 'grid' | 'list') {
     const [columns, setColumns] = useState(3);
 
@@ -33,20 +33,25 @@ function useColumnCount(viewMode: 'grid' | 'list') {
             return;
         }
 
+        const container = document.getElementById('main-content');
+        if (!container) return;
+
         const updateColumns = () => {
-            const width = window.innerWidth;
-            if (width >= 1024) {
-                setColumns(3); // lg:grid-cols-3
-            } else if (width >= 640) {
-                setColumns(2); // sm:grid-cols-2
+            const width = container.clientWidth;
+            if (width >= 768) {
+                setColumns(3);
+            } else if (width >= 480) {
+                setColumns(2);
             } else {
-                setColumns(1); // default single column
+                setColumns(1);
             }
         };
 
+        const observer = new ResizeObserver(updateColumns);
+        observer.observe(container);
         updateColumns();
-        window.addEventListener('resize', updateColumns);
-        return () => window.removeEventListener('resize', updateColumns);
+
+        return () => observer.disconnect();
     }, [viewMode]);
 
     return columns;
@@ -125,7 +130,7 @@ export function ItemsList({ items: initialItems, addItemRef }: ItemsListProps) {
     return (
         <div className="space-y-6">
             {/* Search and Filter Bar */}
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col @sm/main:flex-row gap-4">
                 <div className="flex-1">
                     <Input
                         type="text"
@@ -276,7 +281,9 @@ function VirtualizedItemsList({
                         data-index={virtualRow.index}
                         className={cn(
                             'absolute top-0 left-0 w-full',
-                            viewMode === 'grid' ? 'grid sm:grid-cols-2 lg:grid-cols-3 gap-4' : '',
+                            viewMode === 'grid'
+                                ? 'grid @sm/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4'
+                                : '',
                         )}
                         style={{
                             transform: `translateY(${virtualRow.start - scrollMargin}px)`,

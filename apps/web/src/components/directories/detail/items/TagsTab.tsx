@@ -125,7 +125,7 @@ export function TagsTab({ directoryId, initialTags, items, canEdit }: TagsTabPro
     return (
         <div className="space-y-6">
             {/* Header with search and add button */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="flex flex-col @sm/main:flex-row gap-4 items-start @sm/main:items-center justify-between">
                 <div className="relative flex-1 max-w-md">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary dark:text-text-secondary-dark" />
                     <Input

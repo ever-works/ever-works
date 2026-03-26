@@ -34,7 +34,7 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
                 className={cn(
                     'absolute inset-0 flex flex-col overflow-hidden',
                     'bg-white dark:bg-surface-dark',
-                    'border-r border-border dark:border-white/6',
+                    'border-r border-border dark:border-border-dark',
                     'transition-opacity duration-250 ease-in-out',
                     open ? 'opacity-100' : 'opacity-0 pointer-events-none',
                 )}
