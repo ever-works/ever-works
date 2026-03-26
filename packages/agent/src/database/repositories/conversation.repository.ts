@@ -83,8 +83,16 @@ export class ConversationRepository {
         return saved;
     }
 
-    async updateTitle(id: string, userId: string, title: string): Promise<void> {
-        await this.conversationRepo.update({ id, userId }, { title });
+    async updateTitle(
+        id: string,
+        userId: string,
+        title: string,
+        metadata?: Record<string, unknown>,
+    ): Promise<void> {
+        await this.conversationRepo.update(
+            { id, userId },
+            { title, ...(metadata && { metadata }) },
+        );
     }
 
     async delete(id: string, userId: string): Promise<boolean> {

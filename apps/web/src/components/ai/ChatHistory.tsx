@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { useChatContext } from './ChatProvider';
@@ -22,6 +22,10 @@ export function ChatHistory({ onClose }: ChatHistoryProps) {
     } = useChatContext();
 
     const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    useEffect(() => {
+        refreshConversations();
+    }, [refreshConversations]);
 
     const handleSelect = async (id: string) => {
         await loadConversation(id);
@@ -88,18 +92,21 @@ export function ChatHistory({ onClose }: ChatHistoryProps) {
                             const isDeleting = deletingId === conv.id;
 
                             return (
-                                <button
+                                <div
                                     key={conv.id}
-                                    type="button"
-                                    onClick={() => handleSelect(conv.id)}
-                                    disabled={isDeleting}
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => !isDeleting && handleSelect(conv.id)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !isDeleting) handleSelect(conv.id);
+                                    }}
                                     className={cn(
                                         'flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-left group',
                                         'transition-colors duration-75 cursor-pointer',
                                         isActive
                                             ? 'bg-primary/8 dark:bg-primary/12'
                                             : 'hover:bg-surface-secondary dark:hover:bg-white/[0.04]',
-                                        isDeleting && 'opacity-50',
+                                        isDeleting && 'opacity-50 pointer-events-none',
                                     )}
                                 >
                                     <div className="flex-1 min-w-0">
@@ -135,7 +142,7 @@ export function ChatHistory({ onClose }: ChatHistoryProps) {
                                     ) : (
                                         <Loader2 className="w-3 h-3 animate-spin text-text-muted shrink-0" />
                                     )}
-                                </button>
+                                </div>
                             );
                         })}
                     </div>

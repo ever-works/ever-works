@@ -101,9 +101,13 @@ export class OpenAiCompatService {
         const conversationId = persistence?.conversationId;
         const userId = persistence?.userId;
         if (conversationId && userId && hasResponse) {
-            this.persistMessages(dto, conversationId, userId, assistantContent).catch((err) =>
-                this.logger.error('Failed to persist messages', err),
-            );
+            this.persistMessages(
+                dto,
+                conversationId,
+                userId,
+                assistantContent,
+                facadeOptions,
+            ).catch((err) => this.logger.error('Failed to persist messages', err));
         }
     }
 
@@ -116,6 +120,7 @@ export class OpenAiCompatService {
         conversationId: string,
         userId: string,
         assistantContent: string,
+        facadeOptions: FacadeOptions,
     ): Promise<void> {
         // Validate user owns this conversation
         const conversation = await this.conversationRepo.findById(conversationId, userId);
@@ -143,19 +148,79 @@ export class OpenAiCompatService {
 
         await this.conversationRepo.appendMessages(messagesToPersist);
 
-        // Auto-generate title for new conversations
+        // First message: set title from user message text
         if (!conversation.title && lastUserMsg?.content) {
-            const title = this.generateTitle(lastUserMsg.content);
+            const title = this.truncateTitle(lastUserMsg.content);
             await this.conversationRepo.updateTitle(conversationId, userId, title);
+        }
+
+        const messageCount = (conversation.messages?.length ?? 0) + messagesToPersist.length;
+        if (messageCount >= 4 && !conversation.metadata?.aiTitle) {
+            this.generateAiTitle(
+                conversationId,
+                userId,
+                dto.messages,
+                assistantContent,
+                facadeOptions,
+            ).catch(() => {});
         }
     }
 
-    private generateTitle(userMessage: string): string {
+    private truncateTitle(text: string): string {
         const maxLen = 60;
-        if (userMessage.length <= maxLen) return userMessage;
-        const truncated = userMessage.substring(0, maxLen);
+        if (text.length <= maxLen) return text;
+        const truncated = text.substring(0, maxLen);
         const lastSpace = truncated.lastIndexOf(' ');
         return (lastSpace > 20 ? truncated.substring(0, lastSpace) : truncated) + '...';
+    }
+
+    private async generateAiTitle(
+        conversationId: string,
+        userId: string,
+        messages: OpenAiChatCompletionRequestDto['messages'],
+        lastAssistant: string,
+        facadeOptions: FacadeOptions,
+    ): Promise<void> {
+        try {
+            const resolved = await this.resolveDirectoryContext(facadeOptions);
+
+            // Build a summary of the conversation for the AI
+            const summary = messages
+                .filter((m) => m.role === 'user' || m.role === 'assistant')
+                .slice(-4)
+                .map((m) => `${m.role}: ${(m.content ?? '').substring(0, 200)}`)
+                .join('\n');
+
+            const prompt = `${summary}\nassistant: ${lastAssistant.substring(0, 200)}`;
+
+            const response = await this.aiFacade.createChatCompletion(
+                {
+                    messages: [
+                        {
+                            role: 'system',
+                            content:
+                                'Generate a short title (max 50 chars) for this conversation. Return ONLY the title, no quotes, no explanation.',
+                        },
+                        { role: 'user', content: prompt },
+                    ],
+                    temperature: 0.3,
+                    maxTokens: 30,
+                },
+                resolved,
+            );
+
+            const title = response.choices[0]?.message?.content;
+            if (title && typeof title === 'string' && title.trim().length > 0) {
+                await this.conversationRepo.updateTitle(
+                    conversationId,
+                    userId,
+                    title.trim().substring(0, 100),
+                    { aiTitle: true },
+                );
+            }
+        } catch (err) {
+            this.logger.debug('AI title generation failed, keeping existing title', err);
+        }
     }
 
     // ────────────────────────────────────────────────────────────────
