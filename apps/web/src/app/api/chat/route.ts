@@ -7,7 +7,6 @@ import { API_URL } from '@/lib/constants';
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-    // 1. Auth — same pattern as serverFetch (cookie → JWT → refresh on failure)
     let token = await getAuthAccessCookie();
     if (!token) {
         const refreshed = await refreshAccessToken();
@@ -17,7 +16,6 @@ export async function POST(request: Request) {
         return new Response('Unauthorized', { status: 401 });
     }
 
-    // 2. Parse request body (sent by useChat from @ai-sdk/react)
     const body = await request.json();
     const {
         messages,
@@ -33,8 +31,6 @@ export async function POST(request: Request) {
         return new Response('providerOverride is required', { status: 400 });
     }
 
-    // 3. Create provider pointing to NestJS backend
-    //    API_URL already includes /api suffix (e.g., http://localhost:3100/api)
     const provider = createBackendProvider({
         baseURL: `${API_URL}/v1`,
         authToken: token,
@@ -42,9 +38,10 @@ export async function POST(request: Request) {
         directoryId,
     });
 
-    // 4. Stream through the custom provider → NestJS → AiFacadeService → Plugin
+    // Model ID is ignored by the backend — AiFacadeService resolves the actual model
+    // from plugin settings. We pass a placeholder that won't be sent upstream.
     const result = streamText({
-        model: provider('default'),
+        model: provider.chatModel('auto'),
         messages: await convertToModelMessages(messages),
     });
 

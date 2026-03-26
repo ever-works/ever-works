@@ -4,6 +4,7 @@ import {
     IsNumber,
     IsOptional,
     IsString,
+    Allow,
     ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -22,7 +23,12 @@ export class OpenAiFunctionDto {
     description?: string;
 
     @IsOptional()
+    @Allow()
     parameters?: Record<string, unknown>;
+
+    @IsOptional()
+    @Allow()
+    strict?: boolean;
 }
 
 export class OpenAiToolDefinitionDto {
@@ -35,11 +41,10 @@ export class OpenAiToolDefinitionDto {
 }
 
 export class OpenAiMessageDto {
-    @ApiProperty({ description: 'Message role' })
     @IsString()
     role: string;
 
-    @ApiProperty({ description: 'Message content' })
+    @Allow()
     content: string | null;
 
     @IsOptional()
@@ -47,6 +52,7 @@ export class OpenAiMessageDto {
     name?: string;
 
     @IsOptional()
+    @Allow()
     tool_calls?: Array<{
         id: string;
         type: 'function';
@@ -59,68 +65,61 @@ export class OpenAiMessageDto {
 }
 
 export class OpenAiChatCompletionRequestDto {
-    @ApiPropertyOptional({ description: 'Model identifier' })
     @IsOptional()
     @IsString()
     model?: string;
 
-    @ApiProperty({ description: 'Array of messages', type: [OpenAiMessageDto] })
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => OpenAiMessageDto)
     messages: OpenAiMessageDto[];
 
-    @ApiPropertyOptional({ description: 'Sampling temperature (0-2)' })
     @IsOptional()
     @IsNumber()
     temperature?: number;
 
-    @ApiPropertyOptional({ description: 'Maximum tokens to generate' })
     @IsOptional()
     @IsNumber()
     max_tokens?: number;
 
-    @ApiPropertyOptional({ description: 'Nucleus sampling parameter' })
     @IsOptional()
     @IsNumber()
     top_p?: number;
 
-    @ApiPropertyOptional({ description: 'Frequency penalty (-2 to 2)' })
     @IsOptional()
     @IsNumber()
     frequency_penalty?: number;
 
-    @ApiPropertyOptional({ description: 'Presence penalty (-2 to 2)' })
     @IsOptional()
     @IsNumber()
     presence_penalty?: number;
 
-    @ApiPropertyOptional({ description: 'Stop sequences' })
     @IsOptional()
     @IsArray()
     stop?: string[];
 
-    @ApiPropertyOptional({ description: 'Enable streaming' })
     @IsOptional()
     @IsBoolean()
     stream?: boolean;
 
-    @ApiPropertyOptional({ description: 'Tool definitions', type: [OpenAiToolDefinitionDto] })
+    @IsOptional()
+    @Allow()
+    stream_options?: Record<string, unknown>;
+
     @IsOptional()
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => OpenAiToolDefinitionDto)
     tools?: OpenAiToolDefinitionDto[];
 
-    @ApiPropertyOptional({ description: 'Tool choice strategy' })
     @IsOptional()
+    @Allow()
     tool_choice?: 'none' | 'auto' | 'required' | { type: 'function'; function: { name: string } };
 
-    @ApiPropertyOptional({ description: 'Response format' })
     @IsOptional()
+    @Allow()
     response_format?: { type: 'text' | 'json_object' };
 
-    @ApiPropertyOptional({ description: 'User identifier for tracking' })
     @IsOptional()
     @IsString()
     user?: string;

@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Res, Headers, HttpCode } from '@nestjs/common';
+import {
+    Controller,
+    Post,
+    Body,
+    Res,
+    Headers,
+    HttpCode,
+    UsePipes,
+    ValidationPipe,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CurrentUser } from '../auth/decorators/user.decorator';
@@ -12,9 +21,17 @@ import { OpenAiCompatService } from './openai-compat.service';
 export class OpenAiCompatController {
     constructor(private readonly service: OpenAiCompatService) {}
 
+    /**
+     * OpenAI-compatible chat completions endpoint.
+     *
+     * Uses a permissive validation pipe (whitelist without forbidNonWhitelisted)
+     * because AI SDK clients send many optional/extra fields (stream_options,
+     * logprobs, etc.) that we don't need but shouldn't reject.
+     */
     @Post('chat/completions')
     @HttpCode(200)
     @ApiOperation({ summary: 'Create a chat completion (OpenAI-compatible)' })
+    @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
     async chatCompletions(
         @CurrentUser() auth: AuthenticatedUser,
         @Headers('x-provider-override') providerOverride: string | undefined,

@@ -110,8 +110,11 @@ export class OpenAiCompatService {
             },
         }));
 
+        // "auto" means let AiFacadeService resolve the model from plugin settings
+        const model = dto.model === 'auto' ? undefined : dto.model;
+
         return {
-            model: dto.model,
+            model,
             messages,
             temperature: dto.temperature,
             maxTokens: dto.max_tokens,

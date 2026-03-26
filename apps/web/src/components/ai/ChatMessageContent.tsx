@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import type { UIMessage } from '@ai-sdk/react';
 
 type MessagePart = UIMessage['parts'][number];
@@ -15,6 +16,8 @@ export function ChatMessageContent({
     isMessageStreaming,
     hasText,
 }: ChatMessageContentProps) {
+    const t = useTranslations('dashboard.aiChat');
+
     return (
         <>
             {parts.map((part, i) => {
@@ -26,7 +29,6 @@ export function ChatMessageContent({
                     );
                 }
 
-                // Tool call parts (dynamic tools — type starts with 'tool-' or 'dynamic-tool')
                 if (part.type === 'dynamic-tool' || part.type.startsWith('tool-')) {
                     const toolPart = part as { toolName?: string; state: string };
                     return (
@@ -37,7 +39,7 @@ export function ChatMessageContent({
                             <span className="font-medium">{toolPart.toolName ?? 'tool'}</span>
                             {toolPart.state === 'result' && (
                                 <span className="ml-1 text-text-secondary dark:text-white/60">
-                                    completed
+                                    {t('toolCompleted')}
                                 </span>
                             )}
                         </div>
@@ -47,7 +49,6 @@ export function ChatMessageContent({
                 return null;
             })}
 
-            {/* Streaming indicator — bouncing dots */}
             {isMessageStreaming && !hasText && (
                 <div className="flex space-x-1 py-1">
                     <span className="w-1.5 h-1.5 bg-text-muted dark:bg-text-muted-dark rounded-full animate-bounce" />

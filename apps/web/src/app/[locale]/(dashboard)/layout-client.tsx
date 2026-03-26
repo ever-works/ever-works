@@ -7,6 +7,8 @@ import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { Footer } from '@/components/footer';
 import { HelpDrawer } from '@/components/dashboard/HelpDrawer';
+import { ChatProvider } from '@/components/ai/ChatProvider';
+import { ChatPanel } from '@/components/ai/ChatPanel';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { useSidebarPersistence } from '@/lib/hooks/use-sidebar-persistence';
 
@@ -18,28 +20,24 @@ interface DashboardLayoutClientProps {
 export function DashboardLayoutClient({ user, children }: DashboardLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [helpOpen, setHelpOpen] = useState(false);
+    const [chatOpen, setChatOpen] = useState(true);
 
-    const {
-        sidebarWidth,
-        sidebarCollapsed,
-        handleSidebarWidthChange,
-        handleSidebarCollapsedChange,
-    } = useSidebarPersistence();
+    const { sidebarCollapsed, handleSidebarCollapsedChange } = useSidebarPersistence();
 
     const openHelp = useCallback(() => setHelpOpen(true), []);
     const closeHelp = useCallback(() => setHelpOpen(false), []);
+    const toggleChat = useCallback(() => setChatOpen((v) => !v), []);
 
-    // Register global keyboard shortcuts
     useKeyboardShortcuts({ onOpenHelp: openHelp });
 
     return (
-        <>
+        <ChatProvider>
             <Suspense fallback={null}>
                 <DashboardToasts />
             </Suspense>
 
             <div className="flex h-screen bg-background dark:bg-background-dark overflow-hidden">
-                {/* Mobile overlay - only on small screens */}
+                {/* Mobile overlay */}
                 {sidebarOpen && (
                     <div
                         className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -47,17 +45,22 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
                     />
                 )}
 
+                {/* Navigation sidebar */}
                 <DashboardSidebar
                     user={user}
                     isOpen={sidebarOpen}
                     onToggle={() => setSidebarOpen(!sidebarOpen)}
-                    width={sidebarCollapsed ? 64 : sidebarWidth}
-                    onWidthChange={handleSidebarWidthChange}
                     isCollapsed={sidebarCollapsed}
                     onCollapsedChange={handleSidebarCollapsedChange}
                     onOpenHelp={openHelp}
+                    chatOpen={chatOpen}
+                    onOpenChat={toggleChat}
                 />
 
+                {/* AI Chat panel — sits between sidebar and main content */}
+                <ChatPanel open={chatOpen} onClose={toggleChat} />
+
+                {/* Main content */}
                 <div className="flex-1 flex flex-col overflow-hidden">
                     <DashboardHeader
                         user={user}
@@ -76,12 +79,10 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
 
                         <Footer />
                     </main>
-
-                    {/* Footer */}
                 </div>
             </div>
 
             <HelpDrawer open={helpOpen} onClose={closeHelp} />
-        </>
+        </ChatProvider>
     );
 }

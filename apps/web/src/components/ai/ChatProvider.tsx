@@ -10,19 +10,14 @@ import { resolveEffectiveDefault } from '@ever-works/plugin';
 import { toast } from 'sonner';
 
 interface ChatContextValue {
-    // Chat state from useChat
     messages: UIMessage[];
     setMessages: (messages: UIMessage[] | ((messages: UIMessage[]) => UIMessage[])) => void;
     status: 'submitted' | 'streaming' | 'ready' | 'error';
     error: Error | undefined;
     stop: () => void;
     regenerate: () => void;
-
-    // Actions
     sendMessage: (text: string) => void;
     resetChat: () => void;
-
-    // Provider selection
     providers: ProviderOption[];
     selectedProvider: string | null;
     setSelectedProvider: (id: string | null) => void;
@@ -35,14 +30,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const [providers, setProviders] = useState<ProviderOption[]>([]);
     const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
 
-    const welcomeMessage: UIMessage = {
-        id: 'welcome',
-        role: 'assistant',
-        parts: [{ type: 'text', text: t('welcomeMessage') }],
-    };
-
     const chat = useChat({
-        messages: [welcomeMessage],
         transport: new DefaultChatTransport({
             api: '/api/chat',
             body: () => ({
@@ -51,7 +39,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }),
     });
 
-    // Fetch available AI providers on mount
     useEffect(() => {
         let cancelled = false;
 
@@ -79,7 +66,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
 
         fetchProviders();
-
         return () => {
             cancelled = true;
         };
@@ -101,12 +87,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     );
 
     const resetChat = useCallback(() => {
-        chat.setMessages([welcomeMessage]);
+        chat.setMessages([]);
     }, [chat.setMessages]);
-
-    const handleSetSelectedProvider = useCallback((id: string | null) => {
-        setSelectedProvider(id);
-    }, []);
 
     const value: ChatContextValue = {
         messages: chat.messages,
@@ -119,7 +101,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         resetChat,
         providers,
         selectedProvider,
-        setSelectedProvider: handleSetSelectedProvider,
+        setSelectedProvider: useCallback((id: string | null) => setSelectedProvider(id), []),
     };
 
     return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
@@ -127,10 +109,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
 export function useChatContext(): ChatContextValue {
     const context = useContext(ChatContext);
-
-    if (!context) {
-        throw new Error('useChatContext must be used within a ChatProvider');
-    }
-
+    if (!context) throw new Error('useChatContext must be used within a ChatProvider');
     return context;
 }

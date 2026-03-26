@@ -2340,18 +2340,35 @@
         "aiChat": {
             "title": "AI Assistant",
             "subtitle": "Create directories with natural language",
+            "welcomeTitle": "Welcome to AI Assistant \uD83D\uDC4B",
+            "welcomeSubtitle": "Your AI-powered assistant. Ask me anything about creating directories, generating content, or organizing your data.",
             "welcomeMessage": "Hi! I can help you create directories using natural language. Ask something like \"Create a directory for AI tools\" or describe what you need.",
+            "capabilities": {
+                "directoryCreation": "Directory Creation",
+                "directoryCreationDesc": "Build directories from natural language descriptions",
+                "webResearch": "Web Research",
+                "webResearchDesc": "Search and collect data from across the web",
+                "contentGeneration": "Content Generation",
+                "contentGenerationDesc": "Generate descriptions, categories, and metadata",
+                "smartSuggestions": "Smart Suggestions",
+                "smartSuggestionsDesc": "Get AI-powered recommendations for your projects"
+            },
             "newChat": "New chat",
-            "loadingConversation": "Loading conversation…",
-            "inputPlaceholder": "Describe the directory you want to create...",
+            "history": "History",
+            "loadingConversation": "Loading conversation\u2026",
+            "inputPlaceholder": "Ask me anything...",
             "sendButton": "Send",
-            "sendHint": "Enter to send · Shift+Enter for new line",
+            "sendHint": "Enter to send \u00b7 Shift+Enter for new line",
             "providersError": "Failed to load AI providers. Chat may not work correctly.",
             "providerNotConfigured": "This provider is not configured. Set it up in Plugins.",
             "editMessage": "Edit message",
             "saveEdit": "Save & Submit",
             "cancelEdit": "Cancel",
             "edited": "(edited)",
+            "thinking": "Thinking...",
+            "toolCompleted": "completed",
+            "selectProvider": "Provider",
+            "notConfigured": "Not configured",
             "errors": {
                 "unableToSend": "Unable to send message"
             }
