@@ -95,26 +95,36 @@
 - [x] `cd packages/agent && pnpm test` — 33 suites, 892 tests pass
 - [ ] Manual curl testing (deferred to integration testing)
 
-## Phase 4: Custom Vercel AI SDK Provider
+## Phase 4: Custom Vercel AI SDK Provider + Next.js Route Handler
 
-- [ ] Create `apps/web/src/lib/ai/provider.ts`
-    - [ ] `createBackendProvider(options)` function
-    - [ ] Uses `createOpenAICompatible` from `@ai-sdk/openai-compatible`
-    - [ ] Configures: name, baseURL, apiKey (= JWT token), custom headers
-- [ ] Create `apps/web/src/lib/ai/index.ts` barrel export
-- [ ] Verify TypeScript compilation
+### Provider Selection Requirements
 
-## Phase 5: Next.js Route Handler
+- `X-Provider-Override` is **always** passed — user always has an active AI provider
+- Default: `openrouter` (auto-selected via `resolveEffectiveDefault()` in ChatProvider)
+- Auth: encrypted JWT cookie → `getAuthAccessCookie()` → Bearer token to backend
 
-- [ ] Create `apps/web/src/app/api/chat/route.ts`
-    - [ ] `POST` handler with `maxDuration = 60`
-    - [ ] Auth: `getAuthAccessCookie()` + `refreshAccessToken()` fallback
-    - [ ] Parse body: extract `messages`, `providerOverride`, `directoryId`
-    - [ ] Create provider with `createBackendProvider()`
-    - [ ] Call `streamText()` with provider and messages
-    - [ ] Return `result.toUIMessageStreamResponse()`
-- [ ] Update `apps/web/src/lib/constants.ts`
-    - [ ] Add `API_CHAT: '/api/chat'` to ROUTES
+### 4.1 Custom Provider
+
+- [x] Create `apps/web/src/lib/ai/provider.ts`
+    - [x] `createBackendProvider(options)` function
+    - [x] Uses `createOpenAICompatible` from `@ai-sdk/openai-compatible`
+    - [x] `providerOverride` is **required** (not optional) — always passed as `X-Provider-Override` header
+    - [x] `apiKey` = JWT token (sent as `Authorization: Bearer` automatically)
+    - [x] `baseURL` = `${API_URL}/v1` (API_URL already includes `/api` suffix)
+    - [x] Marked `server-only` — no client-side usage
+- [x] Create `apps/web/src/lib/ai/index.ts` barrel export
+
+### 4.2 Next.js Route Handler
+
+- [x] Create `apps/web/src/app/api/chat/route.ts`
+    - [x] `POST` handler with `maxDuration = 60`
+    - [x] Auth: `getAuthAccessCookie()` + `refreshAccessToken()` fallback (same as `serverFetch`)
+    - [x] Parse body: extract `messages` (UIMessage[]), `providerOverride` (required), `directoryId`
+    - [x] Returns 400 if `providerOverride` missing
+    - [x] Returns 401 if no auth token after refresh attempt
+    - [x] Creates provider with `createBackendProvider()` pointing to `${API_URL}/v1`
+    - [x] Calls `streamText()` with `provider('default')` + `convertToModelMessages(messages)`
+    - [x] Returns `result.toUIMessageStreamResponse()`
 - [ ] Test end-to-end: web -> Next.js route -> NestJS -> plugin -> LangChain
 
 ## Phase 6: Frontend Chat UI Refactor

@@ -404,6 +404,26 @@ cd /home/ubuntu/projects/ever/ever-works && pnpm add ai @ai-sdk/openai-compatibl
 
 ## Phase 4: Custom Vercel AI SDK Provider
 
+### Provider Selection Requirements
+
+- `X-Provider-Override` header is **always passed** — the frontend always has an active AI provider selected
+- Default provider: `openrouter` (auto-selected via `resolveEffectiveDefault()` from `ChatProvider`)
+- Users can switch providers from the chat UI (provider selector buttons)
+- The backend `AiFacadeService` uses the override to resolve the correct plugin + settings
+
+### Auth Pattern
+
+- Next.js route handler reads the encrypted JWT from the `everworks_auth_token` cookie via `getAuthAccessCookie()`
+- On 401, it attempts a single token refresh via `refreshAccessToken()` (same pattern as `serverFetch`)
+- The JWT is passed as `apiKey` to `@ai-sdk/openai-compatible`, which sends it as `Authorization: Bearer <token>`
+- No JWT is ever exposed to the client browser
+
+### URL Resolution
+
+- `API_URL` from constants already includes `/api` suffix (e.g., `http://localhost:3100/api`)
+- The OpenAI-compat endpoint is at `POST /api/v1/chat/completions`
+- So `baseURL` = `${API_URL}/v1` which resolves to `http://localhost:3100/api/v1`
+
 ### New File: `apps/web/src/lib/ai/provider.ts`
 
 ```typescript
@@ -412,25 +432,19 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 export interface BackendProviderOptions {
 	baseURL: string;
 	authToken: string;
-	providerOverride?: string;
+	providerOverride: string; // Always required — user always has an active AI provider
 	directoryId?: string;
 }
 
 export function createBackendProvider(options: BackendProviderOptions) {
-	const customHeaders: Record<string, string> = {};
-
-	if (options.providerOverride) {
-		customHeaders['X-Provider-Override'] = options.providerOverride;
-	}
-	if (options.directoryId) {
-		customHeaders['X-Directory-Id'] = options.directoryId;
-	}
-
 	return createOpenAICompatible({
 		name: 'ever-works',
 		baseURL: options.baseURL,
-		apiKey: options.authToken, // Sent as Authorization: Bearer <token>
-		headers: customHeaders
+		apiKey: options.authToken,
+		headers: {
+			'X-Provider-Override': options.providerOverride,
+			...(options.directoryId && { 'X-Directory-Id': options.directoryId })
+		}
 	});
 }
 ```
@@ -477,11 +491,11 @@ export async function POST(request: Request) {
 		directoryId?: string;
 	};
 
-	// 3. Create provider
+	// 3. Create provider (API_URL already includes /api suffix)
 	const provider = createBackendProvider({
-		baseURL: `${API_URL}/api/v1`,
+		baseURL: `${API_URL}/v1`,
 		authToken: token,
-		providerOverride: rest.providerOverride,
+		providerOverride: rest.providerOverride ?? 'openrouter',
 		directoryId: rest.directoryId
 	});
 
