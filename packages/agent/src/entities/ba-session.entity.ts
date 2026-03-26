@@ -1,32 +1,39 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+    Entity,
+    Column,
+    PrimaryGeneratedColumn,
+    ManyToOne,
+    CreateDateColumn,
+    UpdateDateColumn,
+} from 'typeorm';
 import { BaUser } from './ba-user.entity';
 
 @Entity({ name: 'ba_session' })
 export class BaSession {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column()
-	userId: string;
+    @Column()
+    userId: string;
 
-	@ManyToOne(() => BaUser, { onDelete: 'CASCADE' })
-	user: BaUser;
+    @ManyToOne(() => BaUser, { onDelete: 'CASCADE' })
+    user: BaUser;
 
-	@Column({ unique: true })
-	token: string;
+    @Column({ unique: true })
+    token: string;
 
-	@Column()
-	expiresAt: Date;
+    @Column()
+    expiresAt: Date;
 
-	@Column({ nullable: true })
-	ipAddress: string;
+    @Column({ nullable: true })
+    ipAddress: string;
 
-	@Column({ nullable: true })
-	userAgent: string;
+    @Column({ nullable: true })
+    userAgent: string;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 
-	@UpdateDateColumn()
-	updatedAt: Date;
+    @UpdateDateColumn()
+    updatedAt: Date;
 }

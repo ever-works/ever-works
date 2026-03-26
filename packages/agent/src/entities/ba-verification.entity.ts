@@ -1,22 +1,28 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+    Entity,
+    Column,
+    PrimaryGeneratedColumn,
+    CreateDateColumn,
+    UpdateDateColumn,
+} from 'typeorm';
 
 @Entity({ name: 'ba_verification' })
 export class BaVerification {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column()
-	identifier: string;
+    @Column()
+    identifier: string;
 
-	@Column({ type: 'text' })
-	value: string;
+    @Column({ type: 'text' })
+    value: string;
 
-	@Column()
-	expiresAt: Date;
+    @Column()
+    expiresAt: Date;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 
-	@UpdateDateColumn({ nullable: true })
-	updatedAt: Date;
+    @UpdateDateColumn({ nullable: true })
+    updatedAt: Date;
 }
