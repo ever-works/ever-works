@@ -31,6 +31,7 @@ export function ChatMessage({ message, isStreaming, isLastMessage }: ChatMessage
             >
                 <ChatMessageContent
                     parts={message.parts}
+                    isUser={isUser}
                     isMessageStreaming={isMessageStreaming}
                     hasText={!!text}
                 />

@@ -3,10 +3,11 @@ import { FacadesModule } from '@ever-works/agent/facades';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { OpenAiCompatController } from './openai-compat.controller';
 import { OpenAiCompatService } from './openai-compat.service';
+import { ConversationController } from './conversation.controller';
 
 @Module({
     imports: [FacadesModule, DatabaseModule],
-    controllers: [OpenAiCompatController],
+    controllers: [OpenAiCompatController, ConversationController],
     providers: [OpenAiCompatService],
 })
 export class AiConversationModule {}

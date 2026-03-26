@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useRef } from 'react';
+import { FormEvent, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { SendHorizonal, Square } from 'lucide-react';
@@ -15,6 +15,13 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
     const t = useTranslations('dashboard.aiChat');
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const inputRef = useRef('');
+
+    // Auto-focus when AI finishes generating
+    useEffect(() => {
+        if (!isStreaming && textareaRef.current) {
+            textareaRef.current.focus();
+        }
+    }, [isStreaming]);
 
     const autoResize = () => {
         const el = textareaRef.current;

@@ -21,10 +21,12 @@ export async function POST(request: Request) {
         messages,
         providerOverride,
         directoryId,
+        conversationId,
     }: {
         messages: UIMessage[];
         providerOverride: string;
         directoryId?: string;
+        conversationId?: string;
     } = body;
 
     if (!providerOverride) {
@@ -36,10 +38,9 @@ export async function POST(request: Request) {
         authToken: token,
         providerOverride,
         directoryId,
+        conversationId,
     });
 
-    // Model ID is ignored by the backend — AiFacadeService resolves the actual model
-    // from plugin settings. We pass a placeholder that won't be sent upstream.
     const result = streamText({
         model: provider.chatModel('auto'),
         messages: await convertToModelMessages(messages),

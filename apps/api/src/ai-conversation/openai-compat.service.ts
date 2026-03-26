@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AiFacadeService, type FacadeOptions } from '@ever-works/agent/facades';
-import { DirectoryRepository } from '@ever-works/agent/database';
+import { DirectoryRepository, ConversationRepository } from '@ever-works/agent/database';
 import type {
     ChatMessage,
     ChatCompletionOptions,
@@ -23,6 +23,7 @@ export class OpenAiCompatService {
     constructor(
         private readonly aiFacade: AiFacadeService,
         private readonly directoryRepository: DirectoryRepository,
+        private readonly conversationRepo: ConversationRepository,
     ) {}
 
     /**
@@ -41,15 +42,38 @@ export class OpenAiCompatService {
     }
 
     /**
-     * Handle a streaming chat completion request — writes SSE to the response.
+     * Handle a streaming chat completion request.
+     * Creates/reuses a conversation, streams SSE, then persists messages.
      */
     async handleStreamingCompletion(
         dto: OpenAiChatCompletionRequestDto,
         facadeOptions: FacadeOptions,
         res: Response,
+        persistence?: { userId: string; conversationId?: string; providerId?: string },
     ): Promise<void> {
         const resolved = await this.resolveDirectoryContext(facadeOptions);
         const options = this.mapToInternalOptions(dto);
+
+        // Ensure a conversation exists before streaming
+        let conversationId = persistence?.conversationId;
+        let isNewConversation = false;
+
+        if (persistence?.userId && !conversationId) {
+            const conversation = await this.conversationRepo.create({
+                userId: persistence.userId,
+                providerId: persistence.providerId,
+                model: dto.model,
+            });
+            conversationId = conversation.id;
+            isNewConversation = true;
+        }
+
+        // Send conversation ID to the frontend
+        if (conversationId) {
+            res.setHeader('X-Conversation-Id', conversationId);
+        }
+
+        let assistantContent = '';
 
         try {
             const stream = this.aiFacade.createStreamingChatCompletion(
@@ -63,8 +87,10 @@ export class OpenAiCompatService {
                 const sseChunk = this.mapToOpenAiStreamChunk(chunk, toolCallIndex);
                 res.write(`data: ${JSON.stringify(sseChunk)}\n\n`);
 
-                // Track tool call indexing across chunks
                 const delta = chunk.choices[0]?.delta;
+                if (delta?.content && typeof delta.content === 'string') {
+                    assistantContent += delta.content;
+                }
                 if (delta?.toolCalls?.length) {
                     toolCallIndex += delta.toolCalls.length;
                 }
@@ -79,19 +105,70 @@ export class OpenAiCompatService {
                 object: 'chat.completion.chunk',
                 created: Math.floor(Date.now() / 1000),
                 model: dto.model ?? 'default',
-                choices: [
-                    {
-                        index: 0,
-                        delta: {},
-                        finish_reason: 'error',
-                    },
-                ],
+                choices: [{ index: 0, delta: {}, finish_reason: 'error' }],
             };
             res.write(`data: ${JSON.stringify(errorChunk)}\n\n`);
             res.write(`data: [DONE]\n\n`);
         } finally {
             res.end();
         }
+
+        // Persist messages in background
+        if (conversationId && persistence?.userId && assistantContent) {
+            this.persistMessages(
+                dto,
+                conversationId,
+                persistence.userId,
+                assistantContent,
+                isNewConversation,
+            ).catch((err) => this.logger.error('Failed to persist messages', err));
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Conversation persistence
+    // ────────────────────────────────────────────────────────────────
+
+    private async persistMessages(
+        dto: OpenAiChatCompletionRequestDto,
+        conversationId: string,
+        userId: string,
+        assistantContent: string,
+        isNewConversation: boolean,
+    ): Promise<void> {
+        const lastUserMsg = [...dto.messages].reverse().find((m) => m.role === 'user');
+
+        const messagesToPersist = [];
+
+        if (lastUserMsg) {
+            messagesToPersist.push({
+                conversationId,
+                role: 'user' as const,
+                content: lastUserMsg.content ?? '',
+            });
+        }
+
+        messagesToPersist.push({
+            conversationId,
+            role: 'assistant' as const,
+            content: assistantContent,
+            model: dto.model ?? undefined,
+        });
+
+        await this.conversationRepo.appendMessages(messagesToPersist);
+
+        if (isNewConversation && lastUserMsg?.content) {
+            const title = this.generateTitle(lastUserMsg.content);
+            await this.conversationRepo.updateTitle(conversationId, userId, title);
+        }
+    }
+
+    private generateTitle(userMessage: string): string {
+        const maxLen = 60;
+        if (userMessage.length <= maxLen) return userMessage;
+        const truncated = userMessage.substring(0, maxLen);
+        const lastSpace = truncated.lastIndexOf(' ');
+        return (lastSpace > 20 ? truncated.substring(0, lastSpace) : truncated) + '...';
     }
 
     // ────────────────────────────────────────────────────────────────

@@ -2,17 +2,20 @@
 
 import { useTranslations } from 'next-intl';
 import type { UIMessage } from '@ai-sdk/react';
+import { ChatMarkdown } from './ChatMarkdown';
 
 type MessagePart = UIMessage['parts'][number];
 
 interface ChatMessageContentProps {
     parts: MessagePart[];
+    isUser: boolean;
     isMessageStreaming: boolean;
     hasText: boolean;
 }
 
 export function ChatMessageContent({
     parts,
+    isUser,
     isMessageStreaming,
     hasText,
 }: ChatMessageContentProps) {
@@ -22,11 +25,14 @@ export function ChatMessageContent({
         <>
             {parts.map((part, i) => {
                 if (part.type === 'text' && part.text) {
-                    return (
-                        <p key={i} className="text-xs leading-relaxed whitespace-pre-wrap">
-                            {part.text}
-                        </p>
-                    );
+                    if (isUser) {
+                        return (
+                            <p key={i} className="text-xs leading-relaxed whitespace-pre-wrap">
+                                {part.text}
+                            </p>
+                        );
+                    }
+                    return <ChatMarkdown key={i} content={part.text} />;
                 }
 
                 if (part.type === 'dynamic-tool' || part.type.startsWith('tool-')) {
