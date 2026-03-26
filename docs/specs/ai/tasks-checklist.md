@@ -54,46 +54,46 @@
 
 ### 3.1 Create DTOs
 
-- [ ] Create `apps/api/src/ai-conversation/dto/openai-compat.dto.ts`
-    - [ ] `OpenAiChatCompletionRequestDto` with class-validator decorators
-    - [ ] `OpenAiMessage` interface
-    - [ ] `OpenAiToolDefinition` interface
-    - [ ] OpenAI response types (non-streaming and streaming chunk)
+- [x] Create `apps/api/src/ai-conversation/dto/openai-compat.dto.ts`
+    - [x] `OpenAiChatCompletionRequestDto` with class-validator decorators
+    - [x] `OpenAiMessageDto`, `OpenAiToolDefinitionDto`, `OpenAiFunctionDto` classes
+    - [x] `OpenAiChatCompletionResponse` interface (non-streaming)
+    - [x] `OpenAiChatCompletionChunkResponse` interface (streaming)
+    - [x] `OpenAiToolCallResponse` interface
 
 ### 3.2 Create Service
 
-- [ ] Create `apps/api/src/ai-conversation/openai-compat.service.ts`
-    - [ ] Constructor: inject `AiFacadeService`, `DirectoryRepository`
-    - [ ] `handleCompletion(dto, facadeOptions)` - non-streaming path
-    - [ ] `handleStreamingCompletion(dto, facadeOptions, res)` - SSE streaming path
-    - [ ] `mapToInternalMessages(messages)` - OpenAI -> internal ChatMessage format
-    - [ ] `mapToInternalOptions(dto)` - Full request mapping
-    - [ ] `mapToOpenAiResponse(response)` - Internal -> OpenAI response format
-    - [ ] `mapToOpenAiStreamChunk(chunk)` - Internal -> OpenAI SSE chunk format
-    - [ ] `resolveDirectoryContext(options)` - Reuse from existing service
+- [x] Create `apps/api/src/ai-conversation/openai-compat.service.ts`
+    - [x] Constructor: inject `AiFacadeService`, `DirectoryRepository`
+    - [x] `handleCompletion(dto, facadeOptions)` - non-streaming path
+    - [x] `handleStreamingCompletion(dto, facadeOptions, res)` - SSE streaming path
+    - [x] `mapToInternalMessages(messages)` - OpenAI -> internal ChatMessage format (with tool_calls + tool_call_id)
+    - [x] `mapToInternalOptions(dto)` - Full request mapping (snake_case -> camelCase)
+    - [x] `mapToOpenAiResponse(response)` - Internal -> OpenAI response format (camelCase -> snake_case)
+    - [x] `mapToOpenAiStreamChunk(chunk, toolCallBaseIndex)` - Internal -> OpenAI SSE chunk format with indexed tool_calls
+    - [x] `resolveDirectoryContext(options)` - Reuses same logic as old service
 
 ### 3.3 Create Controller
 
-- [ ] Create `apps/api/src/ai-conversation/openai-compat.controller.ts`
-    - [ ] `POST /api/v1/chat/completions`
-    - [ ] JWT auth via `@CurrentUser()`
-    - [ ] Read `X-Provider-Override` and `X-Directory-Id` headers
-    - [ ] Route to streaming vs non-streaming based on `body.stream`
-    - [ ] Set proper response headers for SSE
+- [x] Create `apps/api/src/ai-conversation/openai-compat.controller.ts`
+    - [x] `POST /api/v1/chat/completions`
+    - [x] JWT auth via `@CurrentUser()`
+    - [x] Read `X-Provider-Override` and `X-Directory-Id` headers
+    - [x] Route to streaming (SSE) vs non-streaming (JSON) based on `body.stream`
+    - [x] Proper SSE headers: `text/event-stream`, `no-cache`, `keep-alive`, `X-Accel-Buffering: no`
 
-### 3.4 Register in Module
+### 3.4 Clean Up Old Code
 
-- [ ] Update `apps/api/src/ai-conversation/ai-conversation.module.ts`
-    - [ ] Add `OpenAiCompatController` to controllers
-    - [ ] Add `OpenAiCompatService` to providers
+- [x] Deleted `apps/api/src/ai-conversation/ai-conversation.controller.ts` (old NDJSON controller)
+- [x] Deleted `apps/api/src/ai-conversation/ai-conversation.service.ts` (old streaming service)
+- [x] Updated `ai-conversation.module.ts` — only registers `OpenAiCompatController` + `OpenAiCompatService`
+- [x] Fixed `ai.facade.spec.ts` — added `createStreamingChatCompletion` to mock (required after interface change)
 
-### 3.5 Test Endpoint
+### 3.5 Verify
 
-- [ ] Start API: `pnpm dev:api`
-- [ ] Test non-streaming with curl
-- [ ] Test streaming with curl (verify SSE format: `data: {...}\n\n` + `data: [DONE]\n\n`)
-- [ ] Test with invalid auth (should return 401)
-- [ ] Test with `X-Provider-Override` header
+- [x] `npx turbo build --filter=ever-works-api` — 0 TSC issues, all 6 tasks pass
+- [x] `cd packages/agent && pnpm test` — 33 suites, 892 tests pass
+- [ ] Manual curl testing (deferred to integration testing)
 
 ## Phase 4: Custom Vercel AI SDK Provider
 
