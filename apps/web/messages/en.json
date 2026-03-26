@@ -2369,6 +2369,11 @@
             "toolCompleted": "completed",
             "selectProvider": "Provider",
             "notConfigured": "Not configured",
+            "historyEmpty": "No conversations yet. Start a chat to see your history here.",
+            "historyUntitled": "Untitled conversation",
+            "historyToday": "Today",
+            "historyYesterday": "Yesterday",
+            "historyDaysAgo": "{days}d ago",
             "errors": {
                 "unableToSend": "Unable to send message"
             }

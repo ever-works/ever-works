@@ -38,9 +38,9 @@ export class ConversationRepository {
         return this.conversationRepo.save(conversation);
     }
 
-    async findById(id: string, userId: string): Promise<Conversation | null> {
+    async findById(id: string, userId?: string): Promise<Conversation | null> {
         return this.conversationRepo.findOne({
-            where: { id, userId },
+            where: { id, ...(userId && { userId }) },
             relations: ['messages'],
             order: { messages: { createdAt: 'ASC' } },
         });

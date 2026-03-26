@@ -54,25 +54,6 @@ export class OpenAiCompatService {
         const resolved = await this.resolveDirectoryContext(facadeOptions);
         const options = this.mapToInternalOptions(dto);
 
-        // Ensure a conversation exists before streaming
-        let conversationId = persistence?.conversationId;
-        let isNewConversation = false;
-
-        if (persistence?.userId && !conversationId) {
-            const conversation = await this.conversationRepo.create({
-                userId: persistence.userId,
-                providerId: persistence.providerId,
-                model: dto.model,
-            });
-            conversationId = conversation.id;
-            isNewConversation = true;
-        }
-
-        // Send conversation ID to the frontend
-        if (conversationId) {
-            res.setHeader('X-Conversation-Id', conversationId);
-        }
-
         let assistantContent = '';
 
         try {
@@ -104,7 +85,7 @@ export class OpenAiCompatService {
                 id: `chatcmpl-err-${Date.now()}`,
                 object: 'chat.completion.chunk',
                 created: Math.floor(Date.now() / 1000),
-                model: dto.model ?? 'default',
+                model: dto.model ?? 'auto',
                 choices: [{ index: 0, delta: {}, finish_reason: 'error' }],
             };
             res.write(`data: ${JSON.stringify(errorChunk)}\n\n`);
@@ -113,15 +94,12 @@ export class OpenAiCompatService {
             res.end();
         }
 
-        // Persist messages in background
-        if (conversationId && persistence?.userId && assistantContent) {
-            this.persistMessages(
-                dto,
-                conversationId,
-                persistence.userId,
-                assistantContent,
-                isNewConversation,
-            ).catch((err) => this.logger.error('Failed to persist messages', err));
+        // Persist messages to the conversation (frontend creates it upfront)
+        const conversationId = persistence?.conversationId;
+        if (conversationId && assistantContent) {
+            this.persistMessages(dto, conversationId, assistantContent).catch((err) =>
+                this.logger.error('Failed to persist messages', err),
+            );
         }
     }
 
@@ -132,19 +110,18 @@ export class OpenAiCompatService {
     private async persistMessages(
         dto: OpenAiChatCompletionRequestDto,
         conversationId: string,
-        userId: string,
         assistantContent: string,
-        isNewConversation: boolean,
     ): Promise<void> {
         const lastUserMsg = [...dto.messages].reverse().find((m) => m.role === 'user');
+        const resolvedModel = dto.model === 'auto' ? undefined : (dto.model ?? undefined);
 
         const messagesToPersist = [];
 
-        if (lastUserMsg) {
+        if (lastUserMsg?.content) {
             messagesToPersist.push({
                 conversationId,
                 role: 'user' as const,
-                content: lastUserMsg.content ?? '',
+                content: lastUserMsg.content,
             });
         }
 
@@ -152,14 +129,18 @@ export class OpenAiCompatService {
             conversationId,
             role: 'assistant' as const,
             content: assistantContent,
-            model: dto.model ?? undefined,
+            model: resolvedModel,
         });
 
         await this.conversationRepo.appendMessages(messagesToPersist);
 
-        if (isNewConversation && lastUserMsg?.content) {
-            const title = this.generateTitle(lastUserMsg.content);
-            await this.conversationRepo.updateTitle(conversationId, userId, title);
+        // Auto-generate title if conversation has no title yet
+        if (lastUserMsg?.content) {
+            const conversation = await this.conversationRepo.findById(conversationId);
+            if (conversation && !conversation.title) {
+                const title = this.generateTitle(lastUserMsg.content);
+                await this.conversationRepo.updateTitle(conversationId, conversation.userId, title);
+            }
         }
     }
 
