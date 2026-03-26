@@ -7,7 +7,7 @@ import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import type { Directory } from '@/lib/api/directory';
 import { DirectoryMemberRole } from '@/lib/api/enums';
-import { Github, Users } from 'lucide-react';
+import { Github, Users, FolderClosed } from 'lucide-react';
 import { ShowDateTime } from '../ui/show-datetime';
 import { Tooltip } from '../ui/tooltip';
 
@@ -38,17 +38,26 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
             href={ROUTES.DASHBOARD_DIRECTORY(directory.id)}
             className={cn(
                 'flex flex-col rounded-lg p-6 shadow-xs',
-                'bg-card dark:bg-card-primary-dark/70',
-                'border border-card-border dark:border-border-secondary-dark',
-                'hover:border-primary-500/50 dark:hover:border-primary-500/50',
+                'bg-card dark:bg-card-primary-dark',
+                'border border-card-border dark:border-white/9',
+                'hover:border-primary-500/50 dark:hover:border-white/20',
                 'transition-colors',
             )}
         >
-            <div className="flex items-start justify-between gap-4 mb-3">
+            <div className="flex items-center justify-between gap-4 mb-3">
                 <div className="flex items-center gap-2 min-w-0">
-                    <h3 className="text-lg font-semibold text-text dark:text-text-dark truncate">
-                        {directory.name}
-                    </h3>
+                    <div className="flex items-center gap-3 min-w-0 overflow-hidden">
+                        <div className="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-gray-100 dark:bg-white/5">
+                            <FolderClosed
+                                strokeWidth={1}
+                                className="w-5 h-5 text-gray-400 dark:text-gray-500"
+                            />
+                        </div>
+
+                        <h3 className="text-base font-semibold text-text dark:text-text-dark truncate">
+                            {directory.name}
+                        </h3>
+                    </div>
                     {isShared && (
                         <Tooltip content={t('shared.tooltip', { role: t(`role.${userRole}`) })}>
                             <span
