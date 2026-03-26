@@ -10,24 +10,9 @@ import type { UIMessage } from '@ai-sdk/react';
 interface ChatMessagesProps {
     messages: UIMessage[];
     isStreaming: boolean;
-    editingId: string | null;
-    editingContent: string;
-    onEditStart: (id: string, content: string) => void;
-    onEditCancel: () => void;
-    onEditSave: () => void;
-    onEditChange: (content: string) => void;
 }
 
-export function ChatMessages({
-    messages,
-    isStreaming,
-    editingId,
-    editingContent,
-    onEditStart,
-    onEditCancel,
-    onEditSave,
-    onEditChange,
-}: ChatMessagesProps) {
+export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
     const t = useTranslations('dashboard.aiChat');
     const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom();
 
@@ -43,12 +28,6 @@ export function ChatMessages({
                         message={message}
                         isStreaming={isStreaming}
                         isLastMessage={index === messages.length - 1}
-                        editingId={editingId}
-                        editingContent={editingContent}
-                        onEditStart={onEditStart}
-                        onEditCancel={onEditCancel}
-                        onEditSave={onEditSave}
-                        onEditChange={onEditChange}
                     />
                 ))}
 
