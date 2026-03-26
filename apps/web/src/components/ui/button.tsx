@@ -16,11 +16,11 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const buttonVariants = {
-    primary: 'bg-primary-500 hover:bg-primary-500/90 text-white',
+    primary: 'bg-primary-500 dark:bg-button-primary-dark hover:bg-primary-hover/80 dark:hover:bg-button-primary-hover-dark text-white dark:text-black rounded-sm',
     secondary:
-        'bg-surface-secondary dark:bg-surface-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark border border-border dark:border-border-dark text-text dark:text-text-dark',
-    ghost: 'bg-transparent hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark text-text dark:text-text-dark',
-    danger: 'bg-danger hover:bg-danger/90 text-white',
+        'bg-surface-secondary dark:bg-button-primary-dark hover:bg-surface-tertiary dark:hover:bg-button-primary-hover-dark border border-border dark:border-border-dark text-text dark:text-black rounded-sm',
+    ghost: 'bg-transparent hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark text-text dark:text-text-dark rounded-sm',
+    danger: 'bg-danger hover:bg-danger/90 text-white rounded-sm',
     unstyled: '',
 };
 
