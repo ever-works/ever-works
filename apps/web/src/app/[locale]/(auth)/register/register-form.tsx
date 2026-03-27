@@ -3,15 +3,15 @@
 import { useState, useTransition } from 'react';
 import { Link } from '@/i18n/navigation';
 import { AuthLayout } from '@/components/layout/AuthLayout';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { SocialLoginButtons } from '@/components/auth/social-login';
-import { register as registerAction } from '@/app/actions/auth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 export default function RegisterForm() {
+    const locale = useLocale();
     const t = useTranslations('auth.register');
     const [isPending, startTransition] = useTransition();
 
@@ -40,10 +40,33 @@ export default function RegisterForm() {
         }
 
         startTransition(async () => {
-            const response = await registerAction(formData.name, formData.email, formData.password);
+            try {
+                const response = await fetch('/api/auth/better-auth/sign-up/email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name: formData.name,
+                        email: formData.email,
+                        password: formData.password,
+                        rememberMe: true,
+                    }),
+                });
 
-            if (!response.success) {
-                setError(response.error || t('errors.generic'));
+                const payload = (await response.json().catch(() => null)) as {
+                    message?: string;
+                } | null;
+
+                if (!response.ok) {
+                    setError(payload?.message || t('errors.generic'));
+                    return;
+                }
+
+                window.location.assign(`/${locale}?newUser=true`);
+            } catch (error) {
+                console.error('Failed to register with email/password:', error);
+                setError(t('errors.generic'));
                 return;
             }
         });

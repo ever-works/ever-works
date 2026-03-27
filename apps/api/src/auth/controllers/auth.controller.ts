@@ -23,7 +23,6 @@ import { RegisterDto, LoginDto, RefreshTokenDto, UpdatePasswordDto } from '../dt
 import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/email-verification.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { SessionAuthGuard } from '../guards/session-auth.guard';
 import { Public } from '../decorators/public.decorator';
 
@@ -76,7 +75,7 @@ export class AuthController {
         return this.authService.refreshToken(refreshTokenDto.refreshToken, userAgent, ipAddress);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(SessionAuthGuard)
     @Post('logout')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
@@ -86,7 +85,7 @@ export class AuthController {
         return this.authService.logout(refreshTokenDto.refreshToken);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(SessionAuthGuard)
     @Post('logout-all')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
@@ -124,7 +123,7 @@ export class AuthController {
         return this.authService.getUserProfile(req.user.userId);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(SessionAuthGuard)
     @Post('update-password')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
@@ -135,7 +134,7 @@ export class AuthController {
         return this.authService.updatePassword(req.user.userId, updatePasswordDto);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(SessionAuthGuard)
     @Put('profile')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
@@ -148,7 +147,7 @@ export class AuthController {
         return this.authService.updateUserProfile(req.user.userId, updateProfileDto);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(SessionAuthGuard)
     @Post('send-verification')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')

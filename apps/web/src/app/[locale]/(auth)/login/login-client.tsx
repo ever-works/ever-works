@@ -4,13 +4,13 @@ import { useState, useTransition, useEffect } from 'react';
 import { Link } from '@/i18n/navigation';
 import { useSearchParams } from 'next/navigation';
 import { AuthLayout } from '@/components/layout/AuthLayout';
-import { useTranslations } from 'next-intl';
-import { login as loginAction } from '@/app/actions/auth';
+import { useLocale, useTranslations } from 'next-intl';
 import { SocialLoginButtons } from '@/components/auth/social-login';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { REDIRECT_SEARCH_PARAM, ROUTES } from '@/lib/constants';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { isValidRedirectUrl } from '@/lib/utils';
 
 function PasswordResetSuccessMessage() {
     const t = useTranslations('auth.login');
@@ -48,6 +48,7 @@ function PasswordResetSuccessMessage() {
 
 export function LoginClient() {
     const searchParams = useSearchParams();
+    const locale = useLocale();
     const t = useTranslations('auth.login');
     const [isPending, startTransition] = useTransition();
 
@@ -60,6 +61,23 @@ export function LoginClient() {
     });
     const [error, setError] = useState('');
     const [showResetSuccess, setShowResetSuccess] = useState(isPasswordReset);
+
+    const getDashboardUrl = () => `/${locale}`;
+    const getLocalizedInternalUrl = (path: string) => {
+        if (!path.startsWith('/')) {
+            return path;
+        }
+
+        if (path === `/${locale}` || path.startsWith(`/${locale}/`)) {
+            return path;
+        }
+
+        if (path === ROUTES.DASHBOARD) {
+            return getDashboardUrl();
+        }
+
+        return `/${locale}${path}`;
+    };
 
     useEffect(() => {
         if (isPasswordReset) {
@@ -81,9 +99,36 @@ export function LoginClient() {
         setShowResetSuccess(false);
 
         startTransition(async () => {
-            const response = await loginAction(formData.email, formData.password, redirectUrl);
-            if (!response.success) {
-                setError(response.error || t('errors.invalidCredentials'));
+            try {
+                const response = await fetch('/api/auth/better-auth/sign-in/email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: formData.email,
+                        password: formData.password,
+                        rememberMe: true,
+                    }),
+                });
+
+                const payload = (await response.json().catch(() => null)) as {
+                    message?: string;
+                } | null;
+
+                if (!response.ok) {
+                    const message = payload?.message || t('errors.invalidCredentials');
+                    setError(message);
+                    return;
+                }
+
+                const destination =
+                    redirectUrl && isValidRedirectUrl(redirectUrl) ? redirectUrl : ROUTES.DASHBOARD;
+
+                window.location.assign(getLocalizedInternalUrl(destination));
+            } catch (error) {
+                console.error('Failed to sign in with email/password:', error);
+                setError(t('errors.invalidCredentials'));
                 return;
             }
         });
