@@ -30,17 +30,25 @@ export default function DirectoriesClient({
     const [directories, setDirectories] = useState<Directory[]>(initialDirectories);
     const [total, setTotal] = useState(totalDirectories);
     const [loading, setLoading] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [debouncedQuery, setDebouncedQuery] = useState('');
+    const initialQuery = searchParams.get('q') ?? '';
+    const [searchQuery, setSearchQuery] = useState(initialQuery);
+    const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
     const [page, setPage] = useState(1);
     const itemsPerPage = 20;
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-    // Focus search input when navigating with ?focus=search
+    // Handle query params: ?focus=search or ?q=searchterm
     useEffect(() => {
-        if (searchParams.get('focus') === 'search' && searchInputRef.current) {
+        const q = searchParams.get('q');
+        if (q) {
+            setSearchQuery(q);
+            setDebouncedQuery(q);
+            searchInputRef.current?.focus();
+            const url = new URL(window.location.href);
+            url.searchParams.delete('q');
+            window.history.replaceState({}, '', url.toString());
+        } else if (searchParams.get('focus') === 'search' && searchInputRef.current) {
             searchInputRef.current.focus();
-            // Clean up the URL without the focus param
             const url = new URL(window.location.href);
             url.searchParams.delete('focus');
             window.history.replaceState({}, '', url.toString());

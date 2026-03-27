@@ -55,7 +55,7 @@ export class ApiKeyRepository {
 
     async deleteExpiredKeys(): Promise<number> {
         const result = await this.repository.delete({
-            expiresAt: And(Not(IsNull()), LessThan(new Date())),
+            expiresAt: And(Not(IsNull()), LessThan(Date.now())),
         });
         return result.affected ?? 0;
     }

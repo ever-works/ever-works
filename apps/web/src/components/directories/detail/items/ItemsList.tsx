@@ -60,16 +60,32 @@ function useColumnCount(viewMode: 'grid' | 'list') {
 export function ItemsList({ items: initialItems, addItemRef }: ItemsListProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const [items, setItems] = useState(() => sortItems(initialItems));
-    const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const scrollContainerRef = useRef<HTMLElement | null>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
     const columns = useColumnCount(viewMode);
 
-    // Get scroll container reference (the main element)
+    // Read ?q= from URL for AI-driven search
+    const initialQuery =
+        typeof window !== 'undefined'
+            ? (new URLSearchParams(window.location.search).get('q') ?? '')
+            : '';
+    const [searchQuery, setSearchQuery] = useState(initialQuery);
+
     useEffect(() => {
         scrollContainerRef.current = document.getElementById('main-content');
     }, []);
+
+    // Handle ?q= param on mount
+    useEffect(() => {
+        if (initialQuery) {
+            searchInputRef.current?.focus();
+            const url = new URL(window.location.href);
+            url.searchParams.delete('q');
+            window.history.replaceState({}, '', url.toString());
+        }
+    }, [initialQuery]);
 
     // Expose addItem function via ref for parent components
     const handleAddItem = useCallback((newItem: ItemData) => {

@@ -1,9 +1,7 @@
-import { convertToModelMessages, streamText, stepCountIs, type UIMessage } from 'ai';
-import { createBackendProvider } from '@/lib/ai/provider';
-import { chatTools } from '@/lib/ai/tools';
+import type { UIMessage } from 'ai';
+import { runAgent } from '@/lib/ai/agent';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
 import { refreshAccessToken } from '@/lib/auth/refresh';
-import { API_URL } from '@/lib/constants';
 
 export const maxDuration = 60;
 
@@ -17,48 +15,23 @@ export async function POST(request: Request) {
         return new Response('Unauthorized', { status: 401 });
     }
 
-    const body = await request.json();
-    const {
-        messages,
-        providerOverride,
-        directoryId,
-        conversationId,
-    }: {
+    const { messages, providerOverride, directoryId, conversationId } = (await request.json()) as {
         messages: UIMessage[];
         providerOverride: string;
         directoryId?: string;
         conversationId?: string;
-    } = body;
+    };
 
     if (!providerOverride) {
         return new Response('providerOverride is required', { status: 400 });
     }
 
-    const provider = createBackendProvider({
-        baseURL: `${API_URL}/v1`,
+    const result = await runAgent({
+        messages,
         authToken: token,
         providerOverride,
         directoryId,
         conversationId,
-    });
-
-    const result = streamText({
-        model: provider.chatModel('auto'),
-        system: [
-            'You are an AI assistant for Ever Works, a directory builder platform.',
-            'You have tools to help users. ALWAYS use them when relevant — never guess or make up data.',
-            '',
-            'TOOL USAGE RULES:',
-            '- To answer questions about directories, items, or stats: use listDirectories or getDirectoryStats.',
-            '- To show directory details: use getDirectoryDetails.',
-            '- To navigate the user somewhere: use navigate. Do NOT output any text after — the UI handles the redirect.',
-            '- Before creating a directory: use checkGitConnection first.',
-            '',
-            'Be concise. Use markdown for formatting. Never fabricate data — always call a tool.',
-        ].join('\n'),
-        messages: await convertToModelMessages(messages),
-        tools: chatTools,
-        stopWhen: stepCountIs(5),
     });
 
     return result.toUIMessageStreamResponse();

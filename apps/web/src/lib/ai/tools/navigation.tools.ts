@@ -53,17 +53,23 @@ const tabRoutes: Record<(typeof TAB_OPTIONS)[number], (id: string) => string> = 
 };
 
 export const navigate = tool({
-    description:
-        'Navigate the user to a page. The UI handles the redirect. Do NOT output any text after calling this tool.',
+    description: [
+        'Navigate the user to a page with optional search query.',
+        'ALWAYS use this after fetching data — redirect to the relevant page so the user sees it.',
+        'For directories: use page="directories" with search to filter.',
+        'For items in a directory: use directoryId + tab="items" with search to filter.',
+        'The UI handles the redirect. Do NOT output any text after calling this tool.',
+    ].join(' '),
     inputSchema: z.object({
         page: z.enum(PAGE_OPTIONS).describe('The page to navigate to'),
-        directoryId: z
+        directoryId: z.string().optional().describe('Directory ID for directory-specific pages'),
+        tab: z.enum(TAB_OPTIONS).optional().describe('Directory tab to navigate to'),
+        search: z
             .string()
             .optional()
-            .describe('Directory ID (required for directory-specific pages)'),
-        tab: z.enum(TAB_OPTIONS).optional().describe('Directory tab to navigate to'),
+            .describe('Search query to pre-fill on the target page (passed as ?q=...)'),
     }),
-    execute: async ({ page, directoryId, tab }) => {
+    execute: async ({ page, directoryId, tab, search }) => {
         let url = pageRoutes[page] ?? ROUTES.DASHBOARD;
 
         if (directoryId && tab) {
@@ -71,6 +77,10 @@ export const navigate = tool({
             if (routeFn) url = routeFn(directoryId);
         } else if (directoryId) {
             url = ROUTES.DASHBOARD_DIRECTORY(directoryId);
+        }
+
+        if (search) {
+            url += `?q=${encodeURIComponent(search)}`;
         }
 
         return { url, navigated: true };
