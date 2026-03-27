@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { ChatInterface } from './ChatInterface';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, Bot } from 'lucide-react';
 
 const borderToggleClass = cn(
     'absolute -right-3 top-1/2 -translate-y-1/2 z-10',
@@ -64,7 +64,7 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
 export function ChatPanelExpandButton({ onClick }: { onClick: () => void }) {
     return (
         <button onClick={onClick} className={borderToggleClass}>
-            <ChevronRight className="w-3 h-3" />
+            <Bot className="w-3.5 h-3.5" />
         </button>
     );
 }
