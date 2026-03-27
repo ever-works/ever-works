@@ -297,7 +297,7 @@ function ScheduleForm({
             </header>
 
             {/* Summary chips */}
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 @sm/main:grid-cols-2 @3xl/main:grid-cols-4">
                 <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-4 space-y-1">
                     <p className="text-xs uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
                         {t('summary.status')}
@@ -321,7 +321,7 @@ function ScheduleForm({
 
             {activeProviders.length > 0 && <ActiveProvidersBar providers={activeProviders} />}
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 @lg/main:grid-cols-2">
                 <FieldCard
                     label={t('fields.cadence')}
                     helper={

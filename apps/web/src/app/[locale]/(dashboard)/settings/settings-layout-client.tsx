@@ -130,9 +130,9 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 <p className="text-text-muted dark:text-text-muted-dark mt-2">{t('subtitle')}</p>
             </div>
 
-            <div className="flex flex-col lg:flex-row gap-8">
+            <div className="flex flex-col @3xl/main:flex-row gap-8">
                 {/* Sidebar Navigation */}
-                <div className="lg:w-64 flex-shrink-0">
+                <div className="@3xl/main:w-64 flex-shrink-0">
                     <nav className="space-y-1">
                         {/* Static tabs at top */}
                         {staticTabs.map(renderStaticTab)}

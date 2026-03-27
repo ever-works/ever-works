@@ -59,7 +59,7 @@ export default async function DirectoryOverviewPage({ params }: Params) {
             />
 
             {/* Directory Info and Config side by side */}
-            <div className="grid lg:grid-cols-2 gap-6">
+            <div className="grid @3xl/main:grid-cols-2 gap-6">
                 <DirectoryInfo directory={directory} config={config} />
                 {config && <DirectoryConfig config={config} />}
             </div>

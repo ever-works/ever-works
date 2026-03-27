@@ -16,6 +16,8 @@ import {
     DirectorySchedule,
     UsageLedgerEntry,
     Notification,
+    Conversation,
+    ConversationMessage,
 } from '../entities';
 import { PluginEntity, UserPluginEntity, DirectoryPluginEntity } from '../plugins/entities';
 import { UserSyncConfig } from '../account-transfer/entities/user-sync-config.entity';
@@ -65,6 +67,8 @@ export const ENTITIES = [
     DirectorySchedule,
     UsageLedgerEntry,
     Notification,
+    Conversation,
+    ConversationMessage,
     // Plugin entities
     PluginEntity,
     UserPluginEntity,

@@ -60,7 +60,7 @@ export function SimAiOnboardingWizard({
                 <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('subtitle')}</p>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 @lg/main:grid-cols-2">
                 {steps.map((item, index) => (
                     <button
                         key={item.title}

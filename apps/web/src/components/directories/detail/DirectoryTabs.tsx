@@ -238,13 +238,13 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
     return (
         <nav className="border-b border-border dark:border-border-dark">
             <div className="-mb-px flex overflow-x-auto scrollbar-none">
-                <div className="flex min-w-full sm:min-w-0 gap-1 sm:gap-2 md:gap-6 lg:gap-8 px-1">
+                <div className="flex min-w-full @sm/main:min-w-0 gap-1 @sm/main:gap-2 @2xl/main:gap-6 @3xl/main:gap-8 px-1">
                     {tabs.map((tab) => (
                         <Link
                             key={tab.name}
                             href={tab.href}
                             className={cn(
-                                'flex items-center gap-1.5 sm:gap-2 py-3 sm:py-4 px-3 md:px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors',
+                                'flex items-center gap-1.5 @sm/main:gap-2 py-3 @sm/main:py-4 px-3 @2xl/main:px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors',
                                 tab.isActive
                                     ? 'border-primary text-primary'
                                     : 'border-transparent text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark hover:border-border-hover dark:hover:border-border-hover-dark',

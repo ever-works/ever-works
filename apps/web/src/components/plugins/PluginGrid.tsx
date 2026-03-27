@@ -25,7 +25,7 @@ function groupByCategory(plugins: UserPlugin[]): Record<string, UserPlugin[]> {
     );
 }
 
-const GRID = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
+const GRID = 'grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4';
 
 export function PluginGrid({ plugins, grouped, searchQuery, onClearSearch }: PluginGridProps) {
     const t = useTranslations('dashboard.plugins');
