@@ -16,10 +16,12 @@
 		},
 		"dev": {
 			"outputs": [],
+			"persistent": true,
 			"cache": false
 		},
 		"dev:trigger": {
 			"outputs": [],
+			"persistent": true,
 			"cache": false
 		},
 		"lint": {

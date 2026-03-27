@@ -47,11 +47,24 @@ function splitSetCookieHeader(headerValue: string): string[] {
     return cookies;
 }
 
+function getUpstreamCandidates(routePath: string, search: string): URL[] {
+    const primary = new URL(`${API_URL}/auth/better-auth/${routePath}`);
+    primary.search = search;
+
+    const candidates = [primary];
+
+    if (primary.hostname === 'localhost') {
+        const fallback = new URL(primary.toString());
+        fallback.hostname = '127.0.0.1';
+        candidates.push(fallback);
+    }
+
+    return candidates;
+}
+
 async function proxyBetterAuthRequest(request: NextRequest, context: RouteContext) {
     const { betterAuth = [] } = await context.params;
     const routePath = betterAuth.join('/');
-    const upstreamUrl = new URL(`${API_URL}/auth/better-auth/${betterAuth.join('/')}`);
-    upstreamUrl.search = request.nextUrl.search;
 
     const headers = new Headers(request.headers);
     headers.set('x-forwarded-host', request.headers.get('host') || '');
@@ -62,12 +75,36 @@ async function proxyBetterAuthRequest(request: NextRequest, context: RouteContex
             ? undefined
             : await request.arrayBuffer();
 
-    const response = await fetch(upstreamUrl, {
-        method: request.method,
-        headers,
-        body: body && body.byteLength > 0 ? body : undefined,
-        redirect: 'manual',
-    });
+    let response: Response | null = null;
+    let lastError: unknown = null;
+
+    for (const upstreamUrl of getUpstreamCandidates(routePath, request.nextUrl.search)) {
+        try {
+            response = await fetch(upstreamUrl, {
+                method: request.method,
+                headers,
+                body: body && body.byteLength > 0 ? body : undefined,
+                redirect: 'manual',
+            });
+            break;
+        } catch (error) {
+            lastError = error;
+        }
+    }
+
+    if (!response) {
+        console.error('[better-auth proxy] upstream unavailable', {
+            path: routePath,
+            error: lastError,
+        });
+
+        return NextResponse.json(
+            {
+                error: 'Authentication service is temporarily unavailable',
+            },
+            { status: 503 },
+        );
+    }
 
     const responseHeaders = new Headers();
     response.headers.forEach((value, key) => {

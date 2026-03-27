@@ -1,6 +1,7 @@
 import { Module, Global } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
+import { AuthModule } from '@src/auth';
 import { CrmConfigService } from './config/crm-config.service';
 import { TwentyCrmService } from './services/twenty-crm.service';
 import { CrmTenantService } from './services/crm-tenant.service';
@@ -23,6 +24,7 @@ export class TwentyCrmModule {
                     maxRedirects: 5,
                 }),
                 ConfigModule,
+                AuthModule,
             ],
             providers: [
                 CrmConfigService,
@@ -52,6 +54,7 @@ export class TwentyCrmModule {
                     maxRedirects: 5,
                 }),
                 ConfigModule,
+                AuthModule,
             ],
             providers: [
                 CrmConfigService,
