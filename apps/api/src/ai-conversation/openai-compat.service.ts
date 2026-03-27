@@ -55,6 +55,7 @@ export class OpenAiCompatService {
         const options = this.mapToInternalOptions(dto);
 
         let assistantContent = '';
+        const assistantToolCalls: Array<{ id: string; name: string; arguments: string }> = [];
         let hasResponse = false;
 
         try {
@@ -73,6 +74,18 @@ export class OpenAiCompatService {
                     hasResponse = true;
                 }
                 if (delta?.toolCalls?.length) {
+                    for (const tc of delta.toolCalls) {
+                        const existing = assistantToolCalls.find((t) => tc.id && t.id === tc.id);
+                        if (existing) {
+                            existing.arguments += tc.function.arguments ?? '';
+                        } else if (tc.id) {
+                            assistantToolCalls.push({
+                                id: tc.id,
+                                name: tc.function.name ?? '',
+                                arguments: tc.function.arguments ?? '',
+                            });
+                        }
+                    }
                     hasResponse = true;
                 }
             }
@@ -103,6 +116,7 @@ export class OpenAiCompatService {
                 conversationId,
                 userId,
                 assistantContent,
+                assistantToolCalls.length > 0 ? assistantToolCalls : undefined,
                 facadeOptions,
             ).catch((err) => this.logger.error('Failed to persist messages', err));
         }
@@ -117,6 +131,7 @@ export class OpenAiCompatService {
         conversationId: string,
         userId: string,
         assistantContent: string,
+        assistantToolCalls: Array<{ id: string; name: string; arguments: string }> | undefined,
         facadeOptions: FacadeOptions,
     ): Promise<void> {
         const conversation = await this.conversationRepo.findById(conversationId, userId);
@@ -154,6 +169,7 @@ export class OpenAiCompatService {
             conversationId,
             role: 'assistant',
             content: assistantContent,
+            toolCalls: assistantToolCalls,
             model: resolvedModel,
         });
 
