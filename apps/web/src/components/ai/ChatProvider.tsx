@@ -12,6 +12,7 @@ import {
 import { useChat, type UIMessage } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { useTranslations } from 'next-intl';
+import { usePathname } from 'next/navigation';
 import type { ProviderOption } from '@/lib/api/types-only';
 import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
 import { resolveEffectiveDefault } from '@ever-works/plugin';
@@ -55,6 +56,9 @@ const transport = new DefaultChatTransport({ api: '/api/chat' });
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
     const t = useTranslations('dashboard.aiChat');
+    const pathname = usePathname();
+    const pathnameRef = useRef(pathname);
+    pathnameRef.current = pathname;
     const [providers, setProviders] = useState<ProviderOption[]>([]);
     const [selectedProvider, setSelectedProvider] = useLocalStorage<string>(
         'chat-ai-provider',
@@ -183,6 +187,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                     body: {
                         providerOverride: selectedProviderRef.current,
                         conversationId: conversationIdRef.current,
+                        currentPageUrl: pathnameRef.current,
                     },
                 },
             );

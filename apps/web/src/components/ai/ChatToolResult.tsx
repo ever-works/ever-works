@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from '@/i18n/navigation';
+import { useEffect, useState, useTransition } from 'react';
+import { useRouter, usePathname, Link } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
-import { ExternalLink, FolderOpen, GitBranch, Loader2, Check, Compass } from 'lucide-react';
+import { ExternalLink, FolderOpen, GitBranch, Github, Loader2, Check, Compass } from 'lucide-react';
+import { connectOAuthProvider } from '@/app/actions/dashboard/oauth';
+import { toast } from 'sonner';
 
 interface ChatToolResultProps {
     toolName: string;
@@ -15,9 +17,34 @@ interface ChatToolResultProps {
 const LABELS: Record<string, string> = {
     listDirectories: 'Fetching directories',
     getDirectoryDetails: 'Loading directory',
-    getDirectoryStats: 'Loading stats',
+    getStats: 'Loading stats',
+    getDirectoryItemsSummary: 'Loading items summary',
+    getGenerationHistory: 'Loading history',
+    getScheduleStatus: 'Checking schedule',
+    syncDirectory: 'Syncing directory',
     checkGitConnection: 'Checking git',
+    checkDeployConnection: 'Checking deploy',
+    listGitProviders: 'Checking providers',
+    createDirectoryManual: 'Creating directory',
+    createDirectoryWithAI: 'Creating directory with AI',
+    importDirectory: 'Importing directory',
+    analyzeImportSource: 'Analyzing repository',
+    updateDirectory: 'Updating directory',
+    deleteDirectory: 'Deleting directory',
+    addItem: 'Adding item',
+    removeItem: 'Removing item',
+    updateItem: 'Updating item',
+    generateItems: 'Starting generation',
+    checkItemHealth: 'Checking item health',
+    regenerateMarkdown: 'Regenerating markdown',
+    deployDirectory: 'Deploying',
+    checkDeploymentStatus: 'Checking deployment',
+    listDomains: 'Loading domains',
+    setSchedule: 'Updating schedule',
+    runScheduleNow: 'Running schedule',
+    cancelSchedule: 'Cancelling schedule',
     navigate: 'Navigating',
+    reloadPage: 'Refreshing',
 };
 
 export function ChatToolResult({ toolName, state, output }: ChatToolResultProps) {
@@ -27,11 +54,15 @@ export function ChatToolResult({ toolName, state, output }: ChatToolResultProps)
     const isRunning = state === 'input-streaming' || state === 'input-available';
     const isDone = state === 'output-available';
 
-    // Auto-navigate
+    // Auto-navigate or reload
     useEffect(() => {
-        if (toolName === 'navigate' && isDone && output) {
+        if (!isDone || !output) return;
+        if (toolName === 'navigate') {
             const data = output as { url?: string };
             if (data.url) router.push(data.url);
+        }
+        if (toolName === 'reloadPage') {
+            router.refresh();
         }
     }, [toolName, isDone, output, router]);
 
@@ -48,17 +79,20 @@ export function ChatToolResult({ toolName, state, output }: ChatToolResultProps)
 
     if (!isDone) return null;
 
+    // Reload — invisible, handled by useEffect
+    if (toolName === 'reloadPage') return null;
+
     // Navigate — show a brief confirmation, useEffect handles the redirect
     if (toolName === 'navigate') {
         const data = output as { url?: string };
         return data?.url ? (
-            <a
+            <Link
                 href={data.url}
                 className="inline-flex items-center gap-1 mt-1 text-[11px] text-primary dark:text-primary-400 hover:underline"
             >
                 <Compass className="w-3 h-3" />
-                <span>Opened</span>
-            </a>
+                <span>{t('opened')}</span>
+            </Link>
         ) : null;
     }
 
@@ -71,6 +105,8 @@ export function ChatToolResult({ toolName, state, output }: ChatToolResultProps)
             return <Stats output={output} />;
         case 'checkGitConnection':
             return <GitConnection output={output} />;
+        case 'checkDeployConnection':
+            return <DeployConnection output={output} />;
         default:
             return null;
     }
@@ -89,24 +125,22 @@ function DirectoryList({ output }: { output: unknown }) {
     return (
         <div className="mt-1 space-y-0.5">
             {data.directories.map((dir) => (
-                <a
+                <Link
                     key={dir.id}
                     href={dir.url}
                     className={cn(
-                        'flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11px]',
+                        'flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px]',
                         'hover:bg-surface-secondary dark:hover:bg-white/[0.04]',
                         'text-text dark:text-text-dark transition-colors',
                     )}
                 >
-                    <span className="flex items-center gap-1.5">
-                        <FolderOpen className="w-3 h-3 text-primary dark:text-primary-400 shrink-0" />
-                        {dir.name}
-                    </span>
-                    <span className="text-text-muted dark:text-text-muted-dark flex items-center gap-1">
+                    <FolderOpen className="w-3 h-3 text-primary dark:text-primary-400 shrink-0" />
+                    <span className="flex-1 min-w-0 truncate">{dir.name}</span>
+                    <span className="text-text-muted dark:text-text-muted-dark flex items-center gap-1 shrink-0 whitespace-nowrap">
                         {dir.itemsCount}
                         <ExternalLink className="w-2.5 h-2.5" />
                     </span>
-                </a>
+                </Link>
             ))}
         </div>
     );
@@ -114,21 +148,21 @@ function DirectoryList({ output }: { output: unknown }) {
 
 function DirectoryDetail({ output }: { output: unknown }) {
     const data = output as { name?: string; description?: string; url?: string };
-    if (!data?.name) return null;
+    if (!data?.name || !data.url) return null;
 
     return (
-        <a
+        <Link
             href={data.url}
             className={cn(
-                'flex items-center gap-1.5 mt-1 px-2.5 py-1.5 rounded-md text-[11px]',
+                'flex items-center gap-2 mt-1 px-2.5 py-1.5 rounded-md text-[11px]',
                 'hover:bg-surface-secondary dark:hover:bg-white/[0.04]',
                 'text-text dark:text-text-dark transition-colors',
             )}
         >
             <FolderOpen className="w-3 h-3 text-primary dark:text-primary-400 shrink-0" />
-            <span className="font-medium">{data.name}</span>
-            <ExternalLink className="w-2.5 h-2.5 text-text-muted ml-auto shrink-0" />
-        </a>
+            <span className="flex-1 min-w-0 truncate font-medium">{data.name}</span>
+            <ExternalLink className="w-2.5 h-2.5 text-text-muted shrink-0" />
+        </Link>
     );
 }
 
@@ -163,30 +197,132 @@ function Stats({ output }: { output: unknown }) {
 
 function GitConnection({ output }: { output: unknown }) {
     const t = useTranslations('dashboard.aiChat');
-    const data = output as { connected?: boolean; username?: string; setupUrl?: string };
+    const data = output as {
+        connected?: boolean;
+        username?: string;
+        providerId?: string;
+        availableProviders?: Array<{ id: string; name: string }>;
+        setupUrl?: string;
+    };
+    const pathname = usePathname();
+    const [pendingId, setPendingId] = useState<string | null>(null);
+    const [, startTransition] = useTransition();
+
     if (!data) return null;
 
+    if (data.connected) {
+        return (
+            <div className="flex items-center gap-1.5 mt-1 text-[11px] text-success">
+                <Check className="w-3 h-3" />
+                <span>
+                    {t('gitConnectedAs', {
+                        username: data.username ?? '',
+                        provider: data.providerId ?? '',
+                    })}
+                </span>
+            </div>
+        );
+    }
+
+    const handleConnect = (providerId: string) => {
+        setPendingId(providerId);
+        startTransition(async () => {
+            const result = await connectOAuthProvider(providerId, pathname);
+            if (result.success && result.url) {
+                window.location.href = result.url;
+            } else {
+                toast.error(result.error || 'Failed to connect');
+                setPendingId(null);
+            }
+        });
+    };
+
+    const providers = data.availableProviders?.length
+        ? data.availableProviders
+        : [{ id: 'github', name: 'GitHub' }];
+
     return (
-        <div
-            className={cn(
-                'flex items-center gap-1.5 mt-1 text-[11px]',
-                data.connected ? 'text-success' : 'text-warning',
-            )}
-        >
-            {data.connected ? (
-                <>
-                    <Check className="w-3 h-3" />
-                    <span>
-                        Connected as <strong>{data.username}</strong>
-                    </span>
-                </>
-            ) : (
-                <>
-                    <GitBranch className="w-3 h-3" />
-                    <a href={data.setupUrl} className="underline">
-                        {t('notConfigured')}
-                    </a>
-                </>
+        <div className="mt-2 p-3 rounded-lg border border-warning/20 bg-warning/5">
+            <div className="flex items-center gap-2 mb-2">
+                <GitBranch className="w-4 h-4 text-warning" />
+                <span className="text-xs font-medium text-text dark:text-text-dark">
+                    {t('gitNotConnected')}
+                </span>
+            </div>
+            <p className="text-[11px] text-text-muted dark:text-text-muted-dark mb-3">
+                {t('gitNotConnectedDesc')}
+            </p>
+            <div className="flex flex-wrap gap-2">
+                {providers.map((provider) => (
+                    <button
+                        key={provider.id}
+                        onClick={() => handleConnect(provider.id)}
+                        disabled={pendingId !== null}
+                        className={cn(
+                            'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer',
+                            provider.id === 'github'
+                                ? 'bg-github text-white hover:bg-github/90'
+                                : 'bg-primary text-white hover:bg-primary-hover',
+                            'transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+                        )}
+                    >
+                        {pendingId === provider.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : provider.id === 'github' ? (
+                            <Github className="w-3 h-3" />
+                        ) : (
+                            <GitBranch className="w-3 h-3" />
+                        )}
+                        {provider.name}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function DeployConnection({ output }: { output: unknown }) {
+    const t = useTranslations('dashboard.aiChat');
+    const data = output as {
+        configured?: boolean;
+        available?: boolean;
+        providerId?: string;
+        providers?: Array<{ id: string; name: string }>;
+        setupUrl?: string;
+    };
+    if (!data) return null;
+
+    if (data.configured) {
+        return (
+            <div className="flex items-center gap-1.5 mt-1 text-[11px] text-success">
+                <Check className="w-3 h-3" />
+                <span>{t('deployConfigured', { provider: data.providerId || '' })}</span>
+            </div>
+        );
+    }
+
+    return (
+        <div className="mt-2 p-3 rounded-lg border border-warning/20 bg-warning/5">
+            <div className="flex items-center gap-2 mb-2">
+                <ExternalLink className="w-4 h-4 text-warning" />
+                <span className="text-xs font-medium text-text dark:text-text-dark">
+                    {t('deployNotConfigured')}
+                </span>
+            </div>
+            <p className="text-[11px] text-text-muted dark:text-text-muted-dark mb-2">
+                {t('deployNotConfiguredDesc')}
+            </p>
+            {data.setupUrl && (
+                <Link
+                    href={data.setupUrl}
+                    className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium',
+                        'bg-primary text-white hover:bg-primary-hover transition-colors',
+                    )}
+                >
+                    <ExternalLink className="w-3 h-3" />
+                    {t('configureDeployProvider')}
+                </Link>
             )}
         </div>
     );

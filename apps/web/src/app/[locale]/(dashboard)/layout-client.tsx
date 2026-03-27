@@ -15,18 +15,28 @@ import { useSidebarPersistence } from '@/lib/hooks/use-sidebar-persistence';
 interface DashboardLayoutClientProps {
     user: AuthUser;
     children: React.ReactNode;
+    initialChatOpen?: boolean;
 }
 
-export function DashboardLayoutClient({ user, children }: DashboardLayoutClientProps) {
+export function DashboardLayoutClient({
+    user,
+    children,
+    initialChatOpen = false,
+}: DashboardLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [helpOpen, setHelpOpen] = useState(false);
-    const [chatOpen, setChatOpen] = useState(true);
+    const [chatOpen, setChatOpenRaw] = useState(initialChatOpen);
+
+    const setChatOpen = useCallback((value: boolean) => {
+        setChatOpenRaw(value);
+        document.cookie = `chat-panel-open=${value ? '1' : '0'}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+    }, []);
 
     const { sidebarCollapsed, handleSidebarCollapsedChange } = useSidebarPersistence();
 
     const openHelp = useCallback(() => setHelpOpen(true), []);
     const closeHelp = useCallback(() => setHelpOpen(false), []);
-    const toggleChat = useCallback(() => setChatOpen((v) => !v), []);
+    const toggleChat = useCallback(() => setChatOpen(!chatOpen), [chatOpen, setChatOpen]);
 
     useKeyboardShortcuts({ onOpenHelp: openHelp });
 

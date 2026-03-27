@@ -44,7 +44,7 @@ export function ChatWelcome({ onSuggestion }: ChatWelcomeProps) {
                 </p>
             </div>
 
-            <div className="flex flex-wrap gap-1.5 mb-6">
+            <div className="flex flex-wrap gap-1.5 mb-4">
                 {suggestionKeys.map((key) => {
                     const text = ts(key);
                     return (
@@ -67,6 +67,20 @@ export function ChatWelcome({ onSuggestion }: ChatWelcomeProps) {
                         </button>
                     );
                 })}
+                <button
+                    type="button"
+                    onClick={() => onSuggestion(t('feelingLucky'))}
+                    className={cn(
+                        'inline-flex items-center px-2.5 py-1.5 rounded-lg text-[11px] font-medium',
+                        'border border-primary/20 dark:border-primary/30',
+                        'bg-primary/5 dark:bg-primary/10',
+                        'text-primary dark:text-primary-400',
+                        'hover:bg-primary/10 dark:hover:bg-primary/20',
+                        'transition-all duration-150 cursor-pointer',
+                    )}
+                >
+                    {t('feelingLucky')}
+                </button>
             </div>
 
             <div className="grid grid-cols-2 gap-2.5 mt-auto">

@@ -86,3 +86,12 @@ export const navigate = tool({
         return { url, navigated: true };
     },
 });
+
+export const reloadPage = tool({
+    description:
+        'Reload the current page to reflect changes after an action (create, deploy, delete, etc.). Use after mutations.',
+    inputSchema: z.object({}),
+    execute: async () => {
+        return { action: 'reload' };
+    },
+});

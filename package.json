@@ -35,7 +35,7 @@
 		"test": "turbo test",
 		"type-check": "turbo type-check",
 		"clean": "turbo clean",
-		"format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\"",
+		"format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\" --log-level warn",
 		"format:check": "prettier --check \"**/*.{ts,tsx,jsx,json,css,md}\""
 	},
 	"keywords": [],

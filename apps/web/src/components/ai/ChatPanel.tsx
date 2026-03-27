@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { ChatInterface } from './ChatInterface';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -21,21 +22,28 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ open, onClose }: ChatPanelProps) {
+    // Skip transition on first render to avoid flash when restoring from localStorage
+    const hasMounted = useRef(false);
+    useEffect(() => {
+        requestAnimationFrame(() => {
+            hasMounted.current = true;
+        });
+    }, []);
+
     return (
         <div
             className={cn(
                 'relative h-full shrink-0',
-                'transition-[width] duration-250 ease-in-out',
+                hasMounted.current && 'transition-[width] duration-250 ease-in-out',
                 open ? 'w-95' : 'w-0',
             )}
         >
-            {/* Content container — clips content but not the toggle button */}
             <div
                 className={cn(
                     'absolute inset-0 flex flex-col overflow-hidden',
                     'bg-white dark:bg-surface-dark',
                     'border-r border-border dark:border-border-dark',
-                    'transition-opacity duration-250 ease-in-out',
+                    hasMounted.current && 'transition-opacity duration-250 ease-in-out',
                     open ? 'opacity-100' : 'opacity-0 pointer-events-none',
                 )}
             >
@@ -44,7 +52,6 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
                 </div>
             </div>
 
-            {/* Toggle button — outside overflow container */}
             {open && (
                 <button onClick={onClose} className={borderToggleClass}>
                     <ChevronLeft className="w-3 h-3" />

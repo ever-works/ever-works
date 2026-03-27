@@ -2369,17 +2369,27 @@
             "toolCompleted": "completed",
             "selectProvider": "Provider",
             "notConfigured": "Not configured",
+            "gitNotConnected": "Git provider not connected",
+            "gitNotConnectedDesc": "Connect your git provider to create and manage directories.",
+            "connectGithub": "Connect GitHub",
+            "gitConnectedAs": "Connected as {username} via {provider}",
+            "deployNotConfigured": "Deploy provider not configured",
+            "deployNotConfiguredDesc": "Configure a deployment provider to publish your directory websites.",
+            "configureDeployProvider": "Configure Deploy Provider",
+            "deployConfigured": "Deploy provider configured ({provider})",
+            "opened": "Opened",
             "historyEmpty": "No conversations yet. Start a chat to see your history here.",
             "historyUntitled": "Untitled conversation",
             "historyToday": "Today",
             "historyYesterday": "Yesterday",
             "historyDaysAgo": "{days}d ago",
             "suggestions": {
-                "s1": "Create a directory of AI tools",
-                "s2": "List top SaaS products in 2026",
-                "s3": "Build a developer resources hub",
-                "s4": "Compare project management tools"
+                "s1": "Show my directories",
+                "s2": "Create a directory of AI tools",
+                "s3": "Check my git connection",
+                "s4": "Show my stats"
             },
+            "feelingLucky": "Suggest a directory to create",
             "errors": {
                 "unableToSend": "Unable to send message"
             }

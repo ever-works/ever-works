@@ -20,25 +20,27 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
     const isWaitingForResponse = isStreaming && lastMessage?.role === 'user';
 
     return (
-        <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 relative">
-            <div ref={contentRef} className="px-4 py-3 space-y-3">
-                {messages.map((message, index) => (
-                    <ChatMessage
-                        key={message.id}
-                        message={message}
-                        isStreaming={isStreaming}
-                        isLastMessage={index === messages.length - 1}
-                    />
-                ))}
+        <div className="flex-1 min-h-0 relative">
+            <div ref={scrollRef} className="h-full overflow-y-auto">
+                <div ref={contentRef} className="px-4 py-3 space-y-3">
+                    {messages.map((message, index) => (
+                        <ChatMessage
+                            key={message.id}
+                            message={message}
+                            isStreaming={isStreaming}
+                            isLastMessage={index === messages.length - 1}
+                        />
+                    ))}
 
-                {isWaitingForResponse && <StreamingIndicator label={t('thinking')} />}
+                    {isWaitingForResponse && <StreamingIndicator label={t('thinking')} />}
+                </div>
             </div>
 
             {!isAtBottom && (
                 <button
                     onClick={() => scrollToBottom()}
                     className={cn(
-                        'absolute bottom-3 left-1/2 -translate-x-1/2',
+                        'absolute bottom-3 left-1/2 -translate-x-1/2 z-10',
                         'flex items-center justify-center w-8 h-8 rounded-full',
                         'bg-white dark:bg-surface-dark',
                         'border border-border dark:border-white/10',

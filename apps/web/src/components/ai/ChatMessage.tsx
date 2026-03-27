@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { cn } from '@/lib/utils/cn';
 import type { UIMessage } from '@ai-sdk/react';
 import { isToolUIPart } from 'ai';
@@ -11,16 +12,14 @@ interface ChatMessageProps {
     isLastMessage: boolean;
 }
 
-export function ChatMessage({ message, isStreaming, isLastMessage }: ChatMessageProps) {
+function ChatMessageInner({ message, isStreaming, isLastMessage }: ChatMessageProps) {
     const isUser = message.role === 'user';
     const isMessageStreaming = message.role === 'assistant' && isStreaming && isLastMessage;
 
-    // Check if message has any visible content
     const hasVisibleContent = message.parts.some(
         (part) => (part.type === 'text' && part.text?.trim()) || isToolUIPart(part),
     );
 
-    // Don't render empty assistant messages (e.g., intermediate tool-call-only steps)
     if (!isUser && !hasVisibleContent && !isMessageStreaming) {
         return null;
     }
@@ -49,3 +48,12 @@ export function ChatMessage({ message, isStreaming, isLastMessage }: ChatMessage
         </div>
     );
 }
+
+export const ChatMessage = memo(ChatMessageInner, (prev, next) => {
+    // Only re-render if the message itself changed or streaming state relevant to this message changed
+    if (prev.message !== next.message) return false;
+    if (prev.isLastMessage !== next.isLastMessage) return false;
+    // Only care about isStreaming if this is the last message
+    if (next.isLastMessage && prev.isStreaming !== next.isStreaming) return false;
+    return true;
+});

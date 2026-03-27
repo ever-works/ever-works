@@ -15,12 +15,14 @@ export async function POST(request: Request) {
         return new Response('Unauthorized', { status: 401 });
     }
 
-    const { messages, providerOverride, directoryId, conversationId } = (await request.json()) as {
-        messages: UIMessage[];
-        providerOverride: string;
-        directoryId?: string;
-        conversationId?: string;
-    };
+    const { messages, providerOverride, directoryId, conversationId, currentPageUrl } =
+        (await request.json()) as {
+            messages: UIMessage[];
+            providerOverride: string;
+            directoryId?: string;
+            conversationId?: string;
+            currentPageUrl?: string;
+        };
 
     if (!providerOverride) {
         return new Response('providerOverride is required', { status: 400 });
@@ -32,6 +34,7 @@ export async function POST(request: Request) {
         providerOverride,
         directoryId,
         conversationId,
+        currentPageUrl,
     });
 
     return result.toUIMessageStreamResponse();

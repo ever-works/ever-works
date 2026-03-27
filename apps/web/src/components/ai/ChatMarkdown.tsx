@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils/cn';
@@ -26,10 +27,12 @@ const markdownClass = cn(
     'text-xs',
 );
 
-export function ChatMarkdown({ content }: ChatMarkdownProps) {
+const remarkPlugins = [remarkGfm];
+
+export const ChatMarkdown = memo(function ChatMarkdown({ content }: ChatMarkdownProps) {
     return (
         <div className={markdownClass}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={remarkPlugins}>{content}</ReactMarkdown>
         </div>
     );
-}
+});
