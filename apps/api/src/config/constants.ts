@@ -122,7 +122,9 @@ export const config = {
 
     betterAuth: {
         secret: () => process.env.BETTER_AUTH_SECRET || process.env.AUTH_SECRET,
-        url: () => process.env.BETTER_AUTH_URL || 'http://localhost:3100',
+        // BetterAuth's public URL must match the browser-facing origin because
+        // OAuth routes are exposed through the Next.js proxy on the web host.
+        url: () => process.env.BETTER_AUTH_URL || config.webAppUrl(),
     },
 
     directory: {

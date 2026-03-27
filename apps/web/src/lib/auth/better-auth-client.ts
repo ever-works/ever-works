@@ -1,8 +1,11 @@
 import { createAuthClient } from 'better-auth/react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3100';
+const WEB_URL =
+    process.env.NEXT_PUBLIC_WEB_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 export const authClient = createAuthClient({
-    baseURL: API_URL,
+    // Use the Next.js app as the public BetterAuth origin and proxy requests to the API.
+    // This avoids browser-side cross-origin OAuth initiation issues and keeps cookies same-origin.
+    baseURL: WEB_URL,
     basePath: '/api/auth/better-auth',
 });

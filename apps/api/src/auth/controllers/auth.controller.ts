@@ -24,6 +24,7 @@ import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/emai
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { SessionAuthGuard } from '../guards/session-auth.guard';
 import { Public } from '../decorators/public.decorator';
 
 @ApiTags('Auth')
@@ -98,7 +99,7 @@ export class AuthController {
         return this.authService.logoutAllDevices(req.user.userId);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(SessionAuthGuard)
     @Get('profile')
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
@@ -110,7 +111,7 @@ export class AuthController {
         return req.user;
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(SessionAuthGuard)
     @Get('profile/fresh')
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({

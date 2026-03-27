@@ -1,12 +1,13 @@
 import 'server-only';
 import { jwtDecode } from 'jwt-decode';
-import { getAuthAccessCookie, getBetterAuthSessionCookie } from './cookies';
+import { getAuthAccessCookie, getBetterAuthCookieHeader, hasBetterAuthCookie } from './cookies';
 import { API_URL } from '../constants';
 
 export type AuthUser = {
     sub: string;
     email: string;
     provider: string;
+    connectedProviders?: string[];
     username: string;
     emailVerified: boolean;
     isActive: boolean;
@@ -26,12 +27,12 @@ export async function getAuthFromRequest(): Promise<{
     isExpired: boolean;
     token?: string;
 }> {
-    // Check if BetterAuth session cookie exists
-    const baSessionToken = await getBetterAuthSessionCookie();
+    // Check if any BetterAuth auth cookie exists
+    const hasBaCookie = await hasBetterAuthCookie();
 
-    if (baSessionToken) {
+    if (hasBaCookie) {
         // Validate BetterAuth session via API
-        const baUser = await getBetterAuthSessionFromAPI(baSessionToken);
+        const baUser = await getBetterAuthSessionFromAPI();
         if (baUser) {
             return {
                 isAuthenticated: true,
@@ -67,12 +68,17 @@ export async function getAuthFromRequest(): Promise<{
  * Validate BetterAuth session by calling the API's session endpoint.
  * Returns the AuthUser if valid, null otherwise.
  */
-async function getBetterAuthSessionFromAPI(sessionToken: string): Promise<AuthUser | null> {
+async function getBetterAuthSessionFromAPI(): Promise<AuthUser | null> {
     try {
-        const response = await fetch(`${API_URL}/auth/better-auth/get-session`, {
+        const cookieHeader = await getBetterAuthCookieHeader();
+        if (!cookieHeader) {
+            return null;
+        }
+
+        const response = await fetch(`${API_URL}/auth/profile/fresh`, {
             method: 'GET',
             headers: {
-                Cookie: `better-auth.session_token=${sessionToken}`,
+                Cookie: cookieHeader,
             },
             cache: 'no-store',
         });
@@ -80,17 +86,19 @@ async function getBetterAuthSessionFromAPI(sessionToken: string): Promise<AuthUs
         if (!response.ok) return null;
 
         const data = await response.json();
-        if (!data?.user) return null;
-
-        // Map BetterAuth user to AuthUser shape
         return {
-            sub: data.user.id,
-            email: data.user.email,
-            provider: 'betterauth',
-            username: data.user.name || data.user.email.split('@')[0],
-            emailVerified: data.user.emailVerified || false,
-            isActive: true,
-            avatar: data.user.image || null,
+            sub: data.id,
+            email: data.email,
+            provider: data.registrationProvider || 'local',
+            connectedProviders: Array.isArray(data.oauthTokens)
+                ? data.oauthTokens
+                      .map((token: { provider?: string }) => token.provider)
+                      .filter((provider: string | undefined): provider is string => !!provider)
+                : [],
+            username: data.username || data.email.split('@')[0],
+            emailVerified: data.emailVerified || false,
+            isActive: data.isActive ?? true,
+            avatar: data.avatar || null,
         };
     } catch {
         return null;

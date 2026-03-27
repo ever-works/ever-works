@@ -83,7 +83,12 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
             </div>
 
             <HelpDrawer open={helpOpen} onClose={closeHelp} />
-            <ConnectGithubModal hasGithubConnected={user.provider === 'github'} />
+            <ConnectGithubModal
+                hasGithubConnected={
+                    user.provider === 'github' ||
+                    user.connectedProviders?.includes('github') === true
+                }
+            />
         </>
     );
 }

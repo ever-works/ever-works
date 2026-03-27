@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { authClient } from '@/lib/auth/better-auth-client';
+import { usePathname } from '@/i18n/navigation';
 import {
     Dialog,
     DialogContent,
@@ -17,9 +17,15 @@ const DISMISS_KEY = 'github_connect_dismissed';
 interface ConnectGithubModalProps {
     hasGithubConnected: boolean;
 }
+type LinkSocialResponse = {
+    url?: string;
+    redirect?: boolean;
+    status?: boolean;
+};
 
 export function ConnectGithubModal({ hasGithubConnected }: ConnectGithubModalProps) {
     const t = useTranslations('dashboard.connectGithub');
+    const pathname = usePathname();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -35,7 +41,31 @@ export function ConnectGithubModal({ hasGithubConnected }: ConnectGithubModalPro
     const handleConnect = async () => {
         setLoading(true);
         try {
-            await authClient.signIn.social({ provider: 'github', callbackURL: `${window.location.origin}/dashboard` });
+            const callbackURL = `${window.location.origin}${pathname}`;
+            const response = await fetch('/api/auth/better-auth/link-social', {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    provider: 'github',
+                    callbackURL,
+                    disableRedirect: true,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to start GitHub linking flow (${response.status})`);
+            }
+
+            const data = (await response.json()) as LinkSocialResponse;
+
+            if (!data.url) {
+                throw new Error('BetterAuth did not return a GitHub authorization URL');
+            }
+
+            window.location.assign(data.url);
         } catch (error) {
             console.error('Failed to connect GitHub:', error);
             setLoading(false);
