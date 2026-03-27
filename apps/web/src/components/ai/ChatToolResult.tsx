@@ -14,11 +14,57 @@ interface ChatToolResultProps {
     output?: unknown;
 }
 
+// ── Tool output types ───────────────────────────────────────────
+
+interface NavigateOutput {
+    url?: string;
+    navigated?: boolean;
+}
+
+interface DirectoryListOutput {
+    directories?: Array<{ id: string; name: string; itemsCount: number; url: string }>;
+    total?: number;
+}
+
+interface DirectoryDetailOutput {
+    name?: string;
+    description?: string;
+    url?: string;
+}
+
+interface StatsOutput {
+    totalDirectories?: number;
+    totalItems?: number;
+    activeWebsites?: number;
+}
+
+interface GitConnectionOutput {
+    connected?: boolean;
+    username?: string;
+    providerId?: string;
+    availableProviders?: Array<{ id: string; name: string }>;
+    setupUrl?: string;
+}
+
+interface DeployConnectionOutput {
+    configured?: boolean;
+    available?: boolean;
+    providerId?: string;
+    providers?: Array<{ id: string; name: string }>;
+    setupUrl?: string;
+}
+
+interface GenericToolOutput {
+    success?: boolean;
+    error?: string;
+}
+
 const LABELS: Record<string, string> = {
     listDirectories: 'Fetching directories',
     getDirectoryDetails: 'Loading directory',
     getStats: 'Loading stats',
     getDirectoryItemsSummary: 'Loading items summary',
+    getDirectoryConfig: 'Loading config',
     getGenerationHistory: 'Loading history',
     getScheduleStatus: 'Checking schedule',
     syncDirectory: 'Syncing directory',
@@ -58,7 +104,7 @@ export function ChatToolResult({ toolName, state, output }: ChatToolResultProps)
     useEffect(() => {
         if (!isDone || !output) return;
         if (toolName === 'navigate') {
-            const data = output as { url?: string };
+            const data = output as NavigateOutput;
             if (data.url) router.push(data.url);
         }
         if (toolName === 'reloadPage') {
@@ -84,7 +130,7 @@ export function ChatToolResult({ toolName, state, output }: ChatToolResultProps)
 
     // Navigate — show a brief confirmation, useEffect handles the redirect
     if (toolName === 'navigate') {
-        const data = output as { url?: string };
+        const data = output as NavigateOutput;
         return data?.url ? (
             <Link
                 href={data.url}
@@ -107,8 +153,26 @@ export function ChatToolResult({ toolName, state, output }: ChatToolResultProps)
             return <GitConnection output={output} />;
         case 'checkDeployConnection':
             return <DeployConnection output={output} />;
-        default:
-            return null;
+        default: {
+            // Generic completed indicator for tools without custom UI
+            const label = LABELS[toolName];
+            if (!label) return null;
+            const data = output as GenericToolOutput | null;
+            if (data?.error) {
+                return (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-danger">
+                        <ExternalLink className="w-2.5 h-2.5" />
+                        {data.error}
+                    </span>
+                );
+            }
+            return (
+                <span className="inline-flex items-center gap-1 text-[10px] text-success">
+                    <Check className="w-2.5 h-2.5" />
+                    {label}
+                </span>
+            );
+        }
     }
 }
 
@@ -117,9 +181,7 @@ export function ChatToolResult({ toolName, state, output }: ChatToolResultProps)
 // ────────────────────────────────────────────────────────────────
 
 function DirectoryList({ output }: { output: unknown }) {
-    const data = output as {
-        directories?: Array<{ id: string; name: string; itemsCount: number; url: string }>;
-    };
+    const data = output as DirectoryListOutput;
     if (!data?.directories?.length) return null;
 
     return (
@@ -147,7 +209,7 @@ function DirectoryList({ output }: { output: unknown }) {
 }
 
 function DirectoryDetail({ output }: { output: unknown }) {
-    const data = output as { name?: string; description?: string; url?: string };
+    const data = output as DirectoryDetailOutput;
     if (!data?.name || !data.url) return null;
 
     return (
@@ -167,11 +229,7 @@ function DirectoryDetail({ output }: { output: unknown }) {
 }
 
 function Stats({ output }: { output: unknown }) {
-    const data = output as {
-        totalDirectories?: number;
-        totalItems?: number;
-        activeWebsites?: number;
-    };
+    const data = output as StatsOutput;
     if (!data) return null;
 
     return (
@@ -197,13 +255,7 @@ function Stats({ output }: { output: unknown }) {
 
 function GitConnection({ output }: { output: unknown }) {
     const t = useTranslations('dashboard.aiChat');
-    const data = output as {
-        connected?: boolean;
-        username?: string;
-        providerId?: string;
-        availableProviders?: Array<{ id: string; name: string }>;
-        setupUrl?: string;
-    };
+    const data = output as GitConnectionOutput;
     const pathname = usePathname();
     const [pendingId, setPendingId] = useState<string | null>(null);
     const [, startTransition] = useTransition();
@@ -283,13 +335,7 @@ function GitConnection({ output }: { output: unknown }) {
 
 function DeployConnection({ output }: { output: unknown }) {
     const t = useTranslations('dashboard.aiChat');
-    const data = output as {
-        configured?: boolean;
-        available?: boolean;
-        providerId?: string;
-        providers?: Array<{ id: string; name: string }>;
-        setupUrl?: string;
-    };
+    const data = output as DeployConnectionOutput;
     if (!data) return null;
 
     if (data.configured) {

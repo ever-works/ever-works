@@ -122,6 +122,22 @@ export const getScheduleStatus = tool({
     },
 });
 
+export const getDirectoryConfig = tool({
+    description:
+        'Get directory configuration — metadata, initial prompt, generation settings, website config.',
+    inputSchema: z.object({
+        directoryId: z.string().describe('Directory ID'),
+    }),
+    execute: async ({ directoryId }) => {
+        try {
+            const result = await directoryAPI.getConfig(directoryId);
+            return { success: true, config: result.config };
+        } catch {
+            return { success: false, error: 'Failed to fetch config' };
+        }
+    },
+});
+
 // ────────────────────────────────────────────────────────────────
 // Create
 // ────────────────────────────────────────────────────────────────

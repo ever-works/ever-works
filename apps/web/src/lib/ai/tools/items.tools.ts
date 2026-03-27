@@ -8,6 +8,7 @@ import {
     checkItemHealth,
 } from '@/app/actions/dashboard/items';
 import { generateItems, regenerateMarkdown } from '@/app/actions/dashboard/generator';
+import { directoryAPI } from '@/lib/api/directory';
 
 export const addItemTool = tool({
     description: 'Add a single item to a directory from a URL. Extracts details automatically.',
@@ -54,32 +55,6 @@ export const removeItemTool = tool({
     },
 });
 
-export const generateItemsTool = tool({
-    description: [
-        'Generate items for a directory using AI. Requires git provider connection.',
-        'This starts a background generation job — navigate to the generator page to see progress.',
-    ].join(' '),
-    inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
-        prompt: z
-            .string()
-            .describe('What items to generate (e.g., "Top 20 AI tools for developers")'),
-    }),
-    execute: async ({ directoryId, prompt }) => {
-        const result = await generateItems(directoryId, {
-            name: '',
-            prompt,
-            generation_method: undefined,
-        });
-        return {
-            success: result.success,
-            message: result.message,
-            error: result.error,
-            requiresGitProvider: result.requiresGitProvider,
-        };
-    },
-});
-
 export const updateItemTool = tool({
     description:
         'Update an item — toggle featured status, change source URL, or set display order.',
@@ -98,6 +73,54 @@ export const updateItemTool = tool({
             order,
         });
         return { success: result.status === 'success', message: result.message };
+    },
+});
+
+export const generateItemsTool = tool({
+    description: [
+        'Generate or regenerate items for a directory using AI.',
+        'For retries: prompt is optional — auto-fetches the original prompt from directory config.',
+        'For new generation: prompt is required.',
+        'Requires git provider connection.',
+    ].join(' '),
+    inputSchema: z.object({
+        directoryId: z
+            .string()
+            .describe('Directory ID — extract from current page URL or listDirectories'),
+        prompt: z
+            .string()
+            .optional()
+            .describe('What to generate. If omitted, reuses the original prompt.'),
+    }),
+    execute: async ({ directoryId, prompt }) => {
+        const [dirResponse, configResponse] = await Promise.all([
+            directoryAPI.get(directoryId).catch(() => null),
+            directoryAPI.getConfig(directoryId).catch(() => null),
+        ]);
+
+        const directoryName = dirResponse?.directory?.name ?? '';
+        const existingPrompt = configResponse?.config?.metadata?.initial_prompt;
+        const resolvedPrompt = prompt || existingPrompt || '';
+
+        if (!resolvedPrompt) {
+            return {
+                success: false,
+                error: 'No prompt provided and no previous prompt found. Please provide a prompt.',
+            };
+        }
+
+        const result = await generateItems(directoryId, {
+            name: directoryName,
+            prompt: resolvedPrompt,
+            generation_method: undefined,
+        });
+
+        return {
+            success: result.success,
+            message: result.message,
+            error: result.error,
+            requiresGitProvider: result.requiresGitProvider,
+        };
     },
 });
 

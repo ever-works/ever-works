@@ -3,6 +3,7 @@ import {
     getDirectoryDetails,
     getStats,
     getDirectoryItemsSummary,
+    getDirectoryConfig,
     getGenerationHistory,
     getScheduleStatus,
     createDirectoryManual,
@@ -37,6 +38,7 @@ export const chatTools = {
     getDirectoryDetails,
     getStats,
     getDirectoryItemsSummary,
+    getDirectoryConfig,
     getGenerationHistory,
     getScheduleStatus,
 
