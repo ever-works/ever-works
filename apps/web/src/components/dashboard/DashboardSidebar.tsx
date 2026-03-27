@@ -439,7 +439,7 @@ export function DashboardSidebar({
                                 </div>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent side="top" align="start" className="w-56 bg-white">
-                                <DropdownMenuLabel className='cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark'>
+                                <DropdownMenuLabel className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark">
                                     <p className="truncate">{user.username}</p>
                                     <p className="text-xs font-normal text-text-muted dark:text-text-muted-dark truncate">
                                         {user.email}
@@ -448,7 +448,7 @@ export function DashboardSidebar({
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                     onClick={() => router.push(ROUTES.DASHBOARD_SETTINGS)}
-                                    className='cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark'
+                                    className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
                                 >
                                     <Settings className="w-4 h-4 mr-2 shrink-0" />
                                     {t('profileMenu.accountSettings')}
@@ -457,7 +457,7 @@ export function DashboardSidebar({
                                     onClick={() => {
                                         window.open('https://docs.ever.works', '_blank');
                                     }}
-                                    className='cursor-pointer px-3 rounded-sm hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark'
+                                    className="cursor-pointer px-3 rounded-sm hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
                                 >
                                     <HelpCircle className="w-4 h-4 mr-2 shrink-0" />
                                     {t('profileMenu.helpDocs')}
@@ -469,12 +469,16 @@ export function DashboardSidebar({
                                             '_blank',
                                         );
                                     }}
-                                    className='cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark'
+                                    className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
                                 >
                                     <MessageSquare className="w-4 h-4 mr-2 shrink-0" />
                                     {t('profileMenu.support')}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={onOpenHelp} disabled={!onOpenHelp} className='cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark'>
+                                <DropdownMenuItem
+                                    onClick={onOpenHelp}
+                                    disabled={!onOpenHelp}
+                                    className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
+                                >
                                     <Keyboard className="w-4 h-4 mr-2 shrink-0" />
                                     {t('profileMenu.keyboardShortcuts')}
                                 </DropdownMenuItem>
