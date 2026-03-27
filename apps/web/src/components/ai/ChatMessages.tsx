@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { useStickToBottom } from 'use-stick-to-bottom';
 import { useTranslations } from 'next-intl';
@@ -18,6 +19,15 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
 
     const lastMessage = messages[messages.length - 1];
     const isWaitingForResponse = isStreaming && lastMessage?.role === 'user';
+
+    // Scroll to bottom when user sends a message
+    const prevCountRef = useRef(messages.length);
+    useEffect(() => {
+        if (messages.length > prevCountRef.current) {
+            scrollToBottom();
+        }
+        prevCountRef.current = messages.length;
+    }, [messages.length, scrollToBottom]);
 
     return (
         <div className="flex-1 min-h-0 relative">

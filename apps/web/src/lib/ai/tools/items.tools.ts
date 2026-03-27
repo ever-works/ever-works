@@ -9,6 +9,7 @@ import {
 } from '@/app/actions/dashboard/items';
 import { generateItems, regenerateMarkdown } from '@/app/actions/dashboard/generator';
 import { directoryAPI } from '@/lib/api/directory';
+import { resolveGenerationConfig } from './utils';
 
 export const addItemTool = tool({
     description: 'Add a single item to a directory from a URL. Extracts details automatically.',
@@ -78,21 +79,25 @@ export const updateItemTool = tool({
 
 export const generateItemsTool = tool({
     description: [
-        'Generate or regenerate items for a directory using AI.',
-        'For retries: prompt is optional — auto-fetches the original prompt from directory config.',
-        'For new generation: prompt is required.',
+        'Generate or regenerate items for a directory.',
+        'For first-time: call listAvailablePipelines first to let user choose pipeline and providers.',
+        'For retries: just pass directoryId — reuses the previous config automatically.',
         'Requires git provider connection.',
     ].join(' '),
     inputSchema: z.object({
-        directoryId: z
-            .string()
-            .describe('Directory ID — extract from current page URL or listDirectories'),
+        directoryId: z.string().describe('Directory ID'),
         prompt: z
             .string()
             .optional()
             .describe('What to generate. If omitted, reuses the original prompt.'),
+        providers: z
+            .record(z.string())
+            .optional()
+            .describe(
+                'Provider selections from user (e.g., { pipeline: "sim-ai", ai: "openrouter" }). Pass what the user chose from listAvailablePipelines.',
+            ),
     }),
-    execute: async ({ directoryId, prompt }) => {
+    execute: async ({ directoryId, prompt, providers: userProviders }) => {
         const [dirResponse, configResponse] = await Promise.all([
             directoryAPI.get(directoryId).catch(() => null),
             directoryAPI.getConfig(directoryId).catch(() => null),
@@ -109,10 +114,24 @@ export const generateItemsTool = tool({
             };
         }
 
+        // For retries: reuse last config. For new: use user choices or resolve defaults.
+        const lastRequest = configResponse?.config?.metadata?.last_request_data;
+        const resolvedProviders = userProviders ?? lastRequest?.providers;
+        const resolvedPluginConfig = lastRequest?.pluginConfig;
+
+        // If no providers at all, resolve defaults
+        let finalProviders = resolvedProviders;
+        if (!finalProviders) {
+            const genConfig = await resolveGenerationConfig(directoryId);
+            finalProviders = genConfig.providers;
+        }
+
         const result = await generateItems(directoryId, {
             name: directoryName,
             prompt: resolvedPrompt,
             generation_method: undefined,
+            providers: finalProviders,
+            pluginConfig: resolvedPluginConfig,
         });
 
         return {

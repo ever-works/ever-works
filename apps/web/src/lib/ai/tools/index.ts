@@ -15,6 +15,7 @@ import {
     syncDirectory,
 } from './directory.tools';
 import { checkGitConnection, listGitProviders } from './git.tools';
+import { listAvailablePipelines } from './providers.tools';
 import { navigate, reloadPage } from './navigation.tools';
 import {
     checkDeployConnection,
@@ -57,6 +58,7 @@ export const chatTools = {
     checkGitConnection,
     checkDeployConnection,
     listGitProviders,
+    listAvailablePipelines,
 
     // Items
     addItem: addItemTool,

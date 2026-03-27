@@ -13,6 +13,7 @@ import {
     analyzeRepository,
     importDirectory,
 } from '@/app/actions/dashboard/directories';
+import { resolveGenerationConfig } from './utils';
 
 // ────────────────────────────────────────────────────────────────
 // Read
@@ -38,8 +39,10 @@ export const listDirectories = tool({
                 name: d.name,
                 slug: d.slug,
                 itemsCount: d.itemsCount ?? 0,
-                status: d.generateStatus?.status ?? 'idle',
+                generateStatus: d.generateStatus?.status ?? 'idle',
+                generateWarnings: d.generateStatus?.warnings ?? [],
                 gitProvider: d.gitProvider,
+                deployProvider: d.deployProvider,
                 url: ROUTES.DASHBOARD_DIRECTORY(d.id),
             })),
             total: result.total,
@@ -61,7 +64,8 @@ export const getDirectoryDetails = tool({
             slug: directory.slug,
             description: directory.description,
             itemsCount: directory.itemsCount ?? 0,
-            status: directory.generateStatus?.status ?? 'idle',
+            generateStatus: directory.generateStatus?.status ?? 'idle',
+            generateWarnings: directory.generateStatus?.warnings ?? [],
             gitProvider: directory.gitProvider,
             deployProvider: directory.deployProvider,
             url: ROUTES.DASHBOARD_DIRECTORY(directory.id),
@@ -175,18 +179,37 @@ export const createDirectoryManual = tool({
 export const createDirectoryWithAITool = tool({
     description: [
         'Create a directory AND generate content using AI.',
-        'Provide a prompt describing what the directory should contain.',
-        'REQUIRES git provider — call checkGitConnection first.',
+        'BEFORE calling: call checkGitConnection, then listAvailablePipelines to let user choose pipeline/providers.',
+        'Pass user provider choices. If not provided, uses defaults.',
     ].join(' '),
     inputSchema: z.object({
         name: z.string().describe('Directory name'),
-        prompt: z
-            .string()
-            .describe('What the directory should contain (e.g., "Top 50 AI tools for developers")'),
+        prompt: z.string().describe('What the directory should contain'),
         gitProvider: z.string().describe('Git provider ID from checkGitConnection'),
+        deployProvider: z
+            .string()
+            .optional()
+            .describe('Deploy provider ID from checkDeployConnection'),
+        providers: z
+            .record(z.string())
+            .optional()
+            .describe(
+                'User-chosen providers from listAvailablePipelines (e.g., { pipeline: "sim-ai", ai: "openrouter" })',
+            ),
     }),
-    execute: async ({ name, prompt, gitProvider }) => {
-        const result = await createDirectoryWithAI({ name, prompt, gitProvider });
+    execute: async ({ name, prompt, gitProvider, deployProvider, providers: userProviders }) => {
+        // Resolve defaults, then override with user choices
+        const config = await resolveGenerationConfig();
+        const mergedProviders = userProviders ?? config.providers;
+
+        const result = await createDirectoryWithAI({
+            name,
+            prompt,
+            gitProvider,
+            deployProvider,
+            providers: mergedProviders,
+            pluginConfig: config.pluginConfig,
+        });
         return {
             success: result.success,
             directoryId: result.directory?.id,

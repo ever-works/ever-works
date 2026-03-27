@@ -71,6 +71,7 @@ const LABELS: Record<string, string> = {
     checkGitConnection: 'Checking git',
     checkDeployConnection: 'Checking deploy',
     listGitProviders: 'Checking providers',
+    listAvailablePipelines: 'Loading pipelines',
     createDirectoryManual: 'Creating directory',
     createDirectoryWithAI: 'Creating directory with AI',
     importDirectory: 'Importing directory',
