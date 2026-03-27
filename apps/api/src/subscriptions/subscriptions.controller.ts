@@ -9,7 +9,7 @@ import {
     UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { JwtAuthGuard, AuthService, CurrentUser } from '@src/auth';
+import { SessionAuthGuard, AuthService, CurrentUser } from '@src/auth';
 import { SubscriptionService } from '@ever-works/agent/subscriptions';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { SubscriptionPlanCode } from '@ever-works/agent/entities';
@@ -23,7 +23,7 @@ class UpdateSubscriptionPlanDto {
 @ApiTags('Subscriptions')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/subscriptions')
-@UseGuards(JwtAuthGuard)
+@UseGuards(SessionAuthGuard)
 export class SubscriptionsController {
     constructor(
         private readonly subscriptionService: SubscriptionService,

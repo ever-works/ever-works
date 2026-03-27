@@ -12,7 +12,7 @@ import {
     HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
-import { JwtAuthGuard, CurrentUser } from '../auth';
+import { SessionAuthGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { DirectoryOwnershipService } from '@ever-works/agent/services';
 import { PluginOperationsService } from '@ever-works/agent/plugins';
@@ -34,7 +34,7 @@ import { PluginValidationService } from './plugin-validation.service';
 @ApiTags('Plugins')
 @ApiBearerAuth('JWT-auth')
 @Controller('api')
-@UseGuards(JwtAuthGuard)
+@UseGuards(SessionAuthGuard)
 export class PluginsController {
     constructor(
         private readonly pluginsService: PluginOperationsService,

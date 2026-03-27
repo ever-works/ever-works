@@ -13,7 +13,7 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DirectoryMemberService } from '@ever-works/agent/services';
-import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
+import { AuthService, CurrentUser, SessionAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
@@ -23,7 +23,7 @@ import { config } from '../config/constants';
 @ApiTags('Members')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/directories/:directoryId/members')
-@UseGuards(JwtAuthGuard)
+@UseGuards(SessionAuthGuard)
 export class MembersController {
     constructor(
         private readonly memberService: DirectoryMemberService,
