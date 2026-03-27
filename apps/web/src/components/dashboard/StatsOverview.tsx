@@ -51,7 +51,7 @@ export function StatsOverview({
     ];
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-6">
             {statCards.map((stat) => (
                 <div
                     key={stat.title}

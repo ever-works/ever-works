@@ -138,7 +138,7 @@ export function ComparisonDetailClient({
                                         />
                                     )}
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 @lg/main:grid-cols-2 gap-4">
                                     <div>
                                         <div className="text-sm font-medium text-text dark:text-text-dark mb-1">
                                             {comparison.item_a_name}
@@ -217,11 +217,11 @@ export function ComparisonDetailClient({
                     <ul className="space-y-2">
                         {comparison.sources.map((source) => (
                             <li key={source.url}>
-                                <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-baseline sm:gap-2">
+                                <div className="flex flex-col gap-1 text-sm @sm/main:flex-row @sm/main:items-baseline @sm/main:gap-2">
                                     <span className="text-text dark:text-text-dark">
                                         {source.title}
                                     </span>
-                                    <span className="hidden text-text-secondary dark:text-text-secondary-dark sm:inline">
+                                    <span className="hidden text-text-secondary dark:text-text-secondary-dark @sm/main:inline">
                                         -
                                     </span>
                                     <a

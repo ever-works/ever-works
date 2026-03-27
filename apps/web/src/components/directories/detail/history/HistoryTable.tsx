@@ -296,7 +296,7 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                             )}
 
                                             {/* Changelog */}
-                                            <div className="grid gap-4 md:grid-cols-3">
+                                            <div className="grid gap-4 @lg/main:grid-cols-3">
                                                 <div>
                                                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
                                                         {t('detail.added')}

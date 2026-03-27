@@ -23,7 +23,7 @@ const GRID_ROW_HEIGHT = 200; // Approximate height for grid cards
 const LIST_ITEM_HEIGHT = 80; // Approximate height for list items
 const GAP = 16; // Gap between items (gap-4 = 16px)
 
-// Hook to get responsive column count
+// Hook to get responsive column count based on main content container width
 function useColumnCount(viewMode: 'grid' | 'list') {
     const [columns, setColumns] = useState(3);
 
@@ -33,20 +33,25 @@ function useColumnCount(viewMode: 'grid' | 'list') {
             return;
         }
 
+        const container = document.getElementById('main-content');
+        if (!container) return;
+
         const updateColumns = () => {
-            const width = window.innerWidth;
-            if (width >= 1024) {
-                setColumns(3); // lg:grid-cols-3
-            } else if (width >= 640) {
-                setColumns(2); // sm:grid-cols-2
+            const width = container.clientWidth;
+            if (width >= 768) {
+                setColumns(3);
+            } else if (width >= 480) {
+                setColumns(2);
             } else {
-                setColumns(1); // default single column
+                setColumns(1);
             }
         };
 
+        const observer = new ResizeObserver(updateColumns);
+        observer.observe(container);
         updateColumns();
-        window.addEventListener('resize', updateColumns);
-        return () => window.removeEventListener('resize', updateColumns);
+
+        return () => observer.disconnect();
     }, [viewMode]);
 
     return columns;
@@ -55,16 +60,32 @@ function useColumnCount(viewMode: 'grid' | 'list') {
 export function ItemsList({ items: initialItems, addItemRef }: ItemsListProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const [items, setItems] = useState(() => sortItems(initialItems));
-    const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const scrollContainerRef = useRef<HTMLElement | null>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
     const columns = useColumnCount(viewMode);
 
-    // Get scroll container reference (the main element)
+    // Read ?q= from URL for AI-driven search
+    const initialQuery =
+        typeof window !== 'undefined'
+            ? (new URLSearchParams(window.location.search).get('q') ?? '')
+            : '';
+    const [searchQuery, setSearchQuery] = useState(initialQuery);
+
     useEffect(() => {
         scrollContainerRef.current = document.getElementById('main-content');
     }, []);
+
+    // Handle ?q= param on mount
+    useEffect(() => {
+        if (initialQuery) {
+            searchInputRef.current?.focus();
+            const url = new URL(window.location.href);
+            url.searchParams.delete('q');
+            window.history.replaceState({}, '', url.toString());
+        }
+    }, [initialQuery]);
 
     // Expose addItem function via ref for parent components
     const handleAddItem = useCallback((newItem: ItemData) => {
@@ -125,7 +146,7 @@ export function ItemsList({ items: initialItems, addItemRef }: ItemsListProps) {
     return (
         <div className="space-y-6">
             {/* Search and Filter Bar */}
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col @sm/main:flex-row gap-4">
                 <div className="flex-1">
                     <Input
                         type="text"
@@ -276,7 +297,9 @@ function VirtualizedItemsList({
                         data-index={virtualRow.index}
                         className={cn(
                             'absolute top-0 left-0 w-full',
-                            viewMode === 'grid' ? 'grid sm:grid-cols-2 lg:grid-cols-3 gap-4' : '',
+                            viewMode === 'grid'
+                                ? 'grid @sm/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4'
+                                : '',
                         )}
                         style={{
                             transform: `translateY(${virtualRow.start - scrollMargin}px)`,

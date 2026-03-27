@@ -93,14 +93,14 @@ export function PluginCard({ plugin }: PluginCardProps) {
                             {optimisticEnabled ? (
                                 <>
                                     <PowerOff className="w-3 h-3" />
-                                    <span className="sr-only md:not-sr-only md:ml-1">
+                                    <span className="sr-only @lg/main:not-sr-only @lg/main:ml-1">
                                         {t('disable')}
                                     </span>
                                 </>
                             ) : (
                                 <>
                                     <Power className="w-3 h-3" />
-                                    <span className="sr-only md:not-sr-only md:ml-1">
+                                    <span className="sr-only @lg/main:not-sr-only @lg/main:ml-1">
                                         {t('enable')}
                                     </span>
                                 </>

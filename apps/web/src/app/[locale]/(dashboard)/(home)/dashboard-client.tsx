@@ -58,8 +58,8 @@ export default function DashboardClient({
                 activeWebsites={activeWebsites}
             />
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-                <div className="lg:col-span-3">
+            <div className="grid grid-cols-1 @3xl/main:grid-cols-3 gap-8 mt-8">
+                <div className="@3xl/main:col-span-3">
                     {hasDirectories ? (
                         <>
                             <div className="flex justify-between items-center mb-4">
