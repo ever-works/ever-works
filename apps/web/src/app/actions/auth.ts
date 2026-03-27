@@ -3,11 +3,13 @@
 import { z } from 'zod';
 import {
     removeAuthAccessCookies,
+    removeBetterAuthCookies,
+    getBetterAuthCookieHeader,
     getRefreshCookie,
     setOAuthStateCookie,
     setAuthCookies,
 } from '@/lib/auth';
-import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
+import { API_URL, ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
 import { VALIDATION_RULES } from './validation';
 import { authAPI, AuthResponse } from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
@@ -142,6 +144,17 @@ export async function register(username: string, email: string, password: string
 
 export async function logout() {
     try {
+        const betterAuthCookies = await getBetterAuthCookieHeader();
+        if (betterAuthCookies) {
+            await fetch(`${API_URL}/auth/better-auth/sign-out`, {
+                method: 'POST',
+                headers: {
+                    Cookie: betterAuthCookies,
+                },
+                cache: 'no-store',
+            });
+        }
+
         const refresh_token = await getRefreshCookie();
         if (refresh_token) {
             await authAPI.logout({ refreshToken: refresh_token });
@@ -150,7 +163,7 @@ export async function logout() {
         console.error(error);
     }
 
-    await removeAuthAccessCookies();
+    await Promise.all([removeAuthAccessCookies(), removeBetterAuthCookies()]);
 
     // Redirect to login page
     redirect({

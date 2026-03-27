@@ -104,6 +104,20 @@ export async function hasBetterAuthCookie(): Promise<boolean> {
     );
 }
 
+export async function removeBetterAuthCookies(): Promise<void> {
+    const cookieStore = await cookies();
+    const allCookies = cookieStore.getAll();
+
+    for (const cookie of allCookies) {
+        if (
+            cookie.name.startsWith('better-auth.') ||
+            cookie.name.startsWith('__Secure-better-auth.')
+        ) {
+            cookieStore.delete(cookie.name);
+        }
+    }
+}
+
 /**
  * Get all BetterAuth cookie headers for forwarding to the API.
  * BetterAuth may use multiple cookies (session token + cookie cache).
