@@ -25,11 +25,34 @@ import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { SessionAuthGuard } from '../guards/session-auth.guard';
 import { Public } from '../decorators/public.decorator';
+import { config } from '@src/config/constants';
 
 @ApiTags('Auth')
 @Controller('api/auth')
 export class AuthController {
     constructor(private authService: AuthService) {}
+
+    @Public()
+    @Get('providers')
+    @ApiOperation({
+        summary: 'Get configured auth providers',
+        description: 'Returns the authentication methods currently enabled for the app',
+    })
+    @ApiResponse({ status: 200, description: 'Configured authentication providers' })
+    getProviders() {
+        const socialProviders = [
+            config.github.clientId() ? 'github' : null,
+            config.google.clientId() ? 'google' : null,
+            config.linkedin.clientId() ? 'linkedin' : null,
+            config.facebook.clientId() ? 'facebook' : null,
+            config.twitter.clientId() ? 'twitter' : null,
+        ].filter((provider): provider is string => !!provider);
+
+        return {
+            emailPassword: true,
+            socialProviders,
+        };
+    }
 
     @Public()
     @Post('register')

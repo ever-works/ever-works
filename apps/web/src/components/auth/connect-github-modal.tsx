@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { usePathname } from '@/i18n/navigation';
+import { usePathname, useRouter } from '@/i18n/navigation';
+import { useSearchParams } from 'next/navigation';
 import {
     Dialog,
     DialogContent,
@@ -26,17 +27,20 @@ type LinkSocialResponse = {
 export function ConnectGithubModal({ hasGithubConnected }: ConnectGithubModalProps) {
     const t = useTranslations('dashboard.connectGithub');
     const pathname = usePathname();
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const shouldForcePrompt = searchParams.get('connectGithub') === '1';
 
     useEffect(() => {
         if (hasGithubConnected) return;
 
         const dismissed = localStorage.getItem(DISMISS_KEY);
-        if (!dismissed) {
+        if (shouldForcePrompt || !dismissed) {
             setOpen(true);
         }
-    }, [hasGithubConnected]);
+    }, [hasGithubConnected, shouldForcePrompt]);
 
     const handleConnect = async () => {
         setLoading(true);
@@ -75,12 +79,24 @@ export function ConnectGithubModal({ hasGithubConnected }: ConnectGithubModalPro
     const handleDismiss = () => {
         localStorage.setItem(DISMISS_KEY, 'true');
         setOpen(false);
+        if (shouldForcePrompt) {
+            router.replace(pathname);
+        }
     };
 
     if (hasGithubConnected) return null;
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+            open={open}
+            onOpenChange={(nextOpen) => {
+                if (!nextOpen) {
+                    handleDismiss();
+                    return;
+                }
+                setOpen(nextOpen);
+            }}
+        >
             <DialogContent>
                 <DialogHeader>
                     <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-secondary dark:bg-surface-secondary-dark">

@@ -12,6 +12,10 @@ import { REDIRECT_SEARCH_PARAM, ROUTES } from '@/lib/constants';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { isValidRedirectUrl } from '@/lib/utils';
 
+interface LoginClientProps {
+    availableSocialProviders: ('github' | 'google' | 'linkedin' | 'facebook' | 'twitter')[];
+}
+
 function PasswordResetSuccessMessage() {
     const t = useTranslations('auth.login');
 
@@ -46,7 +50,7 @@ function PasswordResetSuccessMessage() {
     );
 }
 
-export function LoginClient() {
+export function LoginClient({ availableSocialProviders }: LoginClientProps) {
     const searchParams = useSearchParams();
     const locale = useLocale();
     const t = useTranslations('auth.login');
@@ -214,7 +218,7 @@ export function LoginClient() {
                     </div>
                 </div>
 
-                <SocialLoginButtons />
+                <SocialLoginButtons providers={availableSocialProviders} />
 
                 <p className="text-center text-sm text-text-secondary dark:text-text-secondary-dark">
                     {t('signUp.text')}{' '}

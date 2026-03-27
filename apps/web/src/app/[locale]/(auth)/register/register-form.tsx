@@ -10,7 +10,11 @@ import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
 import { ThemeToggle } from '@/components/theme-toggle';
 
-export default function RegisterForm() {
+interface RegisterFormProps {
+    availableSocialProviders: ('github' | 'google' | 'linkedin' | 'facebook' | 'twitter')[];
+}
+
+export default function RegisterForm({ availableSocialProviders }: RegisterFormProps) {
     const locale = useLocale();
     const t = useTranslations('auth.register');
     const [isPending, startTransition] = useTransition();
@@ -186,7 +190,7 @@ export default function RegisterForm() {
                     </div>
                 </div>
 
-                <SocialLoginButtons />
+                <SocialLoginButtons providers={availableSocialProviders} />
 
                 <p className="text-center text-sm text-text-secondary dark:text-text-secondary-dark">
                     {t('signIn.text')}{' '}
