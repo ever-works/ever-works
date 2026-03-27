@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
     ArrowRight,
@@ -63,6 +63,7 @@ export function EverWorksOnboardingWizard({
     plugins,
     oauthConnections,
 }: EverWorksOnboardingWizardProps) {
+    const [isHydrated, setIsHydrated] = useState(false);
     const t = useTranslations('onboarding');
     const [storedState, setStoredState] = useLocalStorage<OnboardingState>(
         ONBOARDING_STORAGE_KEY,
@@ -72,6 +73,10 @@ export function EverWorksOnboardingWizard({
             deserialize: (raw) => JSON.parse(raw) as OnboardingState,
         },
     );
+
+    useEffect(() => {
+        setIsHydrated(true);
+    }, []);
 
     const steps = useMemo<WizardStep[]>(
         () => [
@@ -90,7 +95,7 @@ export function EverWorksOnboardingWizard({
     const dismiss = () => setStoredState({ ...storedState, dismissed: true });
     const goNext = () => setStep(Math.min(activeStep + 1, steps.length - 1));
 
-    if (!shouldOpen) return null;
+    if (!isHydrated || !shouldOpen) return null;
 
     const currentStep = steps[activeStep];
     const progressPercent = Math.round(((activeStep + 1) / steps.length) * 100);
