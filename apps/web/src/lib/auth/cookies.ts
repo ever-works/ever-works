@@ -99,7 +99,8 @@ export async function hasBetterAuthCookie(): Promise<boolean> {
     const allCookies = cookieStore.getAll();
     return allCookies.some(
         (cookie) =>
-            cookie.name.startsWith('better-auth.') || cookie.name.startsWith('__Secure-better-auth.'),
+            cookie.name.startsWith('better-auth.') ||
+            cookie.name.startsWith('__Secure-better-auth.'),
     );
 }
 

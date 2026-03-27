@@ -185,9 +185,13 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                                 // BetterAuth user ID doesn't exist in users table —
                                 // find by email via the ba_user table
                                 const baUserRepo = dataSource.getRepository(BaUser);
-                                const baUser = await baUserRepo.findOne({ where: { id: account.userId } });
+                                const baUser = await baUserRepo.findOne({
+                                    where: { id: account.userId },
+                                });
                                 if (baUser) {
-                                    const existingUser = await userRepository.findByEmail(baUser.email);
+                                    const existingUser = await userRepository.findByEmail(
+                                        baUser.email,
+                                    );
                                     if (existingUser) {
                                         appUserId = existingUser.id;
                                     } else {
@@ -241,9 +245,13 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                             const userById = await userRepository.findById(session.userId);
                             if (!userById) {
                                 const baUserRepo = dataSource.getRepository(BaUser);
-                                const baUser = await baUserRepo.findOne({ where: { id: session.userId } });
+                                const baUser = await baUserRepo.findOne({
+                                    where: { id: session.userId },
+                                });
                                 if (baUser) {
-                                    const existingUser = await userRepository.findByEmail(baUser.email);
+                                    const existingUser = await userRepository.findByEmail(
+                                        baUser.email,
+                                    );
                                     if (existingUser) {
                                         appUserId = existingUser.id;
                                     }
