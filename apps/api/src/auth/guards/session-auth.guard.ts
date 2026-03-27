@@ -96,7 +96,12 @@ export class SessionAuthGuard implements CanActivate {
                 return false;
             }
 
-            const user = await this.userRepository.findById(session.user.id);
+            // Find application user by BetterAuth ID, or fall back to email
+            // (IDs may differ for users who existed before BetterAuth migration)
+            let user = await this.userRepository.findById(session.user.id);
+            if (!user && session.user.email) {
+                user = await this.userRepository.findByEmail(session.user.email);
+            }
             if (!user || !user.isActive) {
                 return false;
             }

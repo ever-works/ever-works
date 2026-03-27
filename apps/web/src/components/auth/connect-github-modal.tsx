@@ -35,7 +35,7 @@ export function ConnectGithubModal({ hasGithubConnected }: ConnectGithubModalPro
     const handleConnect = async () => {
         setLoading(true);
         try {
-            await authClient.signIn.social({ provider: 'github', callbackURL: '/dashboard' });
+            await authClient.signIn.social({ provider: 'github', callbackURL: `${window.location.origin}/dashboard` });
         } catch (error) {
             console.error('Failed to connect GitHub:', error);
             setLoading(false);

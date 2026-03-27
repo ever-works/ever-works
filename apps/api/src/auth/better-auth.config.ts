@@ -111,40 +111,53 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                     after: async (baUser) => {
                         // Sync new BetterAuth user to application users table
                         try {
-                            const existing = await userRepository.findById(baUser.id);
-                            if (!existing) {
-                                // Generate a random hashed password for the users table
-                                // (actual password is stored in ba_account)
-                                const randomPassword = await bcrypt.hash(
-                                    require('crypto').randomBytes(16).toString('hex'),
-                                    10,
+                            // Check if user already exists by ID or email
+                            const existingById = await userRepository.findById(baUser.id);
+                            if (existingById) {
+                                logger.log(`User ${baUser.id} already exists in application table`);
+                                return;
+                            }
+
+                            const existingByEmail = await userRepository.findByEmail(baUser.email);
+                            if (existingByEmail) {
+                                // User exists with different ID (registered via old auth system)
+                                // Link the existing user — no need to create a new one
+                                logger.log(
+                                    `User with email ${baUser.email} already exists (id: ${existingByEmail.id}), skipping create`,
                                 );
+                                return;
+                            }
 
-                                await userRepository.create({
-                                    id: baUser.id,
-                                    username: baUser.name || baUser.email.split('@')[0],
-                                    email: baUser.email,
-                                    password: randomPassword,
-                                    registrationProvider: AuthProvider.LOCAL,
-                                    emailVerified: baUser.emailVerified || false,
-                                    avatar: baUser.image || undefined,
-                                    isActive: true,
-                                } as any);
+                            // Truly new user — create in application table
+                            const randomPassword = await bcrypt.hash(
+                                require('crypto').randomBytes(16).toString('hex'),
+                                10,
+                            );
 
-                                logger.log(`Synced new user to application table: ${baUser.id}`);
+                            await userRepository.create({
+                                id: baUser.id,
+                                username: baUser.name || baUser.email.split('@')[0],
+                                email: baUser.email,
+                                password: randomPassword,
+                                registrationProvider: AuthProvider.LOCAL,
+                                emailVerified: baUser.emailVerified || false,
+                                avatar: baUser.image || undefined,
+                                isActive: true,
+                            } as any);
 
-                                // Emit welcome event for OAuth users (email verified = true)
-                                if (baUser.emailVerified) {
-                                    const user = await userRepository.findById(baUser.id);
-                                    if (user) {
-                                        eventEmitter.emit(
-                                            UserConfirmedEvent.EVENT_NAME,
-                                            new UserConfirmedEvent(
-                                                user,
-                                                `${webAppUrl}/directories/new`,
-                                            ),
-                                        );
-                                    }
+                            logger.log(`Synced new user to application table: ${baUser.id}`);
+
+                            // Emit welcome event for OAuth users (email verified = true)
+                            if (baUser.emailVerified) {
+                                const user = await userRepository.findById(baUser.id);
+                                if (user) {
+                                    eventEmitter.emit(
+                                        UserConfirmedEvent.EVENT_NAME,
+                                        new UserConfirmedEvent(
+                                            user,
+                                            `${webAppUrl}/directories/new`,
+                                        ),
+                                    );
                                 }
                             }
                         } catch (error) {
@@ -163,8 +176,31 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                         if (account.providerId === 'credential') return;
 
                         try {
+                            // BetterAuth may have created the user with a new UUID,
+                            // but the application users table may have the same email
+                            // under a different ID. Find the correct application user ID.
+                            let appUserId = account.userId;
+                            const userById = await userRepository.findById(account.userId);
+                            if (!userById) {
+                                // BetterAuth user ID doesn't exist in users table —
+                                // find by email via the ba_user table
+                                const baUserRepo = dataSource.getRepository(BaUser);
+                                const baUser = await baUserRepo.findOne({ where: { id: account.userId } });
+                                if (baUser) {
+                                    const existingUser = await userRepository.findByEmail(baUser.email);
+                                    if (existingUser) {
+                                        appUserId = existingUser.id;
+                                    } else {
+                                        logger.warn(
+                                            `No application user found for BetterAuth user ${account.userId} (${baUser.email})`,
+                                        );
+                                        return;
+                                    }
+                                }
+                            }
+
                             await oauthTokenRepository.upsert({
-                                userId: account.userId,
+                                userId: appUserId,
                                 provider: account.providerId,
                                 accessToken: account.accessToken || '',
                                 refreshToken: account.refreshToken || undefined,
@@ -178,7 +214,7 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                             });
 
                             // Update the user's registration provider
-                            await userRepository.update(account.userId, {
+                            await userRepository.update(appUserId, {
                                 registrationProvider: account.providerId,
                                 lastLoginAt: new Date(),
                             });
@@ -200,7 +236,21 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                     after: async (session) => {
                         // Update lastLoginAt on the application user
                         try {
-                            await userRepository.update(session.userId, {
+                            // Find the correct application user (may differ from BetterAuth user ID)
+                            let appUserId = session.userId;
+                            const userById = await userRepository.findById(session.userId);
+                            if (!userById) {
+                                const baUserRepo = dataSource.getRepository(BaUser);
+                                const baUser = await baUserRepo.findOne({ where: { id: session.userId } });
+                                if (baUser) {
+                                    const existingUser = await userRepository.findByEmail(baUser.email);
+                                    if (existingUser) {
+                                        appUserId = existingUser.id;
+                                    }
+                                }
+                            }
+
+                            await userRepository.update(appUserId, {
                                 lastLoginAt: new Date(),
                                 lastLoginIp: session.ipAddress || undefined,
                             });
@@ -214,6 +264,8 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                 },
             },
         },
+
+        trustedOrigins: [config.webAppUrl()],
 
         advanced: {
             database: {
