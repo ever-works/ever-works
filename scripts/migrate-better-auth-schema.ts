@@ -1,5 +1,6 @@
 /**
- * Migration script: moves BetterAuth data from ba_* tables to the clean schema.
+ * Migration script: moves BetterAuth data from the legacy prefixed tables
+ * into the clean schema.
  *
  * Target schema:
  * - users (existing application table reused for BetterAuth user records)
@@ -7,7 +8,7 @@
  * - sessions
  * - verifications
  *
- * This script is idempotent and does not drop the old ba_* tables.
+ * This script is idempotent and leaves the source legacy tables in place.
  */
 
 import { configDotenv } from 'dotenv';
@@ -142,7 +143,7 @@ async function main() {
 		const hasBaVerification = await queryRunner.hasTable('ba_verification');
 
 		if (!hasBaUser && !hasBaAccount && !hasBaSession && !hasBaVerification) {
-			console.log('No ba_* tables found. Nothing to migrate.');
+			console.log('No legacy prefixed BetterAuth tables found. Nothing to migrate.');
 			return;
 		}
 
@@ -280,7 +281,7 @@ async function main() {
 		}
 
 		console.log('BetterAuth schema migration complete.');
-		console.log('Old ba_* tables were left in place for manual cleanup after verification.');
+		console.log('Legacy prefixed BetterAuth tables were left in place for manual cleanup after verification.');
 	} finally {
 		await queryRunner.release();
 		await dataSource.destroy();
