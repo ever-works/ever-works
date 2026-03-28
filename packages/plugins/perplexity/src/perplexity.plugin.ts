@@ -10,7 +10,8 @@ import type {
 	SearchOptions,
 	SearchResponse,
 	SearchResult,
-	RateLimitInfo
+	RateLimitInfo,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 
 import Perplexity from '@perplexity-ai/perplexity_ai';
@@ -113,7 +114,27 @@ export class PerplexitySearchPlugin implements IPlugin, ISearchPlugin {
 	}
 
 	async isAvailable(): Promise<boolean> {
-		return true;
+		if (!this.context) return false;
+		const settings = await this.context.getSettings();
+		return Boolean(settings?.apiKey);
+	}
+
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const apiKey = settings.apiKey as string | undefined;
+		if (!apiKey) {
+			return { success: false, message: 'Perplexity API key is not configured.' };
+		}
+
+		try {
+			const client = this.getClient(settings);
+			await client.search.create({ query: 'test', max_results: 1 });
+			return { success: true, message: 'Perplexity connection verified.' };
+		} catch (error) {
+			return {
+				success: false,
+				message: `Perplexity connection failed: ${error instanceof Error ? error.message : String(error)}`
+			};
+		}
 	}
 
 	async getRateLimitInfo(): Promise<RateLimitInfo> {

@@ -29,9 +29,11 @@ import {
     createEmptyPipelineOutputs,
     isPipelineModifierPlugin,
 } from '@ever-works/plugin';
+import type { GenerationStepLog } from '@ever-works/contracts/api';
 import { PipelineBuilderService } from './pipeline-builder.service';
 import { PipelineFacadeService } from './pipeline-facade.service';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import { PluginContextFactoryService } from '../plugins/services/plugin-context-factory.service';
 import { ExecutablePipelineRunner } from './executable-pipeline.class';
 
 export interface CheckpointData {
@@ -73,6 +75,7 @@ export class StepPipelineExecutorService {
         private readonly registry: PluginRegistryService,
         private readonly eventEmitter: EventEmitter2,
         private readonly facadeService: PipelineFacadeService,
+        private readonly contextFactory: PluginContextFactoryService,
         @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
     ) {}
 
@@ -90,7 +93,30 @@ export class StepPipelineExecutorService {
             );
         }
         const context = plugin.createContext(directory, request, existing);
-        return this.executePipeline(plugin, context, options, onProgress);
+
+        // Attach log interceptor to capture ALL plugin logger output
+        const onLogEntry = options?.onLogEntry;
+        let removeInterceptor: (() => void) | undefined;
+        if (onLogEntry) {
+            removeInterceptor = this.contextFactory.addLogInterceptor(
+                plugin.id,
+                (level: string, message: string) => {
+                    onLogEntry({
+                        timestamp: new Date().toISOString(),
+                        level: level as GenerationStepLog['level'],
+                        source: 'pipeline',
+                        event: 'message',
+                        message,
+                    });
+                },
+            );
+        }
+
+        try {
+            return await this.executePipeline(plugin, context, options, onProgress);
+        } finally {
+            removeInterceptor?.();
+        }
     }
 
     private async executePipeline(
@@ -236,10 +262,13 @@ export class StepPipelineExecutorService {
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<void> {
+        const onLogEntry = options?.onLogEntry;
+
         if (options?.skipSteps?.includes(step.id)) {
             this.logger.debug(`Skipping step "${step.id}" (in skipSteps)`);
             runner.markStepSkipped(step.id, 'skipped by options');
             this.emitStepSkipped(step, stepIndex, totalSteps);
+            this.emitLogEntry(onLogEntry, 'step_skipped', step.name, stepIndex, 'info', 'pipeline');
             return;
         }
 
@@ -253,11 +282,13 @@ export class StepPipelineExecutorService {
             this.logger.debug(`Skipping step "${step.id}" (data already provided)`);
             runner.markStepSkipped(step.id, 'data already provided');
             this.emitStepSkipped(step, stepIndex, totalSteps);
+            this.emitLogEntry(onLogEntry, 'step_skipped', step.name, stepIndex, 'info', 'pipeline');
             return;
         }
 
         runner.startStep(step.id);
         this.emitStepEvent(PipelineEvents.STEP_STARTED, step, stepIndex, totalSteps);
+        this.emitLogEntry(onLogEntry, 'step_started', step.name, stepIndex, 'info', 'pipeline');
 
         if (onProgress) {
             onProgress({
@@ -279,6 +310,7 @@ export class StepPipelineExecutorService {
 
             await this.executeStep(step, executor, plugin, context, options);
 
+            const durationMs = Date.now() - stepStartTime;
             const metrics = this.createStepMetrics(step, stepStartTime, true);
             runner.markStepComplete(step.id, metrics);
 
@@ -293,12 +325,29 @@ export class StepPipelineExecutorService {
             );
 
             this.emitStepCompleted(step, stepIndex, totalSteps, metrics.duration ?? 0);
+            this.emitLogEntry(
+                onLogEntry,
+                'step_completed',
+                step.name,
+                stepIndex,
+                'info',
+                'pipeline',
+                durationMs,
+            );
         } catch (error) {
             const err = error as Error;
             const metrics = this.createStepMetrics(step, stepStartTime, false, err.message);
             runner.markStepFailed(step.id, err);
 
             this.emitStepFailed(step, stepIndex, totalSteps, err, step.optional ?? false);
+            this.emitLogEntry(
+                onLogEntry,
+                'step_failed',
+                `${step.name}: ${err.message}`,
+                stepIndex,
+                'error',
+                'pipeline',
+            );
 
             if (!options?.continueOnError && !step.optional) {
                 throw err;
@@ -574,6 +623,26 @@ export class StepPipelineExecutorService {
     // ============================================================================
     // Event Emission
     // ============================================================================
+
+    private emitLogEntry(
+        onLogEntry: ((log: GenerationStepLog) => void) | undefined,
+        event: GenerationStepLog['event'],
+        message: string,
+        stepIndex: number,
+        level: GenerationStepLog['level'],
+        source: GenerationStepLog['source'],
+        durationMs?: number,
+    ): void {
+        onLogEntry?.({
+            timestamp: new Date().toISOString(),
+            level,
+            source,
+            event,
+            message: `${event === 'step_started' ? 'Step started' : event === 'step_completed' ? 'Step completed' : event === 'step_failed' ? 'Step failed' : 'Step skipped'}: ${message}`,
+            stepIndex,
+            durationMs: durationMs ?? null,
+        });
+    }
 
     private emitPipelineEvent(event: string, payload: Partial<PipelineEventPayload>): void {
         this.eventEmitter.emit(event, {

@@ -6,6 +6,7 @@ import { CacheEntryRepository } from '@ever-works/agent/cache';
 import { TriggerModule as TasksTriggerModule } from '@ever-works/trigger-tasks';
 import { WebsiteGeneratorModule } from '@ever-works/agent/generators';
 import { FacadesModule } from '@ever-works/agent/facades';
+import { SubscriptionsModule } from '@ever-works/agent/subscriptions';
 
 // Controllers
 import { DirectoriesController } from './directories.controller';
@@ -16,6 +17,7 @@ import { DirectoryCleanupService } from './tasks/directory-cleanup.service';
 import { WebsiteTemplateSchedulerService } from './tasks/website-template-scheduler.service';
 import { CommunityPrSchedulerService } from './tasks/community-pr-scheduler.service';
 import { ComparisonSchedulerService } from './tasks/comparison-scheduler.service';
+import { ItemSourceValidationCronService } from './tasks/item-source-validation-scheduler.service';
 
 @Module({
     imports: [
@@ -25,6 +27,7 @@ import { ComparisonSchedulerService } from './tasks/comparison-scheduler.service
         TasksTriggerModule,
         WebsiteGeneratorModule,
         FacadesModule,
+        SubscriptionsModule,
     ],
     providers: [
         CacheEntryRepository,
@@ -32,6 +35,7 @@ import { ComparisonSchedulerService } from './tasks/comparison-scheduler.service
         WebsiteTemplateSchedulerService,
         CommunityPrSchedulerService,
         ComparisonSchedulerService,
+        ItemSourceValidationCronService,
     ],
     controllers: [DirectoriesController, MembersController],
 })

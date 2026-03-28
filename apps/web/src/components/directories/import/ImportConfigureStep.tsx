@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -8,13 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { OrganizationSelector } from '../OrganizationSelector';
-import { ProviderSelector } from '../detail/generator/ProviderSelector';
+import { ProviderSelectionSection } from '../shared/ProviderSelectionSection';
 import { SlugConflictWarning } from './SlugConflictWarning';
 import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
-import { resolveEffectiveDefault } from '@ever-works/plugin';
+import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import type { GeneratorFormSchema } from '@/lib/api/types-only';
-import type { ProviderOption } from '@/lib/api/types-only';
-import { Upload, CheckCircle2, FileText, Database, ArrowLeft } from 'lucide-react';
+import type { ImportEnrichmentConfig } from '@/lib/api/directory';
+import { Upload, CheckCircle2, FileText, Database, ArrowLeft, Sparkles } from 'lucide-react';
 
 type DetectedType = 'data_repo' | 'awesome_readme' | 'link_existing' | null;
 
@@ -54,8 +54,19 @@ interface ImportConfigureStepProps {
     owner: string;
     onOwnerChange: (value: string, isOrganization: boolean) => void;
     onBack: () => void;
-    onImport: (providers?: Record<string, string>) => void;
+    onImport: (
+        providers?: Record<string, string>,
+        enrichmentConfig?: ImportEnrichmentConfig,
+    ) => void;
 }
+
+const EXPANSION_OPTIONS = [
+    { value: 1.5, label: '1.5x' },
+    { value: 2, label: '2x' },
+    { value: 2.5, label: '2.5x (recommended)' },
+    { value: 3, label: '3x' },
+    { value: 5, label: '5x' },
+];
 
 export function ImportConfigureStep({
     analysisResult,
@@ -75,58 +86,87 @@ export function ImportConfigureStep({
 }: ImportConfigureStepProps) {
     const t = useTranslations('dashboard.directoryCreation.import');
 
-    // AI provider selection
+    // Pipeline plugins allowed for import enrichment
+    const ALLOWED_IMPORT_PIPELINES = ['agent-pipeline', 'claude-code'];
+
+    // Provider/pipeline selection state
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
-    const [selectedAiProvider, setSelectedAiProvider] = useState<string | null>(null);
+    const {
+        providers: selectedProviders,
+        handleProviderChange,
+        buildSelectedProviders,
+        getUnconfiguredProviders,
+        syncResolvedPipeline,
+    } = useProviderSelection();
+    const fetchVersionRef = useRef(0);
+    const lastFetchedPipelineRef = useRef<string | undefined>(undefined);
+
+    // Enrichment config (for awesome_readme)
+    const [expansionFactor, setExpansionFactor] = useState(2.5);
 
     const effectiveSourceType = analysisResult?.detectedType || manualSourceType;
+    const isAwesomeReadme = effectiveSourceType === 'awesome_readme';
 
+    // Load form schema when pipeline changes (same pattern as DirectoryAICreator)
     useEffect(() => {
-        if (effectiveSourceType !== 'awesome_readme') return;
-        if (formSchema) return;
+        if (!isAwesomeReadme) return;
+
+        const pipelineId = selectedProviders.pipeline || undefined;
+        if (pipelineId === lastFetchedPipelineRef.current && formSchema) return;
+
+        const version = ++fetchVersionRef.current;
 
         async function loadSchema() {
             try {
-                const result = await getGlobalFormSchema();
+                const result = await getGlobalFormSchema(pipelineId);
+                if (version !== fetchVersionRef.current) return;
                 if (result.success && result.data) {
-                    setFormSchema(result.data);
+                    lastFetchedPipelineRef.current = result.data.resolvedPipelineId || pipelineId;
+                    // Filter pipelines to only allowed ones for import
+                    const filtered = {
+                        ...result.data,
+                        providers: {
+                            ...result.data.providers,
+                            pipeline: result.data.providers.pipeline?.filter((p) =>
+                                ALLOWED_IMPORT_PIPELINES.includes(p.id),
+                            ),
+                        },
+                    };
+                    setFormSchema(filtered);
+                    syncResolvedPipeline(filtered);
                 }
             } catch (error) {
+                if (version !== fetchVersionRef.current) return;
                 console.error('Failed to load form schema:', error);
             }
         }
         loadSchema();
-    }, [effectiveSourceType, formSchema]);
+    }, [isAwesomeReadme, selectedProviders.pipeline, syncResolvedPipeline]);
 
-    const aiProviders: ProviderOption[] = formSchema?.providers.ai ?? [];
+    const seedCount = analysisResult?.structure?.itemCount ?? 0;
+    const targetCount = Math.ceil(seedCount * expansionFactor);
+    const newItemsTarget = targetCount - seedCount;
 
     const handleImport = () => {
-        let providers: Record<string, string> | undefined;
-        if (effectiveSourceType === 'awesome_readme') {
-            if (selectedAiProvider) {
-                const selected = aiProviders.find((p) => p.id === selectedAiProvider);
-                if (selected && !selected.configured) {
-                    toast.error(t('errors.providerNotConfigured', { provider: selected.name }));
-                    return;
-                }
-
-                providers = { ai: selectedAiProvider };
-            } else if (formSchema) {
-                const defaultProvider = resolveEffectiveDefault(aiProviders);
-                if (defaultProvider && !defaultProvider.configured) {
-                    toast.error(
-                        t('errors.providerNotConfigured', { provider: defaultProvider.name }),
-                    );
-                    return;
-                }
-
-                if (defaultProvider) {
-                    providers = { ai: defaultProvider.id };
-                }
+        if (isAwesomeReadme) {
+            const unconfigured = getUnconfiguredProviders(formSchema);
+            if (unconfigured.length > 0) {
+                toast.error(
+                    t('errors.providerNotConfigured', { provider: unconfigured.join(', ') }),
+                );
+                return;
             }
-        }
 
-        onImport(providers);
+            const providers = buildSelectedProviders(formSchema);
+
+            const enrichmentConfig: ImportEnrichmentConfig = {
+                expansionFactor,
+            };
+
+            onImport(providers, enrichmentConfig);
+        } else {
+            onImport();
+        }
     };
 
     return (
@@ -138,18 +178,11 @@ export function ImportConfigureStep({
                         'p-4 rounded-lg',
                         analysisResult.detectedType === 'data_repo'
                             ? 'bg-primary/5 border border-primary/20'
-                            : 'bg-warning/5 border border-warning/20',
+                            : 'bg-primary/5 border border-primary/20',
                     )}
                 >
                     <div className="flex items-start gap-3">
-                        <CheckCircle2
-                            className={cn(
-                                'w-6 h-6 mt-0.5 shrink-0',
-                                analysisResult.detectedType === 'data_repo'
-                                    ? 'text-primary'
-                                    : 'text-warning',
-                            )}
-                        />
+                        <CheckCircle2 className="w-6 h-6 mt-0.5 shrink-0 text-primary" />
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                                 <h4 className="font-medium text-text dark:text-text-dark">
@@ -160,9 +193,7 @@ export function ImportConfigureStep({
                                 <span
                                     className={cn(
                                         'px-2 py-0.5 rounded-full text-xs font-medium',
-                                        analysisResult.detectedType === 'data_repo'
-                                            ? 'bg-primary/10 text-primary'
-                                            : 'bg-warning/10 text-warning',
+                                        'bg-primary/10 text-primary',
                                     )}
                                 >
                                     {analysisResult.detectedType === 'data_repo'
@@ -214,11 +245,11 @@ export function ImportConfigureStep({
                                 'p-4 rounded-lg border-2 text-left transition-all',
                                 'bg-card dark:bg-card-dark',
                                 manualSourceType === 'awesome_readme'
-                                    ? 'border-warning shadow-md'
-                                    : 'border-card-border dark:border-card-border-dark hover:border-warning/50',
+                                    ? 'border-primary shadow-md'
+                                    : 'border-card-border dark:border-card-border-dark hover:border-primary/50',
                             )}
                         >
-                            <FileText className="w-6 h-6 text-warning mb-2" />
+                            <FileText className="w-6 h-6 text-primary mb-2" />
                             <h4 className="font-medium text-text dark:text-text-dark">
                                 {t('supportedFormats.awesomeReadme.title')}
                             </h4>
@@ -269,33 +300,97 @@ export function ImportConfigureStep({
                 />
             )}
 
+            {/* Enrichment Config — for awesome_readme imports */}
+            {isAwesomeReadme && (
+                <>
+                    {/* Research Mode Banner */}
+                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                        <div className="flex items-start gap-3">
+                            <Sparkles className="w-6 h-6 mt-0.5 shrink-0 text-primary" />
+                            <div className="flex-1">
+                                <h4 className="font-medium text-text dark:text-text-dark">
+                                    {t('research.title')}
+                                </h4>
+                                <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
+                                    {t('research.description')}
+                                </p>
+                                {seedCount > 0 && (
+                                    <div className="mt-2 flex gap-4 text-xs text-text-muted dark:text-text-muted-dark">
+                                        <span>
+                                            {t('research.seedDetected', { count: seedCount })}
+                                        </span>
+                                        <span>
+                                            {analysisResult?.owner}/{analysisResult?.repo}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Expansion Factor */}
+                    <div className="p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark space-y-3">
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-primary" />
+                            <h3 className="font-medium text-text dark:text-text-dark">
+                                {t('research.expansionFactor')}
+                            </h3>
+                        </div>
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                            {t('research.expansionDescription')}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            {EXPANSION_OPTIONS.map((option) => (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => setExpansionFactor(option.value)}
+                                    className={cn(
+                                        'px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+                                        expansionFactor === option.value
+                                            ? 'bg-primary text-white'
+                                            : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-primary/10',
+                                    )}
+                                >
+                                    {option.label}
+                                </button>
+                            ))}
+                        </div>
+                        {seedCount > 0 && (
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('research.preview', {
+                                    seedCount,
+                                    targetCount,
+                                    newItems: newItemsTarget,
+                                })}
+                            </p>
+                        )}
+                    </div>
+                </>
+            )}
+
             {/* Sync Toggle — only relevant for awesome_readme imports */}
-            {effectiveSourceType === 'awesome_readme' && (
+            {isAwesomeReadme && (
                 <div className="flex items-center justify-between p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
                     <div>
                         <h3 className="font-medium text-text dark:text-text-dark">
-                            {t('sync.title', { fallback: 'Keep synchronized' })}
+                            {t('sync.title')}
                         </h3>
                         <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                            {t('sync.description', {
-                                fallback: 'Automatically pull updates from the source repository.',
-                            })}
+                            {t('sync.description')}
                         </p>
                     </div>
                     <Switch checked={sync} onChange={onSyncChange} disabled={isPending} />
                 </div>
             )}
 
-            {/* AI Provider Selection - only for awesome_readme */}
-            {effectiveSourceType === 'awesome_readme' && aiProviders.length > 0 && (
-                <div className="p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
-                    <ProviderSelector
-                        label={t('aiProviderSettings')}
-                        providers={aiProviders}
-                        value={selectedAiProvider}
-                        onChange={setSelectedAiProvider}
-                    />
-                </div>
+            {/* Provider & Pipeline Selection - only for awesome_readme */}
+            {isAwesomeReadme && formSchema && (
+                <ProviderSelectionSection
+                    formSchema={formSchema}
+                    providers={selectedProviders}
+                    onProviderChange={handleProviderChange}
+                />
             )}
 
             {/* Destination Account */}
@@ -311,7 +406,7 @@ export function ImportConfigureStep({
                 />
             </div>
 
-            {/* Source Attribution Note */}
+            {/* Source Attribution / Legal Note */}
             <div
                 className={cn(
                     'p-4 rounded-lg',
@@ -320,8 +415,17 @@ export function ImportConfigureStep({
                 )}
             >
                 <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                    <strong>{t('attribution.title')}</strong>{' '}
-                    {t('attribution.text', { url: analysisResult?.sourceUrl || sourceUrl })}
+                    {isAwesomeReadme ? (
+                        <>
+                            <strong>{t('research.legalNote')}</strong>{' '}
+                            {t('research.legalDescription')}
+                        </>
+                    ) : (
+                        <>
+                            <strong>{t('attribution.title')}</strong>{' '}
+                            {t('attribution.text', { url: analysisResult?.sourceUrl || sourceUrl })}
+                        </>
+                    )}
                 </p>
             </div>
 
@@ -346,7 +450,16 @@ export function ImportConfigureStep({
                     fullWidth
                 >
                     {isPending ? (
-                        t('importingButton')
+                        isAwesomeReadme ? (
+                            t('research.importingButton')
+                        ) : (
+                            t('importingButton')
+                        )
+                    ) : isAwesomeReadme ? (
+                        <>
+                            <Sparkles className="w-5 h-5" />
+                            {t('research.importButton')}
+                        </>
                     ) : (
                         <>
                             <Upload className="w-5 h-5" />

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -13,8 +14,6 @@ import {
     ChevronDown,
     ChevronUp,
     RefreshCw,
-    Building2,
-    User,
 } from 'lucide-react';
 import { getUserRepositories } from '@/app/actions/dashboard/directories';
 import { getGitProviderOrganizations } from '@/app/actions/dashboard/organizations';
@@ -64,39 +63,23 @@ function OwnerFilter({
             <label className="block text-xs font-medium text-text-secondary dark:text-text-secondary-dark mb-1.5">
                 {t('ownerLabel')}
             </label>
-            <div className="relative">
-                <select
-                    value={selectedOwner ?? ''}
-                    onChange={(e) => onChange(e.target.value || null)}
-                    disabled={orgsLoading}
-                    className={cn(
-                        'w-full pl-8 pr-3 py-2 rounded-md text-sm appearance-none',
-                        'bg-card dark:bg-card-dark',
-                        'border border-border dark:border-border-dark',
-                        'text-text dark:text-text-dark',
-                        'focus:outline-none focus:ring-2 focus:ring-primary/50',
-                        orgsLoading && 'opacity-60',
-                    )}
-                >
-                    <option value="">{t('personalAccount')}</option>
-                    {organizations.length > 0 && (
-                        <optgroup label={t('organizations')}>
-                            {organizations.map((org) => (
-                                <option key={org.id} value={org.login}>
-                                    {org.login}
-                                </option>
-                            ))}
-                        </optgroup>
-                    )}
-                </select>
-                <div className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                    {selectedOwner ? (
-                        <Building2 className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
-                    ) : (
-                        <User className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
-                    )}
-                </div>
-            </div>
+            <Select
+                value={selectedOwner ?? '__personal__'}
+                onValueChange={(val) => onChange(val === '__personal__' ? null : val)}
+                disabled={orgsLoading}
+                size="sm"
+            >
+                <option value="__personal__">{t('personalAccount')}</option>
+                {organizations.length > 0 && (
+                    <optgroup label={t('organizations')}>
+                        {organizations.map((org) => (
+                            <option key={org.id} value={org.login}>
+                                {org.login}
+                            </option>
+                        ))}
+                    </optgroup>
+                )}
+            </Select>
         </div>
     );
 }

@@ -13,8 +13,8 @@ import {
     dismissNotification,
 } from '@/app/actions/notifications';
 import { useRouter } from 'next/navigation';
-import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns';
 import { Bell, X } from 'lucide-react';
 
 interface NotificationDropdownProps {
@@ -128,8 +128,9 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
             }
         } catch (error) {
             console.error('Failed to fetch notifications:', error);
+            toast.error(t('notifications.fetchFailed'));
         }
-    }, []);
+    }, [t]);
 
     const fetchUnreadCount = useCallback(async () => {
         try {

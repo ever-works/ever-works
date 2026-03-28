@@ -83,6 +83,13 @@ export function isFormSchemaProvider(plugin: IPlugin): plugin is IFormSchemaProv
 export interface GeneratorFormSchema {
 	/** Pipeline plugin ID the server resolved for this schema */
 	resolvedPipelineId?: string;
+	/**
+	 * When set, the user has configured a global default pipeline with "enforce" mode.
+	 * The frontend should pre-select this pipeline on initial load, but the user can
+	 * still change it manually. The backend does NOT enforce this — it only provides
+	 * the information so the frontend can handle the override.
+	 */
+	enforcedPipelineId?: string;
 	/** Available providers for each capability category (derived from SELECTABLE_PROVIDER_CATEGORIES) */
 	providers: FormSchemaProvidersType;
 	pluginFields: FormFieldDefinition[];

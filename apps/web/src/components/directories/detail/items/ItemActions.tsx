@@ -4,7 +4,12 @@ import React, { useState, useTransition, memo, useEffect } from 'react';
 import { ItemData } from '@/lib/api/types-only';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { removeItem, updateItem, captureScreenshot } from '@/app/actions/dashboard/items';
+import {
+    removeItem,
+    updateItem,
+    captureScreenshot,
+    checkItemHealth,
+} from '@/app/actions/dashboard/items';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -22,7 +27,15 @@ import {
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Loader2, MoreVertical, Trash2, SlidersHorizontal, Camera } from 'lucide-react';
+import {
+    Loader2,
+    MoreVertical,
+    Trash2,
+    SlidersHorizontal,
+    Camera,
+    ShieldAlert,
+    Link2,
+} from 'lucide-react';
 import { useItemsContext } from './ItemsContext';
 
 type ItemActionsProps = {
@@ -43,6 +56,13 @@ export const ItemActions = memo(function ItemActions({
     const [isDisplayDialogOpen, setIsDisplayDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);
+    const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+    const [isApplyingSuggestedSource, setIsApplyingSuggestedSource] = useState(false);
+    const suggestedSourceUrl =
+        item.source_validation?.suggested_source_url &&
+        item.source_validation.suggested_source_url !== item.source_url
+            ? item.source_validation.suggested_source_url
+            : null;
 
     const handleCaptureScreenshot = async () => {
         if (!item.source_url) {
@@ -79,12 +99,75 @@ export const ItemActions = memo(function ItemActions({
         }
     };
 
+    const handleCheckHealth = async () => {
+        if (!item.slug) {
+            return;
+        }
+
+        setIsCheckingHealth(true);
+        try {
+            const result = await checkItemHealth(directoryId, item.slug);
+
+            if (result.status === 'success' && result.item) {
+                onUpdate?.(result.item);
+                toast.success(result.message || t('sourceValidation.checkCompleted'));
+            } else {
+                toast.error(result.message || t('sourceValidation.checkFailed'));
+            }
+        } catch (error) {
+            toast.error(t('sourceValidation.checkFailed'));
+        } finally {
+            setIsCheckingHealth(false);
+        }
+    };
+
+    const handleUseSuggestedSource = async () => {
+        if (!item.slug || !suggestedSourceUrl) {
+            return;
+        }
+
+        setIsApplyingSuggestedSource(true);
+        try {
+            const result = await updateItem(directoryId, {
+                item_slug: item.slug,
+                source_url: suggestedSourceUrl,
+            });
+
+            if (result.status === 'success') {
+                onUpdate?.({
+                    source_url: suggestedSourceUrl,
+                    health: { status: 'unchecked' },
+                    source_validation: undefined,
+                });
+                toast.success(result.message || t('sourceValidation.suggestedSourceApplied'));
+            } else {
+                toast.error(result.message || t('sourceValidation.failedToUseSuggestedSource'));
+            }
+        } catch (error) {
+            toast.error(t('sourceValidation.failedToUseSuggestedSource'));
+        } finally {
+            setIsApplyingSuggestedSource(false);
+        }
+    };
+
     return (
         <>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" disabled={isPending || isCapturingScreenshot}>
-                        {isPending || isCapturingScreenshot ? (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={
+                            isPending ||
+                            isCapturingScreenshot ||
+                            isCheckingHealth ||
+                            isApplyingSuggestedSource
+                        }
+                    >
+                        {isPending ||
+                        isCapturingScreenshot ||
+                        isCheckingHealth ||
+                        isApplyingSuggestedSource ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                             <MoreVertical className="w-4 h-4" />
@@ -103,6 +186,34 @@ export const ItemActions = memo(function ItemActions({
                         <SlidersHorizontal className="w-4 h-4" />
                         {t('editDisplay', { defaultValue: 'Edit display' })}
                     </DropdownMenuItem>
+                    {item.source_url && (
+                        <DropdownMenuItem
+                            onClick={handleCheckHealth}
+                            disabled={isCheckingHealth}
+                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-primary dark:hover:text-primary focus:bg-surface-secondary dark:focus:bg-surface-secondary-dark transition-colors"
+                        >
+                            {isCheckingHealth ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <ShieldAlert className="w-4 h-4" />
+                            )}
+                            {t('sourceValidation.recheckSource')}
+                        </DropdownMenuItem>
+                    )}
+                    {suggestedSourceUrl && (
+                        <DropdownMenuItem
+                            onClick={handleUseSuggestedSource}
+                            disabled={isApplyingSuggestedSource}
+                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-primary dark:hover:text-primary focus:bg-surface-secondary dark:focus:bg-surface-secondary-dark transition-colors"
+                        >
+                            {isApplyingSuggestedSource ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Link2 className="w-4 h-4" />
+                            )}
+                            {t('sourceValidation.useSuggestedSource')}
+                        </DropdownMenuItem>
+                    )}
                     {item.source_url && screenshotAvailable && (
                         <DropdownMenuItem
                             onClick={handleCaptureScreenshot}

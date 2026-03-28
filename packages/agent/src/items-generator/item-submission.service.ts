@@ -38,7 +38,7 @@ export class ItemSubmissionService {
             // Use directory owner's credentials (they set up the repos)
             // but use current user as committer for attribution
             const directoryOwner = directory.user as User;
-            const committer = user.asCommitter();
+            const committer = directory.resolveCommitter(user);
 
             const repo = directory.getDataRepo();
             const owner = directory.getRepoOwner();
@@ -176,7 +176,7 @@ export class ItemSubmissionService {
                 provider,
                 dest,
                 `Add ${itemWithMarkdown.name}`,
-                user.asCommitter(),
+                directory.resolveCommitter(user),
             );
 
             // Push changes
@@ -283,7 +283,7 @@ export class ItemSubmissionService {
             // Use directory owner's credentials (they set up the repos)
             // but use current user as committer for attribution
             const directoryOwner = directory.user as User;
-            const committer = user.asCommitter();
+            const committer = directory.resolveCommitter(user);
 
             const repo = directory.getDataRepo();
             const owner = directory.getRepoOwner();
@@ -362,7 +362,12 @@ export class ItemSubmissionService {
             const commitMessage = removeItemDto.reason
                 ? `Remove ${itemData.name} - ${removeItemDto.reason}`
                 : `Remove ${itemData.name}`;
-            await this.gitFacade.commit(provider, dest, commitMessage, user.asCommitter());
+            await this.gitFacade.commit(
+                provider,
+                dest,
+                commitMessage,
+                directory.resolveCommitter(user),
+            );
 
             // Push changes
             await this.gitFacade.push(
@@ -438,7 +443,7 @@ export class ItemSubmissionService {
             // Use directory owner's credentials (they set up the repos)
             // but use current user as committer for attribution
             const directoryOwner = directory.user as User;
-            const committer = user.asCommitter();
+            const committer = directory.resolveCommitter(user);
 
             const repo = directory.getDataRepo();
             const owner = directory.getRepoOwner();
@@ -454,8 +459,8 @@ export class ItemSubmissionService {
 
             const data = await DataRepository.create(dest);
 
-            const itemExists = await data.itemExists(updateItemDto.item_slug);
-            if (!itemExists) {
+            const existingItem = await data.getItem(updateItemDto.item_slug).catch(() => null);
+            if (!existingItem) {
                 return {
                     status: 'error',
                     slug: directory.slug,
@@ -485,13 +490,36 @@ export class ItemSubmissionService {
                 });
             }
 
-            const updatedItem = await data.updateItemMetadata(updateItemDto.item_slug, {
-                featured: updateItemDto.featured,
-                order:
-                    updateItemDto.order !== undefined && updateItemDto.order !== null
-                        ? updateItemDto.order
-                        : undefined,
-            });
+            const sourceUrlChanged =
+                updateItemDto.source_url !== undefined &&
+                updateItemDto.source_url !== existingItem.source_url;
+
+            const itemUpdates: {
+                featured?: boolean;
+                order?: number;
+                source_url?: string;
+                health?: { status: 'unchecked' };
+                source_validation?: undefined;
+            } = {};
+
+            if (updateItemDto.featured !== undefined) {
+                itemUpdates.featured = updateItemDto.featured;
+            }
+
+            if (updateItemDto.order !== undefined && updateItemDto.order !== null) {
+                itemUpdates.order = updateItemDto.order;
+            }
+
+            if (updateItemDto.source_url !== undefined) {
+                itemUpdates.source_url = updateItemDto.source_url;
+            }
+
+            if (sourceUrlChanged) {
+                itemUpdates.health = { status: 'unchecked' };
+                itemUpdates.source_validation = undefined;
+            }
+
+            const updatedItem = await data.updateItemMetadata(updateItemDto.item_slug, itemUpdates);
 
             if (!updatedItem) {
                 return {
@@ -504,20 +532,28 @@ export class ItemSubmissionService {
             }
 
             await this.gitFacade.addAll(provider, dest);
-            const commitMessage = `Update ${updatedItem.name} metadata`;
-            await this.gitFacade.commit(provider, dest, commitMessage, user.asCommitter());
+            const commitMessage = sourceUrlChanged
+                ? `Update ${updatedItem.name} source`
+                : `Update ${updatedItem.name} metadata`;
+            await this.gitFacade.commit(
+                provider,
+                dest,
+                commitMessage,
+                directory.resolveCommitter(user),
+            );
             await this.gitFacade.push(
                 { dir: dest },
                 { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
 
             if (shouldCreatePR && branchName && defaultBranch) {
-                const prTitle = `Update ${updatedItem.name} metadata - ${format(new Date(), 'MM/dd/yyyy HH:mm')}`;
+                const prTitle = `${sourceUrlChanged ? 'Update source for' : 'Update'} ${updatedItem.name} - ${format(new Date(), 'MM/dd/yyyy HH:mm')}`;
                 const prBody =
-                    `Update item metadata: ${updatedItem.name}\n\n` +
+                    `${sourceUrlChanged ? 'Update item source' : 'Update item metadata'}: ${updatedItem.name}\n\n` +
                     `**Item Slug:** ${updateItemDto.item_slug}\n` +
                     `**Featured:** ${String(!!updatedItem.featured)}\n` +
                     `**Order:** ${updatedItem.order ?? 'n/a'}\n` +
+                    `**Source URL:** ${updatedItem.source_url}\n` +
                     `\nGenerated by [${appConfig.branding.getAppName()}](${appConfig.branding.getPlatformWebsite()})`;
 
                 const pr = await this.gitFacade.createPullRequest(
@@ -537,7 +573,9 @@ export class ItemSubmissionService {
                     slug: directory.slug,
                     item_name: updatedItem.name,
                     item_slug: updateItemDto.item_slug,
-                    message: `Item "${updatedItem.name}" metadata update submitted. PR #${pr.number} created.`,
+                    message: sourceUrlChanged
+                        ? `Item "${updatedItem.name}" source update submitted. PR #${pr.number} created.`
+                        : `Item "${updatedItem.name}" metadata update submitted. PR #${pr.number} created.`,
                     pr_number: pr.number,
                     pr_url: pr.url,
                     pr_branch_name: branchName,
@@ -551,7 +589,9 @@ export class ItemSubmissionService {
                 slug: directory.slug,
                 item_name: updatedItem.name,
                 item_slug: updateItemDto.item_slug,
-                message: `Item "${updatedItem.name}" metadata updated.`,
+                message: sourceUrlChanged
+                    ? `Item "${updatedItem.name}" source updated.`
+                    : `Item "${updatedItem.name}" metadata updated.`,
             };
         } catch (error) {
             this.logger.error('Failed to update item metadata', error);

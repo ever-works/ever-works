@@ -91,6 +91,10 @@
         "./comparison-generator": {
             "types": "./dist/comparison-generator/index.d.ts",
             "default": "./dist/comparison-generator/index.js"
+        },
+        "./account-transfer": {
+            "types": "./dist/account-transfer/index.d.ts",
+            "default": "./dist/account-transfer/index.js"
         }
     },
     "scripts": {
@@ -161,6 +165,7 @@
         "ajv": "^8.18.0",
         "ajv-formats": "^3.0.1",
         "cache-manager": "^7.2.7",
+        "check-links": "^3.0.1",
         "class-transformer": "^0.5.1",
         "class-validator": "^0.14.3",
         "date-fns": "^4.1.0",
@@ -170,7 +175,7 @@
         "semver": "^7.7.3",
         "superjson": "^1.13.3",
         "typeorm": "^0.3.28",
-        "yaml": "^2.8.2",
+        "yaml": "^2.8.3",
         "zod": "^3.25.76",
         "zod-to-json-schema": "^3.25.1"
     }

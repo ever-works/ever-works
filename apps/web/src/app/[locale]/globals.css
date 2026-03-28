@@ -103,10 +103,32 @@
     );
 }
 
-html,
+html {
+    max-width: 100vw;
+    /* Do NOT set overflow-x: hidden here — it promotes html into a scroll container
+       for both axes, so Radix's body scroll-lock causes a scrollbar on <html>.
+       overflow-x: hidden is only needed on body. */
+}
+
 body {
     max-width: 100vw;
     overflow-x: hidden;
+}
+
+/* Custom select dropdown animation */
+@keyframes sel-in {
+    from {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.sel-dropdown {
+    animation: sel-in 0.15s ease-out;
 }
 
 body {

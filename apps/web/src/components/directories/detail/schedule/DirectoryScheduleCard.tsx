@@ -297,7 +297,7 @@ function ScheduleForm({
             </header>
 
             {/* Summary chips */}
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 @sm/main:grid-cols-2 @3xl/main:grid-cols-4">
                 <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-4 space-y-1">
                     <p className="text-xs uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
                         {t('summary.status')}
@@ -321,7 +321,7 @@ function ScheduleForm({
 
             {activeProviders.length > 0 && <ActiveProvidersBar providers={activeProviders} />}
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 @lg/main:grid-cols-2">
                 <FieldCard
                     label={t('fields.cadence')}
                     helper={
@@ -332,9 +332,9 @@ function ScheduleForm({
                 >
                     <Select
                         value={form.cadence}
-                        onChange={(event) =>
+                        onValueChange={(val) =>
                             updateForm({
-                                cadence: event.target.value as DirectoryScheduleCadence,
+                                cadence: val as DirectoryScheduleCadence,
                             })
                         }
                     >
@@ -413,9 +413,9 @@ function ScheduleForm({
                     <FieldCard label={t('fields.billing')} helper={t('fields.billingHelp')}>
                         <Select
                             value={form.billingMode}
-                            onChange={(event) =>
+                            onValueChange={(val) =>
                                 updateForm({
-                                    billingMode: event.target.value as DirectoryScheduleBillingMode,
+                                    billingMode: val as DirectoryScheduleBillingMode,
                                 })
                             }
                         >
@@ -485,8 +485,11 @@ function PipelineOverrideField({
 
     return (
         <FieldCard label={t('fields.pipeline')} helper={t('fields.pipelineHelp')}>
-            <Select value={value ?? ''} onChange={(e) => onChange(e.target.value || undefined)}>
-                <option value="">{t('pipeline.inherit')}</option>
+            <Select
+                value={value ?? '__inherit__'}
+                onValueChange={(val) => onChange(val === '__inherit__' ? undefined : val)}
+            >
+                <option value="__inherit__">{t('pipeline.inherit')}</option>
                 {providers.map((p) => (
                     <option key={p.id} value={p.id} disabled={!p.configured}>
                         {p.name}

@@ -14,7 +14,6 @@ import { CompaniesController } from './controllers/companies.service';
 @Module({})
 export class TwentyCrmModule {
     static forRoot(config?: Partial<CrmConfigService>) {
-        console.log('forRoot', config?.twentyCrmConfig.apiKey);
         return {
             module: TwentyCrmModule,
             global: true,

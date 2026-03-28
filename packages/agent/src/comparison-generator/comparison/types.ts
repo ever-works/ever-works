@@ -1,4 +1,9 @@
-import type { ItemData, ComparisonData, ComparisonDimension } from '@ever-works/contracts';
+import type {
+    ItemData,
+    ComparisonData,
+    ComparisonDimension,
+    ComparisonSource,
+} from '@ever-works/contracts';
 
 export interface ComparisonPair {
     readonly itemA: ItemData;
@@ -9,7 +14,7 @@ export interface ComparisonPair {
 
 export interface ComparisonResearch {
     readonly content: string;
-    readonly sources: string[];
+    readonly sources: ComparisonSource[];
 }
 
 export interface ComparisonGenerationResult {
@@ -35,5 +40,21 @@ export const DEFAULT_COMPARISON_SETTINGS: ComparisonPluginSettings = {
     max_comparisons: 50,
     min_items_for_comparison: 3,
 };
+
+export type ComparisonProgressStage =
+    | 'researching'
+    | 'analyzing'
+    | 'writing'
+    | 'writing_extended'
+    | 'saving';
+
+export type ComparisonProgressCallback = (stage: ComparisonProgressStage) => void;
+
+export interface ComparisonProgressInfo {
+    readonly stage: ComparisonProgressStage;
+    readonly itemAName: string;
+    readonly itemBName: string;
+    readonly startedAt: string;
+}
 
 export type { ComparisonData, ComparisonDimension };

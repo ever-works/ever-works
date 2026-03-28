@@ -7,6 +7,7 @@ import { resolveEffectiveDefault } from '@ever-works/plugin';
 import { useTranslations } from 'next-intl';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { Tooltip } from '@/components/ui/tooltip';
+import { Check, Network } from 'lucide-react';
 
 interface ProviderSelectorProps {
     label: string;
@@ -35,12 +36,14 @@ export function ProviderSelector({
     }
 
     return (
-        <div className="flex items-center gap-3 py-2">
-            <div className="w-32 shrink-0">
-                <span className="text-sm font-medium text-text dark:text-text-dark">{label}</span>
+        <div className="flex items-center gap-4 px-5 py-3">
+            <div className="w-36 shrink-0">
+                <code className="text-xs font-mono font-medium text-text-secondary dark:text-text-secondary-dark bg-surface-secondary dark:bg-surface-secondary-dark px-1.5 py-0.5 rounded">
+                    {label}
+                </code>
             </div>
 
-            <div className="flex-1 flex flex-wrap gap-2">
+            <div className="flex-1 flex flex-wrap gap-1.5">
                 {providers.map((provider) => {
                     const isActive = value === provider.id || provider.id === effectiveDefaultId;
                     const button = (
@@ -60,34 +63,28 @@ export function ProviderSelector({
                                 provider.id === effectiveDefaultId
                             }
                             className={cn(
-                                'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border',
+                                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all duration-150',
+                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                                 isActive
-                                    ? 'border-primary bg-primary/10 text-primary'
-                                    : 'border-border dark:border-border-dark hover:border-primary/50 text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark',
+                                    ? 'border-primary/40 bg-primary/10 text-primary shadow-sm'
+                                    : 'border-border dark:border-border-dark bg-transparent text-text-secondary dark:text-text-secondary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-text dark:hover:text-text-dark hover:border-primary/30',
                                 !provider.configured && 'opacity-40 cursor-not-allowed',
                                 disabled && 'opacity-50 cursor-not-allowed',
                             )}
                         >
                             {provider.icon && (
-                                <PluginIcon icon={provider.icon} name={provider.name} size={20} />
+                                <PluginIcon
+                                    icon={provider.icon}
+                                    name={provider.name}
+                                    size={14}
+                                    plain
+                                />
                             )}
                             <span>
                                 {provider.name}
                                 {!provider.configured && ` (${t('notConfigured')})`}
                             </span>
-                            {isActive && (
-                                <svg
-                                    className="w-4 h-4 text-primary"
-                                    fill="currentColor"
-                                    viewBox="0 0 20 20"
-                                >
-                                    <path
-                                        fillRule="evenodd"
-                                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                        clipRule="evenodd"
-                                    />
-                                </svg>
-                            )}
+                            {isActive && <Check className="w-3 h-3 ml-0.5" />}
                         </button>
                     );
 
@@ -122,46 +119,65 @@ export function PipelineModeSelector({
         selectedPipeline ?? pipelineProviders.find((p) => p.isDefault)?.id ?? null;
 
     return (
-        <div
-            className={cn(
-                'rounded-lg border p-4',
-                'bg-card dark:bg-card-dark',
-                'border-card-border dark:border-card-border-dark',
-            )}
-        >
-            <h4 className="text-sm font-medium text-text dark:text-text-dark mb-3">
-                {t('pipelineMode')}
-            </h4>
+        <div className="rounded-xl border overflow-hidden border-border dark:border-border-dark bg-surface dark:bg-surface-dark">
+            <div className="px-5 py-3.5 border-b border-border dark:border-border-dark bg-surface-secondary/50 dark:bg-surface-secondary-dark/50 flex items-center gap-3">
+                <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Network className="w-4 h-4 text-primary" />
+                </div>
+                <h4 className="text-sm font-semibold text-text dark:text-text-dark leading-tight">
+                    {t('pipelineMode')}
+                </h4>
+            </div>
 
-            <div className="space-y-3">
+            <div className="divide-y divide-border dark:divide-border-dark">
                 {pipelineProviders.map((provider) => {
                     const isActive = effectiveSelected === provider.id;
-                    const radioLabel = (
-                        <label className="flex items-start gap-3 cursor-pointer">
-                            <input
-                                type="radio"
-                                name="pipeline-mode"
-                                checked={isActive}
-                                onChange={() => onChange(provider.id)}
-                                disabled={!provider.configured}
-                                className="mt-1"
-                            />
-                            <div className="flex-1">
-                                <span className="text-sm font-medium text-text dark:text-text-dark">
+                    const row = (
+                        <button
+                            type="button"
+                            onClick={() => onChange(provider.id)}
+                            disabled={!provider.configured}
+                            className={cn(
+                                'w-full flex items-start gap-3 px-5 py-3 text-left transition-colors',
+                                isActive
+                                    ? 'bg-primary/5 dark:bg-primary/10'
+                                    : 'hover:bg-surface-secondary/50 dark:hover:bg-surface-secondary-dark/50',
+                                !provider.configured && 'opacity-50 cursor-not-allowed',
+                            )}
+                        >
+                            <div
+                                className={cn(
+                                    'mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors',
+                                    isActive
+                                        ? 'border-primary'
+                                        : 'border-border dark:border-border-dark',
+                                )}
+                            >
+                                {isActive && <div className="w-2 h-2 rounded-full bg-primary" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <span
+                                    className={cn(
+                                        'text-sm font-medium',
+                                        isActive
+                                            ? 'text-text dark:text-text-dark'
+                                            : 'text-text-secondary dark:text-text-secondary-dark',
+                                    )}
+                                >
                                     {provider.name}
                                     {!provider.configured && (
-                                        <span className="ml-2 text-xs text-warning">
+                                        <span className="ml-2 text-xs font-normal text-warning">
                                             ({t('notConfigured')})
                                         </span>
                                     )}
                                 </span>
                                 {provider.description && (
-                                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                    <p className="mt-0.5 text-xs text-text-muted dark:text-text-muted-dark">
                                         {provider.description}
                                     </p>
                                 )}
                             </div>
-                        </label>
+                        </button>
                     );
 
                     return !provider.configured ? (
@@ -170,10 +186,10 @@ export function PipelineModeSelector({
                             content={t('notConfiguredTooltip')}
                             position="bottom"
                         >
-                            {radioLabel}
+                            {row}
                         </Tooltip>
                     ) : (
-                        <div key={provider.id}>{radioLabel}</div>
+                        <div key={provider.id}>{row}</div>
                     );
                 })}
             </div>

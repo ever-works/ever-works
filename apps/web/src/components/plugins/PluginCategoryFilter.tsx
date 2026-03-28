@@ -28,10 +28,10 @@ export function PluginCategoryFilter({
                 <button
                     onClick={() => onSelectCategory(null)}
                     className={cn(
-                        'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+                        'px-3 py-1 rounded-full text-sm font-medium transition-colors',
                         selectedCategory === null
-                            ? 'bg-primary text-white'
-                            : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
+                            ? 'bg-primary-500 text-white'
+                            : 'bg-surface-secondary dark:bg-surface-secondary-dark/50 text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
                     )}
                 >
                     {t('all')}
@@ -41,10 +41,10 @@ export function PluginCategoryFilter({
                         key={category}
                         onClick={() => onSelectCategory(category)}
                         className={cn(
-                            'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+                            'px-3 py-1 rounded-full text-sm font-medium transition-colors',
                             selectedCategory === category
-                                ? 'bg-primary text-white'
-                                : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
+                                ? 'bg-primary-500 text-white'
+                                : 'bg-surface-secondary dark:bg-surface-secondary-dark/50 text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
                         )}
                     >
                         {getCategoryLabel(category)}

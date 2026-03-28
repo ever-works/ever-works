@@ -26,7 +26,11 @@ export async function resendVerificationEmail() {
 }
 
 // Profile Actions
-export async function updateProfile(data: { username: string }) {
+export async function updateProfile(data: {
+    username: string;
+    committerName?: string | null;
+    committerEmail?: string | null;
+}) {
     const t = await getTranslations('actions.settings.profile');
     const tAuth = await getTranslations('validation.auth');
 
@@ -38,6 +42,8 @@ export async function updateProfile(data: { username: string }) {
                 VALIDATION_RULES.USERNAME_MIN_LENGTH,
                 tAuth('username.minLength', { length: VALIDATION_RULES.USERNAME_MIN_LENGTH }),
             ),
+        committerName: z.string().nullable().optional(),
+        committerEmail: z.string().email().nullable().optional().or(z.literal('')),
     });
 
     try {
@@ -55,7 +61,11 @@ export async function updateProfile(data: { username: string }) {
             };
         }
 
-        const result = await authAPI.updateProfile(validation.data);
+        const { committerEmail, ...rest } = validation.data;
+        const result = await authAPI.updateProfile({
+            ...rest,
+            committerEmail: committerEmail === '' ? null : committerEmail,
+        });
         revalidatePath(ROUTES.DASHBOARD_SETTINGS);
 
         return { success: true, data: result };

@@ -1,9 +1,14 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { directoryAPI } from '@/lib/api';
-import type { ItemData, Category, Collection, Tag } from '@/lib/api/types-only';
+import type {
+    ItemData,
+    Category,
+    Collection,
+    Tag,
+    SourceValidationSettingsDto,
+} from '@/lib/api/types-only';
 import { ItemsPageClient } from '@/components/directories/detail/items/ItemsPageClient';
-import { ItemsEmptyState } from '@/components/directories/detail/items/ItemsEmptyState';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -19,16 +24,19 @@ export default async function DirectoryItemsPage({ params }: Params) {
     let categories: Category[] = [];
     let tags: Tag[] = [];
     let collections: Collection[] = [];
+    let sourceValidationSettings: SourceValidationSettingsDto | null = null;
     let error: string | null = null;
 
     try {
         // Fetch items and taxonomy data in parallel
-        const [itemsRes, taxonomyRes] = await Promise.all([
+        const [itemsRes, taxonomyRes, sourceValidationRes] = await Promise.all([
             directoryAPI.getItems(id).catch(() => ({ items: [] })),
             directoryAPI
                 .getCategoriesTags(id)
                 .catch(() => ({ categories: [], tags: [], collections: [] })),
+            directoryAPI.getSourceValidationSettings(id).catch(() => null),
         ]);
+        sourceValidationSettings = sourceValidationRes;
 
         items = itemsRes.items || [];
 
@@ -46,7 +54,6 @@ export default async function DirectoryItemsPage({ params }: Params) {
         });
 
         // Ensure tags have proper structure
-        // Use the string itself as ID (it's likely already a slug that matches item references)
         tags = rawTags.map((tag: string | Tag) => {
             if (typeof tag === 'string') {
                 return { id: tag, name: tag };
@@ -74,10 +81,6 @@ export default async function DirectoryItemsPage({ params }: Params) {
         );
     }
 
-    if (items.length === 0) {
-        return <ItemsEmptyState directoryId={id} />;
-    }
-
     return (
         <ItemsPageClient
             items={items}
@@ -85,6 +88,7 @@ export default async function DirectoryItemsPage({ params }: Params) {
             categories={categories}
             tags={tags}
             collections={collections}
+            sourceValidationSettings={sourceValidationSettings}
         />
     );
 }

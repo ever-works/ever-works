@@ -43,7 +43,7 @@ export const CLAUDE_CODE_DIST_URL =
 /**
  * Default CLI version to download
  */
-export const DEFAULT_CLI_VERSION = '2.1.37';
+export const DEFAULT_CLI_VERSION = '2.1.76';
 
 /**
  * Default maximum number of agentic turns for Claude Code

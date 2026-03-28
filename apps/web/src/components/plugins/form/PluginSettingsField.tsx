@@ -4,6 +4,8 @@
 import { useTranslations } from 'next-intl';
 import { PluginSettingsSchemaProperty } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
+import { Select } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Eye, EyeOff, Pencil, X, KeyRound } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { PluginModelSelect } from './PluginModelSelect';
@@ -121,61 +123,51 @@ export function PluginSettingsField({
 
         // Enum - select (works for any type)
         if (schema.enum && schema.enum.length > 0) {
+            // Empty string is not a valid SelectItem value (Radix UI constraint), so map it to '__none__'
+            const currentValue = String(value ?? schema.default ?? '') || '__none__';
             return (
-                <select
-                    value={String(value ?? schema.default ?? '')}
-                    onChange={(e) => onChange(e.target.value || null)}
-                    required={required}
-                    className={cn(
-                        'w-full px-3 py-2 rounded-lg border border-border dark:border-border-dark',
-                        'bg-surface-secondary dark:bg-surface-secondary-dark',
-                        'text-text dark:text-text-dark',
-                        'focus:outline-none focus:ring-2 focus:ring-primary/50',
-                    )}
+                <Select
+                    value={currentValue}
+                    onValueChange={(v) => onChange(v === '__none__' ? '' : v)}
                 >
-                    <option value="">{t('selectPlaceholder')}</option>
+                    <option value="__none__">{t('selectPlaceholder')}</option>
                     {schema.enum.map((opt) => (
                         <option key={String(opt)} value={String(opt)}>
                             {String(opt)}
                         </option>
                     ))}
-                </select>
+                </Select>
             );
         }
 
-        // Number/Integer input
+        // Number/Integer input — use shared Input component
         if (isType(schema.type, 'number') || isType(schema.type, 'integer')) {
             return (
-                <input
+                <Input
                     type="number"
-                    step={isType(schema.type, 'integer') ? 1 : 'any'}
+                    step={isType(schema.type, 'integer') ? '1' : 'any'}
                     value={
                         value === null
                             ? ''
                             : value !== undefined
-                              ? Number(value)
+                              ? String(Number(value))
                               : schema.default !== undefined
-                                ? Number(schema.default)
+                                ? String(Number(schema.default))
                                 : ''
                     }
                     onChange={(e) =>
                         onChange(
-                            e.target.value === ''
+                            e.currentTarget.value === ''
                                 ? null
                                 : isType(schema.type, 'integer')
-                                  ? parseInt(e.target.value, 10)
-                                  : parseFloat(e.target.value),
+                                  ? parseInt(e.currentTarget.value, 10)
+                                  : parseFloat(e.currentTarget.value),
                         )
                     }
-                    min={schema.minimum}
-                    max={schema.maximum}
+                    min={schema.minimum?.toString()}
+                    max={schema.maximum?.toString()}
                     required={required}
-                    className={cn(
-                        'w-full px-3 py-2 rounded-lg border border-border dark:border-border-dark',
-                        'bg-surface-secondary dark:bg-surface-secondary-dark',
-                        'text-text dark:text-text-dark',
-                        'focus:outline-none focus:ring-2 focus:ring-primary/50',
-                    )}
+                    variant="form"
                     placeholder={schema.default !== undefined ? String(schema.default) : undefined}
                 />
             );
@@ -235,21 +227,16 @@ export function PluginSettingsField({
         return (
             <div className="flex items-center gap-2">
                 <div className="relative flex-1">
-                    <input
+                    <Input
                         type={getInputType()}
                         value={String(value ?? schema.default ?? '')}
-                        onChange={(e) => onChange(e.target.value)}
+                        onChange={(e) => onChange(e.currentTarget.value)}
                         maxLength={schema.maxLength}
                         required={required}
                         autoFocus={isEditing}
                         placeholder={isEditing ? t('enterNewValue') : undefined}
-                        className={cn(
-                            'w-full px-3 py-2 rounded-lg border border-border dark:border-border-dark',
-                            'bg-surface-secondary dark:bg-surface-secondary-dark',
-                            'text-text dark:text-text-dark',
-                            'focus:outline-none focus:ring-2 focus:ring-primary/50',
-                            isSecret && 'pr-10',
-                        )}
+                        variant="form"
+                        className={cn(isSecret && 'pr-10')}
                     />
                     {isSecret && (
                         <button

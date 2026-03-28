@@ -193,6 +193,101 @@
             }
         }
     },
+    "onboarding": {
+        "label": "Getting started",
+        "title": "Welcome to Ever Works",
+        "subtitle": "Build and publish your first directory in minutes.",
+        "skipButton": "Skip for now",
+        "nextButton": "Next",
+        "stepIndex": "Step {index}",
+        "steps": {
+            "welcome": {
+                "title": "What is Ever Works?",
+                "description": "Ever Works is an open-source directory builder. Create structured content directories — tools, jobs, links, products — and publish them as live websites.",
+                "detail": "Let's get you set up. Connect your providers below, then create your first directory.",
+                "feature1": {
+                    "title": "AI-powered content",
+                    "description": "Generate and enrich directory items automatically using your AI provider."
+                },
+                "feature2": {
+                    "title": "Instant publishing",
+                    "description": "Deploy to Vercel with one click — no server configuration needed."
+                },
+                "feature3": {
+                    "title": "Git-backed",
+                    "description": "Every directory is a GitHub repository you own and control."
+                }
+            },
+            "directory": {
+                "title": "Create your first directory",
+                "description": "A directory is your content hub. Add items, configure the layout, and publish it in one click.",
+                "detail": "You're all set! Create your first directory to start building and publishing content.",
+                "action": "Create a directory"
+            },
+            "publish": {
+                "title": "Go live",
+                "description": "Connect Vercel or GitHub to deploy your directory as a public website — no hosting configuration needed.",
+                "action": "Set up publishing"
+            }
+        },
+        "pluginStep": {
+            "saveButton": "Save settings",
+            "savedSuccess": "Settings saved.",
+            "noSettings": "No configuration required for this plugin.",
+            "getTokenPrompt": "Create a token first, then paste it below and save to verify the connection."
+        },
+        "plugins": {
+            "byokDescription": "Connect your own key to unlock the full configuration.",
+            "byokDefaultButton": "Bring your own key",
+            "setupTokenDescription": "Create a token first, then paste it below and save to verify the connection."
+        },
+        "claudeWizard": {
+            "label": "Claude Code setup",
+            "title": "Set up Claude Code in three steps",
+            "subtitle": "This flow keeps the recommended configuration visible and verifies the connection before you finish.",
+            "stepIndex": "Step {index}",
+            "continueButton": "Continue",
+            "steps": {
+                "model": {
+                    "title": "Pick a model",
+                    "description": "Sonnet is preselected as the recommended balance of quality and speed, but you can switch to any supported model."
+                },
+                "credentials": {
+                    "title": "Add credentials",
+                    "description": "Paste your Claude Code OAuth token or an Anthropic API key. Either one works."
+                },
+                "verify": {
+                    "title": "Verify connection",
+                    "description": "Save settings and run a live connection check against Claude before finishing.",
+                    "checkTitle": "Run a live Claude validation",
+                    "checkDescription": "Saving here runs a Claude API or CLI check depending on which credential you supplied.",
+                    "button": "Verify and finish setup",
+                    "successDefault": "Claude connection verified."
+                }
+            }
+        },
+        "simWizard": {
+            "label": "SIM AI setup",
+            "title": "Set up SIM AI in two steps",
+            "subtitle": "Add your SIM AI API key and verify the connection to start delegating directory generation to SIM workflows.",
+            "stepIndex": "Step {index}",
+            "continueButton": "Continue",
+            "steps": {
+                "credentials": {
+                    "title": "Add API key",
+                    "description": "Paste your SIM AI API key from your dashboard. Optionally set a custom base URL if you use a self-hosted instance."
+                },
+                "verify": {
+                    "title": "Verify connection",
+                    "description": "Save your API key and run a live connection check against SIM AI.",
+                    "checkTitle": "Run a live SIM AI validation",
+                    "checkDescription": "Saving here verifies your API key is valid and can connect to SIM AI.",
+                    "button": "Verify and finish setup",
+                    "successDefault": "SIM AI connection verified."
+                }
+            }
+        }
+    },
     "dashboard": {
         "title": "Dashboard",
         "toasts": {
@@ -219,7 +314,8 @@
             "subtitle": "Manage your AI-powered directories and track their performance",
             "notifications": {
                 "title": "Notifications",
-                "empty": "No new notifications"
+                "empty": "No new notifications",
+                "fetchFailed": "Failed to load notifications"
             },
             "help": {
                 "title": "Help & Resources",
@@ -255,6 +351,7 @@
             "search": "Search directories...",
             "create": "Create Directory",
             "showing": "Showing {current} of {total} directories",
+            "searchFailed": "Failed to search directories. Please try again.",
             "pagination": {
                 "previous": "Previous",
                 "next": "Next"
@@ -277,8 +374,88 @@
                 "profile": "Profile",
                 "security": "Security",
                 "apiKeys": "API Keys",
+                "data": "Data",
                 "gitProviders": "Git Providers",
                 "dangerZone": "Danger Zone"
+            },
+            "data": {
+                "exportTitle": "Export Data",
+                "exportDescription": "Download your account data including directories, plugin settings, and profile information as a JSON file.",
+                "includeSecrets": "Include secret settings (API keys, tokens) — exported as masked values",
+                "secretsWarning": "Secret settings will be exported as masked values. You will need to manually replace them with real credentials before importing.",
+                "exportButton": "Export Data",
+                "exporting": "Exporting...",
+                "exportSuccess": "Data exported successfully",
+                "exportError": "Failed to export data",
+                "importTitle": "Import Data",
+                "importDescription": "Import data from a previously exported JSON file. You can resolve conflicts for directories with matching slugs.",
+                "importButton": "Import Data",
+                "syncTitle": "GitHub Sync",
+                "syncDescription": "Sync your account configuration to a private GitHub repository for backup and migration between instances.",
+                "import": {
+                    "dropzone": "Drag and drop a JSON export file here, or click to browse",
+                    "selectFile": "Select File",
+                    "analyzing": "Analyzing...",
+                    "invalidFileType": "Please select a JSON file",
+                    "invalidJson": "Invalid JSON file",
+                    "previewError": "Failed to analyze import file",
+                    "summary": "Import Summary",
+                    "directories": "Directories",
+                    "items": "Items",
+                    "userPlugins": "User Plugins",
+                    "version": "Format Version",
+                    "missingPlugins": "These plugins are not installed and will be skipped",
+                    "conflicts": "Slug Conflicts",
+                    "existingDirectory": "Existing",
+                    "incoming": "Incoming",
+                    "strategySkip": "Skip (keep existing)",
+                    "strategyOverwrite": "Overwrite existing",
+                    "strategyRename": "Import with new slug",
+                    "secretsIncluded": "This export includes secret settings that will be imported.",
+                    "maskedSecretsWarning": "This file contains masked secret values (MASKED:***). Please open the JSON file and replace all masked values with your real API keys and credentials before importing. Masked values will be skipped during import.",
+                    "applyImport": "Apply Import",
+                    "applying": "Importing...",
+                    "importSuccess": "Data imported successfully",
+                    "importFailed": "Import completed with errors",
+                    "importError": "Failed to import data",
+                    "cancel": "Cancel",
+                    "done": "Done",
+                    "validationErrors": "Validation Errors",
+                    "resultSuccess": "Import Completed Successfully",
+                    "resultFailed": "Import Failed",
+                    "directoriesCreated": "Directories created",
+                    "directoriesUpdated": "Directories updated",
+                    "directoriesSkipped": "Directories skipped",
+                    "pluginsImported": "Plugins imported",
+                    "warnings": "Warnings",
+                    "errors": "Errors"
+                },
+                "sync": {
+                    "loading": "Loading sync status...",
+                    "connectGitHub": "Connect GitHub",
+                    "connectGitHubDescription": "Connect your GitHub account in the Git Providers settings to enable sync.",
+                    "setupSync": "Set Up GitHub Sync",
+                    "createNewRepo": "Create new private repository (ever-works-config)",
+                    "or": "or",
+                    "repoPlaceholder": "owner/repo-name",
+                    "connect": "Connect",
+                    "cancel": "Cancel",
+                    "configureSuccess": "Sync repository configured",
+                    "configureError": "Failed to configure sync",
+                    "invalidRepoName": "Enter a valid repository name (owner/repo)",
+                    "lastPush": "Last push",
+                    "lastPull": "Last pull",
+                    "push": "Push to GitHub",
+                    "pull": "Pull from GitHub",
+                    "disconnect": "Disconnect",
+                    "pushSuccess": "Configuration pushed to GitHub",
+                    "pushError": "Failed to push to GitHub",
+                    "pullError": "Failed to pull from GitHub",
+                    "disconnectSuccess": "Sync disconnected",
+                    "disconnectError": "Failed to disconnect",
+                    "includeSecrets": "Include API keys and secrets (masked)",
+                    "secretsWarning": "Secret values will be stored as masked placeholders in your GitHub repository. Real credentials are never pushed to GitHub."
+                }
             },
             "pluginCategories": {
                 "ai-provider": "AI Providers",
@@ -294,7 +471,16 @@
                 "configure": "Configure",
                 "noPluginsInCategory": "No plugins in this category",
                 "requiredSettingsMissing": "Required settings not configured",
-                "backToCategory": "Back to {category}"
+                "backToCategory": "Back to {category}",
+                "pipelineDefault": {
+                    "title": "Default Pipeline",
+                    "description": "Choose which pipeline is used by default when generating directory items.",
+                    "autoLabel": "Auto",
+                    "autoDescription": "Use the system-resolved pipeline for each directory",
+                    "enforceLabel": "Enforce this default",
+                    "enforceDescription": "Always pre-select this pipeline, even when a directory has its own pipeline configured. You can still switch pipelines manually in the form.",
+                    "saveFailed": "Failed to save pipeline default"
+                }
             },
             "profile": {
                 "title": "Profile Settings",
@@ -324,6 +510,12 @@
                     "resend": "Resend",
                     "sent": "Verification email sent. Check your inbox.",
                     "sendFailed": "Failed to send verification email. Please try again."
+                },
+                "committer": {
+                    "title": "Git Committer",
+                    "description": "Override the name and email used in git commits. Leave empty to use your account name ({defaultName}) and email ({defaultEmail}).",
+                    "nameLabel": "Committer Name",
+                    "emailLabel": "Committer Email"
                 }
             },
             "security": {
@@ -725,7 +917,14 @@
                     "generating": "Generating comparisons: {completed} / {total} complete",
                     "error": "{count, plural, one {# error} other {# errors}}",
                     "stopped": "Stopped. Generated {count, plural, one {# comparison} other {# comparisons}} with {errors, plural, one {# error} other {# errors}}.",
-                    "done": "Done! Generated {count, plural, one {# comparison} other {# comparisons}}."
+                    "done": "Done! Generated {count, plural, one {# comparison} other {# comparisons}}.",
+                    "stages": {
+                        "researching": "Researching {itemA} vs {itemB}...",
+                        "analyzing": "Analyzing comparison data...",
+                        "writing": "Writing comparison article...",
+                        "writing_extended": "Writing extended analysis...",
+                        "saving": "Saving and publishing..."
+                    }
                 },
                 "pagination": {
                     "showing": "Showing {from}–{to} of {total}"
@@ -788,7 +987,40 @@
                 },
                 "loadMore": "Load more",
                 "noMore": "No more records",
-                "unknown": "Unknown"
+                "unknown": "Unknown",
+                "activity": {
+                    "generation": "Generation",
+                    "item_added": "Item Added",
+                    "item_updated": "Item Updated",
+                    "item_removed": "Item Removed",
+                    "comparison_added": "Comparison Added",
+                    "comparison_removed": "Comparison Removed",
+                    "category_change": "Category Change",
+                    "tag_change": "Tag Change",
+                    "collection_change": "Collection Change",
+                    "community_pr_merged": "Community PR"
+                },
+                "detail": {
+                    "added": "Added",
+                    "updated": "Updated",
+                    "removed": "Removed",
+                    "fields": "Fields",
+                    "expand": "Expand details",
+                    "collapse": "Collapse details",
+                    "stepLogs": "Step Logs"
+                },
+                "filters": {
+                    "label": "Activity",
+                    "all": "All activity",
+                    "generation": "Generation",
+                    "items": "Items",
+                    "comparisons": "Comparisons",
+                    "taxonomy": "Taxonomy",
+                    "community_pr": "Community PR"
+                },
+                "pagination": {
+                    "showing": "Showing {from}-{to} of {total}"
+                }
             },
             "info": {
                 "title": "Directory Information",
@@ -954,7 +1186,8 @@
                     "browseItems": "Browse Items",
                     "categories": "Categories",
                     "tags": "Tags",
-                    "collections": "Collections"
+                    "collections": "Collections",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -1083,6 +1316,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Re-check source",
+                    "checkCompleted": "Item source check completed",
+                    "checkFailed": "Item source check failed",
+                    "failedToCheckSource": "Failed to check item source",
+                    "brokenLink": "Broken link",
+                    "needsReview": "Needs review",
+                    "healthy": "Healthy",
+                    "couldNotVerify": "Could not verify",
+                    "sourceMayHaveIssues": "Source may have issues",
+                    "sourceChecked": "Source checked",
+                    "reachable": "Reachable",
+                    "reachabilityInconclusive": "Automated reachability inconclusive",
+                    "accurateSource": "Accurate source",
+                    "sourceTooGeneric": "Source too generic",
+                    "weakSource": "Weak source",
+                    "sourceAccuracyUnknown": "Source accuracy unknown",
+                    "useSuggestedSource": "Apply suggestion",
+                    "suggestedSourceApplied": "Suggested source applied",
+                    "failedToUseSuggestedSource": "Failed to use suggested source"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {
@@ -1226,7 +1492,9 @@
                     "processing": "Processing..."
                 },
                 "progress": "Progress",
-                "closeNote": "This may take a few minutes. You can close this page and come back later."
+                "closeNote": "This may take a few minutes. You can close this page and come back later.",
+                "showLogs": "Show step logs",
+                "hideLogs": "Hide step logs"
             },
             "settings": {
                 "sourceSettings": "Source Repository",
@@ -1457,6 +1725,15 @@
                             "targetBlank": "New tab"
                         }
                     }
+                },
+                "committer": {
+                    "title": "Git Committer",
+                    "description": "Override the committer name and email for git commits in this directory. Leave empty to use your user-level settings or account defaults.",
+                    "nameLabel": "Committer Name",
+                    "emailLabel": "Committer Email",
+                    "save": "Save Committer",
+                    "saved": "Committer settings saved",
+                    "saveFailed": "Failed to save committer settings"
                 }
             },
             "deploy": {
@@ -1771,6 +2048,25 @@
                     "title": "Source Attribution:",
                     "text": "This directory will reference {url} as its source"
                 },
+                "research": {
+                    "title": "Import & Research Mode",
+                    "description": "Items from the source repository will be used as research seeds. The AI pipeline will discover new items, rewrite descriptions, and expand the taxonomy.",
+                    "seedDetected": "~{count} seed items detected",
+                    "expansionFactor": "Expansion target",
+                    "expansionDescription": "How many times larger should the final collection be compared to the source?",
+                    "preview": "~{seedCount} seed items \u2192 target ~{targetCount} final items (~{newItems} new items to discover)",
+                    "enrichmentOptions": "Enrichment options",
+                    "enrichDescriptions": "Rewrite descriptions",
+                    "enrichDescriptionsHint": "AI will rewrite and expand all imported descriptions",
+                    "expandTaxonomy": "Expand categories & tags",
+                    "expandTaxonomyHint": "Generate new categories and tags beyond the source taxonomy",
+                    "parsePrIssues": "Parse PRs & issues",
+                    "parsePrIssuesHint": "Extract additional items from pull requests and issues",
+                    "legalNote": "Note:",
+                    "legalDescription": "Research mode uses the source repository as input data only. The final collection will consist primarily of newly discovered items with original, AI-generated descriptions. Source content is not copied verbatim.",
+                    "importButton": "Start Import & Research",
+                    "importingButton": "Starting research pipeline..."
+                },
                 "analyzeButton": "Analyze Repository",
                 "importButton": "Import Directory",
                 "importingButton": "Importing...",
@@ -1815,6 +2111,10 @@
                     "linkExisting": {
                         "title": "Link Existing",
                         "description": "Use your existing repository directly. No copying, changes sync automatically."
+                    },
+                    "research": {
+                        "title": "Import & Research",
+                        "description": "Use as research seed, auto-discover new items and enrich content with AI."
                     },
                     "back": "Back"
                 },
@@ -1995,6 +2295,12 @@
                 "plugins": "Plugins",
                 "settings": "Settings"
             },
+            "profileMenu": {
+                "accountSettings": "Account Settings",
+                "helpDocs": "Help & Docs",
+                "support": "Support",
+                "keyboardShortcuts": "Keyboard Shortcuts"
+            },
             "signOut": "Sign Out",
             "signingOut": "Signing out..."
         },
@@ -2034,17 +2340,56 @@
         "aiChat": {
             "title": "AI Assistant",
             "subtitle": "Create directories with natural language",
+            "welcomeTitle": "Welcome to AI Assistant \uD83D\uDC4B",
+            "welcomeSubtitle": "Your AI-powered assistant. Ask me anything about creating directories, generating content, or organizing your data.",
             "welcomeMessage": "Hi! I can help you create directories using natural language. Ask something like \"Create a directory for AI tools\" or describe what you need.",
+            "capabilities": {
+                "directoryCreation": "Directory Creation",
+                "directoryCreationDesc": "Build directories from natural language descriptions",
+                "webResearch": "Web Research",
+                "webResearchDesc": "Search and collect data from across the web",
+                "contentGeneration": "Content Generation",
+                "contentGenerationDesc": "Generate descriptions, categories, and metadata",
+                "smartSuggestions": "Smart Suggestions",
+                "smartSuggestionsDesc": "Get AI-powered recommendations for your projects"
+            },
             "newChat": "New chat",
-            "loadingConversation": "Loading conversation…",
-            "inputPlaceholder": "Describe the directory you want to create...",
+            "history": "History",
+            "loadingConversation": "Loading conversation\u2026",
+            "inputPlaceholder": "Ask me anything...",
             "sendButton": "Send",
-            "sendHint": "Enter to send · Shift+Enter for new line",
+            "sendHint": "Enter to send \u00b7 Shift+Enter for new line",
+            "providersError": "Failed to load AI providers. Chat may not work correctly.",
             "providerNotConfigured": "This provider is not configured. Set it up in Plugins.",
             "editMessage": "Edit message",
             "saveEdit": "Save & Submit",
             "cancelEdit": "Cancel",
             "edited": "(edited)",
+            "thinking": "Thinking...",
+            "toolCompleted": "completed",
+            "selectProvider": "Provider",
+            "notConfigured": "Not configured",
+            "gitNotConnected": "Git provider not connected",
+            "gitNotConnectedDesc": "Connect your git provider to create and manage directories.",
+            "connectGithub": "Connect GitHub",
+            "gitConnectedAs": "Connected as {username} via {provider}",
+            "deployNotConfigured": "Deploy provider not configured",
+            "deployNotConfiguredDesc": "Configure a deployment provider to publish your directory websites.",
+            "configureDeployProvider": "Configure Deploy Provider",
+            "deployConfigured": "Deploy provider configured ({provider})",
+            "opened": "Opened",
+            "historyEmpty": "No conversations yet. Start a chat to see your history here.",
+            "historyUntitled": "Untitled conversation",
+            "historyToday": "Today",
+            "historyYesterday": "Yesterday",
+            "historyDaysAgo": "{days}d ago",
+            "suggestions": {
+                "s1": "Show my directories",
+                "s2": "Create a directory of AI tools",
+                "s3": "Check my git connection",
+                "s4": "Show my stats"
+            },
+            "feelingLucky": "Suggest a directory to create",
             "errors": {
                 "unableToSend": "Unable to send message"
             }
@@ -2231,6 +2576,17 @@
     "errors": {
         "global": {
             "title": "Something went wrong!",
+            "tryAgain": "Try again"
+        },
+        "notFound": {
+            "title": "Page not found",
+            "description": "The page you're looking for doesn't exist or has been moved.",
+            "backHome": "Back to Dashboard",
+            "goBack": "Go Back"
+        },
+        "dashboard": {
+            "title": "Something went wrong",
+            "description": "An unexpected error occurred. Please try again or contact support if the problem persists.",
             "tryAgain": "Try again"
         }
     },

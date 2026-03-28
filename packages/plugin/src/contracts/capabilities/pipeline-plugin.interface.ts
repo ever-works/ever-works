@@ -10,6 +10,7 @@ import type {
 import type { IBuiltInStepExecutor } from '../../pipeline/built-in-step-executor.interface.js';
 import type { StepExecutionContext } from '../../pipeline/step-execution-context.interface.js';
 import type { PipelineMetrics } from '../../pipeline/step-types.js';
+import type { GenerationStepLog } from '@ever-works/contracts/api';
 
 // ============================================================================
 // Shared Pipeline Types
@@ -35,6 +36,8 @@ export interface PipelineExecutionOptions {
 	readonly maxConcurrent?: number;
 	/** Facade access for any pipeline (provided by the engine) */
 	readonly execContext?: StepExecutionContext;
+	/** Callback for structured log entries (used by log collector) */
+	readonly onLogEntry?: (log: GenerationStepLog) => void;
 }
 
 /**

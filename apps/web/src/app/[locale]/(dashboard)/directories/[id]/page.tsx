@@ -6,6 +6,7 @@ import { DirectoryInfo } from '@/components/directories/detail/overview/Director
 import { DirectoryStats } from '@/components/directories/detail/overview/DirectoryStats';
 import { DirectoryConfig } from '@/components/directories/detail/overview/DirectoryConfig';
 import { GenerateStatusType } from '@/lib/api/enums';
+import { notFound } from 'next/navigation';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -17,16 +18,25 @@ type Params = { params: Promise<{ id: string }> };
 export default async function DirectoryOverviewPage({ params }: Params) {
     const { id } = await params;
 
-    const [directoryRes, configRes, countRes] = await Promise.all([
-        directoryAPI.get(id),
-        directoryAPI.getConfig(id).catch(() => ({ config: null })),
-        directoryAPI
-            .getCount(id)
-            .catch(() => ({ items: 0, categories: 0, tags: 0, comparisons: 0 })),
-    ]);
+    let directory;
+    let config = null;
+    let countRes = { items: 0, categories: 0, tags: 0, comparisons: 0 };
 
-    const directory = directoryRes.directory;
-    const config = configRes.config;
+    try {
+        const [directoryRes, configResult, countResult] = await Promise.all([
+            directoryAPI.get(id),
+            directoryAPI.getConfig(id).catch(() => ({ config: null })),
+            directoryAPI
+                .getCount(id)
+                .catch(() => ({ items: 0, categories: 0, tags: 0, comparisons: 0 })),
+        ]);
+
+        directory = directoryRes.directory;
+        config = configResult.config;
+        countRes = countResult;
+    } catch {
+        notFound();
+    }
 
     const showStatusCard =
         !directory.generateStatus?.status ||
@@ -49,7 +59,7 @@ export default async function DirectoryOverviewPage({ params }: Params) {
             />
 
             {/* Directory Info and Config side by side */}
-            <div className="grid lg:grid-cols-2 gap-6">
+            <div className="grid @3xl/main:grid-cols-2 gap-6">
                 <DirectoryInfo directory={directory} config={config} />
                 {config && <DirectoryConfig config={config} />}
             </div>

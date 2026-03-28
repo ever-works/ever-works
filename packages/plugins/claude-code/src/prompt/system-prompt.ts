@@ -66,12 +66,13 @@ When setting \`category\`, \`tags\`, and \`brands\` fields in your item JSON fil
 - Maintain category balance — avoid putting most items in a single category.
 
 ## Markdown Rules
-The \`markdown\` field should contain a detailed, factual description:
+The \`markdown\` field is for detailed product/service information only:
 - Extract only relevant, factual information — no marketing language or testimonials.
 - Include ALL features comprehensively, not just key highlights.
 - Include a Pricing section with all available plans when applicable.
 - Do not include support/contact info for products.
 - Use structured markdown: ## headings, bullet lists, tables where appropriate.
+- Do NOT repeat metadata already in other JSON fields (category, tags, brand, source_url).
 {existingItemsSection}{modificationSection}
 ## Generation Target
 Aim to generate approximately **{targetItems}** new items. This is a target — prioritize quality and relevance over hitting the exact number, but do not stop early if there are more relevant items to find. Do not count existing items toward this target.
@@ -91,18 +92,21 @@ export function buildSystemPromptVariables(
 	let existingItemsSection = '';
 	if (hasExisting) {
 		existingItemsSection =
-			'\n## Avoiding Duplicates\n' +
-			`The workspace already contains ${existingCount} existing item files (e.g., \`my-tool.json\`). ` +
+			'\n## Existing Items — Research Seeds\n' +
+			`The workspace already contains **${existingCount}** existing item files. ` +
+			`These are **research seeds** — treat them as starting-point input, NOT as final content.\n\n` +
 			'A lightweight index is available at `_meta/existing-items.jsonl` ' +
 			'(one JSON per line with slug, name, source_url).\n\n' +
-			'Before creating a new item file, check if a file with that slug already exists in the workspace.\n\n' +
 			'To check for duplicates, **use `grep`** on the index — do NOT read the entire file:\n' +
 			'- Search for URLs: `grep "example.com" _meta/existing-items.jsonl`\n' +
 			'- Search for names: `grep -i "keyword" _meta/existing-items.jsonl`\n\n' +
-			'**Do NOT** modify or rewrite existing item files unless the user request specifically asks for ' +
-			'updates (e.g., reorganization, merging categories, updating fields). ' +
-			'Only create NEW items alongside existing ones.\n\n' +
-			'You may read an individual existing item (e.g., `my-tool.json`) for reference.\n' +
+			'### Enrichment Rules (IMPORTANT)\n' +
+			'1. **Never copy seed content verbatim.** Descriptions, categories, and tags from seeds are input for research only.\n' +
+			'2. **Expand significantly.** Discover NEW items via web search so that seed items represent at most ~30-40% of the final collection. ' +
+			'Search broadly: look for alternatives, competitors, and related projects NOT in the seed list.\n' +
+			'3. **Rewrite all descriptions.** Read each existing item and rewrite its description — add what the tool/project does (2-3 sentences), key features, use cases, and comparisons to alternatives. Do NOT keep original descriptions as-is.\n' +
+			'4. **Expand taxonomy.** Propose new categories beyond the existing ones — seed categories should be ~30% of the final taxonomy. Add descriptive tags that help users filter and discover items.\n' +
+			'5. **Add images.** When rewriting descriptions, include screenshots or logos where available.\n\n' +
 			'**Do NOT** create duplicates — focus on NEW complementary items.\n';
 	}
 
@@ -111,11 +115,11 @@ export function buildSystemPromptVariables(
 		modificationSection =
 			'\n## Modifying Existing Items\n' +
 			'When the user asks to reorganize, merge categories, update fields, or otherwise modify existing items:\n' +
-			'1. Read `_meta/categories.json`, `_meta/tags.json` to understand the current taxonomy.\n' +
-			'2. List existing item files in the workspace root.\n' +
-			'3. Read items that need changes.\n' +
+			'1. **Assess first.** Read `_meta/categories.json`, `_meta/tags.json` to understand the current taxonomy.\n' +
+			'2. **Plan the changes.** Decide which categories/tags to merge, rename, or restructure. Ensure each category appears in only ONE merge target — never assign the same category to two different merges.\n' +
+			'3. **Work in small batches.** Process one merge/rename operation at a time: find affected items, update them, then move to the next operation.\n' +
 			'4. Write the modified item JSON back to the same filename.\n' +
-			'5. Do NOT search the web or create new items when the prompt is about reorganizing existing data.\n';
+			'5. Do NOT search the web or create new items when the prompt is ONLY about reorganizing existing data.\n';
 	}
 
 	let directorySection = '';

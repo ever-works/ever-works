@@ -500,7 +500,8 @@
                             "paused": "一時停止中",
                             "canceled": "キャンセル済",
                             "disabled": "無効"
-                        }
+                        },
+                        "nextSourceValidation": "次回のソース検証"
                     },
                     "fields": {
                         "automation": "自動化",
@@ -513,7 +514,9 @@
                         "maxFailures": "失敗制限",
                         "maxFailuresHelp": "この回数だけ失敗すると自動的に一時停止します。",
                         "createPullRequest": "プルリクエストを作成",
-                        "createPullRequestHelp": "有効にすると、スケジュールされた更新は直接コミットする代わりにプルリクエストを作成します。"
+                        "createPullRequestHelp": "有効にすると、スケジュールされた更新は直接コミットする代わりにプルリクエストを作成します。",
+                        "sourceValidationCadence": "ソース検証の頻度",
+                        "sourceValidationCadenceHelp": "既定では更新頻度と同じ設定になりますが、遅くしたり速くしたりできます。"
                     },
                     "billing": {
                         "subscription": "サブスクリプション",
@@ -630,7 +633,39 @@
                 },
                 "loadMore": "もっと読み込む",
                 "noMore": "これ以上の記録はありません",
-                "unknown": "不明"
+                "unknown": "不明",
+                "activity": {
+                    "generation": "生成",
+                    "item_added": "項目を追加",
+                    "item_updated": "項目を更新",
+                    "item_removed": "項目を削除",
+                    "comparison_added": "比較を追加",
+                    "comparison_removed": "比較を削除",
+                    "category_change": "カテゴリ変更",
+                    "tag_change": "タグ変更",
+                    "collection_change": "コレクション変更",
+                    "community_pr_merged": "コミュニティPR"
+                },
+                "detail": {
+                    "added": "追加",
+                    "updated": "更新",
+                    "removed": "削除",
+                    "fields": "項目",
+                    "expand": "変更履歴の詳細を展開",
+                    "collapse": "変更履歴の詳細を折りたたむ"
+                },
+                "filters": {
+                    "label": "アクティビティ",
+                    "all": "すべてのアクティビティ",
+                    "generation": "生成",
+                    "items": "項目",
+                    "comparisons": "比較",
+                    "taxonomy": "分類",
+                    "community_pr": "コミュニティPR"
+                },
+                "pagination": {
+                    "showing": "{total}件中 {from}-{to}件を表示"
+                }
             },
             "info": {
                 "title": "ディレクトリ情報",
@@ -795,7 +830,8 @@
                 "tabs": {
                     "browseItems": "Browse Items",
                     "categories": "Categories",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -879,6 +915,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "ソースを再確認",
+                    "checkCompleted": "ソース確認が完了しました",
+                    "checkFailed": "ソース確認に失敗しました",
+                    "failedToCheckSource": "項目のソースを確認できませんでした",
+                    "brokenLink": "リンク切れ",
+                    "healthy": "正常",
+                    "couldNotVerify": "確認できませんでした",
+                    "sourceMayHaveIssues": "ソースに問題がある可能性があります",
+                    "sourceChecked": "ソース確認済み",
+                    "reachable": "到達可能",
+                    "reachabilityInconclusive": "自動到達性チェックは結論が出ませんでした",
+                    "accurateSource": "正確なソース",
+                    "sourceTooGeneric": "ソースが汎用的すぎます",
+                    "weakSource": "弱いソース",
+                    "sourceAccuracyUnknown": "ソースの正確性は不明です",
+                    "useSuggestedSource": "提案を適用",
+                    "suggestedSourceApplied": "提案されたソースを適用しました",
+                    "failedToUseSuggestedSource": "提案されたソースを使用できませんでした",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {

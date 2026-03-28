@@ -28,7 +28,7 @@ export class MarkdownGeneratorService {
 
     async initialize(directory: Directory, user: User, options: InitializeOptions = {}) {
         const directoryOwner = getDirectoryOwner(directory);
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
         const description = directory.description;
 
         // Create repository through facade
@@ -180,7 +180,7 @@ export class MarkdownGeneratorService {
                 provider,
                 markdownPath,
                 'sync README.md',
-                user.asCommitter(),
+                directory.resolveCommitter(user),
             );
             await this.gitFacade.push(
                 { dir: markdownPath },
@@ -231,7 +231,7 @@ export class MarkdownGeneratorService {
 
     async removeItemDetail(directory: Directory, user: User, slug: string, branch?: string) {
         const directoryOwner = getDirectoryOwner(directory);
-        const committer = user.asCommitter();
+        const committer = directory.resolveCommitter(user);
 
         const markdownPath = await this.gitFacade.cloneOrPull(
             {

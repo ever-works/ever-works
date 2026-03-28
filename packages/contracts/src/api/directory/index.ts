@@ -10,6 +10,15 @@ export type {
 } from './directory-schedule.dto.js';
 export type {
 	GenerationMetrics,
+	DirectoryChangelog,
+	DirectoryHistoryChangeEntry,
+	DirectoryHistoryChangeAction,
+	DirectoryHistoryChangeEntityType,
 	DirectoryGenerationHistoryEntry,
-	DirectoryGenerationHistoryResponse
+	DirectoryGenerationHistoryResponse,
+	GenerationStepLog,
+	GenerationLogLevel,
+	GenerationLogSource
 } from './generation-metrics.js';
+export { DirectoryHistoryActivityType } from './generation-metrics.js';
+export type { UpdateSourceValidationPayload, SourceValidationSettingsDto } from './source-validation.dto.js';

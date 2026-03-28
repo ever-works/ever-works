@@ -10,7 +10,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function DirectoriesPage() {
     // Fetch all directories with pagination
-    const response = await getDirectories({ limit: 20, offset: 0 });
+    const response = await getDirectories({ limit: 20, offset: 0 }).catch(() => ({
+        success: false,
+        directories: [],
+        total: 0,
+    }));
 
     return (
         <DirectoriesClient

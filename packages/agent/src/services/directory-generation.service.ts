@@ -63,6 +63,11 @@ import { calculateDurationSeconds } from '../utils/time.utils';
 import { PluginOperationsService } from '@src/plugins/services/plugin-operations.service';
 import { getCapabilityFromUIKey, SELECTABLE_PROVIDER_CATEGORIES } from '@ever-works/plugin';
 import { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dto';
+import {
+    DirectoryHistoryActivityType,
+    type DirectoryHistoryChangeEntry,
+} from '@ever-works/contracts/api';
+import { buildDirectoryChangelog } from '../utils/directory-changelog.utils';
 
 export interface BulkCaptureImagesDto {
     itemSlugs?: string[];
@@ -304,6 +309,24 @@ export class DirectoryGenerationService {
                         body: result.pr_body,
                     },
                 });
+
+                if (!result.pr_number && result.item_name && result.item_slug) {
+                    await this.recordActivityHistory({
+                        directoryId: directory.id,
+                        userId: user.id,
+                        activityType: DirectoryHistoryActivityType.ITEM_ADDED,
+                        newItemsCount: 1,
+                        entries: [
+                            {
+                                entityType: 'item',
+                                action: 'added',
+                                name: result.item_name,
+                                slug: result.item_slug,
+                            },
+                        ],
+                        summary: `Item added: ${result.item_name}`,
+                    });
+                }
             }
 
             if (result.status === 'error') {
@@ -348,6 +371,23 @@ export class DirectoryGenerationService {
                         body: result.pr_body,
                     },
                 });
+
+                if (!result.pr_number && result.item_name && result.item_slug) {
+                    await this.recordActivityHistory({
+                        directoryId: directory.id,
+                        userId: user.id,
+                        activityType: DirectoryHistoryActivityType.ITEM_REMOVED,
+                        entries: [
+                            {
+                                entityType: 'item',
+                                action: 'removed',
+                                name: result.item_name,
+                                slug: result.item_slug,
+                            },
+                        ],
+                        summary: `Item removed: ${result.item_name}`,
+                    });
+                }
             }
 
             if (result.status === 'error') {
@@ -383,6 +423,31 @@ export class DirectoryGenerationService {
                 await this.markdownGenerator.initialize(directory, user, {
                     generation_method: GenerationMethod.CREATE_UPDATE,
                 });
+
+                if (!result.pr_number && result.item_name && result.item_slug) {
+                    const fieldsChanged = [
+                        ...(dto.featured !== undefined ? ['featured'] : []),
+                        ...(dto.order !== undefined ? ['order'] : []),
+                        ...(dto.source_url !== undefined ? ['source_url'] : []),
+                    ];
+
+                    await this.recordActivityHistory({
+                        directoryId: directory.id,
+                        userId: user.id,
+                        activityType: DirectoryHistoryActivityType.ITEM_UPDATED,
+                        updatedItemsCount: 1,
+                        entries: [
+                            {
+                                entityType: 'item',
+                                action: 'updated',
+                                name: result.item_name,
+                                slug: result.item_slug,
+                                fieldsChanged,
+                            },
+                        ],
+                        summary: `Item updated: ${result.item_name}`,
+                    });
+                }
             }
 
             if (result.status === 'error') {
@@ -914,6 +979,35 @@ export class DirectoryGenerationService {
             startedAt: new Date(),
             triggeredBy: context.triggeredBy,
             scheduleId: context.scheduleId ?? null,
+            activityType: DirectoryHistoryActivityType.GENERATION,
+        });
+    }
+
+    private async recordActivityHistory(params: {
+        directoryId: string;
+        userId: string;
+        activityType: DirectoryHistoryActivityType;
+        entries: DirectoryHistoryChangeEntry[];
+        summary?: string;
+        newItemsCount?: number;
+        updatedItemsCount?: number;
+        totalItemsCount?: number;
+    }): Promise<void> {
+        const now = new Date();
+
+        await this.generationHistoryRepository.createEntry({
+            directoryId: params.directoryId,
+            userId: params.userId,
+            status: GenerateStatusType.GENERATED,
+            startedAt: now,
+            finishedAt: now,
+            durationInSeconds: 0,
+            newItemsCount: params.newItemsCount ?? 0,
+            updatedItemsCount: params.updatedItemsCount ?? 0,
+            totalItemsCount: params.totalItemsCount ?? 0,
+            triggeredBy: 'user',
+            activityType: params.activityType,
+            changelog: buildDirectoryChangelog(params.entries, params.summary),
         });
     }
 

@@ -7,6 +7,7 @@ import type {
 	IPromptFacade,
 	FacadeOptions,
 	PipelineProgressCallback,
+	PipelineExecutionOptions,
 	PluginLogger
 } from '@ever-works/plugin';
 
@@ -39,6 +40,7 @@ export interface ParentToolContext {
 	tokenAccumulator?: TokenUsageAccumulator;
 	signal?: AbortSignal;
 	promptFacade?: IPromptFacade;
+	onLogEntry?: PipelineExecutionOptions['onLogEntry'];
 }
 
 export interface ParentToolsResult {
@@ -69,7 +71,8 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 				logger: ctx.logger,
 				tokenAccumulator: ctx.tokenAccumulator,
 				signal: ctx.signal,
-				promptFacade: ctx.promptFacade
+				promptFacade: ctx.promptFacade,
+				onLogEntry: ctx.onLogEntry
 			};
 
 			const mapper = async (url: string) => {
@@ -105,7 +108,8 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 				tokenAccumulator: ctx.tokenAccumulator,
 				signal: ctx.signal,
 				promptFacade: ctx.promptFacade,
-				facadeOptions: ctx.facadeOptions
+				facadeOptions: ctx.facadeOptions,
+				onLogEntry: ctx.onLogEntry
 			});
 		}
 	});

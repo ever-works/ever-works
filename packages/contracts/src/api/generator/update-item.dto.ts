@@ -4,6 +4,8 @@
 export interface UpdateItemDto {
 	/** Slug of the item to update */
 	item_slug: string;
+	/** Source URL */
+	source_url?: string;
 	/** Whether item is featured */
 	featured?: boolean;
 	/** Display order */

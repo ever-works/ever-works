@@ -8,6 +8,7 @@ import { UserPluginEntity } from '../entities/user-plugin.entity';
 import { DirectoryPluginEntity } from '../entities/directory-plugin.entity';
 import { PluginRegistryService } from '../services/plugin-registry.service';
 import { SettingsSchemaValidatorService } from '../services/settings-schema-validator.service';
+import { PluginSettingsService } from '../services/plugin-settings.service';
 import type { RegisteredPlugin } from '../services/plugin-registry.service';
 import type { IPlugin, PluginManifest, JsonSchema } from '@ever-works/plugin';
 
@@ -141,6 +142,12 @@ describe('PluginOperationsService', () => {
                     provide: SettingsSchemaValidatorService,
                     useValue: {
                         validate: jest.fn().mockReturnValue({ valid: true, errors: [] }),
+                    },
+                },
+                {
+                    provide: PluginSettingsService,
+                    useValue: {
+                        resolveSettings: jest.fn().mockResolvedValue({}),
                     },
                 },
                 {
@@ -1841,6 +1848,12 @@ describe('PluginOperationsService', () => {
                         useValue: {
                             get: jest.fn(),
                             getAll: jest.fn().mockReturnValue([]),
+                        },
+                    },
+                    {
+                        provide: PluginSettingsService,
+                        useValue: {
+                            resolveSettings: jest.fn().mockResolvedValue({}),
                         },
                     },
                     {

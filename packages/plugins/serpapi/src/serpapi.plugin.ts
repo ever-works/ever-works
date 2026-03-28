@@ -9,7 +9,8 @@ import type {
 	SearchOptions,
 	SearchResponse,
 	SearchResult,
-	RateLimitInfo
+	RateLimitInfo,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 
 const SUPPORTED_ENGINES = ['google', 'bing', 'yahoo', 'duckduckgo', 'baidu', 'yandex'] as const;
@@ -170,7 +171,40 @@ export class SerpApiSearchPlugin implements IPlugin, ISearchPlugin {
 	}
 
 	async isAvailable(): Promise<boolean> {
-		return true;
+		if (!this.context) return false;
+		const settings = await this.context.getSettings();
+		return Boolean(settings?.apiKey);
+	}
+
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const apiKey = settings.apiKey as string | undefined;
+		if (!apiKey) {
+			return { success: false, message: 'SerpAPI API key is not configured.' };
+		}
+
+		try {
+			const params = new URLSearchParams({
+				engine: 'google',
+				q: 'test',
+				api_key: apiKey,
+				num: '1',
+				output: 'json'
+			});
+
+			const response = await fetch(`https://serpapi.com/search?${params.toString()}`);
+
+			if (!response.ok) {
+				const errorText = await response.text();
+				return { success: false, message: `SerpAPI connection failed (${response.status}): ${errorText}` };
+			}
+
+			return { success: true, message: 'SerpAPI connection verified.' };
+		} catch (error) {
+			return {
+				success: false,
+				message: `SerpAPI connection failed: ${error instanceof Error ? error.message : String(error)}`
+			};
+		}
 	}
 
 	async getRateLimitInfo(): Promise<RateLimitInfo> {

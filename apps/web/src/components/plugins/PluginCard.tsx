@@ -55,21 +55,24 @@ export function PluginCard({ plugin }: PluginCardProps) {
 
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                            <h3 className="font-medium text-text dark:text-text-dark truncate">
+                            <h3
+                                className="font-medium text-text dark:text-text-dark truncate"
+                                title={plugin.name}
+                            >
                                 {plugin.name}
                             </h3>
                             {plugin.systemPlugin && (
-                                <span className="shrink-0 text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                                <span className="shrink-0 text-xs px-1.5 py-0.5 rounded bg-primary/5 text-primary">
                                     {t('system')}
                                 </span>
                             )}
                             {plugin.builtIn && !plugin.systemPlugin && (
-                                <span className="shrink-0 text-xs px-1.5 py-0.5 rounded bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
+                                <span className="shrink-0 text-xs px-1.5 py-0.5 rounded bg-surface-tertiary dark:bg-surface-tertiary-dark/40 text-text-muted dark:text-text-muted-dark">
                                     {t('builtIn')}
                                 </span>
                             )}
                         </div>
-                        <p className="text-sm text-text-muted dark:text-text-muted-dark mt-0.5">
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5">
                             v{plugin.version}
                         </p>
                     </div>
@@ -82,21 +85,22 @@ export function PluginCard({ plugin }: PluginCardProps) {
                             disabled={isPending}
                             loading={isPending}
                             className={cn(
+                                'px-2 py-1 text-xs rounded-md gap-0.5',
                                 optimisticEnabled &&
                                     'text-danger hover:text-danger hover:bg-danger/10',
                             )}
                         >
                             {optimisticEnabled ? (
                                 <>
-                                    <PowerOff className="w-4 h-4" />
-                                    <span className="sr-only md:not-sr-only md:ml-1">
+                                    <PowerOff className="w-3 h-3" />
+                                    <span className="sr-only @lg/main:not-sr-only @lg/main:ml-1">
                                         {t('disable')}
                                     </span>
                                 </>
                             ) : (
                                 <>
-                                    <Power className="w-4 h-4" />
-                                    <span className="sr-only md:not-sr-only md:ml-1">
+                                    <Power className="w-3 h-3" />
+                                    <span className="sr-only @lg/main:not-sr-only @lg/main:ml-1">
                                         {t('enable')}
                                     </span>
                                 </>
@@ -106,7 +110,7 @@ export function PluginCard({ plugin }: PluginCardProps) {
                 </div>
 
                 {plugin.description && (
-                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-3 line-clamp-2">
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-5 line-clamp-2">
                         {plugin.description}
                     </p>
                 )}
@@ -142,9 +146,9 @@ export function PluginCard({ plugin }: PluginCardProps) {
                 <div className="flex items-center gap-2 mt-auto pt-3 border-t border-border dark:border-border-dark">
                     <Link
                         href={ROUTES.DASHBOARD_PLUGIN_DETAIL(plugin.pluginId)}
-                        className="text-sm text-primary hover:text-primary-hover flex items-center gap-1"
+                        className="text-xs text-primary hover:text-primary-hover flex items-center gap-1"
                     >
-                        <Settings className="w-4 h-4" />
+                        <Settings className="w-3 h-3" />
                         {t('settings')}
                     </Link>
 
@@ -153,9 +157,9 @@ export function PluginCard({ plugin }: PluginCardProps) {
                             href={plugin.homepage}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark flex items-center gap-1 ml-auto"
+                            className="text-xs text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark flex items-center gap-1 ml-auto"
                         >
-                            <ExternalLink className="w-4 h-4" />
+                            <ExternalLink className="w-3 h-3" />
                             {t('docs')}
                         </a>
                     )}

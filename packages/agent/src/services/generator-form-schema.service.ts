@@ -63,7 +63,12 @@ export class GeneratorFormSchemaService {
         pipelineId?: string,
         options?: FormSchemaOptions,
     ): Promise<GeneratorFormSchema> {
-        // Resolve the selected pipeline plugin
+        // Global default is returned as metadata — enforcement happens on the frontend
+        const userGlobalDefault =
+            options?.userId && this.pluginSettingsService
+                ? await this.pluginSettingsService.getUserGlobalPipelineDefault(options.userId)
+                : null;
+
         const pipelinePlugin = await this.resolvePipelinePlugin(pipelineId, options);
 
         // Get available providers for each capability category (filtered by enable status)
@@ -114,8 +119,18 @@ export class GeneratorFormSchemaService {
             defaultValues = { ...defaultValues, ...dsFields.defaultValues };
         }
 
+        // Enforced pipeline ID — set only when enforce is active and the plugin is loaded
+        let enforcedPipelineId: string | undefined;
+        if (userGlobalDefault?.enforce) {
+            const enforced = this.pluginRegistry.get(userGlobalDefault.pluginId);
+            if (enforced && enforced.state === 'loaded') {
+                enforcedPipelineId = userGlobalDefault.pluginId;
+            }
+        }
+
         return {
             resolvedPipelineId: pipelinePlugin?.plugin.id,
+            enforcedPipelineId,
             providers,
             pluginFields,
             pluginGroups,
@@ -590,7 +605,7 @@ export class GeneratorFormSchemaService {
         pipelineId?: string,
         options?: FormSchemaOptions,
     ): Promise<RegisteredPlugin | undefined> {
-        // 1. Explicit pipelineId — use it directly
+        // 1. Explicit pipelineId — from config.yaml or user click in the form
         if (pipelineId) {
             const registered = this.pluginRegistry.get(pipelineId);
             if (registered && registered.state === 'loaded') {

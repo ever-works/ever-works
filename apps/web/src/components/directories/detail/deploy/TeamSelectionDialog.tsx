@@ -76,21 +76,21 @@ export function TeamSelectionDialog({
                 </DialogHeader>
 
                 <div className="space-y-4">
-                    <Select
-                        label={t('form.deployment.teamSelection.label')}
-                        value={selectedTeamScope}
-                        onChange={(event) => setSelectedTeamScope(event.target.value)}
-                        variant="form"
-                    >
-                        <option value="" disabled>
-                            {t('form.deployment.teamSelection.placeholder')}
-                        </option>
-                        {options.map((team) => (
-                            <option key={team.id} value={team.slug}>
-                                {team.name ? `${team.name} (${team.slug})` : team.slug}
+                    <div className="space-y-1.5">
+                        <label className="block text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                            {t('form.deployment.teamSelection.label')}
+                        </label>
+                        <Select value={selectedTeamScope} onValueChange={setSelectedTeamScope}>
+                            <option value="" disabled>
+                                {t('form.deployment.teamSelection.placeholder')}
                             </option>
-                        ))}
-                    </Select>
+                            {options.map((team) => (
+                                <option key={team.id} value={team.slug}>
+                                    {team.name ? `${team.name} (${team.slug})` : team.slug}
+                                </option>
+                            ))}
+                        </Select>
+                    </div>
                 </div>
 
                 <DialogFooter>

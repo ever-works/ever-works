@@ -9,6 +9,8 @@ import type {
     SubmitItemDto,
     RemoveItemDto,
     UpdateItemDto,
+    CheckItemHealthDto,
+    CheckItemHealthResponseDto,
     ExtractItemDetailsDto,
 } from '@ever-works/contracts/api';
 
@@ -33,6 +35,8 @@ export type {
     SubmitItemDto,
     RemoveItemDto,
     UpdateItemDto,
+    CheckItemHealthDto,
+    CheckItemHealthResponseDto,
     ExtractItemDetailsDto,
 };
 
@@ -117,6 +121,15 @@ export const itemsGeneratorAPI = {
     updateItem: async (directoryId: string, data: UpdateItemDto) => {
         return serverMutation<ItemResponse>({
             endpoint: `/directories/${directoryId}/update-item`,
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    checkItemHealth: async (directoryId: string, data: CheckItemHealthDto) => {
+        return serverMutation<CheckItemHealthResponseDto>({
+            endpoint: `/directories/${directoryId}/check-item-health`,
             data,
             method: 'POST',
             wrapInData: false,

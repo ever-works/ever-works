@@ -2,6 +2,13 @@
 
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { Select } from '@/components/ui/select';
+import {
+    Accordion,
+    AccordionItem,
+    AccordionTrigger,
+    AccordionContent,
+} from '@/components/ui/accordion';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import type { FormFieldDefinition, FormFieldGroup } from '@/lib/api/types-only';
@@ -35,28 +42,11 @@ export function DynamicPluginFields({
         });
     }, [fields]);
 
-    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
-        // Start with collapsible groups that are not collapsed by default
-        const expanded = new Set<string>();
-        groups?.forEach((group) => {
-            if (!group.collapsible || !group.collapsed) {
-                expanded.add(group.name);
-            }
-        });
-        return expanded;
-    });
-
-    const toggleGroup = useCallback((groupName: string) => {
-        setExpandedGroups((prev) => {
-            const next = new Set(prev);
-            if (next.has(groupName)) {
-                next.delete(groupName);
-            } else {
-                next.add(groupName);
-            }
-            return next;
-        });
-    }, []);
+    // Compute default expanded groups for the accordion
+    const defaultExpandedGroups = useMemo(() => {
+        if (!groups) return [];
+        return groups.filter((g) => !g.collapsible || !g.collapsed).map((g) => g.name);
+    }, [groups]);
 
     const handleFieldChange = useCallback(
         (fieldName: string, value: unknown) => {
@@ -215,37 +205,47 @@ export function DynamicPluginFields({
                 case 'select':
                     return (
                         <div key={field.name}>
-                            <label className="block text-sm font-medium text-text dark:text-text-dark mb-1">
-                                {field.label}
-                                {field.validation?.required && (
-                                    <span className="text-danger ml-1">*</span>
-                                )}
-                            </label>
-                            <select
-                                value={(value as string) || ''}
-                                onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                                className={cn(
-                                    'w-full px-3 py-2 rounded-lg border text-sm',
-                                    'bg-surface dark:bg-surface-dark',
-                                    'border-border dark:border-border-dark',
-                                    'text-text dark:text-text-dark',
-                                )}
+                            {field.label && (
+                                <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
+                                    {field.label}
+                                    {field.validation?.required && (
+                                        <span className="text-danger ml-1">*</span>
+                                    )}
+                                </label>
+                            )}
+                            <Select
+                                value={(value as string) || '__none__'}
+                                onValueChange={(val) =>
+                                    handleFieldChange(field.name, val === '__none__' ? '' : val)
+                                }
                             >
                                 {!field.validation?.required && (
-                                    <option value="">{t('selectOption')}</option>
+                                    <option value="__none__">
+                                        {field.placeholder || t('selectOption')}
+                                    </option>
                                 )}
                                 {field.options?.map((option) => (
                                     <option key={String(option.value)} value={String(option.value)}>
                                         {option.label}
                                     </option>
                                 ))}
-                            </select>
+                            </Select>
                             {field.description && (
-                                <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
+                                <p className="mt-1.5 text-xs text-text-muted dark:text-text-muted-dark">
                                     {field.description}
                                 </p>
                             )}
                         </div>
+                    );
+
+                case 'json':
+                    return (
+                        <JsonField
+                            key={field.name}
+                            field={field}
+                            value={value as Record<string, unknown> | undefined}
+                            onChange={(val) => handleFieldChange(field.name, val)}
+                        />
                     );
 
                 case 'tags':
@@ -291,74 +291,129 @@ export function DynamicPluginFields({
             )}
 
             {/* Render grouped fields */}
-            {sortedGroups.map((group) => {
-                const groupFields = uniqueFields.filter((f) => f.group === group.name);
-                if (groupFields.length === 0) return null;
+            <Accordion type="multiple" defaultValue={defaultExpandedGroups} className="space-y-3">
+                {sortedGroups.map((group) => {
+                    const groupFields = uniqueFields.filter((f) => f.group === group.name);
+                    if (groupFields.length === 0) return null;
 
-                const isExpanded = expandedGroups.has(group.name);
-
-                return (
-                    <div
-                        key={group.name}
-                        className={cn(
-                            'rounded-lg border overflow-hidden',
-                            'bg-card dark:bg-card-dark',
-                            'border-card-border dark:border-card-border-dark',
-                        )}
-                    >
-                        {group.collapsible ? (
-                            <button
-                                type="button"
-                                onClick={() => toggleGroup(group.name)}
-                                className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-surface dark:hover:bg-surface-dark transition-colors"
-                            >
+                    return group.collapsible ? (
+                        <AccordionItem
+                            key={group.name}
+                            value={group.name}
+                            className={cn(
+                                'rounded-lg border overflow-hidden',
+                                'bg-card dark:bg-card-primary-dark/30',
+                                'border-card-border dark:border-card-border-dark',
+                            )}
+                        >
+                            <AccordionTrigger className="px-5 py-3.5 hover:no-underline hover:bg-surface/50 dark:hover:bg-surface-dark/50">
                                 <div>
-                                    <h3 className="text-lg font-medium text-text dark:text-text-dark">
+                                    <h3 className="text-md font-semibold text-text dark:text-text-dark">
                                         {group.title}
                                     </h3>
                                     {group.description && (
-                                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
+                                        <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5 font-normal">
                                             {group.description}
                                         </p>
                                     )}
                                 </div>
-                                <svg
-                                    className={cn(
-                                        'w-5 h-5 text-text-secondary dark:text-text-secondary-dark transition-transform',
-                                        isExpanded && 'rotate-180',
-                                    )}
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M19 9l-7 7-7-7"
-                                    />
-                                </svg>
-                            </button>
-                        ) : (
-                            <div className="px-6 py-4">
-                                <h3 className="text-lg font-medium text-text dark:text-text-dark">
+                            </AccordionTrigger>
+                            <AccordionContent className="px-5 pb-4 pt-2">
+                                <div className="space-y-4">{groupFields.map(renderField)}</div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    ) : (
+                        <div
+                            key={group.name}
+                            className={cn(
+                                'rounded-lg border overflow-hidden',
+                                'bg-card dark:bg-card-primary-dark/30',
+                                'border-card-border dark:border-card-border-dark',
+                            )}
+                        >
+                            <div className="px-5 py-3.5 border-b border-card-border dark:border-card-border-dark">
+                                <h3 className="text-md font-semibold text-text dark:text-text-dark">
                                     {group.title}
                                 </h3>
                                 {group.description && (
-                                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
+                                    <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5">
                                         {group.description}
                                     </p>
                                 )}
                             </div>
-                        )}
-                        {(!group.collapsible || isExpanded) && (
-                            <div className="px-6 pb-4 pt-2 space-y-4">
-                                {groupFields.map(renderField)}
+                            <div className="px-5 pb-4 pt-2">
+                                <div className="space-y-4">{groupFields.map(renderField)}</div>
                             </div>
-                        )}
-                    </div>
-                );
-            })}
+                        </div>
+                    );
+                })}
+            </Accordion>
+        </div>
+    );
+}
+
+/**
+ * JSON editor field for key-value parameters.
+ */
+interface JsonFieldProps {
+    field: FormFieldDefinition;
+    value: Record<string, unknown> | undefined;
+    onChange: (value: Record<string, unknown>) => void;
+}
+
+function JsonField({ field, value, onChange }: JsonFieldProps) {
+    const [rawText, setRawText] = useState(() =>
+        value && Object.keys(value).length > 0 ? JSON.stringify(value, null, 2) : '',
+    );
+    const [error, setError] = useState<string | null>(null);
+
+    const handleChange = (text: string) => {
+        setRawText(text);
+
+        if (!text.trim()) {
+            setError(null);
+            onChange({});
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(text);
+            if (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null) {
+                setError('Must be a JSON object');
+                return;
+            }
+            setError(null);
+            onChange(parsed as Record<string, unknown>);
+        } catch {
+            setError('Invalid JSON');
+        }
+    };
+
+    return (
+        <div>
+            <label className="block text-sm font-medium text-text dark:text-text-dark mb-1">
+                {field.label}
+                {field.validation?.required && <span className="text-danger ml-1">*</span>}
+            </label>
+            <textarea
+                value={rawText}
+                onChange={(e) => handleChange(e.target.value)}
+                placeholder={field.placeholder || '{\n  "key": "value"\n}'}
+                className={cn(
+                    'w-full px-3 py-2 rounded-lg border text-sm font-mono resize-none',
+                    'bg-surface dark:bg-surface-dark',
+                    'text-text dark:text-text-dark',
+                    'focus:outline-none focus:ring-2 focus:ring-primary/50',
+                    error ? 'border-danger' : 'border-border dark:border-border-dark',
+                )}
+                rows={4}
+            />
+            {error && <p className="mt-1 text-xs text-danger">{error}</p>}
+            {!error && field.description && (
+                <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
+                    {field.description}
+                </p>
+            )}
         </div>
     );
 }
@@ -403,8 +458,8 @@ function TagsField({ field, value, onChange }: TagsFieldProps) {
             <div
                 className={cn(
                     'min-h-[42px] px-3 py-2 rounded-lg border',
-                    'bg-surface dark:bg-surface-dark',
-                    'border-border dark:border-border-dark',
+                    'bg-card dark:bg-card-primary-dark/30',
+                    'border-card-border dark:border-card-border-dark',
                     'focus-within:ring-2 focus-within:ring-primary/50',
                 )}
             >

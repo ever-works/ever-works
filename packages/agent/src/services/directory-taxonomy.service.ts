@@ -13,6 +13,13 @@ import type { Category, Collection, Tag } from '@ever-works/contracts';
 import { User } from '@src/entities/user.entity';
 import { UserRepository } from '@src/database/repositories/user.repository';
 import { slugifyText } from '@src/utils/text.utils';
+import { DirectoryGenerationHistoryRepository } from '@src/database/repositories/directory-generation-history.repository';
+import { GenerateStatusType } from '@src/entities/types';
+import {
+    DirectoryHistoryActivityType,
+    type DirectoryHistoryChangeEntry,
+} from '@ever-works/contracts/api';
+import { buildDirectoryChangelog } from '@src/utils/directory-changelog.utils';
 
 /**
  * Service for managing directory taxonomy (categories and tags).
@@ -24,6 +31,7 @@ export class DirectoryTaxonomyService {
         private readonly dataGenerator: DataGeneratorService,
         private readonly ownershipService: DirectoryOwnershipService,
         private readonly userRepository: UserRepository,
+        private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
     ) {}
 
     private async ensureUser(userId: string): Promise<User> {
@@ -32,6 +40,28 @@ export class DirectoryTaxonomyService {
             throw new NotFoundException(`User not found: ${userId}`);
         }
         return user;
+    }
+
+    private async recordTaxonomyHistory(params: {
+        directoryId: string;
+        userId: string;
+        activityType: DirectoryHistoryActivityType;
+        entries: DirectoryHistoryChangeEntry[];
+        summary: string;
+    }): Promise<void> {
+        const now = new Date();
+
+        await this.generationHistoryRepository.createEntry({
+            directoryId: params.directoryId,
+            userId: params.userId,
+            status: GenerateStatusType.GENERATED,
+            startedAt: now,
+            finishedAt: now,
+            durationInSeconds: 0,
+            triggeredBy: 'user',
+            activityType: params.activityType,
+            changelog: buildDirectoryChangelog(params.entries, params.summary),
+        });
     }
 
     // ============================================
@@ -75,6 +105,21 @@ export class DirectoryTaxonomyService {
         // Save to data repository
         const updatedCategories = [...categories, newCategory];
         await this.dataGenerator.saveCategories(directory, user, updatedCategories);
+
+        await this.recordTaxonomyHistory({
+            directoryId,
+            userId,
+            activityType: DirectoryHistoryActivityType.CATEGORY_CHANGE,
+            entries: [
+                {
+                    entityType: 'category',
+                    action: 'added',
+                    name: newCategory.name,
+                    slug: newCategory.id,
+                },
+            ],
+            summary: `Category added: ${newCategory.name}`,
+        });
 
         return {
             status: 'success',
@@ -125,6 +170,26 @@ export class DirectoryTaxonomyService {
         // Save to data repository
         await this.dataGenerator.saveCategories(directory, user, categories);
 
+        await this.recordTaxonomyHistory({
+            directoryId,
+            userId,
+            activityType: DirectoryHistoryActivityType.CATEGORY_CHANGE,
+            entries: [
+                {
+                    entityType: 'category',
+                    action: 'updated',
+                    name: updatedCategory.name,
+                    slug: updatedCategory.id,
+                    fieldsChanged: Object.keys(dto).filter(
+                        (key) =>
+                            (dto as Record<string, unknown>)[key] !== undefined &&
+                            ['name', 'description', 'icon_url', 'priority'].includes(key),
+                    ),
+                },
+            ],
+            summary: `Category updated: ${updatedCategory.name}`,
+        });
+
         return {
             status: 'success',
             category: updatedCategory,
@@ -148,11 +213,27 @@ export class DirectoryTaxonomyService {
             throw new NotFoundException('Category not found');
         }
 
+        const removedCategory = categories[categoryIndex];
         // Remove category
         categories.splice(categoryIndex, 1);
 
         // Save to data repository
         await this.dataGenerator.saveCategories(directory, user, categories);
+
+        await this.recordTaxonomyHistory({
+            directoryId,
+            userId,
+            activityType: DirectoryHistoryActivityType.CATEGORY_CHANGE,
+            entries: [
+                {
+                    entityType: 'category',
+                    action: 'removed',
+                    name: removedCategory.name,
+                    slug: removedCategory.id,
+                },
+            ],
+            summary: `Category removed: ${removedCategory.name}`,
+        });
 
         return {
             status: 'success',
@@ -198,6 +279,21 @@ export class DirectoryTaxonomyService {
         // Save to data repository
         const updatedTags = [...tags, newTag];
         await this.dataGenerator.saveTags(directory, user, updatedTags);
+
+        await this.recordTaxonomyHistory({
+            directoryId,
+            userId,
+            activityType: DirectoryHistoryActivityType.TAG_CHANGE,
+            entries: [
+                {
+                    entityType: 'tag',
+                    action: 'added',
+                    name: newTag.name,
+                    slug: newTag.id,
+                },
+            ],
+            summary: `Tag added: ${newTag.name}`,
+        });
 
         return {
             status: 'success',
@@ -245,6 +341,24 @@ export class DirectoryTaxonomyService {
         // Save to data repository
         await this.dataGenerator.saveTags(directory, user, tags);
 
+        await this.recordTaxonomyHistory({
+            directoryId,
+            userId,
+            activityType: DirectoryHistoryActivityType.TAG_CHANGE,
+            entries: [
+                {
+                    entityType: 'tag',
+                    action: 'updated',
+                    name: updatedTag.name,
+                    slug: updatedTag.id,
+                    fieldsChanged: Object.keys(dto).filter(
+                        (key) => (dto as Record<string, unknown>)[key] !== undefined,
+                    ),
+                },
+            ],
+            summary: `Tag updated: ${updatedTag.name}`,
+        });
+
         return {
             status: 'success',
             tag: updatedTag,
@@ -268,11 +382,27 @@ export class DirectoryTaxonomyService {
             throw new NotFoundException('Tag not found');
         }
 
+        const removedTag = tags[tagIndex];
         // Remove tag
         tags.splice(tagIndex, 1);
 
         // Save to data repository
         await this.dataGenerator.saveTags(directory, user, tags);
+
+        await this.recordTaxonomyHistory({
+            directoryId,
+            userId,
+            activityType: DirectoryHistoryActivityType.TAG_CHANGE,
+            entries: [
+                {
+                    entityType: 'tag',
+                    action: 'removed',
+                    name: removedTag.name,
+                    slug: removedTag.id,
+                },
+            ],
+            summary: `Tag removed: ${removedTag.name}`,
+        });
 
         return {
             status: 'success',
@@ -321,6 +451,21 @@ export class DirectoryTaxonomyService {
         // Save to data repository
         const updatedCollections = [...collections, newCollection];
         await this.dataGenerator.saveCollections(directory, user, updatedCollections);
+
+        await this.recordTaxonomyHistory({
+            directoryId,
+            userId,
+            activityType: DirectoryHistoryActivityType.COLLECTION_CHANGE,
+            entries: [
+                {
+                    entityType: 'collection',
+                    action: 'added',
+                    name: newCollection.name,
+                    slug: newCollection.id,
+                },
+            ],
+            summary: `Collection added: ${newCollection.name}`,
+        });
 
         return {
             status: 'success',
@@ -371,6 +516,26 @@ export class DirectoryTaxonomyService {
         // Save to data repository
         await this.dataGenerator.saveCollections(directory, user, collections);
 
+        await this.recordTaxonomyHistory({
+            directoryId,
+            userId,
+            activityType: DirectoryHistoryActivityType.COLLECTION_CHANGE,
+            entries: [
+                {
+                    entityType: 'collection',
+                    action: 'updated',
+                    name: updatedCollection.name,
+                    slug: updatedCollection.id,
+                    fieldsChanged: Object.keys(dto).filter(
+                        (key) =>
+                            (dto as Record<string, unknown>)[key] !== undefined &&
+                            ['name', 'description', 'icon_url', 'priority'].includes(key),
+                    ),
+                },
+            ],
+            summary: `Collection updated: ${updatedCollection.name}`,
+        });
+
         return {
             status: 'success',
             collection: updatedCollection,
@@ -394,11 +559,27 @@ export class DirectoryTaxonomyService {
             throw new NotFoundException('Collection not found');
         }
 
+        const removedCollection = collections[collectionIndex];
         // Remove collection
         collections.splice(collectionIndex, 1);
 
         // Save to data repository
         await this.dataGenerator.saveCollections(directory, user, collections);
+
+        await this.recordTaxonomyHistory({
+            directoryId,
+            userId,
+            activityType: DirectoryHistoryActivityType.COLLECTION_CHANGE,
+            entries: [
+                {
+                    entityType: 'collection',
+                    action: 'removed',
+                    name: removedCollection.name,
+                    slug: removedCollection.id,
+                },
+            ],
+            summary: `Collection removed: ${removedCollection.name}`,
+        });
 
         return {
             status: 'success',

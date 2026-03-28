@@ -22,6 +22,55 @@ export interface GenerationMetrics {
 	total_cost?: number;
 }
 
+export enum DirectoryHistoryActivityType {
+	GENERATION = 'generation',
+	ITEM_ADDED = 'item_added',
+	ITEM_UPDATED = 'item_updated',
+	ITEM_REMOVED = 'item_removed',
+	COMPARISON_ADDED = 'comparison_added',
+	COMPARISON_REMOVED = 'comparison_removed',
+	CATEGORY_CHANGE = 'category_change',
+	TAG_CHANGE = 'tag_change',
+	COLLECTION_CHANGE = 'collection_change',
+	COMMUNITY_PR_MERGED = 'community_pr_merged'
+}
+
+export type DirectoryHistoryChangeEntityType = 'item' | 'comparison' | 'category' | 'tag' | 'collection';
+
+export type DirectoryHistoryChangeAction = 'added' | 'updated' | 'removed';
+
+export interface DirectoryHistoryChangeEntry {
+	entityType: DirectoryHistoryChangeEntityType;
+	action: DirectoryHistoryChangeAction;
+	name: string;
+	slug?: string;
+	fieldsChanged?: string[];
+}
+
+// ── Generation Step Logs ───────────────────────────────────────────────
+
+export type GenerationLogLevel = 'info' | 'warn' | 'error' | 'debug';
+export type GenerationLogSource = 'pipeline' | 'orchestrator' | 'claude-code' | 'system';
+
+export interface GenerationStepLog {
+	timestamp: string;
+	level: GenerationLogLevel;
+	source: GenerationLogSource;
+	stepIndex?: number | null;
+	stepName?: string | null;
+	event: 'step_started' | 'step_completed' | 'step_failed' | 'step_skipped' | 'message';
+	message: string;
+	durationMs?: number | null;
+}
+
+export interface DirectoryChangelog {
+	summary?: string | null;
+	addedCount: number;
+	updatedCount: number;
+	removedCount: number;
+	entries: DirectoryHistoryChangeEntry[];
+}
+
 /**
  * Entry in directory generation history
  */
@@ -56,6 +105,12 @@ export interface DirectoryGenerationHistoryEntry {
 	updatedAt: string;
 	/** Trigger.dev run ID */
 	triggerRunId?: string;
+	/** History activity type */
+	activityType: DirectoryHistoryActivityType;
+	/** Structured changelog details */
+	changelog?: DirectoryChangelog | null;
+	/** Step-level generation logs */
+	logs?: GenerationStepLog[] | null;
 }
 
 /**

@@ -111,18 +111,22 @@ export function InviteMemberDialog({
                         disabled={isSubmitting}
                     />
 
-                    <Select
-                        label={t('invite.roleLabel')}
-                        value={role}
-                        onChange={(e) => setRole(e.target.value as AssignableMemberRole)}
-                        disabled={isSubmitting}
-                    >
-                        {roleOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                            </option>
-                        ))}
-                    </Select>
+                    <div className="space-y-1.5">
+                        <label className="block text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                            {t('invite.roleLabel')}
+                        </label>
+                        <Select
+                            value={role}
+                            onValueChange={(val) => setRole(val as AssignableMemberRole)}
+                            disabled={isSubmitting}
+                        >
+                            {roleOptions.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                </option>
+                            ))}
+                        </Select>
+                    </div>
 
                     <div className="text-sm text-text-secondary dark:text-text-secondary-dark bg-surface-secondary dark:bg-surface-secondary-dark p-3 rounded-lg">
                         {roleOptions.find((opt) => opt.value === role)?.desc}

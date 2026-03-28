@@ -2,6 +2,7 @@
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 
 interface PluginReadmeProps {
     content: string;
@@ -9,9 +10,10 @@ interface PluginReadmeProps {
 
 export function PluginReadme({ content }: PluginReadmeProps) {
     return (
-        <div className="prose prose-sm dark:prose-invert prose-a:text-primary hover:prose-a:text-primary-hover max-w-none">
+        <div className="prose prose-sm prose-p:w-5/6 dark:prose-invert prose-a:text-primary hover:prose-a:text-primary-hover max-w-none">
             <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw]}
                 components={{
                     code: ({ children, className, ...props }) => {
                         if (className) {

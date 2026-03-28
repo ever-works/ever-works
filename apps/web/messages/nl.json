@@ -500,7 +500,8 @@
                             "paused": "Gepauzeerd",
                             "canceled": "Geannuleerd",
                             "disabled": "Uitgeschakeld"
-                        }
+                        },
+                        "nextSourceValidation": "Volgende bronvalidatie"
                     },
                     "fields": {
                         "automation": "Automatisering",
@@ -513,7 +514,9 @@
                         "maxFailures": "Foutlimiet",
                         "maxFailuresHelp": "Automatisch pauzeren zodra dit aantal fouten optreedt.",
                         "createPullRequest": "Pull Requests Aanmaken",
-                        "createPullRequestHelp": "Indien ingeschakeld, maken geplande updates een pull request aan in plaats van direct te committen."
+                        "createPullRequestHelp": "Indien ingeschakeld, maken geplande updates een pull request aan in plaats van direct te committen.",
+                        "sourceValidationCadence": "Frequentie van bronvalidatie",
+                        "sourceValidationCadenceHelp": "Standaard gebruikt dit dezelfde frequentie als je updates, maar je kunt die vertragen of versnellen."
                     },
                     "billing": {
                         "subscription": "Abonnement",
@@ -630,7 +633,39 @@
                 },
                 "loadMore": "Meer laden",
                 "noMore": "Geen verdere gegevens",
-                "unknown": "Onbekend"
+                "unknown": "Onbekend",
+                "activity": {
+                    "generation": "Generatie",
+                    "item_added": "Item toegevoegd",
+                    "item_updated": "Item bijgewerkt",
+                    "item_removed": "Item verwijderd",
+                    "comparison_added": "Vergelijking toegevoegd",
+                    "comparison_removed": "Vergelijking verwijderd",
+                    "category_change": "Categorie gewijzigd",
+                    "tag_change": "Tag gewijzigd",
+                    "collection_change": "Collectie gewijzigd",
+                    "community_pr_merged": "Community-PR"
+                },
+                "detail": {
+                    "added": "Toegevoegd",
+                    "updated": "Bijgewerkt",
+                    "removed": "Verwijderd",
+                    "fields": "Velden",
+                    "expand": "Changelogdetails uitklappen",
+                    "collapse": "Changelogdetails inklappen"
+                },
+                "filters": {
+                    "label": "Activiteit",
+                    "all": "Alle activiteit",
+                    "generation": "Generatie",
+                    "items": "Items",
+                    "comparisons": "Vergelijkingen",
+                    "taxonomy": "Taxonomie",
+                    "community_pr": "Community-PR"
+                },
+                "pagination": {
+                    "showing": "{from}-{to} van {total} weergegeven"
+                }
             },
             "info": {
                 "title": "Directory Informatie",
@@ -795,7 +830,8 @@
                 "tabs": {
                     "browseItems": "Browse Items",
                     "categories": "Categories",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -879,6 +915,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Bron opnieuw controleren",
+                    "checkCompleted": "Broncontrole voltooid",
+                    "checkFailed": "Broncontrole mislukt",
+                    "failedToCheckSource": "Kan de bron van het item niet controleren",
+                    "brokenLink": "Kapotte link",
+                    "healthy": "In orde",
+                    "couldNotVerify": "Kon niet verifieren",
+                    "sourceMayHaveIssues": "De bron kan problemen hebben",
+                    "sourceChecked": "Bron gecontroleerd",
+                    "reachable": "Bereikbaar",
+                    "reachabilityInconclusive": "Automatische bereikbaarheidscontrole was niet doorslaggevend",
+                    "accurateSource": "Nauwkeurige bron",
+                    "sourceTooGeneric": "Bron te algemeen",
+                    "weakSource": "Zwakke bron",
+                    "sourceAccuracyUnknown": "Bronnauwkeurigheid onbekend",
+                    "useSuggestedSource": "Suggestie toepassen",
+                    "suggestedSourceApplied": "Voorgestelde bron toegepast",
+                    "failedToUseSuggestedSource": "Voorgestelde bron kon niet worden gebruikt",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {

@@ -51,14 +51,28 @@ function resolveActiveProviders(
 export default async function DirectorySchedulePage({ params }: Params) {
     const { id } = await params;
 
-    const [directoryRes, scheduleRes, formSchema, configRes] = await Promise.all([
-        directoryAPI.get(id),
-        directoryAPI.getSchedule(id).catch(() => null),
-        itemsGeneratorAPI.getFormSchema(id).catch(() => null),
-        directoryAPI.getConfig(id).catch(() => null),
-    ]);
+    let directory;
+    let scheduleRes;
+    let formSchema;
+    let configRes;
 
-    const directory = directoryRes.directory;
+    try {
+        const [directoryResult, scheduleResult, formSchemaResult, configResult] = await Promise.all(
+            [
+                directoryAPI.get(id),
+                directoryAPI.getSchedule(id).catch(() => null),
+                itemsGeneratorAPI.getFormSchema(id).catch(() => null),
+                directoryAPI.getConfig(id).catch(() => null),
+            ],
+        );
+
+        directory = directoryResult.directory;
+        scheduleRes = scheduleResult;
+        formSchema = formSchemaResult;
+        configRes = configResult;
+    } catch {
+        notFound();
+    }
 
     if (!canManageSchedule(directory.userRole)) {
         notFound();

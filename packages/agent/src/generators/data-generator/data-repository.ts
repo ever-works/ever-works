@@ -4,7 +4,14 @@ import * as yaml from 'yaml';
 import mergeWith from 'lodash/mergeWith';
 import { format } from 'date-fns';
 import semver from 'semver';
-import type { Category, Collection, ComparisonData, ItemData, Tag } from '@ever-works/contracts';
+import type {
+    Category,
+    Collection,
+    ComparisonData,
+    ComparisonSource,
+    ItemData,
+    Tag,
+} from '@ever-works/contracts';
 import { CreateItemsGeneratorDto } from '../../items-generator/dto';
 
 export type PRUpdate = {
@@ -501,6 +508,47 @@ export class DataRepository {
         return path.join(this.comparisonsDir, slug);
     }
 
+    private normalizeComparisonSource(source: unknown): ComparisonSource | null {
+        if (typeof source === 'string' && source.trim()) {
+            try {
+                return {
+                    title: new URL(source).hostname.replace(/^www\./, ''),
+                    url: source,
+                };
+            } catch {
+                return { title: source, url: source };
+            }
+        }
+
+        if (
+            source &&
+            typeof source === 'object' &&
+            typeof source['url'] === 'string' &&
+            source['url'].trim() &&
+            typeof source['title'] === 'string' &&
+            source['title'].trim()
+        ) {
+            return {
+                title: source['title'],
+                url: source['url'],
+                note: typeof source['note'] === 'string' ? source['note'] : undefined,
+            };
+        }
+
+        return null;
+    }
+
+    private normalizeComparison(comparison: ComparisonData): ComparisonData {
+        return {
+            ...comparison,
+            sources: Array.isArray(comparison.sources)
+                ? comparison.sources
+                      .map((source) => this.normalizeComparisonSource(source))
+                      .filter((source): source is ComparisonSource => !!source)
+                : [],
+        };
+    }
+
     async getComparisons(): Promise<ComparisonData[]> {
         try {
             const entries = await fs.readdir(this.comparisonsDir, { withFileTypes: true });
@@ -525,7 +573,7 @@ export class DataRepository {
         const ymlPath = path.join(this.getComparisonPath(slug), `${slug}.yml`);
         try {
             const content = await fs.readFile(ymlPath, 'utf-8');
-            return yaml.parse(content) as ComparisonData;
+            return this.normalizeComparison(yaml.parse(content) as ComparisonData);
         } catch (err) {
             if (err?.code === 'ENOENT') {
                 return null;
@@ -650,10 +698,7 @@ export class DataRepository {
         await fs.writeFile(filepath, str, 'utf-8');
     }
 
-    async updateItemMetadata(
-        slug: string,
-        updates: Partial<Pick<ItemData, 'featured' | 'order'>>,
-    ): Promise<ItemData | null> {
+    async updateItem(slug: string, updates: Partial<ItemData>): Promise<ItemData | null> {
         const existing = await this.getItem(slug).catch(() => null);
         if (!existing) {
             return null;
@@ -666,6 +711,15 @@ export class DataRepository {
 
         await this.writeItem({ ...next, slug });
         return next;
+    }
+
+    async updateItemMetadata(
+        slug: string,
+        updates: Partial<
+            Pick<ItemData, 'featured' | 'order' | 'source_url' | 'health' | 'source_validation'>
+        >,
+    ): Promise<ItemData | null> {
+        return this.updateItem(slug, updates);
     }
 
     async writeItemMarkdown(item: ItemData, markdown: string) {

@@ -72,6 +72,12 @@ export interface CreateRepoOptions {
 	readonly organization?: string;
 }
 
+export interface UpdateRepoOptions {
+	readonly isPrivate?: boolean;
+	readonly description?: string;
+	readonly defaultBranch?: string;
+}
+
 export interface ForkRepositoryOptions {
 	readonly name?: string;
 	readonly organization?: string;
@@ -165,7 +171,7 @@ export interface IGitOperations {
 	pull(dir: string, token: string, committer?: GitCommitter): Promise<void>;
 	add(dir: string, paths: string | string[]): Promise<void>;
 	addAll(dir: string): Promise<void>;
-	commit(dir: string, message: string, committer?: GitCommitter): Promise<string>;
+	commit(dir: string, message: string, committer?: GitCommitter): Promise<string | null>;
 	push(options: GitPushOptions): Promise<void>;
 	getCurrentBranch(dir: string): Promise<string | null>;
 	getMainBranch(dir: string): Promise<string | null>;
@@ -200,12 +206,7 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 	getRepository(owner: string, repo: string, token: string): Promise<GitRepositoryWithPermissions | null>;
 	hasRepositoryAccess?(owner: string, repo: string, token: string): Promise<boolean>;
 	deleteRepository(owner: string, repo: string, token: string): Promise<void>;
-	updateRepository?(
-		owner: string,
-		repo: string,
-		data: { isPrivate?: boolean; description?: string },
-		token: string
-	): Promise<GitRepository>;
+	updateRepository?(owner: string, repo: string, data: UpdateRepoOptions, token: string): Promise<GitRepository>;
 
 	// User & organization
 	getUser(token: string): Promise<GitUser>;

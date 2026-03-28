@@ -35,7 +35,7 @@ export function UpdateItemsFields({
         <div
             className={cn(
                 'rounded-lg border p-6',
-                'bg-card dark:bg-card-dark',
+                'bg-card dark:bg-card-primary-dark/30',
                 'border-card-border dark:border-card-border-dark',
             )}
         >
@@ -44,19 +44,22 @@ export function UpdateItemsFields({
             </h3>
 
             <div className="space-y-4">
-                <Select
-                    label={t('generationMethod')}
-                    value={generationMethod || GenerationMethod.CREATE_UPDATE}
-                    onChange={(e) =>
-                        onChange({ generation_method: e.target.value as GenerationMethod })
-                    }
-                    variant="form"
-                >
-                    <option value={GenerationMethod.CREATE_UPDATE}>
-                        {t('methodCreateUpdate')}
-                    </option>
-                    <option value={GenerationMethod.RECREATE}>{t('methodRecreate')}</option>
-                </Select>
+                <div>
+                    <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
+                        {t('generationMethod')}
+                    </label>
+                    <Select
+                        value={generationMethod || GenerationMethod.CREATE_UPDATE}
+                        onValueChange={(val) =>
+                            onChange({ generation_method: val as GenerationMethod })
+                        }
+                    >
+                        <option value={GenerationMethod.CREATE_UPDATE}>
+                            {t('methodCreateUpdate')}
+                        </option>
+                        <option value={GenerationMethod.RECREATE}>{t('methodRecreate')}</option>
+                    </Select>
+                </div>
 
                 {isRecreate && hasConfig && (
                     <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning dark:text-warning-dark">

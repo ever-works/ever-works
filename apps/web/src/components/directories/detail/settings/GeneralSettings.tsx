@@ -15,16 +15,18 @@ export function GeneralSettings() {
     return (
         <div
             className={cn(
-                'rounded-lg border p-6',
-                'bg-card dark:bg-card-dark',
+                'rounded-lg border overflow-hidden',
+                'bg-card dark:bg-card-primary-dark/30',
                 'border-card-border dark:border-card-border-dark',
             )}
         >
-            <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
-                {t('generalSettings')}
-            </h3>
+            <div className="px-5 py-3.5 border-b border-card-border dark:border-card-border-dark">
+                <h3 className="text-sm font-semibold text-text dark:text-text-dark">
+                    {t('generalSettings')}
+                </h3>
+            </div>
 
-            <form onSubmit={handleUpdate} className="space-y-4">
+            <form onSubmit={handleUpdate} className="px-5 py-4 space-y-4">
                 <Input
                     label={t('directoryName')}
                     type="text"
@@ -61,7 +63,13 @@ export function GeneralSettings() {
                     </>
                 )}
 
-                <Button type="submit" disabled={isPending} loading={isPending} variant="primary">
+                <Button
+                    type="submit"
+                    size="sm"
+                    disabled={isPending}
+                    loading={isPending}
+                    variant="primary"
+                >
                     {t('saveChanges')}
                 </Button>
             </form>

@@ -80,7 +80,7 @@ export function DirectoryList({
                     // showLimit
                     //     ? 'grid-cols-1 md:grid-cols-2'
                     //     : 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3',
-                    'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3',
+                    'grid-cols-1 @2xl/main:grid-cols-2 @5xl/main:grid-cols-3',
                 )}
             >
                 {displayDirectories.map((directory) => (
@@ -93,7 +93,7 @@ export function DirectoryList({
 
 function DirectoryListSkeleton() {
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 @2xl/main:grid-cols-2 @5xl/main:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div
                     key={i}

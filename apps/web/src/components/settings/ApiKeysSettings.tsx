@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -123,17 +124,19 @@ export function ApiKeysSettings({ initialKeys }: ApiKeysSettingsProps) {
 
     return (
         <div className="space-y-8">
-            <div>
-                <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                    {t('title')}
-                </h2>
-                <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
-            </div>
+            <div className="flex justify-between items-start">
+                <div>
+                    <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
+                        {t('title')}
+                    </h2>
+                    <p className="text-text-muted dark:text-text-muted-dark text-sm">
+                        {t('subtitle')}
+                    </p>
+                </div>
 
-            {/* Create Button */}
-            <div className="flex justify-end">
-                <Button onClick={() => setShowCreateDialog(true)}>
-                    <Key className="w-4 h-4 mr-2" />
+                {/* Create Button */}
+                <Button onClick={() => setShowCreateDialog(true)} className="text-sm">
+                    <Key className="w-4 h-4" />
                     {t('create')}
                 </Button>
             </div>
@@ -155,13 +158,13 @@ export function ApiKeysSettings({ initialKeys }: ApiKeysSettingsProps) {
                                 <th className="text-left px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark">
                                     {t('columns.key')}
                                 </th>
-                                <th className="text-left px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark hidden sm:table-cell">
+                                <th className="text-left px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark hidden @sm/main:table-cell">
                                     {t('columns.created')}
                                 </th>
-                                <th className="text-left px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark hidden md:table-cell">
+                                <th className="text-left px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark hidden @lg/main:table-cell">
                                     {t('columns.lastUsed')}
                                 </th>
-                                <th className="text-left px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark hidden md:table-cell">
+                                <th className="text-left px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark hidden @lg/main:table-cell">
                                     {t('columns.expires')}
                                 </th>
                                 <th className="text-right px-4 py-3 text-sm font-medium text-text-muted dark:text-text-muted-dark">
@@ -183,13 +186,13 @@ export function ApiKeysSettings({ initialKeys }: ApiKeysSettingsProps) {
                                             {key.prefix}...
                                         </code>
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-text-muted dark:text-text-muted-dark hidden sm:table-cell">
+                                    <td className="px-4 py-3 text-sm text-text-muted dark:text-text-muted-dark hidden @sm/main:table-cell">
                                         {formatDate(key.createdAt)}
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-text-muted dark:text-text-muted-dark hidden md:table-cell">
+                                    <td className="px-4 py-3 text-sm text-text-muted dark:text-text-muted-dark hidden @lg/main:table-cell">
                                         {formatDate(key.lastUsedAt)}
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-text-muted dark:text-text-muted-dark hidden md:table-cell">
+                                    <td className="px-4 py-3 text-sm text-text-muted dark:text-text-muted-dark hidden @lg/main:table-cell">
                                         {key.expiresAt
                                             ? formatDate(key.expiresAt)
                                             : t('neverExpires')}
@@ -262,24 +265,23 @@ export function ApiKeysSettings({ initialKeys }: ApiKeysSettingsProps) {
                                 <label className="block text-sm font-medium text-text dark:text-text-dark mb-1.5">
                                     {t('dialog.expirationLabel')}
                                 </label>
-                                <select
+                                <Select
                                     value={newKeyExpiration}
-                                    onChange={(e) => setNewKeyExpiration(e.target.value)}
-                                    className="w-full rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-3 py-2 text-sm text-text dark:text-text-dark"
+                                    onValueChange={setNewKeyExpiration}
                                 >
                                     {EXPIRATION_OPTIONS.map((opt) => (
                                         <option key={opt.value} value={opt.value}>
                                             {opt.label}
                                         </option>
                                     ))}
-                                </select>
+                                </Select>
                             </div>
 
                             <DialogFooter>
-                                <Button variant="secondary" onClick={closeCreateDialog}>
+                                <Button size="sm" variant="secondary" onClick={closeCreateDialog}>
                                     {t('dialog.cancel')}
                                 </Button>
-                                <Button onClick={handleCreate} loading={isPending}>
+                                <Button size="sm" onClick={handleCreate} loading={isPending}>
                                     {t('dialog.createButton')}
                                 </Button>
                             </DialogFooter>

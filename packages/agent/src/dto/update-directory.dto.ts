@@ -1,5 +1,12 @@
 import { Type, Transform } from 'class-transformer';
-import { IsOptional, IsString, IsBoolean, ValidateNested, MaxLength } from 'class-validator';
+import {
+    IsOptional,
+    IsString,
+    IsBoolean,
+    IsEmail,
+    ValidateNested,
+    MaxLength,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { MarkdownReadmeConfigDto } from './create-directory.dto';
 import { sanitizeName, sanitizeDescription } from '../utils/sanitize.util';
@@ -63,4 +70,14 @@ export class UpdateDirectoryDto {
     @IsOptional()
     @IsBoolean()
     communityPrAutoClose?: boolean;
+
+    @ApiPropertyOptional({ description: 'Custom git committer name for this directory' })
+    @IsString()
+    @IsOptional()
+    committerName?: string | null;
+
+    @ApiPropertyOptional({ description: 'Custom git committer email for this directory' })
+    @IsEmail()
+    @IsOptional()
+    committerEmail?: string | null;
 }

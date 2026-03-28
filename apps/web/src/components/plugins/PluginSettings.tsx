@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { UserPlugin } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
@@ -18,13 +18,16 @@ import {
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import { updatePluginSettings } from '@/app/actions/plugins';
+import { updatePluginSettings, validatePluginConnection } from '@/app/actions/plugins';
 import { PluginIcon } from './PluginIcon';
 import { PluginSettingsFormFields } from './PluginSettingsFormFields';
 import { PluginReadme } from './PluginReadme';
 import { PluginEnablePanel } from './PluginEnablePanel';
 import { PluginDisableWarning } from './PluginDisableWarning';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
+import { ClaudeCodeOnboardingWizard } from '@/components/settings/ClaudeCodeOnboardingWizard';
+import { SimAiOnboardingWizard } from '@/components/settings/SimAiOnboardingWizard';
+import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 import { usePluginToggle } from '@/lib/hooks/use-plugin-toggle';
@@ -36,6 +39,11 @@ interface PluginSettingsProps {
 
 export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps) {
     const t = useTranslations('dashboard.plugins');
+    const tOnboarding = useTranslations('onboarding.plugins');
+    const byokTrigger = plugin.uiHints?.byok?.triggerField;
+    const [byokRevealed, setByokRevealed] = useState(
+        !plugin.uiHints?.byok || Boolean(byokTrigger && plugin.settings?.[byokTrigger]),
+    );
 
     const onSave = useCallback(
         async (data: {
@@ -46,14 +54,23 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
             if (!result.success) {
                 throw new Error(result.error);
             }
+
+            if (plugin.uiHints?.validateOnSave) {
+                const validation = await validatePluginConnection(plugin.pluginId);
+                if (!validation.success) {
+                    return { validationError: validation.error };
+                }
+                return { validationSuccess: validation.data?.message };
+            }
         },
-        [plugin.pluginId],
+        [plugin.pluginId, plugin.uiHints?.validateOnSave],
     );
 
     const {
         hasChanges,
         isSaving,
         saveSuccess,
+        saveMessage,
         validationError,
         visibleProperties,
         hasSettings,
@@ -84,6 +101,18 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
         visibility: plugin.visibility,
     });
 
+    const filteredVisibleProperties = useMemo(() => {
+        if (!plugin.uiHints?.byok || byokRevealed) {
+            return visibleProperties;
+        }
+        return {};
+    }, [plugin.uiHints?.byok, byokRevealed, visibleProperties]);
+
+    const setupLink = plugin.uiHints?.setupLink;
+    const showSetupButton =
+        setupLink &&
+        (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !plugin.settings?.[f]));
+
     return (
         <div className="space-y-6">
             {/* Back link */}
@@ -110,7 +139,10 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                             <div className="flex items-start justify-between gap-4">
                                 <div>
                                     <div className="flex items-center gap-2.5 flex-wrap">
-                                        <h1 className="text-xl font-semibold text-text dark:text-text-dark">
+                                        <h1
+                                            className="text-xl font-semibold text-text dark:text-text-dark truncate"
+                                            title={plugin.name}
+                                        >
                                             {plugin.name}
                                         </h1>
                                         <span className="text-xs font-mono text-text-muted dark:text-text-muted-dark bg-surface-secondary dark:bg-surface-secondary-dark px-1.5 py-0.5 rounded">
@@ -139,10 +171,11 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                                     <Button
                                         variant={optimisticEnabled ? 'ghost' : 'primary'}
                                         onClick={handleToggle}
+                                        size="sm"
                                         disabled={isPending}
                                         loading={isPending}
                                         className={cn(
-                                            'shrink-0',
+                                            'shrink-0 gap-2',
                                             optimisticEnabled &&
                                                 'text-danger hover:text-danger hover:bg-danger/10',
                                         )}
@@ -234,6 +267,13 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                 />
             )}
 
+            {plugin.uiHints?.organizationSettings && (
+                <GitHubOrganizationsSettings
+                    plugin={plugin}
+                    connected={Boolean(oauthConnection?.connected)}
+                />
+            )}
+
             {/* Settings Form */}
             {hasSettings ? (
                 <div className="bg-surface dark:bg-surface-dark rounded-xl border border-border dark:border-border-dark">
@@ -245,34 +285,113 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                     </div>
 
                     <div className="p-6">
-                        <PluginSettingsFormFields
-                            visibleProperties={visibleProperties}
-                            getFieldValue={getFieldValue}
-                            handleFieldChange={handleFieldChange}
-                            settingsSchema={plugin.settingsSchema}
-                            pluginId={plugin.pluginId}
-                            validationError={validationError}
-                        />
-                    </div>
+                        {plugin.uiHints?.onboardingWizard ? (
+                            plugin.pluginId === 'sim-ai' ? (
+                                <SimAiOnboardingWizard
+                                    pluginId={plugin.pluginId}
+                                    visibleProperties={visibleProperties}
+                                    getFieldValue={getFieldValue}
+                                    handleFieldChange={handleFieldChange}
+                                    handleSave={handleSave}
+                                    isSaving={isSaving}
+                                    saveSuccess={saveSuccess}
+                                    validationError={validationError}
+                                    saveMessage={saveMessage}
+                                />
+                            ) : (
+                                <ClaudeCodeOnboardingWizard
+                                    pluginId={plugin.pluginId}
+                                    visibleProperties={visibleProperties}
+                                    getFieldValue={getFieldValue}
+                                    handleFieldChange={handleFieldChange}
+                                    handleSave={handleSave}
+                                    isSaving={isSaving}
+                                    saveSuccess={saveSuccess}
+                                    validationError={validationError}
+                                    saveMessage={saveMessage}
+                                />
+                            )
+                        ) : (
+                            <div className="space-y-5">
+                                {plugin.uiHints?.byok && !byokRevealed && (
+                                    <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
+                                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                                            {tOnboarding('byokDescription')}
+                                        </p>
+                                        <Button
+                                            variant="secondary"
+                                            className="mt-3"
+                                            onClick={() => setByokRevealed(true)}
+                                        >
+                                            {plugin.uiHints.byok.buttonLabel ??
+                                                tOnboarding('byokDefaultButton')}
+                                        </Button>
+                                    </div>
+                                )}
 
-                    <div className="flex items-center gap-3 px-6 py-4 border-t border-border dark:border-border-dark">
-                        <Button
-                            variant="primary"
-                            onClick={handleSave}
-                            disabled={!hasChanges || isSaving}
-                            loading={isSaving}
-                        >
-                            <Save className="w-4 h-4 mr-2" />
-                            {t('saveSettings')}
-                        </Button>
+                                {showSetupButton && (
+                                    <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
+                                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                                            {tOnboarding('setupTokenDescription')}
+                                        </p>
+                                        <a
+                                            href={setupLink!.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+                                        >
+                                            {setupLink!.buttonLabel ?? setupLink!.label}
+                                            <ExternalLink className="w-4 h-4" />
+                                        </a>
+                                    </div>
+                                )}
 
-                        {saveSuccess && (
-                            <span className="inline-flex items-center gap-1 text-sm text-success">
-                                <Check className="w-4 h-4" />
-                                {t('settingsSaved')}
-                            </span>
+                                {setupLink && (
+                                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                                        <a
+                                            href={setupLink.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            aria-label={setupLink.label}
+                                            className="text-primary hover:text-primary-hover underline"
+                                        >
+                                            {setupLink.url}
+                                        </a>
+                                    </p>
+                                )}
+
+                                <PluginSettingsFormFields
+                                    visibleProperties={filteredVisibleProperties}
+                                    getFieldValue={getFieldValue}
+                                    handleFieldChange={handleFieldChange}
+                                    settingsSchema={plugin.settingsSchema}
+                                    pluginId={plugin.pluginId}
+                                    validationError={validationError}
+                                />
+                            </div>
                         )}
                     </div>
+
+                    {!plugin.uiHints?.onboardingWizard && (
+                        <div className="flex items-center gap-3 px-6 py-4 border-t border-border dark:border-border-dark">
+                            <Button
+                                variant="primary"
+                                onClick={handleSave}
+                                disabled={!hasChanges || isSaving}
+                                loading={isSaving}
+                            >
+                                <Save className="w-4 h-4 mr-2" />
+                                {t('saveSettings')}
+                            </Button>
+
+                            {saveSuccess && (
+                                <span className="inline-flex items-center gap-1 text-sm text-success">
+                                    <Check className="w-4 h-4" />
+                                    {saveMessage || t('settingsSaved')}
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
             ) : null}
 
@@ -285,7 +404,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                             {t('about')}
                         </h2>
                     </div>
-                    <div className="p-6">
+                    <div className="py-10 pl-12 pr-24">
                         <PluginReadme content={plugin.readme} />
                     </div>
                 </div>

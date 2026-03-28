@@ -22,7 +22,7 @@ import {
     LinkExistingConfirm,
     type ImportMode,
 } from './import';
-import type { AnalyzeForLinkingResponseDto } from '@/lib/api/directory';
+import type { AnalyzeForLinkingResponseDto, ImportEnrichmentConfig } from '@/lib/api/directory';
 
 interface DirectoryImportFormProps {
     user: AuthUser;
@@ -30,7 +30,7 @@ interface DirectoryImportFormProps {
     deployProvider?: string;
 }
 
-type ImportStep = 'source' | 'analyzing' | 'choose_mode' | 'configure' | 'importing';
+type ImportStep = 'source' | 'analyzing' | 'choose_mode' | 'configure';
 type ImportPath = 'direct' | 'from_choose_mode';
 
 interface AnalysisResult {
@@ -96,7 +96,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
             const result = await analyzeRepository(sourceUrl, gitProvider);
 
             if (result.success && result.data) {
-                setAnalysisResult(result.data);
+                setAnalysisResult(result.data as AnalysisResult);
 
                 if (result.data.error) {
                     toast.error(result.data.error);
@@ -125,6 +125,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                     }
 
                     if (result.data.relatedDataRepo) {
+                        // data_repo with link_existing option — show mode selector
                         setStep('choose_mode');
                     } else if (!result.data.detectedType) {
                         if (result.data.structure?.hasReadme) {
@@ -132,8 +133,10 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                         }
                         setStep('configure');
                     } else if (result.data.detectedType === 'data_repo') {
+                        // data_repo with potential link option — show mode selector
                         setStep('choose_mode');
                     } else {
+                        // awesome_readme and others go directly to configure
                         setStep('configure');
                     }
                 }
@@ -178,7 +181,6 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
         if (!analysisResult) return;
 
         setShowLinkConfirm(false);
-        setStep('importing');
 
         startTransition(async () => {
             const linkSourceUrl = analysisResult.relatedDataRepo
@@ -197,19 +199,21 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
 
             if (result.success) {
                 toast.success(result.message || t('success.linked'));
-                if (result.directoryId) {
-                    router.push(ROUTES.DASHBOARD_DIRECTORY(result.directoryId));
-                } else {
-                    router.push(ROUTES.DASHBOARD_DIRECTORIES);
-                }
+                router.push(
+                    result.directoryId
+                        ? ROUTES.DASHBOARD_DIRECTORY(result.directoryId)
+                        : ROUTES.DASHBOARD_DIRECTORIES,
+                );
             } else {
                 toast.error(result.error || t('errors.linkFailed'));
-                setStep('choose_mode');
             }
         });
     };
 
-    const handleImport = async (providers?: Record<string, string>) => {
+    const handleImport = async (
+        providers?: Record<string, string>,
+        enrichmentConfig?: ImportEnrichmentConfig,
+    ) => {
         if (!directoryName.trim()) {
             toast.error(t('errors.nameRequired'));
             return;
@@ -220,8 +224,6 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
             toast.error(t('errors.noAnalysis'));
             return;
         }
-
-        setStep('importing');
 
         startTransition(async () => {
             const result = await importDirectory({
@@ -234,21 +236,20 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                 providers,
                 owner: organization ? owner : undefined,
                 organization,
+                enrichmentConfig,
             });
 
             if (result.success) {
                 toast.success(result.message || t('success.started'));
-                if (result.directoryId) {
-                    router.push(ROUTES.DASHBOARD_DIRECTORY(result.directoryId));
-                } else {
-                    router.push(ROUTES.DASHBOARD_DIRECTORIES);
-                }
+                router.push(
+                    result.directoryId
+                        ? ROUTES.DASHBOARD_DIRECTORY(result.directoryId)
+                        : ROUTES.DASHBOARD_DIRECTORIES,
+                );
             } else if (result.requiresGitProvider) {
                 toast.error(result.error || 'Git provider connection required');
-                setStep('configure');
             } else {
                 toast.error(result.error || t('errors.importFailed'));
-                setStep('configure');
             }
         });
     };
@@ -369,18 +370,6 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                         }}
                         onImport={handleImport}
                     />
-                )}
-
-                {step === 'importing' && (
-                    <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                        <Loader2 className="w-12 h-12 text-primary animate-spin" />
-                        <h3 className="text-xl font-semibold text-text dark:text-text-dark">
-                            {t('importing.title')}
-                        </h3>
-                        <p className="text-text-secondary dark:text-text-secondary-dark text-center max-w-md">
-                            {t('importing.subtitle')}
-                        </p>
-                    </div>
                 )}
             </div>
         </div>

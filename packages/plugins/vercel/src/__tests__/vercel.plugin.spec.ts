@@ -52,9 +52,9 @@ describe('VercelPlugin', () => {
 			expect(apiTokenSchema['x-scope']).toBe('user');
 		});
 
-		it('should have optional defaultTeamScope field', () => {
-			expect(plugin.settingsSchema.properties).toHaveProperty('defaultTeamScope');
-			expect(plugin.settingsSchema.required).not.toContain('defaultTeamScope');
+		it('should only require an api token in user settings', () => {
+			expect(Object.keys(plugin.settingsSchema.properties || {})).toEqual(['apiToken']);
+			expect(plugin.settingsSchema.required).toContain('apiToken');
 		});
 	});
 

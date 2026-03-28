@@ -17,19 +17,25 @@ import { CustomCapabilityRegistryService } from '../services/custom-capability-r
 import { PluginBootstrapService } from '../services/plugin-bootstrap.service';
 import type { PluginsModuleOptions } from '../interfaces/plugins-module-options.interface';
 
+jest.setTimeout(30000);
+
+const createTestDatabaseModule = () =>
+    TypeOrmModule.forRoot({
+        type: 'sqljs',
+        autoSave: false,
+        location: ':memory:',
+        entities: PLUGIN_ENTITIES,
+        synchronize: true,
+    });
+
 describe('PluginsModule', () => {
     describe('forRoot', () => {
         let module: TestingModule;
 
-        beforeEach(async () => {
+        beforeAll(async () => {
             module = await Test.createTestingModule({
                 imports: [
-                    TypeOrmModule.forRoot({
-                        type: 'better-sqlite3',
-                        database: ':memory:',
-                        entities: PLUGIN_ENTITIES,
-                        synchronize: true,
-                    }),
+                    createTestDatabaseModule(),
                     EventEmitterModule.forRoot(),
                     CacheModule.register({ isGlobal: true }),
                     PluginsModule.forRoot({
@@ -42,7 +48,7 @@ describe('PluginsModule', () => {
             }).compile();
         });
 
-        afterEach(async () => {
+        afterAll(async () => {
             if (module) {
                 await module.close();
             }
@@ -115,12 +121,7 @@ describe('PluginsModule', () => {
         it('should support useFactory', async () => {
             const module = await Test.createTestingModule({
                 imports: [
-                    TypeOrmModule.forRoot({
-                        type: 'better-sqlite3',
-                        database: ':memory:',
-                        entities: PLUGIN_ENTITIES,
-                        synchronize: true,
-                    }),
+                    createTestDatabaseModule(),
                     EventEmitterModule.forRoot(),
                     CacheModule.register({ isGlobal: true }),
                     PluginsModule.forRootAsync({
@@ -142,12 +143,7 @@ describe('PluginsModule', () => {
         it('should support async useFactory', async () => {
             const module = await Test.createTestingModule({
                 imports: [
-                    TypeOrmModule.forRoot({
-                        type: 'better-sqlite3',
-                        database: ':memory:',
-                        entities: PLUGIN_ENTITIES,
-                        synchronize: true,
-                    }),
+                    createTestDatabaseModule(),
                     EventEmitterModule.forRoot(),
                     CacheModule.register({ isGlobal: true }),
                     PluginsModule.forRootAsync({
@@ -174,12 +170,7 @@ describe('PluginsModule', () => {
         it('should apply default options when not specified', async () => {
             const module = await Test.createTestingModule({
                 imports: [
-                    TypeOrmModule.forRoot({
-                        type: 'better-sqlite3',
-                        database: ':memory:',
-                        entities: PLUGIN_ENTITIES,
-                        synchronize: true,
-                    }),
+                    createTestDatabaseModule(),
                     EventEmitterModule.forRoot(),
                     CacheModule.register({ isGlobal: true }),
                     PluginsModule.forRoot({

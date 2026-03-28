@@ -13,7 +13,8 @@ import type {
 	SearchResult,
 	RateLimitInfo,
 	ContentExtractionOptions,
-	ContentExtractionResult
+	ContentExtractionResult,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 
 import { tavily, TavilyClient } from '@tavily/core';
@@ -86,7 +87,27 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 	}
 
 	async isAvailable(): Promise<boolean> {
-		return true;
+		if (!this.context) return false;
+		const settings = await this.context.getSettings();
+		return Boolean(settings?.apiKey);
+	}
+
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const apiKey = settings.apiKey as string | undefined;
+		if (!apiKey) {
+			return { success: false, message: 'Tavily API key is not configured.' };
+		}
+
+		try {
+			const client = this.getClient(settings);
+			await client.search('test', { maxResults: 1 });
+			return { success: true, message: 'Tavily connection verified.' };
+		} catch (error) {
+			return {
+				success: false,
+				message: `Tavily connection failed: ${error instanceof Error ? error.message : String(error)}`
+			};
+		}
 	}
 
 	async getRateLimitInfo(): Promise<RateLimitInfo> {

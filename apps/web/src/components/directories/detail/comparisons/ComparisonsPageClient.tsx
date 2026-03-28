@@ -8,6 +8,7 @@ import {
     ChevronDown,
     ChevronLeft,
     ChevronRight,
+    ExternalLink,
     Grid,
     List,
     Square,
@@ -22,6 +23,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -34,6 +36,7 @@ import { toast } from 'sonner';
 import type { ComparisonData } from '@/lib/api/directory';
 import type { ProviderOption } from '@/lib/api/types-only';
 import { ROUTES } from '@/lib/constants';
+import { buildPublicComparisonUrl, formatComparisonDate } from '@/lib/utils/comparison';
 import {
     generateNextComparison,
     generateManualComparison,
@@ -41,10 +44,13 @@ import {
     getRemainingComparisonCount,
     saveComparisonAiConfig,
     getAiProviderModels,
+    listComparisons,
 } from '@/app/actions/dashboard/comparisons';
+import { ComparisonGenerationProgress } from './ComparisonGenerationProgress';
 
 interface ComparisonsPageClientProps {
     directoryId: string;
+    websiteUrl: string | null;
     initialComparisons: ComparisonData[];
     items: Array<{ slug: string; name: string; category: string | string[] }>;
     availableProviders: ProviderOption[];
@@ -53,6 +59,7 @@ interface ComparisonsPageClientProps {
 
 export function ComparisonsPageClient({
     directoryId,
+    websiteUrl,
     initialComparisons,
     items,
     availableProviders,
@@ -136,14 +143,23 @@ export function ComparisonsPageClient({
         .filter((item) => item.slug !== selectedItemA)
         .filter((item) => queryB === '' || item.name.toLowerCase().includes(queryB.toLowerCase()));
 
+    const refreshComparisons = async () => {
+        try {
+            const updated = await listComparisons(directoryId);
+            setComparisons(updated);
+        } catch {
+            // Fallback: reload if fetch fails
+            window.location.reload();
+        }
+    };
+
     const handleGenerateNext = () => {
         startTransition(async () => {
             const result = await generateNextComparison(directoryId);
 
             if (result.status === 'success') {
                 toast.success(result.message);
-                // Refresh comparisons list
-                window.location.reload();
+                await refreshComparisons();
             } else if (result.status === 'skipped') {
                 toast.info(result.message);
             } else {
@@ -172,7 +188,7 @@ export function ComparisonsPageClient({
 
             if (result.status === 'success') {
                 toast.success(result.message);
-                window.location.reload();
+                await refreshComparisons();
             } else if (result.status === 'skipped') {
                 toast.info(result.message);
             } else {
@@ -253,7 +269,7 @@ export function ComparisonsPageClient({
             toast.success(t('progress.done', { count: completed }));
         }
 
-        window.location.reload();
+        await refreshComparisons();
     }, [directoryId, remainingCount]);
 
     const handleStopGenerateAll = () => {
@@ -360,18 +376,13 @@ export function ComparisonsPageClient({
                                     <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
                                         {t('aiModel.provider')}
                                     </label>
-                                    <select
-                                        value={aiProvider}
-                                        onChange={(e) => handleProviderChange(e.target.value)}
-                                        className={cn(
-                                            'w-full rounded-lg border border-border dark:border-border-dark',
-                                            'bg-surface dark:bg-surface-dark',
-                                            'px-3 py-2 text-sm text-text dark:text-text-dark',
-                                            'focus:border-primary dark:focus:border-primary-dark',
-                                            'focus:ring-2 focus:ring-primary/20 focus:outline-none',
-                                        )}
+                                    <Select
+                                        value={aiProvider || '__default__'}
+                                        onValueChange={(val) =>
+                                            handleProviderChange(val === '__default__' ? '' : val)
+                                        }
                                     >
-                                        <option value="">{t('aiModel.default')}</option>
+                                        <option value="__default__">{t('aiModel.default')}</option>
                                         {availableProviders.map((p) => (
                                             <option key={p.id} value={p.id}>
                                                 {p.name}
@@ -380,26 +391,20 @@ export function ComparisonsPageClient({
                                                     : ''}
                                             </option>
                                         ))}
-                                    </select>
+                                    </Select>
                                 </div>
                                 <div className="flex-1">
                                     <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
                                         {t('aiModel.model')}
                                     </label>
-                                    <select
-                                        value={aiModel}
-                                        onChange={(e) => setAiModel(e.target.value)}
+                                    <Select
+                                        value={aiModel || '__provider_default__'}
+                                        onValueChange={(val) =>
+                                            setAiModel(val === '__provider_default__' ? '' : val)
+                                        }
                                         disabled={!aiProvider || isLoadingModels}
-                                        className={cn(
-                                            'w-full rounded-lg border border-border dark:border-border-dark',
-                                            'bg-surface dark:bg-surface-dark',
-                                            'px-3 py-2 text-sm text-text dark:text-text-dark',
-                                            'focus:border-primary dark:focus:border-primary-dark',
-                                            'focus:ring-2 focus:ring-primary/20 focus:outline-none',
-                                            'disabled:opacity-50 disabled:cursor-not-allowed',
-                                        )}
                                     >
-                                        <option value="">
+                                        <option value="__provider_default__">
                                             {isLoadingModels
                                                 ? t('aiModel.loadingModels')
                                                 : t('aiModel.providerDefault')}
@@ -409,7 +414,7 @@ export function ComparisonsPageClient({
                                                 {m.name}
                                             </option>
                                         ))}
-                                    </select>
+                                    </Select>
                                 </div>
                                 <Button
                                     size="sm"
@@ -453,6 +458,9 @@ export function ComparisonsPageClient({
                     )}
                 </div>
             )}
+
+            {/* Single generation progress */}
+            <ComparisonGenerationProgress directoryId={directoryId} isGenerating={isPending} />
 
             {/* Generate All progress bar */}
             {isGeneratingAll && (
@@ -771,7 +779,7 @@ export function ComparisonsPageClient({
                 <div
                     className={
                         viewMode === 'grid'
-                            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'
+                            ? 'grid grid-cols-1 @sm/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4'
                             : 'space-y-3'
                     }
                 >
@@ -799,27 +807,44 @@ export function ComparisonsPageClient({
                                         <h3 className="font-medium text-text dark:text-text-dark truncate">
                                             {comparison.title}
                                         </h3>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => setDeleteSlug(comparison.slug)}
-                                            disabled={isBusy}
-                                            className="relative z-10 text-text-secondary hover:text-red-600 dark:text-text-secondary-dark dark:hover:text-red-400 ml-2 shrink-0"
-                                        >
-                                            <svg
-                                                className="w-4 h-4"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
+                                        <div className="relative z-10 ml-2 flex shrink-0 items-center gap-1">
+                                            {websiteUrl && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    href={buildPublicComparisonUrl(
+                                                        websiteUrl,
+                                                        comparison.slug,
+                                                    )}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-text-secondary dark:text-text-secondary-dark"
+                                                >
+                                                    <ExternalLink className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setDeleteSlug(comparison.slug)}
+                                                disabled={isBusy}
+                                                className="text-text-secondary hover:text-red-600 dark:text-text-secondary-dark dark:hover:text-red-400"
                                             >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                                />
-                                            </svg>
-                                        </Button>
+                                                <svg
+                                                    className="w-4 h-4"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                    />
+                                                </svg>
+                                            </Button>
+                                        </div>
                                     </div>
                                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-secondary dark:text-text-secondary-dark">
                                         <span>
@@ -829,9 +854,7 @@ export function ComparisonsPageClient({
                                         <span className="text-border dark:text-border-dark">|</span>
                                         <span>{comparison.category}</span>
                                         <span className="text-border dark:text-border-dark">|</span>
-                                        <span>
-                                            {new Date(comparison.generated_at).toLocaleDateString()}
-                                        </span>
+                                        <span>{formatComparisonDate(comparison.generated_at)}</span>
                                     </div>
                                     <p className="mt-2 text-sm text-text-secondary dark:text-text-secondary-dark line-clamp-2">
                                         {comparison.summary}

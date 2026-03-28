@@ -323,7 +323,7 @@ export class DeployService {
                     owner: directory.getRepoOwner(),
                     repo: directory.getWebsiteRepo(),
                     branch: WEBSITE_TEMPLATE_CONFIG.branch,
-                    committer: user.asCommitter(),
+                    committer: directory.resolveCommitter(user),
                 },
                 { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
@@ -340,7 +340,7 @@ export class DeployService {
                 directory.gitProvider,
                 repoDir,
                 `chore: trigger deployment\n\nTriggered by Ever Works platform`,
-                user.asCommitter(),
+                directory.resolveCommitter(user),
             );
             await this.gitFacade.push(
                 { dir: repoDir },

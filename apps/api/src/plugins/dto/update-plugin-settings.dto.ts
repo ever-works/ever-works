@@ -117,3 +117,25 @@ export class UpdateDirectoryPluginPriorityDto {
     @Min(0)
     priority: number;
 }
+
+/**
+ * DTO for setting the user's global pipeline default
+ */
+export class SetGlobalPipelineDefaultDto {
+    @ApiPropertyOptional({
+        description: 'Pipeline plugin ID to set as global default, or null to clear',
+        example: 'standard-pipeline',
+        nullable: true,
+    })
+    @IsString()
+    @IsOptional()
+    pluginId?: string | null;
+
+    @ApiProperty({
+        description:
+            'When true, this pipeline is pre-selected in the generator form across all directories, overriding directory-level defaults. The user can still change the selection manually.',
+        example: false,
+    })
+    @IsBoolean()
+    enforce: boolean;
+}

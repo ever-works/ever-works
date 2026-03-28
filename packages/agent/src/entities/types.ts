@@ -13,7 +13,7 @@ export type ClassToObject<T> = {
 };
 
 // Re-import types for use in this file
-import type { GenerateStatusType } from '@ever-works/contracts/api';
+import type { GenerateStatusType, GenerationStepLog } from '@ever-works/contracts/api';
 
 export type GenerateStatus = {
     status: GenerateStatusType;
@@ -33,6 +33,8 @@ export type GenerateStatus = {
     error?: string;
     /** Warnings from circuit breaker or degraded services */
     warnings?: string[];
+    /** Recent log entries for live display during generation */
+    recentLogs?: GenerationStepLog[];
 };
 
 export enum SubscriptionPlanCode {

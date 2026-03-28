@@ -17,13 +17,20 @@ type Params = { params: Promise<{ id: string }> };
 export default async function DirectoryGeneratorPage({ params }: Params) {
     const { id } = await params;
 
-    const [directoryRes, configRes] = await Promise.all([
-        directoryAPI.get(id),
-        directoryAPI.getConfig(id).catch(() => ({ config: undefined })),
-    ]);
+    let directory;
+    let config;
 
-    const directory = directoryRes.directory;
-    const config = configRes.config;
+    try {
+        const [directoryRes, configRes] = await Promise.all([
+            directoryAPI.get(id),
+            directoryAPI.getConfig(id).catch(() => ({ config: undefined })),
+        ]);
+
+        directory = directoryRes.directory;
+        config = configRes.config;
+    } catch {
+        notFound();
+    }
 
     // Server-side permission check: only editors+ can access generator
     if (!canGenerate(directory.userRole)) {

@@ -19,6 +19,7 @@ import { PluginRegistryService } from '../../plugins/services/plugin-registry.se
 import * as superjson from 'superjson';
 import { PipelineFacadeService } from '../pipeline-facade.service';
 import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
+import { PluginContextFactoryService } from '../../plugins/services/plugin-context-factory.service';
 import type {
     DirectoryReference,
     GenerationRequest,
@@ -132,6 +133,12 @@ describe('StepPipelineExecutorService', () => {
                     provide: PluginSettingsService,
                     useValue: {
                         getSettings: jest.fn().mockResolvedValue({}),
+                    },
+                },
+                {
+                    provide: PluginContextFactoryService,
+                    useValue: {
+                        addLogInterceptor: jest.fn().mockReturnValue(() => {}),
                     },
                 },
             ],
