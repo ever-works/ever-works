@@ -66,6 +66,28 @@ async function proxyBetterAuthRequest(request: NextRequest, context: RouteContex
     const { betterAuth = [] } = await context.params;
     const routePath = betterAuth.join('/');
 
+    if (routePath === 'sign-in/social') {
+        console.log('[better-auth proxy] social start request', {
+            provider: request.headers.get('content-type')?.includes('application/json')
+                ? 'json'
+                : 'unknown',
+            hasExistingStateCookie:
+                request.cookies.has('better-auth.state') ||
+                request.cookies.has('__Secure-better-auth.state'),
+        });
+    }
+
+    if (routePath.startsWith('callback/')) {
+        console.log('[better-auth proxy] callback request', {
+            path: routePath,
+            stateParam: request.nextUrl.searchParams.get('state'),
+            stateCookie:
+                request.cookies.get('better-auth.state')?.value ||
+                request.cookies.get('__Secure-better-auth.state')?.value ||
+                null,
+        });
+    }
+
     const headers = new Headers(request.headers);
     headers.set('x-forwarded-host', request.headers.get('host') || '');
     headers.set('x-forwarded-proto', request.nextUrl.protocol.replace(':', ''));

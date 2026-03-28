@@ -31,7 +31,13 @@ export class BaAccount {
     @Column({ type: 'text', nullable: true })
     refreshToken: string;
 
-    @Column({ nullable: true })
+    @Column({ type: 'datetime', nullable: true })
+    accessTokenExpiresAt: Date;
+
+    @Column({ type: 'datetime', nullable: true })
+    refreshTokenExpiresAt: Date;
+
+    @Column({ type: 'datetime', nullable: true })
     expiresAt: Date;
 
     @Column({ nullable: true })
