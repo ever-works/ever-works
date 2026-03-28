@@ -327,6 +327,7 @@ export class PluginsController {
         const validation = await this.pluginValidationService.tryValidateConnection(
             pluginId,
             auth.userId,
+            directoryId,
         );
 
         return { ...result, validation };

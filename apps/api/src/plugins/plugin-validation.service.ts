@@ -16,10 +16,12 @@ export class PluginValidationService {
     /**
      * Non-throwing validation for use after settings save.
      * Returns the validation result or null if the plugin has no validation capability.
+     * When directoryId is provided, settings are resolved with directory overrides merged on top of user settings.
      */
     async tryValidateConnection(
         pluginId: string,
         userId: string,
+        directoryId?: string,
     ): Promise<ConnectionValidationResult | null> {
         const registered = this.pluginRegistry.get(pluginId);
         if (!registered || registered.state !== 'loaded') {
@@ -36,7 +38,7 @@ export class PluginValidationService {
         }
 
         try {
-            return await this.validateUserPluginConnection(pluginId, userId);
+            return await this.validatePluginConnection(pluginId, userId, directoryId);
         } catch (error) {
             if (error instanceof BadRequestException) {
                 const response = error.getResponse();
@@ -45,7 +47,8 @@ export class PluginValidationService {
                     return {
                         success: false,
                         message: (body.message as string) || 'Validation failed',
-                        modelResults: body.modelResults as ConnectionValidationResult['modelResults'],
+                        modelResults:
+                            body.modelResults as ConnectionValidationResult['modelResults'],
                     };
                 }
                 return { success: false, message: String(response) };
@@ -57,10 +60,23 @@ export class PluginValidationService {
 
     /**
      * Throwing validation for the explicit validate-connection endpoint.
+     * Kept as alias for backward compatibility.
      */
     async validateUserPluginConnection(
         pluginId: string,
         userId: string,
+    ): Promise<ConnectionValidationResult> {
+        return this.validatePluginConnection(pluginId, userId);
+    }
+
+    /**
+     * Core validation logic. Resolves settings with optional directory scope
+     * so directory-level model overrides are tested correctly.
+     */
+    private async validatePluginConnection(
+        pluginId: string,
+        userId: string,
+        directoryId?: string,
     ): Promise<ConnectionValidationResult> {
         const registered = this.pluginRegistry.get(pluginId);
         if (!registered || registered.state !== 'loaded') {
@@ -69,6 +85,7 @@ export class PluginValidationService {
 
         const settings = await this.pluginSettingsService.getSettings(pluginId, {
             userId,
+            directoryId,
             includeSecrets: true,
         });
 
