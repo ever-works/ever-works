@@ -13,9 +13,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
-const DISMISS_KEY = 'github_connect_dismissed';
+const DISMISS_KEY_PREFIX = 'github_connect_dismissed';
 
 interface ConnectGithubModalProps {
+    userId: string;
     hasGithubConnected: boolean;
 }
 type LinkSocialResponse = {
@@ -24,7 +25,7 @@ type LinkSocialResponse = {
     status?: boolean;
 };
 
-export function ConnectGithubModal({ hasGithubConnected }: ConnectGithubModalProps) {
+export function ConnectGithubModal({ userId, hasGithubConnected }: ConnectGithubModalProps) {
     const t = useTranslations('dashboard.connectGithub');
     const pathname = usePathname();
     const router = useRouter();
@@ -32,15 +33,16 @@ export function ConnectGithubModal({ hasGithubConnected }: ConnectGithubModalPro
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const shouldForcePrompt = searchParams.get('connectGithub') === '1';
+    const dismissKey = `${DISMISS_KEY_PREFIX}:${userId}`;
 
     useEffect(() => {
         if (hasGithubConnected) return;
 
-        const dismissed = localStorage.getItem(DISMISS_KEY);
+        const dismissed = localStorage.getItem(dismissKey);
         if (shouldForcePrompt || !dismissed) {
             setOpen(true);
         }
-    }, [hasGithubConnected, shouldForcePrompt]);
+    }, [dismissKey, hasGithubConnected, shouldForcePrompt]);
 
     const handleConnect = async () => {
         setLoading(true);
@@ -77,7 +79,7 @@ export function ConnectGithubModal({ hasGithubConnected }: ConnectGithubModalPro
     };
 
     const handleDismiss = () => {
-        localStorage.setItem(DISMISS_KEY, 'true');
+        localStorage.setItem(dismissKey, 'true');
         setOpen(false);
         if (shouldForcePrompt) {
             router.replace(pathname);

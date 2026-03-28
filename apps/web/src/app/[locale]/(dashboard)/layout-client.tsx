@@ -95,6 +95,7 @@ export function DashboardLayoutClient({
 
             <HelpDrawer open={helpOpen} onClose={closeHelp} />
             <ConnectGithubModal
+                userId={user.sub}
                 hasGithubConnected={
                     user.provider === 'github' ||
                     user.connectedProviders?.includes('github') === true
