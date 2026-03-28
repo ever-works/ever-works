@@ -1,4 +1,5 @@
 import { API_URL } from '@/lib/constants';
+import { splitSetCookieHeader } from '@ever-works/plugin';
 import { NextRequest, NextResponse } from 'next/server';
 
 type RouteContext = {
@@ -6,47 +7,6 @@ type RouteContext = {
         betterAuth?: string[];
     }>;
 };
-
-// Keep this in sync with apps/api/src/auth/controllers/better-auth.controller.ts.
-function splitSetCookieHeader(headerValue: string): string[] {
-    const cookies: string[] = [];
-    let current = '';
-    let inExpiresAttribute = false;
-
-    for (let i = 0; i < headerValue.length; i++) {
-        const char = headerValue[i];
-        const nextPart = headerValue.slice(i).toLowerCase();
-
-        if (!inExpiresAttribute && nextPart.startsWith('expires=')) {
-            inExpiresAttribute = true;
-        }
-
-        if (char === ',') {
-            if (inExpiresAttribute) {
-                current += char;
-                continue;
-            }
-
-            if (current.trim()) {
-                cookies.push(current.trim());
-            }
-            current = '';
-            continue;
-        }
-
-        if (inExpiresAttribute && char === ';') {
-            inExpiresAttribute = false;
-        }
-
-        current += char;
-    }
-
-    if (current.trim()) {
-        cookies.push(current.trim());
-    }
-
-    return cookies;
-}
 
 function getUpstreamCandidates(routePath: string, search: string): URL[] {
     const primary = new URL(`${API_URL}/auth/better-auth/${routePath}`);

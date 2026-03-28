@@ -1,48 +1,8 @@
 import { All, Controller, Req, Res } from '@nestjs/common';
 import { Public } from '../decorators/public.decorator';
 import { BetterAuthService } from '../services/better-auth.service';
+import { splitSetCookieHeader } from '@ever-works/plugin';
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express';
-
-// Keep this in sync with apps/web/src/app/api/auth/better-auth/[...betterAuth]/route.ts.
-function splitSetCookieHeader(headerValue: string): string[] {
-    const cookies: string[] = [];
-    let current = '';
-    let inExpiresAttribute = false;
-
-    for (let i = 0; i < headerValue.length; i++) {
-        const char = headerValue[i];
-        const nextPart = headerValue.slice(i).toLowerCase();
-
-        if (!inExpiresAttribute && nextPart.startsWith('expires=')) {
-            inExpiresAttribute = true;
-        }
-
-        if (char === ',') {
-            if (inExpiresAttribute) {
-                current += char;
-                continue;
-            }
-
-            if (current.trim()) {
-                cookies.push(current.trim());
-            }
-            current = '';
-            continue;
-        }
-
-        if (inExpiresAttribute && char === ';') {
-            inExpiresAttribute = false;
-        }
-
-        current += char;
-    }
-
-    if (current.trim()) {
-        cookies.push(current.trim());
-    }
-
-    return cookies;
-}
 
 /**
  * Catch-all controller that delegates all /api/auth/better-auth/* requests
