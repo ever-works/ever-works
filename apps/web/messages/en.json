@@ -1007,7 +1007,8 @@
                     "fields": "Fields",
                     "expand": "Expand details",
                     "collapse": "Collapse details",
-                    "stepLogs": "Step Logs"
+                    "stepLogs": "Step Logs",
+                    "changes": "Changes"
                 },
                 "filters": {
                     "label": "Activity",

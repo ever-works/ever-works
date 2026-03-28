@@ -14,12 +14,25 @@ import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import { AuthenticatedUser } from '../auth/types/jwt.types';
 import { ConversationRepository } from '@ever-works/agent/database';
+import { ConversationTitleService } from './conversation-title.service';
+
+type AIMessage = {
+    id?: string;
+    role: string;
+    content: string;
+    parts?: unknown[];
+    model?: string;
+    usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
+};
 
 @ApiTags('Conversations')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/conversations')
 export class ConversationController {
-    constructor(private readonly repo: ConversationRepository) {}
+    constructor(
+        private readonly repo: ConversationRepository,
+        private readonly titleService: ConversationTitleService,
+    ) {}
 
     @Get()
     @ApiOperation({ summary: 'List conversations' })
@@ -74,16 +87,7 @@ export class ConversationController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
         @Body()
-        body: {
-            messages: Array<{
-                role: string;
-                content: string;
-                toolCalls?: Array<{ id: string; name: string; arguments: string }>;
-                toolCallId?: string;
-                model?: string;
-                usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
-            }>;
-        },
+        body: { messages: AIMessage[] },
     ) {
         const conversation = await this.repo.findById(id, auth.userId);
         if (!conversation) throw new NotFoundException();
@@ -93,12 +97,26 @@ export class ConversationController {
                 conversationId: id,
                 role: m.role as 'user' | 'assistant' | 'system' | 'tool',
                 content: m.content,
-                toolCalls: m.toolCalls,
-                toolCallId: m.toolCallId,
+                parts: m.parts,
                 model: m.model,
                 usage: m.usage,
             })),
         );
+
+        // Set title from first user message if none exists
+        if (!conversation.title) {
+            const firstUser = body.messages.find((m) => m.role === 'user');
+            if (firstUser?.content) {
+                const title =
+                    firstUser.content.length <= 60
+                        ? firstUser.content
+                        : firstUser.content.substring(0, 57) + '...';
+                await this.repo.updateTitle(id, auth.userId, title);
+            }
+        }
+
+        // AI title generation in background (fires once at 4+ messages)
+        this.titleService.maybeGenerateTitle(id, auth.userId).catch(() => {});
 
         return { success: true };
     }
