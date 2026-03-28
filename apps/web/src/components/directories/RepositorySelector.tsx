@@ -108,8 +108,8 @@ function SearchBar({
                     placeholder={t('searchPlaceholder')}
                     className={cn(
                         'w-full pl-9 pr-3 py-2 rounded-md text-sm',
-                        'bg-card dark:bg-card-dark',
-                        'border border-border dark:border-border-dark',
+                        'bg-white dark:bg-card-primary-dark',
+                        'border border-card-border dark:border-white/9',
                         'text-text dark:text-text-dark',
                         'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
                         'focus:outline-none focus:ring-2 focus:ring-primary/50',

@@ -196,7 +196,7 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
 
                         return (
                             <Fragment key={entry.id}>
-                                <tr className="bg-background dark:bg-background-dark">
+                                <tr className="bg-card dark:bg-transparent">
                                     <td className="px-4 py-4 align-top">
                                         <div className="flex flex-col gap-2">
                                             <div className="flex items-start gap-2">

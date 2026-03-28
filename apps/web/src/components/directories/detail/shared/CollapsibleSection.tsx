@@ -21,14 +21,14 @@ export function CollapsibleSection({
         <div
             className={cn(
                 'rounded-lg overflow-hidden',
-                'bg-card dark:bg-card-primary-dark',
-                'border border-card-border dark:border-card-border-dark',
+                'bg-card dark:bg-transparent',
+                'border border-card-border dark:border-border-secondary-dark',
             )}
         >
             <button
                 type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-surface dark:hover:bg-surface-dark transition-colors"
+                className="w-full px-6 py-4 flex items-center justify-between bg-card dark:bg-card-primary-dark/10 text-left hover:bg-surface dark:hover:bg-surface-dark transition-colors"
             >
                 <div>
                     <h3 className="text-lg font-medium text-text dark:text-text-dark">{title}</h3>
