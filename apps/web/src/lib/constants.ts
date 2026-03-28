@@ -41,6 +41,9 @@ export const DEFAULT_LOCALE = (process.env.NEXT_PUBLIC_DEFAULT_LOCALE ||
 const apiUrl = process.env.API_URL || 'http://localhost:3100';
 export const API_URL = apiUrl.endsWith('/api') ? apiUrl : `${apiUrl}/api`;
 
+// Default AI provider used when no provider is explicitly selected
+export const DEFAULT_AI_PROVIDER = 'openrouter';
+
 // Allowed redirect hosts
 export const ALLOWED_REDIRECT_URLS = (process.env.ALLOWED_REDIRECT_URLS || 'localhost,127.0.0.1')
     .split(',')
@@ -72,6 +75,7 @@ export const ROUTES = {
     DASHBOARD_DIRECTORY_ITEMS: (id: string) => `/directories/${id}/items`,
     DASHBOARD_DIRECTORY_GENERATOR: (id: string) => `/directories/${id}/generator`,
     DASHBOARD_DIRECTORY_SCHEDULE: (id: string) => `/directories/${id}/schedule`,
+    DASHBOARD_DIRECTORY_HISTORY: (id: string) => `/directories/${id}/history`,
     DASHBOARD_DIRECTORY_DEPLOY: (id: string) => `/directories/${id}/deploy`,
     DASHBOARD_DIRECTORY_MEMBERS: (id: string) => `/directories/${id}/members`,
     DASHBOARD_DIRECTORY_SETTINGS: (id: string) => `/directories/${id}/settings`,
@@ -107,7 +111,7 @@ export const ROUTES = {
     // API routes
     API_AUTH_VERIFY_EMAIL: '/api/auth/verify-email',
     API_AUTH_RESET_PASSWORD: '/api/auth/reset-password',
-    API_AI_CONVERSATIONS_CHAT_STREAM: '/api/ai-conversations/chat/stream',
+    API_CHAT: '/api/chat',
     API_OAUTH_CALLBACK: '/api/oauth/:providerId/callback',
     API_OAUTH_PLUGINS_CALLBACK: '/api/oauth/:providerId/callback/plugins',
 } as const;

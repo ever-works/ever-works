@@ -495,7 +495,7 @@ function FullLayout({
 
             {/* Global Features Card */}
             <SettingsCard title={tSettings('sections.global.title')}>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 @lg/main:grid-cols-4 gap-4">
                     <Switch
                         checked={formData.settings.categories_enabled ?? true}
                         onChange={(checked) => updateSettings('categories_enabled', checked)}
@@ -527,7 +527,7 @@ function FullLayout({
             {/* Header Settings Card */}
             <SettingsCard title={tSettings('sections.header.title')}>
                 <div className="space-y-4">
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-2 @lg/main:grid-cols-3 @3xl/main:grid-cols-5 gap-4">
                         <Switch
                             checked={formData.settings.header?.submit_enabled ?? true}
                             onChange={(checked) => updateHeaderSettings('submit_enabled', checked)}
@@ -556,7 +556,7 @@ function FullLayout({
                             label={tSettings('sections.header.themeSelector')}
                         />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-card-border dark:border-card-border-dark">
+                    <div className="grid grid-cols-1 @lg/main:grid-cols-3 gap-4 pt-3 border-t border-card-border dark:border-card-border-dark">
                         <div className="space-y-1.5">
                             <label className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
                                 {tSettings('sections.header.defaultLayout')}
@@ -634,7 +634,7 @@ function FullLayout({
                             label={tSettings('sections.homepage.search')}
                         />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-card-border dark:border-card-border-dark">
+                    <div className="grid grid-cols-1 @lg/main:grid-cols-2 gap-4 pt-3 border-t border-card-border dark:border-card-border-dark">
                         <div className="space-y-1.5">
                             <label className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
                                 {tSettings('sections.homepage.defaultView')}
@@ -681,7 +681,7 @@ function FullLayout({
 
             {/* Footer Settings Card */}
             <SettingsCard title={tSettings('sections.footer.title')}>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 @lg/main:grid-cols-3 gap-4">
                     <Switch
                         checked={formData.settings.footer?.subscribe_enabled ?? true}
                         onChange={(checked) => updateFooterSettings('subscribe_enabled', checked)}
@@ -1030,7 +1030,7 @@ function CustomMenuEditor({
     tSettings: (key: string) => string;
 }) {
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 @3xl/main:grid-cols-2 gap-6">
             {/* Header Links */}
             <MenuLinkList
                 location="header"

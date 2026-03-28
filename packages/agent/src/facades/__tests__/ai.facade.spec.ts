@@ -66,6 +66,28 @@ describe('AiFacadeService', () => {
                 usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
             }),
         }),
+        createStreamingChatCompletion: jest.fn().mockReturnValue(
+            (async function* () {
+                yield {
+                    id: 'test-chunk',
+                    model: 'gpt-4',
+                    created: Date.now(),
+                    choices: [
+                        {
+                            index: 0,
+                            delta: { role: 'assistant', content: 'test' },
+                            finishReason: null,
+                        },
+                    ],
+                };
+                yield {
+                    id: 'test-chunk',
+                    model: 'gpt-4',
+                    created: Date.now(),
+                    choices: [{ index: 0, delta: {}, finishReason: 'stop' }],
+                };
+            })(),
+        ),
         listModels: jest.fn().mockResolvedValue([]),
         getModel: jest.fn().mockResolvedValue(null),
         getCapabilities: jest.fn().mockReturnValue(mockCapabilities),

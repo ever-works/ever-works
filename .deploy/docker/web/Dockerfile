@@ -1,8 +1,9 @@
 # NodeJS Base
 FROM node:22-alpine AS base
+
 # Update npm and configure pnpm and turbo
-RUN npm install -g npm@latest && \
-    npm install -g pnpm@10 && \
+RUN corepack enable && \
+    corepack prepare pnpm@10 --activate && \
     npm install -g turbo@latest
 
 ENV CI=true

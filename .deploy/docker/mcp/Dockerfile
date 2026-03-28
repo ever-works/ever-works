@@ -1,6 +1,7 @@
 FROM node:22-alpine AS base
-RUN npm install -g npm@latest && \
-    npm install -g pnpm@10 && \
+
+RUN corepack enable && \
+    corepack prepare pnpm@10 --activate && \
     npm install -g turbo@latest
 
 #-- Pruner

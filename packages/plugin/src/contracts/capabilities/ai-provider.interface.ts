@@ -69,6 +69,8 @@ export interface ChatMessage {
 	readonly name?: string;
 	readonly functionCall?: FunctionCall;
 	readonly toolCalls?: readonly ToolCall[];
+	/** Tool call ID — required for messages with role 'tool' to reference the originating tool call */
+	readonly toolCallId?: string;
 }
 
 /**
@@ -263,9 +265,10 @@ export interface IAiProviderPlugin extends IPlugin {
 	askJson?(prompt: string, options?: AskJsonCompletionOptions): Promise<AskJsonCompletionResponse>;
 
 	/**
-	 * Create a streaming chat completion
+	 * Create a streaming chat completion.
+	 * All AI providers must support streaming — use non-streaming fallback in BaseAiProvider if needed.
 	 */
-	createStreamingChatCompletion?(options: ChatCompletionOptions): AsyncIterable<ChatCompletionChunk>;
+	createStreamingChatCompletion(options: ChatCompletionOptions): AsyncIterable<ChatCompletionChunk>;
 
 	/**
 	 * Create embeddings

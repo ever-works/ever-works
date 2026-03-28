@@ -76,7 +76,7 @@ export function SourceValidationSettingsCard({
                 </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 @lg/main:grid-cols-2">
                 <FieldCard label={t('enableLabel')} helper={t('enableHelp')}>
                     <Switch
                         checked={enabled}
