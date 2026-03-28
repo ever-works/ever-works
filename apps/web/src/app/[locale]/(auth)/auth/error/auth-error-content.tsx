@@ -51,6 +51,10 @@ function AuthErrorContent() {
                 return t('verifyEmail.failed');
             case 'authorize_invalid_redirect_url':
                 return t('authorize.invalidRedirectUrl');
+            case 'email_doesn\'t_match':
+                return t('oauth.emailDoesNotMatch');
+            case 'account_already_linked_to_different_user':
+                return t('oauth.accountAlreadyLinkedToDifferentUser');
             default:
                 return t('generic');
         }
@@ -62,6 +66,8 @@ function AuthErrorContent() {
             case 'oauth_invalid_state':
             case 'oauth_unsupported_provider':
             case 'oauth_callback':
+            case 'email_doesn\'t_match':
+            case 'account_already_linked_to_different_user':
                 return (
                     <svg
                         className="w-12 h-12 text-warning"
@@ -244,6 +250,22 @@ function AuthErrorContent() {
                     className="animate-fade-in"
                 >
                     {t('actions.tryRegister')}
+                </Button>,
+            );
+        }
+
+        if (
+            errorType === 'email_doesn\'t_match' ||
+            errorType === 'account_already_linked_to_different_user'
+        ) {
+            buttons.unshift(
+                <Button
+                    key="dashboard"
+                    href={ROUTES.DASHBOARD}
+                    size="lg"
+                    className="animate-fade-in"
+                >
+                    {t('actions.backToDashboard')}
                 </Button>,
             );
         }

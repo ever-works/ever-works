@@ -15,7 +15,9 @@
                 "missingCode": "Authorization code is missing. Please try signing in again.",
                 "invalidState": "Invalid authorization state. Please try signing in again.",
                 "unsupportedProvider": "This authentication provider is not supported.",
-                "callbackFailed": "Failed to complete authentication. Please try again."
+                "callbackFailed": "Failed to complete authentication. Please try again.",
+                "emailDoesNotMatch": "This provider account uses a different email than your current account. If you are trying to connect GitHub, use the GitHub account you want permanently linked to this user.",
+                "accountAlreadyLinkedToDifferentUser": "This provider account is already linked to a different Ever Works user. Disconnect it from that user first, or use a different provider account."
             },
             "resetPassword": {
                 "missingToken": "Reset password link is invalid. Missing verification token.",
@@ -34,6 +36,7 @@
             },
             "actions": {
                 "backToLogin": "Back to Login",
+                "backToDashboard": "Back to Dashboard",
                 "tryRegister": "Try Registering",
                 "resendVerification": "Resend Verification Email",
                 "contactSupport": "Contact Support",
