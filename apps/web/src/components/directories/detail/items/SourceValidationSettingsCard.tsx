@@ -66,7 +66,7 @@ export function SourceValidationSettingsCard({
     };
 
     return (
-        <section className="rounded-2xl border border-card-border dark:border-card-border-dark bg-card dark:bg-card-dark p-6 shadow-sm space-y-4">
+        <section className="rounded-2xl border border-card-border dark:border-border-secondary-dark bg-card dark:bg-transparent p-6 shadow-sm space-y-4">
             <div className="space-y-1">
                 <p className="text-base font-semibold text-text dark:text-text-dark">
                     {t('title')}
