@@ -212,7 +212,6 @@ export function DashboardSidebar({
                                     <ConditionalTooltip show={isCollapsed} content={item.name}>
                                         <Link
                                             href={item.href}
-                                            onClick={() => setChatPanelOpen(false)}
                                             className={cn(
                                                 'flex items-center rounded-sm transition-colors border border-transparent',
                                                 isCollapsed
