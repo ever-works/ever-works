@@ -73,6 +73,11 @@ describe('AgentPipelinePlugin', () => {
 			expect(manifest.selectableProviderCategories).toContain('content-extractor');
 			expect(manifest.selectableProviderCategories).toContain('data-source');
 		});
+
+		it('should declare defaultForCapabilities', () => {
+			const manifest = plugin.getManifest();
+			expect(manifest.defaultForCapabilities).toContain('pipeline');
+		});
 	});
 
 	describe('getStepDefinitions', () => {
