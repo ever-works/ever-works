@@ -3,6 +3,7 @@ import { Public } from '../decorators/public.decorator';
 import { BetterAuthService } from '../services/better-auth.service';
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express';
 
+// Keep this in sync with apps/web/src/app/api/auth/better-auth/[...betterAuth]/route.ts.
 function splitSetCookieHeader(headerValue: string): string[] {
     const cookies: string[] = [];
     let current = '';

@@ -7,6 +7,7 @@ type RouteContext = {
     }>;
 };
 
+// Keep this in sync with apps/api/src/auth/controllers/better-auth.controller.ts.
 function splitSetCookieHeader(headerValue: string): string[] {
     const cookies: string[] = [];
     let current = '';
@@ -65,28 +66,6 @@ function getUpstreamCandidates(routePath: string, search: string): URL[] {
 async function proxyBetterAuthRequest(request: NextRequest, context: RouteContext) {
     const { betterAuth = [] } = await context.params;
     const routePath = betterAuth.join('/');
-
-    if (routePath === 'sign-in/social') {
-        console.log('[better-auth proxy] social start request', {
-            provider: request.headers.get('content-type')?.includes('application/json')
-                ? 'json'
-                : 'unknown',
-            hasExistingStateCookie:
-                request.cookies.has('better-auth.state') ||
-                request.cookies.has('__Secure-better-auth.state'),
-        });
-    }
-
-    if (routePath.startsWith('callback/')) {
-        console.log('[better-auth proxy] callback request', {
-            path: routePath,
-            stateParam: request.nextUrl.searchParams.get('state'),
-            stateCookie:
-                request.cookies.get('better-auth.state')?.value ||
-                request.cookies.get('__Secure-better-auth.state')?.value ||
-                null,
-        });
-    }
 
     const headers = new Headers(request.headers);
     headers.set('x-forwarded-host', request.headers.get('host') || '');
@@ -154,20 +133,6 @@ async function proxyBetterAuthRequest(request: NextRequest, context: RouteContex
                 nextResponse.headers.append('set-cookie', cookie);
             }
         }
-    }
-
-    if (routePath.startsWith('callback/')) {
-        const forwardedSetCookies = nextResponse.headers.get('set-cookie');
-        console.log('[better-auth proxy] callback response', {
-            path: routePath,
-            status: response.status,
-            location: response.headers.get('location'),
-            hasSessionCookie:
-                forwardedSetCookies?.includes('better-auth.session_token') ||
-                forwardedSetCookies?.includes('__Secure-better-auth.session_token') ||
-                false,
-            setCookieHeader: forwardedSetCookies,
-        });
     }
 
     return nextResponse;

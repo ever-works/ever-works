@@ -10,12 +10,14 @@
  * must already exist (created by TypeORM synchronize or migration).
  */
 
+import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
 import { ENTITIES } from '../packages/agent/src/database/database.config';
 
 async function main() {
 	const dbType = (process.env.DB_TYPE || 'better-sqlite3') as any;
 	const isPostgres = dbType === 'postgres';
+	const p = (index: number) => (isPostgres ? `$${index}` : '?');
 
 	const dataSource = new DataSource({
 		type: dbType,
@@ -52,7 +54,10 @@ async function main() {
 
 		for (const user of users) {
 			try {
-				const existing = await queryRunner.query('SELECT id FROM ba_user WHERE id = $1', [user.id]);
+				const existing = await queryRunner.query(
+					`SELECT id FROM ba_user WHERE id = ${p(1)}`,
+					[user.id]
+				);
 
 				if (existing.length > 0) {
 					continue; // Already migrated
@@ -60,7 +65,7 @@ async function main() {
 
 				await queryRunner.query(
 					`INSERT INTO ba_user (id, name, email, "emailVerified", image, "createdAt", "updatedAt")
-					 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+					 VALUES (${p(1)}, ${p(2)}, ${p(3)}, ${p(4)}, ${p(5)}, ${p(6)}, ${p(7)})`,
 					[
 						user.id,
 						user.username,
@@ -86,7 +91,7 @@ async function main() {
 		for (const user of users) {
 			try {
 				const existing = await queryRunner.query(
-					`SELECT id FROM ba_account WHERE "userId" = $1 AND "providerId" = 'credential'`,
+					`SELECT id FROM ba_account WHERE "userId" = ${p(1)} AND "providerId" = 'credential'`,
 					[user.id]
 				);
 
@@ -94,10 +99,10 @@ async function main() {
 					continue;
 				}
 
-				const accountId = require('crypto').randomUUID();
+				const accountId = randomUUID();
 				await queryRunner.query(
 					`INSERT INTO ba_account (id, "userId", "accountId", "providerId", password, "createdAt", "updatedAt")
-					 VALUES ($1, $2, $3, 'credential', $4, $5, $6)`,
+					 VALUES (${p(1)}, ${p(2)}, ${p(3)}, 'credential', ${p(4)}, ${p(5)}, ${p(6)})`,
 					[
 						accountId,
 						user.id,
@@ -125,7 +130,7 @@ async function main() {
 		for (const token of oauthTokens) {
 			try {
 				const existing = await queryRunner.query(
-					`SELECT id FROM ba_account WHERE "userId" = $1 AND "providerId" = $2`,
+					`SELECT id FROM ba_account WHERE "userId" = ${p(1)} AND "providerId" = ${p(2)}`,
 					[token.userId, token.provider]
 				);
 
@@ -140,10 +145,10 @@ async function main() {
 					accountId = metadata?.login || metadata?.sub || token.username || token.userId;
 				}
 
-				const id = require('crypto').randomUUID();
+				const id = randomUUID();
 				await queryRunner.query(
 					`INSERT INTO ba_account (id, "userId", "accountId", "providerId", "accessToken", "refreshToken", scope, "createdAt", "updatedAt")
-					 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+					 VALUES (${p(1)}, ${p(2)}, ${p(3)}, ${p(4)}, ${p(5)}, ${p(6)}, ${p(7)}, ${p(8)}, ${p(9)})`,
 					[
 						id,
 						token.userId,

@@ -45,19 +45,6 @@ export default async function proxy(req: NextRequest) {
 
     // Check authentication
     const auth = await getAuthFromCookie().catch(() => null);
-    if (pathname === '/' || pathname === ROUTES.AUTH_LOGIN) {
-        console.log('[auth proxy] request auth check', {
-            pathname,
-            hasBetterAuthSessionCookie:
-                req.cookies.has('better-auth.session_token') ||
-                req.cookies.has('__Secure-better-auth.session_token'),
-            hasBetterAuthSessionDataCookie:
-                req.cookies.has('better-auth.session_data') ||
-                req.cookies.has('__Secure-better-auth.session_data'),
-            hasLegacyJwtCookie: req.cookies.has(AUTH_COOKIE_NAME),
-            isAuthenticated: !!auth,
-        });
-    }
     if (!auth) {
         // Not authenticated - redirect to login
         const loginUrl = new URL(ROUTES.AUTH_LOGIN, req.url);

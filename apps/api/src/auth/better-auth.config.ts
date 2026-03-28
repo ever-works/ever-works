@@ -9,6 +9,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserConfirmedEvent } from '../events';
 import { Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 
 const logger = new Logger('BetterAuth');
 
@@ -42,7 +43,7 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
         emailAndPassword: {
             enabled: true,
             requireEmailVerification: false,
-            minPasswordLength: 6,
+            minPasswordLength: 8,
             autoSignIn: true,
             password: {
                 // Use same bcrypt config as existing system for compatibility
@@ -129,10 +130,7 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                             }
 
                             // Truly new user — create in application table
-                            const randomPassword = await bcrypt.hash(
-                                require('crypto').randomBytes(16).toString('hex'),
-                                10,
-                            );
+                            const randomPassword = await bcrypt.hash(randomBytes(16).toString('hex'), 10);
 
                             await userRepository.create({
                                 id: baUser.id,
