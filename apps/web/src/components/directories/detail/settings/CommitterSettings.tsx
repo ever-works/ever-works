@@ -74,7 +74,13 @@ export function CommitterSettings() {
                     variant="form"
                 />
 
-                <Button type="submit" disabled={isPending} loading={isPending} variant="primary" className='text-sm'>
+                <Button
+                    type="submit"
+                    disabled={isPending}
+                    loading={isPending}
+                    variant="primary"
+                    className="text-sm"
+                >
                     {t('committer.save')}
                 </Button>
             </form>

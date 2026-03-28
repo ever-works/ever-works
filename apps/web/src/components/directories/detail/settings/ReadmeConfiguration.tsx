@@ -111,7 +111,7 @@ export function ReadmeConfiguration() {
                             disabled={isPending}
                             loading={isPending}
                             variant="secondary"
-                            className='text-sm'
+                            className="text-sm"
                         >
                             {t('updateReadme')}
                         </Button>

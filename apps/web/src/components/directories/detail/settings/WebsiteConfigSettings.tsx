@@ -122,7 +122,7 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
                                     onClick={handleSave}
                                     disabled={isSaving}
                                     loading={isSaving}
-                                    className='text-sm'
+                                    className="text-sm"
                                 >
                                     {t('save')}
                                 </Button>
