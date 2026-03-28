@@ -239,6 +239,15 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                 <RequiredFields formData={coreData} onChange={handleCoreDataChange} />
             )}
 
+            {/* Pipeline & Provider Selection — always visible */}
+            {formSchema && (
+                <ProviderSelectionSection
+                    formSchema={formSchema}
+                    providers={providers}
+                    onProviderChange={handleProviderChange}
+                />
+            )}
+
             {/* Advanced Options Toggle for existing directories */}
             {isGenerated && (
                 <div className="flex justify-end">
@@ -253,19 +262,9 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                 </div>
             )}
 
-            {/* Show additional advanced options for new directories or when toggled */}
+            {/* Dynamic Plugin Fields — shown for new directories or when advanced options toggled */}
             {(!isGenerated || showAdvancedOptions) && (
                 <>
-                    {formSchema && (
-                        <ProviderSelectionSection
-                            formSchema={formSchema}
-                            providers={providers}
-                            onProviderChange={handleProviderChange}
-                        />
-                    )}
-
-                    {/* Dynamic Plugin Fields */}
-
                     {isLoadingSchema ? (
                         <LoadingState />
                     ) : (
