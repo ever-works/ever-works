@@ -79,7 +79,7 @@ export default function NewDirectoryClient({
                                 />
                             </div>
                         </div>
-                        <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-2">
+                        <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
                             {t('ai.title')}
                         </h3>
                         <p className="text-text-secondary/50 text-sm dark:text-text-secondary-dark mb-6">
