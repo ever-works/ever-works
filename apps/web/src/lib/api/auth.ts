@@ -63,10 +63,6 @@ export interface UserProfile {
     committerEmail?: string | null;
 }
 
-export interface OAuthUrlResponse {
-    url: string;
-}
-
 export interface TokenValidationResponse {
     valid: boolean;
     message: string;
@@ -147,38 +143,6 @@ export const authAPI = {
             wrapInData: false,
         });
     },
-
-    // OAuth URLs
-    getGitHubAuthUrl: async (callbackUrl?: string, state?: string) => {
-        const params = new URLSearchParams();
-        if (callbackUrl) params.append('callbackUrl', callbackUrl);
-        if (state) params.append('state', state);
-        const query = params.toString() ? `?${params.toString()}` : '';
-        return serverFetch<OAuthUrlResponse>(`/oauth/github/url${query}`);
-    },
-
-    getGoogleAuthUrl: async (callbackUrl?: string, state?: string) => {
-        const params = new URLSearchParams();
-        if (callbackUrl) params.append('callbackUrl', callbackUrl);
-        if (state) params.append('state', state);
-        const query = params.toString() ? `?${params.toString()}` : '';
-        return serverFetch<OAuthUrlResponse>(`/oauth/google/url${query}`);
-    },
-
-    connectGoogleCallback: async (code: string, state?: string) => {
-        const params = new URLSearchParams({ code });
-        if (state) params.append('state', state);
-
-        return serverFetch<AuthResponse>(`/oauth/google/callback?${params.toString()}`);
-    },
-
-    connectGitHubCallback: async (code: string, state?: string) => {
-        const params = new URLSearchParams({ code });
-        if (state) params.append('state', state);
-
-        return serverFetch<AuthResponse>(`/oauth/github/callback?${params.toString()}`);
-    },
-
     // Email Verification
     sendVerification: async () => {
         return serverMutation<MessageResponse>({

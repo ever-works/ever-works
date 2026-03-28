@@ -12,7 +12,6 @@ export type {
     ForgotPasswordDto,
     ResetPasswordDto,
     AuthResponse,
-    OAuthUrlResponse,
     TokenValidationResponse,
 } from './auth';
 

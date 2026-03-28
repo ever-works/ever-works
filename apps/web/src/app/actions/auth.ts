@@ -6,14 +6,11 @@ import {
     removeBetterAuthCookies,
     getBetterAuthCookieHeader,
     getRefreshCookie,
-    setOAuthStateCookie,
 } from '@/lib/auth';
-import { API_URL, ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
+import { API_URL, ROUTES, withAppUrl } from '@/lib/constants';
 import { authAPI } from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
-import { generateHexToken } from '@/lib/utils/random';
-import { OAuthProvider } from '@/lib/api/enums';
 
 export async function logout() {
     try {
@@ -47,51 +44,6 @@ export async function logout() {
     return {
         success: true,
     };
-}
-
-// =================
-// OAuth
-// =================
-
-export async function connectProvider(providerId: OAuthProvider) {
-    try {
-        const state = generateHexToken(16);
-        await setOAuthStateCookie(state);
-
-        const callbackUrl = routeWithParams(ROUTES.API_OAUTH_CALLBACK, { providerId });
-
-        switch (providerId) {
-            case OAuthProvider.GITHUB: {
-                const { url } = await authAPI.getGitHubAuthUrl(withAppUrl(callbackUrl), state);
-                return {
-                    success: true,
-                    url,
-                };
-            }
-            case OAuthProvider.GOOGLE: {
-                const { url } = await authAPI.getGoogleAuthUrl(withAppUrl(callbackUrl), state);
-                return {
-                    success: true,
-                    url,
-                };
-            }
-            default: {
-                const t = await getTranslations('api.errors');
-                return {
-                    success: false,
-                    error: t('unsupportedProvider'),
-                };
-            }
-        }
-    } catch (error) {
-        console.error(error);
-        const t = await getTranslations('api.errors');
-
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : t('providerConnectFailed'),
-        };
-    }
 }
 
 // =================
@@ -179,6 +131,3 @@ export async function resetPassword(token: string, newPassword: string) {
         success: true,
     };
 }
-
-// For oAuth connection check file:
-// Check apps/web/src/app/auth/[provider]/callback/route.ts
