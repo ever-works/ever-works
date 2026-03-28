@@ -31,14 +31,14 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
                     className={cn(
                         'w-full rounded-lg transition-colors outline-none resize-none text-sm',
                         'text-text dark:text-text-dark placeholder-text-muted dark:placeholder-text-muted-dark',
-                        'border border-border dark:border-border-dark',
-                        'focus:border-primary',
+                        'border border-card-border dark:border-white/9',
+                        'focus:border-primary dark:focus:border-white/9',
                         'disabled:bg-surface-tertiary dark:disabled:bg-surface-tertiary-dark disabled:text-text-muted dark:disabled:text-text-muted-dark disabled:cursor-not-allowed',
                         // Variant-specific styles
-                        variant === 'form' && ['px-4 py-2', 'bg-surface dark:bg-surface-dark'],
+                        variant === 'form' && ['px-4 py-2', 'bg-white dark:bg-card-primary-dark'],
                         variant === 'default' && [
                             'px-4 py-3',
-                            'bg-surface-secondary dark:bg-surface-secondary-dark',
+                            'bg-white dark:bg-card-primary-dark',
                             'focus:ring-2 focus:ring-primary/20',
                             'hover:border-border-secondary dark:hover:border-border-secondary-dark',
                             'duration-200',
