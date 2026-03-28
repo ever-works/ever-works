@@ -10,19 +10,11 @@ import {
     HttpCode,
     HttpStatus,
 } from '@nestjs/common';
-import {
-    ApiTags,
-    ApiOperation,
-    ApiResponse,
-    ApiBearerAuth,
-    ApiBody,
-    ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
-import { RegisterDto, LoginDto, RefreshTokenDto, UpdatePasswordDto } from '../dto/auth.dto';
+import { UpdatePasswordDto } from '../dto/auth.dto';
 import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/email-verification.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
-import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { SessionAuthGuard } from '../guards/session-auth.guard';
 import { Public } from '../decorators/public.decorator';
 import { config } from '@src/config/constants';
@@ -54,58 +46,14 @@ export class AuthController {
         };
     }
 
-    @Public()
-    @Post('register')
-    @ApiOperation({
-        summary: 'Register a new user',
-        description: 'Create a new user account with email and password',
-    })
-    @ApiResponse({ status: 201, description: 'User successfully registered' })
-    @ApiResponse({ status: 400, description: 'Invalid input or email already exists' })
-    async register(@Body() registerDto: RegisterDto) {
-        return this.authService.register(registerDto);
-    }
-
-    @Public()
-    @UseGuards(LocalAuthGuard)
-    @Post('login')
-    @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'User login', description: 'Authenticate with email and password' })
-    @ApiBody({ type: LoginDto })
-    @ApiResponse({
-        status: 200,
-        description: 'Successfully authenticated, returns access and refresh tokens',
-    })
-    @ApiResponse({ status: 401, description: 'Invalid credentials' })
-    async login(@Request() req) {
-        const userAgent = req.headers['user-agent'];
-        const ipAddress = req.ip || req.headers['x-forwarded-for'];
-        return this.authService.login(req.user, userAgent, ipAddress);
-    }
-
-    @Public()
-    @Post('refresh')
-    @HttpCode(HttpStatus.OK)
-    @ApiOperation({
-        summary: 'Refresh access token',
-        description: 'Get a new access token using a refresh token',
-    })
-    @ApiResponse({ status: 200, description: 'New access token generated' })
-    @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
-    async refresh(@Request() req, @Body() refreshTokenDto: RefreshTokenDto) {
-        const userAgent = req.headers['user-agent'];
-        const ipAddress = req.ip || req.headers['x-forwarded-for'];
-        return this.authService.refreshToken(refreshTokenDto.refreshToken, userAgent, ipAddress);
-    }
-
     @UseGuards(SessionAuthGuard)
     @Post('logout')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
-    @ApiOperation({ summary: 'Logout', description: 'Invalidate the current refresh token' })
+    @ApiOperation({ summary: 'Logout', description: 'Logout the current authenticated session' })
     @ApiResponse({ status: 200, description: 'Successfully logged out' })
-    async logout(@Body() refreshTokenDto: RefreshTokenDto) {
-        return this.authService.logout(refreshTokenDto.refreshToken);
+    async logout() {
+        return { message: 'Logged out successfully' };
     }
 
     @UseGuards(SessionAuthGuard)
@@ -114,11 +62,11 @@ export class AuthController {
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
         summary: 'Logout from all devices',
-        description: 'Invalidate all refresh tokens for the user',
+        description: 'Logout from all active sessions for the user',
     })
     @ApiResponse({ status: 200, description: 'Successfully logged out from all devices' })
-    async logoutAll(@Request() req) {
-        return this.authService.logoutAllDevices(req.user.userId);
+    async logoutAll() {
+        return { message: 'Logged out from all devices successfully' };
     }
 
     @UseGuards(SessionAuthGuard)

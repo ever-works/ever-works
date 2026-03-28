@@ -2,11 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import {
-    UserRepository,
-    OAuthTokenRepository,
-    RefreshTokenRepository,
-} from '@ever-works/agent/database';
+import { UserRepository, OAuthTokenRepository } from '@ever-works/agent/database';
 import { createBetterAuthInstance, BetterAuthInstance } from '../better-auth.config';
 
 @Injectable()
@@ -17,7 +13,6 @@ export class BetterAuthService implements OnModuleInit {
         @InjectDataSource() private dataSource: DataSource,
         private readonly userRepository: UserRepository,
         private readonly oauthTokenRepository: OAuthTokenRepository,
-        private readonly refreshTokenRepository: RefreshTokenRepository,
         private readonly eventEmitter: EventEmitter2,
     ) {}
 
@@ -26,7 +21,6 @@ export class BetterAuthService implements OnModuleInit {
             dataSource: this.dataSource,
             userRepository: this.userRepository,
             oauthTokenRepository: this.oauthTokenRepository,
-            refreshTokenRepository: this.refreshTokenRepository,
             eventEmitter: this.eventEmitter,
         });
     }

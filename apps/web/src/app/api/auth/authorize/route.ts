@@ -1,7 +1,7 @@
 import { redirect } from '@/i18n/navigation';
 import { getAuthFromRequest, setRedirectCookie } from '@/lib/auth';
 import { REDIRECT_SEARCH_PARAM, ROUTES } from '@/lib/constants';
-import { addSessionTokenToUrl, isValidRedirectUrl } from '@/lib/utils';
+import { isValidRedirectUrl } from '@/lib/utils';
 import { getLocale } from 'next-intl/server';
 import type { NextRequest } from 'next/server';
 
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     if (auth?.isAuthenticated && !auth.isExpired) {
         return redirect({
             locale,
-            href: addSessionTokenToUrl(redirectUrl, auth.token),
+            href: redirectUrl,
         });
     }
 

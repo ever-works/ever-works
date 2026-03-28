@@ -1,14 +1,8 @@
 'use server';
 
 import { z } from 'zod';
-import {
-    removeAuthAccessCookies,
-    removeBetterAuthCookies,
-    getBetterAuthCookieHeader,
-    getRefreshCookie,
-} from '@/lib/auth';
+import { removeBetterAuthCookies, getBetterAuthCookieHeader } from '@/lib/auth';
 import { API_URL, ROUTES, withAppUrl } from '@/lib/constants';
-import { authAPI } from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 
@@ -39,16 +33,11 @@ export async function logout() {
                 cache: 'no-store',
             });
         }
-
-        const refresh_token = await getRefreshCookie();
-        if (refresh_token) {
-            await authAPI.logout({ refreshToken: refresh_token });
-        }
     } catch (error) {
         console.error(error);
     }
 
-    await Promise.all([removeAuthAccessCookies(), removeBetterAuthCookies()]);
+    await removeBetterAuthCookies();
 
     // Redirect to login page
     redirect({

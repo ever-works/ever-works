@@ -109,8 +109,6 @@ export const ROUTES = {
     AUTH_FORGOT_PASSWORD: '/forgot-password',
 
     // API routes
-    API_AUTH_VERIFY_EMAIL: '/api/auth/verify-email',
-    API_AUTH_RESET_PASSWORD: '/api/auth/reset-password',
     API_CHAT: '/api/chat',
     API_OAUTH_PLUGINS_CALLBACK: '/api/oauth/:providerId/callback/plugins',
 } as const;

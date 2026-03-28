@@ -2,10 +2,6 @@ import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import { MessageResponse } from './types';
 
-export interface RefreshTokenDto {
-    refreshToken: string;
-}
-
 export interface UpdatePasswordDto {
     currentPassword: string;
     newPassword: string;
@@ -48,10 +44,10 @@ export interface TokenValidationResponse {
 }
 
 export const authAPI = {
-    logout: async (data: RefreshTokenDto) => {
+    logout: async () => {
         return serverMutation<MessageResponse>({
             endpoint: '/auth/logout',
-            data,
+            data: {},
             method: 'POST',
             wrapInData: false,
         });

@@ -4,9 +4,7 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { ApiKeyService } from '../services/api-key.service';
 import { BetterAuthService } from '../services/better-auth.service';
 import { UserRepository } from '@ever-works/agent/database';
-import { JwtService } from '@nestjs/jwt';
-import { jwtConstants } from '../../config/constants';
-import type { AuthenticatedUser, JwtPayload } from '../types/jwt.types';
+import type { AuthenticatedUser } from '../types/jwt.types';
 
 const API_KEY_PREFIX = 'ew_live_';
 
@@ -14,7 +12,6 @@ const API_KEY_PREFIX = 'ew_live_';
 export class SessionAuthGuard implements CanActivate {
     private apiKeyService: ApiKeyService;
     private userRepository: UserRepository;
-    private jwtService: JwtService;
 
     constructor(
         private reflector: Reflector,
@@ -33,7 +30,7 @@ export class SessionAuthGuard implements CanActivate {
 
         const request = context.switchToHttp().getRequest();
 
-        // 1. Try API key authentication first (preserved from JwtAuthGuard)
+        // 1. Try API key authentication first
         const apiKey = this.extractApiKey(request);
         if (apiKey) {
             return this.authenticateWithApiKey(request, apiKey);
@@ -42,12 +39,6 @@ export class SessionAuthGuard implements CanActivate {
         // 2. Try BetterAuth session authentication
         const sessionResult = await this.tryAuthenticateWithSession(request);
         if (sessionResult) {
-            return true;
-        }
-
-        // 3. Fall back to legacy JWT authentication (for existing sessions during transition)
-        const jwtResult = await this.tryAuthenticateWithJwt(request);
-        if (jwtResult) {
             return true;
         }
 
@@ -107,50 +98,6 @@ export class SessionAuthGuard implements CanActivate {
             }
 
             request.user = this.buildAuthenticatedUser(user);
-            return true;
-        } catch {
-            return false;
-        }
-    }
-
-    private async tryAuthenticateWithJwt(request: any): Promise<boolean> {
-        if (!this.jwtService) {
-            this.jwtService = this.moduleRef.get(JwtService, { strict: false });
-        }
-
-        const authHeader = request.headers?.authorization;
-        if (!authHeader || typeof authHeader !== 'string') {
-            return false;
-        }
-
-        const [scheme, token] = authHeader.split(' ');
-        if (scheme !== 'Bearer' || !token || token.startsWith(API_KEY_PREFIX)) {
-            return false;
-        }
-
-        try {
-            const payload = this.jwtService.verify<JwtPayload>(token, {
-                secret: jwtConstants.secret(),
-            });
-
-            if (!payload?.sub) {
-                return false;
-            }
-
-            const authenticatedUser: AuthenticatedUser = {
-                userId: payload.sub,
-                email: payload.email,
-                username: payload.username,
-                provider: payload.provider,
-                emailVerified: payload.emailVerified,
-                isActive: payload.isActive,
-                avatar: payload.avatar,
-                iat: payload.iat,
-                iss: payload.iss,
-                aud: payload.aud,
-            };
-
-            request.user = authenticatedUser;
             return true;
         } catch {
             return false;

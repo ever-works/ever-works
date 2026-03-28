@@ -1,8 +1,7 @@
 import 'server-only';
 import { API_URL, WEB_URL } from '../constants';
 import { headers } from 'next/headers';
-import { getAuthAccessCookie, getBetterAuthCookieHeader } from '../auth/cookies';
-import { refreshAccessToken } from '../auth/refresh';
+import { getBetterAuthCookieHeader } from '../auth/cookies';
 import { getTranslations } from 'next-intl/server';
 
 export async function handleServerError(error: unknown): Promise<never> {
@@ -45,7 +44,7 @@ export async function serverFetch<T>(
     const t = await getTranslations('api.errors');
     const { rawResponse, ...fetchOptions } = options;
 
-    const doFetch = async (authToken?: string, baCookieHeader?: string) => {
+    const doFetch = async (baCookieHeader?: string) => {
         const reqHeaders: Record<string, string> = {
             'Content-Type': 'application/json',
             'X-Frontend-URL': frontendUrl,
@@ -56,10 +55,6 @@ export async function serverFetch<T>(
             // Forward BetterAuth session cookies to the API
             reqHeaders['Cookie'] = baCookieHeader;
         }
-        if (authToken) {
-            // Also send JWT Bearer token (legacy fallback — guard tries both)
-            reqHeaders['Authorization'] = `Bearer ${authToken}`;
-        }
 
         return fetch(`${API_URL}${endpoint}`, {
             ...fetchOptions,
@@ -69,19 +64,8 @@ export async function serverFetch<T>(
         });
     };
 
-    // Send both BetterAuth cookies and JWT token — the guard tries session first, then JWT
     const baCookies = await getBetterAuthCookieHeader();
-    const token = await getAuthAccessCookie();
-    let response = await doFetch(token, baCookies);
-
-    // On 401 with legacy JWT (no BetterAuth session), attempt a single token refresh and retry
-    if (response.status === 401 && token && !baCookies) {
-        const refreshed = await refreshAccessToken();
-        if (refreshed) {
-            const newToken = await getAuthAccessCookie();
-            response = await doFetch(newToken);
-        }
-    }
+    const response = await doFetch(baCookies);
 
     // Return raw response for streaming
     if (rawResponse) {

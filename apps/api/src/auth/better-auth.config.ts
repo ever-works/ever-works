@@ -4,11 +4,7 @@ import { DataSource } from 'typeorm';
 import { config, AuthProvider } from '../config/constants';
 import { GITHUB_SCOPES } from './config/github-scopes.config';
 import { AuthUser, AuthSession, AuthAccount, AuthVerification } from '@ever-works/agent/entities';
-import {
-    UserRepository,
-    OAuthTokenRepository,
-    RefreshTokenRepository,
-} from '@ever-works/agent/database';
+import { UserRepository, OAuthTokenRepository } from '@ever-works/agent/database';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserConfirmedEvent, UserCreatedEvent, UserForgotPasswordEvent } from '../events';
 import { Logger } from '@nestjs/common';
@@ -21,18 +17,11 @@ export interface BetterAuthDeps {
     dataSource: DataSource;
     userRepository: UserRepository;
     oauthTokenRepository: OAuthTokenRepository;
-    refreshTokenRepository: RefreshTokenRepository;
     eventEmitter: EventEmitter2;
 }
 
 export function createBetterAuthInstance(deps: BetterAuthDeps) {
-    const {
-        dataSource,
-        userRepository,
-        oauthTokenRepository,
-        refreshTokenRepository,
-        eventEmitter,
-    } = deps;
+    const { dataSource, userRepository, oauthTokenRepository, eventEmitter } = deps;
     const webAppUrl = config.webAppUrl();
 
     return betterAuth({
@@ -105,10 +94,6 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                     passwordResetToken: null,
                     passwordResetExpires: null,
                 });
-                await refreshTokenRepository.revokeAllUserTokens(
-                    appUser.id,
-                    'Password reset via BetterAuth',
-                );
             },
             password: {
                 // Use same bcrypt config as existing system for compatibility
