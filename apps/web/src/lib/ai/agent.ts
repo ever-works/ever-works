@@ -43,7 +43,8 @@ Be concise. Use markdown for formatting.`;
 
 interface AgentOptions {
     messages: UIMessage[];
-    authToken: string;
+    authToken?: string;
+    authCookieHeader?: string;
     providerOverride: string;
     directoryId?: string;
     conversationId?: string;
@@ -53,6 +54,7 @@ interface AgentOptions {
 export async function runAgent({
     messages,
     authToken,
+    authCookieHeader,
     providerOverride,
     directoryId,
     conversationId,
@@ -61,6 +63,7 @@ export async function runAgent({
     const provider = createBackendProvider({
         baseURL: `${API_URL}/v1`,
         authToken,
+        authCookieHeader,
         providerOverride,
         directoryId,
         conversationId,

@@ -3,14 +3,10 @@
 
 export type {
     // From auth.ts
-    RegisterDto,
-    LoginDto,
     RefreshTokenDto,
     UpdatePasswordDto,
     UpdateProfileDto,
     VerifyEmailDto,
-    ForgotPasswordDto,
-    ResetPasswordDto,
     AuthResponse,
     TokenValidationResponse,
 } from './auth';

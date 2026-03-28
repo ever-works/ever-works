@@ -26,8 +26,13 @@ export interface BetterAuthDeps {
 }
 
 export function createBetterAuthInstance(deps: BetterAuthDeps) {
-    const { dataSource, userRepository, oauthTokenRepository, refreshTokenRepository, eventEmitter } =
-        deps;
+    const {
+        dataSource,
+        userRepository,
+        oauthTokenRepository,
+        refreshTokenRepository,
+        eventEmitter,
+    } = deps;
     const webAppUrl = config.webAppUrl();
 
     return betterAuth({

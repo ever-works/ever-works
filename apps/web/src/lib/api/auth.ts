@@ -2,19 +2,6 @@ import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import { MessageResponse } from './types';
 
-// DTOs - Auth
-export interface RegisterDto {
-    username: string;
-    email: string;
-    password: string;
-    emailVerificationCallbackUrl?: string;
-}
-
-export interface LoginDto {
-    email: string;
-    password: string;
-}
-
 export interface RefreshTokenDto {
     refreshToken: string;
 }
@@ -34,16 +21,6 @@ export interface UpdateProfileDto {
 // DTOs - Email Verification
 export interface VerifyEmailDto {
     token: string;
-}
-
-export interface ForgotPasswordDto {
-    email: string;
-    resetPasswordCallbackUrl?: string;
-}
-
-export interface ResetPasswordDto {
-    token: string;
-    newPassword: string;
 }
 
 // Response Types
@@ -71,34 +48,6 @@ export interface TokenValidationResponse {
 }
 
 export const authAPI = {
-    // Authentication
-    register: async (data: RegisterDto) => {
-        return serverMutation<AuthResponse>({
-            endpoint: '/auth/register',
-            data,
-            method: 'POST',
-            wrapInData: false,
-        });
-    },
-
-    login: async (data: LoginDto) => {
-        return serverMutation<AuthResponse>({
-            endpoint: '/auth/login',
-            data,
-            method: 'POST',
-            wrapInData: false,
-        });
-    },
-
-    refresh: async (data: RefreshTokenDto) => {
-        return serverMutation<AuthResponse>({
-            endpoint: '/auth/refresh',
-            data,
-            method: 'POST',
-            wrapInData: false,
-        });
-    },
-
     logout: async (data: RefreshTokenDto) => {
         return serverMutation<MessageResponse>({
             endpoint: '/auth/logout',
@@ -160,30 +109,6 @@ export const authAPI = {
             method: 'POST',
             wrapInData: false,
         });
-    },
-
-    forgotPassword: async (data: ForgotPasswordDto) => {
-        return serverMutation<MessageResponse>({
-            endpoint: '/auth/forgot-password',
-            data,
-            method: 'POST',
-            wrapInData: false,
-        });
-    },
-
-    resetPassword: async (data: ResetPasswordDto) => {
-        return serverMutation<MessageResponse>({
-            endpoint: '/auth/reset-password',
-            data,
-            method: 'POST',
-            wrapInData: false,
-        });
-    },
-
-    validateEmailVerificationToken: async (token: string) => {
-        return serverFetch<TokenValidationResponse>(
-            `/auth/validate-email-token?token=${encodeURIComponent(token)}`,
-        );
     },
 
     validatePasswordResetToken: async (token: string) => {
