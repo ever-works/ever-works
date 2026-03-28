@@ -4,7 +4,11 @@ import {
     PrimaryGeneratedColumn,
     CreateDateColumn,
     UpdateDateColumn,
+    BeforeInsert,
 } from 'typeorm';
+
+const BETTER_AUTH_PLACEHOLDER_PASSWORD_HASH =
+    '$2b$10$3FpU5KTq.lf4tUSzT4i0JOuuywnxGPnkKorObPlIEG14V0wl17ANS';
 
 @Entity({ name: 'users', synchronize: false })
 export class AuthUser {
@@ -17,6 +21,9 @@ export class AuthUser {
     @Column({ unique: true })
     email: string;
 
+    @Column()
+    password: string;
+
     @Column({ default: false })
     emailVerified: boolean;
 
@@ -28,4 +35,11 @@ export class AuthUser {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @BeforeInsert()
+    ensurePlaceholderPassword() {
+        if (!this.password) {
+            this.password = BETTER_AUTH_PLACEHOLDER_PASSWORD_HASH;
+        }
+    }
 }

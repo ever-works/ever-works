@@ -177,9 +177,6 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
             account: {
                 create: {
                     after: async (account) => {
-                        // Sync OAuth accounts to oauth_tokens table (for plugin system)
-                        if (account.providerId === 'credential') return;
-
                         try {
                             // BetterAuth may have created the user with a new UUID,
                             // but the application users table may have the same email
@@ -204,6 +201,15 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                                         return;
                                     }
                                 }
+                            }
+
+                            if (account.providerId === 'credential') {
+                                await userRepository.update(appUserId, {
+                                    password: account.password || undefined,
+                                    registrationProvider: AuthProvider.LOCAL,
+                                    lastLoginAt: new Date(),
+                                });
+                                return;
                             }
 
                             await oauthTokenRepository.upsert({
