@@ -209,10 +209,10 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                         'w-full flex items-center justify-between rounded-lg border text-sm',
                         'transition-colors outline-none text-left cursor-pointer',
                         'bg-surface dark:bg-surface-secondary-dark/20',
-                        'border-card-border dark:border-card-border-dark',
-                        'hover:border-primary/40 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20',
+                        'border-card-border dark:border-border-secondary-dark',
+                        'hover:border-white/40 focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white/20',
                         'disabled:cursor-not-allowed disabled:opacity-50',
-                        open && 'border-primary ring-2 ring-primary/20',
+                        open && 'border-white/9 ring-1 ring-white/20',
                         size === 'default' ? 'h-9 px-3 py-2' : 'h-8 px-2 text-sm',
                     )}
                 >
@@ -252,7 +252,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                                 'fixed z-[9999] min-w-[8rem]',
                                 'rounded-lg border shadow-sm overflow-hidden',
                                 'bg-white dark:bg-surface-dark',
-                                'border-card-border dark:border-card-border-dark',
+                                'border-card-border dark:border-border-secondary-dark',
                                 'max-h-60 overflow-y-auto py-1',
                                 'sel-dropdown',
                             )}
@@ -362,14 +362,14 @@ function OptionRow({
                     : 'px-2 py-1.5 mx-1 rounded-sm my-px text-sm',
                 indent && 'pl-6',
                 selected
-                    ? 'bg-surface-secondary dark:bg-card-dark/70 font-medium text-text dark:text-text-dark'
-                    : 'text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-card-dark/70',
+                    ? 'bg-surface-secondary dark:bg-white/6 font-medium text-text dark:text-text-dark'
+                    : 'text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-white/4',
                 opt.disabled &&
                     'opacity-50 cursor-not-allowed pointer-events-none text-text-muted dark:text-text-muted-dark',
             )}
         >
             <span className="flex-1 truncate">{opt.label}</span>
-            {selected && <CheckIcon className="size-4 shrink-0 text-primary" />}
+            {selected && <CheckIcon className="size-4 shrink-0 text-gray-800 dark:text-gray-100" />}
         </div>
     );
 }

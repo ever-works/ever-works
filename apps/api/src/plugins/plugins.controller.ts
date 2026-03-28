@@ -168,14 +168,21 @@ export class PluginsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('pluginId') pluginId: string,
         @Body() dto: UpdateUserPluginSettingsDto,
-    ): Promise<UserPluginResponseDto> {
-        return this.pluginsService.updateUserPluginSettings(
+    ) {
+        const result = await this.pluginsService.updateUserPluginSettings(
             pluginId,
             auth.userId,
             dto.settings,
             dto.secretSettings,
             dto.metadata,
         );
+
+        const validation = await this.pluginValidationService.tryValidateConnection(
+            pluginId,
+            auth.userId,
+        );
+
+        return { ...result, validation };
     }
 
     @Post('plugins/pipeline-default')
@@ -306,9 +313,9 @@ export class PluginsController {
         @Param('directoryId') directoryId: string,
         @Param('pluginId') pluginId: string,
         @Body() dto: UpdateDirectoryPluginSettingsDto,
-    ): Promise<DirectoryPluginResponseDto> {
+    ) {
         await this.ownershipService.ensureCanEdit(directoryId, auth.userId);
-        return this.pluginsService.updateDirectoryPluginSettings(
+        const result = await this.pluginsService.updateDirectoryPluginSettings(
             directoryId,
             pluginId,
             auth.userId,
@@ -316,6 +323,14 @@ export class PluginsController {
             dto.secretSettings,
             dto.metadata,
         );
+
+        const validation = await this.pluginValidationService.tryValidateConnection(
+            pluginId,
+            auth.userId,
+            directoryId,
+        );
+
+        return { ...result, validation };
     }
 
     @Post('directories/:directoryId/plugins/:pluginId/capability')

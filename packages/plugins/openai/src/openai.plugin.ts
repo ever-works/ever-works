@@ -182,6 +182,9 @@ export class OpenAiPlugin extends BaseAiProvider {
 			builtIn: true,
 			autoEnable: false,
 			visibility: 'public',
+			uiHints: {
+				completionFields: ['apiKey', 'defaultModel']
+			},
 			readme: [
 				'## What is the OpenAI plugin?',
 				'',

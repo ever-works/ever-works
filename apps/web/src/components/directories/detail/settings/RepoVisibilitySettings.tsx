@@ -79,8 +79,8 @@ export function RepoVisibilitySettings({ initialRepositories }: RepoVisibilitySe
     };
 
     return (
-        <div className="bg-card dark:bg-card-primary-dark/30 border border-card-border dark:border-card-border-dark rounded-lg overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-card-border dark:border-card-border-dark">
+        <div className="bg-card dark:bg-card-primary-dark/30 border border-card-border dark:border-border-secondary-dark rounded-lg overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-card-border dark:border-border-secondary-dark">
                 <h3 className="text-sm font-semibold text-text dark:text-text-dark">
                     Repository Visibility
                 </h3>
@@ -89,7 +89,7 @@ export function RepoVisibilitySettings({ initialRepositories }: RepoVisibilitySe
                 {repositories.map((repo) => (
                     <div
                         key={repo.type}
-                        className="flex items-center justify-between p-3 border rounded-lg border-card-border dark:border-card-border-dark"
+                        className="flex items-center justify-between p-3 border rounded-lg border-card-border dark:border-border-secondary-dark"
                     >
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">

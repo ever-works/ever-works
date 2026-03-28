@@ -84,7 +84,7 @@ export function OrganizationSelector({
                     className={cn(
                         'flex items-center justify-center py-8',
                         'bg-surface dark:bg-surface-dark',
-                        'border border-card-border dark:border-card-border-dark',
+                        'border border-card-border dark:border-border-secondary-dark',
                         'rounded-lg',
                     )}
                 >
@@ -128,7 +128,7 @@ export function OrganizationSelector({
                 className={cn(
                     'flex items-center gap-2 px-3 py-2 rounded-lg',
                     'bg-surface-secondary dark:bg-surface-secondary-dark',
-                    'border border-card-border dark:border-card-border-dark',
+                    'border border-card-border dark:border-border-secondary-dark',
                 )}
             >
                 {value === '' ? (

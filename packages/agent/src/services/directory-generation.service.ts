@@ -61,6 +61,7 @@ import { GeneratorFormSchemaService } from './generator-form-schema.service';
 import { buildStatsUpdate } from '../directory-operations/directory-operations.service';
 import { calculateDurationSeconds } from '../utils/time.utils';
 import { PluginOperationsService } from '@src/plugins/services/plugin-operations.service';
+import { PluginRegistryService } from '@src/plugins/services/plugin-registry.service';
 import { getCapabilityFromUIKey, SELECTABLE_PROVIDER_CATEGORIES } from '@ever-works/plugin';
 import { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dto';
 import {
@@ -122,6 +123,7 @@ export class DirectoryGenerationService {
         private readonly screenshotFacade: ScreenshotFacadeService,
         private readonly generatorFormSchemaService: GeneratorFormSchemaService,
         private readonly pluginOperationsService: PluginOperationsService,
+        private readonly pluginRegistryService: PluginRegistryService,
         @Optional()
         @Inject(DIRECTORY_GENERATION_DISPATCHER)
         private readonly generationDispatcher?: DirectoryGenerationDispatcher,
@@ -908,7 +910,8 @@ export class DirectoryGenerationService {
 
     /**
      * Auto-enable selected providers for a directory before generation starts.
-     * This ensures DirectoryPluginEntity records exist so resolvePluginEnabled() returns true.
+     * Respects explicit disables: if a provider was explicitly disabled for this directory,
+     * it is removed from the dto so the pipeline falls back to the default provider.
      */
     private async ensureProvidersEnabledForDirectory(
         providers: ProvidersDto | undefined,
@@ -920,8 +923,25 @@ export class DirectoryGenerationService {
         const uiKeys = Object.values(SELECTABLE_PROVIDER_CATEGORIES).map((c) => c.uiKey);
 
         for (const uiKey of uiKeys) {
-            const pluginId = providers[uiKey as keyof ProvidersDto];
+            const key = uiKey as keyof ProvidersDto;
+            const pluginId = providers[key];
             if (!pluginId) continue;
+
+            // Check if the plugin is currently enabled for this scope.
+            // If it was explicitly disabled, don't re-enable — clear it so the system falls back.
+            const isEnabled = await this.pluginRegistryService.isPluginEnabledForScope(
+                pluginId,
+                directoryId,
+                userId,
+            );
+
+            if (!isEnabled) {
+                this.logger.warn(
+                    `Provider "${pluginId}" (${uiKey}) is disabled for directory ${directoryId}, removing from request`,
+                );
+                delete providers[key];
+                continue;
+            }
 
             try {
                 const capability = getCapabilityFromUIKey(uiKey);

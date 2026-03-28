@@ -113,7 +113,7 @@ export function DeployProviderSelector({
             className={cn(
                 'p-4 rounded-lg',
                 'bg-surface dark:bg-surface-dark',
-                'border border-border dark:border-border-dark',
+                'hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark',
             )}
         >
             <h3 className="text-sm font-medium text-text dark:text-text-dark mb-3">{t('title')}</h3>

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AiFacadeService, type FacadeOptions } from '@ever-works/agent/facades';
-import { DirectoryRepository, ConversationRepository } from '@ever-works/agent/database';
+import { DirectoryRepository } from '@ever-works/agent/database';
 import type {
     ChatMessage,
     ChatCompletionOptions,
@@ -23,7 +23,6 @@ export class OpenAiCompatService {
     constructor(
         private readonly aiFacade: AiFacadeService,
         private readonly directoryRepository: DirectoryRepository,
-        private readonly conversationRepo: ConversationRepository,
     ) {}
 
     /**
@@ -49,14 +48,9 @@ export class OpenAiCompatService {
         dto: OpenAiChatCompletionRequestDto,
         facadeOptions: FacadeOptions,
         res: Response,
-        persistence?: { userId: string; conversationId?: string; providerId?: string },
     ): Promise<void> {
         const resolved = await this.resolveDirectoryContext(facadeOptions);
         const options = this.mapToInternalOptions(dto);
-
-        let assistantContent = '';
-        const assistantToolCalls: Array<{ id: string; name: string; arguments: string }> = [];
-        let hasResponse = false;
 
         try {
             const stream = this.aiFacade.createStreamingChatCompletion(
@@ -67,27 +61,6 @@ export class OpenAiCompatService {
             for await (const chunk of stream) {
                 const sseChunk = this.mapToOpenAiStreamChunk(chunk);
                 res.write(`data: ${JSON.stringify(sseChunk)}\n\n`);
-
-                const delta = chunk.choices[0]?.delta;
-                if (delta?.content && typeof delta.content === 'string') {
-                    assistantContent += delta.content;
-                    hasResponse = true;
-                }
-                if (delta?.toolCalls?.length) {
-                    for (const tc of delta.toolCalls) {
-                        const existing = assistantToolCalls.find((t) => tc.id && t.id === tc.id);
-                        if (existing) {
-                            existing.arguments += tc.function.arguments ?? '';
-                        } else if (tc.id) {
-                            assistantToolCalls.push({
-                                id: tc.id,
-                                name: tc.function.name ?? '',
-                                arguments: tc.function.arguments ?? '',
-                            });
-                        }
-                    }
-                    hasResponse = true;
-                }
             }
 
             res.write('data: [DONE]\n\n');
@@ -99,153 +72,30 @@ export class OpenAiCompatService {
                 object: 'chat.completion.chunk',
                 created: Math.floor(Date.now() / 1000),
                 model: dto.model ?? 'auto',
-                choices: [{ index: 0, delta: {}, finish_reason: 'error' }],
+                choices: [
+                    {
+                        index: 0,
+                        delta: {
+                            role: 'assistant',
+                            content: `\n\n**Error:** ${this.sanitizeErrorMessage(error)}`,
+                        },
+                        finish_reason: null,
+                    },
+                ],
             };
             res.write(`data: ${JSON.stringify(errorChunk)}\n\n`);
+
+            const doneChunk: OpenAiChatCompletionChunkResponse = {
+                id: `chatcmpl-err-${Date.now()}`,
+                object: 'chat.completion.chunk',
+                created: Math.floor(Date.now() / 1000),
+                model: dto.model ?? 'auto',
+                choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+            };
+            res.write(`data: ${JSON.stringify(doneChunk)}\n\n`);
             res.write(`data: [DONE]\n\n`);
         } finally {
             res.end();
-        }
-
-        // Persist messages to the conversation (frontend creates it upfront)
-        const conversationId = persistence?.conversationId;
-        const userId = persistence?.userId;
-        if (conversationId && userId && hasResponse) {
-            this.persistMessages(
-                dto,
-                conversationId,
-                userId,
-                assistantContent,
-                assistantToolCalls.length > 0 ? assistantToolCalls : undefined,
-                facadeOptions,
-            ).catch((err) => this.logger.error('Failed to persist messages', err));
-        }
-    }
-
-    // ────────────────────────────────────────────────────────────────
-    // Conversation persistence
-    // ────────────────────────────────────────────────────────────────
-
-    private async persistMessages(
-        dto: OpenAiChatCompletionRequestDto,
-        conversationId: string,
-        userId: string,
-        assistantContent: string,
-        assistantToolCalls: Array<{ id: string; name: string; arguments: string }> | undefined,
-        facadeOptions: FacadeOptions,
-    ): Promise<void> {
-        const conversation = await this.conversationRepo.findById(conversationId, userId);
-        if (!conversation) return;
-
-        const existingCount = conversation.messages?.length ?? 0;
-        const resolvedModel = dto.model === 'auto' ? undefined : (dto.model ?? undefined);
-
-        // Persist all messages from the request that aren't already stored.
-        // The SDK sends the full history each call. Skip the first N that match existing DB records.
-        const newMessages = dto.messages.slice(existingCount);
-        const messagesToPersist = newMessages.map((msg) => ({
-            conversationId,
-            role: (msg.role === 'tool' ? 'tool' : msg.role) as
-                | 'user'
-                | 'assistant'
-                | 'system'
-                | 'tool',
-            content: msg.content ?? '',
-            toolCalls: msg.tool_calls?.map((tc) => ({
-                id: tc.id,
-                name: tc.function.name,
-                arguments: tc.function.arguments,
-            })),
-            toolCallId: msg.tool_call_id,
-        }));
-
-        // Persist intermediate messages (user, tool calls, tool results)
-        if (messagesToPersist.length > 0) {
-            await this.conversationRepo.appendMessages(messagesToPersist);
-        }
-
-        // Persist the final assistant response from this streaming round
-        await this.conversationRepo.appendMessage({
-            conversationId,
-            role: 'assistant',
-            content: assistantContent,
-            toolCalls: assistantToolCalls,
-            model: resolvedModel,
-        });
-
-        // Title management
-        const firstUserMsg = dto.messages.find((m) => m.role === 'user');
-        if (!conversation.title && firstUserMsg?.content) {
-            const title = this.truncateTitle(firstUserMsg.content);
-            await this.conversationRepo.updateTitle(conversationId, userId, title);
-        }
-
-        const totalMessages = existingCount + messagesToPersist.length;
-        if (totalMessages >= 4 && !conversation.metadata?.aiTitle) {
-            this.generateAiTitle(
-                conversationId,
-                userId,
-                dto.messages,
-                assistantContent,
-                facadeOptions,
-            ).catch(() => {});
-        }
-    }
-
-    private truncateTitle(text: string): string {
-        const maxLen = 60;
-        if (text.length <= maxLen) return text;
-        const truncated = text.substring(0, maxLen);
-        const lastSpace = truncated.lastIndexOf(' ');
-        return (lastSpace > 20 ? truncated.substring(0, lastSpace) : truncated) + '...';
-    }
-
-    private async generateAiTitle(
-        conversationId: string,
-        userId: string,
-        messages: OpenAiChatCompletionRequestDto['messages'],
-        lastAssistant: string,
-        facadeOptions: FacadeOptions,
-    ): Promise<void> {
-        try {
-            const resolved = await this.resolveDirectoryContext(facadeOptions);
-
-            // Build a summary of the conversation for the AI
-            const summary = messages
-                .filter((m) => m.role === 'user' || m.role === 'assistant')
-                .slice(-4)
-                .map((m) => `${m.role}: ${(m.content ?? '').substring(0, 200)}`)
-                .join('\n');
-
-            const prompt = `${summary}\nassistant: ${lastAssistant.substring(0, 200)}`;
-
-            const response = await this.aiFacade.createChatCompletion(
-                {
-                    messages: [
-                        {
-                            role: 'system',
-                            content:
-                                'Generate a short title (max 50 chars) for this conversation. Return ONLY the title, no quotes, no explanation.',
-                        },
-                        { role: 'user', content: prompt },
-                    ],
-                    temperature: 0.3,
-                    maxTokens: 30,
-                },
-                resolved,
-            );
-
-            const title = response.choices[0]?.message?.content;
-            if (title && typeof title === 'string' && title.trim().length > 0) {
-                await this.conversationRepo.updateTitle(
-                    conversationId,
-                    userId,
-                    title.trim().substring(0, 100),
-                    { aiTitle: true },
-                );
-            }
-        } catch (err) {
-            this.logger.debug('AI title generation failed, keeping existing title', err);
         }
     }
 
@@ -442,5 +292,26 @@ export class OpenAiCompatService {
         }
 
         return options;
+    }
+
+    /**
+     * Extract an actionable error message while stripping sensitive data.
+     * Keeps: status codes, model names, "invalid key", "rate limit", "not found" etc.
+     * Strips: URLs, API keys, tokens, stack traces.
+     */
+    private sanitizeErrorMessage(error: unknown): string {
+        if (!(error instanceof Error)) return 'Something went wrong. Please try again.';
+
+        let msg = error.message;
+
+        // Strip anything that looks like a key/token (long alphanumeric strings)
+        msg = msg.replace(/\b(sk-|key-|token-|Bearer\s+)[A-Za-z0-9_-]{10,}\b/gi, '[redacted]');
+
+        // Truncate to reasonable length
+        if (msg.length > 300) {
+            msg = msg.substring(0, 300) + '...';
+        }
+
+        return msg;
     }
 }

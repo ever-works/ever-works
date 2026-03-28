@@ -11,29 +11,36 @@ import { ConnectGithubModal } from '@/components/auth/connect-github-modal';
 import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ChatPanel } from '@/components/ai/ChatPanel';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
-import { useSidebarPersistence } from '@/lib/hooks/use-sidebar-persistence';
 
 interface DashboardLayoutClientProps {
     user: AuthUser;
     children: React.ReactNode;
     initialChatOpen?: boolean;
+    initialSidebarCollapsed?: boolean;
 }
+
+const COOKIE_OPTS = `path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
 
 export function DashboardLayoutClient({
     user,
     children,
     initialChatOpen = false,
+    initialSidebarCollapsed = false,
 }: DashboardLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [helpOpen, setHelpOpen] = useState(false);
     const [chatOpen, setChatOpenRaw] = useState(initialChatOpen);
+    const [sidebarCollapsed, setSidebarCollapsedRaw] = useState(initialSidebarCollapsed);
 
     const setChatOpen = useCallback((value: boolean) => {
         setChatOpenRaw(value);
-        document.cookie = `chat-panel-open=${value ? '1' : '0'}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+        document.cookie = `chat-panel-open=${value ? '1' : '0'}; ${COOKIE_OPTS}`;
     }, []);
 
-    const { sidebarCollapsed, handleSidebarCollapsedChange } = useSidebarPersistence();
+    const handleSidebarCollapsedChange = useCallback((value: boolean) => {
+        setSidebarCollapsedRaw(value);
+        document.cookie = `sidebar-collapsed=${value ? '1' : '0'}; ${COOKIE_OPTS}`;
+    }, []);
 
     const openHelp = useCallback(() => setHelpOpen(true), []);
     const closeHelp = useCallback(() => setHelpOpen(false), []);

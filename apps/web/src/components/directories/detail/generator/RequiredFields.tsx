@@ -22,8 +22,8 @@ export function RequiredFields({ formData, onChange }: RequiredFieldsProps) {
         <div
             className={cn(
                 'rounded-lg border p-6',
-                'bg-card dark:bg-card-primary-dark/30',
-                'border-card-border dark:border-card-border-dark',
+                'bg-card dark:bg-card-primary-dark/10',
+                'border-card-border dark:border-border-secondary-dark',
             )}
         >
             <h3 className="text-lg font-medium text-text dark:text-text-dark mb-4">
