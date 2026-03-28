@@ -16,7 +16,7 @@ import { SubscriptionPlan } from './subscription-plan.entity';
 import { DirectorySchedule } from './directory-schedule.entity';
 import { DirectoryMember } from './directory-member.entity';
 
-@Entity({ name: 'users' })
+@Entity({ name: 'users', synchronize: false })
 export class User {
     @PrimaryGeneratedColumn('uuid')
     id: string;
