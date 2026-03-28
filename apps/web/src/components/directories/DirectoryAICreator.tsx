@@ -202,19 +202,19 @@ export function DirectoryAICreator({
                         </h4>
                         <ul className="space-y-1 text-sm text-text-secondary dark:text-text-secondary-dark border-l border-primary/20 pl-4">
                             <li className="flex items-start gap-2">
-                                <Check className="w-4 h-4 bg-primary-500 dark:bg-primary-800 p-1 rounded-full text-white mt-0.5 shrink-0" />
+                                <Check className="w-4 h-4 bg-black dark:bg-white p-1 rounded-full text-white dark:text-black mt-0.5 shrink-0" />
                                 <span>{t('features.0')}</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="w-4 h-4 bg-primary-500 dark:bg-primary-800 p-1 rounded-full text-white mt-0.5 shrink-0" />
+                                <Check className="w-4 h-4 bg-black dark:bg-white p-1 rounded-full text-white dark:text-black mt-0.5 shrink-0" />
                                 <span>{t('features.1')}</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="w-4 h-4 bg-primary-500 dark:bg-primary-800 p-1 rounded-full text-white mt-0.5 shrink-0" />
+                                <Check className="w-4 h-4 bg-black dark:bg-white p-1 rounded-full text-white dark:text-black mt-0.5 shrink-0" />
                                 <span>{t('features.2')}</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="w-4 h-4 bg-primary-500 dark:bg-primary-800 p-1 rounded-full text-white mt-0.5 shrink-0" />
+                                <Check className="w-4 h-4 bg-black dark:bg-white p-1 rounded-full text-white dark:text-black mt-0.5 shrink-0" />
                                 <span>{t('features.3')}</span>
                             </li>
                         </ul>
@@ -266,7 +266,6 @@ export function DirectoryAICreator({
                     variant="primary"
                     size="lg"
                     fullWidth
-                    className="bg-primary-500"
                 >
                     {isPending ? (
                         t('generatingButton')
@@ -346,7 +345,7 @@ function ExamplePrompts({
                         className={cn(
                             'rounded-full py-1 cursor-pointer font-medium',
                             'bg-surface dark:bg-card-secondary-dark/80',
-                            'border border-primary-500 dark:border-border-secondary-dark',
+                            'border hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark',
                             'text-text-secondary dark:text-text-dark',
                             'hover:border-primary-500 hover:bg-primary-500 hover:text-white',
                             'dark:hover:border-primary-800 dark:hover:bg-primary-800 dark:hover:text-white',

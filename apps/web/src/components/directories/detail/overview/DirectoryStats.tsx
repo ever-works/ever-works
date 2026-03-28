@@ -32,7 +32,7 @@ function StatCard({ title, value, icon, iconColor }: StatCardProps) {
         >
             <div
                 className={cn(
-                    'relative rounded-sm px-5 py-2 overflow-hidden',
+                    'relative rounded-sm px-5 py-2 overflow-hidden h-full',
                     'bg-card dark:bg-card-primary-dark',
                     'border border-card-border dark:border-border-dark',
                 )}

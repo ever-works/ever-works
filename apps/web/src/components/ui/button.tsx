@@ -17,9 +17,9 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const buttonVariants = {
     primary:
-        'bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-white dark:text-black rounded-sm',
+        'bg-black dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-white dark:text-black rounded-sm',
     secondary:
-        'bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark border border-border dark:border-border-dark text-text dark:text-black rounded-sm',
+        'bg-black dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark border border-border dark:border-border-dark text-text dark:text-black rounded-sm',
     ghost: 'bg-transparent hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark text-text dark:text-text-dark rounded-sm',
     danger: 'bg-danger hover:bg-danger/90 text-white rounded-sm',
     unstyled: '',
