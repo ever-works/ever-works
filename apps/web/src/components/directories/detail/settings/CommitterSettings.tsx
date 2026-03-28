@@ -42,10 +42,10 @@ export function CommitterSettings() {
             className={cn(
                 'rounded-lg border overflow-hidden',
                 'bg-card dark:bg-card-primary-dark/30',
-                'border-card-border dark:border-card-border-dark',
+                'border-card-border dark:border-border-secondary-dark',
             )}
         >
-            <div className="px-5 py-3.5 border-b border-card-border dark:border-card-border-dark">
+            <div className="px-5 py-3.5 border-b border-card-border dark:border-border-secondary-dark">
                 <h3 className="text-sm font-semibold text-text dark:text-text-dark">
                     {t('committer.title')}
                 </h3>
@@ -74,7 +74,7 @@ export function CommitterSettings() {
                     variant="form"
                 />
 
-                <Button type="submit" disabled={isPending} loading={isPending} variant="primary">
+                <Button type="submit" disabled={isPending} loading={isPending} variant="primary" className='text-sm'>
                     {t('committer.save')}
                 </Button>
             </form>

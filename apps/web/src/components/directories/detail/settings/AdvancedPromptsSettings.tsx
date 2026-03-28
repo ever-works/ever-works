@@ -194,7 +194,7 @@ export function AdvancedPromptsSettings({ directoryId }: AdvancedPromptsSettings
                 className={cn(
                     'rounded-lg border overflow-hidden',
                     'bg-card dark:bg-card-primary-dark/30',
-                    'border-card-border dark:border-card-border-dark',
+                    'border-card-border dark:border-border-secondary-dark',
                 )}
             >
                 <AccordionTrigger className="px-5 py-3.5 hover:no-underline hover:bg-surface/50 dark:hover:bg-surface-dark/50">
@@ -257,7 +257,7 @@ export function AdvancedPromptsSettings({ directoryId }: AdvancedPromptsSettings
                 className={cn(
                     'rounded-lg border overflow-hidden',
                     'bg-card dark:bg-card-primary-dark/30',
-                    'border-card-border dark:border-card-border-dark',
+                    'border-card-border dark:border-border-secondary-dark',
                 )}
             >
                 <AccordionTrigger className="px-5 py-3.5 hover:no-underline hover:bg-surface/50 dark:hover:bg-surface-dark/50">
