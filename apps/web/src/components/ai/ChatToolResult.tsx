@@ -4,7 +4,16 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter, usePathname, Link } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
-import { ExternalLink, FolderOpen, GitBranch, Github, Loader2, Check, Compass } from 'lucide-react';
+import {
+    ExternalLink,
+    FolderOpen,
+    GitBranch,
+    Github,
+    Loader2,
+    Check,
+    Compass,
+    AlertCircle,
+} from 'lucide-react';
 import { connectOAuthProvider } from '@/app/actions/dashboard/oauth';
 import { toast } from 'sonner';
 
@@ -130,7 +139,7 @@ export function ChatToolResult({ toolName, state, output, errorText }: ChatToolR
         const label = LABELS[toolName] ?? toolName;
         return (
             <span className="inline-flex items-center gap-1 text-[10px] text-danger">
-                <ExternalLink className="w-2.5 h-2.5" />
+                <AlertCircle className="w-2.5 h-2.5" />
                 {label} failed{errorText ? `: ${errorText}` : ''}
             </span>
         );

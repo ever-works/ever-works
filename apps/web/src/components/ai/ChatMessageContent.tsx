@@ -42,8 +42,10 @@ export function ChatMessageContent({
                     const name = getToolName(part);
                     if (!name) return null;
                     const errorText =
-                        part.state === 'output-error'
-                            ? (part as { errorText?: string }).errorText
+                        part.state === 'output-error' &&
+                        'errorText' in part &&
+                        typeof part.errorText === 'string'
+                            ? part.errorText
                             : undefined;
                     return (
                         <ChatToolResult

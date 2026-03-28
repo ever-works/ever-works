@@ -67,7 +67,6 @@ export class OpenAiCompatService {
         } catch (error) {
             this.logger.error('Streaming completion error', error);
 
-            const errorMessage = error instanceof Error ? error.message : 'An error occurred';
             const errorChunk: OpenAiChatCompletionChunkResponse = {
                 id: `chatcmpl-err-${Date.now()}`,
                 object: 'chat.completion.chunk',
@@ -76,7 +75,10 @@ export class OpenAiCompatService {
                 choices: [
                     {
                         index: 0,
-                        delta: { role: 'assistant', content: `\n\n**Error:** ${errorMessage}` },
+                        delta: {
+                            role: 'assistant',
+                            content: `\n\n**Error:** ${this.sanitizeErrorMessage(error)}`,
+                        },
                         finish_reason: null,
                     },
                 ],
@@ -290,5 +292,29 @@ export class OpenAiCompatService {
         }
 
         return options;
+    }
+
+    /**
+     * Extract an actionable error message while stripping sensitive data.
+     * Keeps: status codes, model names, "invalid key", "rate limit", "not found" etc.
+     * Strips: URLs, API keys, tokens, stack traces.
+     */
+    private sanitizeErrorMessage(error: unknown): string {
+        if (!(error instanceof Error)) return 'Something went wrong. Please try again.';
+
+        let msg = error.message;
+
+        // Strip URLs (may contain API keys as query params or path segments)
+        msg = msg.replace(/https?:\/\/[^\s)]+/g, '[url]');
+
+        // Strip anything that looks like a key/token (long alphanumeric strings)
+        msg = msg.replace(/\b(sk-|key-|token-|Bearer\s+)[A-Za-z0-9_-]{10,}\b/gi, '[redacted]');
+
+        // Truncate to reasonable length
+        if (msg.length > 300) {
+            msg = msg.substring(0, 300) + '...';
+        }
+
+        return msg;
     }
 }
