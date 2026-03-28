@@ -1,8 +1,6 @@
 import type { UIMessage } from 'ai';
 import { runAgent } from '@/lib/ai/agent';
 import { getBetterAuthCookieHeader } from '@/lib/auth/cookies';
-import { getAuthAccessCookie } from '@/lib/auth/cookies';
-import { refreshAccessToken } from '@/lib/auth/refresh';
 import { saveConversationMessages, type MessageUsage } from '@/lib/ai/persistence';
 
 export const maxDuration = 60;
