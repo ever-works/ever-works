@@ -17,11 +17,9 @@ import {
     Plug,
     PanelLeftClose,
     PanelLeftOpen,
-    User,
     HelpCircle,
     MessageSquare,
     Keyboard,
-    ChevronUp,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
