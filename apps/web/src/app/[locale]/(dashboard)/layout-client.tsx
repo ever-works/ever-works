@@ -47,11 +47,11 @@ export function DashboardLayoutClient({
                 <DashboardToasts />
             </Suspense>
 
-            <div className="flex h-screen bg-background dark:bg-background-dark overflow-hidden">
+            <div className="flex h-screen overflow-hidden bg-background dark:bg-background-dark">
                 {/* Mobile overlay */}
                 {sidebarOpen && (
                     <div
-                        className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                        className="fixed inset-0 z-40 bg-black/50 lg:hidden"
                         onClick={() => setSidebarOpen(false)}
                     />
                 )}
@@ -68,11 +68,11 @@ export function DashboardLayoutClient({
                     onOpenChat={toggleChat}
                 />
 
-                {/* AI Chat panel — sits between sidebar and main content */}
+                {/* AI Chat panel sits between sidebar and main content */}
                 <ChatPanel open={chatOpen} onClose={toggleChat} />
 
-                {/* Main content — uses @container so children respond to available space, not viewport */}
-                <div className="flex-1 flex flex-col overflow-hidden @container/main">
+                {/* Main content uses @container so children respond to available space, not viewport */}
+                <div className="flex flex-1 flex-col overflow-hidden @container/main">
                     <DashboardHeader
                         user={user}
                         onMenuClick={() => setSidebarOpen(!sidebarOpen)}
@@ -81,10 +81,10 @@ export function DashboardLayoutClient({
                     />
 
                     <main
-                        className="flex-1 flex flex-col overflow-y-auto bg-surface dark:bg-surface-dark min-h-0"
+                        className="min-h-0 flex flex-1 flex-col overflow-y-auto bg-surface dark:bg-surface-dark"
                         id="main-content"
                     >
-                        <div className="flex-1 mx-auto w-full px-4 @sm/main:px-6 @3xl/main:px-8 py-6 @3xl/main:py-8 max-w-full @5xl/main:max-w-7xl">
+                        <div className="mx-auto flex-1 w-full max-w-full px-4 py-6 @sm/main:px-6 @3xl/main:px-8 @3xl/main:py-8 @5xl/main:max-w-7xl">
                             {children}
                         </div>
 
@@ -100,7 +100,6 @@ export function DashboardLayoutClient({
                     user.connectedProviders?.includes('github') === true
                 }
             />
-        </>
         </ChatProvider>
     );
 }

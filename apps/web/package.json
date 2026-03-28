@@ -6,7 +6,7 @@
         "dev": "next dev --turbopack",
         "build": "next build",
         "start": "next start",
-        "lint": "npx eslint .",
+        "lint": "eslint .",
         "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\""
     },
     "dependencies": {
@@ -48,6 +48,8 @@
         "@types/node": "^20.19.27",
         "@types/react": "^19.2.7",
         "@types/react-dom": "^19.2.3",
+        "eslint": "^9.39.0",
+        "eslint-config-next": "16.1.7",
         "shadcn": "^3.8.5",
         "tailwindcss": "^4.2.0",
         "typescript": "^5.9.3"
