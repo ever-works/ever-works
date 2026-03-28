@@ -68,6 +68,9 @@
 			"autoEnable": true,
 			"systemPlugin": true,
 			"visibility": "public",
+			"defaultForCapabilities": [
+				"pipeline"
+			],
 			"selectableProviderCategories": [
 				"ai-provider",
 				"search",

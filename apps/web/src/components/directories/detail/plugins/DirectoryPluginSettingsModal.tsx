@@ -48,6 +48,18 @@ export function DirectoryPluginSettingsModal({
             if (!result.success) {
                 throw new Error(result.error);
             }
+
+            const validation = (result.data as Record<string, unknown>)?.validation as
+                | { success: boolean; message: string }
+                | null
+                | undefined;
+
+            if (validation && !validation.success) {
+                return { validationError: validation.message };
+            }
+            if (validation?.success) {
+                return { validationSuccess: validation.message };
+            }
         },
         [directoryId, plugin.pluginId],
     );
@@ -56,6 +68,7 @@ export function DirectoryPluginSettingsModal({
         hasChanges,
         isSaving,
         saveSuccess,
+        saveMessage,
         validationError,
         visibleProperties,
         handleFieldChange,
@@ -208,7 +221,7 @@ export function DirectoryPluginSettingsModal({
                         {saveSuccess && (
                             <span className="inline-flex items-center gap-1 text-sm text-success">
                                 <Check className="w-4 h-4" />
-                                {t('saved')}
+                                {saveMessage || t('saved')}
                             </span>
                         )}
                         <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>

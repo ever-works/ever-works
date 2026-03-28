@@ -179,6 +179,9 @@ export class GroqPlugin extends BaseAiProvider {
 			builtIn: true,
 			autoEnable: false,
 			visibility: 'public',
+			uiHints: {
+				completionFields: ['apiKey', 'defaultModel']
+			},
 			readme: [
 				'## What is the Groq plugin?',
 				'',

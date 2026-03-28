@@ -1,5 +1,11 @@
 import 'server-only';
-import { convertToModelMessages, streamText, stepCountIs, type UIMessage } from 'ai';
+import {
+    convertToModelMessages,
+    streamText,
+    stepCountIs,
+    type UIMessage,
+    type StreamTextOnFinishCallback,
+} from 'ai';
 import { createBackendProvider } from './provider';
 import { chatTools } from './tools';
 import { API_URL } from '@/lib/constants';
@@ -48,6 +54,7 @@ interface AgentOptions {
     directoryId?: string;
     conversationId?: string;
     currentPageUrl?: string;
+    onFinish?: StreamTextOnFinishCallback<typeof chatTools>;
 }
 
 export async function runAgent({
@@ -57,6 +64,7 @@ export async function runAgent({
     directoryId,
     conversationId,
     currentPageUrl,
+    onFinish,
 }: AgentOptions) {
     const provider = createBackendProvider({
         baseURL: `${API_URL}/v1`,
@@ -76,5 +84,6 @@ export async function runAgent({
         messages: await convertToModelMessages(messages),
         tools: chatTools,
         stopWhen: stepCountIs(MAX_TOOL_STEPS),
+        onFinish,
     });
 }
