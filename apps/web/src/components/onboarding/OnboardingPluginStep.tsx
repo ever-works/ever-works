@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Save, CheckCircle2, AlertCircle } from 'lucide-react';
 import type { UserPlugin } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
-import { updatePluginSettings, validatePluginConnection } from '@/app/actions/plugins';
+import { updatePluginSettings } from '@/app/actions/plugins';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { PluginSettingsFormFields } from '@/components/plugins/PluginSettingsFormFields';
 import { Button } from '@/components/ui/button';
@@ -30,15 +30,19 @@ function FieldBasedPluginStep({ plugin }: { plugin: UserPlugin }) {
             if (!result.success) {
                 throw new Error(result.error);
             }
-            if (plugin.uiHints?.validateOnSave) {
-                const validation = await validatePluginConnection(plugin.pluginId);
-                if (!validation.success) {
-                    return { validationError: validation.error };
-                }
-                return { validationSuccess: validation.data?.message };
+            const validation = (result.data as Record<string, unknown>)?.validation as
+                | { success: boolean; message: string }
+                | null
+                | undefined;
+
+            if (validation && !validation.success) {
+                return { validationError: validation.message };
+            }
+            if (validation?.success) {
+                return { validationSuccess: validation.message };
             }
         },
-        [plugin.pluginId, plugin.uiHints?.validateOnSave],
+        [plugin.pluginId],
     );
 
     const {

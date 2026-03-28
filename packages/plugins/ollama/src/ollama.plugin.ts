@@ -191,6 +191,9 @@ export class OllamaPlugin extends BaseAiProvider {
 			builtIn: true,
 			autoEnable: false,
 			visibility: 'public',
+			uiHints: {
+				completionFields: ['defaultModel']
+			},
 			readme: [
 				'## What is the Ollama plugin?',
 				'',

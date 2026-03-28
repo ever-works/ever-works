@@ -5,10 +5,20 @@ import type { JsonSchema } from '../settings/json-schema.types.js';
 import type { ConfigurationMode } from '../settings/settings.types.js';
 import type { ValidationResult } from '../settings/validation.types.js';
 
+export interface ModelValidationResult {
+	tier: 'default' | 'simple' | 'medium' | 'complex';
+	model: string;
+	success: boolean;
+	responseTime: number;
+	error?: string;
+}
+
 export interface ConnectionValidationResult {
 	success: boolean;
 	message: string;
 	details?: Record<string, unknown>;
+	/** Per-model-tier validation results. Present when an AI provider tests configured models. */
+	modelResults?: ModelValidationResult[];
 }
 
 /**

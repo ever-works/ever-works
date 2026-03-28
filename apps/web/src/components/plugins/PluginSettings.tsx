@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import { updatePluginSettings, validatePluginConnection } from '@/app/actions/plugins';
+import { updatePluginSettings } from '@/app/actions/plugins';
 import { PluginIcon } from './PluginIcon';
 import { PluginSettingsFormFields } from './PluginSettingsFormFields';
 import { PluginReadme } from './PluginReadme';
@@ -55,15 +55,19 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                 throw new Error(result.error);
             }
 
-            if (plugin.uiHints?.validateOnSave) {
-                const validation = await validatePluginConnection(plugin.pluginId);
-                if (!validation.success) {
-                    return { validationError: validation.error };
-                }
-                return { validationSuccess: validation.data?.message };
+            const validation = (result.data as Record<string, unknown>)?.validation as
+                | { success: boolean; message: string }
+                | null
+                | undefined;
+
+            if (validation && !validation.success) {
+                return { validationError: validation.message };
+            }
+            if (validation?.success) {
+                return { validationSuccess: validation.message };
             }
         },
-        [plugin.pluginId, plugin.uiHints?.validateOnSave],
+        [plugin.pluginId],
     );
 
     const {

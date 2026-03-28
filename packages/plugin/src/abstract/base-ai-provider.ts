@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { BasePlugin } from './base-plugin.js';
-import type { ConnectionValidationResult } from '../contracts/plugin.interface.js';
+import type { ConnectionValidationResult, ModelValidationResult } from '../contracts/plugin.interface.js';
 import type {
 	IAiProviderPlugin,
 	AiProviderType,
@@ -101,13 +101,53 @@ export abstract class BaseAiProvider extends BasePlugin implements IAiProviderPl
 	}
 
 	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
-		const available = await this.isAvailable(settings);
-		return available
-			? { success: true, message: `${this.providerName} connection verified.` }
-			: {
-					success: false,
-					message: `${this.providerName} connection failed. Check your credentials and try again.`
-				};
+		if (!this.aiOps) {
+			const available = await this.isAvailable(settings);
+			return available
+				? { success: true, message: `${this.providerName} connection verified.` }
+				: {
+						success: false,
+						message: `${this.providerName} connection failed. Check your credentials and try again.`
+					};
+		}
+
+		const resolvedConfig = this.resolveConfig(settings);
+		const defaultModel = (settings.defaultModel as string) || this.getDefaultModelId();
+
+		const tiers: Array<{ tier: ModelValidationResult['tier']; model: string }> = [
+			{ tier: 'default', model: defaultModel }
+		];
+		if (settings.simpleModel) tiers.push({ tier: 'simple', model: settings.simpleModel as string });
+		if (settings.mediumModel) tiers.push({ tier: 'medium', model: settings.mediumModel as string });
+		if (settings.complexModel) tiers.push({ tier: 'complex', model: settings.complexModel as string });
+
+		// Deduplicate by model ID
+		const seen = new Set<string>();
+		const uniqueTiers = tiers.filter((t) => {
+			if (seen.has(t.model)) return false;
+			seen.add(t.model);
+			return true;
+		});
+
+		const results: ModelValidationResult[] = await Promise.all(
+			uniqueTiers.map(async ({ tier, model }) => {
+				const result = await this.aiOps!.testConnection(resolvedConfig, model);
+				return { tier, model, ...result };
+			})
+		);
+
+		const allPassed = results.every((r) => r.success);
+		const failedTiers = results.filter((r) => !r.success);
+
+		let message: string;
+		if (allPassed) {
+			message = `${this.providerName} connection verified — ${results.length} model(s) tested successfully.`;
+		} else {
+			const failedNames = failedTiers.map((f) => `${f.tier} (${f.model})`).join(', ');
+			message = `${this.providerName}: ${failedTiers.length} model(s) failed validation: ${failedNames}`;
+		}
+
+		return { success: allPassed, message, modelResults: results };
 	}
 
 	protected abstract getDefaultModelId(): string;

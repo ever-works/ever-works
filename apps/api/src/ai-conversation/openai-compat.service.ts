@@ -304,9 +304,6 @@ export class OpenAiCompatService {
 
         let msg = error.message;
 
-        // Strip URLs (may contain API keys as query params or path segments)
-        msg = msg.replace(/https?:\/\/[^\s)]+/g, '[url]');
-
         // Strip anything that looks like a key/token (long alphanumeric strings)
         msg = msg.replace(/\b(sk-|key-|token-|Bearer\s+)[A-Za-z0-9_-]{10,}\b/gi, '[redacted]');
 
