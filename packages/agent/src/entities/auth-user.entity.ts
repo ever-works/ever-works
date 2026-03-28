@@ -1,31 +1,31 @@
 import {
-	Entity,
-	Column,
-	PrimaryGeneratedColumn,
-	CreateDateColumn,
-	UpdateDateColumn
+    Entity,
+    Column,
+    PrimaryGeneratedColumn,
+    CreateDateColumn,
+    UpdateDateColumn,
 } from 'typeorm';
 
 @Entity({ name: 'users', synchronize: false })
 export class AuthUser {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column({ name: 'username' })
-	name: string;
+    @Column({ name: 'username' })
+    name: string;
 
-	@Column({ unique: true })
-	email: string;
+    @Column({ unique: true })
+    email: string;
 
-	@Column({ default: false })
-	emailVerified: boolean;
+    @Column({ default: false })
+    emailVerified: boolean;
 
-	@Column({ name: 'avatar', nullable: true })
-	image: string;
+    @Column({ name: 'avatar', nullable: true })
+    image: string;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 
-	@UpdateDateColumn()
-	updatedAt: Date;
+    @UpdateDateColumn()
+    updatedAt: Date;
 }

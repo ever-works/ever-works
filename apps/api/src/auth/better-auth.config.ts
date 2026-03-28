@@ -115,11 +115,15 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                             // Check if user already exists by ID or email
                             const existingById = await userRepository.findById(authUser.id);
                             if (existingById) {
-                                logger.log(`User ${authUser.id} already exists in application table`);
+                                logger.log(
+                                    `User ${authUser.id} already exists in application table`,
+                                );
                                 return;
                             }
 
-                            const existingByEmail = await userRepository.findByEmail(authUser.email);
+                            const existingByEmail = await userRepository.findByEmail(
+                                authUser.email,
+                            );
                             if (existingByEmail) {
                                 // User exists with different ID (registered via old auth system)
                                 // Link the existing user — no need to create a new one

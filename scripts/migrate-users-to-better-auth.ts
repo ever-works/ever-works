@@ -67,10 +67,10 @@ async function main() {
 			try {
 				if (!user.password) {
 					const randomPassword = await bcrypt.hash(randomBytes(16).toString('hex'), 10);
-					await queryRunner.query(
-						`UPDATE users SET password = ${p(1)} WHERE id = ${p(2)}`,
-						[randomPassword, user.id]
-					);
+					await queryRunner.query(`UPDATE users SET password = ${p(1)} WHERE id = ${p(2)}`, [
+						randomPassword,
+						user.id
+					]);
 				}
 				usersCreated++;
 			} catch (error: any) {

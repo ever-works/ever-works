@@ -150,20 +150,16 @@ async function main() {
 		console.log(`Found ${baUsers.length} BetterAuth users to reconcile`);
 
 		for (const baUser of baUsers) {
-			const existingById = await queryRunner.query(
-				`SELECT id FROM users WHERE id = ${p(1)}`,
-				[baUser.id]
-			);
+			const existingById = await queryRunner.query(`SELECT id FROM users WHERE id = ${p(1)}`, [baUser.id]);
 
 			if (existingById.length > 0) {
 				userIdMap.set(baUser.id, existingById[0].id);
 				continue;
 			}
 
-			const existingByEmail = await queryRunner.query(
-				`SELECT id FROM users WHERE email = ${p(1)}`,
-				[baUser.email]
-			);
+			const existingByEmail = await queryRunner.query(`SELECT id FROM users WHERE email = ${p(1)}`, [
+				baUser.email
+			]);
 
 			if (existingByEmail.length > 0) {
 				userIdMap.set(baUser.id, existingByEmail[0].id);
@@ -196,10 +192,7 @@ async function main() {
 
 			for (const account of accounts) {
 				const targetUserId = userIdMap.get(account.userId) || account.userId;
-				const existing = await queryRunner.query(
-					`SELECT id FROM accounts WHERE id = ${p(1)}`,
-					[account.id]
-				);
+				const existing = await queryRunner.query(`SELECT id FROM accounts WHERE id = ${p(1)}`, [account.id]);
 
 				if (existing.length > 0) {
 					continue;
@@ -235,10 +228,7 @@ async function main() {
 
 			for (const session of sessions) {
 				const targetUserId = userIdMap.get(session.userId) || session.userId;
-				const existing = await queryRunner.query(
-					`SELECT id FROM sessions WHERE id = ${p(1)}`,
-					[session.id]
-				);
+				const existing = await queryRunner.query(`SELECT id FROM sessions WHERE id = ${p(1)}`, [session.id]);
 
 				if (existing.length > 0) {
 					continue;
@@ -266,10 +256,9 @@ async function main() {
 			console.log(`Found ${verifications.length} BetterAuth verifications to migrate`);
 
 			for (const verification of verifications) {
-				const existing = await queryRunner.query(
-					`SELECT id FROM verifications WHERE id = ${p(1)}`,
-					[verification.id]
-				);
+				const existing = await queryRunner.query(`SELECT id FROM verifications WHERE id = ${p(1)}`, [
+					verification.id
+				]);
 
 				if (existing.length > 0) {
 					continue;
