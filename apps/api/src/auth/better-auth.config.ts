@@ -4,9 +4,13 @@ import { DataSource } from 'typeorm';
 import { config, AuthProvider } from '../config/constants';
 import { GITHUB_SCOPES } from './config/github-scopes.config';
 import { AuthUser, AuthSession, AuthAccount, AuthVerification } from '@ever-works/agent/entities';
-import { UserRepository, OAuthTokenRepository } from '@ever-works/agent/database';
+import {
+    UserRepository,
+    OAuthTokenRepository,
+    RefreshTokenRepository,
+} from '@ever-works/agent/database';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { UserConfirmedEvent } from '../events';
+import { UserConfirmedEvent, UserCreatedEvent, UserForgotPasswordEvent } from '../events';
 import { Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
@@ -17,11 +21,13 @@ export interface BetterAuthDeps {
     dataSource: DataSource;
     userRepository: UserRepository;
     oauthTokenRepository: OAuthTokenRepository;
+    refreshTokenRepository: RefreshTokenRepository;
     eventEmitter: EventEmitter2;
 }
 
 export function createBetterAuthInstance(deps: BetterAuthDeps) {
-    const { dataSource, userRepository, oauthTokenRepository, eventEmitter } = deps;
+    const { dataSource, userRepository, oauthTokenRepository, refreshTokenRepository, eventEmitter } =
+        deps;
     const webAppUrl = config.webAppUrl();
 
     return betterAuth({
@@ -45,6 +51,60 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
             requireEmailVerification: false,
             minPasswordLength: 8,
             autoSignIn: true,
+            sendResetPassword: async ({ user, url, token }) => {
+                const appUser =
+                    (await userRepository.findById(user.id)) ||
+                    (await userRepository.findByEmail(user.email));
+
+                if (!appUser) {
+                    logger.warn(
+                        `Unable to send BetterAuth password reset email for unknown user ${user.email}`,
+                    );
+                    return;
+                }
+
+                eventEmitter.emit(
+                    UserForgotPasswordEvent.EVENT_NAME,
+                    new UserForgotPasswordEvent(appUser, token, url, '1 hour'),
+                );
+            },
+            onPasswordReset: async ({ user }) => {
+                const authAccountRepository = dataSource.getRepository(AuthAccount);
+                const credentialAccount = await authAccountRepository.findOne({
+                    where: {
+                        userId: user.id,
+                        providerId: 'credential',
+                    },
+                });
+
+                if (!credentialAccount?.password) {
+                    logger.warn(
+                        `Unable to sync BetterAuth password reset for user ${user.id}: credential account missing`,
+                    );
+                    return;
+                }
+
+                const appUser =
+                    (await userRepository.findById(user.id)) ||
+                    (await userRepository.findByEmail(user.email));
+
+                if (!appUser) {
+                    logger.warn(
+                        `Unable to sync BetterAuth password reset for unknown user ${user.email}`,
+                    );
+                    return;
+                }
+
+                await userRepository.update(appUser.id, {
+                    password: credentialAccount.password,
+                    passwordResetToken: null,
+                    passwordResetExpires: null,
+                });
+                await refreshTokenRepository.revokeAllUserTokens(
+                    appUser.id,
+                    'Password reset via BetterAuth',
+                );
+            },
             password: {
                 // Use same bcrypt config as existing system for compatibility
                 hash: async (password: string) => {
@@ -53,6 +113,45 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                 verify: async ({ hash, password }: { hash: string; password: string }) => {
                     return bcrypt.compare(password, hash);
                 },
+            },
+        },
+
+        emailVerification: {
+            sendOnSignUp: true,
+            autoSignInAfterVerification: true,
+            sendVerificationEmail: async ({ user, url, token }) => {
+                const appUser =
+                    (await userRepository.findById(user.id)) ||
+                    (await userRepository.findByEmail(user.email));
+
+                if (!appUser) {
+                    logger.warn(
+                        `Unable to send BetterAuth verification email for unknown user ${user.email}`,
+                    );
+                    return;
+                }
+
+                eventEmitter.emit(
+                    UserCreatedEvent.EVENT_NAME,
+                    new UserCreatedEvent(appUser, token, url),
+                );
+            },
+            afterEmailVerification: async (user) => {
+                const appUser =
+                    (await userRepository.findById(user.id)) ||
+                    (await userRepository.findByEmail(user.email));
+
+                if (!appUser) {
+                    logger.warn(
+                        `Unable to handle afterEmailVerification for unknown user ${user.email}`,
+                    );
+                    return;
+                }
+
+                eventEmitter.emit(
+                    UserConfirmedEvent.EVENT_NAME,
+                    new UserConfirmedEvent(appUser, `${webAppUrl}/directories/new`),
+                );
             },
         },
 

@@ -22,6 +22,9 @@ import { UserCreatedEvent, UserConfirmedEvent, UserForgotPasswordEvent } from '.
 import { ForgotPasswordDto } from '../dto/email-verification.dto';
 import { GITHUB_SCOPES } from '../config/github-scopes.config';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import { AuthAccount } from '@ever-works/agent/entities';
 
 @Injectable()
 export class AuthService {
@@ -30,6 +33,7 @@ export class AuthService {
     private webAppUrl: string;
 
     constructor(
+        @InjectDataSource() private readonly dataSource: DataSource,
         private readonly userRepository: UserRepository,
         private readonly refreshTokenRepository: RefreshTokenRepository,
         private readonly oauthTokenRepository: OAuthTokenRepository,
@@ -150,6 +154,7 @@ export class AuthService {
             authConstants.bcryptSaltRounds,
         );
         await this.userRepository.update(userId, { password: hashedPassword });
+        await this.syncCredentialAccountPassword(userId, hashedPassword);
 
         return { message: 'Password updated successfully' };
     }
@@ -424,6 +429,7 @@ export class AuthService {
             passwordResetToken: null,
             passwordResetExpires: null,
         });
+        await this.syncCredentialAccountPassword(user.id, hashedPassword);
 
         // Revoke all refresh tokens for security
         await this.refreshTokenRepository.revokeAllUserTokens(user.id, 'Password reset');
@@ -530,6 +536,24 @@ export class AuthService {
             email: user.email,
             expiresAt: user.passwordResetExpires,
         };
+    }
+
+    private async syncCredentialAccountPassword(userId: string, hashedPassword: string) {
+        const authAccountRepository = this.dataSource.getRepository(AuthAccount);
+        const credentialAccount = await authAccountRepository.findOne({
+            where: {
+                userId,
+                providerId: 'credential',
+            },
+        });
+
+        if (!credentialAccount) {
+            this.logger.warn(`No BetterAuth credential account found for user ${userId}`);
+            return;
+        }
+
+        credentialAccount.password = hashedPassword;
+        await authAccountRepository.save(credentialAccount);
     }
 
     private async generateTokens(

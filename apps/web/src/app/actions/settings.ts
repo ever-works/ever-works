@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { authAPI } from '@/lib/api/auth';
 import { getAuthFromCookie } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
-import { ROUTES } from '@/lib/constants';
-import { getTranslations } from 'next-intl/server';
+import { API_URL, ROUTES, withAppUrl } from '@/lib/constants';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { VALIDATION_RULES } from './validation';
 
 // Note: Validation schemas are now created inside each function with translations
@@ -18,7 +18,32 @@ export async function resendVerificationEmail() {
         if (!user) {
             return { success: false, error: t('notAuthenticated') };
         }
-        await authAPI.sendVerification();
+        const locale = await getLocale();
+        const response = await fetch(`${API_URL}/auth/better-auth/send-verification-email`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email: user.email,
+                callbackURL: withAppUrl(`/${locale}${ROUTES.DASHBOARD}?verified=true`),
+            }),
+            cache: 'no-store',
+        });
+
+        if (!response.ok) {
+            let errorMessage = t('sendFailed');
+            try {
+                const data = await response.json();
+                if (typeof data?.message === 'string' && data.message.trim()) {
+                    errorMessage = data.message;
+                } else if (typeof data?.error === 'string' && data.error.trim()) {
+                    errorMessage = data.error;
+                }
+            } catch {}
+
+            return { success: false, error: errorMessage };
+        }
         return { success: true, message: t('sent') };
     } catch (error: any) {
         return { success: false, error: error?.message || t('sendFailed') };
@@ -87,7 +112,7 @@ export async function updatePassword(data: { currentPassword: string; newPasswor
         currentPassword: z.string().min(1, t('currentRequired')),
         newPassword: z
             .string()
-            .min(6, tAuth('password.minLength', { length: 6 }))
+            .min(8, tAuth('password.minLength', { length: 8 }))
             .regex(/[a-z]/, tAuth('password.lowercase'))
             .regex(/(\d|\W)/, tAuth('password.numberOrSpecial'))
             .regex(/^[^.\n]/, tAuth('password.cannotStartWith')),
