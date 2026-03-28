@@ -33,7 +33,7 @@ function StatCard({ title, value, icon, iconColor }: StatCardProps) {
             <div
                 className={cn(
                     'relative rounded-sm px-5 py-2 overflow-hidden',
-                    'bg-card dark:bg-surface-secondary-dark/30',
+                    'bg-card dark:bg-card-primary-dark',
                     'border border-card-border dark:border-border-dark',
                 )}
             >
@@ -62,7 +62,7 @@ function getGenerationStatusStat(
     return {
         title: t('generationStatus'),
         value: tStatus(config.labelKey),
-        icon: <Icon className={cn('w-5 h-5', config.animate && 'animate-spin')} />,
+        icon: <Icon className={cn('w-4 h-4', config.animate && 'animate-spin')} />,
         iconColor: config.stat.iconColor,
     };
 }
@@ -80,19 +80,19 @@ export function DirectoryStats({
         {
             title: t('totalItems'),
             value: itemsCount,
-            icon: <Package className="w-5 h-5" />,
+            icon: <Package className="w-4 h-4" />,
             iconColor: 'text-blue-500',
         },
         {
             title: t('categories'),
             value: categoriesCount,
-            icon: <Tag className="w-5 h-5" />,
+            icon: <Tag className="w-4 h-4" />,
             iconColor: 'text-violet-500',
         },
         {
             title: t('comparisons'),
             value: comparisonsCount,
-            icon: <Scale className="w-5 h-5" />,
+            icon: <Scale className="w-4 h-4" />,
             iconColor: 'text-emerald-500',
         },
         getGenerationStatusStat(directory, t, tStatus),
@@ -102,13 +102,13 @@ export function DirectoryStats({
                 (new Date().getTime() - new Date(directory.createdAt).getTime()) /
                     (1000 * 60 * 60 * 24),
             ),
-            icon: <Clock className="w-5 h-5" />,
+            icon: <Clock className="w-4 h-4" />,
             iconColor: 'text-orange-500',
         },
     ];
 
     return (
-        <div className="grid @sm/main:grid-cols-2 @3xl/main:grid-cols-3 @5xl/main:grid-cols-5 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             {stats.map((stat) => (
                 <StatCard
                     key={stat.title}
