@@ -64,7 +64,7 @@ export function StatsOverview({
                     <div
                         className={cn(
                             'group relative rounded-sm p-5 transition-shadow duration-200 overflow-hidden',
-                            'bg-card dark:bg-surface-secondary-dark/30',
+                            'bg-card dark:bg-surface-secondary-dark',
                             'border border-card-border dark:border-border-dark',
                         )}
                     >

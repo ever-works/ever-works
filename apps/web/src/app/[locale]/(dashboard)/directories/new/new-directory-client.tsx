@@ -54,51 +54,43 @@ export default function NewDirectoryClient({
                     </p>
                 </div>
 
-                <div className="grid @2xl/main:grid-cols-3 gap-6">
+                <div className="grid md:grid-cols-3 gap-6">
                     {/* AI Creation Card */}
                     <button
                         onClick={() => setCreationMode('ai')}
                         className={cn(
-                            'rounded-b-lg rounded-t-lg rounded-tr-lg text-left transition-all',
-                            'bg-surface-tertiary dark:bg-card-navy-dark',
-                            'hover:shadow-lg shadow-sm',
+                            'rounded-b-lg p-4 rounded-t-lg rounded-tr-lg text-left transition-all shadow-sm',
+                            'bg-white dark:bg-card-primary-dark',
+                            'border border-card-border dark:border-white/9',
+                            'hover:border-primary-500/50 dark:hover:border-white/20',
                             'group relative cursor-pointer',
                         )}
                     >
-                        <div className="absolute left-0 -top-2 flex w-full">
-                            <div className="h-6 w-2/4 bg-surface-tertiary dark:bg-card-navy-dark rounded-t-2xl" />
-                            <div className="w-0 h-0 -ml-2 mt-0.5 border-b-20 border-r-20 border-b-surface-tertiary dark:border-b-card-navy-dark border-r-transparent" />
-                        </div>
-                        <div className="flex absolute right-0 top-1 w-[55%] h-6">
-                            <div className="w-0 h-0 border-b-20 mt-1 -mr-1.5 border-l-20 border-b-card dark:border-b-card-primary-dark border-l-transparent"></div>
-                            <div className="w-[94%] h-full bg-card dark:bg-card-primary-dark rounded-tl-2xl rounded-tr-lg" />
-                        </div>
-                        <div className="relative overflow-hidden rounded-lg bg-card dark:bg-card-primary-dark p-6 mt-4  h-[94%]">
-                            <div className="opacity-0 group-hover:opacity-100 absolute -bottom-5 right-6 w-40 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/15  blur-2xl pointer-events-none" />
-                            <div className="card-top-accent-indigo opacity-0 group-hover:opacity-100 pointer-events-none absolute right-8 bottom-0 w-1/2 h-px z-20 rounded-full" />
-                            <div className="mb-4">
-                                <div
-                                    className={cn(
-                                        'w-12 h-12 rounded-lg flex items-center justify-center',
-                                        'bg-primary/10 border border-primary/20 group-hover:bg-primary/20 transition-colors',
-                                    )}
-                                >
-                                    <Bot className="w-6 h-6 text-primary" strokeWidth={1.5} />
-                                </div>
-                            </div>
-                            <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                                {t('ai.title')}
-                            </h3>
-                            <p className="text-text-secondary text-sm dark:text-text-secondary-dark mb-4">
-                                {t('ai.subtitle')}
-                            </p>
-                            <div className="flex items-center gap-2 text-primary font-medium">
-                                <span>{t('ai.getStarted')}</span>
-                                <ArrowRight
-                                    className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                                    strokeWidth={2}
+                        <div className="mb-4">
+                            <div
+                                className={cn(
+                                    'w-12 h-12 rounded-lg flex items-center justify-center',
+                                    'bg-gray-100 dark:bg-white/5',
+                                )}
+                            >
+                                <Bot
+                                    className="w-6 h-6 text-gray-800 dark:text-gray-300"
+                                    strokeWidth={1.5}
                                 />
                             </div>
+                        </div>
+                        <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
+                            {t('ai.title')}
+                        </h3>
+                        <p className="text-text-secondary/50 text-sm dark:text-text-secondary-dark mb-6">
+                            {t('ai.subtitle')}
+                        </p>
+                        <div className="flex items-center gap-2 bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-white dark:text-black rounded-full px-3 py-1 text-sm font-medium w-fit">
+                            <span>{t('ai.getStarted')}</span>
+                            <ArrowRight
+                                className="w-4 h-4 group-hover:translate-x-1 transition-transform"
+                                strokeWidth={2}
+                            />
                         </div>
                     </button>
 
@@ -106,46 +98,38 @@ export default function NewDirectoryClient({
                     <button
                         onClick={() => setCreationMode('manual')}
                         className={cn(
-                            'rounded-b-lg rounded-t-lg rounded-tr-lg text-left transition-all',
-                            'bg-surface-tertiary dark:bg-card-navy-dark',
-                            'hover:shadow-lg shadow-sm',
+                            'rounded-b-lg p-4 rounded-t-lg rounded-tr-lg text-left transition-all shadow-sm',
+                            'bg-white dark:bg-card-primary-dark',
+                            'border border-card-border dark:border-white/9',
+                            'hover:border-primary-500/50 dark:hover:border-white/20',
                             'group relative cursor-pointer',
                         )}
                     >
-                        <div className="absolute left-0 -top-2 flex w-full">
-                            <div className="h-6 w-2/4 bg-surface-tertiary dark:bg-card-navy-dark rounded-t-2xl" />
-                            <div className="w-0 h-0 -ml-2 mt-0.5 border-b-20 border-r-20 border-b-surface-tertiary dark:border-b-card-navy-dark border-r-transparent" />
-                        </div>
-                        <div className="flex absolute right-0 top-1 w-[55%] h-6">
-                            <div className="w-0 h-0 border-b-20 mt-1 -mr-1.5 border-l-20 border-b-card dark:border-b-card-primary-dark border-l-transparent"></div>
-                            <div className="w-[94%] h-full bg-card dark:bg-card-primary-dark rounded-tl-2xl rounded-tr-lg" />
-                        </div>
-                        <div className="relative overflow-hidden rounded-lg bg-card dark:bg-card-primary-dark p-6 mt-4  h-[94%]">
-                            <div className="opacity-0 group-hover:opacity-100 absolute -bottom-5 right-6 w-40 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/15  blur-2xl pointer-events-none" />
-                            <div className="card-top-accent-indigo opacity-0 group-hover:opacity-100 pointer-events-none absolute right-8 bottom-0 w-1/2 h-px z-20 rounded-full" />
-                            <div className="mb-4">
-                                <div
-                                    className={cn(
-                                        'w-12 h-12 rounded-lg flex items-center justify-center',
-                                        'bg-success/10 border border-success/20 group-hover:bg-success/20 transition-colors',
-                                    )}
-                                >
-                                    <PenLine className="w-6 h-6 text-success" strokeWidth={1.5} />
-                                </div>
-                            </div>
-                            <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                                {t('manual.title')}
-                            </h3>
-                            <p className="text-text-secondary text-sm dark:text-text-secondary-dark mb-4">
-                                {t('manual.subtitle')}
-                            </p>
-                            <div className="flex items-center gap-2 text-success font-medium">
-                                <span>{t('manual.configureNow')}</span>
-                                <ArrowRight
-                                    className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                                    strokeWidth={2}
+                        <div className="mb-4">
+                            <div
+                                className={cn(
+                                    'w-12 h-12 rounded-lg flex items-center justify-center',
+                                    'bg-gray-100 dark:bg-white/5',
+                                )}
+                            >
+                                <PenLine
+                                    className="w-6 h-6 text-gray-800 dark:text-gray-500"
+                                    strokeWidth={1.5}
                                 />
                             </div>
+                        </div>
+                        <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
+                            {t('manual.title')}
+                        </h3>
+                        <p className="text-text-secondary/50 text-sm dark:text-text-secondary-dark mb-4">
+                            {t('manual.subtitle')}
+                        </p>
+                        <div className="flex items-center gap-2 bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-white dark:text-black rounded-full px-3 py-1 text-sm font-medium w-fit">
+                            <span>{t('manual.configureNow')}</span>
+                            <ArrowRight
+                                className="w-4 h-4 group-hover:translate-x-1 transition-transform"
+                                strokeWidth={2}
+                            />
                         </div>
                     </button>
 
@@ -153,49 +137,38 @@ export default function NewDirectoryClient({
                     <button
                         onClick={() => setCreationMode('import')}
                         className={cn(
-                            'rounded-b-lg rounded-t-lg rounded-tr-lg text-left transition-all',
-                            'bg-surface-tertiary dark:bg-card-navy-dark',
-                            'hover:shadow-lg shadow-sm',
+                            'rounded-b-lg p-4 rounded-t-lg rounded-tr-lg text-left transition-all shadow-sm',
+                            'bg-white dark:bg-card-primary-dark',
+                            'border border-card-border dark:border-white/9',
+                            'hover:border-primary-500/50 dark:hover:border-white/20',
                             'group relative cursor-pointer',
                         )}
                     >
-                        <div className="absolute left-0 -top-2 flex w-full">
-                            <div className="h-6 w-2/4 bg-surface-tertiary dark:bg-card-navy-dark rounded-t-2xl" />
-                            <div className="w-0 h-0 -ml-2 mt-0.5 border-b-20 border-r-20 border-b-surface-tertiary dark:border-b-card-navy-dark border-r-transparent" />
-                        </div>
-                        <div className="flex absolute right-0 top-1 w-[55%] h-6">
-                            <div className="w-0 h-0 border-b-20 mt-1 -mr-1.5 border-l-20 border-b-card dark:border-b-card-primary-dark border-l-transparent"></div>
-                            <div className="w-[94%] h-full bg-card dark:bg-card-primary-dark rounded-tl-2xl rounded-tr-lg" />
-                        </div>
-                        <div className="relative overflow-hidden rounded-lg bg-card dark:bg-card-primary-dark p-6 mt-4 h-[94%]">
-                            <div className="opacity-0 group-hover:opacity-100 absolute -bottom-5 right-6 w-40 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/15  blur-2xl pointer-events-none" />
-                            <div className="card-top-accent-indigo opacity-0 group-hover:opacity-100 pointer-events-none absolute right-8 bottom-0 w-1/2 h-px z-20 rounded-full" />
-                            <div className="mb-4">
-                                <div
-                                    className={cn(
-                                        'w-12 h-12 rounded-lg flex items-center justify-center',
-                                        'bg-warning/10 border border-warning/20 group-hover:bg-warning/20 transition-colors',
-                                    )}
-                                >
-                                    <FolderInput
-                                        className="w-6 h-6 text-warning"
-                                        strokeWidth={1.5}
-                                    />
-                                </div>
-                            </div>
-                            <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                                {t('import.title')}
-                            </h3>
-                            <p className="text-text-secondary text-sm dark:text-text-secondary-dark mb-4">
-                                {t('import.subtitle')}
-                            </p>
-                            <div className="flex items-center gap-2 text-warning font-medium">
-                                <span>{t('import.importNow')}</span>
-                                <ArrowRight
-                                    className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                                    strokeWidth={2}
+                        <div className="mb-4">
+                            <div
+                                className={cn(
+                                    'w-12 h-12 rounded-lg flex items-center justify-center',
+                                    'bg-gray-100 dark:bg-white/5',
+                                )}
+                            >
+                                <FolderInput
+                                    className="w-6 h-6 text-gray-800 dark:text-gray-500"
+                                    strokeWidth={1.5}
                                 />
                             </div>
+                        </div>
+                        <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
+                            {t('import.title')}
+                        </h3>
+                        <p className="text-text-secondary/50 text-sm dark:text-text-secondary-dark mb-4">
+                            {t('import.subtitle')}
+                        </p>
+                        <div className="flex items-center gap-2 bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-white dark:text-black rounded-full px-3 py-1 text-sm font-medium w-fit">
+                            <span>{t('import.importNow')}</span>
+                            <ArrowRight
+                                className="w-4 h-4 group-hover:translate-x-1 transition-transform"
+                                strokeWidth={2}
+                            />
                         </div>
                     </button>
                 </div>

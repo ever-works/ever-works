@@ -18,8 +18,7 @@ export interface AppendMessageInput {
     conversationId: string;
     role: ConversationMessageRole;
     content: string;
-    toolCalls?: Array<{ id: string; name: string; arguments: string }>;
-    toolCallId?: string;
+    parts?: unknown[];
     model?: string;
     usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
 }

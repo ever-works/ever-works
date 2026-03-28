@@ -136,8 +136,6 @@ export interface PluginUiHints {
 	includeInOnboarding?: boolean;
 	/** Step position in the onboarding wizard (lower = earlier). */
 	onboardingPriority?: number;
-	/** Run connection validation automatically after the user saves settings. */
-	validateOnSave?: boolean;
 	/**
 	 * Fields that must all be non-empty for the plugin to be considered "connected".
 	 * Falls back to OAuth connection status when absent and the plugin has 'oauth' capability.

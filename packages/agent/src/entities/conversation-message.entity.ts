@@ -32,11 +32,9 @@ export class ConversationMessage {
     @Column({ type: 'text' })
     content: string;
 
+    /** Full UIMessage parts array — preserves tool calls, results, and all part types */
     @Column({ type: 'simple-json', nullable: true })
-    toolCalls?: Array<{ id: string; name: string; arguments: string }>;
-
-    @Column({ type: 'varchar', length: 100, nullable: true })
-    toolCallId?: string;
+    parts?: unknown[];
 
     @Column({ type: 'varchar', length: 100, nullable: true })
     model?: string;

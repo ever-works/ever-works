@@ -17,11 +17,9 @@ import {
     Plug,
     PanelLeftClose,
     PanelLeftOpen,
-    User,
     HelpCircle,
     MessageSquare,
     Keyboard,
-    ChevronUp,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -174,7 +172,7 @@ export function DashboardSidebar({
                                 href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
                                 variant="primary"
                                 size="icon"
-                                className="w-9 h-9 text-white bg-primary-hover hover:bg-primary-hover/80 shadow-sm rounded-xl"
+                                className="w-9 h-9 shadow-sm rounded-xl"
                             >
                                 <Plus className="w-5 h-5" />
                             </Button>
@@ -183,9 +181,9 @@ export function DashboardSidebar({
                         <Button
                             href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
                             variant="primary"
-                            size="lg"
+                            size="sm"
                             fullWidth
-                            className="dark:text-white hover:text-white text-primary-hover rounded-xl dark:bg-primary-hover/20 text-sm bg-primary-hover/10 hover:bg-primary-hover/80 shadow-sm ring-1 dark:ring-white/6 dark:border dark:border-primary-hover dark:hover:border-white/12"
+                            className="shadow-s dark:border"
                         >
                             <Plus className="w-5 h-5" />
                             <span className="font-medium">{t('newDirectory')}</span>
@@ -215,16 +213,16 @@ export function DashboardSidebar({
                                         <Link
                                             href={item.href}
                                             className={cn(
-                                                'flex items-center rounded-lg transition-colors border border-transparent',
+                                                'flex items-center rounded-sm transition-colors border border-transparent',
                                                 isCollapsed
                                                     ? 'justify-center w-8 h-8 px-0'
-                                                    : 'gap-3 px-3 py-2',
+                                                    : 'gap-3 px-4 py-2',
                                                 isActive
-                                                    ? 'border bg-surface-secondary border-surface-tertiary dark:border-primary/10 dark:bg-surface-secondary-dark/50 text-text dark:text-primary'
-                                                    : 'text-text dark:text-text-secondary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark/30 hover:text-text dark:hover:text-text-dark',
+                                                    ? 'border bg-surface-secondary border-surface-tertiary dark:border-transparent dark:bg-card-secondary-dark text-text dark:text-text-dark'
+                                                    : 'text-text dark:text-text-secondary-dark/70 hover:bg-surface-secondary dark:hover:bg-card-primary-dark hover:text-text dark:hover:text-text-dark',
                                             )}
                                         >
-                                            <item.icon className="w-4.5 h-4.5 shrink-0" />
+                                            <item.icon className="w-5 h-5 shrink-0" />
                                             {!isCollapsed && (
                                                 <span className="text-sm">{item.name}</span>
                                             )}
@@ -239,7 +237,7 @@ export function DashboardSidebar({
                 {/* Bottom section: user menu */}
                 <div
                     className={cn(
-                        'mt-auto shrink-0 border-t border-border dark:border-border-dark',
+                        'mt-auto shrink-0 border-t border-border dark:border-border-dark z-999999',
                         isCollapsed ? 'px-2' : 'px-4',
                     )}
                 >
@@ -247,21 +245,21 @@ export function DashboardSidebar({
                         <DropdownMenu>
                             <DropdownMenuTrigger
                                 className={cn(
-                                    'w-full rounded-lg transition-colors cursor-pointer',
-                                    'hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
+                                    'w-full rounded-md transition-colors cursor-pointer focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:border-transparent focus-visible:border-transparent',
+                                    'hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark',
                                     isCollapsed ? 'p-1 flex justify-center' : 'p-2',
                                 )}
                             >
                                 <div
                                     className={cn(
-                                        'flex items-center gap-3',
+                                        'flex items-center gap-3 ',
                                         isCollapsed && 'justify-center',
                                     )}
                                 >
                                     <ConditionalTooltip show={isCollapsed} content={user.username}>
                                         <div
                                             className={cn(
-                                                'relative w-7 h-7 rounded-full shrink-0 flex items-center justify-center overflow-hidden',
+                                                'relative w-8 h-8 rounded-full shrink-0 flex items-center justify-center overflow-hidden',
                                                 'bg-surface-tertiary dark:bg-surface-tertiary-dark',
                                             )}
                                         >
@@ -272,10 +270,10 @@ export function DashboardSidebar({
                                                     fill
                                                     className="object-cover"
                                                     onError={() => setAvatarError(true)}
-                                                    sizes="28px"
+                                                    sizes="32px"
                                                 />
                                             ) : (
-                                                <span className="text-[10px] font-semibold text-text dark:text-text-dark">
+                                                <span className="text-xs font-semibold text-text dark:text-text-dark">
                                                     {user.username.charAt(0).toUpperCase()}
                                                 </span>
                                             )}
@@ -287,17 +285,16 @@ export function DashboardSidebar({
                                                 <p className="text-sm font-medium text-text dark:text-text-dark truncate">
                                                     {user.username}
                                                 </p>
-                                                <p className="text-[11px] text-text-muted dark:text-text-muted-dark truncate">
+                                                <p className="text-xs text-text-muted dark:text-text-muted-dark truncate">
                                                     {user.email}
                                                 </p>
                                             </div>
-                                            <ChevronUp className="w-3.5 h-3.5 shrink-0 text-text-muted dark:text-text-muted-dark" />
                                         </>
                                     )}
                                 </div>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent side="top" align="start" className="w-56">
-                                <DropdownMenuLabel>
+                            <DropdownMenuContent side="top" align="start" className="w-56 bg-white">
+                                <DropdownMenuLabel className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark">
                                     <p className="truncate">{user.username}</p>
                                     <p className="text-xs font-normal text-text-muted dark:text-text-muted-dark truncate">
                                         {user.email}
@@ -306,28 +303,37 @@ export function DashboardSidebar({
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                     onClick={() => router.push(ROUTES.DASHBOARD_SETTINGS)}
+                                    className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
                                 >
-                                    <User className="w-4 h-4 mr-2 shrink-0" />
+                                    <Settings className="w-4 h-4 mr-2 shrink-0" />
                                     {t('profileMenu.accountSettings')}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                    onClick={() => window.open('https://docs.ever.works', '_blank')}
+                                    onClick={() => {
+                                        window.open('https://docs.ever.works', '_blank');
+                                    }}
+                                    className="cursor-pointer px-3 rounded-sm hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
                                 >
                                     <HelpCircle className="w-4 h-4 mr-2 shrink-0" />
                                     {t('profileMenu.helpDocs')}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                    onClick={() =>
+                                    onClick={() => {
                                         window.open(
                                             'https://github.com/ever-works/ever-works/issues',
                                             '_blank',
-                                        )
-                                    }
+                                        );
+                                    }}
+                                    className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
                                 >
                                     <MessageSquare className="w-4 h-4 mr-2 shrink-0" />
                                     {t('profileMenu.support')}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={onOpenHelp} disabled={!onOpenHelp}>
+                                <DropdownMenuItem
+                                    onClick={onOpenHelp}
+                                    disabled={!onOpenHelp}
+                                    className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
+                                >
                                     <Keyboard className="w-4 h-4 mr-2 shrink-0" />
                                     {t('profileMenu.keyboardShortcuts')}
                                 </DropdownMenuItem>
@@ -335,7 +341,7 @@ export function DashboardSidebar({
                                 <DropdownMenuItem
                                     onClick={handleLogout}
                                     disabled={isPending}
-                                    className="text-danger"
+                                    className="text-danger hover:bg-danger/10 cursor-pointer px-3"
                                 >
                                     <LogOut className="w-4 h-4 mr-2 shrink-0" />
                                     {isPending ? t('signingOut') : t('signOut')}

@@ -96,7 +96,7 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                         : undefined
                 }
                 className={cn(
-                    'bg-surface dark:bg-surface-dark rounded-lg border border-border dark:border-border-dark p-4',
+                    'bg-surface dark:bg-surface-dark rounded-lg border border-card-border dark:border-border-secondary-dark p-4',
                     'transition-all',
                     isEnabled && 'ring-1 ring-primary/20',
                     !canEnable && !isEnabled && 'opacity-60',

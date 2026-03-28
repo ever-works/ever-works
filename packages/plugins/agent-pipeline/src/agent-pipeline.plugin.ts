@@ -132,6 +132,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			autoEnable: true,
 			systemPlugin: true,
 			visibility: 'public',
+			defaultForCapabilities: ['pipeline'],
 			selectableProviderCategories: ['ai-provider', 'search', 'screenshot', 'content-extractor', 'data-source'],
 			readme: [
 				'# Agent Pipeline Plugin',

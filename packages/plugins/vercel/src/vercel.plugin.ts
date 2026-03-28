@@ -276,7 +276,6 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 					buttonLabel: 'Get Vercel API token',
 					showWhenEmpty: ['apiToken']
 				},
-				validateOnSave: true,
 				includeInOnboarding: true,
 				onboardingPriority: 4,
 				completionFields: ['apiToken'],

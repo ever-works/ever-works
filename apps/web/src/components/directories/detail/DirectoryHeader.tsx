@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
 import { useTranslations } from 'next-intl';
 import { DirectoryMemberRole } from '@/lib/api/enums';
-import { Link as IconLink, Users, Zap, Code2, Clock } from 'lucide-react';
+import { Link as IconLink, Users, Cog, Github, Clock } from 'lucide-react';
 import { useDirectoryDetail, useDirectoryPermissions } from './DirectoryDetailContext';
 import { getStepText, getItemsProcessedText } from '@/lib/utils/generator-steps';
 import { buildPublicComparisonUrl } from '@/lib/utils/comparison';
@@ -51,7 +51,7 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                         {isShared && (
                             <span
                                 className={cn(
-                                    'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium',
+                                    'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium',
                                     'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
                                 )}
                                 title={t('shared.tooltip', { role: t(`role.${role}`) })}
@@ -62,12 +62,12 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                         )}
                         <span
                             className={cn(
-                                'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium',
+                                'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium',
                                 statusStyle.badge,
                             )}
                         >
                             <StatusIcon
-                                className={cn('w-4 h-4', statusStyle.animate && 'animate-spin')}
+                                className={cn('w-3 h-3', statusStyle.animate && 'animate-spin')}
                             />
                             {t(`status.${statusStyle.labelKey}`)}
                             {directory.generateStatus?.step && statusStyle.animate && (
@@ -85,13 +85,13 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                         </span>
                     </div>
 
-                    <p className="text-lg text-text-secondary dark:text-text-secondary-dark mb-4">
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark mb-4">
                         {directory.description}
                     </p>
 
                     <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted dark:text-text-muted-dark">
-                        <div className="flex items-center gap-1.5">
-                            <Zap className="w-4 h-4" />
+                        <div className="flex items-center gap-0.5">
+                            <Cog className="w-4 h-4" />
                             <code className="px-1.5 py-0.5 bg-surface dark:bg-surface-dark rounded">
                                 {directory.slug}
                             </code>
@@ -107,7 +107,7 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                         {(() => {
                             const innerJSX = (
                                 <>
-                                    <Code2 className="w-4 h-4" />
+                                    <Github className="w-4 h-4" />
                                     <span className="capitalize">{directory.gitProvider}</span>
                                 </>
                             );

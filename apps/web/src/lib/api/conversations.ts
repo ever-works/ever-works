@@ -14,9 +14,7 @@ export interface ConversationMessage {
     id: string;
     role: 'user' | 'assistant' | 'system' | 'tool';
     content: string;
-    toolCalls?: Array<{ id: string; name: string; arguments: string }>;
-    toolCallId?: string;
-    model?: string;
+    parts?: unknown[];
     createdAt: string;
 }
 

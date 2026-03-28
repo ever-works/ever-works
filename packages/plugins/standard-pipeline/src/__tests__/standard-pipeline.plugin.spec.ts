@@ -460,11 +460,6 @@ describe('StandardPipelinePlugin', () => {
 			expect(manifest.systemPlugin).toBe(true);
 		});
 
-		it('should declare defaultForCapabilities', () => {
-			const manifest = plugin.getManifest();
-			expect(manifest.defaultForCapabilities).toContain('pipeline');
-		});
-
 		it('should declare selectableProviderCategories', () => {
 			const manifest = plugin.getManifest();
 			expect(manifest.selectableProviderCategories).toEqual(

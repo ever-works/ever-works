@@ -306,7 +306,6 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			selectableProviderCategories: ['screenshot'],
 			uiHints: {
 				onboardingWizard: true,
-				validateOnSave: true,
 				includeInOnboarding: true,
 				onboardingPriority: 1,
 				completionFields: ['oauthToken', 'apiKey'],
