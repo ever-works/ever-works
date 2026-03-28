@@ -3,7 +3,7 @@ import { typeormAdapter } from 'better-auth-typeorm-adapter';
 import { DataSource } from 'typeorm';
 import { config, AuthProvider } from '../config/constants';
 import { GITHUB_SCOPES } from './config/github-scopes.config';
-import { BaUser, BaSession, BaAccount, BaVerification } from '@ever-works/agent/entities';
+import { AuthUser, AuthSession, AuthAccount, AuthVerification } from '@ever-works/agent/entities';
 import { UserRepository, OAuthTokenRepository } from '@ever-works/agent/database';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserConfirmedEvent } from '../events';
@@ -33,10 +33,10 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
         database: typeormAdapter({
             dataSource,
             entities: {
-                user: BaUser,
-                session: BaSession,
-                account: BaAccount,
-                verification: BaVerification,
+                user: AuthUser,
+                session: AuthSession,
+                account: AuthAccount,
+                verification: AuthVerification,
             },
         }),
 
@@ -109,22 +109,22 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
         databaseHooks: {
             user: {
                 create: {
-                    after: async (baUser) => {
+                    after: async (authUser) => {
                         // Sync new BetterAuth user to application users table
                         try {
                             // Check if user already exists by ID or email
-                            const existingById = await userRepository.findById(baUser.id);
+                            const existingById = await userRepository.findById(authUser.id);
                             if (existingById) {
-                                logger.log(`User ${baUser.id} already exists in application table`);
+                                logger.log(`User ${authUser.id} already exists in application table`);
                                 return;
                             }
 
-                            const existingByEmail = await userRepository.findByEmail(baUser.email);
+                            const existingByEmail = await userRepository.findByEmail(authUser.email);
                             if (existingByEmail) {
                                 // User exists with different ID (registered via old auth system)
                                 // Link the existing user — no need to create a new one
                                 logger.log(
-                                    `User with email ${baUser.email} already exists (id: ${existingByEmail.id}), skipping create`,
+                                    `User with email ${authUser.email} already exists (id: ${existingByEmail.id}), skipping create`,
                                 );
                                 return;
                             }
@@ -136,21 +136,21 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                             );
 
                             await userRepository.create({
-                                id: baUser.id,
-                                username: baUser.name || baUser.email.split('@')[0],
-                                email: baUser.email,
+                                id: authUser.id,
+                                username: authUser.name || authUser.email.split('@')[0],
+                                email: authUser.email,
                                 password: randomPassword,
                                 registrationProvider: AuthProvider.LOCAL,
-                                emailVerified: baUser.emailVerified || false,
-                                avatar: baUser.image || undefined,
+                                emailVerified: authUser.emailVerified || false,
+                                avatar: authUser.image || undefined,
                                 isActive: true,
                             } as any);
 
-                            logger.log(`Synced new user to application table: ${baUser.id}`);
+                            logger.log(`Synced new user to application table: ${authUser.id}`);
 
                             // Emit welcome event for OAuth users (email verified = true)
-                            if (baUser.emailVerified) {
-                                const user = await userRepository.findById(baUser.id);
+                            if (authUser.emailVerified) {
+                                const user = await userRepository.findById(authUser.id);
                                 if (user) {
                                     eventEmitter.emit(
                                         UserConfirmedEvent.EVENT_NAME,
@@ -163,7 +163,7 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                             }
                         } catch (error) {
                             logger.error(
-                                `Failed to sync user ${baUser.id} to application table:`,
+                                `Failed to sync user ${authUser.id} to application table:`,
                                 error,
                             );
                         }
@@ -183,21 +183,19 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                             let appUserId = account.userId;
                             const userById = await userRepository.findById(account.userId);
                             if (!userById) {
-                                // BetterAuth user ID doesn't exist in users table —
-                                // find by email via the ba_user table
-                                const baUserRepo = dataSource.getRepository(BaUser);
-                                const baUser = await baUserRepo.findOne({
+                                const authUserRepo = dataSource.getRepository(AuthUser);
+                                const authUser = await authUserRepo.findOne({
                                     where: { id: account.userId },
                                 });
-                                if (baUser) {
+                                if (authUser) {
                                     const existingUser = await userRepository.findByEmail(
-                                        baUser.email,
+                                        authUser.email,
                                     );
                                     if (existingUser) {
                                         appUserId = existingUser.id;
                                     } else {
                                         logger.warn(
-                                            `No application user found for BetterAuth user ${account.userId} (${baUser.email})`,
+                                            `No application user found for BetterAuth user ${account.userId} (${authUser.email})`,
                                         );
                                         return;
                                     }
@@ -245,13 +243,13 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                             let appUserId = session.userId;
                             const userById = await userRepository.findById(session.userId);
                             if (!userById) {
-                                const baUserRepo = dataSource.getRepository(BaUser);
-                                const baUser = await baUserRepo.findOne({
+                                const authUserRepo = dataSource.getRepository(AuthUser);
+                                const authUser = await authUserRepo.findOne({
                                     where: { id: session.userId },
                                 });
-                                if (baUser) {
+                                if (authUser) {
                                     const existingUser = await userRepository.findByEmail(
-                                        baUser.email,
+                                        authUser.email,
                                     );
                                     if (existingUser) {
                                         appUserId = existingUser.id;

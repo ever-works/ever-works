@@ -16,10 +16,10 @@ import {
     DirectorySchedule,
     UsageLedgerEntry,
     Notification,
-    BaUser,
-    BaSession,
-    BaAccount,
-    BaVerification,
+    AuthUser,
+    AuthSession,
+    AuthAccount,
+    AuthVerification,
     Conversation,
     ConversationMessage,
 } from '../entities';
@@ -80,10 +80,10 @@ export const ENTITIES = [
     // Account transfer entities
     UserSyncConfig,
     // BetterAuth entities
-    BaUser,
-    BaSession,
-    BaAccount,
-    BaVerification,
+    AuthUser,
+    AuthSession,
+    AuthAccount,
+    AuthVerification,
 ];
 
 export const databaseConfig = registerAs('database', (): DatabaseConfig => {
