@@ -41,12 +41,14 @@ export function ChatMessageContent({
                 if (isToolUIPart(part)) {
                     const name = getToolName(part);
                     if (!name) return null;
+                    const errorText = part.state === 'output-error' ? (part as { errorText?: string }).errorText : undefined;
                     return (
                         <ChatToolResult
                             key={part.toolCallId}
                             toolName={name}
                             state={part.state}
                             output={part.state === 'output-available' ? part.output : undefined}
+                            errorText={errorText}
                         />
                     );
                 }

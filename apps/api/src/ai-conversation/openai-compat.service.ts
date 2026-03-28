@@ -94,14 +94,25 @@ export class OpenAiCompatService {
         } catch (error) {
             this.logger.error('Streaming completion error', error);
 
-            const errorChunk: OpenAiChatCompletionChunkResponse = {
+            const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+            // Send error as assistant content so the user sees it in the chat
+            const errorContentChunk: OpenAiChatCompletionChunkResponse = {
                 id: `chatcmpl-err-${Date.now()}`,
                 object: 'chat.completion.chunk',
                 created: Math.floor(Date.now() / 1000),
                 model: dto.model ?? 'auto',
-                choices: [{ index: 0, delta: {}, finish_reason: 'error' }],
+                choices: [{ index: 0, delta: { role: 'assistant', content: `\n\n**Error:** ${errorMessage}` }, finish_reason: null }],
             };
-            res.write(`data: ${JSON.stringify(errorChunk)}\n\n`);
+            res.write(`data: ${JSON.stringify(errorContentChunk)}\n\n`);
+
+            const doneChunk: OpenAiChatCompletionChunkResponse = {
+                id: `chatcmpl-err-${Date.now()}`,
+                object: 'chat.completion.chunk',
+                created: Math.floor(Date.now() / 1000),
+                model: dto.model ?? 'auto',
+                choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+            };
+            res.write(`data: ${JSON.stringify(doneChunk)}\n\n`);
             res.write(`data: [DONE]\n\n`);
         } finally {
             res.end();

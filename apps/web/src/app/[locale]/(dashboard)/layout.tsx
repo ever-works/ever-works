@@ -10,7 +10,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
     }
 
     const cookieStore = await cookies();
-    const chatPanelOpen = cookieStore.get('chat-panel-open')?.value === '1';
+    const chatCookie = cookieStore.get('chat-panel-open')?.value;
+    const chatPanelOpen = chatCookie === undefined ? true : chatCookie === '1';
 
     return (
         <DashboardLayoutClient user={user} initialChatOpen={chatPanelOpen}>

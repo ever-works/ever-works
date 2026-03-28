@@ -12,6 +12,7 @@ interface ChatToolResultProps {
     toolName: string;
     state: string;
     output?: unknown;
+    errorText?: string;
 }
 
 // ── Tool output types ───────────────────────────────────────────
@@ -94,12 +95,13 @@ const LABELS: Record<string, string> = {
     reloadPage: 'Refreshing',
 };
 
-export function ChatToolResult({ toolName, state, output }: ChatToolResultProps) {
+export function ChatToolResult({ toolName, state, output, errorText }: ChatToolResultProps) {
     const t = useTranslations('dashboard.aiChat');
     const router = useRouter();
 
     const isRunning = state === 'input-streaming' || state === 'input-available';
     const isDone = state === 'output-available';
+    const isError = state === 'output-error';
 
     // Auto-navigate or reload
     useEffect(() => {
@@ -120,6 +122,16 @@ export function ChatToolResult({ toolName, state, output }: ChatToolResultProps)
             <span className="inline-flex items-center gap-1 text-[10px] text-text-muted dark:text-text-muted-dark">
                 <Loader2 className="w-2.5 h-2.5 animate-spin" />
                 {LABELS[toolName]}
+            </span>
+        );
+    }
+
+    if (isError) {
+        const label = LABELS[toolName] ?? toolName;
+        return (
+            <span className="inline-flex items-center gap-1 text-[10px] text-danger">
+                <ExternalLink className="w-2.5 h-2.5" />
+                {label} failed{errorText ? `: ${errorText}` : ''}
             </span>
         );
     }
