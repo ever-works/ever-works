@@ -68,6 +68,10 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
         account: {
             accountLinking: {
                 enabled: true,
+                // The GitHub connect step is an explicit authenticated linking flow.
+                // We require GitHub for git-backed features even when the user's
+                // primary account was created with a different email provider.
+                allowDifferentEmails: true,
             },
         },
 
