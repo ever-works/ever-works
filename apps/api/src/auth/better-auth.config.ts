@@ -87,6 +87,7 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                 google: {
                     clientId: config.google.clientId()!,
                     clientSecret: config.google.clientSecret()!,
+                    prompt: 'select_account consent' as const,
                     accessType: 'offline' as const,
                 },
             }),
