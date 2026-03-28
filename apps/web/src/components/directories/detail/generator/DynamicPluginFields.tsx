@@ -175,7 +175,7 @@ export function DynamicPluginFields({
                                 className={cn(
                                     'w-full px-3 py-2 rounded-lg border text-sm resize-none',
                                     'bg-surface dark:bg-surface-dark',
-                                    'border-border dark:border-border-dark',
+                                    'hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark',
                                     'text-text dark:text-text-dark',
                                     'focus:outline-none focus:ring-2 focus:ring-primary/50',
                                 )}
@@ -303,7 +303,7 @@ export function DynamicPluginFields({
                             className={cn(
                                 'rounded-lg border overflow-hidden',
                                 'bg-card dark:bg-card-primary-dark/30',
-                                'border-card-border dark:border-card-border-dark',
+                                'hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark',
                             )}
                         >
                             <AccordionTrigger className="px-5 py-3.5 hover:no-underline hover:bg-surface/50 dark:hover:bg-surface-dark/50">
