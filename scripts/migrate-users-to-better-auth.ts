@@ -54,10 +54,7 @@ async function main() {
 
 		for (const user of users) {
 			try {
-				const existing = await queryRunner.query(
-					`SELECT id FROM ba_user WHERE id = ${p(1)}`,
-					[user.id]
-				);
+				const existing = await queryRunner.query(`SELECT id FROM ba_user WHERE id = ${p(1)}`, [user.id]);
 
 				if (existing.length > 0) {
 					continue; // Already migrated

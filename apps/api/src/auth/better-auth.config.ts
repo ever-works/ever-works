@@ -130,7 +130,10 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                             }
 
                             // Truly new user — create in application table
-                            const randomPassword = await bcrypt.hash(randomBytes(16).toString('hex'), 10);
+                            const randomPassword = await bcrypt.hash(
+                                randomBytes(16).toString('hex'),
+                                10,
+                            );
 
                             await userRepository.create({
                                 id: baUser.id,
