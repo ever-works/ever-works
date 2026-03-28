@@ -70,7 +70,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     // Plugin-specific configuration (dynamic fields from pipeline plugin)
     const [pluginConfig, setPluginConfig] = useState<Record<string, unknown>>({});
 
-    // Provider selection (null = use directory/system default)
+    // Provider selection (seeded from config.yaml)
     const {
         providers,
         handleProviderChange,
@@ -79,8 +79,8 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
         syncResolvedPipeline,
     } = useProviderSelection(lastRequestData?.providers);
 
-    // Seed data from the previous generation — used once during schema init,
-    // should not trigger re-fetches when the parent re-renders with a new config reference.
+    // Only apply enforce override once on initial load
+    const enforceAppliedRef = useRef(false);
     const lastPluginConfigRef = useRef(lastRequestData?.pluginConfig);
 
     // Load form schema when directory changes or pipeline provider changes
@@ -116,7 +116,16 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                     }
                     setPluginConfig(defaults);
 
-                    // Sync pipeline selection to server-resolved ID
+                    // Enforce override: switch to enforced pipeline on initial load
+                    const enforced = result.data.enforcedPipelineId;
+                    if (enforced && !enforceAppliedRef.current && enforced !== pipelineId) {
+                        enforceAppliedRef.current = true;
+                        handleProviderChange('pipeline', enforced);
+                        return;
+                    }
+                    enforceAppliedRef.current = true;
+
+                    // Sync pipeline when none was set
                     syncResolvedPipeline(result.data);
                 }
             } catch (error) {
@@ -130,7 +139,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             }
         }
         loadFormSchema();
-    }, [directoryId, t, providers.pipeline, syncResolvedPipeline]);
+    }, [directoryId, t, providers.pipeline, syncResolvedPipeline, handleProviderChange]);
 
     const handleCoreDataChange = useCallback((updates: Partial<typeof coreData>) => {
         setCoreData((prev) => ({ ...prev, ...updates }));
@@ -280,7 +289,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                     disabled={isPending}
                     loading={isPending}
                     variant="primary"
-                    size="lg"
+                    size="sm"
                 >
                     {getButtonText()}
                 </Button>
@@ -289,7 +298,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                     onClick={() => router.back()}
                     disabled={isPending}
                     variant="secondary"
-                    size="lg"
+                    size="sm"
                 >
                     {t('cancel')}
                 </Button>
@@ -314,6 +323,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                         <Button
                             type="button"
                             variant="secondary"
+                            size="sm"
                             onClick={() => setConfirmRecreate(false)}
                             disabled={isPending}
                         >

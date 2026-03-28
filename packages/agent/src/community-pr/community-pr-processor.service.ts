@@ -3,12 +3,19 @@ import { z } from 'zod';
 import { GitFacadeService, type GitFacadeOptions } from '../facades/git.facade';
 import { AiFacadeService } from '../facades/ai.facade';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
+import { DirectoryGenerationHistoryRepository } from '../database/repositories/directory-generation-history.repository';
 import type { Directory } from '../entities/directory.entity';
 import type { CommunityPrState } from '../entities/types';
 import type { GitPullRequest } from '@ever-works/plugin';
 import type { Category } from '@ever-works/contracts';
 import { slugifyText } from '../utils/text.utils';
 import { DataRepository } from '../generators/data-generator/data-repository';
+import { GenerateStatusType } from '../entities/types';
+import {
+    DirectoryHistoryActivityType,
+    type DirectoryHistoryChangeEntry,
+} from '@ever-works/contracts/api';
+import { buildDirectoryChangelog } from '../utils/directory-changelog.utils';
 
 const MAX_PROCESSED_PR_NUMBERS = 500;
 const MAX_CHANGE_CONTEXT_LENGTH = 50_000;
@@ -38,7 +45,33 @@ export class CommunityPrProcessorService {
         private readonly gitFacade: GitFacadeService,
         private readonly aiFacade: AiFacadeService,
         private readonly directoryRepository: DirectoryRepository,
+        private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
     ) {}
+
+    private async recordCommunityPrHistory(params: {
+        directoryId: string;
+        userId: string;
+        prNumber: number;
+        entries: DirectoryHistoryChangeEntry[];
+    }): Promise<void> {
+        const now = new Date();
+
+        await this.generationHistoryRepository.createEntry({
+            directoryId: params.directoryId,
+            userId: params.userId,
+            status: GenerateStatusType.GENERATED,
+            startedAt: now,
+            finishedAt: now,
+            durationInSeconds: 0,
+            newItemsCount: params.entries.length,
+            triggeredBy: 'user',
+            activityType: DirectoryHistoryActivityType.COMMUNITY_PR_MERGED,
+            changelog: buildDirectoryChangelog(
+                params.entries,
+                `Community PR #${params.prNumber} merged: ${params.entries.length} item${params.entries.length === 1 ? '' : 's'} added`,
+            ),
+        });
+    }
 
     async processAllDirectories(): Promise<CommunityPrProcessingResult> {
         const directories = await this.directoryRepository.findWithCommunityPrEnabled();
@@ -254,6 +287,18 @@ export class CommunityPrProcessorService {
             `Add ${extractedItems.items.length} item(s) from community PR #${pr.number}`,
         );
         await this.gitFacade.push({ dir: dest }, gitOptions);
+
+        await this.recordCommunityPrHistory({
+            directoryId: directory.id,
+            userId: directory.userId,
+            prNumber: pr.number,
+            entries: extractedItems.items.map((item) => ({
+                entityType: 'item',
+                action: 'added',
+                name: item.name,
+                slug: slugifyText(item.name),
+            })),
+        });
 
         // Comment on PR
         const itemNames = extractedItems.items.map((i) => `- ${i.name}`).join('\n');

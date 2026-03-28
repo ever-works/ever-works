@@ -65,8 +65,8 @@
 			},
 			"license": "MIT",
 			"builtIn": true,
-			"autoEnable": false,
-			"systemPlugin": false,
+			"autoEnable": true,
+			"systemPlugin": true,
 			"visibility": "public",
 			"selectableProviderCategories": [
 				"ai-provider",

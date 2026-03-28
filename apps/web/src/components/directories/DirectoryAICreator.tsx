@@ -50,6 +50,7 @@ export function DirectoryAICreator({
     const [pluginConfig, setPluginConfig] = useState<Record<string, unknown>>({});
     const fetchVersionRef = useRef(0);
     const lastFetchedPipelineRef = useRef<string | undefined>(undefined);
+    const enforceAppliedRef = useRef(false);
 
     // Load form schema when pipeline provider changes
     useEffect(() => {
@@ -69,6 +70,15 @@ export function DirectoryAICreator({
                         setPluginConfig({ ...result.data.defaultValues });
                     }
 
+                    // Enforce override on initial load
+                    const enforced = result.data.enforcedPipelineId;
+                    if (enforced && !enforceAppliedRef.current && enforced !== pipelineId) {
+                        enforceAppliedRef.current = true;
+                        handleProviderChange('pipeline', enforced);
+                        return;
+                    }
+                    enforceAppliedRef.current = true;
+
                     // Sync pipeline selection to server-resolved ID
                     syncResolvedPipeline(result.data);
                 }
@@ -78,7 +88,7 @@ export function DirectoryAICreator({
             }
         }
         loadSchema();
-    }, [providers.pipeline, syncResolvedPipeline]);
+    }, [providers.pipeline, syncResolvedPipeline, handleProviderChange]);
 
     const handlePluginConfigChange = useCallback((values: Record<string, unknown>) => {
         setPluginConfig(values);

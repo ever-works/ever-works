@@ -100,11 +100,8 @@ export function MemberRow({
                     {canManage ? (
                         <Select
                             value={member.role}
-                            onChange={(e) =>
-                                handleRoleChange(e.target.value as AssignableMemberRole)
-                            }
+                            onValueChange={(val) => handleRoleChange(val as AssignableMemberRole)}
                             disabled={isUpdating}
-                            variant="form"
                             className="w-32"
                         >
                             {roleOptions.map((opt) => (

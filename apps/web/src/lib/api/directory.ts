@@ -15,6 +15,9 @@ import {
     type GenerationMetrics,
     type DirectoryGenerationHistoryEntry,
     type DirectoryGenerationHistoryResponse,
+    type SourceValidationSettingsDto,
+    type UpdateSourceValidationPayload,
+    type GenerationStepLog,
 } from '@ever-works/contracts/api';
 import { APIResponse, ItemData, Category, Tag, Collection } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
@@ -25,8 +28,11 @@ export type {
     DirectoryScheduleDto,
     UpdateDirectorySchedulePayload,
     GenerationMetrics,
+    GenerationStepLog,
     DirectoryGenerationHistoryEntry,
     DirectoryGenerationHistoryResponse,
+    SourceValidationSettingsDto,
+    UpdateSourceValidationPayload,
 } from '@ever-works/contracts/api';
 
 export interface MarkdownReadmeConfig {
@@ -58,6 +64,8 @@ export interface UpdateDirectoryDto {
     websiteTemplateUseBeta?: boolean;
     communityPrEnabled?: boolean;
     communityPrAutoClose?: boolean;
+    committerName?: string | null;
+    committerEmail?: string | null;
 }
 
 export interface DeleteDirectoryDto {
@@ -90,6 +98,8 @@ export type GenerateStatus = {
     error?: string;
     /** Warnings from degraded services (e.g. circuit breaker tripped) */
     warnings?: string[];
+    /** Recent log entries for live display during generation */
+    recentLogs?: GenerationStepLog[];
 };
 
 export type GetProjectsReadyState =
@@ -154,6 +164,9 @@ export interface Directory {
     // Import Source FIELDS
     sourceRepository?: SourceRepository;
     repoVisibility?: RepoVisibility;
+    // Git committer overrides
+    committerName?: string | null;
+    committerEmail?: string | null;
 }
 
 export interface DirectoriesResponse {
@@ -329,6 +342,10 @@ export interface SyncDirectoryResponse {
 // Import types
 export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing';
 
+export interface ImportEnrichmentConfig {
+    expansionFactor?: number;
+}
+
 export interface AnalyzeRepositoryDto {
     sourceUrl: string;
     gitProvider?: string;
@@ -370,6 +387,7 @@ export interface ImportDirectoryDto {
     gitProvider: string;
     deployProvider?: string;
     providers?: Record<string, string>;
+    enrichmentConfig?: ImportEnrichmentConfig;
 }
 
 export interface ImportDirectoryResponseDto {
@@ -462,6 +480,12 @@ export interface ComparisonDimension {
     winner?: 'item_a' | 'item_b' | 'tie';
 }
 
+export interface ComparisonSource {
+    title: string;
+    url: string;
+    note?: string;
+}
+
 export interface ComparisonData {
     id: string;
     slug: string;
@@ -475,7 +499,7 @@ export interface ComparisonData {
     verdict: string;
     verdict_winner?: 'item_a' | 'item_b' | 'tie';
     dimensions: ComparisonDimension[];
-    sources: string[];
+    sources: ComparisonSource[];
     generated_at: string;
 }
 
@@ -560,10 +584,14 @@ export const directoryAPI = {
     },
 
     // Get directory generation history
-    getHistory: async (id: string, options?: { limit?: number; offset?: number }) => {
+    getHistory: async (
+        id: string,
+        options?: { limit?: number; offset?: number; activityType?: string },
+    ) => {
         const params = new URLSearchParams();
         if (options?.limit !== undefined) params.append('limit', String(options.limit));
         if (options?.offset !== undefined) params.append('offset', String(options.offset));
+        if (options?.activityType) params.append('activityType', options.activityType);
         const query = params.toString() ? `?${params.toString()}` : '';
 
         return serverFetch<APIResponse<DirectoryGenerationHistoryResponse>>(
@@ -610,6 +638,19 @@ export const directoryAPI = {
             endpoint: `/directories/${id}/schedule/run`,
             data: {},
             method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    getSourceValidationSettings: async (id: string) => {
+        return serverFetch<SourceValidationSettingsDto>(`/directories/${id}/source-validation`);
+    },
+
+    updateSourceValidationSettings: async (id: string, data: UpdateSourceValidationPayload) => {
+        return serverMutation<SourceValidationSettingsDto>({
+            endpoint: `/directories/${id}/source-validation`,
+            data,
+            method: 'PUT',
             wrapInData: false,
         });
     },
@@ -835,6 +876,16 @@ export const directoryAPI = {
 
     getRemainingComparisonCount: async (id: string) => {
         return serverFetch<{ count: number }>(`/directories/${id}/comparisons/remaining-count`);
+    },
+
+    getComparisonGenerationStatus: async (id: string) => {
+        return serverFetch<{
+            generating: boolean;
+            stage?: string;
+            itemAName?: string;
+            itemBName?: string;
+            startedAt?: string;
+        }>(`/directories/${id}/comparisons/generation-status`);
     },
 
     generateNextComparison: async (id: string) => {

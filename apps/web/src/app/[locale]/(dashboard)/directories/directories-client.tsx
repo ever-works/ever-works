@@ -10,6 +10,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { getDirectories } from '@/app/actions/dashboard/directories';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 
 const MIN_SEARCH_CHARS = 3;
 const DEBOUNCE_MS = 300;
@@ -29,17 +30,25 @@ export default function DirectoriesClient({
     const [directories, setDirectories] = useState<Directory[]>(initialDirectories);
     const [total, setTotal] = useState(totalDirectories);
     const [loading, setLoading] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [debouncedQuery, setDebouncedQuery] = useState('');
+    const initialQuery = searchParams.get('q') ?? '';
+    const [searchQuery, setSearchQuery] = useState(initialQuery);
+    const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
     const [page, setPage] = useState(1);
     const itemsPerPage = 20;
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-    // Focus search input when navigating with ?focus=search
+    // Handle query params: ?focus=search or ?q=searchterm
     useEffect(() => {
-        if (searchParams.get('focus') === 'search' && searchInputRef.current) {
+        const q = searchParams.get('q');
+        if (q) {
+            setSearchQuery(q);
+            setDebouncedQuery(q);
+            searchInputRef.current?.focus();
+            const url = new URL(window.location.href);
+            url.searchParams.delete('q');
+            window.history.replaceState({}, '', url.toString());
+        } else if (searchParams.get('focus') === 'search' && searchInputRef.current) {
             searchInputRef.current.focus();
-            // Clean up the URL without the focus param
             const url = new URL(window.location.href);
             url.searchParams.delete('focus');
             window.history.replaceState({}, '', url.toString());
@@ -69,9 +78,10 @@ export default function DirectoriesClient({
                     setTotal(response.total);
                 }
             } catch (error) {
-                // Only log error if this is still the latest request
+                // Only show error if this is still the latest request
                 if (currentRequestId === requestIdRef.current) {
                     console.error('Failed to search directories:', error);
+                    toast.error(t('searchFailed'));
                 }
             } finally {
                 // Only clear loading if this is still the latest request
@@ -125,7 +135,7 @@ export default function DirectoriesClient({
             </div>
 
             {/* Search and Actions Bar */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+            <div className="flex flex-col @sm/main:flex-row gap-4 mb-8">
                 <div className="flex-1">
                     <div className="relative">
                         <input

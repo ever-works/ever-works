@@ -135,7 +135,7 @@ export function CollectionsTab({
     return (
         <div className="space-y-6">
             {/* Header with search and add button */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="flex flex-col @sm/main:flex-row gap-4 items-start @sm/main:items-center justify-between">
                 <div className="relative flex-1 max-w-md">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary dark:text-text-secondary-dark" />
                     <Input
@@ -190,7 +190,7 @@ export function CollectionsTab({
                                 <th className="text-left px-4 py-3 text-sm font-medium text-text-secondary dark:text-text-secondary-dark">
                                     {t('collections.columns.name')}
                                 </th>
-                                <th className="text-left px-4 py-3 text-sm font-medium text-text-secondary dark:text-text-secondary-dark hidden sm:table-cell">
+                                <th className="text-left px-4 py-3 text-sm font-medium text-text-secondary dark:text-text-secondary-dark hidden @sm/main:table-cell">
                                     {t('collections.columns.description')}
                                 </th>
                                 <th className="text-center px-4 py-3 text-sm font-medium text-text-secondary dark:text-text-secondary-dark w-24">
@@ -230,7 +230,7 @@ export function CollectionsTab({
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3 hidden sm:table-cell">
+                                        <td className="px-4 py-3 hidden @sm/main:table-cell">
                                             <span className="text-sm text-text-secondary dark:text-text-secondary-dark line-clamp-1">
                                                 {collection.description || '-'}
                                             </span>

@@ -18,45 +18,33 @@ interface StatCardProps {
     title: string;
     value: string | number;
     icon: React.ReactNode;
-    trend?: {
-        value: number;
-        isPositive: boolean;
-    };
-    color: string;
+    iconColor: string;
 }
 
-function StatCard({ title, value, icon, trend, color }: StatCardProps) {
+function StatCard({ title, value, icon, iconColor }: StatCardProps) {
     return (
         <div
             className={cn(
-                'rounded-lg border p-6',
-                'bg-card dark:bg-card-dark',
-                'border-card-border dark:border-card-border-dark',
+                'p-1 rounded-lg',
+                'bg-card/10 dark:bg-card-primary-dark/30',
+                'border border-card-border dark:border-border-secondary-dark',
             )}
         >
-            <div className="flex items-center justify-between mb-4">
-                <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', color)}>
-                    {icon}
-                </div>
-                {trend && (
-                    <span
-                        className={cn(
-                            'text-xs font-medium px-2 py-1 rounded',
-                            trend.isPositive
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-                        )}
-                    >
-                        {trend.isPositive ? '+' : ''}
-                        {trend.value}%
-                    </span>
+            <div
+                className={cn(
+                    'relative rounded-sm px-5 py-2 overflow-hidden',
+                    'bg-card dark:bg-surface-secondary-dark/30',
+                    'border border-card-border dark:border-border-dark',
                 )}
-            </div>
-            <div>
-                <p className="text-2xl font-bold text-text dark:text-text-dark">{value}</p>
-                <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
-                    {title}
+            >
+                <p className="text-sm text-text-muted dark:text-text-muted-dark">{title}</p>
+                <p className="text-2xl font-bold text-text dark:text-text-dark mt-2 truncate">
+                    {value}
                 </p>
+
+                <div className="absolute top-3 right-3">
+                    <span className={iconColor}>{icon}</span>
+                </div>
             </div>
         </div>
     );
@@ -74,12 +62,8 @@ function getGenerationStatusStat(
     return {
         title: t('generationStatus'),
         value: tStatus(config.labelKey),
-        icon: (
-            <Icon
-                className={cn('w-5 h-5', config.stat.iconColor, config.animate && 'animate-spin')}
-            />
-        ),
-        color: config.stat.bgColor,
+        icon: <Icon className={cn('w-5 h-5', config.animate && 'animate-spin')} />,
+        iconColor: config.stat.iconColor,
     };
 }
 
@@ -96,20 +80,20 @@ export function DirectoryStats({
         {
             title: t('totalItems'),
             value: itemsCount,
-            icon: <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />,
-            color: 'bg-blue-100 dark:bg-blue-900',
+            icon: <Package className="w-5 h-5" />,
+            iconColor: 'text-blue-500',
         },
         {
             title: t('categories'),
             value: categoriesCount,
-            icon: <Tag className="w-5 h-5 text-purple-600 dark:text-purple-400" />,
-            color: 'bg-purple-100 dark:bg-purple-900',
+            icon: <Tag className="w-5 h-5" />,
+            iconColor: 'text-violet-500',
         },
         {
             title: t('comparisons'),
             value: comparisonsCount,
-            icon: <Scale className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />,
-            color: 'bg-emerald-100 dark:bg-emerald-900',
+            icon: <Scale className="w-5 h-5" />,
+            iconColor: 'text-emerald-500',
         },
         getGenerationStatusStat(directory, t, tStatus),
         {
@@ -118,20 +102,20 @@ export function DirectoryStats({
                 (new Date().getTime() - new Date(directory.createdAt).getTime()) /
                     (1000 * 60 * 60 * 24),
             ),
-            icon: <Clock className="w-5 h-5 text-orange-600 dark:text-orange-400" />,
-            color: 'bg-orange-100 dark:bg-orange-900',
+            icon: <Clock className="w-5 h-5" />,
+            iconColor: 'text-orange-500',
         },
     ];
 
     return (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid @sm/main:grid-cols-2 @3xl/main:grid-cols-3 @5xl/main:grid-cols-5 gap-4">
             {stats.map((stat) => (
                 <StatCard
                     key={stat.title}
                     title={stat.title}
                     value={stat.value}
                     icon={stat.icon}
-                    color={stat.color}
+                    iconColor={stat.iconColor}
                 />
             ))}
         </div>

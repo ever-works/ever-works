@@ -17,6 +17,7 @@ export default async function DirectoryComparisonsPage({ params }: Params) {
 
     let comparisons: ComparisonData[] = [];
     let items: Array<{ slug: string; name: string; category: string | string[] }> = [];
+    let websiteUrl: string | null = null;
 
     const defaultAiConfig = {
         currentConfig: {
@@ -32,7 +33,8 @@ export default async function DirectoryComparisonsPage({ params }: Params) {
     let aiConfig = defaultAiConfig;
 
     try {
-        const [comparisonsRes, itemsRes, aiConfigRes] = await Promise.all([
+        const [directoryRes, comparisonsRes, itemsRes, aiConfigRes] = await Promise.all([
+            directoryAPI.get(id).catch(() => null),
             directoryAPI.getComparisons(id).catch(() => []),
             directoryAPI.getItems(id).catch(() => null),
             getComparisonAiConfig(id),
@@ -40,6 +42,7 @@ export default async function DirectoryComparisonsPage({ params }: Params) {
 
         comparisons = comparisonsRes ?? [];
         aiConfig = aiConfigRes;
+        websiteUrl = directoryRes?.directory?.website ?? null;
 
         if (itemsRes?.items) {
             items = itemsRes.items.map((item) => ({
@@ -55,6 +58,7 @@ export default async function DirectoryComparisonsPage({ params }: Params) {
     return (
         <ComparisonsPageClient
             directoryId={id}
+            websiteUrl={websiteUrl}
             initialComparisons={comparisons}
             items={items}
             availableProviders={aiConfig.availableProviders}

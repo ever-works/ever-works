@@ -5,11 +5,7 @@ import { NotificationService } from '@ever-works/agent/notifications';
 import { DataGeneratorService } from '@ever-works/agent/generators';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
 import { WebsiteGeneratorService, BranchSyncService } from '@ever-works/agent/generators';
-import {
-    SourceRepoAnalyzerService,
-    AwesomeReadmeParserService,
-    ImportExecutorService,
-} from '@ever-works/agent/import';
+import { SourceRepoAnalyzerService, ImportExecutorService } from '@ever-works/agent/import';
 import { TriggerPluginsModule } from './trigger-plugins.module';
 import { TriggerFacadesModule } from './trigger-facades.module';
 import { TriggerPipelineModule } from './trigger-pipeline.module';
@@ -52,7 +48,6 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
         WebsiteGeneratorService,
         BranchSyncService,
         SourceRepoAnalyzerService,
-        AwesomeReadmeParserService,
         ImportExecutorService,
         TriggerGenerationOrchestrator,
         TriggerImportOrchestrator,

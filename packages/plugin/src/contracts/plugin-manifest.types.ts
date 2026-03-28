@@ -110,6 +110,43 @@ export interface PluginRepository {
 	readonly url: string;
 }
 
+/** UI behavior hints declared by a plugin. Drives plugin-specific UI without hardcoding IDs. */
+export interface PluginUiHints {
+	/** Plugin has a multi-step setup wizard shown inside its settings page. */
+	onboardingWizard?: boolean;
+	/** Hide all settings fields behind a reveal button until the user opts in. */
+	byok?: {
+		/** Reveal button label. Defaults to "Bring your own key". */
+		buttonLabel?: string;
+		/** Field name whose presence auto-opens the form (user already has a key saved). */
+		triggerField?: string;
+	};
+	/** Show an external setup link (e.g. "Get API Token") inside the settings form. */
+	setupLink?: {
+		url: string;
+		label: string;
+		/** Button label. Defaults to the value of `label`. */
+		buttonLabel?: string;
+		/** Only show the button when ALL listed fields are empty. */
+		showWhenEmpty?: string[];
+	};
+	/** Show an org/team management panel inside the plugin settings page. */
+	organizationSettings?: boolean;
+	/** Include this plugin as a step in the first-time onboarding wizard. */
+	includeInOnboarding?: boolean;
+	/** Step position in the onboarding wizard (lower = earlier). */
+	onboardingPriority?: number;
+	/** Run connection validation automatically after the user saves settings. */
+	validateOnSave?: boolean;
+	/**
+	 * Fields that must all be non-empty for the plugin to be considered "connected".
+	 * Falls back to OAuth connection status when absent and the plugin has 'oauth' capability.
+	 */
+	completionFields?: string[];
+	/** User-friendly step description shown in the onboarding wizard (separate from the plugin description). */
+	onboardingDescription?: string;
+}
+
 /**
  * Plugin manifest containing metadata
  */
@@ -186,4 +223,6 @@ export interface PluginManifest {
 	 * e.g. ['standard-pipeline'] or ['*'] for all engine-orchestratable pipelines.
 	 */
 	readonly targetPipelines?: readonly string[];
+	/** UI behavior hints for the frontend. Drives plugin-specific UI without hardcoding IDs. */
+	readonly uiHints?: PluginUiHints;
 }

@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { z } from 'zod';
 import { AiFacadeService } from '../facades/ai.facade';
 import { SearchFacadeService } from '../facades/search.facade';
@@ -6,11 +6,14 @@ import { ContentExtractorFacadeService } from '../facades/content-extractor.faca
 import { GitFacadeService, type GitFacadeOptions } from '../facades/git.facade';
 import { PromptFacadeService } from '../facades/prompt.facade';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
+import { DirectoryGenerationHistoryRepository } from '../database/repositories/directory-generation-history.repository';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import type { Directory } from '../entities/directory.entity';
 import type { ComparisonData } from '@ever-works/contracts';
 import type { FacadeOptions } from '@ever-works/plugin';
 import { DataRepository, type IDataConfig } from '../generators/data-generator/data-repository';
+import { CACHE_MANAGER, type Cache } from '../cache';
+import { GenerateStatusType } from '../entities/types';
 import {
     DEFAULT_COMPARISON_SETTINGS,
     selectNextPair,
@@ -23,7 +26,15 @@ import {
     type ResearchDependencies,
     type ComparisonAiDependencies,
     type ComparisonPromptOptions,
+    type ComparisonProgressStage,
+    type ComparisonProgressInfo,
+    type ComparisonProgressCallback,
 } from './comparison';
+import {
+    DirectoryHistoryActivityType,
+    type DirectoryHistoryChangeEntry,
+} from '@ever-works/contracts/api';
+import { buildDirectoryChangelog } from '../utils/directory-changelog.utils';
 
 const comparisonStructureSchema = z.object({
     title: z.string(),
@@ -59,8 +70,70 @@ export class ComparisonGenerationService {
         private readonly gitFacade: GitFacadeService,
         private readonly promptFacade: PromptFacadeService,
         private readonly directoryRepository: DirectoryRepository,
+        private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
         private readonly directoryPluginRepository: DirectoryPluginRepository,
+        @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
     ) {}
+
+    private static readonly PROGRESS_CACHE_TTL = 120_000; // 2 minutes
+
+    private progressCacheKey(directoryId: string): string {
+        return `comparison-progress-${directoryId}`;
+    }
+
+    private async setProgress(
+        directoryId: string,
+        stage: ComparisonProgressStage,
+        itemAName: string,
+        itemBName: string,
+        startedAt: string,
+    ): Promise<void> {
+        if (!this.cacheManager) return;
+        const info: ComparisonProgressInfo = { stage, itemAName, itemBName, startedAt };
+        await this.cacheManager.set(
+            this.progressCacheKey(directoryId),
+            info,
+            ComparisonGenerationService.PROGRESS_CACHE_TTL,
+        );
+    }
+
+    private async clearProgress(directoryId: string): Promise<void> {
+        if (!this.cacheManager) return;
+        await this.cacheManager.del(this.progressCacheKey(directoryId));
+    }
+
+    async getGenerationStatus(
+        directoryId: string,
+    ): Promise<{ generating: boolean } & Partial<ComparisonProgressInfo>> {
+        if (!this.cacheManager) return { generating: false };
+        const info = await this.cacheManager.get<ComparisonProgressInfo>(
+            this.progressCacheKey(directoryId),
+        );
+        if (!info) return { generating: false };
+        return { generating: true, ...info };
+    }
+
+    private async recordComparisonHistory(params: {
+        directoryId: string;
+        userId: string;
+        activityType: DirectoryHistoryActivityType;
+        entries: DirectoryHistoryChangeEntry[];
+        summary: string;
+    }): Promise<void> {
+        const now = new Date();
+
+        await this.generationHistoryRepository.createEntry({
+            directoryId: params.directoryId,
+            userId: params.userId,
+            status: GenerateStatusType.GENERATED,
+            startedAt: now,
+            finishedAt: now,
+            durationInSeconds: 0,
+            triggeredBy: 'user',
+            activityType: params.activityType,
+            changelog: buildDirectoryChangelog(params.entries, params.summary),
+        });
+    }
 
     private async findDirectoryOrFail(directoryId: string): Promise<Directory> {
         const directory = await this.directoryRepository.findById(directoryId);
@@ -343,6 +416,21 @@ export class ComparisonGenerationService {
         );
         await this.gitFacade.push({ dir: dest }, gitOptions);
 
+        await this.recordComparisonHistory({
+            directoryId,
+            userId,
+            activityType: DirectoryHistoryActivityType.COMPARISON_REMOVED,
+            entries: [
+                {
+                    entityType: 'comparison',
+                    action: 'removed',
+                    name: slug,
+                    slug,
+                },
+            ],
+            summary: `Comparison removed: ${slug}`,
+        });
+
         return { status: 'success', slug, message: 'Comparison deleted' };
     }
 
@@ -358,115 +446,148 @@ export class ComparisonGenerationService {
         },
         gitOptions: GitFacadeOptions,
     ): Promise<ComparisonResult> {
-        const pluginSettings = await this.getComparisonPluginSettings(directory.id);
-        const facadeOptions: FacadeOptions = {
-            userId: gitOptions.userId!,
-            directoryId: directory.id,
-            providerOverride: pluginSettings.ai_provider,
+        const startedAt = new Date().toISOString();
+        const onProgress: ComparisonProgressCallback = (stage) => {
+            this.setProgress(
+                directory.id,
+                stage,
+                pair.itemA.name,
+                pair.itemB.name,
+                startedAt,
+            ).catch(() => {});
         };
 
-        // 1. Research the pair
-        const researchDeps: ResearchDependencies = {
-            search: async (query: string, limit: number) => {
-                const results = await this.searchFacade.search(
-                    query,
-                    { maxResults: limit },
-                    facadeOptions,
-                );
-                return results.map((r) => ({ url: r.url, snippet: r.title || '' }));
-            },
-            extractContent: async (url: string) => {
-                const result = await this.contentExtractorFacade.extractContent(
-                    url,
-                    undefined,
-                    facadeOptions,
-                );
-                return result?.rawContent ?? null;
-            },
-        };
+        try {
+            const pluginSettings = await this.getComparisonPluginSettings(directory.id);
+            const facadeOptions: FacadeOptions = {
+                userId: gitOptions.userId!,
+                directoryId: directory.id,
+                providerOverride: pluginSettings.ai_provider,
+            };
 
-        this.logger.log(`Researching comparison: ${pair.itemA.name} vs ${pair.itemB.name}`);
-        const research = await researchPair(pair, researchDeps);
+            // 1. Research the pair
+            onProgress('researching');
+            const researchDeps: ResearchDependencies = {
+                search: async (query: string, limit: number) => {
+                    const results = await this.searchFacade.search(
+                        query,
+                        { maxResults: limit },
+                        facadeOptions,
+                    );
+                    return results.map((r) => ({ url: r.url, snippet: r.title || '' }));
+                },
+                extractContent: async (url: string) => {
+                    const result = await this.contentExtractorFacade.extractContent(
+                        url,
+                        undefined,
+                        facadeOptions,
+                    );
+                    return result?.rawContent ?? null;
+                },
+            };
 
-        // 2. Generate comparison via AI
-        const aiDeps: ComparisonAiDependencies = {
-            askJson: async <T>(prompt: string, _schema: Record<string, unknown>) => {
-                const response = await this.aiFacade.askJson(
-                    prompt,
-                    comparisonStructureSchema,
-                    pluginSettings.ai_model
-                        ? { routing: { modelOverride: pluginSettings.ai_model } }
-                        : undefined,
-                    facadeOptions,
-                );
-                return response.result as T;
-            },
-            askText: async (prompt: string) => {
-                const response = await this.aiFacade.createChatCompletion(
-                    {
-                        messages: [{ role: 'user', content: prompt }],
-                        model: pluginSettings.ai_model,
-                    },
-                    facadeOptions,
-                );
-                const content = response.choices[0]?.message?.content;
-                return typeof content === 'string' ? content : '';
-            },
-        };
+            this.logger.log(`Researching comparison: ${pair.itemA.name} vs ${pair.itemB.name}`);
+            const research = await researchPair(pair, researchDeps);
 
-        this.logger.log(`Generating comparison: ${pair.itemA.name} vs ${pair.itemB.name}`);
-        const promptOptions: ComparisonPromptOptions = {
-            promptFacade: this.promptFacade,
-            facadeOptions,
-        };
-        const result = await generateComparison(
-            pair,
-            research,
-            aiDeps,
-            {
-                name: directory.name,
-                description: directory.description,
-                customPrompt: pluginSettings.custom_prompt,
-                extendedAnalysis: pluginSettings.extended_analysis,
-            },
-            promptOptions,
-        );
+            // 2. Generate comparison via AI
+            const aiDeps: ComparisonAiDependencies = {
+                askJson: async <T>(prompt: string, _schema: Record<string, unknown>) => {
+                    const response = await this.aiFacade.askJson(
+                        prompt,
+                        comparisonStructureSchema,
+                        pluginSettings.ai_model
+                            ? { routing: { modelOverride: pluginSettings.ai_model } }
+                            : undefined,
+                        facadeOptions,
+                    );
+                    return response.result as T;
+                },
+                askText: async (prompt: string) => {
+                    const response = await this.aiFacade.createChatCompletion(
+                        {
+                            messages: [{ role: 'user', content: prompt }],
+                            model: pluginSettings.ai_model,
+                        },
+                        facadeOptions,
+                    );
+                    const content = response.choices[0]?.message?.content;
+                    return typeof content === 'string' ? content : '';
+                },
+            };
 
-        // 3. Write to data repo
-        await dataRepo.writeComparison(result.comparison);
-        await dataRepo.writeComparisonMarkdown(result.comparison.slug, result.markdown);
-        if (result.extendedAnalysisMarkdown) {
-            await dataRepo.writeComparisonExtendedMarkdown(
-                result.comparison.slug,
-                result.extendedAnalysisMarkdown,
+            this.logger.log(`Generating comparison: ${pair.itemA.name} vs ${pair.itemB.name}`);
+            const promptOptions: ComparisonPromptOptions = {
+                promptFacade: this.promptFacade,
+                facadeOptions,
+            };
+            const result = await generateComparison(
+                pair,
+                research,
+                aiDeps,
+                {
+                    name: directory.name,
+                    description: directory.description,
+                    customPrompt: pluginSettings.custom_prompt,
+                    extendedAnalysis: pluginSettings.extended_analysis,
+                },
+                promptOptions,
+                onProgress,
             );
+
+            // 3. Write to data repo
+            onProgress('saving');
+            await dataRepo.writeComparison(result.comparison);
+            await dataRepo.writeComparisonMarkdown(result.comparison.slug, result.markdown);
+            if (result.extendedAnalysisMarkdown) {
+                await dataRepo.writeComparisonExtendedMarkdown(
+                    result.comparison.slug,
+                    result.extendedAnalysisMarkdown,
+                );
+            }
+
+            // 4. Update comparison state
+            comparisonState.generated_pairs.push(result.comparison.slug);
+            comparisonState.last_generated_at = new Date().toISOString();
+            comparisonState.total_generated += 1;
+
+            await dataRepo.mergeConfig({
+                settings: { comparisons_enabled: true },
+                metadata: { ...config.metadata, comparison_state: comparisonState },
+            });
+
+            // 5. Commit and push
+            await this.gitFacade.add(directory.gitProvider, dataRepo.dir, '.');
+            await this.gitFacade.commit(
+                directory.gitProvider,
+                dataRepo.dir,
+                `chore: add comparison - ${pair.itemA.name} vs ${pair.itemB.name}`,
+            );
+            await this.gitFacade.push({ dir: dataRepo.dir }, gitOptions);
+
+            this.logger.log(`Comparison generated: ${result.comparison.slug}`);
+
+            await this.recordComparisonHistory({
+                directoryId: directory.id,
+                userId: gitOptions.userId!,
+                activityType: DirectoryHistoryActivityType.COMPARISON_ADDED,
+                entries: [
+                    {
+                        entityType: 'comparison',
+                        action: 'added',
+                        name: result.comparison.title,
+                        slug: result.comparison.slug,
+                    },
+                ],
+                summary: `Comparison generated: ${pair.itemA.name} vs ${pair.itemB.name}`,
+            });
+
+            return {
+                status: 'success',
+                slug: result.comparison.slug,
+                message: `Generated comparison: ${pair.itemA.name} vs ${pair.itemB.name}`,
+            };
+        } finally {
+            await this.clearProgress(directory.id);
         }
-
-        // 4. Update comparison state
-        comparisonState.generated_pairs.push(result.comparison.slug);
-        comparisonState.last_generated_at = new Date().toISOString();
-        comparisonState.total_generated += 1;
-
-        await dataRepo.mergeConfig({
-            settings: { comparisons_enabled: true },
-            metadata: { ...config.metadata, comparison_state: comparisonState },
-        });
-
-        // 5. Commit and push
-        await this.gitFacade.add(directory.gitProvider, dataRepo.dir, '.');
-        await this.gitFacade.commit(
-            directory.gitProvider,
-            dataRepo.dir,
-            `chore: add comparison - ${pair.itemA.name} vs ${pair.itemB.name}`,
-        );
-        await this.gitFacade.push({ dir: dataRepo.dir }, gitOptions);
-
-        this.logger.log(`Comparison generated: ${result.comparison.slug}`);
-
-        return {
-            status: 'success',
-            slug: result.comparison.slug,
-            message: `Generated comparison: ${pair.itemA.name} vs ${pair.itemB.name}`,
-        };
     }
 }

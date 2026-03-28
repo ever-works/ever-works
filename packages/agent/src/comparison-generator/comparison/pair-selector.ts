@@ -1,12 +1,31 @@
+import { createHash } from 'crypto';
 import type { ItemData } from '@ever-works/contracts';
 import type { ComparisonPair } from './types';
+
+const MAX_COMPARISON_SLUG_LENGTH = 120;
+const TRUNCATED_SLUG_PART_LENGTH = 48;
+
+function truncateSlugPart(slug: string, maxLength: number): string {
+    if (slug.length <= maxLength) return slug;
+    return slug.slice(0, maxLength).replace(/-+$/g, '');
+}
 
 /**
  * Build a canonical pair key that is order-independent.
  * "netlify--vercel" and "vercel--netlify" both produce "netlify--vercel".
  */
 export function buildPairKey(slugA: string, slugB: string): string {
-    return [slugA, slugB].sort().join('--');
+    const canonicalKey = [slugA, slugB].sort().join('--');
+    if (canonicalKey.length <= MAX_COMPARISON_SLUG_LENGTH) {
+        return canonicalKey;
+    }
+
+    const [first, second] = [slugA, slugB].sort();
+    const truncatedFirst = truncateSlugPart(first, TRUNCATED_SLUG_PART_LENGTH);
+    const truncatedSecond = truncateSlugPart(second, TRUNCATED_SLUG_PART_LENGTH);
+    const hash = createHash('sha1').update(canonicalKey).digest('hex').slice(0, 10);
+
+    return `${truncatedFirst}--${truncatedSecond}-${hash}`;
 }
 
 /**

@@ -7,6 +7,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DirectoryGenerationCompletedEvent } from '@src/events';
 import { GenerationStats } from '../generators/data-generator/data-generator.service';
 import { DirectoryImportResult } from '../tasks/directory-import.types';
+import type { DirectoryChangelog, GenerationStepLog } from '@ever-works/contracts/api';
 
 export type GenerationHistoryUpdateInput = {
     status?: GenerateStatusType;
@@ -19,19 +20,22 @@ export type GenerationHistoryUpdateInput = {
     errorMessage?: string | null;
     metrics?: GenerationMetrics | null;
     parameters?: Record<string, any> | null;
+    changelog?: DirectoryChangelog | null;
+    logs?: GenerationStepLog[] | null;
 };
 
 export function buildStatsUpdate(
     stats: GenerationStats | null | undefined,
 ): Pick<
     GenerationHistoryUpdateInput,
-    'newItemsCount' | 'updatedItemsCount' | 'totalItemsCount' | 'metrics'
+    'newItemsCount' | 'updatedItemsCount' | 'totalItemsCount' | 'metrics' | 'changelog'
 > {
     return {
         newItemsCount: stats?.newItemsCount ?? 0,
         updatedItemsCount: stats?.updatedItemsCount ?? 0,
         totalItemsCount: stats?.totalItemsCount ?? 0,
         metrics: stats?.metrics,
+        changelog: stats?.changelog ?? null,
     };
 }
 
@@ -107,6 +111,10 @@ export class DirectoryOperationsService {
             DirectoryGenerationCompletedEvent.EVENT_NAME,
             new DirectoryGenerationCompletedEvent(directory),
         );
+    }
+
+    async appendGenerationLogs(historyId: string, logs: GenerationStepLog[]): Promise<void> {
+        await this.generationHistoryRepository.appendLogs(historyId, logs);
     }
 
     async updateGenerationHistory(

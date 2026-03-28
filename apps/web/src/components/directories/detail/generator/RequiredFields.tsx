@@ -22,7 +22,7 @@ export function RequiredFields({ formData, onChange }: RequiredFieldsProps) {
         <div
             className={cn(
                 'rounded-lg border p-6',
-                'bg-card dark:bg-card-dark',
+                'bg-card dark:bg-card-primary-dark/30',
                 'border-card-border dark:border-card-border-dark',
             )}
         >

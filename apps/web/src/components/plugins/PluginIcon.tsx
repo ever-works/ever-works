@@ -32,9 +32,10 @@ interface PluginIconProps {
     name: string;
     size?: number;
     className?: string;
+    plain?: boolean;
 }
 
-export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps) {
+export function PluginIcon({ icon, name, size = 32, className, plain = false }: PluginIconProps) {
     const isDark = useIsDark();
     const containerStyle = { width: size, height: size };
 
@@ -46,6 +47,13 @@ export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps
     );
 
     if (!icon) {
+        if (plain)
+            return (
+                <Plug
+                    style={{ width: size, height: size }}
+                    className="text-text-muted dark:text-text-muted-dark"
+                />
+            );
         return (
             <div className={containerClass} style={containerStyle}>
                 <Plug className="w-1/2 h-1/2 text-text-muted dark:text-text-muted-dark" />
@@ -56,6 +64,14 @@ export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps
     // Handle different icon types based on type/value pattern
     switch (icon.type) {
         case 'svg':
+            if (plain)
+                return (
+                    <div
+                        style={{ ...containerStyle, color: icon.color || undefined }}
+                        className={cn('[&>svg]:w-full [&>svg]:h-full', className)}
+                        dangerouslySetInnerHTML={{ __html: iconValue! }}
+                    />
+                );
             return (
                 <div
                     className={cn(containerClass, 'p-1.5 [&>svg]:w-full [&>svg]:h-full')}
@@ -69,6 +85,15 @@ export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps
             );
 
         case 'url':
+            if (plain)
+                return (
+                    <img
+                        src={iconValue!}
+                        alt={name}
+                        style={containerStyle}
+                        className={cn('object-contain', className)}
+                    />
+                );
             return (
                 <div
                     className={cn(containerClass, 'overflow-hidden')}
@@ -82,6 +107,15 @@ export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps
             const dataUrl = iconValue!.startsWith('data:')
                 ? iconValue!
                 : `data:image/png;base64,${iconValue!}`;
+            if (plain)
+                return (
+                    <img
+                        src={dataUrl}
+                        alt={name}
+                        style={containerStyle}
+                        className={cn('object-contain', className)}
+                    />
+                );
             return (
                 <div
                     className={cn(containerClass, 'overflow-hidden')}
@@ -98,6 +132,7 @@ export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps
                 iconName
             ];
             if (LucideIcon) {
+                if (plain) return <LucideIcon style={containerStyle} className={cn(className)} />;
                 return (
                     <div
                         className={containerClass}
@@ -112,6 +147,13 @@ export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps
                 );
             }
             // Fallback if icon not found
+            if (plain)
+                return (
+                    <Plug
+                        style={containerStyle}
+                        className={cn('text-text-muted dark:text-text-muted-dark', className)}
+                    />
+                );
             return (
                 <div className={containerClass} style={containerStyle}>
                     <Plug className="w-1/2 h-1/2 text-text-muted dark:text-text-muted-dark" />
@@ -121,10 +163,14 @@ export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps
         case 'emoji':
             return (
                 <div
-                    className={containerClass}
-                    style={{ ...containerStyle, backgroundColor: icon.backgroundColor }}
+                    className={plain ? className : containerClass}
+                    style={
+                        plain
+                            ? undefined
+                            : { ...containerStyle, backgroundColor: icon.backgroundColor }
+                    }
                 >
-                    <span style={{ fontSize: size * 0.5 }}>{iconValue}</span>
+                    <span style={{ fontSize: plain ? size : size * 0.5 }}>{iconValue}</span>
                 </div>
             );
 

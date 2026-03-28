@@ -1,7 +1,12 @@
-import type { ComparisonDimension } from '@ever-works/contracts';
+import type { ComparisonDimension, ComparisonSource } from '@ever-works/contracts';
 import { substituteVariables } from '@ever-works/plugin';
 import type { IPromptFacade, FacadeOptions, TemplateVariables } from '@ever-works/plugin';
-import type { ComparisonPair, ComparisonResearch, ComparisonGenerationResult } from './types';
+import type {
+    ComparisonPair,
+    ComparisonResearch,
+    ComparisonGenerationResult,
+    ComparisonProgressCallback,
+} from './types';
 import { buildPairKey } from './pair-selector';
 import { PROMPT_KEYS } from './prompt-keys';
 
@@ -16,6 +21,84 @@ interface AiComparisonStructure {
     readonly verdict: string;
     readonly verdict_winner: 'item_a' | 'item_b' | 'tie';
     readonly dimensions: ComparisonDimension[];
+}
+
+function isLikelyAssetUrl(url: string): boolean {
+    const lowerUrl = url.toLowerCase();
+    return (
+        /\.(png|jpe?g|gif|webp|svg|ico)(\?|$)/i.test(lowerUrl) ||
+        lowerUrl.includes('/profile_images/') ||
+        lowerUrl.includes('/repo-images/') ||
+        lowerUrl.includes('storage.googleapis.com') ||
+        lowerUrl.includes('twimg.com')
+    );
+}
+
+function isUrlLikeText(text: string): boolean {
+    return /^https?:\/\//i.test(text.trim());
+}
+
+function extractMarkdownLinks(markdown?: string): ComparisonSource[] {
+    if (!markdown) return [];
+
+    const matches = markdown.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g);
+    return Array.from(matches, (match) => ({
+        title: match[1].trim(),
+        url: match[2].trim(),
+    })).filter((source) => {
+        return (
+            source.title.length > 0 && !isUrlLikeText(source.title) && !isLikelyAssetUrl(source.url)
+        );
+    });
+}
+
+function getPreferredItemSource(item: ComparisonPair['itemA']): ComparisonSource[] {
+    const preferredUrl =
+        item.source_validation?.suggested_source_url?.trim() || item.source_url?.trim();
+    const sources: ComparisonSource[] = [];
+
+    if (preferredUrl) {
+        sources.push({
+            title: `${item.name} official source`,
+            url: preferredUrl,
+        });
+    }
+
+    const originalUrl = item.source_url?.trim();
+    if (originalUrl && originalUrl !== preferredUrl) {
+        sources.push({
+            title: `${item.name} original source`,
+            url: originalUrl,
+        });
+    }
+
+    sources.push(...extractMarkdownLinks(item.markdown));
+    return sources;
+}
+
+function normalizeComparisonSources(
+    pair: ComparisonPair,
+    research: ComparisonResearch,
+): ComparisonSource[] {
+    const candidates: ComparisonSource[] = [
+        ...research.sources,
+        ...getPreferredItemSource(pair.itemA),
+        ...getPreferredItemSource(pair.itemB),
+    ];
+
+    const deduped = new Map<string, ComparisonSource>();
+    for (const candidate of candidates) {
+        const url = candidate.url?.trim();
+        if (!url) continue;
+        if (!deduped.has(url)) {
+            deduped.set(url, {
+                ...candidate,
+                url,
+            });
+        }
+    }
+
+    return Array.from(deduped.values());
 }
 
 const COMPARISON_JSON_SCHEMA = {
@@ -193,6 +276,7 @@ export function buildMarkdownPromptVariables(
     pair: ComparisonPair,
     structure: AiComparisonStructure,
     research: ComparisonResearch,
+    normalizedSources: ComparisonSource[],
     customPrompt?: string,
 ): TemplateVariables<typeof DEFAULT_MARKDOWN_PROMPT> {
     const dimensionsText = structure.dimensions
@@ -202,7 +286,13 @@ export function buildMarkdownPromptVariables(
         )
         .join('\n\n');
 
-    const sourcesText = research.sources.map((s) => `- ${s}`).join('\n');
+    const sourcesText = normalizedSources
+        .map((source) =>
+            source.note
+                ? `- ${source.title} – ${source.url} (${source.note})`
+                : `- ${source.title} – ${source.url}`,
+        )
+        .join('\n');
 
     let customPromptSection = '';
     if (customPrompt?.trim()) {
@@ -225,11 +315,12 @@ function buildMarkdownPrompt(
     pair: ComparisonPair,
     structure: AiComparisonStructure,
     research: ComparisonResearch,
+    normalizedSources: ComparisonSource[],
     customPrompt?: string,
 ): string {
     return substituteVariables(
         DEFAULT_MARKDOWN_PROMPT,
-        buildMarkdownPromptVariables(pair, structure, research, customPrompt),
+        buildMarkdownPromptVariables(pair, structure, research, normalizedSources, customPrompt),
     );
 }
 
@@ -329,6 +420,7 @@ export async function generateComparison(
         extendedAnalysis?: boolean;
     },
     promptOptions?: ComparisonPromptOptions,
+    onProgress?: ComparisonProgressCallback,
 ): Promise<ComparisonGenerationResult> {
     const { promptFacade, facadeOptions } = promptOptions ?? {};
 
@@ -347,10 +439,12 @@ export async function generateComparison(
         buildStructurePromptVariables(pair, research, directoryContext),
     );
 
+    onProgress?.('analyzing');
     const structure = await ai.askJson<AiComparisonStructure>(
         structurePrompt,
         COMPARISON_JSON_SCHEMA,
     );
+    const normalizedSources = normalizeComparisonSources(pair, research);
 
     // Resolve markdown prompt
     const markdownTemplate = (
@@ -364,9 +458,16 @@ export async function generateComparison(
     ) as typeof DEFAULT_MARKDOWN_PROMPT;
     const markdownPrompt = substituteVariables(
         markdownTemplate,
-        buildMarkdownPromptVariables(pair, structure, research, directoryContext?.customPrompt),
+        buildMarkdownPromptVariables(
+            pair,
+            structure,
+            research,
+            normalizedSources,
+            directoryContext?.customPrompt,
+        ),
     );
 
+    onProgress?.('writing');
     const markdown = await ai.askText(markdownPrompt);
 
     let extendedAnalysisMarkdown: string | undefined;
@@ -390,6 +491,7 @@ export async function generateComparison(
                 directoryContext?.customPrompt,
             ),
         );
+        onProgress?.('writing_extended');
         extendedAnalysisMarkdown = await ai.askText(extendedPrompt);
     }
 
@@ -417,7 +519,7 @@ export async function generateComparison(
             verdict: structure.verdict,
             verdict_winner: structure.verdict_winner,
             dimensions: structure.dimensions,
-            sources: research.sources,
+            sources: normalizedSources,
             generated_at: new Date().toISOString(),
         },
         markdown,

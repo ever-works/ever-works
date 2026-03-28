@@ -20,7 +20,7 @@ export function Footer({ className }: FooterProps) {
             className={cn(
                 // 'border-t border-border dark:border-border-dark',
                 // 'bg-surface-secondary dark:bg-surface-secondary-dark',
-                'py-4 px-4 sm:px-6 lg:px-8',
+                'py-4 px-4 @sm/main:px-6 @3xl/main:px-8',
                 className,
             )}
             role="contentinfo"

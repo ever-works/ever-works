@@ -264,14 +264,6 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             settings,
         };
 
-        if (!plugin.createStreamingChatCompletion) {
-            throw new AiFacadeError(
-                `Provider ${plugin.id} does not support streaming`,
-                'createStreamingChatCompletion',
-                plugin.id,
-            );
-        }
-
         yield* plugin.createStreamingChatCompletion(mergedOptions);
     }
 

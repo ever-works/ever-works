@@ -500,7 +500,8 @@
                             "paused": "Призупинено",
                             "canceled": "Скасовано",
                             "disabled": "Вимкнено"
-                        }
+                        },
+                        "nextSourceValidation": "Наступна перевірка джерела"
                     },
                     "fields": {
                         "automation": "Автоматизація",
@@ -513,7 +514,9 @@
                         "maxFailures": "Ліміт помилок",
                         "maxFailuresHelp": "Автоматично призупиняти після досягнення цієї кількості помилок.",
                         "createPullRequest": "Створювати Pull Requests",
-                        "createPullRequestHelp": "Якщо увімкнено, заплановані оновлення створюють pull request замість прямого коміту."
+                        "createPullRequestHelp": "Якщо увімкнено, заплановані оновлення створюють pull request замість прямого коміту.",
+                        "sourceValidationCadence": "Частота перевірки джерела",
+                        "sourceValidationCadenceHelp": "За замовчуванням використовується та сама частота, що й для оновлень, але ви можете зробити її рідшою або частішою."
                     },
                     "billing": {
                         "subscription": "Підписка",
@@ -630,7 +633,39 @@
                 },
                 "loadMore": "Завантажити ще",
                 "noMore": "Більше немає записів",
-                "unknown": "Невідомо"
+                "unknown": "Невідомо",
+                "activity": {
+                    "generation": "Генерація",
+                    "item_added": "Елемент додано",
+                    "item_updated": "Елемент оновлено",
+                    "item_removed": "Елемент видалено",
+                    "comparison_added": "Порівняння додано",
+                    "comparison_removed": "Порівняння видалено",
+                    "category_change": "Зміна категорії",
+                    "tag_change": "Зміна тега",
+                    "collection_change": "Зміна колекції",
+                    "community_pr_merged": "PR спільноти"
+                },
+                "detail": {
+                    "added": "Додано",
+                    "updated": "Оновлено",
+                    "removed": "Видалено",
+                    "fields": "Поля",
+                    "expand": "Розгорнути деталі журналу змін",
+                    "collapse": "Згорнути деталі журналу змін"
+                },
+                "filters": {
+                    "label": "Активність",
+                    "all": "Уся активність",
+                    "generation": "Генерація",
+                    "items": "Елементи",
+                    "comparisons": "Порівняння",
+                    "taxonomy": "Таксономія",
+                    "community_pr": "PR спільноти"
+                },
+                "pagination": {
+                    "showing": "Показано {from}-{to} із {total}"
+                }
             },
             "info": {
                 "title": "Інформація про довідник",
@@ -795,7 +830,8 @@
                 "tabs": {
                     "browseItems": "Browse Items",
                     "categories": "Categories",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -879,6 +915,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Pereviryty dzherelo shche raz",
+                    "checkCompleted": "Perevirku dzherela zaversheno",
+                    "checkFailed": "Ne vdalosya pereviryty dzherelo",
+                    "failedToCheckSource": "Ne vdalosya pereviryty dzherelo elementa",
+                    "brokenLink": "Neroboche posylannya",
+                    "healthy": "Dostupne",
+                    "couldNotVerify": "Ne vdalosya pereviryty",
+                    "sourceMayHaveIssues": "Dzherelo mozhe maty problemy",
+                    "sourceChecked": "Dzherelo perevireno",
+                    "reachable": "Dosyazhne",
+                    "reachabilityInconclusive": "Avtomatychna perevirka dostupnosti bula neperekonlyvoyu",
+                    "accurateSource": "Tochne dzherelo",
+                    "sourceTooGeneric": "Dzherelo nadto zahalne",
+                    "weakSource": "Slabke dzherelo",
+                    "sourceAccuracyUnknown": "Tochnist dzherela nevidoma",
+                    "useSuggestedSource": "Застосувати пропозицію",
+                    "suggestedSourceApplied": "Запропоноване джерело застосовано",
+                    "failedToUseSuggestedSource": "Не вдалося використати запропоноване джерело",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {

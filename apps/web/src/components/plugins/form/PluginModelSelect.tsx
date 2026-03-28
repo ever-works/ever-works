@@ -120,7 +120,7 @@ export function PluginModelSelect({
                 onClick={() => setIsOpen(!isOpen)}
                 className={cn(
                     'w-full px-3 py-2 rounded-lg border border-border dark:border-border-dark',
-                    'bg-surface-secondary dark:bg-surface-secondary-dark',
+                    'bg-surface-secondary dark:bg-surface-secondary-dark/30',
                     'text-text dark:text-text-dark text-left text-sm',
                     'focus:outline-none focus:ring-2 focus:ring-primary/50',
                     'flex items-center justify-between gap-2',
@@ -151,7 +151,7 @@ export function PluginModelSelect({
                                 placeholder={t('searchPlaceholder')}
                                 className={cn(
                                     'w-full pl-8 pr-3 py-1.5 text-sm rounded-md',
-                                    'bg-surface-secondary dark:bg-surface-secondary-dark',
+                                    'bg-surface-secondary dark:bg-surface-secondary-dark/30',
                                     'text-text dark:text-text-dark',
                                     'border border-border dark:border-border-dark',
                                     'focus:outline-none focus:ring-1 focus:ring-primary/50',

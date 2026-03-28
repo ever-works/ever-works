@@ -57,7 +57,7 @@ export class TwentyCrmService {
             const config = this.configService.twentyCrmConfig;
             const url = schema ? `${this.metadataUrl}${endpoint}` : `${this.baseUrl}${endpoint}`;
 
-            this.logger.debug(`Making ${method} request to ${url}`, { data, params });
+            this.logger.debug(`Making ${method} request to ${url}`);
 
             const response = await firstValueFrom(
                 this.httpService.request({

@@ -15,6 +15,7 @@ import type {
 	GitCommit,
 	GitPullRequest,
 	CreateRepoOptions,
+	UpdateRepoOptions,
 	CreatePROptions,
 	MergeOptions,
 	MergeResult,
@@ -150,7 +151,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 	async updateRepository(
 		owner: string,
 		repo: string,
-		data: { isPrivate?: boolean; description?: string },
+		data: UpdateRepoOptions,
 		token: string
 	): Promise<GitRepository> {
 		const settings = await this.getSettings();
@@ -316,7 +317,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 		return this.gitOps!.addAll(dir);
 	}
 
-	async commit(dir: string, message: string, committer?: GitCommitter): Promise<string> {
+	async commit(dir: string, message: string, committer?: GitCommitter): Promise<string | null> {
 		this.ensureGitOps();
 		return this.gitOps!.commit(dir, message, committer);
 	}
@@ -554,7 +555,13 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 			builtIn: true,
 			systemPlugin: true,
 			autoEnable: true,
-			visibility: 'user-only', // User-only, not shown in directory plugins list
+			visibility: 'user-only',
+			uiHints: {
+				organizationSettings: true,
+				includeInOnboarding: true,
+				onboardingPriority: 2,
+				onboardingDescription: 'Link your GitHub account to store projects and enable automatic deployments.'
+			},
 			readme: [
 				'## What does the GitHub plugin do?',
 				'',

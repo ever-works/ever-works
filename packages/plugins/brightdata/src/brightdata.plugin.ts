@@ -13,7 +13,8 @@ import type {
 	SearchResult,
 	RateLimitInfo,
 	ContentExtractionOptions,
-	ContentExtractionResult
+	ContentExtractionResult,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 
 import { bdclient } from '@brightdata/sdk';
@@ -127,7 +128,27 @@ export class BrightDataPlugin implements IPlugin, ISearchPlugin, IContentExtract
 	}
 
 	async isAvailable(): Promise<boolean> {
-		return true;
+		if (!this.context) return false;
+		const settings = await this.context.getSettings();
+		return Boolean(settings?.apiKey);
+	}
+
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const apiKey = settings.apiKey as string | undefined;
+		if (!apiKey) {
+			return { success: false, message: 'Bright Data API key is not configured.' };
+		}
+
+		try {
+			const client = this.getClient(settings);
+			await client.search('test', { format: 'json' });
+			return { success: true, message: 'Bright Data connection verified.' };
+		} catch (error) {
+			return {
+				success: false,
+				message: `Bright Data connection failed: ${error instanceof Error ? error.message : String(error)}`
+			};
+		}
 	}
 
 	async getRateLimitInfo(): Promise<RateLimitInfo> {

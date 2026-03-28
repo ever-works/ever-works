@@ -39,7 +39,7 @@ export function ItemsEmptyState({ directoryId }: ItemsEmptyStateProps) {
             <Button
                 onClick={() => router.push(`${ROUTES.DASHBOARD_DIRECTORY(directoryId)}/generator`)}
                 variant="primary"
-                size="lg"
+                size="md"
             >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path

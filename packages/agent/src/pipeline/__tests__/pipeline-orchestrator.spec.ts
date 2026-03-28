@@ -12,6 +12,7 @@ import { MockPipelinePlugin, createLinearChain } from './mock-pipeline-plugin';
 import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
 import { PipelineFacadeService } from '../pipeline-facade.service';
 import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
+import { PluginContextFactoryService } from '../../plugins/services/plugin-context-factory.service';
 import type {
     DirectoryReference,
     GenerationRequest,
@@ -151,6 +152,12 @@ describe('PipelineOrchestratorService', () => {
                     provide: PluginSettingsService,
                     useValue: {
                         getSettings: jest.fn().mockResolvedValue({}),
+                    },
+                },
+                {
+                    provide: PluginContextFactoryService,
+                    useValue: {
+                        addLogInterceptor: jest.fn().mockReturnValue(() => {}),
                     },
                 },
             ],

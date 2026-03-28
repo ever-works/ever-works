@@ -11,6 +11,7 @@ function makeItem(slug: string, category: string, opts: Partial<ItemData> = {}):
         category,
         slug,
         tags: [],
+        markdown: '',
         ...opts,
     };
 }
@@ -62,7 +63,10 @@ const MOCK_MARKDOWN = '## Introduction\nVercel and Netlify are both excellent ho
 function makeResearch(): ComparisonResearch {
     return {
         content: 'Source: https://review.com\nVercel is fast...',
-        sources: ['https://review.com', 'https://blog.com'],
+        sources: [
+            { title: 'Review.com benchmark', url: 'https://review.com' },
+            { title: 'Blog.com analysis', url: 'https://blog.com', note: 'accessed March 2026' },
+        ],
     };
 }
 
@@ -158,7 +162,72 @@ describe('generateComparison', () => {
 
         const result = await generateComparison(pair, research, ai);
 
-        expect(result.comparison.sources).toEqual(research.sources);
+        expect(result.comparison.sources).toEqual([
+            ...research.sources,
+            { title: 'Vercel official source', url: 'https://vercel.example.com' },
+            { title: 'Netlify official source', url: 'https://netlify.example.com' },
+        ]);
+    });
+
+    it('should fall back to item source urls when research sources are empty', async () => {
+        const ai = makeAi();
+        const emptyResearch = {
+            ...research,
+            sources: [],
+        };
+
+        const result = await generateComparison(pair, emptyResearch, ai);
+
+        expect(result.comparison.sources).toEqual([
+            { title: 'Vercel official source', url: 'https://vercel.example.com' },
+            { title: 'Netlify official source', url: 'https://netlify.example.com' },
+        ]);
+    });
+
+    it('should prefer suggested source urls and include markdown links in fallback sources', async () => {
+        const ai = makeAi();
+        const richPair = {
+            ...pair,
+            itemA: makeItem('github-com', 'hosting', {
+                name: 'GitHub Copilot',
+                source_url: 'https://github.com/',
+                markdown:
+                    'See the [GitHub pricing page](https://github.com/pricing) for plan details. [https://storage.googleapis.com/logo.png](https://storage.googleapis.com/logo.png)',
+                source_validation: {
+                    reachability_status: 'reachable',
+                    accuracy_status: 'accurate',
+                    suggested_source_url: 'https://github.com/features/copilot',
+                },
+            }),
+            itemB: makeItem('gitlab-code-suggestions', 'hosting', {
+                name: 'GitLab Code Suggestions',
+                source_url:
+                    'https://docs.gitlab.com/ee/user/project/repository/code_suggestions.html',
+                markdown:
+                    'Reference: [GitLab Docs](https://docs.gitlab.com/ee/user/project/repository/code_suggestions.html) and [https://pbs.twimg.com/profile_images/x.png](https://pbs.twimg.com/profile_images/x.png)',
+            }),
+        };
+
+        const result = await generateComparison(richPair, { ...research, sources: [] }, ai);
+
+        expect(result.comparison.sources).toEqual([
+            {
+                title: 'GitHub Copilot official source',
+                url: 'https://github.com/features/copilot',
+            },
+            {
+                title: 'GitHub Copilot original source',
+                url: 'https://github.com/',
+            },
+            {
+                title: 'GitHub pricing page',
+                url: 'https://github.com/pricing',
+            },
+            {
+                title: 'GitLab Code Suggestions official source',
+                url: 'https://docs.gitlab.com/ee/user/project/repository/code_suggestions.html',
+            },
+        ]);
     });
 
     it('should set generated_at as ISO string', async () => {
@@ -241,5 +310,63 @@ describe('generateComparison', () => {
         const extendedPrompt = askText.mock.calls[1][0] as string;
         expect(extendedPrompt).toContain('Vercel');
         expect(extendedPrompt).toContain('Netlify');
+    });
+
+    it('should call onProgress at each generation stage', async () => {
+        const ai = makeAi();
+        const onProgress = jest.fn();
+
+        await generateComparison(pair, research, ai, { name: 'Test' }, undefined, onProgress);
+
+        expect(onProgress).toHaveBeenCalledWith('analyzing');
+        expect(onProgress).toHaveBeenCalledWith('writing');
+
+        // Verify order: analyzing before writing
+        const calls = onProgress.mock.calls.map((c: unknown[]) => c[0]);
+        expect(calls.indexOf('analyzing')).toBeLessThan(calls.indexOf('writing'));
+    });
+
+    it('should call onProgress with writing_extended when extended analysis is enabled', async () => {
+        const ai = makeAi();
+        const onProgress = jest.fn();
+
+        await generateComparison(
+            pair,
+            research,
+            ai,
+            { name: 'Test', extendedAnalysis: true },
+            undefined,
+            onProgress,
+        );
+
+        expect(onProgress).toHaveBeenCalledWith('analyzing');
+        expect(onProgress).toHaveBeenCalledWith('writing');
+        expect(onProgress).toHaveBeenCalledWith('writing_extended');
+    });
+
+    it('should not call onProgress with writing_extended when extended analysis is disabled', async () => {
+        const ai = makeAi();
+        const onProgress = jest.fn();
+
+        await generateComparison(
+            pair,
+            research,
+            ai,
+            { name: 'Test', extendedAnalysis: false },
+            undefined,
+            onProgress,
+        );
+
+        expect(onProgress).not.toHaveBeenCalledWith('writing_extended');
+    });
+
+    it('should work without onProgress callback', async () => {
+        const ai = makeAi();
+
+        // Should not throw when no onProgress is provided
+        const result = await generateComparison(pair, research, ai);
+
+        expect(result.comparison).toBeDefined();
+        expect(result.markdown).toBeDefined();
     });
 });

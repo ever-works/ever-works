@@ -15,6 +15,7 @@ import type {
     DirectoryPluginListResponse,
     SettingScopeApi,
     PluginVisibility,
+    PluginUiHints,
 } from '@ever-works/plugin/api';
 
 // Re-export types for convenience
@@ -185,6 +186,11 @@ export class PluginResponseDto implements PluginResponse {
 
     @ApiPropertyOptional({ description: 'Whether plugin is auto-enabled' })
     autoEnable?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'UI hints for frontend rendering (onboarding, BYOK, setup links, etc.)',
+    })
+    uiHints?: PluginUiHints;
 }
 
 /**
@@ -199,6 +205,9 @@ export class UserPluginResponseDto extends PluginResponseDto implements UserPlug
 
     @ApiPropertyOptional({ description: 'User-specific settings (masked)' })
     settings?: Record<string, unknown>;
+
+    @ApiPropertyOptional({ description: 'User-specific plugin metadata (read-only state)' })
+    metadata?: Record<string, unknown>;
 
     @ApiPropertyOptional({ description: 'User plugin entity ID' })
     userPluginId?: string;

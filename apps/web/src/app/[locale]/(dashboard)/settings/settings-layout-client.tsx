@@ -2,7 +2,7 @@
 
 import { usePathname } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
-import { User, Lock, Key, AlertTriangle } from 'lucide-react';
+import { User, Lock, Key, AlertTriangle, HardDrive } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useMemo } from 'react';
@@ -43,6 +43,12 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 icon: Key,
                 href: `${baseSettingsPath}/api-keys`,
             },
+            {
+                id: 'data',
+                label: t('tabs.data'),
+                icon: HardDrive,
+                href: `${baseSettingsPath}/data`,
+            },
         ],
         [t],
     );
@@ -77,13 +83,13 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 key={tab.id}
                 href={tab.href}
                 className={cn(
-                    'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors',
+                    'w-full flex items-center gap-3 px-4 py-2 rounded-lg text-left transition-colors',
                     isActive(tab.href)
                         ? 'bg-surface-secondary dark:bg-surface-secondary-dark text-text dark:text-text-dark font-medium'
                         : 'text-text-muted dark:text-text-muted-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-text dark:hover:text-text-dark',
                 )}
             >
-                <Icon className="w-5 h-5" />
+                <Icon className="w-4 h-4" />
                 <span>{tab.label}</span>
             </Link>
         );
@@ -99,7 +105,7 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 key={category.category}
                 href={categoryHref}
                 className={cn(
-                    'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors',
+                    'w-full flex items-center gap-3 px-4 py-2 rounded-lg text-left transition-colors',
                     isCategoryActive(category)
                         ? 'bg-surface-secondary dark:bg-surface-secondary-dark text-text dark:text-text-dark font-medium'
                         : 'text-text-muted dark:text-text-muted-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-text dark:hover:text-text-dark',
@@ -124,9 +130,9 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 <p className="text-text-muted dark:text-text-muted-dark mt-2">{t('subtitle')}</p>
             </div>
 
-            <div className="flex flex-col lg:flex-row gap-8">
+            <div className="flex flex-col @3xl/main:flex-row gap-8">
                 {/* Sidebar Navigation */}
-                <div className="lg:w-64 flex-shrink-0">
+                <div className="@3xl/main:w-64 flex-shrink-0">
                     <nav className="space-y-1">
                         {/* Static tabs at top */}
                         {staticTabs.map(renderStaticTab)}
@@ -135,7 +141,7 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                         {settingsMenu?.categories && settingsMenu.categories.length > 0 && (
                             <>
                                 <div className="pt-4 pb-2 px-4">
-                                    <span className="text-xs font-medium text-text-muted dark:text-text-muted-dark uppercase tracking-wider">
+                                    <span className="text-xs font-medium text-text-muted dark:text-text-muted-dark/70 uppercase tracking-wider">
                                         Plugins
                                     </span>
                                 </div>

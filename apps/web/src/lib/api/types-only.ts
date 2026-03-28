@@ -31,6 +31,7 @@ export type {
     DirectoryConfig,
     PRUpdate,
     GenerationMetrics,
+    GenerationStepLog,
     DirectoryGenerationHistoryEntry,
     DirectoryGenerationHistoryResponse,
     DirectoryScheduleDto,
@@ -39,6 +40,7 @@ export type {
     SyncDirectoryResponse,
     RepositoryStatus,
     RepositoryType,
+    SourceValidationSettingsDto,
     // GenerateStatus now has dynamic step support
 } from './directory';
 
@@ -50,6 +52,8 @@ export type {
     SubmitItemDto,
     RemoveItemDto,
     UpdateItemDto,
+    CheckItemHealthDto,
+    CheckItemHealthResponseDto,
     ExtractItemDetailsDto,
     ItemsGeneratorResponse,
     ExtractItemDetailsResponse,
@@ -78,14 +82,6 @@ export type {
 } from './settings';
 
 export type {
-    // From ai-conversation.ts
-    ChatMessage as ConversationMessage,
-    ChatMessageRole,
-    ChatStreamRequestDto,
-    StreamChunk,
-} from './ai-conversation';
-
-export type {
     // From types.ts
     MessageResponse,
     Category,
@@ -96,6 +92,8 @@ export type {
     Brand,
     ItemData,
     Collection,
+    ItemSourceReachabilityStatus,
+    ItemSourceAccuracyStatus,
 } from './types';
 
 export type {

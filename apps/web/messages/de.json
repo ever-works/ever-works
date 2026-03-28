@@ -537,7 +537,39 @@
                 },
                 "loadMore": "Mehr laden",
                 "noMore": "Keine weiteren Einträge",
-                "unknown": "Unbekannt"
+                "unknown": "Unbekannt",
+                "activity": {
+                    "generation": "Generierung",
+                    "item_added": "Eintrag hinzugefügt",
+                    "item_updated": "Eintrag aktualisiert",
+                    "item_removed": "Eintrag entfernt",
+                    "comparison_added": "Vergleich hinzugefügt",
+                    "comparison_removed": "Vergleich entfernt",
+                    "category_change": "Kategorieänderung",
+                    "tag_change": "Tag-Änderung",
+                    "collection_change": "Sammlungsänderung",
+                    "community_pr_merged": "Community-PR"
+                },
+                "detail": {
+                    "added": "Hinzugefügt",
+                    "updated": "Aktualisiert",
+                    "removed": "Entfernt",
+                    "fields": "Felder",
+                    "expand": "Changelog-Details erweitern",
+                    "collapse": "Changelog-Details ausblenden"
+                },
+                "filters": {
+                    "label": "Aktivität",
+                    "all": "Alle Aktivitäten",
+                    "generation": "Generierung",
+                    "items": "Einträge",
+                    "comparisons": "Vergleiche",
+                    "taxonomy": "Taxonomie",
+                    "community_pr": "Community-PR"
+                },
+                "pagination": {
+                    "showing": "Zeige {from}-{to} von {total}"
+                }
             },
             "info": {
                 "title": "Verzeichnisinformationen",
@@ -702,7 +734,8 @@
                 "tabs": {
                     "browseItems": "Elemente durchsuchen",
                     "categories": "Kategorien",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -786,6 +819,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Quelle erneut pruefen",
+                    "checkCompleted": "Quellenpruefung abgeschlossen",
+                    "checkFailed": "Quellenpruefung fehlgeschlagen",
+                    "failedToCheckSource": "Die Quelle des Eintrags konnte nicht geprueft werden",
+                    "brokenLink": "Defekter Link",
+                    "healthy": "In Ordnung",
+                    "couldNotVerify": "Konnte nicht verifiziert werden",
+                    "sourceMayHaveIssues": "Die Quelle koennte Probleme haben",
+                    "sourceChecked": "Quelle geprueft",
+                    "reachable": "Erreichbar",
+                    "reachabilityInconclusive": "Automatische Erreichbarkeitspruefung war nicht eindeutig",
+                    "accurateSource": "Praezise Quelle",
+                    "sourceTooGeneric": "Quelle zu allgemein",
+                    "weakSource": "Schwache Quelle",
+                    "sourceAccuracyUnknown": "Quellgenauigkeit unbekannt",
+                    "useSuggestedSource": "Vorschlag übernehmen",
+                    "suggestedSourceApplied": "Vorgeschlagene Quelle übernommen",
+                    "failedToUseSuggestedSource": "Vorgeschlagene Quelle konnte nicht verwendet werden",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {
@@ -1213,7 +1279,8 @@
                             "paused": "Pausiert",
                             "canceled": "Abgebrochen",
                             "disabled": "Deaktiviert"
-                        }
+                        },
+                        "nextSourceValidation": "Nächste Quellenprüfung"
                     },
                     "fields": {
                         "automation": "Automatisierung",
@@ -1226,7 +1293,9 @@
                         "maxFailures": "Fehlerlimit",
                         "maxFailuresHelp": "Automatisch pausieren, sobald diese Anzahl von Fehlern auftritt.",
                         "createPullRequest": "Pull Requests erstellen",
-                        "createPullRequestHelp": "Wenn aktiviert, erstellen geplante Aktualisierungen einen Pull Request anstatt direkt zu committen."
+                        "createPullRequestHelp": "Wenn aktiviert, erstellen geplante Aktualisierungen einen Pull Request anstatt direkt zu committen.",
+                        "sourceValidationCadence": "Intervall der Quellenprüfung",
+                        "sourceValidationCadenceHelp": "Standardmäßig wird derselbe Rhythmus wie für deine Aktualisierungen verwendet, du kannst ihn aber verlangsamen oder beschleunigen."
                     },
                     "billing": {
                         "subscription": "Abonnement",

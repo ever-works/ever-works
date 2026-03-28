@@ -98,7 +98,7 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                 className={cn(
                     'bg-surface dark:bg-surface-dark rounded-lg border border-border dark:border-border-dark p-4',
                     'transition-all',
-                    isEnabled && 'ring-2 ring-primary/20',
+                    isEnabled && 'ring-1 ring-primary/20',
                     !canEnable && !isEnabled && 'opacity-60',
                     isClickable && 'cursor-pointer hover:border-primary/40',
                 )}
@@ -155,14 +155,14 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                                 {isEnabled ? (
                                     <>
                                         <PowerOff className="w-4 h-4" />
-                                        <span className="sr-only md:not-sr-only md:ml-1">
+                                        <span className="sr-only @lg/main:not-sr-only @lg/main:ml-1">
                                             {t('disable')}
                                         </span>
                                     </>
                                 ) : (
                                     <>
                                         <Power className="w-4 h-4" />
-                                        <span className="sr-only md:not-sr-only md:ml-1">
+                                        <span className="sr-only @lg/main:not-sr-only @lg/main:ml-1">
                                             {t('enable')}
                                         </span>
                                     </>

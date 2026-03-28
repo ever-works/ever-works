@@ -44,18 +44,20 @@ export function SourceSettings() {
     return (
         <div
             className={cn(
-                'rounded-lg border p-6',
-                'bg-card dark:bg-card-dark',
+                'rounded-lg border overflow-hidden',
+                'bg-card dark:bg-card-primary-dark/30',
                 'border-card-border dark:border-card-border-dark',
             )}
         >
-            <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
-                {t('sourceSettings')}
-            </h3>
+            <div className="px-5 py-3.5 border-b border-card-border dark:border-card-border-dark">
+                <h3 className="text-sm font-semibold text-text dark:text-text-dark">
+                    {t('sourceSettings')}
+                </h3>
+            </div>
 
-            <div className="space-y-4">
+            <div className="px-5 py-4 space-y-4">
                 <div className="flex flex-col gap-1">
-                    <span className="text-sm font-medium text-text dark:text-text-dark">
+                    <span className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
                         {t('originalSource')}
                     </span>
                     <a
@@ -71,7 +73,7 @@ export function SourceSettings() {
 
                 <div className="flex items-center justify-between pt-2">
                     <div>
-                        <h4 className="text-sm font-medium text-text dark:text-text-dark">
+                        <h4 className="text-xs font-medium text-text dark:text-text-dark">
                             {t('syncEnabled')}
                         </h4>
                         <p className="text-xs text-text-muted dark:text-text-muted-dark">

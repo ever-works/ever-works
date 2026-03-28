@@ -25,7 +25,9 @@ export type {
 
 // Type aliases for backward compatibility
 export type Plugin = PluginResponse;
-export type UserPlugin = UserPluginResponse;
+export type UserPlugin = UserPluginResponse & {
+    metadata?: Record<string, unknown>;
+};
 export type DirectoryPlugin = DirectoryPluginResponse;
 export type PluginListResponse = IPluginListResponse;
 export type DirectoryPluginListResponse = IDirectoryPluginListResponse;
@@ -138,6 +140,24 @@ export const pluginsAPI = {
         });
     },
 
+    /**
+     * Validate a user plugin connection after saving credentials.
+     */
+    validateConnection: async (
+        pluginId: string,
+    ): Promise<{ success: boolean; message: string; details?: Record<string, unknown> }> => {
+        return serverMutation<{
+            success: boolean;
+            message: string;
+            details?: Record<string, unknown>;
+        }>({
+            endpoint: `/plugins/${pluginId}/validate-connection`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
     // ============================================
     // Directory Plugin Management
     // ============================================
@@ -200,6 +220,18 @@ export const pluginsAPI = {
             endpoint: `/directories/${directoryId}/plugins/${pluginId}/settings`,
             data,
             method: 'PATCH',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Set or clear the global default pipeline for the current user
+     */
+    setGlobalPipelineDefault: async (pluginId: string | null, enforce: boolean): Promise<void> => {
+        await serverMutation<void>({
+            endpoint: '/plugins/pipeline-default',
+            data: { pluginId, enforce },
+            method: 'POST',
             wrapInData: false,
         });
     },

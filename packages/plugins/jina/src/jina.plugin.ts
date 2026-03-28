@@ -12,7 +12,8 @@ import type {
 	SearchResult,
 	RateLimitInfo,
 	ContentExtractionOptions,
-	ContentExtractionResult
+	ContentExtractionResult,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 
 const JINA_READER_URL = 'https://r.jina.ai/';
@@ -152,7 +153,44 @@ export class JinaReaderPlugin implements IPlugin, ISearchPlugin, IContentExtract
 	}
 
 	async isAvailable(): Promise<boolean> {
-		return true;
+		if (!this.context) return false;
+		const settings = await this.context.getSettings();
+		return Boolean(settings?.apiKey);
+	}
+
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const apiKey = settings.apiKey as string | undefined;
+		if (!apiKey) {
+			return { success: false, message: 'Jina AI API key is not configured.' };
+		}
+
+		try {
+			const response = await fetch(JINA_SEARCH_URL, {
+				method: 'POST',
+				headers: {
+					Accept: 'application/json',
+					'Content-Type': 'application/json',
+					'X-Respond-With': 'no-content',
+					Authorization: `Bearer ${apiKey}`
+				},
+				body: JSON.stringify({ q: 'test', num: 1 }),
+				signal: AbortSignal.timeout(15000)
+			});
+
+			if (!response.ok) {
+				return {
+					success: false,
+					message: `Jina AI connection failed (${response.status}): ${response.statusText}`
+				};
+			}
+
+			return { success: true, message: 'Jina AI connection verified.' };
+		} catch (error) {
+			return {
+				success: false,
+				message: `Jina AI connection failed: ${error instanceof Error ? error.message : String(error)}`
+			};
+		}
 	}
 
 	async getRateLimitInfo(): Promise<RateLimitInfo> {

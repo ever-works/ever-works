@@ -8,6 +8,7 @@ import {
     DirectoryOperationsService,
     buildStatsUpdate,
 } from '@ever-works/agent/directory-operations';
+import { GenerationLogCollector } from '@ever-works/agent/generators';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { normalizeGeneratorError } from '@ever-works/agent/services';
 import { calculateDurationSeconds } from '@ever-works/agent/utils';
@@ -40,6 +41,10 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
     async run({ directory, user, dto, historyId, historyStartedAt }: TriggerGenerationOptions) {
         const startTime = this.resolveStartTime(historyStartedAt);
 
+        const logCollector = new GenerationLogCollector(historyId, (hId, logs) =>
+            this.directoryOperations.appendGenerationLogs(hId, logs),
+        );
+
         await Promise.all([
             this.directoryOperations.recordGenerationStartTime(directory.id, startTime),
             this.directoryOperations.updateGenerateStatus(directory.id, {
@@ -51,37 +56,48 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
             }),
         ]);
 
+        logCollector.message('Generation started', 'info', 'orchestrator');
+
         let generationStats: GenerationStats | null = null;
         let generationWarnings: string[] | undefined;
 
         try {
-            const generated = await this.dataGenerator.initialize(directory, user, dto);
+            const generated = await this.dataGenerator.initialize(directory, user, dto, {
+                logCollector,
+            });
             generationWarnings = generated.warnings;
 
             if (generated.success === false) {
                 throw new Error(generated.error.message);
             }
 
+            logCollector.message('Data generation completed', 'info', 'orchestrator');
             generationStats = generated.stats;
             const newItemsCount = generated.stats?.newItemsCount ?? 0;
             const updatedItemsCount = generated.stats?.updatedItemsCount ?? 0;
 
             if (newItemsCount > 0 || updatedItemsCount > 0) {
+                logCollector.message('Markdown generation started', 'info', 'orchestrator');
                 await this.markdownGenerator.initialize(directory, user, {
                     generation_method: dto.generation_method,
                     pr_update: generated.prUpdate,
                 });
+                logCollector.message('Markdown generation completed', 'info', 'orchestrator');
             }
 
             if (newItemsCount > 0 || generated.hasExistingItems) {
+                logCollector.message('Website generation started', 'info', 'orchestrator');
                 await this.websiteGenerator.initialize(
                     directory,
                     user,
                     dto.website_repository_creation_method,
                 );
+                logCollector.message('Website generation completed', 'info', 'orchestrator');
             }
 
             const endTime = new Date();
+
+            logCollector.message('Generation completed successfully', 'info', 'orchestrator');
 
             await Promise.all([
                 this.directoryOperations.recordGenerationFinishTime(directory.id, endTime),
@@ -89,6 +105,7 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
                     status: GenerateStatusType.GENERATED,
                     step: null,
                     warnings: generationWarnings,
+                    recentLogs: logCollector.getRecentLogs(),
                 }),
                 this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
                     status: GenerateStatusType.GENERATED,
@@ -100,22 +117,28 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
         } catch (error) {
             const endTime = new Date();
 
+            logCollector.message(
+                `Generation failed: ${normalizeGeneratorError(error)}`,
+                'error',
+                'orchestrator',
+            );
+
             await Promise.all([
                 this.directoryOperations.recordGenerationFinishTime(directory.id, endTime),
                 this.directoryOperations.updateGenerateStatus(directory.id, {
                     status: GenerateStatusType.ERROR,
                     error: normalizeGeneratorError(error),
                     warnings: generationWarnings,
+                    recentLogs: logCollector.getRecentLogs(),
+                }),
+                this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
+                    status: GenerateStatusType.ERROR,
+                    finishedAt: endTime,
+                    durationInSeconds: calculateDurationSeconds(startTime, endTime),
+                    errorMessage: normalizeGeneratorError(error),
+                    ...buildStatsUpdate(generationStats),
                 }),
             ]);
-
-            await this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
-                status: GenerateStatusType.ERROR,
-                finishedAt: endTime,
-                durationInSeconds: calculateDurationSeconds(startTime, endTime),
-                errorMessage: normalizeGeneratorError(error),
-                ...buildStatsUpdate(generationStats),
-            });
 
             this.logger.error('Generation failed', error as Error);
 
@@ -123,6 +146,7 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
 
             throw error;
         } finally {
+            await logCollector.dispose();
             await this.directoryOperations.emitGenerationCompleted(directory.id);
         }
     }

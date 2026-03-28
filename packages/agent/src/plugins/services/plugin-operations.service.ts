@@ -13,6 +13,7 @@ import {
     type JsonSchema,
     type PluginManifest,
     toPluginSettingsSchemaProperty,
+    PLUGIN_CAPABILITIES,
 } from '@ever-works/plugin';
 import type {
     PluginResponse,
@@ -39,6 +40,7 @@ import {
     SettingsSchemaValidatorService,
     type SettingsScope,
 } from './settings-schema-validator.service';
+import { PluginSettingsService } from './plugin-settings.service';
 import { AiFacadeService } from '../../facades';
 
 @Injectable()
@@ -54,6 +56,7 @@ export class PluginOperationsService {
         private readonly directoryPluginRepository: Repository<DirectoryPluginEntity>,
         private readonly pluginRegistryService: PluginRegistryService,
         private readonly settingsValidator: SettingsSchemaValidatorService,
+        private readonly settingsService: PluginSettingsService,
         private readonly aiFacade: AiFacadeService,
     ) {}
 
@@ -509,6 +512,77 @@ export class PluginOperationsService {
         return this.toUserPluginResponse(registered, userPlugin);
     }
 
+    /**
+     * Set or clear the user's global pipeline default preference.
+     *
+     * Clears `isGlobalPipelineDefault` from all pipeline plugins for this user,
+     * then marks the given plugin (if any) as the global default.
+     *
+     * @param userId - The user to update
+     * @param pluginId - Plugin to set as default, or null to clear
+     * @param enforce - When true, this pipeline is forced in the generator form
+     */
+    async setGlobalPipelineDefault(
+        userId: string,
+        pluginId: string | null,
+        enforce: boolean,
+    ): Promise<void> {
+        // Clear the flag from all user plugins in the DB that have it set.
+        // Querying the DB directly (rather than the registry) ensures stale flags from
+        // previously-registered-but-now-unloaded plugins are also removed.
+        const flaggedPlugins = await this.userPluginRepository.find({ where: { userId } });
+        for (const existing of flaggedPlugins) {
+            if (existing.metadata?.isGlobalPipelineDefault) {
+                let newMeta = { ...existing.metadata };
+                delete newMeta.isGlobalPipelineDefault;
+                delete newMeta.globalPipelineDefaultEnforce;
+                await this.userPluginRepository.save({ ...existing, metadata: newMeta });
+            }
+        }
+
+        if (!pluginId) return;
+
+        // Ensure the target plugin exists
+        const target = this.pluginRegistryService.get(pluginId);
+        if (!target) {
+            throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        }
+        if (!target.plugin.capabilities.includes(PLUGIN_CAPABILITIES.PIPELINE)) {
+            throw new BadRequestException(`Plugin "${pluginId}" is not a pipeline plugin`);
+        }
+
+        // Find or create the user plugin record for the target
+        let userPlugin = await this.userPluginRepository.findOne({
+            where: { userId, pluginId },
+        });
+
+        if (!userPlugin) {
+            const pluginEntity = await this.pluginRepository.findOne({ where: { pluginId } });
+            if (!pluginEntity) {
+                throw new NotFoundException(`Plugin entity "${pluginId}" not found`);
+            }
+            userPlugin = this.userPluginRepository.create({
+                userId,
+                pluginId,
+                pluginEntityId: pluginEntity.id,
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            });
+        }
+
+        userPlugin.metadata = {
+            ...userPlugin.metadata,
+            isGlobalPipelineDefault: true,
+            globalPipelineDefaultEnforce: enforce,
+        };
+        await this.userPluginRepository.save(userPlugin);
+        this.logger.log(
+            `Global pipeline default set to "${pluginId}" (enforce=${enforce}) for user "${userId}"`,
+        );
+    }
+
     // ============================================
     // Directory Plugin Operations
     // ============================================
@@ -908,10 +982,19 @@ export class PluginOperationsService {
         }
 
         try {
-            return await this.aiFacade.getAvailableModels({
-                providerOverride: pluginId,
+            if (registered.plugin.capabilities.includes('ai-provider')) {
+                return await this.aiFacade.getAvailableModels({
+                    providerOverride: pluginId,
+                    userId,
+                });
+            }
+
+            const settings = await this.settingsService.getResolvedSettings(pluginId, {
                 userId,
+                includeSecrets: true,
             });
+
+            return await plugin.listModels(settings);
         } catch (error) {
             this.logger.warn(
                 `Failed to list models for plugin ${pluginId}: ${(error as Error).message}`,
@@ -1043,6 +1126,7 @@ export class PluginOperationsService {
             installed: !!userPlugin || enabled,
             enabled,
             settings: this.maskSecretSettings(mergedSettings, registered.plugin.settingsSchema),
+            metadata: userPlugin?.metadata ?? {},
             userPluginId: userPlugin?.id,
             autoEnableForDirectories: userPlugin?.autoEnableForDirectories ?? false,
         };

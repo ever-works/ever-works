@@ -4,7 +4,13 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import { ChevronDownIcon, ChevronUpIcon, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import {
+    Accordion,
+    AccordionItem,
+    AccordionTrigger,
+    AccordionContent,
+} from '@/components/ui/accordion';
 import { toast } from 'sonner';
 import { updateWebsiteSettings } from '@/app/actions/dashboard/directories';
 import { useWebsiteSettingsForm, WebsiteSettingsFormContent } from '../shared/WebsiteSettingsForm';
@@ -63,38 +69,32 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
         }
     };
 
-    return (
-        <div
-            className={cn(
-                'rounded-lg border',
-                'bg-card dark:bg-card-dark',
-                'border-card-border dark:border-card-border-dark',
-            )}
-        >
-            {/* Collapsible Header */}
-            <button
-                type="button"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full p-6 flex items-center justify-between text-left hover:bg-muted/50 dark:hover:bg-muted-dark/50 transition-colors rounded-lg"
-            >
-                <div>
-                    <h3 className="text-lg font-semibold text-text dark:text-text-dark">
-                        {t('title')}
-                    </h3>
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark mt-1">
-                        {t('subtitle')}
-                    </p>
-                </div>
-                {isExpanded ? (
-                    <ChevronUpIcon className="h-5 w-5 text-text-muted dark:text-text-muted-dark" />
-                ) : (
-                    <ChevronDownIcon className="h-5 w-5 text-text-muted dark:text-text-muted-dark" />
-                )}
-            </button>
+    const handleAccordionChange = (value: string) => {
+        const nowExpanded = value === 'website-config';
+        setIsExpanded(nowExpanded);
+    };
 
-            {/* Expandable Content */}
-            {isExpanded && (
-                <div className="px-6 pb-6">
+    return (
+        <Accordion type="single" collapsible onValueChange={handleAccordionChange}>
+            <AccordionItem
+                value="website-config"
+                className={cn(
+                    'rounded-lg border overflow-hidden',
+                    'bg-card dark:bg-card-primary-dark/30',
+                    'border-card-border dark:border-card-border-dark',
+                )}
+            >
+                <AccordionTrigger className="px-5 py-3.5 hover:no-underline hover:bg-surface/50 dark:hover:bg-surface-dark/50">
+                    <div className="text-left">
+                        <span className="text-sm font-semibold text-text dark:text-text-dark">
+                            {t('title')}
+                        </span>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5 font-normal">
+                            {t('subtitle')}
+                        </p>
+                    </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-5 pb-4 pt-2">
                     {isLoading ? (
                         <div className="flex justify-center py-12">
                             <Loader2 className="animate-spin h-8 w-8 text-primary" />
@@ -128,8 +128,8 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
                             </div>
                         </>
                     )}
-                </div>
-            )}
-        </div>
+                </AccordionContent>
+            </AccordionItem>
+        </Accordion>
     );
 }

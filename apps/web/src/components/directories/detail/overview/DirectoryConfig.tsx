@@ -20,20 +20,22 @@ export function DirectoryConfig({ config }: DirectoryConfigProps) {
     return (
         <div
             className={cn(
-                'rounded-lg border p-6',
-                'bg-card dark:bg-card-dark',
+                'rounded-lg border overflow-hidden',
+                'bg-card dark:bg-card-primary-dark/30',
                 'border-card-border dark:border-card-border-dark',
             )}
         >
-            <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
-                {t('title')}
-            </h3>
+            <div className="px-5 py-3.5 border-b border-card-border dark:border-card-border-dark">
+                <h3 className="text-sm font-semibold text-text dark:text-text-dark">
+                    {t('title')}
+                </h3>
+            </div>
 
-            <div className="space-y-4">
+            <div className="px-5 py-4 space-y-4">
                 {/* Generation Details */}
                 {config.metadata?.initial_prompt && (
                     <div>
-                        <h4 className="text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
+                        <h4 className="text-xs font-medium text-text-muted dark:text-text-muted-dark mb-1">
                             {t('initialPrompt')}
                         </h4>
                         <p className="text-sm text-text dark:text-text-dark bg-surface dark:bg-surface-dark rounded-md p-3">
@@ -45,7 +47,7 @@ export function DirectoryConfig({ config }: DirectoryConfigProps) {
                 {/* Company Information */}
                 {(config.company_name || config.company_website) && (
                     <div>
-                        <h4 className="text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-2">
+                        <h4 className="text-xs font-medium text-text-muted dark:text-text-muted-dark mb-2">
                             {t('companyDetails')}
                         </h4>
                         <div className="grid grid-cols-2 gap-4">
@@ -80,7 +82,7 @@ export function DirectoryConfig({ config }: DirectoryConfigProps) {
 
                 {/* Generation Settings */}
                 <div className="hidden">
-                    <h4 className="text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-2">
+                    <h4 className="text-xs font-medium text-text-muted dark:text-text-muted-dark mb-2">
                         {t('generationSettings')}
                     </h4>
                     <div className="grid grid-cols-2 gap-4">

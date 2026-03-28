@@ -500,7 +500,8 @@
                             "paused": "Dijeda",
                             "canceled": "Dibatalkan",
                             "disabled": "Dinonaktifkan"
-                        }
+                        },
+                        "nextSourceValidation": "Validasi sumber berikutnya"
                     },
                     "fields": {
                         "automation": "Otomasi",
@@ -513,7 +514,9 @@
                         "maxFailures": "Batas kegagalan",
                         "maxFailuresHelp": "Jeda otomatis setelah jumlah kegagalan ini tercapai.",
                         "createPullRequest": "Buat Pull Request",
-                        "createPullRequestHelp": "Saat diaktifkan, pembaruan terjadwal membuat pull request alih-alih melakukan commit langsung."
+                        "createPullRequestHelp": "Saat diaktifkan, pembaruan terjadwal membuat pull request alih-alih melakukan commit langsung.",
+                        "sourceValidationCadence": "Frekuensi validasi sumber",
+                        "sourceValidationCadenceHelp": "Secara default mengikuti frekuensi pembaruan Anda, tetapi Anda bisa memperlambat atau mempercepatnya."
                     },
                     "billing": {
                         "subscription": "Langganan",
@@ -630,7 +633,39 @@
                 },
                 "loadMore": "Muat lebih banyak",
                 "noMore": "Tidak ada catatan lagi",
-                "unknown": "Tidak diketahui"
+                "unknown": "Tidak diketahui",
+                "activity": {
+                    "generation": "Generasi",
+                    "item_added": "Item ditambahkan",
+                    "item_updated": "Item diperbarui",
+                    "item_removed": "Item dihapus",
+                    "comparison_added": "Perbandingan ditambahkan",
+                    "comparison_removed": "Perbandingan dihapus",
+                    "category_change": "Perubahan kategori",
+                    "tag_change": "Perubahan tag",
+                    "collection_change": "Perubahan koleksi",
+                    "community_pr_merged": "PR komunitas"
+                },
+                "detail": {
+                    "added": "Ditambahkan",
+                    "updated": "Diperbarui",
+                    "removed": "Dihapus",
+                    "fields": "Bidang",
+                    "expand": "Perluas detail changelog",
+                    "collapse": "Ciutkan detail changelog"
+                },
+                "filters": {
+                    "label": "Aktivitas",
+                    "all": "Semua aktivitas",
+                    "generation": "Generasi",
+                    "items": "Item",
+                    "comparisons": "Perbandingan",
+                    "taxonomy": "Taksonomi",
+                    "community_pr": "PR komunitas"
+                },
+                "pagination": {
+                    "showing": "Menampilkan {from}-{to} dari {total}"
+                }
             },
             "info": {
                 "title": "Informasi Direktori",
@@ -795,7 +830,8 @@
                 "tabs": {
                     "browseItems": "Browse Items",
                     "categories": "Categories",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -879,6 +915,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "Periksa ulang sumber",
+                    "checkCompleted": "Pemeriksaan sumber selesai",
+                    "checkFailed": "Pemeriksaan sumber gagal",
+                    "failedToCheckSource": "Gagal memeriksa sumber item",
+                    "brokenLink": "Tautan rusak",
+                    "healthy": "Baik",
+                    "couldNotVerify": "Tidak dapat diverifikasi",
+                    "sourceMayHaveIssues": "Sumber mungkin memiliki masalah",
+                    "sourceChecked": "Sumber diperiksa",
+                    "reachable": "Dapat dijangkau",
+                    "reachabilityInconclusive": "Pemeriksaan keterjangkauan otomatis tidak meyakinkan",
+                    "accurateSource": "Sumber akurat",
+                    "sourceTooGeneric": "Sumber terlalu umum",
+                    "weakSource": "Sumber lemah",
+                    "sourceAccuracyUnknown": "Keakuratan sumber tidak diketahui",
+                    "useSuggestedSource": "Terapkan saran",
+                    "suggestedSourceApplied": "Sumber yang disarankan diterapkan",
+                    "failedToUseSuggestedSource": "Gagal menggunakan sumber yang disarankan",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {

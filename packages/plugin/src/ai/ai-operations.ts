@@ -7,7 +7,14 @@
 import type { ZodType } from 'zod';
 import { jsonrepair } from 'jsonrepair';
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
-import { HumanMessage, SystemMessage, AIMessage, type AIMessageChunk } from '@langchain/core/messages';
+import {
+	HumanMessage,
+	SystemMessage,
+	AIMessage,
+	ToolMessage,
+	type AIMessageChunk,
+	type BaseMessage
+} from '@langchain/core/messages';
 import type {
 	ChatCompletionOptions,
 	ChatCompletionResponse,
@@ -49,12 +56,27 @@ export class AiOperations {
 		const model = options.model || config.model;
 
 		return this.withParamRetry(model, async (skip) => {
-			const llm = this.createChatModel(config, model, options, skip);
+			const baseLlm = this.createChatModel(config, model, options, skip);
+			const llm = this.bindTools(baseLlm, options, skip);
 			const tracker = new TokenUsageTracker();
 			const messages = this.toLangChainMessages(options.messages);
 
 			const response = await llm.invoke(messages, { callbacks: [tracker] });
 			const content = typeof response.content === 'string' ? response.content : '';
+
+			// Extract tool calls from LangChain response
+			const toolCalls = response.tool_calls?.length
+				? response.tool_calls.map((tc) => ({
+						id: tc.id ?? `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+						type: 'function' as const,
+						function: {
+							name: tc.name,
+							arguments: typeof tc.args === 'string' ? tc.args : JSON.stringify(tc.args)
+						}
+					}))
+				: undefined;
+
+			const hasToolCalls = toolCalls && toolCalls.length > 0;
 
 			return {
 				id: `chatcmpl-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -63,8 +85,12 @@ export class AiOperations {
 				choices: [
 					{
 						index: 0,
-						message: { role: 'assistant', content },
-						finishReason: 'stop'
+						message: {
+							role: 'assistant' as const,
+							content,
+							...(hasToolCalls && { toolCalls })
+						},
+						finishReason: hasToolCalls ? ('tool_calls' as const) : ('stop' as const)
 					}
 				],
 				usage: this.mapTokenUsage(tracker)
@@ -117,17 +143,54 @@ export class AiOperations {
 		const skip = new Set(this.rejectedParams.get(model));
 		let stream: AsyncIterable<AIMessageChunk>;
 		try {
-			stream = await this.createChatModel(config, model, options, skip).stream(messages);
+			const baseLlm = this.createChatModel(config, model, options, skip);
+			const llm = this.bindTools(baseLlm, options, skip);
+			stream = await llm.stream(messages);
 		} catch (error) {
 			const param = this.parseRejectedParam(error);
 			if (!param || skip.has(param)) throw error;
 			skip.add(param);
 			this.rejectedParams.set(model, new Set(skip));
-			stream = await this.createChatModel(config, model, options, skip).stream(messages);
+			const baseLlm = this.createChatModel(config, model, options, skip);
+			const llm = this.bindTools(baseLlm, options, skip);
+			stream = await llm.stream(messages);
 		}
+
+		let hadToolCalls = false;
+		let isFirstChunk = true;
+		const seenToolCallIds = new Map<number, string>();
 
 		for await (const chunk of stream) {
 			const content = typeof chunk.content === 'string' ? chunk.content : '';
+
+			const toolCallChunks = chunk.tool_call_chunks?.length
+				? chunk.tool_call_chunks.map((tc) => {
+						const idx = tc.index ?? seenToolCallIds.size;
+						const isNew = !seenToolCallIds.has(idx);
+						if (isNew && tc.id) seenToolCallIds.set(idx, tc.id);
+
+						return {
+							index: idx,
+							id: isNew ? tc.id || `call_${Date.now()}_${idx}` : undefined,
+							type: isNew ? ('function' as const) : undefined,
+							function: {
+								name: isNew ? (tc.name ?? '') : undefined,
+								arguments: tc.args ?? ''
+							}
+						};
+					})
+				: undefined;
+
+			if (toolCallChunks?.length) hadToolCalls = true;
+
+			const delta: Record<string, unknown> = {};
+			if (isFirstChunk) {
+				delta.role = 'assistant';
+				isFirstChunk = false;
+			}
+			if (content) delta.content = content;
+			if (toolCallChunks?.length) delta.toolCalls = toolCallChunks;
+
 			yield {
 				id: `chatcmpl-${Date.now()}`,
 				model,
@@ -135,7 +198,7 @@ export class AiOperations {
 				choices: [
 					{
 						index: 0,
-						delta: { role: 'assistant', content },
+						delta: delta as Partial<ChatMessage>,
 						finishReason: null
 					}
 				]
@@ -151,7 +214,7 @@ export class AiOperations {
 				{
 					index: 0,
 					delta: {},
-					finishReason: 'stop'
+					finishReason: hadToolCalls ? 'tool_calls' : 'stop'
 				}
 			]
 		};
@@ -374,6 +437,33 @@ export class AiOperations {
 		};
 	}
 
+	/**
+	 * Bind tools to a ChatOpenAI model when tool definitions are provided.
+	 * Uses llm.bind() with OpenAI-format tools to ensure the `type: 'function'`
+	 * wrapper is always present in the API request.
+	 */
+	private bindTools(llm: ChatOpenAI, options?: ChatCompletionOptions, skip?: Set<string>): ChatOpenAI {
+		if (!options?.tools?.length || skip?.has('tools')) {
+			return llm;
+		}
+
+		const tools = options.tools.map((t) => ({
+			type: 'function' as const,
+			function: {
+				name: t.function.name,
+				description: t.function.description ?? '',
+				parameters: t.function.parameters ?? {}
+			}
+		}));
+
+		const bindArgs: Record<string, unknown> = { tools };
+		if (options.toolChoice) {
+			bindArgs.tool_choice = options.toolChoice;
+		}
+
+		return llm.bind(bindArgs) as unknown as ChatOpenAI;
+	}
+
 	private parseRejectedParam(error: unknown): string | undefined {
 		if (!(error instanceof Error)) return undefined;
 		const msg = error.message.toLowerCase();
@@ -381,21 +471,45 @@ export class AiOperations {
 		if (msg.includes("'reasoning'") || msg.includes("'reasoning_effort'")) return 'reasoning';
 		if (msg.includes('json_schema') || msg.includes('response_format') || msg.includes('structured output'))
 			return 'structured_output';
+		if (msg.includes("'tools'") || msg.includes('"tools"') || msg.includes('tool_choice')) return 'tools';
 		return undefined;
 	}
 
-	private toLangChainMessages(messages: readonly ChatMessage[]): Array<HumanMessage | SystemMessage | AIMessage> {
+	private toLangChainMessages(messages: readonly ChatMessage[]): BaseMessage[] {
 		return messages.map((msg) => {
 			const content = typeof msg.content === 'string' ? msg.content : '';
 			switch (msg.role) {
 				case 'system':
 					return new SystemMessage(content);
-				case 'assistant':
-					return new AIMessage(content);
+				case 'assistant': {
+					const aiMsg = new AIMessage({ content });
+					if (msg.toolCalls?.length) {
+						aiMsg.tool_calls = msg.toolCalls.map((tc) => ({
+							id: tc.id,
+							name: tc.function.name,
+							args: this.safeParseJson(tc.function.arguments),
+							type: 'tool_call' as const
+						}));
+					}
+					return aiMsg;
+				}
+				case 'tool':
+					return new ToolMessage({
+						content,
+						tool_call_id: msg.toolCallId ?? ''
+					});
 				case 'user':
 				default:
 					return new HumanMessage(content);
 			}
 		});
+	}
+
+	private safeParseJson(value: string): Record<string, unknown> {
+		try {
+			return JSON.parse(value);
+		} catch {
+			return {};
+		}
 	}
 }

@@ -500,7 +500,8 @@
                             "paused": "หยุดชั่วคราว",
                             "canceled": "ยกเลิกแล้ว",
                             "disabled": "ปิดใช้งาน"
-                        }
+                        },
+                        "nextSourceValidation": "การตรวจสอบแหล่งข้อมูลครั้งถัดไป"
                     },
                     "fields": {
                         "automation": "ระบบอัตโนมัติ",
@@ -513,7 +514,9 @@
                         "maxFailures": "ขีดจำกัดความล้มเหลว",
                         "maxFailuresHelp": "หยุดชั่วคราวโดยอัตโนมัติเมื่อเกิดความล้มเหลวครบจำนวนนี้",
                         "createPullRequest": "สร้าง Pull Requests",
-                        "createPullRequestHelp": "เมื่อเปิดใช้งาน การอัปเดตตามกำหนดการจะสร้าง pull request แทนที่จะ commit โดยตรง"
+                        "createPullRequestHelp": "เมื่อเปิดใช้งาน การอัปเดตตามกำหนดการจะสร้าง pull request แทนที่จะ commit โดยตรง",
+                        "sourceValidationCadence": "ความถี่ในการตรวจสอบแหล่งข้อมูล",
+                        "sourceValidationCadenceHelp": "ค่าเริ่มต้นจะใช้ความถี่เดียวกับการอัปเดตของคุณ แต่คุณสามารถทำให้ช้าลงหรือเร็วขึ้นได้"
                     },
                     "billing": {
                         "subscription": "การสมัครสมาชิก",
@@ -630,7 +633,39 @@
                 },
                 "loadMore": "โหลดเพิ่ม",
                 "noMore": "ไม่มีบันทึกเพิ่มเติม",
-                "unknown": "ไม่ทราบ"
+                "unknown": "ไม่ทราบ",
+                "activity": {
+                    "generation": "การสร้าง",
+                    "item_added": "เพิ่มรายการ",
+                    "item_updated": "อัปเดตรายการ",
+                    "item_removed": "ลบรายการ",
+                    "comparison_added": "เพิ่มการเปรียบเทียบ",
+                    "comparison_removed": "ลบการเปรียบเทียบ",
+                    "category_change": "เปลี่ยนหมวดหมู่",
+                    "tag_change": "เปลี่ยนแท็ก",
+                    "collection_change": "เปลี่ยนคอลเลกชัน",
+                    "community_pr_merged": "PR ชุมชน"
+                },
+                "detail": {
+                    "added": "เพิ่มแล้ว",
+                    "updated": "อัปเดตแล้ว",
+                    "removed": "ลบแล้ว",
+                    "fields": "ฟิลด์",
+                    "expand": "ขยายรายละเอียดบันทึกการเปลี่ยนแปลง",
+                    "collapse": "ย่อรายละเอียดบันทึกการเปลี่ยนแปลง"
+                },
+                "filters": {
+                    "label": "กิจกรรม",
+                    "all": "กิจกรรมทั้งหมด",
+                    "generation": "การสร้าง",
+                    "items": "รายการ",
+                    "comparisons": "การเปรียบเทียบ",
+                    "taxonomy": "อนุกรมวิธาน",
+                    "community_pr": "PR ชุมชน"
+                },
+                "pagination": {
+                    "showing": "กำลังแสดง {from}-{to} จาก {total}"
+                }
             },
             "info": {
                 "title": "ข้อมูลไดเรกทอรี",
@@ -795,7 +830,8 @@
                 "tabs": {
                     "browseItems": "Browse Items",
                     "categories": "Categories",
-                    "tags": "Tags"
+                    "tags": "Tags",
+                    "sourceHealth": "Source Health"
                 },
                 "taxonomy": {
                     "categories": {
@@ -879,6 +915,39 @@
                             }
                         }
                     }
+                },
+                "sourceValidation": {
+                    "recheckSource": "ตรวจสอบแหล่งที่มาอีกครั้ง",
+                    "checkCompleted": "ตรวจสอบแหล่งที่มาเสร็จแล้ว",
+                    "checkFailed": "ตรวจสอบแหล่งที่มาไม่สำเร็จ",
+                    "failedToCheckSource": "ไม่สามารถตรวจสอบแหล่งที่มาของรายการได้",
+                    "brokenLink": "ลิงก์เสีย",
+                    "healthy": "ปกติ",
+                    "couldNotVerify": "ไม่สามารถยืนยันได้",
+                    "sourceMayHaveIssues": "แหล่งที่มาอาจมีปัญหา",
+                    "sourceChecked": "ตรวจสอบแหล่งที่มาแล้ว",
+                    "reachable": "เข้าถึงได้",
+                    "reachabilityInconclusive": "การตรวจสอบการเข้าถึงอัตโนมัติยังไม่ชัดเจน",
+                    "accurateSource": "แหล่งที่มาที่แม่นยำ",
+                    "sourceTooGeneric": "แหล่งที่มาทั่วไปเกินไป",
+                    "weakSource": "แหล่งที่มาอ่อน",
+                    "sourceAccuracyUnknown": "ไม่ทราบความแม่นยำของแหล่งที่มา",
+                    "useSuggestedSource": "ใช้คำแนะนำ",
+                    "suggestedSourceApplied": "นำแหล่งข้อมูลที่แนะนำมาใช้แล้ว",
+                    "failedToUseSuggestedSource": "ไม่สามารถใช้แหล่งข้อมูลที่แนะนำได้",
+                    "needsReview": "Needs review"
+                },
+                "sourceValidationSettings": {
+                    "title": "Source Health Checks",
+                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
+                    "enableLabel": "Enable scheduled checks",
+                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
+                    "cadenceLabel": "Check frequency",
+                    "cadenceHelp": "How often to run source validation on your items.",
+                    "save": "Save",
+                    "saving": "Saving...",
+                    "saveSuccess": "Source validation settings saved",
+                    "saveFailed": "Failed to save source validation settings"
                 }
             },
             "generator": {
@@ -1725,10 +1794,9 @@
             "sendHint": "Enter เพื่อส่ง · Shift+Enter สำหรับบรรทัดใหม่",
             "providerNotConfigured": "ผู้ให้บริการนี้ยังไม่ได้ตั้งค่า ตั้งค่าใน Plugins",
             "editMessage": "แก้ไขข้อความ",
-            "saveEdit": "บันทึกและส่ง",
+            "saveEdit": "บันทึก & ส่ง",
             "cancelEdit": "ยกเลิก",
             "edited": "(แก้ไขแล้ว)",
-            "saveEdit": "บันทึก & ส่ง",
             "errors": {
                 "unableToSend": "ไม่สามารถส่งข้อความได้"
             },

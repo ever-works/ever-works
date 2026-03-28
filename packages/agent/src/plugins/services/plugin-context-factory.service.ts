@@ -25,6 +25,12 @@ import { PLUGINS_MODULE_OPTIONS, DEFAULT_PLATFORM_VERSION } from '../plugins.con
 import type { PluginsModuleOptions } from '../interfaces/plugins-module-options.interface';
 
 /**
+ * Callback that receives intercepted log calls from plugin loggers.
+ * Used to capture ALL logger output during pipeline execution.
+ */
+export type LogInterceptorFn = (level: string, message: string, ...args: unknown[]) => void;
+
+/**
  * Service for creating PluginContext instances for plugins.
  * Provides scoped access to platform services.
  */
@@ -35,6 +41,8 @@ export class PluginContextFactoryService {
     private readonly environment: 'development' | 'production' | 'test';
     private readonly features: ReadonlySet<string>;
     private injectedServices: Partial<PluginServices> = {};
+    /** Per-plugin log interceptors — keyed by pluginId */
+    private readonly logInterceptors = new Map<string, Set<LogInterceptorFn>>();
 
     constructor(
         @Inject(PLUGINS_MODULE_OPTIONS)
@@ -173,26 +181,66 @@ export class PluginContextFactoryService {
     }
 
     /**
-     * Create a PluginLogger for a plugin
+     * Add a log interceptor for a plugin.
+     * All logger.log/warn/error/debug/verbose calls will also be forwarded to the interceptor.
+     * Returns an unsubscribe function.
+     */
+    addLogInterceptor(pluginId: string, fn: LogInterceptorFn): () => void {
+        let set = this.logInterceptors.get(pluginId);
+        if (!set) {
+            set = new Set();
+            this.logInterceptors.set(pluginId, set);
+        }
+        set.add(fn);
+        return () => {
+            set!.delete(fn);
+            if (set!.size === 0) {
+                this.logInterceptors.delete(pluginId);
+            }
+        };
+    }
+
+    /**
+     * Create a PluginLogger for a plugin.
+     * Each call is forwarded to both the NestJS logger and any active interceptors.
      */
     private createLogger(pluginId: string): PluginLogger {
         const logger = new Logger(`Plugin:${pluginId}`);
+        const interceptors = this.logInterceptors;
+
+        const fireInterceptors = (level: string, message: string, ...args: unknown[]) => {
+            const set = interceptors.get(pluginId);
+            if (set && set.size > 0) {
+                for (const fn of set) {
+                    try {
+                        fn(level, message, ...args);
+                    } catch {
+                        // never let interceptor errors break the plugin
+                    }
+                }
+            }
+        };
 
         return {
             log: (message: string, ...args: unknown[]) => {
                 logger.log(message, ...args);
+                fireInterceptors('info', message, ...args);
             },
             error: (message: string, trace?: string, ...args: unknown[]) => {
                 logger.error(message, trace, ...args);
+                fireInterceptors('error', message, ...args);
             },
             warn: (message: string, ...args: unknown[]) => {
                 logger.warn(message, ...args);
+                fireInterceptors('warn', message, ...args);
             },
             debug: (message: string, ...args: unknown[]) => {
                 logger.debug(message, ...args);
+                fireInterceptors('debug', message, ...args);
             },
             verbose: (message: string, ...args: unknown[]) => {
                 logger.verbose(message, ...args);
+                fireInterceptors('debug', message, ...args);
             },
         };
     }
