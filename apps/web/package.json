@@ -27,7 +27,7 @@
         "next": "16.1.7",
         "next-intl": "^4.6.1",
         "nextjs-toploader": "^3.9.17",
-        "path-to-regexp": "^8.3.0",
+        "path-to-regexp": "^8.4.0",
         "radix-ui": "^1.4.3",
         "react": "19.2.3",
         "react-dom": "19.2.3",
