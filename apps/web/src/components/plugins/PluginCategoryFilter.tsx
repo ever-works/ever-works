@@ -28,9 +28,9 @@ export function PluginCategoryFilter({
                 <button
                     onClick={() => onSelectCategory(null)}
                     className={cn(
-                        'px-3 py-1 rounded-full text-sm font-medium transition-colors',
+                        'px-3 py-1 rounded-full text-sm font-medium transition-colors cursor-pointer',
                         selectedCategory === null
-                            ? 'bg-primary-500 text-white'
+                            ? 'bg-button-primary dark:bg-button-primary-dark text-white dark:text-black'
                             : 'bg-surface-secondary dark:bg-surface-secondary-dark/50 text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
                     )}
                 >
@@ -41,10 +41,10 @@ export function PluginCategoryFilter({
                         key={category}
                         onClick={() => onSelectCategory(category)}
                         className={cn(
-                            'px-3 py-1 rounded-full text-sm font-medium transition-colors',
+                            'px-3 py-1 rounded-full text-sm font-medium transition-colors cursor-pointer',
                             selectedCategory === category
-                                ? 'bg-primary-500 text-white'
-                                : 'bg-surface-secondary dark:bg-surface-secondary-dark/50 text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
+                                ? 'bg-button-primary dark:bg-button-primary-dark text-white dark:text-black'
+                                : 'bg-surface-secondary dark:bg-white/9 text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-white/20',
                         )}
                     >
                         {getCategoryLabel(category)}

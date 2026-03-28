@@ -49,18 +49,18 @@ const Input = ({
             type={type}
             id={inputId}
             className={cn(
-                'w-full rounded-lg transition-colors outline-none dark:bg-surface-dark/40',
+                'w-full rounded-lg transition-colors outline-none',
+                'bg-white dark:bg-card-primary-dark',
+                'border border-card-border dark:border-white/9',
                 'text-text dark:text-text-dark placeholder-text-muted dark:placeholder-text-muted-dark',
-                'border border-primary-800/30 dark:border-card-border-dark',
-                'focus:border-primary',
-                'disabled:bg-surface-tertiary dark:disabled:bg-surface-tertiary-dark/50 disabled:text-text-muted dark:disabled:text-text-muted-dark disabled:cursor-not-allowed',
+                'focus:border-primary dark:focus:border-white/9',
+                'disabled:bg-surface-tertiary dark:disabled:bg-white/9 disabled:text-text-muted dark:disabled:text-text-muted-dark disabled:cursor-not-allowed',
                 isNumber &&
                     '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none pr-8',
                 // Variant-specific styles
-                variant === 'form' && ['px-4 py-2', 'bg-white dark:bg-input-bg-dark'],
+                variant === 'form' && ['px-4 py-2'],
                 variant === 'default' && [
                     'px-4 py-2',
-                    'bg-white dark:bg-input-bg-dark',
                     'focus:ring-2 focus:ring-primary-800/20',
                     'hover:border-border-secondary dark:hover:border-border-secondary-dark',
                     'duration-200',
@@ -88,7 +88,7 @@ const Input = ({
             {isNumber ? (
                 <div className="relative">
                     {inputElement}
-                    <div className="absolute right-0 inset-y-0 flex flex-col border-l border-primary-800/30 dark:border-card-border-dark rounded-r-lg overflow-hidden">
+                    <div className="absolute right-0 inset-y-0 flex flex-col border-l border-card-border dark:border-white/9 rounded-r-lg overflow-hidden">
                         <button
                             type="button"
                             tabIndex={-1}
@@ -103,7 +103,7 @@ const Input = ({
                                 'text-text-muted dark:text-text-muted-dark',
                                 'hover:bg-primary/10 hover:text-primary',
                                 'disabled:opacity-40 disabled:cursor-not-allowed',
-                                'transition-colors border-b border-primary-800/30 dark:border-card-border-dark',
+                                'transition-colors border-b border-card-border dark:border-white/9',
                             )}
                         >
                             <ChevronUp className="w-3 h-3" />
