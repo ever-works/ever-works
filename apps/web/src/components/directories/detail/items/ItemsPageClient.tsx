@@ -135,7 +135,7 @@ export function ItemsPageClient({
                                 className={cn(
                                     'flex items-center gap-2 whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium transition-colors',
                                     activeTab === tab.id
-                                        ? 'border-primary text-primary dark:border-primary-dark dark:text-primary-dark'
+                                        ? 'border-primary text-primary dark:border-gray-200 dark:text-gray-200'
                                         : 'border-transparent text-text-secondary dark:text-text-secondary-dark hover:border-border dark:hover:border-border-dark hover:text-text dark:hover:text-text-dark',
                                 )}
                             >

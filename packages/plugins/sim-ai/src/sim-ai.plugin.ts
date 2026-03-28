@@ -171,7 +171,6 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			visibility: 'public',
 			selectableProviderCategories: ['screenshot'],
 			uiHints: {
-				validateOnSave: true,
 				includeInOnboarding: true,
 				onboardingPriority: 2,
 				completionFields: ['apiKey', 'defaultWorkflowId'],

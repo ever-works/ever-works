@@ -851,7 +851,6 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 			systemPlugin: true,
 			autoEnable: true,
 			visibility: 'public',
-			defaultForCapabilities: ['pipeline'],
 			selectableProviderCategories: ['ai-provider', 'search', 'screenshot', 'content-extractor'],
 			readme: [
 				'## What is the Standard Pipeline?',

@@ -179,6 +179,9 @@ export class AnthropicPlugin extends BaseAiProvider {
 			builtIn: true,
 			autoEnable: false,
 			visibility: 'public',
+			uiHints: {
+				completionFields: ['apiKey', 'defaultModel']
+			},
 			readme: [
 				'## What is the Anthropic plugin?',
 				'',

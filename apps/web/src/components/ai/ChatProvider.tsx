@@ -97,7 +97,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                     .map((msg) => ({
                         id: msg.id,
                         role: msg.role as 'user' | 'assistant',
-                        parts: [{ type: 'text' as const, text: msg.content }],
+                        parts: (msg.parts as UIMessage['parts']) ?? [
+                            { type: 'text' as const, text: msg.content },
+                        ],
                     }));
                 chatRef.current.setMessages(uiMessages);
             })
@@ -212,7 +214,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                     .map((msg) => ({
                         id: msg.id,
                         role: msg.role as 'user' | 'assistant',
-                        parts: [{ type: 'text' as const, text: msg.content }],
+                        parts: (msg.parts as UIMessage['parts']) ?? [
+                            { type: 'text' as const, text: msg.content },
+                        ],
                     }));
 
                 chatRef.current.setMessages(uiMessages);

@@ -224,16 +224,16 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
         <div
             className={cn(
                 'rounded-lg border overflow-hidden',
-                'bg-card dark:bg-card-primary-dark/30',
-                'border-card-border dark:border-card-border-dark',
+                'bg-card dark:bg-transparent',
+                'border-card-border dark:border-border-secondary-dark',
             )}
         >
-            <div className="px-5 py-3.5 border-b border-card-border dark:border-card-border-dark">
+            <div className="px-5 py-3.5 border-b border-card-border dark:border-border-secondary-dark">
                 <h3 className="text-sm font-semibold text-text dark:text-text-dark">
                     {t('title')}
                 </h3>
             </div>
-            <div className="divide-y divide-card-border dark:divide-card-border-dark">
+            <div className="divide-y divide-card-border dark:divide-border-secondary-dark">
                 {infoItems
                     .filter((item) => item.active !== false)
                     .map((item) => (

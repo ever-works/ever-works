@@ -246,8 +246,8 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
                             className={cn(
                                 'flex items-center gap-1.5 @sm/main:gap-2 py-3 @sm/main:py-4 px-3 @2xl/main:px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors',
                                 tab.isActive
-                                    ? 'border-primary text-primary'
-                                    : 'border-transparent text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark hover:border-border-hover dark:hover:border-border-hover-dark',
+                                    ? 'border-primary dark:border-gray-100 dark:text-text-dark text-primary'
+                                    : 'border-transparent text-text-secondary dark:text-text-secondary-dark/70 hover:text-text dark:hover:text-text-dark hover:border-border-hover dark:hover:border-border-hover-dark',
                             )}
                         >
                             {tab.icon}

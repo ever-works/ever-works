@@ -51,7 +51,8 @@ export async function disablePlugin(pluginId: string): Promise<ActionResult> {
 }
 
 /**
- * Update plugin settings for the current user
+ * Update plugin settings for the current user.
+ * The API automatically validates the connection after saving and returns the result.
  */
 export async function updatePluginSettings(
     pluginId: string,
@@ -71,25 +72,6 @@ export async function updatePluginSettings(
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to update plugin settings',
-        };
-    }
-}
-
-export async function validatePluginConnection(pluginId: string): Promise<
-    ActionResult<{
-        success: boolean;
-        message: string;
-        details?: Record<string, unknown>;
-    }>
-> {
-    try {
-        const result = await pluginsAPI.validateConnection(pluginId);
-        return { success: true, data: result };
-    } catch (error) {
-        console.error('Failed to validate plugin connection:', error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Failed to validate plugin connection',
         };
     }
 }
@@ -140,7 +122,8 @@ export async function disableDirectoryPlugin(
 }
 
 /**
- * Update directory plugin settings
+ * Update directory plugin settings.
+ * The API automatically validates the connection after saving and returns the result.
  */
 export async function updateDirectoryPluginSettings(
     directoryId: string,

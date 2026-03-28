@@ -42,7 +42,7 @@ export function ImportSourceStep({
                     onClick={() => onSourceMethodChange('url')}
                     className={cn(
                         'p-4 rounded-lg border text-left transition-all cursor-pointer',
-                        'bg-card dark:bg-card-dark',
+                        'bg-[#0a0a0a] dark:bg-[#0a0a0a]',
                         sourceMethod === 'url'
                             ? 'border-primary-500 shadow-lg'
                             : 'border-card-border dark:border-card-border-dark hover:border-primary-500/50',
@@ -62,7 +62,7 @@ export function ImportSourceStep({
                     onClick={() => onSourceMethodChange('repository')}
                     className={cn(
                         'p-4 rounded-lg border text-left transition-all cursor-pointer',
-                        'bg-card dark:bg-card-dark',
+                        'bg-[#0a0a0a] dark:bg-[#0a0a0a]',
                         sourceMethod === 'repository'
                             ? 'border-accent-indigo shadow-lg'
                             : 'border-card-border dark:border-card-border-dark hover:border-primary-500/50',
@@ -139,7 +139,6 @@ export function ImportSourceStep({
                     variant="primary"
                     size="lg"
                     fullWidth
-                    className="bg-primary-600"
                 >
                     <ArrowRight className="w-5 h-5" />
                     {t('analyzeButton')}

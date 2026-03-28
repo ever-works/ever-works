@@ -6,7 +6,7 @@ import { Fragment, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { ShowDateTime } from '@/components/ui/show-datetime';
 import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
-import { TerminalLogViewer } from '../shared/TerminalLogViewer';
+import { HistoryExpandedDetail } from './HistoryExpandedDetail';
 
 interface HistoryTableProps {
     entries: DirectoryGenerationHistoryEntry[];
@@ -196,7 +196,7 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
 
                         return (
                             <Fragment key={entry.id}>
-                                <tr className="bg-background dark:bg-background-dark">
+                                <tr className="bg-card dark:bg-transparent">
                                     <td className="px-4 py-4 align-top">
                                         <div className="flex flex-col gap-2">
                                             <div className="flex items-start gap-2">
@@ -281,116 +281,12 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                 {hasDetails && isExpanded ? (
                                     <tr className="bg-muted/20 dark:bg-muted/10">
                                         <td colSpan={7} className="px-4 py-4">
-                                            {/* Step Logs */}
-                                            {entry.logs && entry.logs.length > 0 && (
-                                                <div className="mb-4">
-                                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-                                                        {t('detail.stepLogs')}
-                                                    </p>
-                                                    <TerminalLogViewer
-                                                        logs={entry.logs}
-                                                        title={t('detail.stepLogs')}
-                                                        maxHeight="max-h-60"
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {/* Changelog */}
-                                            <div className="grid gap-4 @lg/main:grid-cols-3">
-                                                <div>
-                                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-                                                        {t('detail.added')}
-                                                    </p>
-                                                    <div className="space-y-2">
-                                                        {addedEntries.length > 0 ? (
-                                                            addedEntries.map((change) => (
-                                                                <div
-                                                                    key={`${entry.id}-${change.action}-${change.slug ?? change.name}`}
-                                                                    className="rounded-md border border-border bg-background px-3 py-2 text-sm dark:border-border-dark dark:bg-background-dark"
-                                                                >
-                                                                    <div className="font-medium text-text dark:text-text-dark">
-                                                                        {change.name}
-                                                                    </div>
-                                                                    {change.slug ? (
-                                                                        <div className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                                                                            {change.slug}
-                                                                        </div>
-                                                                    ) : null}
-                                                                </div>
-                                                            ))
-                                                        ) : (
-                                                            <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                                                                —
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-                                                        {t('detail.updated')}
-                                                    </p>
-                                                    <div className="space-y-2">
-                                                        {updatedEntries.length > 0 ? (
-                                                            updatedEntries.map((change) => (
-                                                                <div
-                                                                    key={`${entry.id}-${change.action}-${change.slug ?? change.name}`}
-                                                                    className="rounded-md border border-border bg-background px-3 py-2 text-sm dark:border-border-dark dark:bg-background-dark"
-                                                                >
-                                                                    <div className="font-medium text-text dark:text-text-dark">
-                                                                        {change.name}
-                                                                    </div>
-                                                                    {change.slug ? (
-                                                                        <div className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                                                                            {change.slug}
-                                                                        </div>
-                                                                    ) : null}
-                                                                    {change.fieldsChanged
-                                                                        ?.length ? (
-                                                                        <div className="mt-1 text-xs text-text-secondary dark:text-text-secondary-dark">
-                                                                            {t('detail.fields')}:{' '}
-                                                                            {change.fieldsChanged.join(
-                                                                                ', ',
-                                                                            )}
-                                                                        </div>
-                                                                    ) : null}
-                                                                </div>
-                                                            ))
-                                                        ) : (
-                                                            <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                                                                —
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-                                                        {t('detail.removed')}
-                                                    </p>
-                                                    <div className="space-y-2">
-                                                        {removedEntries.length > 0 ? (
-                                                            removedEntries.map((change) => (
-                                                                <div
-                                                                    key={`${entry.id}-${change.action}-${change.slug ?? change.name}`}
-                                                                    className="rounded-md border border-border bg-background px-3 py-2 text-sm dark:border-border-dark dark:bg-background-dark"
-                                                                >
-                                                                    <div className="font-medium text-text dark:text-text-dark">
-                                                                        {change.name}
-                                                                    </div>
-                                                                    {change.slug ? (
-                                                                        <div className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                                                                            {change.slug}
-                                                                        </div>
-                                                                    ) : null}
-                                                                </div>
-                                                            ))
-                                                        ) : (
-                                                            <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                                                                —
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
+                                            <HistoryExpandedDetail
+                                                entry={entry}
+                                                addedEntries={addedEntries}
+                                                updatedEntries={updatedEntries}
+                                                removedEntries={removedEntries}
+                                            />
                                         </td>
                                     </tr>
                                 ) : null}

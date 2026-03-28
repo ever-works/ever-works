@@ -48,9 +48,9 @@ export function ProviderSelectionSection({
                 <Accordion type="single" collapsible defaultValue="open">
                     <AccordionItem
                         value="open"
-                        className="rounded-lg border bg-card dark:bg-card-primary-dark/30 border-card-border dark:border-card-border-dark"
+                        className="rounded-lg border bg-card dark:bg-card-primary-dark/10 border-card-border dark:border-border-secondary-dark"
                     >
-                        <AccordionTrigger className="px-5 py-3.5 hover:no-underline hover:bg-surface-secondary/80 dark:hover:bg-surface-secondary-dark/80 bg-surface-secondary/50 dark:bg-surface-secondary-dark/50 border-b border-border dark:border-border-dark">
+                        <AccordionTrigger className="px-5 py-3.5 hover:no-underline hover:bg-surface-secondary/80 dark:hover:bg-surface-secondary-dark/80 bg-surface-secondary/50 dark:bg-transparent">
                             <div className="flex items-center gap-3">
                                 <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <Sliders className="w-4 h-4 text-primary" />

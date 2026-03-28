@@ -173,7 +173,7 @@ export default function DirectoriesClient({
                     href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
                     className={cn(
                         'px-6 py-2 rounded-lg font-medium transition-colors inline-flex items-center gap-2',
-                        'bg-primary-500 hover:bg-primary-700 text-white',
+                        'bg-black dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-white dark:text-black rounded-sm',
                     )}
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -302,13 +302,14 @@ export class AiOperations {
 	 * Test connection to the provider with a simple prompt.
 	 */
 	async testConnection(
-		configOverrides?: Partial<AiOperationsConfig>
+		configOverrides?: Partial<AiOperationsConfig>,
+		modelOverride?: string
 	): Promise<{ success: boolean; responseTime: number; error?: string }> {
 		const startTime = Date.now();
 
 		try {
 			const config = this.mergeConfig(configOverrides);
-			const llm = this.createChatModel(config, config.model);
+			const llm = this.createChatModel(config, modelOverride ?? config.model);
 
 			await llm.invoke([new HumanMessage('Respond with just "OK" to confirm you are working.')]);
 

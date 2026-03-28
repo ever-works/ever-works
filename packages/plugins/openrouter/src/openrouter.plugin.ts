@@ -253,7 +253,6 @@ export class OpenRouterPlugin extends BaseAiProvider {
 					buttonLabel: 'Bring your own key',
 					triggerField: 'apiKey'
 				},
-				validateOnSave: true,
 				includeInOnboarding: true,
 				onboardingPriority: 3,
 				completionFields: ['apiKey', 'defaultModel'],

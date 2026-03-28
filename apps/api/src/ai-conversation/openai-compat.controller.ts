@@ -36,7 +36,6 @@ export class OpenAiCompatController {
         @CurrentUser() auth: AuthenticatedUser,
         @Headers('x-provider-override') providerOverride: string | undefined,
         @Headers('x-directory-id') directoryId: string | undefined,
-        @Headers('x-conversation-id') conversationId: string | undefined,
         @Body() body: OpenAiChatCompletionRequestDto,
         @Res() res: Response,
     ): Promise<void> {
@@ -46,24 +45,13 @@ export class OpenAiCompatController {
             providerOverride,
         };
 
-        const persistenceContext = {
-            userId: auth.userId,
-            conversationId,
-            providerId: providerOverride,
-        };
-
         if (body.stream) {
             res.setHeader('Content-Type', 'text/event-stream');
             res.setHeader('Cache-Control', 'no-cache');
             res.setHeader('Connection', 'keep-alive');
             res.setHeader('X-Accel-Buffering', 'no');
 
-            await this.service.handleStreamingCompletion(
-                body,
-                facadeOptions,
-                res,
-                persistenceContext,
-            );
+            await this.service.handleStreamingCompletion(body, facadeOptions, res);
         } else {
             const result = await this.service.handleCompletion(body, facadeOptions);
             res.setHeader('Content-Type', 'application/json');
