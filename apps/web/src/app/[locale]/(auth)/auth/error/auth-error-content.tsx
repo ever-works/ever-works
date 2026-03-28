@@ -51,7 +51,7 @@ function AuthErrorContent() {
                 return t('verifyEmail.failed');
             case 'authorize_invalid_redirect_url':
                 return t('authorize.invalidRedirectUrl');
-            case 'email_doesn\'t_match':
+            case "email_doesn't_match":
                 return t('oauth.emailDoesNotMatch');
             case 'account_already_linked_to_different_user':
                 return t('oauth.accountAlreadyLinkedToDifferentUser');
@@ -66,7 +66,7 @@ function AuthErrorContent() {
             case 'oauth_invalid_state':
             case 'oauth_unsupported_provider':
             case 'oauth_callback':
-            case 'email_doesn\'t_match':
+            case "email_doesn't_match":
             case 'account_already_linked_to_different_user':
                 return (
                     <svg
@@ -255,7 +255,7 @@ function AuthErrorContent() {
         }
 
         if (
-            errorType === 'email_doesn\'t_match' ||
+            errorType === "email_doesn't_match" ||
             errorType === 'account_already_linked_to_different_user'
         ) {
             buttons.unshift(
