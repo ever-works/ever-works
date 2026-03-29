@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { LangfusePlugin } from '../langfuse.plugin.js';
+import { LangfusePlugin } from '../langfuse.plugin';
 import type { PluginContext } from '@ever-works/plugin';
 
 const mockPromptGet = vi.fn();
