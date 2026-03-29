@@ -19,7 +19,7 @@ const buttonVariants = {
     primary:
         'bg-black dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-white dark:text-black rounded-sm',
     secondary:
-        'bg-black dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark border border-border dark:border-border-dark text-text dark:text-black rounded-sm',
+        'bg-surface dark:bg-surface-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark border border-border dark:border-border-dark text-text dark:text-text-dark rounded-sm',
     ghost: 'bg-transparent hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark text-text dark:text-text-dark rounded-sm',
     danger: 'bg-danger hover:bg-danger/90 text-white rounded-sm',
     unstyled: '',
