@@ -312,11 +312,18 @@ export class AiOperations {
 			const config = this.mergeConfig(configOverrides);
 			const llm = this.createChatModel(config, modelOverride ?? config.model);
 
+			let timeoutHandle: ReturnType<typeof setTimeout>;
 			await Promise.race([
-				llm.invoke([new HumanMessage('Respond with just "OK" to confirm you are working.')]),
-				new Promise<never>((_, reject) =>
-					setTimeout(() => reject(new Error('Connection test timed out after 15s')), TIMEOUT_MS)
-				)
+				llm.invoke([new HumanMessage('Respond with just "OK" to confirm you are working.')]).then((r) => {
+					clearTimeout(timeoutHandle);
+					return r;
+				}),
+				new Promise<never>((_, reject) => {
+					timeoutHandle = setTimeout(
+						() => reject(new Error(`Connection test timed out after ${TIMEOUT_MS / 1000}s`)),
+						TIMEOUT_MS
+					);
+				})
 			]);
 
 			return {

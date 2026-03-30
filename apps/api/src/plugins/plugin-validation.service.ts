@@ -40,14 +40,18 @@ export class PluginValidationService {
         const VALIDATION_TIMEOUT_MS = 20_000;
 
         try {
+            let timeoutHandle: ReturnType<typeof setTimeout>;
             const result = await Promise.race([
-                this.validatePluginConnection(pluginId, userId, directoryId),
-                new Promise<never>((_, reject) =>
-                    setTimeout(
+                this.validatePluginConnection(pluginId, userId, directoryId).then((r) => {
+                    clearTimeout(timeoutHandle);
+                    return r;
+                }),
+                new Promise<never>((_, reject) => {
+                    timeoutHandle = setTimeout(
                         () => reject(new Error('Connection validation timed out')),
                         VALIDATION_TIMEOUT_MS,
-                    ),
-                ),
+                    );
+                }),
             ]);
             return result;
         } catch (error) {
