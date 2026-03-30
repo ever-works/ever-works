@@ -237,10 +237,10 @@ export class DirectoryGenerationService {
             );
 
             if (context.triggeredBy === 'schedule' && context.scheduleId) {
-                await this.directoryScheduleService.markRunFailed(
-                    context.scheduleId,
-                    'Invalid configuration (stale data). Please run a manual generation to fix.',
-                );
+                await this.directoryScheduleService.finalizeScheduleRun(context.scheduleId, {
+                    status: 'failed',
+                    reason: 'Invalid configuration (stale data). Please run a manual generation to fix.',
+                });
                 // Force pause immediately if config is broken
                 await this.directoryScheduleService.pauseSchedule(context.scheduleId);
             }
@@ -790,6 +790,12 @@ export class DirectoryGenerationService {
                 user,
             );
             if (!allowed) {
+                // validateRunEntitlement pauses the schedule, but doesn't clear
+                // lastRunStatus from GENERATING or scheduledFor — finalize explicitly.
+                await this.directoryScheduleService.finalizeScheduleRun(schedule.id, {
+                    status: 'skipped',
+                    reason: 'Entitlement check failed — schedule paused',
+                });
                 return;
             }
 

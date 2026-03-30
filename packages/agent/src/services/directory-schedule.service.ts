@@ -393,7 +393,7 @@ export class DirectoryScheduleService {
                 : null;
 
         await this.scheduleRepository.updateById(schedule.id, {
-            lastRunStatus: GenerateStatusType.ERROR,
+            lastRunStatus: null,
             lastRunAt: new Date(),
             nextRunAt,
             scheduledFor: null,
@@ -402,7 +402,7 @@ export class DirectoryScheduleService {
         await this.syncDirectory(schedule.directoryId, {
             ...schedule,
             nextRunAt,
-            lastRunStatus: GenerateStatusType.ERROR,
+            lastRunStatus: null,
         });
     }
 

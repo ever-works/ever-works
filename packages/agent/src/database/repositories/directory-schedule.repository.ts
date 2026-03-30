@@ -100,6 +100,11 @@ export class DirectoryScheduleRepository {
     /**
      * Atomically claim a schedule for dispatch.
      * Returns the original nextRunAt value if successful, or null if already claimed.
+     *
+     * Note: there is a theoretical TOCTOU gap between reading nextRunAt and the
+     * atomic UPDATE. In practice the window is microseconds, and the only way
+     * scheduledFor could be stale is if a full generation cycle completes between
+     * the two queries — which is effectively impossible.
      */
     async tryMarkDispatched(scheduleId: string): Promise<Date | null> {
         // Read the nextRunAt before clearing it so we can preserve it as scheduledFor
