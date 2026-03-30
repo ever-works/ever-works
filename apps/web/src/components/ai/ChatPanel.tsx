@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { ChatInterface } from './ChatInterface';
-import { ChevronLeft, Bot } from 'lucide-react';
+import { Bot } from 'lucide-react';
 
 const borderToggleClass = cn(
     'absolute -right-3 top-1/2 -translate-y-1/2 z-10',
@@ -21,7 +21,12 @@ interface ChatPanelProps {
     onClose: () => void;
 }
 
-export function ChatPanel({ open, onClose }: ChatPanelProps) {
+export function ChatPanel({
+    open,
+    onClose,
+    className,
+    style,
+}: ChatPanelProps & { className?: string; style?: React.CSSProperties }) {
     // Skip transition on first render to avoid flash when restoring from localStorage
     const hasMounted = useRef(false);
     useEffect(() => {
@@ -34,29 +39,24 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
         <div
             className={cn(
                 'relative h-full shrink-0',
-                hasMounted.current && 'transition-[width] duration-250 ease-in-out',
-                open ? 'w-95' : 'w-0',
+                hasMounted.current && 'transition-all duration-200',
+                className,
             )}
+            style={style}
         >
             <div
                 className={cn(
                     'absolute inset-0 flex flex-col overflow-hidden',
                     'bg-white dark:bg-surface-dark',
                     'border-r border-border dark:border-border-dark',
-                    hasMounted.current && 'transition-opacity duration-250 ease-in-out',
+                    hasMounted.current && 'transition-opacity duration-200',
                     open ? 'opacity-100' : 'opacity-0 pointer-events-none',
                 )}
             >
-                <div className="flex-1 flex flex-col min-h-0 w-95">
+                <div className="flex-1 flex flex-col min-h-0 w-full">
                     <ChatInterface />
                 </div>
             </div>
-
-            {open && (
-                <button onClick={onClose} className={borderToggleClass}>
-                    <ChevronLeft className="w-3 h-3" />
-                </button>
-            )}
         </div>
     );
 }

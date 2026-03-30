@@ -140,6 +140,10 @@ export class DirectoryGenerationHistoryRepository {
      * Find history records stuck in GENERATING whose directory is no longer generating.
      * These are orphaned records where the generation finished (or errored) at the directory
      * level but the history record was never updated — e.g. due to a crash or missed finally block.
+     *
+     * Safety: this query relies on recordGenerationStartTime always resetting
+     * generationFinishedAt to null. If that invariant changes, add a condition on
+     * d.generateStatus to exclude currently active generations.
      */
     async findOrphanedGenerating(): Promise<DirectoryGenerationHistory[]> {
         return this.repository

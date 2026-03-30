@@ -262,7 +262,7 @@ function ScheduleForm({
     );
 
     return (
-        <section className="rounded-2xl border border-card-border dark:border-card-border-dark bg-card dark:bg-card-dark p-6 shadow-sm space-y-6">
+        <section className="rounded-2xl border border-card-border dark:border-border-secondary-dark bg-card dark:bg-card-primary-dark/10 p-6 shadow-sm space-y-6">
             <header className="flex items-start justify-between gap-4">
                 <div className="space-y-2">
                     <p className="text-lg font-semibold text-text dark:text-text-dark">
@@ -298,7 +298,7 @@ function ScheduleForm({
 
             {/* Summary chips */}
             <div className="grid gap-3 @sm/main:grid-cols-2 @3xl/main:grid-cols-4">
-                <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-4 space-y-1">
+                <div className="rounded-xl border border-card-border dark:border-border-secondary-dark bg-card dark:bg-card-primary-dark/10 p-4 space-y-1">
                     <p className="text-xs uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
                         {t('summary.status')}
                     </p>

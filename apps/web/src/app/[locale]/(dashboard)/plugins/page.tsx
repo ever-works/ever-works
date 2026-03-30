@@ -17,7 +17,7 @@ export default async function PluginsPage() {
     }));
 
     return (
-        <div className="w-full">
+        <div className="w-full overflow-auto">
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-text dark:text-text-dark">{t('title')}</h1>
                 <p className="text-text-muted dark:text-text-muted-dark mt-2">{t('subtitle')}</p>

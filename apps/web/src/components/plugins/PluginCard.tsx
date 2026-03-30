@@ -44,10 +44,10 @@ export function PluginCard({ plugin }: PluginCardProps) {
         <>
             <div
                 className={cn(
-                    'bg-surface dark:bg-surface-dark rounded-lg border border-border dark:border-border-dark p-4',
+                    'bg-surface dark:bg-surface-dark rounded-lg border border-border dark:border-border-dark p-4 min-w-[200px]',
                     'transition-all hover:shadow-md',
                     'flex flex-col h-full',
-                    (optimisticEnabled || plugin.systemPlugin) && 'ring-2 ring-primary/20',
+                    (optimisticEnabled || plugin.systemPlugin) && 'ring-1 ring-primary/20',
                 )}
             >
                 <div className="flex items-start gap-3">

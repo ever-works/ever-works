@@ -45,6 +45,7 @@ interface DashboardSidebarProps {
     onOpenHelp?: () => void;
     chatOpen?: boolean;
     onOpenChat?: () => void;
+    onInteraction?: () => void;
 }
 
 function ConditionalTooltip({
@@ -73,6 +74,7 @@ export function DashboardSidebar({
     onOpenHelp,
     chatOpen,
     onOpenChat,
+    onInteraction,
 }: DashboardSidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
@@ -173,6 +175,7 @@ export function DashboardSidebar({
                                 variant="primary"
                                 size="icon"
                                 className="w-9 h-9 shadow-sm rounded-xl"
+                                onClick={() => onInteraction?.()}
                             >
                                 <Plus className="w-5 h-5" />
                             </Button>
@@ -184,6 +187,7 @@ export function DashboardSidebar({
                             size="sm"
                             fullWidth
                             className="shadow-s dark:border"
+                            onClick={() => onInteraction?.()}
                         >
                             <Plus className="w-5 h-5" />
                             <span className="font-medium">{t('newDirectory')}</span>
@@ -212,6 +216,7 @@ export function DashboardSidebar({
                                     <ConditionalTooltip show={isCollapsed} content={item.name}>
                                         <Link
                                             href={item.href}
+                                            onClick={() => onInteraction?.()}
                                             className={cn(
                                                 'flex items-center rounded-sm transition-colors border border-transparent',
                                                 isCollapsed
@@ -302,7 +307,10 @@ export function DashboardSidebar({
                                 </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                    onClick={() => router.push(ROUTES.DASHBOARD_SETTINGS)}
+                                    onClick={() => {
+                                        onInteraction?.();
+                                        router.push(ROUTES.DASHBOARD_SETTINGS);
+                                    }}
                                     className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
                                 >
                                     <Settings className="w-4 h-4 mr-2 shrink-0" />
@@ -310,6 +318,7 @@ export function DashboardSidebar({
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                     onClick={() => {
+                                        onInteraction?.();
                                         window.open('https://docs.ever.works', '_blank');
                                     }}
                                     className="cursor-pointer px-3 rounded-sm hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
@@ -319,6 +328,7 @@ export function DashboardSidebar({
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                     onClick={() => {
+                                        onInteraction?.();
                                         window.open(
                                             'https://github.com/ever-works/ever-works/issues',
                                             '_blank',
@@ -330,7 +340,10 @@ export function DashboardSidebar({
                                     {t('profileMenu.support')}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                    onClick={onOpenHelp}
+                                    onClick={() => {
+                                        onInteraction?.();
+                                        onOpenHelp?.();
+                                    }}
                                     disabled={!onOpenHelp}
                                     className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
                                 >
@@ -339,7 +352,10 @@ export function DashboardSidebar({
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                    onClick={handleLogout}
+                                    onClick={() => {
+                                        onInteraction?.();
+                                        handleLogout();
+                                    }}
                                     disabled={isPending}
                                     className="text-danger hover:bg-danger/10 cursor-pointer px-3"
                                 >
