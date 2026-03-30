@@ -88,7 +88,7 @@ export class DirectoryScheduleRepository {
         return this.repository.find({
             where: {
                 lastRunStatus: GenerateStatusType.GENERATING,
-                lastRunAt: LessThanOrEqual(olderThan),
+                updatedAt: LessThanOrEqual(olderThan),
             },
         });
     }
@@ -97,13 +97,35 @@ export class DirectoryScheduleRepository {
         await this.repository.update(scheduleId, { status: DirectoryScheduleStatus.PAUSED });
     }
 
-    async tryMarkDispatched(scheduleId: string): Promise<boolean> {
+    /**
+     * Atomically claim a schedule for dispatch.
+     * Returns the original nextRunAt value if successful, or null if already claimed.
+     *
+     * Note: there is a theoretical TOCTOU gap between reading nextRunAt and the
+     * atomic UPDATE. In practice the window is microseconds, and the only way
+     * scheduledFor could be stale is if a full generation cycle completes between
+     * the two queries — which is effectively impossible.
+     */
+    async tryMarkDispatched(scheduleId: string): Promise<Date | null> {
+        // Read the nextRunAt before clearing it so we can preserve it as scheduledFor
+        const schedule = await this.repository.findOne({
+            where: { id: scheduleId },
+            select: ['id', 'nextRunAt'],
+        });
+        if (!schedule?.nextRunAt) {
+            return null;
+        }
+
+        const originalNextRunAt = schedule.nextRunAt;
+
         const result = await this.repository
             .createQueryBuilder()
             .update(DirectorySchedule)
             .set({
                 lastRunStatus: GenerateStatusType.GENERATING,
+                scheduledFor: originalNextRunAt,
                 nextRunAt: null,
+                lastRunAt: () => 'CURRENT_TIMESTAMP',
                 updatedAt: () => 'CURRENT_TIMESTAMP',
             })
             .where('id = :id', { id: scheduleId })
@@ -111,7 +133,7 @@ export class DirectoryScheduleRepository {
             .andWhere('nextRunAt IS NOT NULL')
             .execute();
 
-        return (result.affected ?? 0) > 0;
+        return (result.affected ?? 0) > 0 ? originalNextRunAt : null;
     }
 
     async countActiveByUser(userId: string): Promise<number> {

@@ -451,6 +451,7 @@ export class DirectoryQueryService {
             activityType: record.activityType,
             changelog: record.changelog ?? null,
             logs: record.logs ?? null,
+            triggeredBy: record.triggeredBy ?? null,
         };
     }
 

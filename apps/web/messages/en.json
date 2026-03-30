@@ -1010,6 +1010,10 @@
                     "stepLogs": "Step Logs",
                     "changes": "Changes"
                 },
+                "trigger": {
+                    "schedule": "Scheduled",
+                    "api": "API"
+                },
                 "filters": {
                     "label": "Activity",
                     "all": "All activity",
