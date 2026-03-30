@@ -46,6 +46,9 @@ export function DashboardLayoutClient({
     const draggingRef = useRef(false);
     const prevWidthRef = useRef<number | null>(null);
     const [mainStyle, setMainStyle] = useState<React.CSSProperties | undefined>(undefined);
+    const [isMobile, setIsMobile] = useState<boolean>(() =>
+        typeof window !== 'undefined' ? window.innerWidth < 768 : false,
+    );
 
     const setChatOpen = useCallback((value: boolean, resetOnOpen = true) => {
         setChatOpenRaw(value);
@@ -110,7 +113,10 @@ export function DashboardLayoutClient({
 
     useEffect(() => {
         setMainStyle(computeMainStyle());
-        const onResize = () => setMainStyle(computeMainStyle());
+        const onResize = () => {
+            setIsMobile(window.innerWidth < 768);
+            setMainStyle(computeMainStyle());
+        };
         window.addEventListener('resize', onResize);
         return () => window.removeEventListener('resize', onResize);
     }, [computeMainStyle, sidebarCollapsed, chatWidth, chatOpen]);
@@ -126,14 +132,36 @@ export function DashboardLayoutClient({
 
     // Drag behavior: attach pointermove/up when drag starts to ensure immediate response
 
-    const handleSidebarCollapsedChange = useCallback((value: boolean) => {
-        setSidebarCollapsedRaw(value);
-        document.cookie = `sidebar-collapsed=${value ? '1' : '0'}; ${COOKIE_OPTS}`;
-    }, []);
+    const handleSidebarCollapsedChange = useCallback(
+        (value: boolean) => {
+            setSidebarCollapsedRaw(value);
+            document.cookie = `sidebar-collapsed=${value ? '1' : '0'}; ${COOKIE_OPTS}`;
+
+            // If collapsing the sidebar while chat is expanded, immediately hide
+            // the main content to keep focus on expanded chat.
+            if (value && isChatExpanded) {
+                setMainStyle({ width: 0, flex: '0 0 0', transition: 'width 200ms ease' });
+            }
+        },
+        [isChatExpanded],
+    );
 
     const openHelp = useCallback(() => setHelpOpen(true), []);
     const closeHelp = useCallback(() => setHelpOpen(false), []);
     const toggleChat = useCallback(() => setChatOpen(!chatOpen), [chatOpen, setChatOpen]);
+
+    // Ensure chat is in resizable (non-expanded) mode. Used when user interacts
+    // with the sidebar so we collapse the expanded view back to the resizable width.
+    const ensureResizableMode = useCallback(() => {
+        if (isChatExpanded) {
+            setIsChatExpanded(false);
+            setMainStyle(undefined);
+            try {
+                const v = localStorage.getItem('chat-width');
+                setChatWidth(v ? parseInt(v, 10) : DEFAULT_CHAT_WIDTH);
+            } catch (e) {}
+        }
+    }, [isChatExpanded]);
 
     const handleCollapse = useCallback(() => {
         if (chatOpen) {
@@ -211,19 +239,50 @@ export function DashboardLayoutClient({
                     onOpenHelp={openHelp}
                     chatOpen={chatOpen}
                     onOpenChat={toggleChat}
+                    onInteraction={ensureResizableMode}
                 />
 
-                {/* AI Chat panel — sits between sidebar and main content */}
-                <div
-                    ref={chatRef}
-                    className="relative h-full"
-                    style={{ width: chatOpen ? chatWidth : 0, transition: 'width 200ms ease' }}
-                >
-                    <ChatPanel open={chatOpen} onClose={toggleChat} style={{ width: '100%' }} />
-                </div>
+                {/* AI Chat panel — side panel on desktop, full-screen overlay on mobile */}
+                {!isMobile ? (
+                    <div
+                        ref={chatRef}
+                        className="relative h-full"
+                        style={{ width: chatOpen ? chatWidth : 0, transition: 'width 200ms ease' }}
+                    >
+                        <ChatPanel open={chatOpen} onClose={toggleChat} style={{ width: '100%' }} />
+                    </div>
+                ) : (
+                    chatOpen && (
+                        <div className="fixed inset-0 z-50 flex">
+                            <div
+                                className="absolute inset-0 bg-black/40"
+                                onClick={() => setChatOpen(false)}
+                            />
+                            <div className="relative w-full h-full bg-transparent">
+                                <div className="h-full bg-white dark:bg-surface-dark shadow-lg">
+                                    <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+                                        <div className="text-sm font-medium">Chat</div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                aria-label="Close chat"
+                                                onClick={() => setChatOpen(false)}
+                                                className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-surface-secondary"
+                                            >
+                                                <ChevronRight className="w-4 h-4 rotate-180" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="h-[calc(100%-48px)]">
+                                        <ChatPanel open={chatOpen} onClose={toggleChat} style={{ width: '100%', height: '100%' }} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                )}
 
                 {/* Resize controls: collapse / drag handle / expand (only when chat is open) */}
-                {chatOpen && (
+                {chatOpen && !isMobile && (
                     <div className="flex flex-col items-center justify-center px-1">
                         <div className="flex flex-col border-r border-y rounded-r-sm -ml-1 bg-white dark:bg-surface-dark">
                             <Tooltip content="Collapse chat" position="left">

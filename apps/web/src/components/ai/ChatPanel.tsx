@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { ChatInterface } from './ChatInterface';
-import { ChevronLeft, Bot } from 'lucide-react';
+import {  Bot } from 'lucide-react';
 
 const borderToggleClass = cn(
     'absolute -right-3 top-1/2 -translate-y-1/2 z-10',
@@ -21,7 +21,12 @@ interface ChatPanelProps {
     onClose: () => void;
 }
 
-export function ChatPanel({ open, onClose, className, style }: ChatPanelProps & { className?: string; style?: React.CSSProperties }) {
+export function ChatPanel({
+    open,
+    onClose,
+    className,
+    style,
+}: ChatPanelProps & { className?: string; style?: React.CSSProperties }) {
     // Skip transition on first render to avoid flash when restoring from localStorage
     const hasMounted = useRef(false);
     useEffect(() => {
@@ -32,7 +37,11 @@ export function ChatPanel({ open, onClose, className, style }: ChatPanelProps & 
 
     return (
         <div
-            className={cn('relative h-full shrink-0', hasMounted.current && 'transition-all duration-200', className)}
+            className={cn(
+                'relative h-full shrink-0',
+                hasMounted.current && 'transition-all duration-200',
+                className,
+            )}
             style={style}
         >
             <div
