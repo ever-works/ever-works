@@ -107,10 +107,9 @@ export class ConversationController {
         if (!conversation.title) {
             const firstUser = body.messages.find((m) => m.role === 'user');
             if (firstUser?.content) {
+                const normalised = firstUser.content.replace(/\s+/g, ' ').trim();
                 const title =
-                    firstUser.content.length <= 60
-                        ? firstUser.content
-                        : firstUser.content.substring(0, 57) + '...';
+                    normalised.length <= 60 ? normalised : normalised.substring(0, 57) + '...';
                 await this.repo.updateTitle(id, auth.userId, title);
             }
         }
