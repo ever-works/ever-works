@@ -10,3 +10,8 @@ export type GenerationTriggerContext = OperationTriggerContext & {
 };
 
 export const DEFAULT_TRIGGER_CONTEXT: OperationTriggerContext = { triggeredBy: 'user' };
+
+export type ScheduleRunOutcome =
+    | { status: 'completed'; historyId?: string }
+    | { status: 'failed'; reason?: string }
+    | { status: 'skipped'; reason: string };

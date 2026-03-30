@@ -136,6 +136,20 @@ export class DirectoryGenerationHistoryRepository {
         await this.repository.update(id, { logs: [...existing, ...newLogs] });
     }
 
+    /**
+     * Find history records stuck in GENERATING whose directory is no longer generating.
+     * These are orphaned records where the generation finished (or errored) at the directory
+     * level but the history record was never updated — e.g. due to a crash or missed finally block.
+     */
+    async findOrphanedGenerating(): Promise<DirectoryGenerationHistory[]> {
+        return this.repository
+            .createQueryBuilder('h')
+            .innerJoin('h.directory', 'd')
+            .where('h.status = :historyStatus', { historyStatus: GenerateStatusType.GENERATING })
+            .andWhere('d.generationFinishedAt IS NOT NULL')
+            .getMany();
+    }
+
     async deleteEntry(id: string): Promise<void> {
         await this.repository.delete(id);
     }
