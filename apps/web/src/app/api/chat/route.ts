@@ -1,4 +1,4 @@
-import type { UIMessage } from 'ai';
+import { consumeStream, type UIMessage } from 'ai';
 import { runAgent } from '@/lib/ai/agent';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
 import { refreshAccessToken } from '@/lib/auth/refresh';
@@ -60,6 +60,7 @@ export async function POST(request: Request) {
 
     return result.toUIMessageStreamResponse({
         originalMessages: messages,
+        consumeSseStream: consumeStream,
         onFinish: ({ messages: allMessages }) => {
             if (conversationId) {
                 saveConversationMessages({
