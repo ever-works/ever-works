@@ -89,6 +89,7 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
                             <button
                                 type="button"
                                 onClick={onStop}
+                                aria-label="Stop generating"
                                 className="flex cursor-pointer items-center justify-center w-7 h-7 rounded-lg bg-danger/10 text-danger hover:bg-danger/20 transition-all duration-150"
                             >
                                 <Square className="w-3 h-3" />
@@ -96,6 +97,7 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
                         ) : (
                             <button
                                 type="submit"
+                                aria-label={t('sendButton')}
                                 className={cn(
                                     'flex cursor-pointer items-center justify-center w-7 h-7 rounded-lg transition-all duration-150',
                                     'bg-primary dark:bg-primary/80 text-white hover:bg-primary-hover dark:hover:bg-primary/90 shadow-sm',
