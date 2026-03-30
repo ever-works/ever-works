@@ -37,6 +37,7 @@ import type { ScheduleRunOutcome } from './types/trigger-context.types';
 export class DirectoryScheduleService {
     private readonly logger = new Logger(DirectoryScheduleService.name);
     private readonly RETRY_DELAY_MINUTES = 15;
+    private readonly IDEMPOTENT_WINDOW_MINUTES = 5;
 
     constructor(
         private readonly scheduleRepository: DirectoryScheduleRepository,
@@ -385,11 +386,13 @@ export class DirectoryScheduleService {
 
         this.logger.warn(`Schedule ${schedule.id} skipped: ${reason}`);
 
-        // Reschedule using the original cadence — don't penalize the schedule
+        // Reschedule using the original cadence — don't penalize the schedule.
+        // If the anchor is in the past, use now() to avoid a rapid retry loop.
         const anchorDate = this.resolveAnchorDate(schedule);
+        const baseDate = anchorDate.getTime() > Date.now() ? anchorDate : new Date();
         const nextRunAt =
             schedule.status === DirectoryScheduleStatus.ACTIVE && schedule.cadence
-                ? new Date(anchorDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000)
+                ? new Date(baseDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000)
                 : null;
 
         await this.scheduleRepository.updateById(schedule.id, {
@@ -454,9 +457,8 @@ export class DirectoryScheduleService {
         if (!schedule.lastRunAt) {
             return false;
         }
-        // If marked ERROR within the last 5 minutes, consider it a duplicate call
-        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-        return schedule.lastRunAt.getTime() > fiveMinutesAgo;
+        const windowMs = this.IDEMPOTENT_WINDOW_MINUTES * 60 * 1000;
+        return schedule.lastRunAt.getTime() > Date.now() - windowMs;
     }
 
     async validateRunEntitlement(schedule: DirectorySchedule, user: User): Promise<boolean> {
