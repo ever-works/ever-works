@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    ConflictException,
     HttpException,
     Inject,
     Injectable,
@@ -93,7 +94,11 @@ export interface BulkCaptureImagesResponseDto {
     message?: string;
 }
 
-import { GenerationTriggerContext, DEFAULT_TRIGGER_CONTEXT } from './types/trigger-context.types';
+import {
+    GenerationTriggerContext,
+    DEFAULT_TRIGGER_CONTEXT,
+    type ScheduleRunOutcome,
+} from './types/trigger-context.types';
 
 export type UpdateItemsGeneratorOptions = {
     directoryId: string;
@@ -140,6 +145,7 @@ export class DirectoryGenerationService {
     ): Promise<ItemsGeneratorResponseDto> {
         // Require editor role to generate/update items
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
+        this.ensureNotAlreadyGenerating(directory);
         const triggerContext = this.resolveContext(context);
 
         const scopeOptions = { userId: user.id, directoryId };
@@ -189,6 +195,24 @@ export class DirectoryGenerationService {
 
         // Require editor role to generate/update items
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
+
+        // For scheduled runs, skip gracefully if directory is busy (don't penalize the schedule)
+        if (
+            directory.generateStatus?.status === GenerateStatusType.GENERATING &&
+            context.triggeredBy === 'schedule' &&
+            context.scheduleId
+        ) {
+            await this.directoryScheduleService.finalizeScheduleRun(context.scheduleId, {
+                status: 'skipped',
+                reason: 'Directory already has a generation in progress',
+            });
+            return {
+                slug: directory.slug,
+                status: 'skipped' as any,
+                message: 'Skipped — directory already generating',
+            };
+        }
+        this.ensureNotAlreadyGenerating(directory);
         const triggerContext = this.resolveContext(context);
 
         let lastRequestData;
@@ -213,10 +237,10 @@ export class DirectoryGenerationService {
             );
 
             if (context.triggeredBy === 'schedule' && context.scheduleId) {
-                await this.directoryScheduleService.markRunFailed(
-                    context.scheduleId,
-                    'Invalid configuration (stale data). Please run a manual generation to fix.',
-                );
+                await this.directoryScheduleService.finalizeScheduleRun(context.scheduleId, {
+                    status: 'failed',
+                    reason: 'Invalid configuration (stale data). Please run a manual generation to fix.',
+                });
                 // Force pause immediately if config is broken
                 await this.directoryScheduleService.pauseSchedule(context.scheduleId);
             }
@@ -752,47 +776,67 @@ export class DirectoryGenerationService {
     }
 
     async runScheduledUpdate(schedule: DirectorySchedule) {
-        const user =
-            (schedule.user as User) || (await this.userRepository.findById(schedule.userId));
+        let user: User | null = null;
+        try {
+            user = (schedule.user as User) || (await this.userRepository.findById(schedule.userId));
 
-        if (!user) {
-            throw new NotFoundException('User not found for scheduled update');
+            if (!user) {
+                throw new NotFoundException('User not found for scheduled update');
+            }
+
+            // Enforce plan limits (e.g. if user downgraded)
+            const allowed = await this.directoryScheduleService.validateRunEntitlement(
+                schedule,
+                user,
+            );
+            if (!allowed) {
+                // validateRunEntitlement pauses the schedule, but doesn't clear
+                // lastRunStatus from GENERATING or scheduledFor — finalize explicitly.
+                await this.directoryScheduleService.finalizeScheduleRun(schedule.id, {
+                    status: 'skipped',
+                    reason: 'Entitlement check failed — schedule paused',
+                });
+                return;
+            }
+
+            const directory =
+                (schedule.directory as Directory) ||
+                (await this.directoryRepository.findById(schedule.directoryId));
+
+            // Handle sync for directories with a source repository
+            if (directory?.sourceRepository) {
+                return await this.runScheduledSync(directory, user, schedule);
+            }
+
+            const updateDto: UpdateItemsGeneratorDto = {
+                update_with_pull_request: schedule.alwaysCreatePullRequest ?? false,
+            };
+
+            if (schedule.providerOverrides) {
+                updateDto.providers = schedule.providerOverrides;
+            }
+
+            return await this.updateItemsGenerator({
+                directoryId: schedule.directoryId,
+                updateDto,
+                user,
+                awaitCompletion: false,
+                context: {
+                    triggeredBy: 'schedule',
+                    scheduleId: schedule.id,
+                    billingMode: schedule.billingMode,
+                },
+            });
+        } catch (error) {
+            // Ensure the schedule is finalized even for early failures (e.g. user deleted,
+            // entitlement check throws). Inner methods handle their own finalization,
+            // and markRunFailed is idempotent, so a duplicate call here is harmless.
+            await this.directoryScheduleService.finalizeScheduleRun(schedule.id, {
+                status: 'failed',
+                reason: (error as Error)?.message,
+            });
+            throw error;
         }
-
-        // Enforce plan limits (e.g. if user downgraded)
-        const allowed = await this.directoryScheduleService.validateRunEntitlement(schedule, user);
-        if (!allowed) {
-            return;
-        }
-
-        const directory =
-            (schedule.directory as Directory) ||
-            (await this.directoryRepository.findById(schedule.directoryId));
-
-        // Handle sync for directories with a source repository
-        if (directory?.sourceRepository) {
-            return this.runScheduledSync(directory, user, schedule);
-        }
-
-        const updateDto: UpdateItemsGeneratorDto = {
-            update_with_pull_request: schedule.alwaysCreatePullRequest ?? false,
-        };
-
-        if (schedule.providerOverrides) {
-            updateDto.providers = schedule.providerOverrides;
-        }
-
-        return this.updateItemsGenerator({
-            directoryId: schedule.directoryId,
-            updateDto,
-            user,
-            awaitCompletion: false,
-            context: {
-                triggeredBy: 'schedule',
-                scheduleId: schedule.id,
-                billingMode: schedule.billingMode,
-            },
-        });
     }
 
     /**
@@ -851,10 +895,9 @@ export class DirectoryGenerationService {
         historyId: string,
     ): Promise<void> {
         await Promise.all([
-            this.directoryScheduleService.markRunCompleted({
-                scheduleId,
+            this.directoryScheduleService.finalizeScheduleRun(scheduleId, {
+                status: 'completed',
                 historyId,
-                status: GenerateStatusType.GENERATED,
             }),
             this.directoryRepository.recordGenerationFinishTime(directoryId, new Date()),
             this.directoryRepository.updateGenerateStatus(directoryId, {
@@ -871,7 +914,10 @@ export class DirectoryGenerationService {
         errorMessage?: string,
     ): Promise<void> {
         await Promise.all([
-            this.directoryScheduleService.markRunFailed(scheduleId, errorMessage),
+            this.directoryScheduleService.finalizeScheduleRun(scheduleId, {
+                status: 'failed',
+                reason: errorMessage,
+            }),
             this.generationHistoryRepository.updateEntry(historyId, {
                 status: GenerateStatusType.ERROR,
                 errorMessage,
@@ -1097,9 +1143,99 @@ export class DirectoryGenerationService {
     ) {
         const startTime = new Date();
 
+        await this.markGenerationStarted(directory.id, startTime, history);
+
+        const acc: { stats: GenerationStats | null; warnings?: string[] } = {
+            stats: null,
+        };
+        let generationError: unknown = null;
+
+        try {
+            await this.executeGenerationPipeline(directory, user, dto, context, acc);
+        } catch (error) {
+            generationError = error;
+        } finally {
+            try {
+                await this.finalizeGeneration({
+                    directoryId: directory.id,
+                    startTime,
+                    history,
+                    error: generationError,
+                    stats: acc.stats,
+                    warnings: acc.warnings,
+                    context,
+                });
+            } catch (finalizeError) {
+                this.logger.error('Failed to finalize generation status:', finalizeError);
+            }
+        }
+
+        this.eventEmitter.emit(
+            DirectoryGenerationCompletedEvent.EVENT_NAME,
+            new DirectoryGenerationCompletedEvent(directory),
+        );
+
+        if (generationError) {
+            this.logger.error('Error during generation:', generationError);
+            await this.handleErrorNotification(generationError, user, directory);
+
+            if (generationError instanceof HttpException) {
+                throw generationError;
+            }
+        }
+    }
+
+    /**
+     * Runs the actual data → markdown → website pipeline.
+     * Collects warnings/stats into the provided accumulator so they survive errors.
+     */
+    private async executeGenerationPipeline(
+        directory: Directory,
+        user: User,
+        dto: CreateItemsGeneratorDto,
+        context: GenerationTriggerContext,
+        acc: { stats: GenerationStats | null; warnings?: string[] },
+    ): Promise<void> {
+        const generated = await this.dataGenerator.initialize(directory, user, dto, {
+            tryResume: context.triggeredBy === 'schedule',
+        });
+
+        acc.warnings = generated.warnings;
+
+        if (generated.success === false) {
+            const { error } = generated;
+            this.logger.error(`Data generation failed: ${error.message}`);
+            throw error.cause || new Error(error.message);
+        }
+
+        acc.stats = generated.stats;
+        const newItemsCount = generated.stats?.newItemsCount ?? 0;
+        const updatedItemsCount = generated.stats?.updatedItemsCount ?? 0;
+
+        if (newItemsCount > 0 || updatedItemsCount > 0) {
+            await this.markdownGenerator.initialize(directory, user, {
+                generation_method: dto.generation_method,
+                pr_update: generated.prUpdate,
+            });
+        }
+
+        if (generated.hasExistingItems || newItemsCount > 0) {
+            await this.websiteGenerator.initialize(
+                directory,
+                user,
+                dto.website_repository_creation_method,
+            );
+        }
+    }
+
+    private async markGenerationStarted(
+        directoryId: string,
+        startTime: Date,
+        history?: DirectoryGenerationHistory,
+    ): Promise<void> {
         await Promise.all([
-            this.directoryRepository.recordGenerationStartTime(directory.id, startTime),
-            this.directoryRepository.updateGenerateStatus(directory.id, {
+            this.directoryRepository.recordGenerationStartTime(directoryId, startTime),
+            this.directoryRepository.updateGenerateStatus(directoryId, {
                 status: GenerateStatusType.GENERATING,
             }),
         ]);
@@ -1110,119 +1246,62 @@ export class DirectoryGenerationService {
                 status: GenerateStatusType.GENERATING,
             });
         }
+    }
 
-        let hasError = false;
-        let generationStats: GenerationStats | null = null;
-        let generationWarnings: string[] | undefined;
+    /**
+     * Guarantees that directory, history, and schedule all reach a terminal state.
+     * Called from finally — runs regardless of success or failure.
+     */
+    private async finalizeGeneration(params: {
+        directoryId: string;
+        startTime: Date;
+        history?: DirectoryGenerationHistory;
+        error: unknown;
+        stats: GenerationStats | null;
+        warnings?: string[];
+        context: GenerationTriggerContext;
+    }): Promise<void> {
+        const { directoryId, startTime, history, error, stats, warnings, context } = params;
+        const endTime = new Date();
+        const durationInSeconds = calculateDurationSeconds(startTime, endTime);
+        const finalStatus = error ? GenerateStatusType.ERROR : GenerateStatusType.GENERATED;
 
-        try {
-            const generated = await this.dataGenerator.initialize(directory, user, dto, {
-                tryResume: context.triggeredBy === 'schedule',
+        // 1. Finalize directory status
+        await Promise.all([
+            this.directoryRepository.recordGenerationFinishTime(directoryId, endTime),
+            this.directoryRepository.updateGenerateStatus(directoryId, {
+                status: finalStatus,
+                ...(error ? { error: normalizeGeneratorError(error) } : { step: null }),
+                warnings,
+            }),
+        ]);
+
+        // 2. Finalize history record
+        if (history) {
+            await this.generationHistoryRepository.updateEntry(history.id, {
+                status: finalStatus,
+                finishedAt: endTime,
+                durationInSeconds,
+                ...(error ? { errorMessage: normalizeGeneratorError(error) } : {}),
+                ...buildStatsUpdate(stats),
             });
-
-            generationWarnings = generated.warnings;
-
-            if (generated.success === false) {
-                const { error } = generated;
-                this.logger.error(`Data generation failed: ${error.message}`);
-                throw error.cause || new Error(error.message);
-            }
-
-            generationStats = generated.stats;
-            const newItemsCount = generated.stats?.newItemsCount ?? 0;
-            const updatedItemsCount = generated.stats?.updatedItemsCount ?? 0;
-
-            if (newItemsCount > 0 || updatedItemsCount > 0) {
-                await this.markdownGenerator.initialize(directory, user, {
-                    generation_method: dto.generation_method,
-                    pr_update: generated.prUpdate,
-                });
-            }
-
-            if (generated.hasExistingItems || newItemsCount > 0) {
-                await this.websiteGenerator.initialize(
-                    directory,
-                    user,
-                    dto.website_repository_creation_method,
-                );
-            }
-
-            if (history) {
-                await this.generationHistoryRepository.updateEntry(history.id, {
-                    ...buildStatsUpdate(generationStats),
-                });
-            }
-        } catch (error) {
-            const endTime = new Date();
-
-            await Promise.all([
-                this.directoryRepository.recordGenerationFinishTime(directory.id, endTime),
-                this.directoryRepository.updateGenerateStatus(directory.id, {
-                    status: GenerateStatusType.ERROR,
-                    error: normalizeGeneratorError(error),
-                    warnings: generationWarnings,
-                }),
-            ]);
-
-            if (history) {
-                await this.generationHistoryRepository.updateEntry(history.id, {
-                    status: GenerateStatusType.ERROR,
-                    finishedAt: endTime,
-                    durationInSeconds: calculateDurationSeconds(startTime, endTime),
-                    errorMessage: normalizeGeneratorError(error),
-                    ...buildStatsUpdate(generationStats),
-                });
-            }
-
-            if (error instanceof HttpException) {
-                throw error;
-            }
-
-            hasError = true;
-
-            this.logger.error('Error during generation:', error);
-
-            // Notify user of account-level errors
-            await this.handleErrorNotification(error, user, directory);
         }
 
-        if (!hasError) {
-            await Promise.all([
-                this.directoryRepository.recordGenerationFinishTime(directory.id, new Date()),
-                this.directoryRepository.updateGenerateStatus(directory.id, {
-                    status: GenerateStatusType.GENERATED,
-                    step: null,
-                    warnings: generationWarnings,
-                }),
-            ]);
-
-            if (history) {
-                const endTime = new Date();
-                await this.generationHistoryRepository.updateEntry(history.id, {
-                    status: GenerateStatusType.GENERATED,
-                    finishedAt: endTime,
-                    durationInSeconds: calculateDurationSeconds(startTime, endTime),
-                    ...buildStatsUpdate(generationStats),
-                });
-            }
-        }
-
+        // 3. Finalize schedule
         if (context.triggeredBy === 'schedule' && context.scheduleId) {
-            if (!hasError) {
-                await this.directoryScheduleService.markRunCompleted({
-                    scheduleId: context.scheduleId,
-                    historyId: history?.id,
-                    status: GenerateStatusType.GENERATED,
-                });
-            } else {
-                await this.directoryScheduleService.markRunFailed(context.scheduleId);
-            }
+            const outcome: ScheduleRunOutcome = error
+                ? { status: 'failed', reason: normalizeGeneratorError(error) }
+                : { status: 'completed', historyId: history?.id };
+            await this.directoryScheduleService.finalizeScheduleRun(context.scheduleId, outcome);
         }
+    }
 
-        this.eventEmitter.emit(
-            DirectoryGenerationCompletedEvent.EVENT_NAME,
-            new DirectoryGenerationCompletedEvent(directory),
-        );
+    private ensureNotAlreadyGenerating(directory: Directory): void {
+        if (directory.generateStatus?.status === GenerateStatusType.GENERATING) {
+            throw new ConflictException(
+                `Directory "${directory.name}" already has a generation in progress`,
+            );
+        }
     }
 
     private resolveContext(context?: GenerationTriggerContext): GenerationTriggerContext {

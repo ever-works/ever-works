@@ -142,6 +142,9 @@ export const config = {
         getMaxFailureBeforePause() {
             return parseInt(process.env.SCHEDULED_UPDATES_MAX_FAILURE_BEFORE_PAUSE || '3');
         },
+        getScheduleStuckTimeoutMinutes() {
+            return parseInt(process.env.SCHEDULE_STUCK_TIMEOUT_MINUTES || '180');
+        },
         getPayPerUsePriceCents() {
             const usd = parseFloat(process.env.PAY_PER_USE_PRICE_USD || '5');
             return Math.max(0, Math.round(usd * 100));

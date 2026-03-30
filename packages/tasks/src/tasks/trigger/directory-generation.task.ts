@@ -94,6 +94,8 @@ export const directoryGenerationTask = task({
                     });
                 }
             } catch (error) {
+                // Mark schedule as failed. The onFailure handler also calls markRunFailed,
+                // but markRunFailed is idempotent so the duplicate call is harmless.
                 if (payload.triggerSource === 'schedule' && payload.scheduleId) {
                     await scheduleService.markRunFailed(
                         payload.scheduleId,
