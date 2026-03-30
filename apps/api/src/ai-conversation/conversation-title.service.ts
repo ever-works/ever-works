@@ -84,10 +84,14 @@ export class ConversationTitleService {
     }
 
     private async resolveFacadeOptions(userId: string): Promise<FacadeOptions> {
-        const directories = await this.directoryRepository.findByUser(userId);
-        return {
-            userId,
-            directoryId: directories[0]?.id,
-        };
+        try {
+            const directories = await this.directoryRepository.findByUser(userId);
+            return {
+                userId,
+                directoryId: directories[0]?.id,
+            };
+        } catch {
+            return { userId };
+        }
     }
 }

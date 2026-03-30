@@ -117,7 +117,7 @@ export function ChatToolResult({ toolName, state, output, errorText }: ChatToolR
         if (!isDone || !output) return;
         if (toolName === 'navigate') {
             const data = output as NavigateOutput;
-            if (data.url) router.push(data.url);
+            if (data.url && data.url.startsWith('/')) router.push(data.url);
         }
         if (toolName === 'reloadPage') {
             router.refresh();
