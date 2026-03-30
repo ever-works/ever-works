@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Search } from 'lucide-react';
 import { UserPlugin } from '@/lib/api/plugins';
@@ -16,33 +17,45 @@ interface PluginGridProps {
 }
 
 function groupByCategory(plugins: UserPlugin[]): Record<string, UserPlugin[]> {
-    return plugins.reduce(
-        (acc, plugin) => {
-            (acc[plugin.category] ??= []).push(plugin);
-            return acc;
-        },
-        {} as Record<string, UserPlugin[]>,
-    );
+    return plugins.reduce((acc, plugin) => {
+        (acc[plugin.category] ??= []).push(plugin);
+        return acc;
+    }, {} as Record<string, UserPlugin[]>);
 }
 
-const GRID = 'grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4';
+const GRID = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4';
 
 export function PluginGrid({ plugins, grouped, searchQuery, onClearSearch }: PluginGridProps) {
     const t = useTranslations('dashboard.plugins');
 
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const [isHidden, setIsHidden] = useState(false);
+
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el || typeof ResizeObserver === 'undefined') return;
+
+        const ro = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const w = entry.contentRect.width;
+                setIsHidden(w < 100);
+            }
+        });
+
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+
     if (plugins.length === 0) {
         return (
-            <div className="text-center py-16">
+            <div ref={containerRef} className="text-center py-16">
                 {searchQuery ? (
                     <>
                         <Search className="w-10 h-10 text-text-muted dark:text-text-muted-dark mx-auto mb-3 opacity-40" />
                         <p className="text-text-secondary dark:text-text-secondary-dark font-medium">
                             {t('searchEmpty', { query: searchQuery })}
                         </p>
-                        <button
-                            onClick={onClearSearch}
-                            className="mt-2 text-sm text-primary hover:text-primary-hover"
-                        >
+                        <button onClick={onClearSearch} className="mt-2 text-sm text-primary hover:text-primary-hover">
                             {t('filters.clearSearch')}
                         </button>
                     </>
@@ -55,16 +68,15 @@ export function PluginGrid({ plugins, grouped, searchQuery, onClearSearch }: Plu
 
     if (!grouped) {
         return (
-            <div className={GRID}>
-                {plugins.map((plugin) => (
-                    <PluginCard key={plugin.pluginId} plugin={plugin} />
-                ))}
+            <div ref={containerRef} className={`${GRID} min-h-0`}>
+                {!isHidden &&
+                    plugins.map((plugin) => <PluginCard key={plugin.pluginId} plugin={plugin} />)}
             </div>
         );
     }
 
     return (
-        <div className="space-y-8">
+        <div ref={containerRef} className="space-y-8">
             {Object.entries(groupByCategory(plugins))
                 .sort(([a], [b]) => compareCategoryOrder(a, b))
                 .map(([category, categoryPlugins]) => (
@@ -72,10 +84,11 @@ export function PluginGrid({ plugins, grouped, searchQuery, onClearSearch }: Plu
                         <h2 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
                             {getCategoryLabel(category)}
                         </h2>
-                        <div className={GRID}>
-                            {categoryPlugins.map((plugin) => (
-                                <PluginCard key={plugin.pluginId} plugin={plugin} />
-                            ))}
+                        <div className={`${GRID} min-h-0`}>
+                            {!isHidden &&
+                                categoryPlugins.map((plugin) => (
+                                    <PluginCard key={plugin.pluginId} plugin={plugin} />
+                                ))}
                         </div>
                     </div>
                 ))}

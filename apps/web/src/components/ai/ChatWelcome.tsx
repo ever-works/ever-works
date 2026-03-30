@@ -44,7 +44,7 @@ export function ChatWelcome({ onSuggestion }: ChatWelcomeProps) {
                 </p>
             </div>
 
-            <div className="flex flex-wrap gap-1.5 mb-4">
+            <div className="flex flex-wrap gap-1.5 mb-2">
                 {suggestionKeys.map((key) => {
                     const text = ts(key);
                     return (
