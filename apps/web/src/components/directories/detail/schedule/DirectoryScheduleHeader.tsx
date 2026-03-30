@@ -8,7 +8,7 @@ export function DirectoryScheduleHeader() {
     const pageT = useTranslations('dashboard.directoryDetail.schedule.page');
 
     return (
-        <header className="rounded-2xl border border-card-border dark:border-card-border-dark bg-card dark:bg-card-dark p-6 shadow-sm space-y-2">
+        <header className="rounded-2xl border border-card-border dark:border-border-secondary-dark bg-card dark:bg-card-primary-dark/10 p-6 shadow-sm space-y-2">
             <p className="text-2xl font-semibold text-text dark:text-text-dark">{pageT('title')}</p>
             <p className="text-sm text-text-secondary dark:text-text-secondary-dark max-w-2xl">
                 {pageT('subtitle', {

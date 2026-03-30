@@ -34,7 +34,7 @@ export function ChatWelcome({ onSuggestion }: ChatWelcomeProps) {
     const ts = useTranslations('dashboard.aiChat.suggestions');
 
     return (
-        <div className="flex flex-col h-full px-5 py-6 overflow-y-auto">
+        <div className="flex flex-col h-full px-5 py-6 overflow-y-auto max-w-150 mx-auto">
             <div className="mb-6">
                 <h2 className="text-lg font-semibold text-text dark:text-white tracking-tight">
                     {t('welcomeTitle')}
@@ -44,7 +44,7 @@ export function ChatWelcome({ onSuggestion }: ChatWelcomeProps) {
                 </p>
             </div>
 
-            <div className="flex flex-wrap gap-1.5 mb-4">
+            <div className="flex flex-wrap gap-1.5 mb-2">
                 {suggestionKeys.map((key) => {
                     const text = ts(key);
                     return (
@@ -55,9 +55,9 @@ export function ChatWelcome({ onSuggestion }: ChatWelcomeProps) {
                             className={cn(
                                 'inline-flex items-center px-2.5 py-1.5 rounded-lg text-[11px] font-medium',
                                 'border border-border dark:border-white/8',
-                                'bg-surface-secondary/60 dark:bg-white/[0.04]',
+                                'bg-surface-secondary/60 dark:bg-white/4',
                                 'text-text-secondary dark:text-text-secondary-dark',
-                                'hover:bg-surface-tertiary/60 dark:hover:bg-white/[0.08]',
+                                'hover:bg-surface-tertiary/60 dark:hover:bg-white/8',
                                 'hover:text-text dark:hover:text-white',
                                 'hover:border-primary/20 dark:hover:border-white/15',
                                 'transition-all duration-150 cursor-pointer',
@@ -90,7 +90,7 @@ export function ChatWelcome({ onSuggestion }: ChatWelcomeProps) {
                         className={cn(
                             'flex flex-col gap-2 p-3 rounded-xl',
                             'border border-border dark:border-white/6',
-                            'bg-surface-secondary/40 dark:bg-white/[0.025]',
+                            'bg-surface-secondary/40 dark:bg-white/2',
                         )}
                     >
                         <div
