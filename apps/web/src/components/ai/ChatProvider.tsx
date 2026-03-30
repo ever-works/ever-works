@@ -175,7 +175,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
             if (!conversationIdRef.current) {
                 try {
-                    const title = text.length <= 60 ? text : text.substring(0, 57) + '...';
+                    const normalised = text.replace(/\s+/g, ' ').trim();
+                    const title =
+                        normalised.length <= 60 ? normalised : normalised.substring(0, 57) + '...';
                     const conv = await createConversation(selectedProviderRef.current, title);
                     updateConversationId(conv.id);
                 } catch {

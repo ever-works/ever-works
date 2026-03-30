@@ -69,7 +69,7 @@ export class ConversationTitleService {
     /**
      * Extract readable text from a message, falling back to parts if content is empty.
      */
-    private extractMessageText(message: { content: string; parts?: unknown }): string {
+    private extractMessageText(message: { content?: string | null; parts?: unknown }): string {
         if (message.content?.trim()) return message.content;
 
         // Fall back to parts — extract text parts
