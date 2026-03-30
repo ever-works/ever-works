@@ -31,8 +31,8 @@ const remarkPlugins = [remarkGfm];
 
 function ScrollableTable(props: ComponentPropsWithoutRef<'table'>) {
     return (
-        <div className="overflow-x-auto">
-            <table {...props} />
+        <div className="overflow-x-auto -mx-3 px-3">
+            <table className="min-w-full" {...props} />
         </div>
     );
 }
