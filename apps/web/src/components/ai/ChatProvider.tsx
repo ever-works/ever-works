@@ -175,7 +175,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
             if (!conversationIdRef.current) {
                 try {
-                    const conv = await createConversation(selectedProviderRef.current);
+                    const title = text.length <= 60 ? text : text.substring(0, 57) + '...';
+                    const conv = await createConversation(selectedProviderRef.current, title);
                     updateConversationId(conv.id);
                 } catch {
                     toast.error(t('errors.unableToSend'));

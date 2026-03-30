@@ -30,7 +30,10 @@ export class ConversationTitleService {
             const summary = conversation.messages
                 .filter((m) => m.role === 'user' || m.role === 'assistant')
                 .slice(-4)
-                .map((m) => `${m.role}: ${m.content.substring(0, 200)}`)
+                .map((m) => {
+                    const text = this.extractMessageText(m);
+                    return `${m.role}: ${text.substring(0, 200)}`;
+                })
                 .join('\n');
 
             const response = await this.aiFacade.createChatCompletion(
@@ -61,6 +64,23 @@ export class ConversationTitleService {
         } catch (err) {
             this.logger.debug('AI title generation failed', err);
         }
+    }
+
+    /**
+     * Extract readable text from a message, falling back to parts if content is empty.
+     */
+    private extractMessageText(message: { content: string; parts?: unknown }): string {
+        if (message.content?.trim()) return message.content;
+
+        // Fall back to parts — extract text parts
+        if (Array.isArray(message.parts)) {
+            return (message.parts as Array<{ type: string; text?: string }>)
+                .filter((p) => p.type === 'text' && p.text)
+                .map((p) => p.text!)
+                .join(' ');
+        }
+
+        return '';
     }
 
     private async resolveFacadeOptions(userId: string): Promise<FacadeOptions> {

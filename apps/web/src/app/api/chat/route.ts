@@ -52,13 +52,19 @@ export async function POST(request: Request) {
 
     result.consumeStream();
 
+    // The SDK sends all messages including the new user message in the request body.
+    // To correctly diff new vs existing, originalMessages should exclude the last user message
+    // since it hasn't been persisted yet.
+    const lastMessage = messages[messages.length - 1];
+    const previousMessages = lastMessage?.role === 'user' ? messages.slice(0, -1) : messages;
+
     return result.toUIMessageStreamResponse({
         originalMessages: messages,
         onFinish: ({ messages: allMessages }) => {
             if (conversationId) {
                 saveConversationMessages({
                     conversationId,
-                    originalMessages: messages,
+                    originalMessages: previousMessages,
                     allMessages,
                     model: resolvedModel,
                     usage: resolvedUsage,
