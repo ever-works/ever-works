@@ -306,12 +306,25 @@ export class AiOperations {
 		modelOverride?: string
 	): Promise<{ success: boolean; responseTime: number; error?: string }> {
 		const startTime = Date.now();
+		const TIMEOUT_MS = 15_000;
 
 		try {
 			const config = this.mergeConfig(configOverrides);
 			const llm = this.createChatModel(config, modelOverride ?? config.model);
 
-			await llm.invoke([new HumanMessage('Respond with just "OK" to confirm you are working.')]);
+			let timeoutHandle: ReturnType<typeof setTimeout>;
+			await Promise.race([
+				llm.invoke([new HumanMessage('Respond with just "OK" to confirm you are working.')]).then((r) => {
+					clearTimeout(timeoutHandle);
+					return r;
+				}),
+				new Promise<never>((_, reject) => {
+					timeoutHandle = setTimeout(
+						() => reject(new Error(`Connection test timed out after ${TIMEOUT_MS / 1000}s`)),
+						TIMEOUT_MS
+					);
+				})
+			]);
 
 			return {
 				success: true,

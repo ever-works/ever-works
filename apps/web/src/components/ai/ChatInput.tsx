@@ -47,10 +47,10 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
             <form onSubmit={handleSubmit}>
                 <div
                     className={cn(
-                        'relative flex flex-col rounded-xl border transition-colors',
+                        'relative flex flex-col rounded-xl border transition-colors  max-w-200 mx-auto',
                         'bg-white dark:bg-surface-dark',
-                        'border-border dark:border-white/8',
-                        'focus-within:border-primary/40 dark:focus-within:border-white/15',
+                        'border-border dark:border-white/20',
+                        'focus-within:border-primary/60 dark:focus-within:border-white/30',
                         'shadow-sm',
                     )}
                 >

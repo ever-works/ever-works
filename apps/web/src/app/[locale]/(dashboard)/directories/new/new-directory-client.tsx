@@ -54,7 +54,7 @@ export default function NewDirectoryClient({
                     </p>
                 </div>
 
-                <div className="grid md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {/* AI Creation Card */}
                     <button
                         onClick={() => setCreationMode('ai')}
@@ -227,7 +227,7 @@ export default function NewDirectoryClient({
             </div>
 
             {/* Git Provider Selector Sidebar */}
-            <aside className="w-80 shrink-0">
+            <aside className="hidden md:block w-80 shrink-0">
                 <div
                     className={cn(
                         'sticky top-8 p-1 rounded-lg space-y-6 shadow-xs',
@@ -270,6 +270,49 @@ export default function NewDirectoryClient({
                     </div>
                 </div>
             </aside>
+            {/* Mobile: provider selector below content */}
+            <div className="block md:hidden mt-6">
+                <div
+                    className={cn(
+                        'p-1 rounded-lg space-y-6 shadow-xs',
+                        'bg-card/10 dark:bg-card-primary-dark/30',
+                        'border border-card-border dark:border-border-secondary-dark',
+                    )}
+                >
+                    <div
+                        className={cn(
+                            'p-4 rounded-sm relative overflow-hidden',
+                            'bg-card dark:bg-card-secondary-dark/30',
+                            'border border-card-border dark:border-border-secondary-dark',
+                        )}
+                    >
+                        <div className="relative z-20 mb-4">
+                            <h3 className="font-bold text-sm text-text dark:text-text-dark mb-2">
+                                {t('sidebar.selectedProvider')}
+                            </h3>
+                            <GitProviderSelector
+                                providers={providers}
+                                selectedProviderId={selectedProviderId}
+                                onSelect={setSelectedProviderId}
+                                compact
+                            />
+                        </div>
+                        {deployProviders.length > 0 && (
+                            <div className="relative z-20 mb-4">
+                                <h3 className="font-bold text-sm text-text dark:text-text-dark mb-2">
+                                    {t('sidebar.selectedDeployProvider')}
+                                </h3>
+                                <DeployProviderSelector
+                                    providers={deployProviders}
+                                    selectedProviderId={selectedDeployProviderId}
+                                    onSelect={setSelectedDeployProviderId}
+                                    compact
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
