@@ -43,7 +43,7 @@ export function DashboardLayoutClient({
     });
     const [isChatExpanded, setIsChatExpanded] = useState(false);
     const chatRef = useRef<HTMLDivElement | null>(null);
-    
+
     const prevWidthRef = useRef<number | null>(null);
     const [mainStyle, setMainStyle] = useState<React.CSSProperties | undefined>(undefined);
     const [isMobile, setIsMobile] = useState<boolean>(() =>
