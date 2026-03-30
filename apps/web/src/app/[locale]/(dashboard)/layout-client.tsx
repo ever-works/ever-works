@@ -43,7 +43,7 @@ export function DashboardLayoutClient({
     });
     const [isChatExpanded, setIsChatExpanded] = useState(false);
     const chatRef = useRef<HTMLDivElement | null>(null);
-    const draggingRef = useRef(false);
+    
     const prevWidthRef = useRef<number | null>(null);
     const [mainStyle, setMainStyle] = useState<React.CSSProperties | undefined>(undefined);
     const [isMobile, setIsMobile] = useState<boolean>(() =>
@@ -187,9 +187,9 @@ export function DashboardLayoutClient({
         setIsChatExpanded(true);
     }, [chatWidth, sidebarCollapsed]);
 
-    const startDrag = useCallback((e: any) => {
+    const startDrag = useCallback((e: React.PointerEvent<Element>) => {
         e.preventDefault();
-        draggingRef.current = true;
+        // Use currentTarget/target cast to Element to call setPointerCapture
         (e.target as Element).setPointerCapture?.(e.pointerId);
 
         const handlePointerMove = (ev: PointerEvent) => {
@@ -203,7 +203,6 @@ export function DashboardLayoutClient({
         };
 
         const handlePointerUp = (ev: PointerEvent) => {
-            draggingRef.current = false;
             window.removeEventListener('pointermove', handlePointerMove);
             window.removeEventListener('pointerup', handlePointerUp);
         };
