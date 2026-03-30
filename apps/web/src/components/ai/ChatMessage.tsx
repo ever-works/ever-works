@@ -34,8 +34,8 @@ function ChatMessageInner({ message, isStreaming, isLastMessage }: ChatMessagePr
                 className={cn(
                     'max-w-[90%] rounded-lg px-3 py-2 wrap-break-word overflow-hidden',
                     isUser
-                        ? 'bg-primary/10 dark:bg-card-primary-dark text-text dark:text-text-dark'
-                        : 'bg-surface-secondary dark:bg-surface-tertiary-dark/50 text-text dark:text-text-dark',
+                        ? 'bg-primary/10 dark:bg-white/9 text-text dark:text-text-dark'
+                        : 'bg-surface-secondary dark:bg-white/2 text-text dark:text-text-dark',
                 )}
             >
                 <ChatMessageContent

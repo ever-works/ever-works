@@ -47,29 +47,26 @@ export function DashboardLayoutClient({
     const prevWidthRef = useRef<number | null>(null);
     const [mainStyle, setMainStyle] = useState<React.CSSProperties | undefined>(undefined);
 
-    const setChatOpen = useCallback(
-        (value: boolean, resetOnOpen = true) => {
-            setChatOpenRaw(value);
-            document.cookie = `chat-panel-open=${value ? '1' : '0'}; ${COOKIE_OPTS}`;
+    const setChatOpen = useCallback((value: boolean, resetOnOpen = true) => {
+        setChatOpenRaw(value);
+        document.cookie = `chat-panel-open=${value ? '1' : '0'}; ${COOKIE_OPTS}`;
 
-            if (value) {
-                if (resetOnOpen) {
-                    // When reopening the chat normally, reset to resizable (non-expanded) mode
-                    // and restore the last saved resizable width if available.
-                    setIsChatExpanded(false);
-                    setMainStyle(undefined);
-                    try {
-                        const v = localStorage.getItem('chat-width');
-                        setChatWidth(v ? parseInt(v, 10) : DEFAULT_CHAT_WIDTH);
-                    } catch (e) {}
-                }
-            } else {
-                // If closing chat, clear any main-style overrides so layout returns to normal
+        if (value) {
+            if (resetOnOpen) {
+                // When reopening the chat normally, reset to resizable (non-expanded) mode
+                // and restore the last saved resizable width if available.
+                setIsChatExpanded(false);
                 setMainStyle(undefined);
+                try {
+                    const v = localStorage.getItem('chat-width');
+                    setChatWidth(v ? parseInt(v, 10) : DEFAULT_CHAT_WIDTH);
+                } catch (e) {}
             }
-        },
-        [],
-    );
+        } else {
+            // If closing chat, clear any main-style overrides so layout returns to normal
+            setMainStyle(undefined);
+        }
+    }, []);
 
     useEffect(() => {
         try {
