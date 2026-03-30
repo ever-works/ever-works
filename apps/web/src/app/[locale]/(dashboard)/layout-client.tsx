@@ -273,7 +273,11 @@ export function DashboardLayoutClient({
                                         </div>
                                     </div>
                                     <div className="h-[calc(100%-48px)]">
-                                        <ChatPanel open={chatOpen} onClose={toggleChat} style={{ width: '100%', height: '100%' }} />
+                                        <ChatPanel
+                                            open={chatOpen}
+                                            onClose={toggleChat}
+                                            style={{ width: '100%', height: '100%' }}
+                                        />
                                     </div>
                                 </div>
                             </div>

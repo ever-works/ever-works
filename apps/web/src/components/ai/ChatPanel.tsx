@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { ChatInterface } from './ChatInterface';
-import {  Bot } from 'lucide-react';
+import { Bot } from 'lucide-react';
 
 const borderToggleClass = cn(
     'absolute -right-3 top-1/2 -translate-y-1/2 z-10',
