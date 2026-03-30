@@ -1,6 +1,6 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, type ComponentPropsWithoutRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils/cn';
@@ -29,10 +29,24 @@ const markdownClass = cn(
 
 const remarkPlugins = [remarkGfm];
 
+function ScrollableTable(props: ComponentPropsWithoutRef<'table'>) {
+    return (
+        <div className="overflow-x-auto -mx-3 px-3">
+            <table className="min-w-full" {...props} />
+        </div>
+    );
+}
+
+const markdownComponents = {
+    table: ScrollableTable,
+};
+
 export const ChatMarkdown = memo(function ChatMarkdown({ content }: ChatMarkdownProps) {
     return (
         <div className={markdownClass}>
-            <ReactMarkdown remarkPlugins={remarkPlugins}>{content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
+                {content}
+            </ReactMarkdown>
         </div>
     );
 });

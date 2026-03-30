@@ -17,8 +17,11 @@ export async function getConversation(id: string): Promise<ConversationDetail> {
     return conversationsAPI.get(id);
 }
 
-export async function createConversation(providerId?: string): Promise<ConversationSummary> {
-    return conversationsAPI.create({ providerId });
+export async function createConversation(
+    providerId?: string,
+    title?: string,
+): Promise<ConversationSummary> {
+    return conversationsAPI.create({ providerId, title });
 }
 
 export async function deleteConversation(id: string): Promise<void> {
