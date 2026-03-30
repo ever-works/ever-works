@@ -17,13 +17,17 @@ interface PluginGridProps {
 }
 
 function groupByCategory(plugins: UserPlugin[]): Record<string, UserPlugin[]> {
-    return plugins.reduce((acc, plugin) => {
-        (acc[plugin.category] ??= []).push(plugin);
-        return acc;
-    }, {} as Record<string, UserPlugin[]>);
+    return plugins.reduce(
+        (acc, plugin) => {
+            (acc[plugin.category] ??= []).push(plugin);
+            return acc;
+        },
+        {} as Record<string, UserPlugin[]>,
+    );
 }
 
-const GRID = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4';
+const GRID =
+    'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4';
 
 export function PluginGrid({ plugins, grouped, searchQuery, onClearSearch }: PluginGridProps) {
     const t = useTranslations('dashboard.plugins');
@@ -55,7 +59,10 @@ export function PluginGrid({ plugins, grouped, searchQuery, onClearSearch }: Plu
                         <p className="text-text-secondary dark:text-text-secondary-dark font-medium">
                             {t('searchEmpty', { query: searchQuery })}
                         </p>
-                        <button onClick={onClearSearch} className="mt-2 text-sm text-primary hover:text-primary-hover">
+                        <button
+                            onClick={onClearSearch}
+                            className="mt-2 text-sm text-primary hover:text-primary-hover"
+                        >
                             {t('filters.clearSearch')}
                         </button>
                     </>
