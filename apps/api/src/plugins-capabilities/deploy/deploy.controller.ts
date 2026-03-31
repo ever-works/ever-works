@@ -386,6 +386,19 @@ export class DeployController {
             batchDeployDto.teamScope,
         );
 
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                actionType: ActivityActionType.DEPLOYMENT,
+                action: 'deployment.batch_started',
+                status: ActivityStatus.IN_PROGRESS,
+                summary: `Batch deployed ${batchDeployDto.directories.length} directories`,
+                details: {
+                    directoryIds: batchDeployDto.directories.map((item) => item.directoryId),
+                },
+            })
+            .catch(() => {});
+
         for (const deployResult of result.results) {
             if (deployResult.status === 'pending' && deployResult.directoryId) {
                 const { directory } = await this.ownershipService.ensureCanEdit(

@@ -298,11 +298,29 @@ export class PluginsController {
         @Body() dto: EnableDirectoryPluginDto,
     ): Promise<DirectoryPluginResponseDto> {
         await this.ownershipService.ensureCanEdit(directoryId, auth.userId);
-        return this.pluginsService.enablePluginForDirectory(directoryId, pluginId, auth.userId, {
-            settings: dto.settings,
-            activeCapability: dto.activeCapability,
-            priority: dto.priority,
-        });
+        const result = await this.pluginsService.enablePluginForDirectory(
+            directoryId,
+            pluginId,
+            auth.userId,
+            {
+                settings: dto.settings,
+                activeCapability: dto.activeCapability,
+                priority: dto.priority,
+            },
+        );
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId,
+                actionType: ActivityActionType.PLUGIN_ENABLED,
+                action: 'directory.plugin_enabled',
+                status: ActivityStatus.COMPLETED,
+                summary: `Enabled plugin ${pluginId} for directory`,
+            })
+            .catch(() => {});
+
+        return result;
     }
 
     @Post('directories/:directoryId/plugins/:pluginId/disable')
@@ -324,7 +342,24 @@ export class PluginsController {
         @Param('pluginId') pluginId: string,
     ): Promise<DirectoryPluginResponseDto> {
         await this.ownershipService.ensureCanEdit(directoryId, auth.userId);
-        return this.pluginsService.disablePluginForDirectory(directoryId, pluginId, auth.userId);
+        const result = await this.pluginsService.disablePluginForDirectory(
+            directoryId,
+            pluginId,
+            auth.userId,
+        );
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId,
+                actionType: ActivityActionType.PLUGIN_DISABLED,
+                action: 'directory.plugin_disabled',
+                status: ActivityStatus.COMPLETED,
+                summary: `Disabled plugin ${pluginId} for directory`,
+            })
+            .catch(() => {});
+
+        return result;
     }
 
     @Patch('directories/:directoryId/plugins/:pluginId/settings')
@@ -362,6 +397,17 @@ export class PluginsController {
             auth.userId,
             directoryId,
         );
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId,
+                actionType: ActivityActionType.PLUGIN_CONFIGURED,
+                action: 'directory.plugin_configured',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated plugin settings for ${pluginId}`,
+            })
+            .catch(() => {});
 
         return { ...result, validation };
     }

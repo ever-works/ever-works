@@ -634,14 +634,16 @@ export class DirectoriesController {
     ): Promise<SubmitItemResponseDto> {
         const user = await this.authService.getUser(auth.userId);
         const result = await this.directoryGenerationService.submitItem(id, submitItemDto, user);
-        this.activityLogService.log({
-            userId: auth.userId,
-            directoryId: id,
-            actionType: ActivityActionType.ITEM_ADDED,
-            action: 'item.submitted',
-            status: ActivityStatus.COMPLETED,
-            summary: `Added item: ${submitItemDto.name || 'New item'}`,
-        }).catch(() => {});
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.ITEM_ADDED,
+                action: 'item.submitted',
+                status: ActivityStatus.COMPLETED,
+                summary: `Added item: ${submitItemDto.name || 'New item'}`,
+            })
+            .catch(() => {});
         return result;
     }
 
@@ -657,14 +659,16 @@ export class DirectoriesController {
     ): Promise<RemoveItemResponseDto> {
         const user = await this.authService.getUser(auth.userId);
         const result = await this.directoryGenerationService.removeItem(id, removeItemDto, user);
-        this.activityLogService.log({
-            userId: auth.userId,
-            directoryId: id,
-            actionType: ActivityActionType.ITEM_REMOVED,
-            action: 'item.removed',
-            status: ActivityStatus.COMPLETED,
-            summary: `Removed item`,
-        }).catch(() => {});
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.ITEM_REMOVED,
+                action: 'item.removed',
+                status: ActivityStatus.COMPLETED,
+                summary: `Removed item`,
+            })
+            .catch(() => {});
         return result;
     }
 
@@ -682,7 +686,11 @@ export class DirectoriesController {
         @Body() updateItemDto: UpdateItemDto,
     ) {
         const user = await this.authService.getUser(auth.userId);
-        const result = await this.directoryGenerationService.updateItemMetadata(id, updateItemDto, user);
+        const result = await this.directoryGenerationService.updateItemMetadata(
+            id,
+            updateItemDto,
+            user,
+        );
 
         this.activityLogService
             .log({
@@ -1014,7 +1022,24 @@ export class DirectoriesController {
         @Body() importDto: ImportDirectoryDto,
     ): Promise<ImportDirectoryResponseDto> {
         const user = await this.authService.getUser(auth.userId);
-        return this.directoryImportService.initiateImport(importDto, user);
+        const result = await this.directoryImportService.initiateImport(importDto, user);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                actionType: ActivityActionType.IMPORT,
+                action: 'directory.import_started',
+                status: ActivityStatus.IN_PROGRESS,
+                summary: `Started directory import`,
+                details: {
+                    sourceUrl: importDto.sourceUrl,
+                    sourceType: importDto.sourceType,
+                    gitProvider: importDto.gitProvider,
+                },
+            })
+            .catch(() => {});
+
+        return result;
     }
 
     @Get('directories/import/repositories')
@@ -1056,6 +1081,18 @@ export class DirectoriesController {
     ) {
         const result = await this.directoryTaxonomyService.createCategory(id, dto, auth.userId);
         await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.SETTINGS_UPDATED,
+                action: 'taxonomy.category_created',
+                status: ActivityStatus.COMPLETED,
+                summary: `Created category: ${dto.name}`,
+            })
+            .catch(() => {});
+
         return result;
     }
 
@@ -1074,6 +1111,19 @@ export class DirectoriesController {
             auth.userId,
         );
         await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.SETTINGS_UPDATED,
+                action: 'taxonomy.category_updated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated category`,
+                details: { categoryId, name: dto.name },
+            })
+            .catch(() => {});
+
         return result;
     }
 
@@ -1090,6 +1140,19 @@ export class DirectoriesController {
             auth.userId,
         );
         await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.SETTINGS_UPDATED,
+                action: 'taxonomy.category_deleted',
+                status: ActivityStatus.COMPLETED,
+                summary: `Deleted category`,
+                details: { categoryId },
+            })
+            .catch(() => {});
+
         return result;
     }
 
@@ -1103,6 +1166,18 @@ export class DirectoriesController {
     ) {
         const result = await this.directoryTaxonomyService.createTag(id, dto, auth.userId);
         await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.SETTINGS_UPDATED,
+                action: 'taxonomy.tag_created',
+                status: ActivityStatus.COMPLETED,
+                summary: `Created tag: ${dto.name}`,
+            })
+            .catch(() => {});
+
         return result;
     }
 
@@ -1116,6 +1191,19 @@ export class DirectoriesController {
     ) {
         const result = await this.directoryTaxonomyService.updateTag(id, tagId, dto, auth.userId);
         await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.SETTINGS_UPDATED,
+                action: 'taxonomy.tag_updated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated tag`,
+                details: { tagId, name: dto.name },
+            })
+            .catch(() => {});
+
         return result;
     }
 
@@ -1128,6 +1216,19 @@ export class DirectoriesController {
     ) {
         const result = await this.directoryTaxonomyService.deleteTag(id, tagId, auth.userId);
         await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.SETTINGS_UPDATED,
+                action: 'taxonomy.tag_deleted',
+                status: ActivityStatus.COMPLETED,
+                summary: `Deleted tag`,
+                details: { tagId },
+            })
+            .catch(() => {});
+
         return result;
     }
 

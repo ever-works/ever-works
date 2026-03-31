@@ -209,12 +209,12 @@ class ActivityLogService {
 
 ### REST API Endpoints
 
-| Method   | Path                              | Description                                                  |
-| -------- | --------------------------------- | ------------------------------------------------------------ |
-| `GET`    | `/api/activity-log`               | List activities (paginated, filtered, searchable)            |
-| `GET`    | `/api/activity-log/running-count` | Count of in_progress activities (for badge)                  |
-| `GET`    | `/api/activity-log/:id`           | Get single activity with full details                        |
-| `GET`    | `/api/activity-log/export`        | Export activity log as CSV                                   |
+| Method | Path                              | Description                                       |
+| ------ | --------------------------------- | ------------------------------------------------- |
+| `GET`  | `/api/activity-log`               | List activities (paginated, filtered, searchable) |
+| `GET`  | `/api/activity-log/running-count` | Count of in_progress activities (for badge)       |
+| `GET`  | `/api/activity-log/:id`           | Get single activity with full details             |
+| `GET`  | `/api/activity-log/export`        | Export activity log as CSV                        |
 
 > **Note:** Retry failed and dismiss were removed per review feedback. Retry may be added in a future PR for specific action types (e.g., generation). Activity log entries are permanent audit records.
 

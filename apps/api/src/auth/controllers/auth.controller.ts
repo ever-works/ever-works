@@ -63,15 +63,17 @@ export class AuthController {
         const userAgent = req.headers['user-agent'];
         const ipAddress = req.ip || req.headers['x-forwarded-for'];
         const result = await this.authService.login(req.user, userAgent, ipAddress);
-        this.activityLogService.log({
-            userId: req.user.id,
-            actionType: ActivityActionType.USER_LOGIN,
-            action: 'user.login',
-            status: ActivityStatus.COMPLETED,
-            summary: 'Signed in',
-            ipAddress,
-            userAgent,
-        }).catch(() => {});
+        this.activityLogService
+            .log({
+                userId: req.user.id,
+                actionType: ActivityActionType.USER_LOGIN,
+                action: 'user.login',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Signed in',
+                ipAddress,
+                userAgent,
+            })
+            .catch(() => {});
         return result;
     }
 
