@@ -254,7 +254,7 @@ export function DashboardSidebar({
                         isCollapsed ? 'px-2' : 'px-4',
                     )}
                 >
-                    <div className="py-2">
+                    <div className="flex items-center gap-2 py-1 relative">
                         <DropdownMenu>
                             <DropdownMenuTrigger
                                 className={cn(
