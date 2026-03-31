@@ -58,7 +58,7 @@ export function DashboardHeader({
                             <div>
                                 <ThemeToggle
                                     variant="inline"
-                                    className="p-2 rounded-md text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark hover:bg-surface dark:hover:bg-surface-secondary-dark"
+                                    className="rounded-md text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark hover:bg-surface dark:hover:bg-surface-secondary-dark"
                                 />
                             </div>
                         </Tooltip>
@@ -67,13 +67,13 @@ export function DashboardHeader({
                             <button
                                 onClick={onHelpClick}
                                 className={cn(
-                                    'p-2 rounded-md',
+                                    'rounded-md cursor-pointer',
                                     'text-text-secondary dark:text-text-secondary-dark',
                                     'hover:text-text dark:hover:text-text-dark',
                                     'hover:bg-surface dark:hover:bg-surface-secondary-dark',
                                 )}
                             >
-                                <HelpCircle className="w-5 h-5" />
+                                <HelpCircle className="w-3.5 h-3.5" />
                             </button>
                         </Tooltip>
                     </div>

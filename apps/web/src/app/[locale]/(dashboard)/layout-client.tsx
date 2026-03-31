@@ -197,7 +197,7 @@ export function DashboardLayoutClient({
             const rect = chatRef.current.getBoundingClientRect();
             const maxWidth = Math.floor(window.innerWidth * 0.5);
             const pointerWidth = Math.max(0, ev.clientX - rect.left);
-            const newWidth = Math.max(240, Math.min(maxWidth, pointerWidth));
+            const newWidth = Math.max(350, Math.min(maxWidth, pointerWidth));
             setChatWidth(newWidth);
             setIsChatExpanded(false);
         };
@@ -286,37 +286,29 @@ export function DashboardLayoutClient({
 
                 {/* Resize controls: collapse / drag handle / expand (only when chat is open) */}
                 {chatOpen && !isMobile && (
-                    <div className="flex flex-col items-center justify-center px-1">
-                        <div className="flex flex-col border-r border-y rounded-r-sm -ml-1 bg-white dark:bg-surface-dark">
-                            <Tooltip content="Collapse chat" position="left">
-                                <button
-                                    aria-label="Collapse chat"
-                                    onClick={handleCollapse}
-                                    className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-surface-secondary dark:hover:bg-surface-secondary/9"
-                                >
-                                    <ChevronLeft className="w-4 h-4" />
-                                </button>
-                            </Tooltip>
-
-                            <Tooltip content="Resize chat" position="left">
-                                <div
-                                    onPointerDown={startDrag}
-                                    className="w-8 h-10 my-2 flex items-center justify-center cursor-col-resize hover:bg-surface-secondary dark:hover:bg-surface-secondary/9"
-                                    title="Drag to resize chat"
-                                >
-                                    <GripVertical className="w-4 h-4 text-text-muted" />
-                                </div>
-                            </Tooltip>
-
-                            <Tooltip content="Expand chat" position="left">
-                                <button
-                                    aria-label="Expand chat"
-                                    onClick={handleExpand}
-                                    className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-surface-secondary dark:hover:bg-surface-secondary/9"
-                                >
-                                    <ChevronRight className="w-4 h-4" />
-                                </button>
-                            </Tooltip>
+                    <div className="relative">
+                        <div className="flex flex-col items-center w-5 -ml-3.5 absolute -right-3 top-1/2 -translate-y-1/2 z-10">
+                            <button
+                                aria-label="Collapse chat"
+                                onClick={handleCollapse}
+                                className="w-5 h-5 flex -ml-1.5 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white cursor-pointer items-center border rounded-full p-1 justify-center dark:bg-surface-dark"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </button>
+                            <div
+                                onPointerDown={startDrag}
+                                className="w-2.5 h-5 -ml-1 my-1.5 flex text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white items-center justify-center cursor-col-resize dark:bg-surface-dark"
+                                title="Drag to resize chat"
+                            >
+                                <GripVertical className="w-full h-4 text-text-muted/70" />
+                            </div>
+                            <button
+                                aria-label="Expand chat"
+                                onClick={handleExpand}
+                                className="w-5 h-5 flex -ml-1.5 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white cursor-pointer items-center border rounded-full p-1 justify-center dark:bg-surface-dark"
+                            >
+                                <ChevronRight className="w-4 h-4" />
+                            </button>
                         </div>
                     </div>
                 )}

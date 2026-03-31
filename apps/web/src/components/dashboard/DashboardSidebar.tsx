@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { AuthUser } from '@/lib/auth';
 import { logout } from '@/app/actions/auth';
 import { cn } from '@/lib/utils/cn';
-import { ROUTES } from '@/lib/constants';
+import { ROUTES, getSiteConfig } from '@/lib/constants';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import {
     Home,
@@ -32,7 +32,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { LogoEverWork } from '../logos';
+import { LogoEverWork, FaviconEverWork } from '../logos';
 import { useDirectoryDetail } from '../directories/detail/DirectoryDetailContext';
 import { ChatPanelExpandButton } from '@/components/ai/ChatPanel';
 
@@ -117,12 +117,16 @@ export function DashboardSidebar({
                 {/* Logo + controls */}
                 <div
                     className={cn(
-                        'h-14 flex items-center shrink-0',
+                        'h-16 flex items-center shrink-0',
                         isCollapsed ? 'justify-center px-2' : 'px-5',
                     )}
                 >
-                    <div className="flex items-center justify-between w-full">
-                        {!isCollapsed && <LogoEverWork config={config} />}
+                    <div className="flex items-center justify-between w-full relative">
+                        {isCollapsed ? (
+                            <FaviconEverWork config={config} />
+                        ) : (
+                            <LogoEverWork config={config} />
+                        )}
                         <div
                             className={cn(
                                 'flex items-center gap-0.5',
@@ -130,25 +134,29 @@ export function DashboardSidebar({
                             )}
                         >
                             {onCollapsedChange && (
-                                <Tooltip
-                                    content={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                                    position="right"
-                                >
-                                    <button
-                                        onClick={() => handleCollapsedChange(!isCollapsed)}
-                                        className={cn(
-                                            'flex items-center justify-center w-7 h-7 rounded-md transition-colors',
-                                            'text-text-muted dark:text-text-muted-dark',
-                                            'hover:text-text dark:hover:text-white hover:bg-surface-secondary dark:hover:bg-white/5',
-                                        )}
+                                <div className={isCollapsed ? 'absolute -right-5 top-1.5' : ''}>
+                                    <Tooltip
+                                        content={
+                                            isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+                                        }
+                                        position="right"
                                     >
-                                        {isCollapsed ? (
-                                            <PanelLeftOpen className="w-4 h-4" />
-                                        ) : (
-                                            <PanelLeftClose className="w-4 h-4" />
-                                        )}
-                                    </button>
-                                </Tooltip>
+                                        <button
+                                            onClick={() => handleCollapsedChange(!isCollapsed)}
+                                            className={cn(
+                                                'flex items-center justify-center w-5 h-5 rounded-md transition-colors cursor-pointer',
+                                                'text-text-muted dark:text-text-muted-dark',
+                                                'hover:text-text dark:hover:text-white hover:bg-surface-secondary dark:hover:bg-white/5',
+                                            )}
+                                        >
+                                            {isCollapsed ? (
+                                                <PanelLeftOpen className="w-4 h-4" />
+                                            ) : (
+                                                <PanelLeftClose className="w-4 h-4" />
+                                            )}
+                                        </button>
+                                    </Tooltip>
+                                </div>
                             )}
                             {!isCollapsed && (
                                 <Button
@@ -166,7 +174,7 @@ export function DashboardSidebar({
 
                 {/* New Directory */}
                 <div
-                    className={cn(isCollapsed ? 'px-2 py-3 flex justify-center' : 'px-4 pt-2 pb-6')}
+                    className={cn(isCollapsed ? 'px-2 py-3 flex justify-center' : 'px-4 pt-5 pb-6')}
                 >
                     {isCollapsed ? (
                         <ConditionalTooltip show content={t('newDirectory')}>
@@ -174,7 +182,7 @@ export function DashboardSidebar({
                                 href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
                                 variant="primary"
                                 size="icon"
-                                className="w-9 h-9 shadow-sm rounded-xl"
+                                className="w-8 h-8 shadow-sm rounded-xl"
                                 onClick={() => onInteraction?.()}
                             >
                                 <Plus className="w-5 h-5" />
@@ -242,17 +250,17 @@ export function DashboardSidebar({
                 {/* Bottom section: user menu */}
                 <div
                     className={cn(
-                        'mt-auto shrink-0 border-t border-border dark:border-border-dark z-999999',
+                        'mt-auto shrink-0 border-t h-16 border-border dark:border-border-dark z-999999',
                         isCollapsed ? 'px-2' : 'px-4',
                     )}
                 >
-                    <div className="py-2">
+                    <div className="flex items-center gap-2 py-1 relative">
                         <DropdownMenu>
                             <DropdownMenuTrigger
                                 className={cn(
-                                    'w-full rounded-md transition-colors cursor-pointer focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:border-transparent focus-visible:border-transparent',
+                                    'w-full mx-auto rounded-md transition-colors cursor-pointer focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:border-transparent focus-visible:border-transparent',
                                     'hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark',
-                                    isCollapsed ? 'p-1 flex justify-center' : 'p-2',
+                                    isCollapsed ? 'p-2 flex justify-center' : 'p-2',
                                 )}
                             >
                                 <div
