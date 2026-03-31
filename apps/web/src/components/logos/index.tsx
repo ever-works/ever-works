@@ -66,7 +66,7 @@ export function FaviconEverWork({
                 width={size}
                 height={size}
                 priority={priority}
-                className="block dark:hidden object-contain max-h-8"
+                className="block dark:hidden object-contain max-h-8 ml-1"
             />
             <Image
                 src={siteConfig.favicon.dark}

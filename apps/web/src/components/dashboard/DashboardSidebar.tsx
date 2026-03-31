@@ -82,7 +82,6 @@ export function DashboardSidebar({
     const [avatarError, setAvatarError] = useState(false);
     const t = useTranslations('dashboard.sidebar');
     const { config } = useDirectoryDetail();
-    const siteConfig = getSiteConfig(config);
 
     const handleCollapsedChange = (v: boolean) => {
         onCollapsedChange?.(v);
@@ -174,7 +173,7 @@ export function DashboardSidebar({
                 </div>
 
                 {/* New Directory */}
-                <div className={cn('px-4 pt-5 pb-6')}>
+                <div className={cn(isCollapsed ? 'px-2 py-3 flex justify-center' : 'px-4 pt-5 pb-6')}>
                     {isCollapsed ? (
                         <ConditionalTooltip show content={t('newDirectory')}>
                             <Button
