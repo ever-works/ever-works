@@ -823,7 +823,20 @@ export class DirectoriesController {
     ): Promise<BulkCaptureImagesResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.directoryGenerationService.bulkCaptureImages(id, dto, user);
+        const result = await this.directoryGenerationService.bulkCaptureImages(id, dto, user);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.ITEM_UPDATED,
+                action: 'items.images_captured',
+                status: ActivityStatus.COMPLETED,
+                summary: `Captured item images`,
+            })
+            .catch(() => {});
+
+        return result;
     }
 
     @Put('directories/:id/domain-type')
@@ -854,7 +867,20 @@ export class DirectoriesController {
     async regenerateMarkdown(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.directoryGenerationService.regenerateMarkdown(id, user);
+        const result = await this.directoryGenerationService.regenerateMarkdown(id, user);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.SETTINGS_UPDATED,
+                action: 'directory.markdown_regenerated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Regenerated markdown`,
+            })
+            .catch(() => {});
+
+        return result;
     }
 
     @Post('directories/:id/update-readme')
@@ -862,7 +888,20 @@ export class DirectoriesController {
     async updateReadme(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.directoryGenerationService.updateReadme(id, user);
+        const result = await this.directoryGenerationService.updateReadme(id, user);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.SETTINGS_UPDATED,
+                action: 'directory.readme_updated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated README`,
+            })
+            .catch(() => {});
+
+        return result;
     }
 
     @Post('directories/:id/update-website')
@@ -879,7 +918,20 @@ export class DirectoriesController {
     ): Promise<UpdateWebsiteRepositoryResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.directoryGenerationService.updateWebsiteRepository(id, user);
+        const result = await this.directoryGenerationService.updateWebsiteRepository(id, user);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.WEBSITE_SETTINGS_UPDATED,
+                action: 'directory.website_updated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated website repository`,
+            })
+            .catch(() => {});
+
+        return result;
     }
 
     @Post('directories/:id/delete')
@@ -919,7 +971,20 @@ export class DirectoriesController {
     async syncDirectoryData(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.directoryLifecycleService.syncFromDataRepository(id, user);
+        const result = await this.directoryLifecycleService.syncFromDataRepository(id, user);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.DIRECTORY_UPDATED,
+                action: 'directory.synced_from_data_repo',
+                status: ActivityStatus.COMPLETED,
+                summary: `Synced directory data`,
+            })
+            .catch(() => {});
+
+        return result;
     }
 
     // ============================================
@@ -1241,6 +1306,18 @@ export class DirectoriesController {
     ) {
         const result = await this.directoryTaxonomyService.createCollection(id, dto, auth.userId);
         await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.SETTINGS_UPDATED,
+                action: 'taxonomy.collection_created',
+                status: ActivityStatus.COMPLETED,
+                summary: `Created collection: ${dto.name}`,
+            })
+            .catch(() => {});
+
         return result;
     }
 
@@ -1259,6 +1336,19 @@ export class DirectoriesController {
             auth.userId,
         );
         await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.SETTINGS_UPDATED,
+                action: 'taxonomy.collection_updated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated collection`,
+                details: { collectionId, name: dto.name },
+            })
+            .catch(() => {});
+
         return result;
     }
 
@@ -1275,6 +1365,19 @@ export class DirectoriesController {
             auth.userId,
         );
         await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.SETTINGS_UPDATED,
+                action: 'taxonomy.collection_deleted',
+                status: ActivityStatus.COMPLETED,
+                summary: `Deleted collection`,
+                details: { collectionId },
+            })
+            .catch(() => {});
+
         return result;
     }
 
@@ -1304,6 +1407,19 @@ export class DirectoriesController {
         }
 
         const itemsAdded = await this.communityPrProcessorService.processDirectory(directory);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.COMMUNITY_PR_MERGED,
+                action: 'community_pr.processed',
+                status: ActivityStatus.COMPLETED,
+                summary: `Processed community PRs`,
+                details: { itemsAdded },
+            })
+            .catch(() => {});
+
         return { itemsAdded };
     }
 
