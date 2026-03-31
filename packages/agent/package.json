@@ -64,6 +64,10 @@
             "types": "./dist/notifications/index.d.ts",
             "default": "./dist/notifications/index.js"
         },
+        "./activity-log": {
+            "types": "./dist/activity-log/index.d.ts",
+            "default": "./dist/activity-log/index.js"
+        },
         "./import": {
             "types": "./dist/import/index.d.ts",
             "default": "./dist/import/index.js"
