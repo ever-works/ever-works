@@ -182,7 +182,7 @@ export function DashboardSidebar({
                                 href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
                                 variant="primary"
                                 size="icon"
-                                className="w-9 h-9 shadow-sm rounded-xl"
+                                className="w-8 h-8 shadow-sm rounded-xl"
                                 onClick={() => onInteraction?.()}
                             >
                                 <Plus className="w-5 h-5" />
