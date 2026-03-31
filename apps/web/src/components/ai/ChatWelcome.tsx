@@ -53,7 +53,7 @@ export function ChatWelcome({ onSuggestion }: ChatWelcomeProps) {
                             type="button"
                             onClick={() => onSuggestion(text)}
                             className={cn(
-                                'inline-flex items-center px-2.5 py-1.5 rounded-lg text-[11px] font-medium',
+                                'inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-medium',
                                 'border border-border dark:border-white/8',
                                 'bg-surface-secondary/60 dark:bg-white/4',
                                 'text-text-secondary dark:text-text-secondary-dark',
