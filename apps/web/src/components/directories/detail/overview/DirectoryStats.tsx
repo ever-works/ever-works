@@ -25,7 +25,7 @@ function StatCard({ title, value, icon, iconColor }: StatCardProps) {
     return (
         <div
             className={cn(
-                'rounded-lg',
+                'rounded-lg p-1',
                 'bg-card/10 dark:bg-card-primary-dark/30',
                 'border border-card-border dark:border-border-secondary-dark',
                 'w-full',
@@ -114,7 +114,7 @@ export function DirectoryStats({
     ];
 
     return (
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 w-full h-auto">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-4 w-full h-auto">
             {stats.map((stat) => (
                 <StatCard
                     key={stat.title}
