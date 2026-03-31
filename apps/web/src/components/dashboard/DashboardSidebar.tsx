@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { AuthUser } from '@/lib/auth';
 import { logout } from '@/app/actions/auth';
 import { cn } from '@/lib/utils/cn';
-import { ROUTES } from '@/lib/constants';
+import { ROUTES, getSiteConfig } from '@/lib/constants';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import {
     Home,
@@ -32,7 +32,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { LogoEverWork } from '../logos';
+import { LogoEverWork, FaviconEverWork } from '../logos';
 import { useDirectoryDetail } from '../directories/detail/DirectoryDetailContext';
 import { ChatPanelExpandButton } from '@/components/ai/ChatPanel';
 
@@ -82,6 +82,7 @@ export function DashboardSidebar({
     const [avatarError, setAvatarError] = useState(false);
     const t = useTranslations('dashboard.sidebar');
     const { config } = useDirectoryDetail();
+    const siteConfig = getSiteConfig(config);
 
     const handleCollapsedChange = (v: boolean) => {
         onCollapsedChange?.(v);
@@ -117,12 +118,16 @@ export function DashboardSidebar({
                 {/* Logo + controls */}
                 <div
                     className={cn(
-                        'h-14 flex items-center shrink-0',
+                        'h-16 flex items-center shrink-0',
                         isCollapsed ? 'justify-center px-2' : 'px-5',
                     )}
                 >
-                    <div className="flex items-center justify-between w-full">
-                        {!isCollapsed && <LogoEverWork config={config} />}
+                    <div className="flex items-center justify-between w-full relative">
+                        {isCollapsed ? (
+                            <FaviconEverWork config={config} />
+                        ) : (
+                            <LogoEverWork config={config} />
+                        )}
                         <div
                             className={cn(
                                 'flex items-center gap-0.5',
@@ -130,25 +135,29 @@ export function DashboardSidebar({
                             )}
                         >
                             {onCollapsedChange && (
-                                <Tooltip
-                                    content={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                                    position="right"
-                                >
-                                    <button
-                                        onClick={() => handleCollapsedChange(!isCollapsed)}
-                                        className={cn(
-                                            'flex items-center justify-center w-7 h-7 rounded-md transition-colors',
-                                            'text-text-muted dark:text-text-muted-dark',
-                                            'hover:text-text dark:hover:text-white hover:bg-surface-secondary dark:hover:bg-white/5',
-                                        )}
+                                <div className={isCollapsed ? 'absolute -right-6' : ''}>
+                                    <Tooltip
+                                        content={
+                                            isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+                                        }
+                                        position="right"
                                     >
-                                        {isCollapsed ? (
-                                            <PanelLeftOpen className="w-4 h-4" />
-                                        ) : (
-                                            <PanelLeftClose className="w-4 h-4" />
-                                        )}
-                                    </button>
-                                </Tooltip>
+                                        <button
+                                            onClick={() => handleCollapsedChange(!isCollapsed)}
+                                            className={cn(
+                                                'flex items-center justify-center w-7 h-7 rounded-md transition-colors cursor-pointer',
+                                                'text-text-muted dark:text-text-muted-dark',
+                                                'hover:text-text dark:hover:text-white hover:bg-surface-secondary dark:hover:bg-white/5',
+                                            )}
+                                        >
+                                            {isCollapsed ? (
+                                                <PanelLeftOpen className="w-4 h-4" />
+                                            ) : (
+                                                <PanelLeftClose className="w-4 h-4" />
+                                            )}
+                                        </button>
+                                    </Tooltip>
+                                </div>
                             )}
                             {!isCollapsed && (
                                 <Button
@@ -165,9 +174,7 @@ export function DashboardSidebar({
                 </div>
 
                 {/* New Directory */}
-                <div
-                    className={cn(isCollapsed ? 'px-2 py-3 flex justify-center' : 'px-4 pt-2 pb-6')}
-                >
+                <div className={cn('px-4 pt-5 pb-6')}>
                     {isCollapsed ? (
                         <ConditionalTooltip show content={t('newDirectory')}>
                             <Button
