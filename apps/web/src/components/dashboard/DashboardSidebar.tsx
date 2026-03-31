@@ -250,7 +250,7 @@ export function DashboardSidebar({
                 {/* Bottom section: user menu */}
                 <div
                     className={cn(
-                        'mt-auto shrink-0 border-t border-border dark:border-border-dark z-999999',
+                        'mt-auto shrink-0 border-t h-16 border-border dark:border-border-dark z-999999',
                         isCollapsed ? 'px-2' : 'px-4',
                     )}
                 >
@@ -258,9 +258,9 @@ export function DashboardSidebar({
                         <DropdownMenu>
                             <DropdownMenuTrigger
                                 className={cn(
-                                    'w-full rounded-md transition-colors cursor-pointer focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:border-transparent focus-visible:border-transparent',
+                                    'w-full mx-auto rounded-md transition-colors cursor-pointer focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:border-transparent focus-visible:border-transparent',
                                     'hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark',
-                                    isCollapsed ? 'p-1 flex justify-center' : 'p-2',
+                                    isCollapsed ? 'p-2 flex justify-center' : 'p-2',
                                 )}
                             >
                                 <div
