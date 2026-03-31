@@ -134,7 +134,7 @@ export function DashboardSidebar({
                             )}
                         >
                             {onCollapsedChange && (
-                                <div className={isCollapsed ? 'absolute -right-6' : ''}>
+                                <div className={isCollapsed ? 'absolute -right-5 top-1.5' : ''}>
                                     <Tooltip
                                         content={
                                             isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
@@ -144,7 +144,7 @@ export function DashboardSidebar({
                                         <button
                                             onClick={() => handleCollapsedChange(!isCollapsed)}
                                             className={cn(
-                                                'flex items-center justify-center w-7 h-7 rounded-md transition-colors cursor-pointer',
+                                                'flex items-center justify-center w-5 h-5 rounded-md transition-colors cursor-pointer',
                                                 'text-text-muted dark:text-text-muted-dark',
                                                 'hover:text-text dark:hover:text-white hover:bg-surface-secondary dark:hover:bg-white/5',
                                             )}
