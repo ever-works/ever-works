@@ -69,6 +69,7 @@ export const REDIRECT_SEARCH_PARAM = process.env.REDIRECT_SEARCH_PARAM || 'redir
 export const ROUTES = {
     // Dashboard routes (these are under (dashboard) route group)
     DASHBOARD: '/',
+    DASHBOARD_ACTIVITY: '/activity',
     DASHBOARD_DIRECTORIES: '/directories',
     DASHBOARD_DIRECTORIES_NEW: '/directories/new',
     DASHBOARD_DIRECTORY: (id: string) => `/directories/${id}`,

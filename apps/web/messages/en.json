@@ -343,6 +343,63 @@
                 "version": "Ever Works v{version}"
             }
         },
+        "activity": {
+            "title": "Activity Log",
+            "subtitle": "Track all operations across your directories",
+            "fetchFailed": "Failed to load activities",
+            "dismissFailed": "Failed to dismiss activity",
+            "exportFailed": "Failed to export activity log",
+            "showing": "Showing {from} to {to} of {total}",
+            "columns": {
+                "status": "Status",
+                "dateTime": "Date / Time",
+                "directory": "Directory",
+                "type": "Type",
+                "summary": "Summary"
+            },
+            "filters": {
+                "search": "Search activities...",
+                "types": {
+                    "allTypes": "All Types",
+                    "generation": "Generation",
+                    "comparison": "Comparison",
+                    "deployment": "Deployment",
+                    "directoryCreated": "Directory Created",
+                    "directoryUpdated": "Directory Updated",
+                    "directoryDeleted": "Directory Deleted",
+                    "pluginEnabled": "Plugin Enabled",
+                    "pluginDisabled": "Plugin Disabled",
+                    "pluginConfigured": "Plugin Configured",
+                    "memberInvited": "Member Invited",
+                    "scheduleExecuted": "Schedule Executed",
+                    "import": "Import",
+                    "login": "Login",
+                    "signup": "Signup"
+                },
+                "statuses": {
+                    "allStatuses": "All Statuses",
+                    "pending": "Pending",
+                    "inProgress": "In Progress",
+                    "completed": "Completed",
+                    "failed": "Failed"
+                }
+            },
+            "actions": {
+                "dismiss": "Dismiss",
+                "export": "Export CSV"
+            },
+            "empty": {
+                "title": "No activities yet",
+                "description": "Activities will appear here as you use the platform."
+            },
+            "detail": {
+                "title": "Details"
+            },
+            "pagination": {
+                "previous": "Previous",
+                "next": "Next"
+            }
+        },
         "directories": {
             "title": "Directories",
             "subtitle": "Manage and organize your AI-powered directories",
@@ -2296,6 +2353,7 @@
             "newDirectory": "New Directory",
             "navigation": {
                 "dashboard": "Dashboard",
+                "activity": "Activity",
                 "directories": "Directories",
                 "plugins": "Plugins",
                 "settings": "Settings"
@@ -2605,6 +2663,7 @@
             "resetPassword": "Reset Password",
             "authError": "Authentication Error",
             "dashboard": "Dashboard",
+            "activity": "Activity Log",
             "directories": "Directories",
             "newDirectory": "New Directory",
             "directory": "Directory",
