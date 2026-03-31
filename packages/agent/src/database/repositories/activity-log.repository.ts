@@ -90,8 +90,4 @@ export class ActivityLogRepository {
         });
     }
 
-    async deleteById(id: string, userId: string): Promise<boolean> {
-        const result = await this.repository.delete({ id, userId });
-        return (result.affected ?? 0) > 0;
-    }
 }

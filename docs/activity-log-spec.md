@@ -22,7 +22,9 @@ This is separate from the existing **Directory History tab** (which provides det
 10. Search across activity descriptions and directory names
 11. Clickable entries open detail view with full logs, items affected, duration, errors
 12. Badge on sidebar icon showing count of currently running operations
-13. Bulk actions: dismiss, retry failed, export activity log
+13. Export activity log as CSV
+
+> **Deferred:** Retry failed and dismiss were removed per review feedback. Retry may be revisited in a future PR for specific action types like generation.
 
 ---
 
@@ -212,9 +214,9 @@ class ActivityLogService {
 | `GET`    | `/api/activity-log`               | List activities (paginated, filtered, searchable)            |
 | `GET`    | `/api/activity-log/running-count` | Count of in_progress activities (for badge)                  |
 | `GET`    | `/api/activity-log/:id`           | Get single activity with full details                        |
-| `POST`   | `/api/activity-log/:id/retry`     | Retry a failed activity (re-triggers the original operation) |
-| `DELETE` | `/api/activity-log/:id`           | Dismiss/delete an activity entry                             |
 | `GET`    | `/api/activity-log/export`        | Export activity log as CSV                                   |
+
+> **Note:** Retry failed and dismiss were removed per review feedback. Retry may be added in a future PR for specific action types (e.g., generation). Activity log entries are permanent audit records.
 
 ### Query Parameters (GET /api/activity-log)
 

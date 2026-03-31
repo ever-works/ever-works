@@ -600,8 +600,16 @@ export class DirectoriesController {
         @Body() submitItemDto: SubmitItemDto,
     ): Promise<SubmitItemResponseDto> {
         const user = await this.authService.getUser(auth.userId);
-
-        return this.directoryGenerationService.submitItem(id, submitItemDto, user);
+        const result = await this.directoryGenerationService.submitItem(id, submitItemDto, user);
+        this.activityLogService.log({
+            userId: auth.userId,
+            directoryId: id,
+            actionType: ActivityActionType.ITEM_ADDED,
+            action: 'item.submitted',
+            status: ActivityStatus.COMPLETED,
+            summary: `Added item: ${submitItemDto.name || 'New item'}`,
+        }).catch(() => {});
+        return result;
     }
 
     @Post('directories/:id/remove-item')
@@ -615,8 +623,16 @@ export class DirectoriesController {
         @Body() removeItemDto: RemoveItemDto,
     ): Promise<RemoveItemResponseDto> {
         const user = await this.authService.getUser(auth.userId);
-
-        return this.directoryGenerationService.removeItem(id, removeItemDto, user);
+        const result = await this.directoryGenerationService.removeItem(id, removeItemDto, user);
+        this.activityLogService.log({
+            userId: auth.userId,
+            directoryId: id,
+            actionType: ActivityActionType.ITEM_REMOVED,
+            action: 'item.removed',
+            status: ActivityStatus.COMPLETED,
+            summary: `Removed item`,
+        }).catch(() => {});
+        return result;
     }
 
     @Post('directories/:id/update-item')

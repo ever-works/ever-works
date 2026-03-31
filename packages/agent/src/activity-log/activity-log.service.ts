@@ -47,10 +47,6 @@ export class ActivityLogService {
         return this.repository.findById(id);
     }
 
-    async dismiss(id: string, userId: string): Promise<boolean> {
-        return this.repository.deleteById(id, userId);
-    }
-
     async exportCsv(query: ActivityLogQueryOptions): Promise<string> {
         const { activities } = await this.repository.findByUserId({
             ...query,
