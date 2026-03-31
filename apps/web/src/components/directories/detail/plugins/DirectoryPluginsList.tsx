@@ -131,7 +131,7 @@ export function DirectoryPluginsList({
                     )}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">
                     {filteredPlugins.map((plugin) => (
                         <DirectoryPluginCard
                             key={plugin.pluginId}

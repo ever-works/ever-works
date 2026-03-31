@@ -54,7 +54,7 @@ export default function NewDirectoryClient({
                     </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 @md/main:grid-cols-2 @lg/main:grid-cols-3 gap-6">
                     {/* AI Creation Card */}
                     <button
                         onClick={() => setCreationMode('ai')}
