@@ -49,7 +49,7 @@ export function ActivityFilters({
     const t = useTranslations('dashboard.activity');
 
     const selectClass =
-        'px-3 py-2 text-sm rounded-lg border border-border dark:border-border-dark bg-card dark:bg-transparent text-text dark:text-text-dark focus:outline-none focus:ring-2 focus:ring-primary/20';
+        'px-3 py-2 text-sm rounded-lg border border-border dark:border-border-dark bg-card dark:bg-surface-dark text-text dark:text-text-dark focus:outline-none focus:ring-2 focus:ring-primary/20';
 
     return (
         <div className="flex flex-wrap gap-3">
