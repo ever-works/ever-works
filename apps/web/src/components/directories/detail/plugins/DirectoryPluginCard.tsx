@@ -112,9 +112,6 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                             {isEnabled && (
                                 <span className="ml-1 text-success">&middot; {t('active')}</span>
                             )}
-                            {plugin.systemPlugin && (
-                                <span className="ml-1 text-primary">&middot; {t('system')}</span>
-                            )}
                         </p>
                     </div>
                 </div>

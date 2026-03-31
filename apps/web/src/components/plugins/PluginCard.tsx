@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils/cn';
 import { ROUTES } from '@/lib/constants';
 import { Link } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
-import { Settings, Power, PowerOff } from 'lucide-react';
+import { Settings, Power, PowerOff, ExternalLink } from 'lucide-react';
 import { PluginIcon } from './PluginIcon';
 import { PluginEnablePanel } from './PluginEnablePanel';
 import { PluginDisableWarning } from './PluginDisableWarning';
@@ -111,6 +111,18 @@ export function PluginCard({ plugin }: PluginCardProps) {
                         <Settings className="w-3 h-3" />
                         {t('settings')}
                     </Link>
+
+                    {plugin.homepage && (
+                        <a
+                            href={plugin.homepage}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark flex items-center gap-1"
+                        >
+                            <ExternalLink className="w-3 h-3" />
+                            {t('docs')}
+                        </a>
+                    )}
 
                     {!plugin.systemPlugin && (
                         <Button
