@@ -5,9 +5,9 @@ import { ActivityLogController } from './activity-log.controller';
 import { ActivityLogListener } from './activity-log.listener';
 
 @Module({
-	imports: [AgentActivityLogModule, DatabaseModule],
-	controllers: [ActivityLogController],
-	providers: [ActivityLogListener],
-	exports: [AgentActivityLogModule],
+    imports: [AgentActivityLogModule, DatabaseModule],
+    controllers: [ActivityLogController],
+    providers: [ActivityLogListener],
+    exports: [AgentActivityLogModule],
 })
 export class ActivityLogModule {}

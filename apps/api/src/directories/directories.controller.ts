@@ -205,7 +205,22 @@ export class DirectoriesController {
         @Body() updateDirectoryDto: UpdateDirectoryDto,
     ) {
         const user = await this.authService.getUser(auth.userId);
-        return this.directoryLifecycleService.updateDirectory(id, updateDirectoryDto, user);
+        const result = await this.directoryLifecycleService.updateDirectory(
+            id,
+            updateDirectoryDto,
+            user,
+        );
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.DIRECTORY_UPDATED,
+                action: 'directory.updated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated directory settings`,
+            })
+            .catch(() => {});
+        return result;
     }
 
     @Get('directories/:id/items')
@@ -263,14 +278,16 @@ export class DirectoriesController {
     ) {
         const user = await this.authService.getUser(auth.userId);
         const result = await this.directoryQueryService.updateWebsiteSettings(id, user, dto);
-        this.activityLogService.log({
-            userId: auth.userId,
-            directoryId: id,
-            actionType: ActivityActionType.WEBSITE_SETTINGS_UPDATED,
-            action: 'directory.website_settings_updated',
-            status: ActivityStatus.COMPLETED,
-            summary: `Updated website settings`,
-        }).catch(() => {});
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.WEBSITE_SETTINGS_UPDATED,
+                action: 'directory.website_settings_updated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated website settings`,
+            })
+            .catch(() => {});
         return result;
     }
 
@@ -432,6 +449,17 @@ export class DirectoriesController {
     ): Promise<ItemsGeneratorResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.GENERATION,
+                action: 'generation.started',
+                status: ActivityStatus.IN_PROGRESS,
+                summary: `Started item generation`,
+            })
+            .catch(() => {});
+
         return this.directoryGenerationService.generateItems(
             id,
             createItemsGeneratorDto,
@@ -501,6 +529,17 @@ export class DirectoriesController {
             updateScheduleDto,
             user,
         );
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.SCHEDULE_UPDATED,
+                action: 'schedule.updated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated schedule`,
+            })
+            .catch(() => {});
 
         return {
             status: 'success',
@@ -748,8 +787,22 @@ export class DirectoriesController {
         @Body() deleteDirectoryDto: DeleteDirectoryDto,
     ): Promise<DeleteDirectoryResponseDto> {
         const user = await this.authService.getUser(auth.userId);
-
-        return this.directoryLifecycleService.deleteDirectory(id, deleteDirectoryDto, user);
+        const result = await this.directoryLifecycleService.deleteDirectory(
+            id,
+            deleteDirectoryDto,
+            user,
+        );
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.DIRECTORY_DELETED,
+                action: 'directory.deleted',
+                status: ActivityStatus.COMPLETED,
+                summary: `Deleted directory`,
+            })
+            .catch(() => {});
+        return result;
     }
 
     @Post('directories/:id/sync-data')
@@ -811,15 +864,21 @@ export class DirectoriesController {
         @Param('id') id: string,
         @Body() dto: UpdateDirectoryAdvancedPromptsDto,
     ) {
-        const result = await this.directoryAdvancedPromptsService.updateAdvancedPrompts(id, dto, auth.userId);
-        this.activityLogService.log({
-            userId: auth.userId,
-            directoryId: id,
-            actionType: ActivityActionType.PROMPTS_UPDATED,
-            action: 'directory.prompts_updated',
-            status: ActivityStatus.COMPLETED,
-            summary: `Updated advanced prompts`,
-        }).catch(() => {});
+        const result = await this.directoryAdvancedPromptsService.updateAdvancedPrompts(
+            id,
+            dto,
+            auth.userId,
+        );
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.PROMPTS_UPDATED,
+                action: 'directory.prompts_updated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated advanced prompts`,
+            })
+            .catch(() => {});
         return result;
     }
 
@@ -1129,6 +1188,16 @@ export class DirectoriesController {
 
         const result = await this.comparisonGenerationService.generateNextComparison(id, user.id);
         await this.cacheManager.del(`directory-count-${id}-${auth.userId}`);
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.COMPARISON_GENERATION,
+                action: 'comparison.generated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Generated comparison`,
+            })
+            .catch(() => {});
         return result;
     }
 
@@ -1159,6 +1228,16 @@ export class DirectoriesController {
             body.itemBSlug,
         );
         await this.cacheManager.del(`directory-count-${id}-${auth.userId}`);
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.COMPARISON_GENERATION,
+                action: 'comparison.generated_manual',
+                status: ActivityStatus.COMPLETED,
+                summary: `Generated comparison: ${body.itemASlug} vs ${body.itemBSlug}`,
+            })
+            .catch(() => {});
         return result;
     }
 
@@ -1177,6 +1256,16 @@ export class DirectoriesController {
 
         const result = await this.comparisonGenerationService.deleteComparison(id, user.id, slug);
         await this.cacheManager.del(`directory-count-${id}-${auth.userId}`);
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.COMPARISON_GENERATION,
+                action: 'comparison.deleted',
+                status: ActivityStatus.COMPLETED,
+                summary: `Deleted comparison: ${slug}`,
+            })
+            .catch(() => {});
         return result;
     }
 }

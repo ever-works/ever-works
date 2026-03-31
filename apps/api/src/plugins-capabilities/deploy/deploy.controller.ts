@@ -167,14 +167,16 @@ export class DeployController {
             );
         }
 
-        this.activityLogService.log({
-            userId: auth.userId,
-            directoryId: id,
-            actionType: ActivityActionType.DEPLOYMENT,
-            action: 'directory.deployed',
-            status: ActivityStatus.IN_PROGRESS,
-            summary: `Deployed ${directory.name} via ${providerName}`,
-        }).catch(() => {});
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.DEPLOYMENT,
+                action: 'directory.deployed',
+                status: ActivityStatus.IN_PROGRESS,
+                summary: `Deployed ${directory.name} via ${providerName}`,
+            })
+            .catch(() => {});
 
         return {
             status: 'pending',

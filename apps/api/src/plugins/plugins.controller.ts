@@ -139,13 +139,15 @@ export class PluginsController {
             dto.secretSettings,
             dto.autoEnableForDirectories,
         );
-        this.activityLogService.log({
-            userId: auth.userId,
-            actionType: ActivityActionType.PLUGIN_ENABLED,
-            action: 'plugin.enabled',
-            status: ActivityStatus.COMPLETED,
-            summary: `Enabled plugin: ${pluginId}`,
-        }).catch(() => {});
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                actionType: ActivityActionType.PLUGIN_ENABLED,
+                action: 'plugin.enabled',
+                status: ActivityStatus.COMPLETED,
+                summary: `Enabled plugin: ${pluginId}`,
+            })
+            .catch(() => {});
         return result;
     }
 
@@ -163,13 +165,15 @@ export class PluginsController {
         @Param('pluginId') pluginId: string,
     ): Promise<UserPluginResponseDto> {
         const result = await this.pluginsService.disablePluginForUser(pluginId, auth.userId);
-        this.activityLogService.log({
-            userId: auth.userId,
-            actionType: ActivityActionType.PLUGIN_DISABLED,
-            action: 'plugin.disabled',
-            status: ActivityStatus.COMPLETED,
-            summary: `Disabled plugin: ${pluginId}`,
-        }).catch(() => {});
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                actionType: ActivityActionType.PLUGIN_DISABLED,
+                action: 'plugin.disabled',
+                status: ActivityStatus.COMPLETED,
+                summary: `Disabled plugin: ${pluginId}`,
+            })
+            .catch(() => {});
         return result;
     }
 

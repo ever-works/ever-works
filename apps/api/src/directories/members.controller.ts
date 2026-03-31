@@ -120,15 +120,17 @@ export class MembersController {
             dto,
         );
 
-        this.activityLogService.log({
-            userId: auth.userId,
-            directoryId,
-            actionType: ActivityActionType.MEMBER_ROLE_CHANGED,
-            action: 'member.role_changed',
-            status: ActivityStatus.COMPLETED,
-            summary: `Changed member role to ${dto.role}`,
-            details: { memberId, role: dto.role },
-        }).catch(() => {});
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId,
+                actionType: ActivityActionType.MEMBER_ROLE_CHANGED,
+                action: 'member.role_changed',
+                status: ActivityStatus.COMPLETED,
+                summary: `Changed member role to ${dto.role}`,
+                details: { memberId, role: dto.role },
+            })
+            .catch(() => {});
 
         return {
             status: 'success',
@@ -148,15 +150,17 @@ export class MembersController {
         const user = await this.authService.getUser(auth.userId);
         await this.memberService.removeMember(directoryId, user.id, memberId);
 
-        this.activityLogService.log({
-            userId: auth.userId,
-            directoryId,
-            actionType: ActivityActionType.MEMBER_REMOVED,
-            action: 'member.removed',
-            status: ActivityStatus.COMPLETED,
-            summary: `Removed member from directory`,
-            details: { memberId },
-        }).catch(() => {});
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId,
+                actionType: ActivityActionType.MEMBER_REMOVED,
+                action: 'member.removed',
+                status: ActivityStatus.COMPLETED,
+                summary: `Removed member from directory`,
+                details: { memberId },
+            })
+            .catch(() => {});
 
         return {
             status: 'success',
