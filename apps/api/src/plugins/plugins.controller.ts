@@ -205,6 +205,16 @@ export class PluginsController {
             auth.userId,
         );
 
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                actionType: ActivityActionType.PLUGIN_CONFIGURED,
+                action: 'plugin.configured',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated plugin settings: ${pluginId}`,
+            })
+            .catch(() => {});
+
         return { ...result, validation };
     }
 

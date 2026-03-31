@@ -483,6 +483,17 @@ export class DirectoriesController {
     ): Promise<ItemsGeneratorResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.GENERATION,
+                action: 'generation.update_started',
+                status: ActivityStatus.IN_PROGRESS,
+                summary: `Started item update`,
+            })
+            .catch(() => {});
+
         return this.directoryGenerationService.updateItemsGenerator({
             directoryId: id,
             updateDto: updateItemsGeneratorDto,
@@ -559,6 +570,17 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
         const schedule = await this.directoryScheduleService.cancelSchedule(id, user);
 
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.SCHEDULE_DELETED,
+                action: 'schedule.deleted',
+                status: ActivityStatus.COMPLETED,
+                summary: `Deleted schedule`,
+            })
+            .catch(() => {});
+
         return {
             status: 'success',
             schedule,
@@ -584,6 +606,17 @@ export class DirectoriesController {
                 message: 'Schedule must be active to run',
             });
         }
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.SCHEDULE_EXECUTED,
+                action: 'schedule.executed',
+                status: ActivityStatus.IN_PROGRESS,
+                summary: `Triggered scheduled update`,
+            })
+            .catch(() => {});
 
         const response = await this.directoryGenerationService.runScheduledUpdate(schedule);
         return response;
@@ -649,8 +682,25 @@ export class DirectoriesController {
         @Body() updateItemDto: UpdateItemDto,
     ) {
         const user = await this.authService.getUser(auth.userId);
+        const result = await this.directoryGenerationService.updateItemMetadata(id, updateItemDto, user);
 
-        return this.directoryGenerationService.updateItemMetadata(id, updateItemDto, user);
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.ITEM_UPDATED,
+                action: 'item.updated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated item metadata`,
+                details: {
+                    itemSlug: updateItemDto.item_slug,
+                    featured: updateItemDto.featured,
+                    order: updateItemDto.order,
+                },
+            })
+            .catch(() => {});
+
+        return result;
     }
 
     @Post('directories/:id/check-item-health')
@@ -673,6 +723,24 @@ export class DirectoriesController {
             user,
         );
         await this.cacheManager.del(`directory-items-${id}-${auth.userId}`);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.ITEM_UPDATED,
+                action: 'item.source_rechecked',
+                status: ActivityStatus.COMPLETED,
+                summary: `Re-checked item source: ${result.item_name || checkItemHealthDto.item_slug}`,
+                details: {
+                    itemSlug: result.item_slug,
+                    itemName: result.item_name,
+                    health: result.health,
+                    message: result.message,
+                },
+            })
+            .catch(() => {});
+
         return result;
     }
 
@@ -701,7 +769,24 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
         await this.directoryOwnershipService.ensureCanEdit(id, user.id);
         const allowances = await this.subscriptionService.getCadenceAllowances(user);
-        return this.sourceValidationService.updateSettings(id, dto, allowances);
+        const result = await this.sourceValidationService.updateSettings(id, dto, allowances);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.SETTINGS_UPDATED,
+                action: 'directory.source_validation_updated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated source validation settings`,
+                details: {
+                    cadence: dto.cadence,
+                    enabled: dto.enabled,
+                },
+            })
+            .catch(() => {});
+
+        return result;
     }
 
     @Post('extract-item-details')

@@ -5,6 +5,8 @@ import { AuthService } from '../services/auth.service';
 import { OAuthUrlService } from '../services/oauth-url.service';
 import { Public } from '../decorators/public.decorator';
 import { AuthProvider } from '../../config/constants';
+import { ActivityLogService } from '@ever-works/agent/activity-log';
+import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 
 @ApiTags('Auth')
 @Controller('api/oauth')
@@ -12,6 +14,7 @@ export class OAuthController {
     constructor(
         private authService: AuthService,
         private oauthUrlService: OAuthUrlService,
+        private readonly activityLogService: ActivityLogService,
     ) {}
 
     @Public()
@@ -67,7 +70,24 @@ export class OAuthController {
     async githubAuthRedirect(@Request() req) {
         const userAgent = req.headers['user-agent'];
         const ipAddress = req.ip || req.headers['x-forwarded-for'];
-        return this.authService.login(req.user, userAgent, ipAddress);
+        const result = await this.authService.login(req.user, userAgent, ipAddress);
+
+        this.activityLogService
+            .log({
+                userId: req.user.id,
+                actionType: ActivityActionType.USER_LOGIN,
+                action: 'user.login.github',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Signed in via GitHub',
+                ipAddress,
+                userAgent,
+                metadata: {
+                    provider: AuthProvider.GITHUB,
+                },
+            })
+            .catch(() => {});
+
+        return result;
     }
 
     @Public()
@@ -81,6 +101,23 @@ export class OAuthController {
     async googleAuthRedirect(@Request() req) {
         const userAgent = req.headers['user-agent'];
         const ipAddress = req.ip || req.headers['x-forwarded-for'];
-        return this.authService.login(req.user, userAgent, ipAddress);
+        const result = await this.authService.login(req.user, userAgent, ipAddress);
+
+        this.activityLogService
+            .log({
+                userId: req.user.id,
+                actionType: ActivityActionType.USER_LOGIN,
+                action: 'user.login.google',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Signed in via Google',
+                ipAddress,
+                userAgent,
+                metadata: {
+                    provider: AuthProvider.GOOGLE,
+                },
+            })
+            .catch(() => {});
+
+        return result;
     }
 }
