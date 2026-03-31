@@ -7,6 +7,7 @@ import { TriggerModule as TasksTriggerModule } from '@ever-works/trigger-tasks';
 import { WebsiteGeneratorModule } from '@ever-works/agent/generators';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { SubscriptionsModule } from '@ever-works/agent/subscriptions';
+import { ActivityLogModule } from '@ever-works/agent/activity-log';
 
 // Controllers
 import { DirectoriesController } from './directories.controller';
@@ -28,6 +29,7 @@ import { ItemSourceValidationCronService } from './tasks/item-source-validation-
         WebsiteGeneratorModule,
         FacadesModule,
         SubscriptionsModule,
+        ActivityLogModule,
     ],
     providers: [
         CacheEntryRepository,

@@ -90,6 +90,8 @@ import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
 import { UpdateDirectoryScheduleDto, UpdateSourceValidationDto } from '@ever-works/agent/dto';
 import { DirectoryScheduleStatus } from '@ever-works/agent/entities';
 import { SubscriptionService } from '@ever-works/agent/subscriptions';
+import { ActivityLogService } from '@ever-works/agent/activity-log';
+import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 
 let CACHE_TTL = 1000 * 60 * 10; // 10 minutes
 
@@ -118,6 +120,7 @@ export class DirectoriesController {
         private readonly directoryRepository: DirectoryRepository,
         private readonly sourceValidationService: ItemSourceValidationSchedulerService,
         private readonly subscriptionService: SubscriptionService,
+        private readonly activityLogService: ActivityLogService,
     ) {}
 
     @Get('directories')
@@ -259,7 +262,16 @@ export class DirectoriesController {
         @Body() dto: UpdateWebsiteSettingsDto,
     ) {
         const user = await this.authService.getUser(auth.userId);
-        return this.directoryQueryService.updateWebsiteSettings(id, user, dto);
+        const result = await this.directoryQueryService.updateWebsiteSettings(id, user, dto);
+        this.activityLogService.log({
+            userId: auth.userId,
+            directoryId: id,
+            actionType: ActivityActionType.WEBSITE_SETTINGS_UPDATED,
+            action: 'directory.website_settings_updated',
+            status: ActivityStatus.COMPLETED,
+            summary: `Updated website settings`,
+        }).catch(() => {});
+        return result;
     }
 
     @Get('directories/:id/count')
@@ -799,7 +811,16 @@ export class DirectoriesController {
         @Param('id') id: string,
         @Body() dto: UpdateDirectoryAdvancedPromptsDto,
     ) {
-        return this.directoryAdvancedPromptsService.updateAdvancedPrompts(id, dto, auth.userId);
+        const result = await this.directoryAdvancedPromptsService.updateAdvancedPrompts(id, dto, auth.userId);
+        this.activityLogService.log({
+            userId: auth.userId,
+            directoryId: id,
+            actionType: ActivityActionType.PROMPTS_UPDATED,
+            action: 'directory.prompts_updated',
+            status: ActivityStatus.COMPLETED,
+            summary: `Updated advanced prompts`,
+        }).catch(() => {});
+        return result;
     }
 
     // ============================================

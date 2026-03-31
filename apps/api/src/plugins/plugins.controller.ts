@@ -30,6 +30,8 @@ import {
     SetGlobalPipelineDefaultDto,
 } from './dto';
 import { PluginValidationService } from './plugin-validation.service';
+import { ActivityLogService } from '@ever-works/agent/activity-log';
+import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 
 @ApiTags('Plugins')
 @ApiBearerAuth('JWT-auth')
@@ -40,6 +42,7 @@ export class PluginsController {
         private readonly pluginsService: PluginOperationsService,
         private readonly ownershipService: DirectoryOwnershipService,
         private readonly pluginValidationService: PluginValidationService,
+        private readonly activityLogService: ActivityLogService,
     ) {}
 
     // ============================================
@@ -129,13 +132,21 @@ export class PluginsController {
         @Param('pluginId') pluginId: string,
         @Body() dto: EnableUserPluginDto,
     ): Promise<UserPluginResponseDto> {
-        return this.pluginsService.enablePluginForUser(
+        const result = await this.pluginsService.enablePluginForUser(
             pluginId,
             auth.userId,
             dto.settings,
             dto.secretSettings,
             dto.autoEnableForDirectories,
         );
+        this.activityLogService.log({
+            userId: auth.userId,
+            actionType: ActivityActionType.PLUGIN_ENABLED,
+            action: 'plugin.enabled',
+            status: ActivityStatus.COMPLETED,
+            summary: `Enabled plugin: ${pluginId}`,
+        }).catch(() => {});
+        return result;
     }
 
     @Post('plugins/:pluginId/disable')
@@ -151,7 +162,15 @@ export class PluginsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('pluginId') pluginId: string,
     ): Promise<UserPluginResponseDto> {
-        return this.pluginsService.disablePluginForUser(pluginId, auth.userId);
+        const result = await this.pluginsService.disablePluginForUser(pluginId, auth.userId);
+        this.activityLogService.log({
+            userId: auth.userId,
+            actionType: ActivityActionType.PLUGIN_DISABLED,
+            action: 'plugin.disabled',
+            status: ActivityStatus.COMPLETED,
+            summary: `Disabled plugin: ${pluginId}`,
+        }).catch(() => {});
+        return result;
     }
 
     @Patch('plugins/:pluginId/settings')
