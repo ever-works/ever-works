@@ -7,66 +7,68 @@ import { test, expect } from '@playwright/test';
  */
 
 test.describe('Route protection', () => {
-	test('should redirect unauthenticated user from dashboard to login', async ({ page }) => {
-		await page.goto('/en');
+    test('should redirect unauthenticated user from dashboard to login', async ({ page }) => {
+        await page.goto('/en');
 
-		// Unauthenticated users should be redirected to login
-		await page.waitForURL(/\/(login|register|en\/?$)/, { timeout: 10_000 });
-	});
+        // Unauthenticated users should be redirected to login
+        await page.waitForURL(/\/(login|register|en\/?$)/, { timeout: 10_000 });
+    });
 
-	test('should redirect unauthenticated user from directories to login', async ({ page }) => {
-		await page.goto('/en/directories');
+    test('should redirect unauthenticated user from directories to login', async ({ page }) => {
+        await page.goto('/en/directories');
 
-		await page.waitForURL(/\/(login|register|en\/?$)/, { timeout: 10_000 });
-	});
+        await page.waitForURL(/\/(login|register|en\/?$)/, { timeout: 10_000 });
+    });
 
-	test('should redirect unauthenticated user from settings to login', async ({ page }) => {
-		await page.goto('/en/settings');
+    test('should redirect unauthenticated user from settings to login', async ({ page }) => {
+        await page.goto('/en/settings');
 
-		await page.waitForURL(/\/(login|register|en\/?$)/, { timeout: 10_000 });
-	});
+        await page.waitForURL(/\/(login|register|en\/?$)/, { timeout: 10_000 });
+    });
 
-	test('should redirect unauthenticated user from new directory page to login', async ({ page }) => {
-		await page.goto('/en/directories/new');
+    test('should redirect unauthenticated user from new directory page to login', async ({
+        page,
+    }) => {
+        await page.goto('/en/directories/new');
 
-		await page.waitForURL(/\/(login|register|en\/?$)/, { timeout: 10_000 });
-	});
+        await page.waitForURL(/\/(login|register|en\/?$)/, { timeout: 10_000 });
+    });
 });
 
 test.describe('Public pages', () => {
-	test('should load login page without redirect', async ({ page }) => {
-		await page.goto('/en/login');
+    test('should load login page without redirect', async ({ page }) => {
+        await page.goto('/en/login');
 
-		await expect(page).toHaveURL(/\/login/);
-		await expect(page.locator('input[name="email"]')).toBeVisible();
-	});
+        await expect(page).toHaveURL(/\/login/);
+        await expect(page.locator('input[name="email"]')).toBeVisible();
+    });
 
-	test('should load register page without redirect', async ({ page }) => {
-		await page.goto('/en/register');
+    test('should load register page without redirect', async ({ page }) => {
+        await page.goto('/en/register');
 
-		await expect(page).toHaveURL(/\/register/);
-		await expect(page.locator('input[name="name"]')).toBeVisible();
-	});
+        await expect(page).toHaveURL(/\/register/);
+        await expect(page.locator('input[name="name"]')).toBeVisible();
+    });
 
-	test('should load forgot password page without redirect', async ({ page }) => {
-		await page.goto('/en/forgot-password');
+    test('should load forgot password page without redirect', async ({ page }) => {
+        await page.goto('/en/forgot-password');
 
-		await expect(page).toHaveURL(/\/forgot-password/);
-		// Should render without 500 error
-		await expect(page.locator('body')).not.toContainText('Internal Server Error');
-	});
+        await expect(page).toHaveURL(/\/forgot-password/);
+        // Should render without 500 error
+        await expect(page.locator('body')).not.toContainText('Internal Server Error');
+    });
 });
 
 test.describe('Locale routing', () => {
-	test('should redirect root to default locale', async ({ page }) => {
-		await page.goto('/');
+    test('should redirect root to default locale', async ({ page }) => {
+        await page.goto('/');
 
-		// Should redirect to /en/ or another locale
-		await page.waitForURL(/\/[a-z]{2}\//, { timeout: 10_000 });
-	});
+        // Should redirect to /en/ or another locale
+        await page.waitForURL(/\/[a-z]{2}\//, { timeout: 10_000 });
+    });
 
-	test('should load pages with explicit locale prefix', async ({ page }) => {
-		await page.goto('/en/login');
-		await expect(page).toHaveURL(/\/en\/login/);
-	});
+    test('should load pages with explicit locale prefix', async ({ page }) => {
+        await page.goto('/en/login');
+        await expect(page).toHaveURL(/\/en\/login/);
+    });
 });
