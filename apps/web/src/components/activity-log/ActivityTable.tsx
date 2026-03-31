@@ -6,17 +6,16 @@ import { formatDistanceToNow } from 'date-fns';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
 import { ActivityTypeBadge } from './ActivityTypeBadge';
-import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 
 interface ActivityTableProps {
 	activities: ActivityLogEntry[];
 	loading: boolean;
-	onDismiss: (id: string) => void;
 }
 
-export function ActivityTable({ activities, loading, onDismiss }: ActivityTableProps) {
+export function ActivityTable({ activities, loading }: ActivityTableProps) {
 	const t = useTranslations('dashboard.activity');
 	const [expandedIds, setExpandedIds] = useState<string[]>([]);
 
@@ -47,7 +46,6 @@ export function ActivityTable({ activities, loading, onDismiss }: ActivityTableP
 						<th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-secondary dark:text-text-secondary-dark">
 							{t('columns.summary')}
 						</th>
-						<th className="w-10 px-3 py-3" />
 					</tr>
 				</thead>
 				<tbody className="divide-y divide-border dark:divide-border-dark">
@@ -96,22 +94,10 @@ export function ActivityTable({ activities, loading, onDismiss }: ActivityTableP
 									<td className="px-4 py-3 text-sm text-text dark:text-text-dark max-w-md truncate">
 										{activity.summary}
 									</td>
-									<td className="px-3 py-3">
-										<button
-											onClick={(e) => {
-												e.stopPropagation();
-												onDismiss(activity.id);
-											}}
-											className="p-1 rounded hover:bg-danger/10 text-text-muted dark:text-text-muted-dark hover:text-danger transition-colors"
-											title={t('actions.dismiss')}
-										>
-											<Trash2 className="w-4 h-4" />
-										</button>
-									</td>
 								</tr>
 								{hasDetails && isExpanded && (
 									<tr key={`${activity.id}-details`} className="bg-muted/20 dark:bg-muted/10">
-										<td colSpan={7} className="px-6 py-4">
+										<td colSpan={6} className="px-6 py-4">
 											<div className="space-y-3">
 												<h4 className="text-sm font-medium text-text dark:text-text-dark">
 													{t('detail.title')}

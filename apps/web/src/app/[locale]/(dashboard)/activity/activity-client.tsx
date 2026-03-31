@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
-import { getActivityLog, dismissActivity } from '@/app/actions/activity-log';
+import { getActivityLog } from '@/app/actions/activity-log';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
 import { ActivityTable } from '@/components/activity-log/ActivityTable';
 import { ActivityFilters } from '@/components/activity-log/ActivityFilters';
@@ -87,16 +87,6 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
 		fetchActivities(newPage);
 	};
 
-	const handleDismiss = async (id: string) => {
-		const result = await dismissActivity(id);
-		if (result.success) {
-			setActivities((prev) => prev.filter((a) => a.id !== id));
-			setTotal((prev) => prev - 1);
-		} else {
-			toast.error(result.error || t('dismissFailed'));
-		}
-	};
-
 	const handleExport = async () => {
 		try {
 			const params = new URLSearchParams();
@@ -144,7 +134,6 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
 					<ActivityTable
 						activities={activities}
 						loading={loading}
-						onDismiss={handleDismiss}
 					/>
 
 					{totalPages > 1 && (

@@ -347,7 +347,6 @@
             "title": "Activity Log",
             "subtitle": "Track all operations across your directories",
             "fetchFailed": "Failed to load activities",
-            "dismissFailed": "Failed to dismiss activity",
             "exportFailed": "Failed to export activity log",
             "showing": "Showing {from} to {to} of {total}",
             "columns": {
@@ -385,7 +384,6 @@
                 }
             },
             "actions": {
-                "dismiss": "Dismiss",
                 "export": "Export CSV"
             },
             "empty": {

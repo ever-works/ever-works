@@ -64,7 +64,4 @@ export const activityLogAPI = {
 		return serverFetch<{ activity: ActivityLogEntry }>(`/activity-log/${id}`);
 	},
 
-	dismiss: async (id: string): Promise<{ success: boolean }> => {
-		return serverFetch<{ success: boolean }>(`/activity-log/${id}`, { method: 'DELETE' });
-	},
 };

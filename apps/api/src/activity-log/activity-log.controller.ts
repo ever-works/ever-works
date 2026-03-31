@@ -1,14 +1,11 @@
 import {
 	Controller,
 	Get,
-	Delete,
 	Param,
 	Query,
 	Res,
 	DefaultValuePipe,
 	ParseIntPipe,
-	HttpCode,
-	HttpStatus,
 	NotFoundException,
 } from '@nestjs/common';
 import {
@@ -138,19 +135,4 @@ export class ActivityLogController {
 		return { activity };
 	}
 
-	@Delete(':id')
-	@HttpCode(HttpStatus.OK)
-	@ApiOperation({
-		summary: 'Dismiss an activity log entry',
-		description: 'Remove an activity log entry',
-	})
-	@ApiParam({ name: 'id', description: 'Activity log entry ID' })
-	@ApiResponse({ status: 200, description: 'Activity dismissed' })
-	async dismissActivity(
-		@CurrentUser() auth: AuthenticatedUser,
-		@Param('id') id: string,
-	) {
-		const deleted = await this.activityLogService.dismiss(id, auth.userId);
-		return { success: deleted };
-	}
 }

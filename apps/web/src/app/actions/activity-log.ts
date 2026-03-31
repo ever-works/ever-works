@@ -39,17 +39,3 @@ export async function getRunningActivityCount(): Promise<{
 	}
 }
 
-export async function dismissActivity(id: string): Promise<{
-	success: boolean;
-	error?: string;
-}> {
-	try {
-		await activityLogAPI.dismiss(id);
-		return { success: true };
-	} catch (error) {
-		return {
-			success: false,
-			error: error instanceof Error ? error.message : 'Failed to dismiss activity',
-		};
-	}
-}
