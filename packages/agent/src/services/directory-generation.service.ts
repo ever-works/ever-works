@@ -57,7 +57,12 @@ import { DirectoryScheduleService } from './directory-schedule.service';
 import { UserRepository } from '@src/database/repositories/user.repository';
 import { DirectoryImportService } from './directory-import.service';
 import { NotificationService } from '@src/notifications/notification.service';
-import { ScreenshotFacadeService } from '@src/facades';
+import {
+    ScreenshotFacadeService,
+    AiFacadeService,
+    ContentExtractorFacadeService,
+} from '@src/facades';
+import { z } from 'zod';
 import { GeneratorFormSchemaService } from './generator-form-schema.service';
 import { buildStatsUpdate } from '../directory-operations/directory-operations.service';
 import { calculateDurationSeconds } from '../utils/time.utils';
@@ -126,6 +131,8 @@ export class DirectoryGenerationService {
         private readonly directoryImportService: DirectoryImportService,
         private readonly userRepository: UserRepository,
         private readonly screenshotFacade: ScreenshotFacadeService,
+        private readonly aiFacade: AiFacadeService,
+        private readonly contentExtractorFacade: ContentExtractorFacadeService,
         private readonly generatorFormSchemaService: GeneratorFormSchemaService,
         private readonly pluginOperationsService: PluginOperationsService,
         private readonly pluginRegistryService: PluginRegistryService,
@@ -497,14 +504,100 @@ export class DirectoryGenerationService {
         }
     }
 
-    async extractItemDetails(dto: ExtractItemDetailsDto): Promise<ExtractItemDetailsResponseDto> {
-        // TODO: Implement using pipeline step executor for item extraction
-        // This method needs refactoring to use the plugin-based pipeline system
-        throw new BadRequestException({
-            status: 'error',
-            source_url: dto.source_url,
-            message: 'Item extraction is not yet implemented in the pipeline system',
-        });
+    async extractItemDetails(
+        dto: ExtractItemDetailsDto,
+        user: User,
+    ): Promise<ExtractItemDetailsResponseDto> {
+        const { source_url, existing_categories } = dto;
+        const facadeOptions = { userId: user.id };
+
+        try {
+            // 1. Extract page content
+            const extracted = await this.contentExtractorFacade.extractContent(
+                source_url,
+                undefined,
+                facadeOptions,
+            );
+
+            if (!extracted || !extracted.rawContent) {
+                return {
+                    status: 'error',
+                    source_url,
+                    message: 'Could not extract content from the provided URL',
+                };
+            }
+
+            // 2. Use AI to extract structured item data from the content
+            const itemSchema = z.object({
+                name: z.string().describe('The name or title of the item/product/tool'),
+                description: z.string().describe('A concise description (1-3 sentences)'),
+                category: z.string().describe('The most appropriate category for this item'),
+                tags: z.array(z.string()).describe('Relevant tags or keywords (3-8 tags)'),
+                brand: z
+                    .string()
+                    .nullable()
+                    .describe('The brand or company behind this item, or null'),
+                brand_logo_url: z
+                    .string()
+                    .nullable()
+                    .describe('URL to the brand logo if found on the page, or null'),
+                images: z.array(z.string()).describe('URLs of relevant images found on the page'),
+            });
+
+            const categoriesHint = existing_categories?.length
+                ? `\nPrefer matching one of these existing categories: ${existing_categories.join(', ')}`
+                : '';
+
+            const prompt = `Extract structured item details from this web page content.
+The source URL is: {{source_url}}
+${categoriesHint}
+
+Page content:
+{{content}}
+
+Extract the item name, a concise description, an appropriate category, relevant tags, brand info, and image URLs.
+If the page is about a product/tool/service, extract its details.
+If the page is a general article, extract the main subject as the item.
+Only include image URLs that are absolute URLs (starting with http).`;
+
+            const { result } = await this.aiFacade.askJson(
+                prompt,
+                itemSchema,
+                {
+                    temperature: 0.1,
+                    variables: {
+                        source_url,
+                        content: extracted.rawContent.slice(0, 12_000),
+                    },
+                    routing: { complexity: 'simple' as const },
+                },
+                facadeOptions,
+            );
+
+            return {
+                status: 'success',
+                source_url,
+                item: {
+                    name: result.name,
+                    description: result.description,
+                    source_url,
+                    category: result.category,
+                    tags: result.tags,
+                    brand: result.brand || undefined,
+                    brand_logo_url: result.brand_logo_url,
+                    images: result.images?.filter((url) => url.startsWith('http')) || [],
+                },
+                message: 'Item details extracted successfully',
+            };
+        } catch (error) {
+            this.logger.error(`Failed to extract item details from ${source_url}:`, error);
+
+            throw new BadRequestException({
+                status: 'error',
+                source_url,
+                message: normalizeGeneratorError(error),
+            });
+        }
     }
 
     async bulkCaptureImages(
