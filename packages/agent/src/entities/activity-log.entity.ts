@@ -15,6 +15,7 @@ import type { ActivityActionType, ActivityStatus } from './activity-log.types';
 @Entity({ name: 'activity_log' })
 @Index(['userId', 'createdAt'])
 @Index(['userId', 'actionType'])
+@Index(['userId', 'directoryId'])
 @Index(['userId', 'status'])
 export class ActivityLog {
     @PrimaryGeneratedColumn('uuid')

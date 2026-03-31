@@ -59,7 +59,7 @@ export class ActivityLogService {
         );
 
         const rows = activities.map((a) => {
-            const directoryName = a.directory?.name || '';
+            const directoryName = (a.directory?.name || '').replace(/"/g, '""');
             const summary = a.summary.replace(/"/g, '""');
             return [
                 a.createdAt.toISOString(),

@@ -92,9 +92,9 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
             const params = new URLSearchParams();
             if (actionType) params.set('actionType', actionType);
             if (status) params.set('status', status);
+            if (debouncedSearch) params.set('search', debouncedSearch);
             const query = params.toString();
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3100';
-            window.open(`${apiUrl}/api/activity-log/export${query ? `?${query}` : ''}`, '_blank');
+            window.open(`/api/activity-log/export${query ? `?${query}` : ''}`, '_blank');
         } catch (error) {
             toast.error(t('exportFailed'));
         }
