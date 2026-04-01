@@ -79,7 +79,7 @@ export const ENTITIES = [
     DirectoryPluginEntity,
     // Account transfer entities
     UserSyncConfig,
-    // BetterAuth entities
+    // Auth provider entities
     AuthUser,
     AuthSession,
     AuthAccount,

@@ -7,7 +7,7 @@ import {
     BeforeInsert,
 } from 'typeorm';
 
-const BETTER_AUTH_PLACEHOLDER_PASSWORD_HASH =
+const AUTH_PROVIDER_PLACEHOLDER_PASSWORD_HASH =
     '$2b$10$3FpU5KTq.lf4tUSzT4i0JOuuywnxGPnkKorObPlIEG14V0wl17ANS';
 
 @Entity({ name: 'users', synchronize: false })
@@ -39,7 +39,7 @@ export class AuthUser {
     @BeforeInsert()
     ensurePlaceholderPassword() {
         if (!this.password) {
-            this.password = BETTER_AUTH_PLACEHOLDER_PASSWORD_HASH;
+            this.password = AUTH_PROVIDER_PLACEHOLDER_PASSWORD_HASH;
         }
     }
 }
