@@ -5,6 +5,7 @@ import { Link } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
 import { getSiteConfig } from '@/lib/constants';
 import { DirectoryConfig } from '@/lib/api';
+import { useTheme } from '@/lib/hooks/use-theme';
 
 export function LogoEverWork({
     className,
@@ -43,13 +44,8 @@ export function FaviconEverWork({
     config?: DirectoryConfig | null;
 }) {
     const siteConfig = getSiteConfig(configProps);
-    const imgProps = {
-        alt: siteConfig.name,
-        width: 120,
-        height: 120,
-        style: { animationDuration: '10s' },
-        className: 'object-contain max-h-8 ml-[8.5px] animate-spin motion-reduce:animate-none',
-    };
+    const { isDark, mounted } = useTheme();
+    const faviconSrc = mounted && isDark ? siteConfig.favicon.dark : siteConfig.favicon.light;
 
     return (
         <Link
@@ -57,14 +53,13 @@ export function FaviconEverWork({
             className={cn('relative flex items-center', className)}
         >
             <Image
-                {...imgProps}
-                src={siteConfig.favicon.light}
-                className={cn(imgProps.className, 'block dark:hidden')}
-            />
-            <Image
-                {...imgProps}
-                src={siteConfig.favicon.dark}
-                className={cn(imgProps.className, 'hidden dark:block')}
+                key={faviconSrc}
+                src={faviconSrc}
+                alt={siteConfig.name}
+                width={120}
+                height={120}
+                style={{ animationDuration: '10s' }}
+                className="object-contain max-h-8 ml-[8.5px] animate-spin motion-reduce:animate-none"
             />
         </Link>
     );
