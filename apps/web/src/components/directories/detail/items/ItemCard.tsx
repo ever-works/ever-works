@@ -23,7 +23,7 @@ export const ItemCard = memo(function ItemCard({
     onDelete,
     onUpdate,
 }: ItemCardProps) {
-    const { directoryId, canEdit } = useItemsContext();
+    const { canEdit } = useItemsContext();
 
     if (viewMode === 'list') {
         return (
@@ -120,7 +120,7 @@ const ItemCardList = memo(function ItemCardList({
                         <ExternalLink className="w-3.5 h-3.5" />
                     </Link>
                 )}
-                {canEdit && (
+                {canEdit && onDelete && (
                     <ItemActions
                         item={item}
                         onDelete={onDelete}
@@ -167,7 +167,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
                     </h4>
                     <ItemHealthBadge item={item} />
                 </div>
-                {canEdit && (
+                {canEdit && onDelete && (
                     <div className="shrink-0 -mt-1 -mr-1">
                         <ItemActions
                             item={item}
