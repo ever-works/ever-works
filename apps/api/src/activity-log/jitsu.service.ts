@@ -37,6 +37,7 @@ export class JitsuService implements ActivityLogAnalyticsDispatcher {
                 : {};
 
         await this.client.track(activity.action, {
+            ...metadata,
             activityId: activity.id,
             userId: activity.userId,
             directoryId: activity.directoryId ?? undefined,
@@ -46,7 +47,6 @@ export class JitsuService implements ActivityLogAnalyticsDispatcher {
             summary: activity.summary,
             details: activity.details ?? undefined,
             createdAt: activity.createdAt.toISOString(),
-            ...metadata,
         });
     }
 }
