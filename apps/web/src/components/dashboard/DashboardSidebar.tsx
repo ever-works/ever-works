@@ -125,7 +125,10 @@ export function DashboardSidebar({
                 >
                     <div className="w-full relative">
                         <div className={cn('flex items-center gap-1 -ml-2')}>
-                            <FaviconEverWork config={config} className={cn(isCollapsed ? 'w-11 ml-[8.5px]' : 'w-12')} />
+                            <FaviconEverWork
+                                config={config}
+                                className={cn(isCollapsed ? 'w-11 ml-[8.5px]' : 'w-12')}
+                            />
                             <LogoEverWork config={config} className={cn(isCollapsed && 'hidden')} />
                         </div>
                         <div
@@ -137,7 +140,9 @@ export function DashboardSidebar({
                             {onCollapsedChange && (
                                 <div
                                     className={cn(
-                                        isCollapsed ? 'absolute -right-5 top-2' : 'absolute -right-1 top-2',
+                                        isCollapsed
+                                            ? 'absolute -right-5 top-2'
+                                            : 'absolute -right-1 top-2',
                                     )}
                                 >
                                     <Tooltip

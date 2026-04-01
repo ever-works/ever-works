@@ -17,7 +17,10 @@ export function LogoEverWork({
     const logoHref = siteConfig.website || '/';
 
     return (
-        <Link href={logoHref} className={cn('relative flex items-center text-gray-900 dark:text-white', className)}>
+        <Link
+            href={logoHref}
+            className={cn('relative flex items-center text-gray-900 dark:text-white', className)}
+        >
             <svg
                 width={132}
                 height={25}
@@ -49,9 +52,20 @@ export function FaviconEverWork({
     };
 
     return (
-        <Link href={siteConfig.website || '/'} className={cn('relative flex items-center', className)}>
-            <Image {...imgProps} src={siteConfig.favicon.light} className={cn(imgProps.className, 'block dark:hidden')} />
-            <Image {...imgProps} src={siteConfig.favicon.dark} className={cn(imgProps.className, 'hidden dark:block')} />
+        <Link
+            href={siteConfig.website || '/'}
+            className={cn('relative flex items-center', className)}
+        >
+            <Image
+                {...imgProps}
+                src={siteConfig.favicon.light}
+                className={cn(imgProps.className, 'block dark:hidden')}
+            />
+            <Image
+                {...imgProps}
+                src={siteConfig.favicon.dark}
+                className={cn(imgProps.className, 'hidden dark:block')}
+            />
         </Link>
     );
 }
