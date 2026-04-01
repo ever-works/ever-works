@@ -11,7 +11,7 @@ import { ActivityEmptyState } from '@/components/activity-log/ActivityEmptyState
 import { toast } from 'sonner';
 import { Download } from 'lucide-react';
 
-const POLL_INTERVAL = 30000;
+const POLL_INTERVAL = 5000;
 const ITEMS_PER_PAGE = 25;
 
 interface ActivityClientProps {
