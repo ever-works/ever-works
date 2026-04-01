@@ -1,13 +1,11 @@
 'use client';
 
-import { memo, useTransition } from 'react';
+import { memo } from 'react';
 import { ItemData, ItemBadges } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { ExternalLink, Star, Eye, AlertTriangle } from 'lucide-react';
-import { removeItem } from '@/app/actions/dashboard/items';
-import { toast } from 'sonner';
 import { getCategoryName } from '@/lib/utils/items';
 import { ItemActions } from './ItemActions';
 import { useItemsContext } from './ItemsContext';
@@ -25,120 +23,90 @@ export const ItemCard = memo(function ItemCard({
     onDelete,
     onUpdate,
 }: ItemCardProps) {
-    const t = useTranslations('dashboard.directoryDetail.items');
-    const { directoryId } = useItemsContext();
-    const [isPending, startTransition] = useTransition();
-
-    const handleDelete = () => {
-        if (!confirm(t('deleteConfirm', { name: item.name }))) {
-            return;
-        }
-
-        startTransition(async () => {
-            try {
-                const result = await removeItem(directoryId, item.slug!);
-                if (result.status === 'success') {
-                    toast.success(result.message || t('deleteSuccess'));
-                    onDelete?.();
-                } else {
-                    toast.error(result.message || t('deleteFailed'));
-                }
-            } catch (error) {
-                toast.error(t('deleteError'));
-            }
-        });
-    };
+    const { directoryId, canEdit } = useItemsContext();
 
     if (viewMode === 'list') {
         return (
-            <ItemCardList
-                item={item}
-                onDelete={handleDelete}
-                onUpdate={onUpdate}
-                isPending={isPending}
-            />
+            <ItemCardList item={item} canEdit={canEdit} onDelete={onDelete} onUpdate={onUpdate} />
         );
     }
 
-    return (
-        <ItemCardGrid
-            item={item}
-            onDelete={handleDelete}
-            onUpdate={onUpdate}
-            isPending={isPending}
-        />
-    );
+    return <ItemCardGrid item={item} canEdit={canEdit} onDelete={onDelete} onUpdate={onUpdate} />;
 });
+
+// ── List view ────────────────────────────────────────────────────
 
 interface ItemCardViewProps {
     item: ItemData;
-    onDelete: () => void;
-    isPending: boolean;
+    canEdit: boolean;
+    onDelete?: () => void;
     onUpdate?: (item: Partial<ItemData>) => void;
 }
 
 const ItemCardList = memo(function ItemCardList({
     item,
+    canEdit,
     onDelete,
-    isPending,
     onUpdate,
 }: ItemCardViewProps) {
-    const { canEdit, directoryWebsite } = useItemsContext();
+    const { directoryWebsite } = useItemsContext();
     const isFeatured = item.featured === true;
+    const categoryName = getCategoryName(item.category);
 
     return (
         <div
             className={cn(
-                'flex items-center gap-4 p-4 rounded-lg border-2',
-                'bg-card dark:bg-card-dark',
-                'transition-colors',
+                'flex items-center gap-3 p-3 rounded-lg border',
+                'bg-card dark:bg-card-primary-dark transition-colors',
                 isFeatured
-                    ? 'border-amber-400 dark:border-amber-500 bg-amber-50/50 dark:bg-amber-900/10'
-                    : 'border-card-border dark:border-card-border-dark hover:border-primary/50',
+                    ? 'border-amber-400/50 dark:border-amber-500/30 bg-amber-50/30 dark:bg-amber-900/10'
+                    : 'border-card-border dark:border-white/9 hover:border-primary-500/50 dark:hover:border-white/20',
             )}
         >
+            {/* Main content — takes remaining space, truncates */}
             <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                     {isFeatured && (
-                        <Star className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
+                        <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
                     )}
-                    <h4 className="font-medium text-text dark:text-text-dark truncate">
+                    <span className="font-medium text-sm text-text dark:text-text-dark truncate">
                         {item.name}
-                    </h4>
+                    </span>
                     <ItemHealthBadge item={item} />
-                    <ItemBadgesDisplay badges={item.badges} />
                 </div>
                 {item.description && (
-                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark line-clamp-1">
+                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark truncate mt-0.5">
                         {item.description}
                     </p>
                 )}
             </div>
 
-            {/* Order badge and Category */}
-            <div className="flex items-center gap-2 shrink-0">
-                {item.order !== undefined && item.order !== null && (
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+            {/* Metadata — badges, order, category */}
+            <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+                <ItemBadgesDisplay badges={item.badges} />
+                {item.order != null && (
+                    <span className="px-1.5 py-0.5 text-[11px] font-medium rounded-full bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">
                         #{item.order}
                     </span>
                 )}
-                {getCategoryName(item.category) && (
-                    <span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
-                        {getCategoryName(item.category)}
+                {categoryName && (
+                    <span className="px-1.5 py-0.5 text-[11px] rounded-full bg-primary/10 text-primary truncate max-w-[120px]">
+                        {categoryName}
                     </span>
                 )}
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Links + actions — fixed width area */}
+            <div className="flex items-center gap-1 shrink-0">
                 {directoryWebsite && item.slug && (
                     <Link
                         href={`${directoryWebsite}/details/${item.slug}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs hover:underline flex items-center gap-1 text-text-secondary dark:text-text-secondary-dark hover:text-primary"
-                        aria-label="View on directory website"
+                        className="p-1 rounded text-text-secondary dark:text-text-secondary-dark hover:text-primary transition-colors"
+                        aria-label="View on website"
                     >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-3.5 h-3.5" />
                     </Link>
                 )}
                 {item.source_url && (
@@ -146,9 +114,10 @@ const ItemCardList = memo(function ItemCardList({
                         href={item.source_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs hover:underline flex items-center gap-1"
+                        className="p-1 rounded text-text-secondary dark:text-text-secondary-dark hover:text-primary transition-colors"
+                        aria-label="Open source URL"
                     >
-                        <ExternalLink className="w-3 h-3" />
+                        <ExternalLink className="w-3.5 h-3.5" />
                     </Link>
                 )}
                 {canEdit && (
@@ -156,7 +125,7 @@ const ItemCardList = memo(function ItemCardList({
                         item={item}
                         onDelete={onDelete}
                         onUpdate={onUpdate}
-                        isPending={isPending}
+                        isPending={false}
                     />
                 )}
             </div>
@@ -164,78 +133,86 @@ const ItemCardList = memo(function ItemCardList({
     );
 });
 
+// ── Grid view ────────────────────────────────────────────────────
+
 const ItemCardGrid = memo(function ItemCardGrid({
     item,
+    canEdit,
     onDelete,
-    isPending,
     onUpdate,
 }: ItemCardViewProps) {
-    const { canEdit, directoryWebsite } = useItemsContext();
+    const { directoryWebsite } = useItemsContext();
     const t = useTranslations('dashboard.directoryDetail.items');
     const isFeatured = item.featured === true;
+    const categoryName = getCategoryName(item.category);
 
     return (
         <div
             className={cn(
-                'p-4 rounded-lg border-2',
-                'bg-card dark:bg-card-dark',
-                'transition-colors',
+                'flex flex-col p-4 rounded-lg border',
+                'bg-card dark:bg-card-primary-dark transition-colors',
                 isFeatured
                     ? 'border-amber-400/30 dark:border-amber-500/30'
-                    : 'border-card-border dark:border-card-border-dark hover:border-primary/50',
+                    : 'border-card-border dark:border-white/9 hover:border-primary-500/50 dark:hover:border-white/20',
             )}
         >
-            <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center gap-2 min-w-0">
+            {/* Header: title + actions on same line */}
+            <div className="flex items-start gap-2 mb-1">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
                     {isFeatured && (
-                        <Star className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
+                        <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
                     )}
-                    <h4 className="font-medium text-text dark:text-text-dark line-clamp-1">
+                    <h4 className="font-medium text-sm text-text dark:text-text-dark truncate">
                         {item.name}
                     </h4>
                     <ItemHealthBadge item={item} />
                 </div>
                 {canEdit && (
-                    <ItemActions
-                        item={item}
-                        onDelete={onDelete}
-                        onUpdate={onUpdate}
-                        isPending={isPending}
-                    />
+                    <div className="shrink-0 -mt-1 -mr-1">
+                        <ItemActions
+                            item={item}
+                            onDelete={onDelete}
+                            onUpdate={onUpdate}
+                            isPending={false}
+                        />
+                    </div>
                 )}
             </div>
 
-            <ItemBadgesDisplay badges={item.badges} className="mb-2" />
+            {/* Badges */}
+            <ItemBadgesDisplay badges={item.badges} className="mb-1.5" />
 
+            {/* Description */}
             {item.description && (
-                <p className="text-sm text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-3 flex-1">
+                <p className="text-xs text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-3 flex-1">
                     {item.description}
                 </p>
             )}
 
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    {item.order !== undefined && item.order !== null && (
-                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+            {/* Footer: metadata + links */}
+            <div className="flex items-center justify-between mt-auto pt-1">
+                <div className="flex items-center gap-1.5 min-w-0">
+                    {item.order != null && (
+                        <span className="px-1.5 py-0.5 text-[11px] font-medium rounded-full bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">
                             #{item.order}
                         </span>
                     )}
-                    {getCategoryName(item.category) && (
-                        <span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
-                            {getCategoryName(item.category)}
+                    {categoryName && (
+                        <span className="px-1.5 py-0.5 text-[11px] rounded-full bg-primary/10 text-primary truncate max-w-[100px]">
+                            {categoryName}
                         </span>
                     )}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 shrink-0">
                     {directoryWebsite && item.slug && (
                         <Link
                             href={`${directoryWebsite}/items/${item.slug}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-text-secondary dark:text-text-secondary-dark hover:text-primary hover:underline flex items-center gap-1"
-                            aria-label="View on directory website"
+                            className="text-xs text-text-secondary dark:text-text-secondary-dark hover:text-primary transition-colors flex items-center gap-1"
+                            aria-label="View on website"
                         >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" />
                         </Link>
                     )}
                     {item.source_url && (
@@ -255,6 +232,8 @@ const ItemCardGrid = memo(function ItemCardGrid({
     );
 });
 
+// ── Shared components ────────────────────────────────────────────
+
 function ItemHealthBadge({ item }: { item: ItemData }) {
     const t = useTranslations('dashboard.directoryDetail.items.sourceValidation');
 
@@ -264,26 +243,24 @@ function ItemHealthBadge({ item }: { item: ItemData }) {
 
     const isBroken = item.health.status === 'broken';
     const label = isBroken ? t('brokenLink') : t('needsReview');
-    const tone = isBroken
-        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
 
     return (
         <span
             className={cn(
-                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
-                tone,
+                'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium shrink-0',
+                isBroken
+                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
             )}
             title={item.health.message || label}
         >
-            <AlertTriangle className="h-3 w-3" />
+            <AlertTriangle className="h-2.5 w-2.5" />
             {label}
         </span>
     );
 }
 
 const BADGE_STYLES: Record<string, { good: string; bad: string; neutral: string }> = {
-    // SOFTWARE badges
     security: {
         good: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
         bad: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
@@ -299,7 +276,6 @@ const BADGE_STYLES: Record<string, { good: string; bad: string; neutral: string 
         bad: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
         neutral: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400',
     },
-    // ECOMMERCE / SERVICES / GENERAL badges
     verified: {
         good: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
         bad: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400',
@@ -363,7 +339,10 @@ const ItemBadgesDisplay = memo(function ItemBadgesDisplay({
                     <span
                         key={key}
                         title={badge.details || undefined}
-                        className={cn('px-1.5 py-0.5 text-xs font-medium rounded', styles[variant])}
+                        className={cn(
+                            'px-1.5 py-0.5 text-[11px] font-medium rounded',
+                            styles[variant],
+                        )}
                     >
                         {key}: {badge.value}
                     </span>
