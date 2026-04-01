@@ -124,10 +124,10 @@ export function DashboardSidebar({
                     )}
                 >
                     <div className="w-full relative">
-                        <div className={cn('flex items-center gap-1 -ml-2')}>
+                        <div className={cn('flex items-center -ml-2')}>
                             <FaviconEverWork
                                 config={config}
-                                className={cn(isCollapsed ? 'w-11 ml-[8.5px]' : 'w-12')}
+                                className={cn(isCollapsed ? 'w-11 ml-[5px]' : 'w-12')}
                             />
                             <LogoEverWork config={config} className={cn(isCollapsed && 'hidden')} />
                         </div>
