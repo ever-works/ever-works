@@ -29,10 +29,12 @@ export function DirectoryLayoutClient({
     const t = useTranslations('dashboard.directoryDetail');
     const isGenerating = directory.generateStatus?.status === GenerateStatusType.GENERATING;
     const lastGenerateStatus = useRef(directory.generateStatus?.status);
+    const previousGenerateStatus = lastGenerateStatus.current;
+    const hasSyncedOnMount = useRef(false);
     const generateStatus = directory.generateStatus?.status;
 
     useEffect(() => {
-        const lastStatus = lastGenerateStatus.current;
+        const lastStatus = previousGenerateStatus;
         const currentStatus = directory.generateStatus?.status;
 
         if (lastStatus !== currentStatus && currentStatus === GenerateStatusType.ERROR) {
@@ -54,7 +56,7 @@ export function DirectoryLayoutClient({
         }
 
         lastGenerateStatus.current = directory.generateStatus?.status;
-    }, [generateStatus]);
+    }, [directory.generateStatus?.status, previousGenerateStatus, t]);
 
     useEffect(() => {
         if (isGenerating) {
@@ -64,12 +66,26 @@ export function DirectoryLayoutClient({
     }, [isGenerating, router]);
 
     useEffect(() => {
+        if (hasSyncedOnMount.current) {
+            return;
+        }
+
+        hasSyncedOnMount.current = true;
         syncDirectoryData(directory.id).catch(() => {
             // Silent fail; best effort
         });
+    }, [directory.id]);
 
-        // we want also sync when generateStatus changes
-    }, [directory.id, generateStatus, router]);
+    useEffect(() => {
+        if (
+            previousGenerateStatus === GenerateStatusType.GENERATING &&
+            generateStatus === GenerateStatusType.GENERATED
+        ) {
+            syncDirectoryData(directory.id).catch(() => {
+                // Silent fail; best effort
+            });
+        }
+    }, [directory.id, generateStatus, previousGenerateStatus]);
 
     return (
         <DirectoryDetailProvider

@@ -44,6 +44,9 @@ importers:
       '@ever-works/trigger-tasks':
         specifier: workspace:*
         version: link:../../packages/tasks
+      '@jitsu/js':
+        specifier: ^1.10.4
+        version: 1.10.4(@jitsu/protocols@1.10.4)(@types/dlv@1.1.5)
       '@nestjs-modules/mailer':
         specifier: ^2.0.2
         version: 2.0.2(@nestjs/common@11.1.13(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.13)(nodemailer@8.0.4)
@@ -1688,6 +1691,27 @@ packages:
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
     engines: {node: '>=10'}
 
+  '@analytics/cookie-utils@0.2.14':
+    resolution: {integrity: sha512-x51x2cLqvP5Fb1ydgNvTCX+SVv0ALK/yTNwp/53++yk4kLhxb850krWtQ4aASN0612oXrIGotwfmdJIttnLiPQ==}
+
+  '@analytics/core@0.12.17':
+    resolution: {integrity: sha512-GMxRm5Dp3Wam/w5NNvqNKMO6zWecozbVv21Kn4WhftCx6OjJI7zMlVtiLpjGjxa0RRZfVG80YhupF0Qh9XL2gw==}
+
+  '@analytics/global-storage-utils@0.1.9':
+    resolution: {integrity: sha512-+xm6CDnWsVOQIKkqbPRPRdYDXKk3PNgr/bCZWSI+7tEDT5PCDgI0QSBZe+FqCVkCRtTkgOrjFOY7wOM8Gq+ndA==}
+
+  '@analytics/localstorage-utils@0.1.12':
+    resolution: {integrity: sha512-BL3vuZUwWgMqdkQsE0GKsED5SPLC6daI4K4LE0a/BkKv+4Cae5JLLqpO5gju2HUGOjJxIvw8U/G5EcglNY5+1w==}
+
+  '@analytics/session-storage-utils@0.0.9':
+    resolution: {integrity: sha512-fhP9QCpyq45rZKsXaAxyz+VTmOUWljIW08CWSkFzpwOHkDM4Xy5tymc1YcWqSBBaLjHldo3HlY4qfqEIS4Aj1A==}
+
+  '@analytics/storage-utils@0.4.4':
+    resolution: {integrity: sha512-873P4wDIunbOnBqADc2AhTVsLbluUv1dP6k9UrK8FIeV8WXv5+fG12HdwwaniUIxq6QLgZJfKEaCwtWSKrrV0g==}
+
+  '@analytics/type-utils@0.6.4':
+    resolution: {integrity: sha512-Ou1gQxFakOWLcPnbFVsrPb8g1wLLUZYYJXDPjHkG07+5mustGs5yqACx42UAu4A6NszNN6Z5gGxhyH45zPWRxw==}
+
   '@angular-devkit/core@19.2.17':
     resolution: {integrity: sha512-Ah008x2RJkd0F+NLKqIpA34/vUGwjlprRCkvddjDopAWRzYn6xCkz1Tqwuhn0nR1Dy47wTLKYD999TYl5ONOAQ==}
     engines: {node: ^18.19.1 || ^20.11.1 || >=22.0.0, npm: ^6.11.0 || ^7.5.6 || >=8.0.0, yarn: '>= 1.13.0'}
@@ -2973,6 +2997,14 @@ packages:
   '@jest/types@29.6.3':
     resolution: {integrity: sha512-u3UPsIilWKOM3F9CXtrG8LEJmNxwoCQC/XVj4IKYXvvpx7QIi/Kg1LI5uDmDpKlac62NUtX7eLjRh+jVZcLOzw==}
     engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
+
+  '@jitsu/js@1.10.4':
+    resolution: {integrity: sha512-FTMIH7TnfzK+o+wODV/TQ37VeTIKigMqkoWE7iOnEKmBscToYsaEfXShBOcrTq/O//ENujcy/J8no+COuC/bqw==}
+    peerDependencies:
+      '@jitsu/protocols': 1.10.4
+
+  '@jitsu/protocols@1.10.4':
+    resolution: {integrity: sha512-eOjIObyovCLbOMp7IK+MNnkYwpkPBmYVqU0y7JQkMLsnzFpbD9micAsLs1zAwAUuQ4oqBdYOIsumz0KesI55bQ==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -5495,6 +5527,9 @@ packages:
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
 
+  '@types/dlv@1.1.5':
+    resolution: {integrity: sha512-JHOWNfiWepAhfwlSw17kiWrWrk6od2dEQgHltJw9AS0JPFoLZJBge5+Dnil2NfdjAvJ/+vGSX60/BRW20PpUXw==}
+
   '@types/ejs@3.1.5':
     resolution: {integrity: sha512-nv+GSx77ZtXiJzwKdsASqi+YQ5Z7vwHsTP0JY2SiQgjGckkBRKZnk8nIM+7oUZ1VCtuTz0+By4qVR7fqzp/Dfg==}
 
@@ -6057,6 +6092,14 @@ packages:
   amdefine@1.0.1:
     resolution: {integrity: sha512-S2Hw0TtNkMJhIabBwIojKL9YHO5T0n5eNqWJ7Lrlel/zDbftQpxpapi8tZs3X1HWa+u+QeydGmzzNU0m09+Rcg==}
     engines: {node: '>=0.4.2'}
+
+  analytics-utils@1.1.1:
+    resolution: {integrity: sha512-nRybjTpRAcHVhWb1cvYaOLJaI3R79r8XjMbu5c0wd2jKmANNqSrYwybiU0X3mp+CQQdm4YiAggTXb2cIA8XhUg==}
+    peerDependencies:
+      '@types/dlv': ^1.0.0
+
+  analytics@0.8.9:
+    resolution: {integrity: sha512-oTbUzQpncMTslakqfK70GgB6bopk5hY+uuekwnadMkDyqNLgcD02KRzteTnO7q5Ko6wDECVtT8xi/6OuAMZykA==}
 
   ansi-colors@4.1.3:
     resolution: {integrity: sha512-/6w/C21Pm1A7aZitlI5Ni/2J6FFQN8i1Cvz3kHABAAbw93v/NlvKdVOqz7CCWz/3iv/JplRSEEZ83XION15ovw==}
@@ -11897,6 +11940,40 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
+  '@analytics/cookie-utils@0.2.14':
+    dependencies:
+      '@analytics/global-storage-utils': 0.1.9
+
+  '@analytics/core@0.12.17(@types/dlv@1.1.5)':
+    dependencies:
+      '@analytics/global-storage-utils': 0.1.9
+      '@analytics/type-utils': 0.6.4
+      analytics-utils: 1.1.1(@types/dlv@1.1.5)
+    transitivePeerDependencies:
+      - '@types/dlv'
+
+  '@analytics/global-storage-utils@0.1.9':
+    dependencies:
+      '@analytics/type-utils': 0.6.4
+
+  '@analytics/localstorage-utils@0.1.12':
+    dependencies:
+      '@analytics/global-storage-utils': 0.1.9
+
+  '@analytics/session-storage-utils@0.0.9':
+    dependencies:
+      '@analytics/global-storage-utils': 0.1.9
+
+  '@analytics/storage-utils@0.4.4':
+    dependencies:
+      '@analytics/cookie-utils': 0.2.14
+      '@analytics/global-storage-utils': 0.1.9
+      '@analytics/localstorage-utils': 0.1.12
+      '@analytics/session-storage-utils': 0.0.9
+      '@analytics/type-utils': 0.6.4
+
+  '@analytics/type-utils@0.6.4': {}
+
   '@angular-devkit/core@19.2.17(chokidar@4.0.3)':
     dependencies:
       ajv: 8.17.1
@@ -13237,6 +13314,15 @@ snapshots:
       '@types/node': 22.19.11
       '@types/yargs': 17.0.35
       chalk: 4.1.2
+
+  '@jitsu/js@1.10.4(@jitsu/protocols@1.10.4)(@types/dlv@1.1.5)':
+    dependencies:
+      '@jitsu/protocols': 1.10.4
+      analytics: 0.8.9(@types/dlv@1.1.5)
+    transitivePeerDependencies:
+      - '@types/dlv'
+
+  '@jitsu/protocols@1.10.4': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -15938,6 +16024,8 @@ snapshots:
 
   '@types/deep-eql@4.0.2': {}
 
+  '@types/dlv@1.1.5': {}
+
   '@types/ejs@3.1.5':
     optional: true
 
@@ -16692,6 +16780,19 @@ snapshots:
     optional: true
 
   amdefine@1.0.1: {}
+
+  analytics-utils@1.1.1(@types/dlv@1.1.5):
+    dependencies:
+      '@analytics/type-utils': 0.6.4
+      '@types/dlv': 1.1.5
+      dlv: 1.1.3
+
+  analytics@0.8.9(@types/dlv@1.1.5):
+    dependencies:
+      '@analytics/core': 0.12.17(@types/dlv@1.1.5)
+      '@analytics/storage-utils': 0.4.4
+    transitivePeerDependencies:
+      - '@types/dlv'
 
   ansi-colors@4.1.3: {}
 
@@ -20357,7 +20458,7 @@ snapshots:
 
   minimatch@5.1.6:
     dependencies:
-      brace-expansion: 2.0.2
+      brace-expansion: 2.0.3
     optional: true
 
   minimatch@9.0.1:
