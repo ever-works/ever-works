@@ -306,7 +306,7 @@ export class LinkupSearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 			homepage: 'https://linkup.so',
 			icon: {
 				type: 'url',
-				value: 'https://linkup.so/favicon.ico'
+				value: 'https://framerusercontent.com/images/PuShJA41szIkwbQopIjqoEoOvUc.png'
 			},
 			readme: [
 				'## What does Linkup do?',
