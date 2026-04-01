@@ -3,9 +3,10 @@ import { ActivityLogModule as AgentActivityLogModule } from '@ever-works/agent/a
 import { DatabaseModule } from '@ever-works/agent/database';
 import { ActivityLogController } from './activity-log.controller';
 import { ActivityLogListener } from './activity-log.listener';
+import { JitsuModule } from './jitsu.module';
 
 @Module({
-    imports: [AgentActivityLogModule, DatabaseModule],
+    imports: [JitsuModule, AgentActivityLogModule, DatabaseModule],
     controllers: [ActivityLogController],
     providers: [ActivityLogListener],
     exports: [AgentActivityLogModule],
