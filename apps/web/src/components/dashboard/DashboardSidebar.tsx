@@ -20,6 +20,7 @@ import {
     HelpCircle,
     MessageSquare,
     Keyboard,
+    Activity,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -97,6 +98,7 @@ export function DashboardSidebar({
         { name: t('navigation.dashboard'), href: ROUTES.DASHBOARD, icon: Home },
         { name: t('navigation.directories'), href: ROUTES.DASHBOARD_DIRECTORIES, icon: Folder },
         { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
+        { name: t('navigation.activity'), href: ROUTES.DASHBOARD_ACTIVITY, icon: Activity },
         { name: t('navigation.settings'), href: ROUTES.DASHBOARD_SETTINGS, icon: Settings },
     ];
 

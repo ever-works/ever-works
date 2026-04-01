@@ -25,11 +25,16 @@ import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Public } from '../decorators/public.decorator';
+import { ActivityLogService } from '@ever-works/agent/activity-log';
+import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 
 @ApiTags('Auth')
 @Controller('api/auth')
 export class AuthController {
-    constructor(private authService: AuthService) {}
+    constructor(
+        private authService: AuthService,
+        private activityLogService: ActivityLogService,
+    ) {}
 
     @Public()
     @Post('register')
@@ -57,7 +62,19 @@ export class AuthController {
     async login(@Request() req) {
         const userAgent = req.headers['user-agent'];
         const ipAddress = req.ip || req.headers['x-forwarded-for'];
-        return this.authService.login(req.user, userAgent, ipAddress);
+        const result = await this.authService.login(req.user, userAgent, ipAddress);
+        this.activityLogService
+            .log({
+                userId: req.user.id,
+                actionType: ActivityActionType.USER_LOGIN,
+                action: 'user.login',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Signed in',
+                ipAddress,
+                userAgent,
+            })
+            .catch(() => {});
+        return result;
     }
 
     @Public()
