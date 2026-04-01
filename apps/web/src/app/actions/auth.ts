@@ -1,12 +1,12 @@
 'use server';
 
 import { z } from 'zod';
-import { removeBetterAuthCookies, getBetterAuthCookieHeader } from '@/lib/auth';
+import { clearAuthSessionCookies, getAuthSessionCookieHeader } from '@/lib/auth';
 import { API_URL, ROUTES, withAppUrl } from '@/lib/constants';
 import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 
-async function parseBetterAuthError(response: Response, fallback: string) {
+async function parseAuthProviderError(response: Response, fallback: string) {
     try {
         const data = await response.json();
         if (typeof data?.message === 'string' && data.message.trim()) {
@@ -23,12 +23,12 @@ async function parseBetterAuthError(response: Response, fallback: string) {
 
 export async function logout() {
     try {
-        const betterAuthCookies = await getBetterAuthCookieHeader();
-        if (betterAuthCookies) {
-            await fetch(`${API_URL}/auth/better-auth/sign-out`, {
+        const authSessionCookies = await getAuthSessionCookieHeader();
+        if (authSessionCookies) {
+            await fetch(`${API_URL}/auth/provider/sign-out`, {
                 method: 'POST',
                 headers: {
-                    Cookie: betterAuthCookies,
+                    Cookie: authSessionCookies,
                 },
                 cache: 'no-store',
             });
@@ -37,7 +37,7 @@ export async function logout() {
         console.error(error);
     }
 
-    await removeBetterAuthCookies();
+    await clearAuthSessionCookies();
 
     // Redirect to login page
     redirect({
@@ -70,7 +70,7 @@ export async function forgotPassword(email: string) {
     }
 
     try {
-        const response = await fetch(`${API_URL}/auth/better-auth/request-password-reset`, {
+        const response = await fetch(`${API_URL}/auth/provider/request-password-reset`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -84,7 +84,7 @@ export async function forgotPassword(email: string) {
 
         if (!response.ok) {
             throw new Error(
-                await parseBetterAuthError(response, 'Failed to send password reset instructions'),
+                await parseAuthProviderError(response, 'Failed to send password reset instructions'),
             );
         }
 
@@ -127,7 +127,7 @@ export async function resetPassword(token: string, newPassword: string) {
     }
 
     try {
-        const response = await fetch(`${API_URL}/auth/better-auth/reset-password`, {
+        const response = await fetch(`${API_URL}/auth/provider/reset-password`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -140,7 +140,7 @@ export async function resetPassword(token: string, newPassword: string) {
         });
 
         if (!response.ok) {
-            throw new Error(await parseBetterAuthError(response, 'Failed to reset password'));
+            throw new Error(await parseAuthProviderError(response, 'Failed to reset password'));
         }
     } catch (error) {
         console.error(error);

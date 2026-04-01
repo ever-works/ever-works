@@ -45,7 +45,7 @@ export default function RegisterForm({ availableSocialProviders }: RegisterFormP
 
         startTransition(async () => {
             try {
-                const response = await fetch('/api/auth/better-auth/sign-up/email', {
+                const response = await fetch('/api/auth/provider/sign-up/email', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

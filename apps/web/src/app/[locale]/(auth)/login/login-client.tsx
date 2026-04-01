@@ -104,7 +104,7 @@ export function LoginClient({ availableSocialProviders }: LoginClientProps) {
 
         startTransition(async () => {
             try {
-                const response = await fetch('/api/auth/better-auth/sign-in/email', {
+                const response = await fetch('/api/auth/provider/sign-in/email', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

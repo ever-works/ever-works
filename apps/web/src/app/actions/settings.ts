@@ -19,7 +19,7 @@ export async function resendVerificationEmail() {
             return { success: false, error: t('notAuthenticated') };
         }
         const locale = await getLocale();
-        const response = await fetch(`${API_URL}/auth/better-auth/send-verification-email`, {
+        const response = await fetch(`${API_URL}/auth/provider/send-verification-email`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

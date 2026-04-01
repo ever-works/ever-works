@@ -120,9 +120,9 @@ export const config = {
         clientSecret: () => process.env.TWITTER_CLIENT_SECRET,
     },
 
-    betterAuth: {
+    authProvider: {
         secret: () => process.env.BETTER_AUTH_SECRET || process.env.AUTH_SECRET,
-        // BetterAuth's public URL must match the browser-facing origin because
+        // The auth provider's public URL must match the browser-facing origin because
         // OAuth routes are exposed through the Next.js proxy on the web host.
         url: () => process.env.BETTER_AUTH_URL || config.webAppUrl(),
     },

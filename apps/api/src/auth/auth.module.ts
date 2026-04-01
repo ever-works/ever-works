@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { AuthService } from './services/auth.service';
 import { ApiKeyService } from './services/api-key.service';
-import { BetterAuthService } from './services/better-auth.service';
+import { AuthProviderService } from './services/auth-provider.service';
 import { AuthController } from './controllers/auth.controller';
 import { ApiKeysController } from './controllers/api-keys.controller';
-import { BetterAuthController } from './controllers/better-auth.controller';
+import { AuthProviderController } from './controllers/auth-provider.controller';
 import { SessionAuthGuard } from './guards/session-auth.guard';
 import {
     DatabaseModule,
@@ -19,13 +19,13 @@ import {
     providers: [
         AuthService,
         ApiKeyService,
-        BetterAuthService,
+        AuthProviderService,
         ApiKeyRepository,
         UserRepository,
         OAuthTokenRepository,
         SessionAuthGuard,
     ],
-    controllers: [AuthController, ApiKeysController, BetterAuthController],
-    exports: [AuthService, ApiKeyService, BetterAuthService, SessionAuthGuard],
+    controllers: [AuthController, ApiKeysController, AuthProviderController],
+    exports: [AuthService, ApiKeyService, AuthProviderService, SessionAuthGuard],
 })
 export class AuthModule {}

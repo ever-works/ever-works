@@ -1,21 +1,21 @@
 import { All, Controller, Req, Res } from '@nestjs/common';
 import { Public } from '../decorators/public.decorator';
-import { BetterAuthService } from '../services/better-auth.service';
+import { AuthProviderService } from '../services/auth-provider.service';
 import { splitSetCookieHeader } from '@ever-works/plugin';
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express';
 
 /**
- * Catch-all controller that delegates all /api/auth/better-auth/* requests
- * to BetterAuth's internal router.
+ * Catch-all controller that delegates all /api/auth/provider/* requests
+ * to the configured auth provider's internal router.
  */
-@Controller('api/auth/better-auth')
-export class BetterAuthController {
-    constructor(private readonly betterAuthService: BetterAuthService) {}
+@Controller('api/auth/provider')
+export class AuthProviderController {
+    constructor(private readonly authProviderService: AuthProviderService) {}
 
     @Public()
     @All('*path')
     async handleAuth(@Req() req: ExpressRequest, @Res() res: ExpressResponse) {
-        // Convert Express request to Web Fetch API Request for BetterAuth
+        // Convert Express request to Web Fetch API Request for the auth provider
         const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
         const headers = new Headers();
         for (const [key, value] of Object.entries(req.headers)) {
@@ -33,9 +33,9 @@ export class BetterAuthController {
                     : undefined,
         });
 
-        const response = await this.betterAuthService.handleRequest(webRequest);
+        const response = await this.authProviderService.handleRequest(webRequest);
 
-        // Forward BetterAuth response back to Express
+        // Forward auth provider response back to Express
         const setCookies = response.headers.getSetCookie?.() ?? [];
         response.headers.forEach((value, key) => {
             if (key.toLowerCase() === 'set-cookie') {

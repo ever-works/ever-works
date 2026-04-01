@@ -1,7 +1,7 @@
 import 'server-only';
 import { API_URL, WEB_URL } from '../constants';
 import { headers } from 'next/headers';
-import { getBetterAuthCookieHeader } from '../auth/cookies';
+import { getAuthSessionCookieHeader } from '../auth/cookies';
 import { getTranslations } from 'next-intl/server';
 
 export async function handleServerError(error: unknown): Promise<never> {
@@ -44,16 +44,16 @@ export async function serverFetch<T>(
     const t = await getTranslations('api.errors');
     const { rawResponse, ...fetchOptions } = options;
 
-    const doFetch = async (baCookieHeader?: string) => {
+    const doFetch = async (authCookieHeader?: string) => {
         const reqHeaders: Record<string, string> = {
             'Content-Type': 'application/json',
             'X-Frontend-URL': frontendUrl,
             ...((fetchOptions.headers as Record<string, string>) || {}),
         };
 
-        if (baCookieHeader) {
-            // Forward BetterAuth session cookies to the API
-            reqHeaders['Cookie'] = baCookieHeader;
+        if (authCookieHeader) {
+            // Forward auth session cookies to the API
+            reqHeaders['Cookie'] = authCookieHeader;
         }
 
         return fetch(`${API_URL}${endpoint}`, {
@@ -64,8 +64,8 @@ export async function serverFetch<T>(
         });
     };
 
-    const baCookies = await getBetterAuthCookieHeader();
-    const response = await doFetch(baCookies);
+    const authCookies = await getAuthSessionCookieHeader();
+    const response = await doFetch(authCookies);
 
     // Return raw response for streaming
     if (rawResponse) {

@@ -14,7 +14,7 @@ export function createBackendProvider(options: BackendProviderOptions) {
     return createOpenAICompatible({
         name: 'ever-works',
         baseURL: options.baseURL,
-        apiKey: options.authToken || 'better-auth-session',
+        apiKey: options.authToken || 'auth-session',
         headers: {
             'X-Provider-Override': options.providerOverride,
             ...(options.authCookieHeader && { Cookie: options.authCookieHeader }),

@@ -34,7 +34,7 @@ export function SocialLoginButtons({ providers }: SocialLoginButtonsProps) {
                 newUserCallbackURL.searchParams.set('connectGithub', '1');
             }
 
-            const response = await fetch('/api/auth/better-auth/sign-in/social', {
+            const response = await fetch('/api/auth/provider/sign-in/social', {
                 method: 'POST',
                 headers: {
                     'content-type': 'application/json',
@@ -55,7 +55,7 @@ export function SocialLoginButtons({ providers }: SocialLoginButtonsProps) {
             const data = (await response.json()) as SocialAuthResponse;
 
             if (!data.url) {
-                throw new Error(`BetterAuth did not return an authorization URL for ${provider}`);
+                throw new Error(`Auth provider did not return an authorization URL for ${provider}`);
             }
 
             window.location.assign(data.url);

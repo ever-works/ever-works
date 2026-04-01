@@ -415,7 +415,7 @@ export class AuthService {
         });
 
         if (!credentialAccount) {
-            this.logger.warn(`No BetterAuth credential account found for user ${userId}`);
+            this.logger.warn(`No credential account found for user ${userId}`);
             return;
         }
 

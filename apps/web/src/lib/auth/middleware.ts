@@ -1,5 +1,5 @@
 import 'server-only';
-import { getBetterAuthCookieHeader, hasBetterAuthCookie } from './cookies';
+import { getAuthSessionCookieHeader, hasAuthSessionCookie } from './cookies';
 import { API_URL } from '../constants';
 
 export type AuthUser = {
@@ -18,16 +18,16 @@ export async function getAuthFromRequest(): Promise<{
     user?: AuthUser;
     isExpired: false;
 }> {
-    // Check if any BetterAuth auth cookie exists
-    const hasBaCookie = await hasBetterAuthCookie();
+    // Check if any auth session cookie exists
+    const hasSessionCookie = await hasAuthSessionCookie();
 
-    if (hasBaCookie) {
-        // Validate BetterAuth session via API
-        const baUser = await getBetterAuthSessionFromAPI();
-        if (baUser) {
+    if (hasSessionCookie) {
+        // Validate session via API
+        const authUser = await getSessionUserFromAPI();
+        if (authUser) {
             return {
                 isAuthenticated: true,
-                user: baUser,
+                user: authUser,
                 isExpired: false,
             };
         }
@@ -37,12 +37,12 @@ export async function getAuthFromRequest(): Promise<{
 }
 
 /**
- * Validate BetterAuth session by calling the API's session endpoint.
+ * Validate the auth session by calling the API's session endpoint.
  * Returns the AuthUser if valid, null otherwise.
  */
-async function getBetterAuthSessionFromAPI(): Promise<AuthUser | null> {
+async function getSessionUserFromAPI(): Promise<AuthUser | null> {
     try {
-        const cookieHeader = await getBetterAuthCookieHeader();
+        const cookieHeader = await getAuthSessionCookieHeader();
         if (!cookieHeader) {
             return null;
         }

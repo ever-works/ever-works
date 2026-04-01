@@ -11,24 +11,24 @@ import { Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 
-const logger = new Logger('BetterAuth');
+const logger = new Logger('AuthProvider');
 
-export interface BetterAuthDeps {
+export interface AuthProviderDeps {
     dataSource: DataSource;
     userRepository: UserRepository;
     oauthTokenRepository: OAuthTokenRepository;
     eventEmitter: EventEmitter2;
 }
 
-export function createBetterAuthInstance(deps: BetterAuthDeps) {
+export function createAuthProviderInstance(deps: AuthProviderDeps) {
     const { dataSource, userRepository, oauthTokenRepository, eventEmitter } = deps;
     const webAppUrl = config.webAppUrl();
 
     return betterAuth({
         appName: config.branding.appName(),
-        baseURL: config.betterAuth.url(),
-        basePath: '/api/auth/better-auth',
-        secret: config.betterAuth.secret(),
+        baseURL: config.authProvider.url(),
+        basePath: '/api/auth/provider',
+        secret: config.authProvider.secret(),
 
         database: typeormAdapter({
             dataSource,
@@ -52,7 +52,7 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
 
                 if (!appUser) {
                     logger.warn(
-                        `Unable to send BetterAuth password reset email for unknown user ${user.email}`,
+                        `Unable to send provider password reset email for unknown user ${user.email}`,
                     );
                     return;
                 }
@@ -73,7 +73,7 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
 
                 if (!credentialAccount?.password) {
                     logger.warn(
-                        `Unable to sync BetterAuth password reset for user ${user.id}: credential account missing`,
+                        `Unable to sync provider password reset for user ${user.id}: credential account missing`,
                     );
                     return;
                 }
@@ -84,7 +84,7 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
 
                 if (!appUser) {
                     logger.warn(
-                        `Unable to sync BetterAuth password reset for unknown user ${user.email}`,
+                        `Unable to sync provider password reset for unknown user ${user.email}`,
                     );
                     return;
                 }
@@ -116,7 +116,7 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
 
                 if (!appUser) {
                     logger.warn(
-                        `Unable to send BetterAuth verification email for unknown user ${user.email}`,
+                        `Unable to send provider verification email for unknown user ${user.email}`,
                     );
                     return;
                 }
@@ -205,7 +205,7 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
             user: {
                 create: {
                     after: async (authUser) => {
-                        // Sync new BetterAuth user to application users table
+                        // Sync new auth-provider user to application users table
                         try {
                             // Check if user already exists by ID or email
                             const existingById = await userRepository.findById(authUser.id);
@@ -220,8 +220,8 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                                 authUser.email,
                             );
                             if (existingByEmail) {
-                                // User exists with different ID (registered via old auth system)
-                                // Link the existing user — no need to create a new one
+                            // User exists with different ID (registered via old auth system)
+                            // Link the existing user — no need to create a new one
                                 logger.log(
                                     `User with email ${authUser.email} already exists (id: ${existingByEmail.id}), skipping create`,
                                 );
@@ -273,7 +273,7 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                 create: {
                     after: async (account) => {
                         try {
-                            // BetterAuth may have created the user with a new UUID,
+                            // The auth provider may have created the user with a new UUID,
                             // but the application users table may have the same email
                             // under a different ID. Find the correct application user ID.
                             let appUserId = account.userId;
@@ -291,7 +291,7 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                                         appUserId = existingUser.id;
                                     } else {
                                         logger.warn(
-                                            `No application user found for BetterAuth user ${account.userId} (${authUser.email})`,
+                                            `No application user found for auth provider user ${account.userId} (${authUser.email})`,
                                         );
                                         return;
                                     }
@@ -317,7 +317,7 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                                 expiresAt: account.accessTokenExpiresAt || undefined,
                                 metadata: {
                                     accountId: account.accountId,
-                                    syncedFromBetterAuth: true,
+                                    syncedFromProvider: true,
                                 },
                             });
 
@@ -344,7 +344,7 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
                     after: async (session) => {
                         // Update lastLoginAt on the application user
                         try {
-                            // Find the correct application user (may differ from BetterAuth user ID)
+                            // Find the correct application user (may differ from auth provider user ID)
                             let appUserId = session.userId;
                             const userById = await userRepository.findById(session.userId);
                             if (!userById) {
@@ -387,4 +387,4 @@ export function createBetterAuthInstance(deps: BetterAuthDeps) {
     });
 }
 
-export type BetterAuthInstance = ReturnType<typeof createBetterAuthInstance>;
+export type AuthProviderInstance = ReturnType<typeof createAuthProviderInstance>;

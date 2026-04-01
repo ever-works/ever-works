@@ -2,7 +2,7 @@ import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from
 import { ModuleRef, Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { ApiKeyService } from '../services/api-key.service';
-import { BetterAuthService } from '../services/better-auth.service';
+import { AuthProviderService } from '../services/auth-provider.service';
 import { UserRepository } from '@ever-works/agent/database';
 import type { AuthenticatedUser } from '../types/jwt.types';
 
@@ -16,7 +16,7 @@ export class SessionAuthGuard implements CanActivate {
     constructor(
         private reflector: Reflector,
         private moduleRef: ModuleRef,
-        private betterAuthService: BetterAuthService,
+        private authProviderService: AuthProviderService,
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -36,7 +36,7 @@ export class SessionAuthGuard implements CanActivate {
             return this.authenticateWithApiKey(request, apiKey);
         }
 
-        // 2. Try BetterAuth session authentication
+        // 2. Try session authentication via the configured auth provider
         const sessionResult = await this.tryAuthenticateWithSession(request);
         if (sessionResult) {
             return true;
@@ -72,7 +72,7 @@ export class SessionAuthGuard implements CanActivate {
             this.userRepository = this.moduleRef.get(UserRepository, { strict: false });
         }
 
-        // Convert Express request headers to standard Headers for BetterAuth
+        // Convert Express request headers to standard Headers for the auth provider
         const headers = new Headers();
         for (const [key, value] of Object.entries(request.headers)) {
             if (value) {
@@ -81,14 +81,14 @@ export class SessionAuthGuard implements CanActivate {
         }
 
         try {
-            const session = await this.betterAuthService.api.getSession({ headers });
+            const session = await this.authProviderService.api.getSession({ headers });
 
             if (!session || !session.user) {
                 return false;
             }
 
-            // Find application user by BetterAuth ID, or fall back to email
-            // (IDs may differ for users who existed before BetterAuth migration)
+            // Find application user by provider ID, or fall back to email
+            // (IDs may differ for users who existed before the auth provider migration)
             let user = await this.userRepository.findById(session.user.id);
             if (!user && session.user.email) {
                 user = await this.userRepository.findByEmail(session.user.email);

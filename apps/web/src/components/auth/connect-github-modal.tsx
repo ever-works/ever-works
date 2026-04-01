@@ -48,7 +48,7 @@ export function ConnectGithubModal({ userId, hasGithubConnected }: ConnectGithub
         setLoading(true);
         try {
             const callbackURL = `${window.location.origin}${pathname}`;
-            const response = await fetch('/api/auth/better-auth/link-social', {
+            const response = await fetch('/api/auth/provider/link-social', {
                 method: 'POST',
                 headers: {
                     'content-type': 'application/json',
@@ -68,7 +68,7 @@ export function ConnectGithubModal({ userId, hasGithubConnected }: ConnectGithub
             const data = (await response.json()) as LinkSocialResponse;
 
             if (!data.url) {
-                throw new Error('BetterAuth did not return a GitHub authorization URL');
+                throw new Error('Auth provider did not return a GitHub authorization URL');
             }
 
             window.location.assign(data.url);

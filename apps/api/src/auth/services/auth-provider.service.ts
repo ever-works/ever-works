@@ -3,11 +3,11 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserRepository, OAuthTokenRepository } from '@ever-works/agent/database';
-import { createBetterAuthInstance, BetterAuthInstance } from '../better-auth.config';
+import { createAuthProviderInstance, AuthProviderInstance } from '../auth-provider.config';
 
 @Injectable()
-export class BetterAuthService implements OnModuleInit {
-    private auth: BetterAuthInstance;
+export class AuthProviderService implements OnModuleInit {
+    private auth: AuthProviderInstance;
 
     constructor(
         @InjectDataSource() private dataSource: DataSource,
@@ -17,7 +17,7 @@ export class BetterAuthService implements OnModuleInit {
     ) {}
 
     onModuleInit() {
-        this.auth = createBetterAuthInstance({
+        this.auth = createAuthProviderInstance({
             dataSource: this.dataSource,
             userRepository: this.userRepository,
             oauthTokenRepository: this.oauthTokenRepository,
@@ -25,7 +25,7 @@ export class BetterAuthService implements OnModuleInit {
         });
     }
 
-    get instance(): BetterAuthInstance {
+    get instance(): AuthProviderInstance {
         return this.auth;
     }
 
@@ -34,7 +34,7 @@ export class BetterAuthService implements OnModuleInit {
     }
 
     /**
-     * Handle an incoming HTTP request by delegating to BetterAuth's internal router.
+     * Handle an incoming HTTP request by delegating to the configured auth provider router.
      */
     async handleRequest(request: Request): Promise<Response> {
         return this.auth.handler(request);

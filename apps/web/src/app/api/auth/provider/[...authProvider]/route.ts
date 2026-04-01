@@ -4,12 +4,12 @@ import { NextRequest, NextResponse } from 'next/server';
 
 type RouteContext = {
     params: Promise<{
-        betterAuth?: string[];
+        authProvider?: string[];
     }>;
 };
 
 function getUpstreamCandidates(routePath: string, search: string): URL[] {
-    const primary = new URL(`${API_URL}/auth/better-auth/${routePath}`);
+    const primary = new URL(`${API_URL}/auth/provider/${routePath}`);
     primary.search = search;
 
     const candidates = [primary];
@@ -23,9 +23,9 @@ function getUpstreamCandidates(routePath: string, search: string): URL[] {
     return candidates;
 }
 
-async function proxyBetterAuthRequest(request: NextRequest, context: RouteContext) {
-    const { betterAuth = [] } = await context.params;
-    const routePath = betterAuth.join('/');
+async function proxyAuthProviderRequest(request: NextRequest, context: RouteContext) {
+    const { authProvider = [] } = await context.params;
+    const routePath = authProvider.join('/');
 
     const headers = new Headers(request.headers);
     headers.set('x-forwarded-host', request.headers.get('host') || '');
@@ -54,7 +54,7 @@ async function proxyBetterAuthRequest(request: NextRequest, context: RouteContex
     }
 
     if (!response) {
-        console.error('[better-auth proxy] upstream unavailable', {
+        console.error('[auth-provider proxy] upstream unavailable', {
             path: routePath,
             error: lastError,
         });
@@ -99,21 +99,21 @@ async function proxyBetterAuthRequest(request: NextRequest, context: RouteContex
 }
 
 export async function GET(request: NextRequest, context: RouteContext) {
-    return proxyBetterAuthRequest(request, context);
+    return proxyAuthProviderRequest(request, context);
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
-    return proxyBetterAuthRequest(request, context);
+    return proxyAuthProviderRequest(request, context);
 }
 
 export async function PUT(request: NextRequest, context: RouteContext) {
-    return proxyBetterAuthRequest(request, context);
+    return proxyAuthProviderRequest(request, context);
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-    return proxyBetterAuthRequest(request, context);
+    return proxyAuthProviderRequest(request, context);
 }
 
 export async function DELETE(request: NextRequest, context: RouteContext) {
-    return proxyBetterAuthRequest(request, context);
+    return proxyAuthProviderRequest(request, context);
 }

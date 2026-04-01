@@ -2,8 +2,8 @@ import 'server-only';
 import { ResponseCookie } from 'next/dist/compiled/@edge-runtime/cookies';
 import { cookies } from 'next/headers';
 
-export const BETTER_AUTH_SESSION_COOKIE = 'better-auth.session_token';
-export const BETTER_AUTH_SESSION_DATA_COOKIE = 'better-auth.session_data';
+export const AUTH_SESSION_COOKIE_NAME = 'better-auth.session_token';
+export const AUTH_SESSION_DATA_COOKIE_NAME = 'better-auth.session_data';
 
 const cookieOptions: Partial<ResponseCookie> = {
     httpOnly: true,
@@ -14,18 +14,18 @@ const cookieOptions: Partial<ResponseCookie> = {
 };
 
 // =================
-// BetterAuth Session
+// Auth Session
 // =================
 
-export async function getBetterAuthSessionCookie(): Promise<string | undefined> {
+export async function getAuthSessionCookie(): Promise<string | undefined> {
     const cookieStore = await cookies();
     return (
-        cookieStore.get(BETTER_AUTH_SESSION_COOKIE)?.value ||
-        cookieStore.get(`__Secure-${BETTER_AUTH_SESSION_COOKIE}`)?.value
+        cookieStore.get(AUTH_SESSION_COOKIE_NAME)?.value ||
+        cookieStore.get(`__Secure-${AUTH_SESSION_COOKIE_NAME}`)?.value
     );
 }
 
-export async function hasBetterAuthCookie(): Promise<boolean> {
+export async function hasAuthSessionCookie(): Promise<boolean> {
     const cookieStore = await cookies();
     const allCookies = cookieStore.getAll();
     return allCookies.some(
@@ -35,7 +35,7 @@ export async function hasBetterAuthCookie(): Promise<boolean> {
     );
 }
 
-export async function removeBetterAuthCookies(): Promise<void> {
+export async function clearAuthSessionCookies(): Promise<void> {
     const cookieStore = await cookies();
     const allCookies = cookieStore.getAll();
 
@@ -50,17 +50,17 @@ export async function removeBetterAuthCookies(): Promise<void> {
 }
 
 /**
- * Get all BetterAuth cookie headers for forwarding to the API.
- * BetterAuth may use multiple cookies (session token + cookie cache).
+ * Get all auth session cookie headers for forwarding to the API.
+ * The provider may use multiple cookies (session token + cookie cache).
  */
-export async function getBetterAuthCookieHeader(): Promise<string | undefined> {
+export async function getAuthSessionCookieHeader(): Promise<string | undefined> {
     const cookieStore = await cookies();
     const allCookies = cookieStore.getAll();
-    const baCookies = allCookies.filter(
+    const sessionCookies = allCookies.filter(
         (c) => c.name.startsWith('better-auth.') || c.name.startsWith('__Secure-better-auth.'),
     );
-    if (baCookies.length === 0) return undefined;
-    return baCookies.map((c) => `${c.name}=${c.value}`).join('; ');
+    if (sessionCookies.length === 0) return undefined;
+    return sessionCookies.map((c) => `${c.name}=${c.value}`).join('; ');
 }
 
 // =================

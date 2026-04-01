@@ -1,13 +1,13 @@
 import type { UIMessage } from 'ai';
 import { runAgent } from '@/lib/ai/agent';
-import { getBetterAuthCookieHeader } from '@/lib/auth/cookies';
+import { getAuthSessionCookieHeader } from '@/lib/auth/cookies';
 import { saveConversationMessages, type MessageUsage } from '@/lib/ai/persistence';
 
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-    const betterAuthCookies = await getBetterAuthCookieHeader();
-    if (!betterAuthCookies) {
+    const authSessionCookies = await getAuthSessionCookieHeader();
+    if (!authSessionCookies) {
         return new Response('Unauthorized', { status: 401 });
     }
 
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
     const result = await runAgent({
         messages,
-        authCookieHeader: betterAuthCookies,
+        authCookieHeader: authSessionCookies,
         providerOverride,
         directoryId,
         conversationId,
