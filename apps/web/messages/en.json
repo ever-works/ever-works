@@ -343,6 +343,69 @@
                 "version": "Ever Works v{version}"
             }
         },
+        "activity": {
+            "title": "Activity Log",
+            "subtitle": "Track all operations across your directories",
+            "fetchFailed": "Failed to load activities",
+            "exportFailed": "Failed to export activity log",
+            "showing": "Showing {from} to {to} of {total}",
+            "columns": {
+                "status": "Status",
+                "dateTime": "Date / Time",
+                "directory": "Directory",
+                "type": "Type",
+                "summary": "Summary"
+            },
+            "filters": {
+                "search": "Search activities...",
+                "types": {
+                    "allTypes": "All Types",
+                    "generation": "Generation",
+                    "comparison": "Comparison",
+                    "deployment": "Deployment",
+                    "directoryCreated": "Directory Created",
+                    "directoryUpdated": "Directory Updated",
+                    "directoryDeleted": "Directory Deleted",
+                    "pluginEnabled": "Plugin Enabled",
+                    "pluginDisabled": "Plugin Disabled",
+                    "pluginConfigured": "Plugin Configured",
+                    "memberInvited": "Member Invited",
+                    "memberRoleChanged": "Role Changed",
+                    "memberRemoved": "Member Removed",
+                    "scheduleCreated": "Schedule Created",
+                    "scheduleExecuted": "Schedule Executed",
+                    "import": "Import",
+                    "login": "Login",
+                    "signup": "Signup",
+                    "passwordChanged": "Password Changed"
+                },
+                "statuses": {
+                    "allStatuses": "All Statuses",
+                    "pending": "Pending",
+                    "inProgress": "In Progress",
+                    "completed": "Completed",
+                    "failed": "Failed"
+                }
+            },
+            "actions": {
+                "export": "Export CSV",
+                "clearFilters": "Clear filters"
+            },
+            "empty": {
+                "title": "No activities yet",
+                "description": "Activities will appear here as you use the platform.",
+                "noResults": "No matching activities",
+                "noResultsDescription": "No activities match your current filters. Try adjusting your search or filters."
+            },
+            "detail": {
+                "title": "Details"
+            },
+            "pagination": {
+                "previous": "Previous",
+                "next": "Next",
+                "pageOf": "Page {page} of {total}"
+            }
+        },
         "directories": {
             "title": "Directories",
             "subtitle": "Manage and organize your AI-powered directories",
@@ -2302,6 +2365,7 @@
             "newDirectory": "New Directory",
             "navigation": {
                 "dashboard": "Dashboard",
+                "activity": "Activity",
                 "directories": "Directories",
                 "plugins": "Plugins",
                 "settings": "Settings"
@@ -2611,6 +2675,7 @@
             "resetPassword": "Reset Password",
             "authError": "Authentication Error",
             "dashboard": "Dashboard",
+            "activity": "Activity Log",
             "directories": "Directories",
             "newDirectory": "New Directory",
             "directory": "Directory",

@@ -21,12 +21,14 @@ import {
     OAuthTokenRepository,
 } from '@ever-works/agent/database';
 import { jwtConstants } from '../config/constants';
+import { ActivityLogModule } from '@ever-works/agent/activity-log';
 
 @Module({
     imports: [
         PassportModule,
         DatabaseModule,
         HttpModule,
+        ActivityLogModule,
         JwtModule.registerAsync({
             useFactory: () => ({
                 secret: jwtConstants.secret(),
