@@ -1,3 +1,3 @@
 export { createBackendProvider, type BackendProviderOptions } from './provider';
-export { chatTools, type ChatTools } from './tools';
+export { buildChatTools, type ChatTools } from './tools';
 export { runAgent } from './agent';
