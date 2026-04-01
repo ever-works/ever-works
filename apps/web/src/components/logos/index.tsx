@@ -9,14 +9,18 @@ import { useTheme } from '@/lib/hooks/use-theme';
 
 interface LogoEverWorkProps {
     className?: string;
-    size?: number;
+    /** Intrinsic width hint for Next.js Image (px). Actual render size is controlled by CSS. */
+    width?: number;
+    /** Intrinsic height hint for Next.js Image (px). Actual render size is controlled by CSS. */
+    height?: number;
     priority?: boolean;
     config?: DirectoryConfig | null;
 }
 
 export function LogoEverWork({
     className,
-    size = 120,
+    width = 120,
+    height = 40,
     priority = true,
     config: configProps,
 }: LogoEverWorkProps) {
@@ -28,16 +32,16 @@ export function LogoEverWork({
             <Image
                 src={siteConfig.logo.light}
                 alt={siteConfig.name}
-                width={size}
-                height={size}
+                width={width}
+                height={height}
                 priority={priority}
                 className="block dark:hidden h-auto w-auto max-h-12 object-contain"
             />
             <Image
                 src={siteConfig.logo.dark}
                 alt={siteConfig.name}
-                width={size}
-                height={size}
+                width={width}
+                height={height}
                 priority={false}
                 className="hidden dark:block h-auto w-auto max-h-12 object-contain"
             />
@@ -65,10 +69,10 @@ export function FaviconEverWork({
                 key={faviconSrc}
                 src={faviconSrc}
                 alt={siteConfig.name}
-                width={120}
-                height={120}
+                width={32}
+                height={32}
                 style={{ animationDuration: '10s' }}
-                className="object-contain max-h-8 ml-[8.5px] animate-spin motion-reduce:animate-none"
+                className="object-contain max-h-8 ml-[10.5px] animate-spin motion-reduce:animate-none"
             />
         </Link>
     );
