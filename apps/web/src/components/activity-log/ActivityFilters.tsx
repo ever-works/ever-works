@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 
 const ACTION_TYPES = [
     { value: '', label: 'allTypes' },
@@ -36,6 +36,8 @@ interface ActivityFiltersProps {
     onStatusChange: (value: string) => void;
     search: string;
     onSearchChange: (value: string) => void;
+    hasActiveFilters: boolean;
+    onClearFilters: () => void;
 }
 
 export function ActivityFilters({
@@ -45,6 +47,8 @@ export function ActivityFilters({
     onStatusChange,
     search,
     onSearchChange,
+    hasActiveFilters,
+    onClearFilters,
 }: ActivityFiltersProps) {
     const t = useTranslations('dashboard.activity');
 
@@ -52,7 +56,7 @@ export function ActivityFilters({
         'px-3 py-2 text-sm rounded-lg border border-border dark:border-border-dark bg-card dark:bg-surface-dark text-text dark:text-text-dark focus:outline-none focus:ring-2 focus:ring-primary/20';
 
     return (
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 items-center">
             <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted dark:text-text-muted-dark" />
                 <input
@@ -60,6 +64,7 @@ export function ActivityFilters({
                     value={search}
                     onChange={(e) => onSearchChange(e.target.value)}
                     placeholder={t('filters.search')}
+                    aria-label={t('filters.search')}
                     className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border dark:border-border-dark bg-card dark:bg-transparent text-text dark:text-text-dark placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
             </div>
@@ -67,6 +72,7 @@ export function ActivityFilters({
             <select
                 value={actionType}
                 onChange={(e) => onActionTypeChange(e.target.value)}
+                aria-label={t('columns.type')}
                 className={selectClass}
             >
                 {ACTION_TYPES.map((type) => (
@@ -79,6 +85,7 @@ export function ActivityFilters({
             <select
                 value={status}
                 onChange={(e) => onStatusChange(e.target.value)}
+                aria-label={t('columns.status')}
                 className={selectClass}
             >
                 {STATUS_OPTIONS.map((opt) => (
@@ -87,6 +94,16 @@ export function ActivityFilters({
                     </option>
                 ))}
             </select>
+
+            {hasActiveFilters && (
+                <button
+                    onClick={onClearFilters}
+                    className="inline-flex items-center gap-1 px-3 py-2 text-sm rounded-lg text-text-muted dark:text-text-muted-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+                >
+                    <X className="w-3.5 h-3.5" />
+                    {t('actions.clearFilters')}
+                </button>
+            )}
         </div>
     );
 }

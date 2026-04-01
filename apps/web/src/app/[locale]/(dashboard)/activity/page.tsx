@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { getTranslations } from 'next-intl/server';
 import { getActivityLog } from '@/app/actions/activity-log';
 import { ActivityClient } from './activity-client';
@@ -16,6 +17,11 @@ export default async function ActivityPage() {
     }));
 
     return (
-        <ActivityClient initialActivities={response.activities} totalActivities={response.total} />
+        <Suspense fallback={null}>
+            <ActivityClient
+                initialActivities={response.activities}
+                totalActivities={response.total}
+            />
+        </Suspense>
     );
 }

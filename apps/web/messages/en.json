@@ -370,10 +370,14 @@
                     "pluginDisabled": "Plugin Disabled",
                     "pluginConfigured": "Plugin Configured",
                     "memberInvited": "Member Invited",
+                    "memberRoleChanged": "Role Changed",
+                    "memberRemoved": "Member Removed",
+                    "scheduleCreated": "Schedule Created",
                     "scheduleExecuted": "Schedule Executed",
                     "import": "Import",
                     "login": "Login",
-                    "signup": "Signup"
+                    "signup": "Signup",
+                    "passwordChanged": "Password Changed"
                 },
                 "statuses": {
                     "allStatuses": "All Statuses",
@@ -384,18 +388,22 @@
                 }
             },
             "actions": {
-                "export": "Export CSV"
+                "export": "Export CSV",
+                "clearFilters": "Clear filters"
             },
             "empty": {
                 "title": "No activities yet",
-                "description": "Activities will appear here as you use the platform."
+                "description": "Activities will appear here as you use the platform.",
+                "noResults": "No matching activities",
+                "noResultsDescription": "No activities match your current filters. Try adjusting your search or filters."
             },
             "detail": {
                 "title": "Details"
             },
             "pagination": {
                 "previous": "Previous",
-                "next": "Next"
+                "next": "Next",
+                "pageOf": "Page {page} of {total}"
             }
         },
         "directories": {

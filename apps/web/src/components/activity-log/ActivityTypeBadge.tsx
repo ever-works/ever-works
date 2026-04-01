@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 const TYPE_COLORS: Record<string, string> = {
     generation: 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300',
     comparison_generation:
@@ -24,18 +26,41 @@ const TYPE_COLORS: Record<string, string> = {
 
 const DEFAULT_COLOR = 'bg-gray-50 text-gray-700 dark:bg-gray-900/20 dark:text-gray-300';
 
-function formatLabel(actionType: string): string {
-    return actionType.replace(/_/g, ' ');
-}
+// Maps backend actionType values to i18n filter label keys
+const TYPE_TO_I18N: Record<string, string> = {
+    generation: 'generation',
+    comparison_generation: 'comparison',
+    deployment: 'deployment',
+    directory_created: 'directoryCreated',
+    directory_updated: 'directoryUpdated',
+    directory_deleted: 'directoryDeleted',
+    plugin_enabled: 'pluginEnabled',
+    plugin_disabled: 'pluginDisabled',
+    plugin_configured: 'pluginConfigured',
+    member_invited: 'memberInvited',
+    member_role_changed: 'memberRoleChanged',
+    member_removed: 'memberRemoved',
+    schedule_created: 'scheduleCreated',
+    schedule_executed: 'scheduleExecuted',
+    import: 'import',
+    user_signup: 'signup',
+    user_login: 'login',
+    password_changed: 'passwordChanged',
+};
 
 export function ActivityTypeBadge({ actionType }: { actionType: string }) {
+    const t = useTranslations('dashboard.activity');
     const color = TYPE_COLORS[actionType] || DEFAULT_COLOR;
+    const i18nKey = TYPE_TO_I18N[actionType];
+
+    // Use translated label when available, fall back to formatted raw value
+    const label = i18nKey ? t(`filters.types.${i18nKey}` as any) : actionType.replace(/_/g, ' ');
 
     return (
         <span
             className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${color}`}
         >
-            {formatLabel(actionType)}
+            {label}
         </span>
     );
 }

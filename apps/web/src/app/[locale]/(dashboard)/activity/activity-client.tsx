@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { getActivityLog } from '@/app/actions/activity-log';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
 import { ActivityTable } from '@/components/activity-log/ActivityTable';
@@ -20,18 +21,42 @@ interface ActivityClientProps {
 
 export function ActivityClient({ initialActivities, totalActivities }: ActivityClientProps) {
     const t = useTranslations('dashboard.activity');
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const pathname = usePathname();
+
+    // Initialise filters from URL query params
     const [activities, setActivities] = useState<ActivityLogEntry[]>(initialActivities);
     const [total, setTotal] = useState(totalActivities);
     const [loading, setLoading] = useState(false);
-    const [page, setPage] = useState(1);
+    const [page, setPage] = useState(() => {
+        const p = parseInt(searchParams.get('page') || '1', 10);
+        return Number.isFinite(p) && p >= 1 ? p : 1;
+    });
 
-    // Filters
-    const [actionType, setActionType] = useState<string>('');
-    const [status, setStatus] = useState<string>('');
-    const [search, setSearch] = useState('');
-    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [actionType, setActionType] = useState<string>(searchParams.get('actionType') || '');
+    const [status, setStatus] = useState<string>(searchParams.get('status') || '');
+    const [search, setSearch] = useState(searchParams.get('search') || '');
+    const [debouncedSearch, setDebouncedSearch] = useState(search);
 
     const requestIdRef = useRef(0);
+    const hasMountedRef = useRef(false);
+    const hasActiveFilters = actionType !== '' || status !== '' || debouncedSearch !== '';
+
+    // Sync filters → URL query params
+    useEffect(() => {
+        if (!hasMountedRef.current) {
+            hasMountedRef.current = true;
+            return;
+        }
+        const params = new URLSearchParams();
+        if (actionType) params.set('actionType', actionType);
+        if (status) params.set('status', status);
+        if (debouncedSearch) params.set('search', debouncedSearch);
+        if (page > 1) params.set('page', String(page));
+        const query = params.toString();
+        router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
+    }, [actionType, status, debouncedSearch, page, pathname, router]);
 
     // Debounce search
     useEffect(() => {
@@ -40,9 +65,9 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
     }, [search]);
 
     const fetchActivities = useCallback(
-        async (currentPage: number) => {
+        async (currentPage: number, silent = false) => {
             const currentRequestId = ++requestIdRef.current;
-            setLoading(true);
+            if (!silent) setLoading(true);
             try {
                 const response = await getActivityLog({
                     actionType: actionType || undefined,
@@ -57,12 +82,12 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                     setTotal(response.total);
                 }
             } catch (error) {
-                if (currentRequestId === requestIdRef.current) {
+                if (currentRequestId === requestIdRef.current && !silent) {
                     console.error('Failed to fetch activities:', error);
                     toast.error(t('fetchFailed'));
                 }
             } finally {
-                if (currentRequestId === requestIdRef.current) {
+                if (currentRequestId === requestIdRef.current && !silent) {
                     setLoading(false);
                 }
             }
@@ -70,21 +95,52 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         [actionType, status, debouncedSearch, t],
     );
 
-    // Refetch on filter/search change
+    // Refetch on filter/search change (non-silent)
     useEffect(() => {
         setPage(1);
         fetchActivities(1);
     }, [fetchActivities]);
 
-    // Polling for updates
+    // Polling — silent refresh, paused when tab is hidden
     useEffect(() => {
-        const interval = setInterval(() => fetchActivities(page), POLL_INTERVAL);
-        return () => clearInterval(interval);
+        let interval: ReturnType<typeof setInterval>;
+
+        const startPolling = () => {
+            interval = setInterval(() => {
+                if (!document.hidden) {
+                    fetchActivities(page, true);
+                }
+            }, POLL_INTERVAL);
+        };
+
+        const handleVisibility = () => {
+            clearInterval(interval);
+            if (!document.hidden) {
+                // Immediately refresh when returning to tab, then resume polling
+                fetchActivities(page, true);
+                startPolling();
+            }
+        };
+
+        startPolling();
+        document.addEventListener('visibilitychange', handleVisibility);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibility);
+        };
     }, [fetchActivities, page]);
 
     const handlePageChange = (newPage: number) => {
         setPage(newPage);
         fetchActivities(newPage);
+    };
+
+    const handleClearFilters = () => {
+        setActionType('');
+        setStatus('');
+        setSearch('');
+        setDebouncedSearch('');
     };
 
     const handleExport = async () => {
@@ -129,10 +185,15 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                 onStatusChange={setStatus}
                 search={search}
                 onSearchChange={setSearch}
+                hasActiveFilters={hasActiveFilters}
+                onClearFilters={handleClearFilters}
             />
 
             {activities.length === 0 && !loading ? (
-                <ActivityEmptyState />
+                <ActivityEmptyState
+                    filtered={hasActiveFilters}
+                    onClearFilters={handleClearFilters}
+                />
             ) : (
                 <>
                     <ActivityTable activities={activities} loading={loading} />
@@ -146,21 +207,26 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                                     total,
                                 })}
                             </p>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => handlePageChange(page - 1)}
-                                    disabled={page <= 1}
-                                    className="px-3 py-1.5 text-sm rounded-md border border-border dark:border-border-dark disabled:opacity-50 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
-                                >
-                                    {t('pagination.previous')}
-                                </button>
-                                <button
-                                    onClick={() => handlePageChange(page + 1)}
-                                    disabled={page >= totalPages}
-                                    className="px-3 py-1.5 text-sm rounded-md border border-border dark:border-border-dark disabled:opacity-50 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
-                                >
-                                    {t('pagination.next')}
-                                </button>
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm text-text-muted dark:text-text-muted-dark">
+                                    {t('pagination.pageOf', { page, total: totalPages })}
+                                </span>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => handlePageChange(page - 1)}
+                                        disabled={page <= 1}
+                                        className="px-3 py-1.5 text-sm rounded-md border border-border dark:border-border-dark disabled:opacity-50 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+                                    >
+                                        {t('pagination.previous')}
+                                    </button>
+                                    <button
+                                        onClick={() => handlePageChange(page + 1)}
+                                        disabled={page >= totalPages}
+                                        className="px-3 py-1.5 text-sm rounded-md border border-border dark:border-border-dark disabled:opacity-50 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+                                    >
+                                        {t('pagination.next')}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
