@@ -165,40 +165,45 @@ export function createAuthProviderInstance(deps: AuthProviderDeps) {
         },
 
         socialProviders: {
-            ...(config.github.clientId() && config.github.clientSecret() && {
-                github: {
-                    clientId: config.github.clientId()!,
-                    clientSecret: config.github.clientSecret()!,
-                    prompt: 'select_account' as const,
-                    scope: [...GITHUB_SCOPES],
-                },
-            }),
-            ...(config.google.clientId() && config.google.clientSecret() && {
-                google: {
-                    clientId: config.google.clientId()!,
-                    clientSecret: config.google.clientSecret()!,
-                    prompt: 'select_account consent' as const,
-                    accessType: 'offline' as const,
-                },
-            }),
-            ...(config.linkedin.clientId() && config.linkedin.clientSecret() && {
-                linkedin: {
-                    clientId: config.linkedin.clientId()!,
-                    clientSecret: config.linkedin.clientSecret()!,
-                },
-            }),
-            ...(config.facebook.clientId() && config.facebook.clientSecret() && {
-                facebook: {
-                    clientId: config.facebook.clientId()!,
-                    clientSecret: config.facebook.clientSecret()!,
-                },
-            }),
-            ...(config.twitter.clientId() && config.twitter.clientSecret() && {
-                twitter: {
-                    clientId: config.twitter.clientId()!,
-                    clientSecret: config.twitter.clientSecret()!,
-                },
-            }),
+            ...(config.github.clientId() &&
+                config.github.clientSecret() && {
+                    github: {
+                        clientId: config.github.clientId()!,
+                        clientSecret: config.github.clientSecret()!,
+                        prompt: 'select_account' as const,
+                        scope: [...GITHUB_SCOPES],
+                    },
+                }),
+            ...(config.google.clientId() &&
+                config.google.clientSecret() && {
+                    google: {
+                        clientId: config.google.clientId()!,
+                        clientSecret: config.google.clientSecret()!,
+                        prompt: 'select_account consent' as const,
+                        accessType: 'offline' as const,
+                    },
+                }),
+            ...(config.linkedin.clientId() &&
+                config.linkedin.clientSecret() && {
+                    linkedin: {
+                        clientId: config.linkedin.clientId()!,
+                        clientSecret: config.linkedin.clientSecret()!,
+                    },
+                }),
+            ...(config.facebook.clientId() &&
+                config.facebook.clientSecret() && {
+                    facebook: {
+                        clientId: config.facebook.clientId()!,
+                        clientSecret: config.facebook.clientSecret()!,
+                    },
+                }),
+            ...(config.twitter.clientId() &&
+                config.twitter.clientSecret() && {
+                    twitter: {
+                        clientId: config.twitter.clientId()!,
+                        clientSecret: config.twitter.clientSecret()!,
+                    },
+                }),
         },
 
         databaseHooks: {
@@ -220,8 +225,8 @@ export function createAuthProviderInstance(deps: AuthProviderDeps) {
                                 authUser.email,
                             );
                             if (existingByEmail) {
-                            // User exists with different ID (registered via old auth system)
-                            // Link the existing user — no need to create a new one
+                                // User exists with different ID (registered via old auth system)
+                                // Link the existing user — no need to create a new one
                                 logger.log(
                                     `User with email ${authUser.email} already exists (id: ${existingByEmail.id}), skipping create`,
                                 );

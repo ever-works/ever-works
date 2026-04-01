@@ -84,7 +84,10 @@ export async function forgotPassword(email: string) {
 
         if (!response.ok) {
             throw new Error(
-                await parseAuthProviderError(response, 'Failed to send password reset instructions'),
+                await parseAuthProviderError(
+                    response,
+                    'Failed to send password reset instructions',
+                ),
             );
         }
 
