@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter, usePathname, Link } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
@@ -129,9 +129,17 @@ export function ChatToolResult({ toolName, state, output, errorText }: ChatToolR
     const isDone = state === 'output-available';
     const isError = state === 'output-error';
 
-    // Auto-navigate or reload
+    // Track whether this tool was live (seen running) vs loaded from history.
+    // Only auto-navigate/reload for live tool executions, not replayed results.
+    const wasLive = useRef(false);
     useEffect(() => {
-        if (!isDone || !output) return;
+        if (isRunning) {
+            wasLive.current = true;
+        }
+    }, [isRunning]);
+
+    useEffect(() => {
+        if (!isDone || !output || !wasLive.current) return;
         if (toolName === 'navigate') {
             const data = output as NavigateOutput;
             if (data.url && data.url.startsWith('/')) router.push(data.url);
