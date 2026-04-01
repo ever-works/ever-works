@@ -81,68 +81,6 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
             isActive: pathname.includes('/generator'),
         },
         {
-            name: t('schedule'),
-            href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/schedule`,
-            visible: Boolean(config) && permissions.canManageSchedule,
-            icon: (
-                <svg
-                    className="w-4 h-4 shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7V5a2 2 0 114 0v2m0 0V5a2 2 0 114 0v2m-8 0h8M5 11h14M7 15h2m4 0h2m-8 4h2m4 0h2M6 5h0a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h0"
-                    />
-                </svg>
-            ),
-            isActive: pathname.includes('/schedule'),
-        },
-        {
-            name: t('history'),
-            href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/history`,
-            icon: (
-                <svg
-                    className="w-4 h-4 shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                </svg>
-            ),
-            isActive: pathname.includes('/history'),
-        },
-        {
-            name: t('comparisons'),
-            href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/comparisons`,
-            visible: permissions.canEdit,
-            icon: (
-                <svg
-                    className="w-4 h-4 shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"
-                    />
-                </svg>
-            ),
-            isActive: pathname.includes('/comparisons'),
-        },
-        {
             name: t('plugins'),
             href: ROUTES.DASHBOARD_DIRECTORY_PLUGINS(directory.id),
             visible: permissions.canAccessSettings,

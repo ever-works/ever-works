@@ -43,3 +43,39 @@ export function LogoEverWork({
         </Link>
     );
 }
+
+export function FaviconEverWork({
+    className,
+    size = 120,
+    priority = false,
+    config: configProps,
+}: {
+    className?: string;
+    size?: number;
+    priority?: boolean;
+    config?: DirectoryConfig | null;
+}) {
+    const siteConfig = getSiteConfig(configProps);
+    const logoHref = siteConfig.website || '/';
+
+    return (
+        <Link href={logoHref} className={cn('relative flex items-center', className)}>
+            <Image
+                src={siteConfig.favicon.light}
+                alt={siteConfig.name}
+                width={size}
+                height={size}
+                priority={priority}
+                className="block dark:hidden object-contain max-h-8 ml-[8.5px]"
+            />
+            <Image
+                src={siteConfig.favicon.dark}
+                alt={siteConfig.name}
+                width={size}
+                height={size}
+                priority={priority}
+                className="hidden dark:block object-contain max-h-8 ml-[8.5px]"
+            />
+        </Link>
+    );
+}

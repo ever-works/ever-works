@@ -10,7 +10,7 @@ interface DropdownMenuProps {
 
 export function DropdownMenu({ children }: DropdownMenuProps) {
     return (
-        <Menu as="div" className="relative inline-block text-left">
+        <Menu as="div" className="relative inline-block text-left w-full">
             {children}
         </Menu>
     );

@@ -28,6 +28,10 @@
 		"test": {
 			"outputs": []
 		},
+		"test:e2e": {
+			"outputs": [],
+			"cache": false
+		},
 		"type-check": {
 			"outputs": []
 		},

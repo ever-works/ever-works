@@ -69,20 +69,21 @@ export const REDIRECT_SEARCH_PARAM = process.env.REDIRECT_SEARCH_PARAM || 'redir
 export const ROUTES = {
     // Dashboard routes (these are under (dashboard) route group)
     DASHBOARD: '/',
+    DASHBOARD_ACTIVITY: '/activity',
     DASHBOARD_DIRECTORIES: '/directories',
     DASHBOARD_DIRECTORIES_NEW: '/directories/new',
     DASHBOARD_DIRECTORY: (id: string) => `/directories/${id}`,
     DASHBOARD_DIRECTORY_ITEMS: (id: string) => `/directories/${id}/items`,
     DASHBOARD_DIRECTORY_GENERATOR: (id: string) => `/directories/${id}/generator`,
-    DASHBOARD_DIRECTORY_SCHEDULE: (id: string) => `/directories/${id}/schedule`,
-    DASHBOARD_DIRECTORY_HISTORY: (id: string) => `/directories/${id}/history`,
+    DASHBOARD_DIRECTORY_SCHEDULE: (id: string) => `/directories/${id}/generator/schedule`,
+    DASHBOARD_DIRECTORY_HISTORY: (id: string) => `/directories/${id}/generator/history`,
+    DASHBOARD_DIRECTORY_COMPARISONS: (id: string) => `/directories/${id}/generator/comparisons`,
+    DASHBOARD_DIRECTORY_COMPARISON: (id: string, slug: string) =>
+        `/directories/${id}/generator/comparisons/${slug}`,
     DASHBOARD_DIRECTORY_DEPLOY: (id: string) => `/directories/${id}/deploy`,
     DASHBOARD_DIRECTORY_MEMBERS: (id: string) => `/directories/${id}/members`,
     DASHBOARD_DIRECTORY_SETTINGS: (id: string) => `/directories/${id}/settings`,
     DASHBOARD_DIRECTORY_PLUGINS: (id: string) => `/directories/${id}/plugins`,
-    DASHBOARD_DIRECTORY_COMPARISONS: (id: string) => `/directories/${id}/comparisons`,
-    DASHBOARD_DIRECTORY_COMPARISON: (id: string, slug: string) =>
-        `/directories/${id}/comparisons/${slug}`,
     // Plugins
     DASHBOARD_PLUGINS: '/plugins',
     DASHBOARD_PLUGIN_DETAIL: (pluginId: string) => `/plugins/${pluginId}`,
