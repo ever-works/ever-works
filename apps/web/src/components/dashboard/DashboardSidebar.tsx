@@ -119,16 +119,18 @@ export function DashboardSidebar({
                 {/* Logo + controls */}
                 <div
                     className={cn(
-                        'h-16 flex items-center shrink-0',
-                        isCollapsed ? 'justify-center px-2' : 'px-5',
+                        'h-15 flex items-center shrink-0',
+                        isCollapsed ? 'justify-center px-2' : 'px-4',
                     )}
                 >
-                    <div className="flex items-center justify-between w-full relative">
-                        {isCollapsed ? (
-                            <FaviconEverWork config={config} />
-                        ) : (
-                            <LogoEverWork config={config} />
-                        )}
+                    <div className="w-full relative">
+                        <div className={cn('flex items-center -ml-2')}>
+                            <FaviconEverWork
+                                config={config}
+                                className={cn(isCollapsed ? 'w-11 ml-[5px]' : 'w-12')}
+                            />
+                            <LogoEverWork config={config} className={cn(isCollapsed && 'hidden')} />
+                        </div>
                         <div
                             className={cn(
                                 'flex items-center gap-0.5',
@@ -136,7 +138,13 @@ export function DashboardSidebar({
                             )}
                         >
                             {onCollapsedChange && (
-                                <div className={isCollapsed ? 'absolute -right-5 top-1.5' : ''}>
+                                <div
+                                    className={cn(
+                                        isCollapsed
+                                            ? 'absolute -right-5 top-2'
+                                            : 'absolute -right-1 top-2',
+                                    )}
+                                >
                                     <Tooltip
                                         content={
                                             isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
