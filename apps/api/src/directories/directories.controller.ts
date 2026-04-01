@@ -613,7 +613,7 @@ export class DirectoriesController {
                 directoryId: id,
                 actionType: ActivityActionType.SCHEDULE_EXECUTED,
                 action: 'schedule.executed',
-                status: ActivityStatus.IN_PROGRESS,
+                status: ActivityStatus.COMPLETED,
                 summary: `Triggered scheduled update`,
             })
             .catch(() => {});
@@ -1096,8 +1096,8 @@ export class DirectoriesController {
                 userId: auth.userId,
                 actionType: ActivityActionType.IMPORT,
                 action: 'directory.import_started',
-                status: ActivityStatus.IN_PROGRESS,
-                summary: `Started directory import`,
+                status: ActivityStatus.COMPLETED,
+                summary: `Triggered directory import`,
                 details: {
                     sourceUrl: importDto.sourceUrl,
                     sourceType: importDto.sourceType,
