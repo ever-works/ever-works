@@ -73,12 +73,15 @@ export class ConversationRepository {
     async appendMessages(messages: AppendMessageInput[]): Promise<ConversationMessage[]> {
         if (messages.length === 0) return [];
 
-        // Save messages one by one to guarantee distinct createdAt timestamps
-        // and preserve insertion order. Batch save assigns the same timestamp
-        // to all messages, causing incorrect ordering on reload.
+        // Save messages sequentially with explicit timestamps to guarantee ordering.
+        // Batch save can assign the same createdAt to all rows, breaking ORDER BY on reload.
         const saved: ConversationMessage[] = [];
-        for (const m of messages) {
-            const entity = this.messageRepo.create(m);
+        const baseTime = Date.now();
+        for (let i = 0; i < messages.length; i++) {
+            const entity = this.messageRepo.create({
+                ...messages[i],
+                createdAt: new Date(baseTime + i),
+            });
             saved.push(await this.messageRepo.save(entity));
         }
 
