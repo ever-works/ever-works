@@ -7,7 +7,7 @@ import {
     type StreamTextOnFinishCallback,
 } from 'ai';
 import { createBackendProvider } from './provider';
-import { chatTools } from './tools';
+import { buildChatTools, type ChatTools } from './tools';
 import { API_URL } from '@/lib/constants';
 
 const MAX_TOOL_STEPS = 50;
@@ -44,6 +44,12 @@ For first-time generation or when user wants to change pipeline:
 For retries or re-runs:
 - Just call generateItems(directoryId) — it automatically reuses the last prompt, pipeline, providers, and plugin config.
 
+## SEARCH & SUGGESTIONS
+
+- **webSearch**: Search the web for information. Requires a configured search plugin.
+- **getUserInfo**: Get the current user's profile (name, email).
+- **suggestDirectories**: A research subagent that autonomously looks up the user, searches the web for their interests, and returns personalized directory suggestions. Use when the user asks "what should I create?", "suggest directories", or "help me get started". This tool may take a moment as it runs multiple searches.
+
 ## CURRENT CONTEXT
 {context}
 
@@ -56,7 +62,7 @@ interface AgentOptions {
     directoryId?: string;
     conversationId?: string;
     currentPageUrl?: string;
-    onFinish?: StreamTextOnFinishCallback<typeof chatTools>;
+    onFinish?: StreamTextOnFinishCallback<ChatTools>;
 }
 
 export async function runAgent({
@@ -80,11 +86,14 @@ export async function runAgent({
         ? `The user is currently viewing: ${currentPageUrl}`
         : 'The user is on the dashboard.';
 
+    const model = provider.chatModel('auto');
+    const tools = buildChatTools(model);
+
     return streamText({
-        model: provider.chatModel('auto'),
+        model,
         system: SYSTEM_PROMPT.replace('{context}', context),
         messages: await convertToModelMessages(messages),
-        tools: chatTools,
+        tools,
         stopWhen: stepCountIs(MAX_TOOL_STEPS),
         onFinish,
     });
