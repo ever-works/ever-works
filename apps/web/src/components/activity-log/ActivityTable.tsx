@@ -117,7 +117,7 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                     colSpan={6}
                                     className="px-4 py-10 text-center text-sm text-text-muted dark:text-text-muted-dark"
                                 >
-                                    Loading...
+                                    {t('loading')}
                                 </td>
                             </tr>
                         )}
