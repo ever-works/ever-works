@@ -121,12 +121,7 @@ const ItemCardList = memo(function ItemCardList({
                     </Link>
                 )}
                 {canEdit && onDelete && (
-                    <ItemActions
-                        item={item}
-                        onDelete={onDelete}
-                        onUpdate={onUpdate}
-                        isPending={false}
-                    />
+                    <ItemActions item={item} onDelete={onDelete} onUpdate={onUpdate} />
                 )}
             </div>
         </div>
@@ -169,12 +164,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
                 </div>
                 {canEdit && onDelete && (
                     <div className="shrink-0 -mt-1 -mr-1">
-                        <ItemActions
-                            item={item}
-                            onDelete={onDelete}
-                            onUpdate={onUpdate}
-                            isPending={false}
-                        />
+                        <ItemActions item={item} onDelete={onDelete} onUpdate={onUpdate} />
                     </div>
                 )}
             </div>
