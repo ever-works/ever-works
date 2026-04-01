@@ -30,7 +30,9 @@ export class JitsuService implements ActivityLogAnalyticsDispatcher {
         }
 
         const metadata =
-            activity.metadata && typeof activity.metadata === 'object' && !Array.isArray(activity.metadata)
+            activity.metadata &&
+            typeof activity.metadata === 'object' &&
+            !Array.isArray(activity.metadata)
                 ? activity.metadata
                 : {};
 
