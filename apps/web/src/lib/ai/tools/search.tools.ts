@@ -11,7 +11,9 @@ export const webSearch = tool({
         'Use natural language queries — do NOT use search operators like site: or inurl:.',
     ].join(' '),
     inputSchema: z.object({
-        query: z.string().describe('Natural language search query. Do not use site: or other search operators.'),
+        query: z
+            .string()
+            .describe('Natural language search query. Do not use site: or other search operators.'),
         maxResults: z.number().optional().describe('Maximum number of results (default: 10)'),
     }),
     execute: async ({ query, maxResults }) => {
