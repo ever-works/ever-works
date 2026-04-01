@@ -38,7 +38,7 @@ export function LogoEverWork({
                 alt={siteConfig.name}
                 width={size}
                 height={size}
-                priority={priority}
+                priority={false}
                 className="hidden dark:block h-auto w-auto max-h-12 object-contain"
             />
         </Link>
