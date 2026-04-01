@@ -1357,6 +1357,12 @@
                 }
             },
             "generator": {
+                "tabs": {
+                    "generate": "Generate",
+                    "schedule": "Schedule",
+                    "history": "History",
+                    "comparisons": "Comparisons"
+                },
                 "regenerationWarning": "Regeneration Warning",
                 "regenerationWarningDescription": "This directory has already been generated. Starting a new generation will replace existing items.",
                 "requiredInfo": "Required Information",

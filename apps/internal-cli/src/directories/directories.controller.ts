@@ -131,7 +131,8 @@ export class DirectoriesController {
     async extractItemDetails(
         @Body() extractItemDetailsDto: ExtractItemDetailsDto,
     ): Promise<ExtractItemDetailsResponseDto> {
-        return this.directoryGenerationService.extractItemDetails(extractItemDetailsDto);
+        const user = await this.userRepository.createOrGetLocalUser();
+        return this.directoryGenerationService.extractItemDetails(extractItemDetailsDto, user);
     }
 
     @Post('directories/:id/regenerate-markdown')

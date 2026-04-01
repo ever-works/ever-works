@@ -36,6 +36,7 @@
 		"type-check": "turbo type-check",
 		"clean": "turbo clean",
 		"format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\" --log-level warn",
+		"test:e2e": "turbo test:e2e --filter=ever-works-web",
 		"format:check": "prettier --check \"**/*.{ts,tsx,jsx,json,css,md}\""
 	},
 	"keywords": [],
@@ -46,7 +47,7 @@
 		"prettier": "^3.7.4",
 		"prettier-eslint-cli": "^8.0.1",
 		"prettier-plugin-tailwindcss": "^0.5.14",
-		"turbo": "^2.8.21"
+		"turbo": "^2.9.3"
 	},
 	"engines": {
 		"node": ">=20",

@@ -645,9 +645,11 @@ export class DirectoriesController {
     })
     @ApiResponse({ status: 200, description: 'Extracted item details' })
     async extractItemDetails(
+        @CurrentUser() auth: AuthenticatedUser,
         @Body() extractItemDetailsDto: ExtractItemDetailsDto,
     ): Promise<ExtractItemDetailsResponseDto> {
-        return this.directoryGenerationService.extractItemDetails(extractItemDetailsDto);
+        const user = await this.authService.getUser(auth.userId);
+        return this.directoryGenerationService.extractItemDetails(extractItemDetailsDto, user);
     }
 
     // ============================================

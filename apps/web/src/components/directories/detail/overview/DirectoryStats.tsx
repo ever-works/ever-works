@@ -19,9 +19,10 @@ interface StatCardProps {
     value: string | number;
     icon: React.ReactNode;
     iconColor: string;
+    className?: string;
 }
 
-function StatCard({ title, value, icon, iconColor }: StatCardProps) {
+function StatCard({ title, value, icon, iconColor, className }: StatCardProps) {
     return (
         <div
             className={cn(
@@ -44,7 +45,12 @@ function StatCard({ title, value, icon, iconColor }: StatCardProps) {
                 <p className="text-xs sm:text-sm text-text-muted dark:text-text-muted-dark">
                     {title}
                 </p>
-                <p className="text-xl sm:text-2xl font-bold text-text dark:text-text-dark mt-2 break-words whitespace-normal">
+                <p
+                    className={cn(
+                        'text-xl sm:text-2xl font-bold text-text dark:text-text-dark mt-2 break-words whitespace-normal',
+                        className,
+                    )}
+                >
                     {value}
                 </p>
 
@@ -70,6 +76,7 @@ function getGenerationStatusStat(
         value: tStatus(config.labelKey),
         icon: <Icon className={cn('w-3 h-3 sm:w-4 sm:h-4', config.animate && 'animate-spin')} />,
         iconColor: config.stat.iconColor,
+        className: config.labelKey === 'generatedWithWarnings' ? 'sm:text-xl' : undefined,
     };
 }
 
@@ -122,6 +129,7 @@ export function DirectoryStats({
                     value={stat.value}
                     icon={stat.icon}
                     iconColor={stat.iconColor}
+                    className={'className' in stat ? stat.className : undefined}
                 />
             ))}
         </div>
