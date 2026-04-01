@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { authAPI } from '@/lib/api/auth';
 import { getAuthFromCookie } from '@/lib/auth';
+import { getAuthSessionCookieHeader } from '@/lib/auth/cookies';
 import { revalidatePath } from 'next/cache';
 import { API_URL, ROUTES, withAppUrl } from '@/lib/constants';
 import { getLocale, getTranslations } from 'next-intl/server';
@@ -19,10 +20,12 @@ export async function resendVerificationEmail() {
             return { success: false, error: t('notAuthenticated') };
         }
         const locale = await getLocale();
+        const authSessionCookieHeader = await getAuthSessionCookieHeader();
         const response = await fetch(`${API_URL}/auth/provider/send-verification-email`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                ...(authSessionCookieHeader ? { Cookie: authSessionCookieHeader } : {}),
             },
             body: JSON.stringify({
                 email: user.email,

@@ -165,7 +165,7 @@ export function createAuthProviderInstance(deps: AuthProviderDeps) {
         },
 
         socialProviders: {
-            ...(config.github.clientId() && {
+            ...(config.github.clientId() && config.github.clientSecret() && {
                 github: {
                     clientId: config.github.clientId()!,
                     clientSecret: config.github.clientSecret()!,
@@ -173,7 +173,7 @@ export function createAuthProviderInstance(deps: AuthProviderDeps) {
                     scope: [...GITHUB_SCOPES],
                 },
             }),
-            ...(config.google.clientId() && {
+            ...(config.google.clientId() && config.google.clientSecret() && {
                 google: {
                     clientId: config.google.clientId()!,
                     clientSecret: config.google.clientSecret()!,
@@ -181,19 +181,19 @@ export function createAuthProviderInstance(deps: AuthProviderDeps) {
                     accessType: 'offline' as const,
                 },
             }),
-            ...(config.linkedin.clientId() && {
+            ...(config.linkedin.clientId() && config.linkedin.clientSecret() && {
                 linkedin: {
                     clientId: config.linkedin.clientId()!,
                     clientSecret: config.linkedin.clientSecret()!,
                 },
             }),
-            ...(config.facebook.clientId() && {
+            ...(config.facebook.clientId() && config.facebook.clientSecret() && {
                 facebook: {
                     clientId: config.facebook.clientId()!,
                     clientSecret: config.facebook.clientSecret()!,
                 },
             }),
-            ...(config.twitter.clientId() && {
+            ...(config.twitter.clientId() && config.twitter.clientSecret() && {
                 twitter: {
                     clientId: config.twitter.clientId()!,
                     clientSecret: config.twitter.clientSecret()!,

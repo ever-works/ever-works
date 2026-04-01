@@ -18,11 +18,26 @@ import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { SessionAuthGuard } from '../guards/session-auth.guard';
 import { Public } from '../decorators/public.decorator';
 import { config } from '@src/config/constants';
+import { AuthProviderService } from '../services/auth-provider.service';
+import type { Request as ExpressRequest } from 'express';
 
 @ApiTags('Auth')
 @Controller('api/auth')
 export class AuthController {
-    constructor(private authService: AuthService) {}
+    constructor(
+        private authService: AuthService,
+        private authProviderService: AuthProviderService,
+    ) {}
+
+    private createForwardedHeaders(req: ExpressRequest): Headers {
+        const headers = new Headers();
+        for (const [key, value] of Object.entries(req.headers)) {
+            if (value) {
+                headers.set(key, Array.isArray(value) ? value.join(', ') : String(value));
+            }
+        }
+        return headers;
+    }
 
     @Public()
     @Get('providers')
@@ -33,11 +48,11 @@ export class AuthController {
     @ApiResponse({ status: 200, description: 'Configured authentication providers' })
     getProviders() {
         const socialProviders = [
-            config.github.clientId() ? 'github' : null,
-            config.google.clientId() ? 'google' : null,
-            config.linkedin.clientId() ? 'linkedin' : null,
-            config.facebook.clientId() ? 'facebook' : null,
-            config.twitter.clientId() ? 'twitter' : null,
+            config.github.clientId() && config.github.clientSecret() ? 'github' : null,
+            config.google.clientId() && config.google.clientSecret() ? 'google' : null,
+            config.linkedin.clientId() && config.linkedin.clientSecret() ? 'linkedin' : null,
+            config.facebook.clientId() && config.facebook.clientSecret() ? 'facebook' : null,
+            config.twitter.clientId() && config.twitter.clientSecret() ? 'twitter' : null,
         ].filter((provider): provider is string => !!provider);
 
         return {
@@ -52,7 +67,10 @@ export class AuthController {
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: 'Logout', description: 'Logout the current authenticated session' })
     @ApiResponse({ status: 200, description: 'Successfully logged out' })
-    async logout() {
+    async logout(@Request() req) {
+        await this.authProviderService.api.signOut({
+            headers: this.createForwardedHeaders(req),
+        });
         return { message: 'Logged out successfully' };
     }
 
@@ -65,7 +83,10 @@ export class AuthController {
         description: 'Logout from all active sessions for the user',
     })
     @ApiResponse({ status: 200, description: 'Successfully logged out from all devices' })
-    async logoutAll() {
+    async logoutAll(@Request() req) {
+        await this.authProviderService.api.revokeOtherSessions({
+            headers: this.createForwardedHeaders(req),
+        });
         return { message: 'Logged out from all devices successfully' };
     }
 
