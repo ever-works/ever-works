@@ -132,9 +132,11 @@ export function ChatToolResult({ toolName, state, output, errorText }: ChatToolR
     // Track whether this tool was live (seen running) vs loaded from history.
     // Only auto-navigate/reload for live tool executions, not replayed results.
     const wasLive = useRef(false);
-    if (isRunning) {
-        wasLive.current = true;
-    }
+    useEffect(() => {
+        if (isRunning) {
+            wasLive.current = true;
+        }
+    }, [isRunning]);
 
     useEffect(() => {
         if (!isDone || !output || !wasLive.current) return;
