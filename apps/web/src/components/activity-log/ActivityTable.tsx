@@ -111,6 +111,16 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-border dark:divide-border-dark">
+                        {loading && activities.length === 0 && (
+                            <tr className="bg-card dark:bg-transparent">
+                                <td
+                                    colSpan={6}
+                                    className="px-4 py-10 text-center text-sm text-text-muted dark:text-text-muted-dark"
+                                >
+                                    Loading...
+                                </td>
+                            </tr>
+                        )}
                         {activities.map((activity) => {
                             const isExpanded = expandedIds.includes(activity.id);
                             const hasDetails =

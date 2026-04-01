@@ -47,8 +47,12 @@ export class ActivityLogService {
         return this.repository.findById(id);
     }
 
+    async findByIdAndUserId(id: string, userId: string): Promise<ActivityLog | null> {
+        return this.repository.findByIdAndUserId(id, userId);
+    }
+
     async exportCsv(query: ActivityLogQueryOptions): Promise<string> {
-        const { activities } = await this.repository.findByUserId({
+        const activities = await this.repository.findByUserIdForExport({
             ...query,
             limit: 10000,
             offset: 0,

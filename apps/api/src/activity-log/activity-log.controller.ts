@@ -125,7 +125,7 @@ export class ActivityLogController {
     @ApiResponse({ status: 200, description: 'Activity log entry details' })
     @ApiResponse({ status: 404, description: 'Activity not found' })
     async getActivity(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
-        const activity = await this.activityLogService.findById(id);
+        const activity = await this.activityLogService.findByIdAndUserId(id, auth.userId);
         if (!activity) {
             throw new NotFoundException('Activity not found');
         }

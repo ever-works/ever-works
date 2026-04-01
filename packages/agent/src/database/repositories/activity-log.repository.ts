@@ -42,6 +42,18 @@ export class ActivityLogRepository {
     async findByUserId(
         options: ActivityLogQueryOptions,
     ): Promise<{ activities: ActivityLog[]; total: number }> {
+        return this.findByUserIdWithLimit(options, true);
+    }
+
+    async findByUserIdForExport(options: ActivityLogQueryOptions): Promise<ActivityLog[]> {
+        const { activities } = await this.findByUserIdWithLimit(options, false);
+        return activities;
+    }
+
+    private async findByUserIdWithLimit(
+        options: ActivityLogQueryOptions,
+        enforceCap: boolean,
+    ): Promise<{ activities: ActivityLog[]; total: number }> {
         const qb = this.repository
             .createQueryBuilder('activity')
             .leftJoinAndSelect('activity.directory', 'directory')
@@ -76,7 +88,8 @@ export class ActivityLogRepository {
             });
         }
 
-        const limit = Math.min(options.limit || 25, 100);
+        const requestedLimit = options.limit || 25;
+        const limit = enforceCap ? Math.min(requestedLimit, 100) : requestedLimit;
         const offset = options.offset || 0;
 
         const [activities, total] = await qb.take(limit).skip(offset).getManyAndCount();
