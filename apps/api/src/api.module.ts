@@ -16,6 +16,7 @@ import { TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ScreenshotModule } from './plugins-capabilities/screenshot/screenshot.module';
+import { SearchModule } from './plugins-capabilities/search/search.module';
 import { PluginsModule } from './plugins/plugins.module';
 import { GitProviderModule } from './plugins-capabilities/git-provider/git-provider.module';
 import { OAuthModule } from './plugins-capabilities/oauth/oauth.module';
@@ -55,6 +56,7 @@ import { CacheFactory } from '@ever-works/agent/cache';
         SubscriptionsModule,
         NotificationsModule,
         ScreenshotModule,
+        SearchModule,
         AgentPluginsModule.forRoot(),
         PluginsModule,
         GitProviderModule,
