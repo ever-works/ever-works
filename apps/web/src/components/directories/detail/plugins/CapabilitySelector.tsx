@@ -44,8 +44,8 @@ export function CapabilitySelector({
 
     if (plugins.length === 0) {
         return (
-            <div className="flex items-center gap-4 px-5 py-3">
-                <div className="w-36 shrink-0">
+            <div className="flex flex-col gap-1.5 px-5 py-3 @sm/main:flex-row @sm/main:items-center @sm/main:gap-4">
+                <div className="shrink-0">
                     <code className="text-xs font-mono font-medium text-text-secondary dark:text-text-secondary-dark bg-surface-secondary dark:bg-surface-secondary-dark px-1.5 py-0.5 rounded">
                         {getCapabilityLabel(capability)}
                     </code>
@@ -58,8 +58,8 @@ export function CapabilitySelector({
     }
 
     return (
-        <div className="flex items-center gap-4 px-5 py-3">
-            <div className="w-36 shrink-0">
+        <div className="flex flex-col gap-1.5 px-5 py-3 @sm/main:flex-row @sm/main:items-center @sm/main:gap-4">
+            <div className="shrink-0">
                 <code className="text-xs font-mono font-medium text-text-secondary dark:text-text-secondary-dark bg-surface-secondary dark:bg-surface-secondary-dark px-1.5 py-0.5 rounded">
                     {getCapabilityLabel(capability)}
                 </code>

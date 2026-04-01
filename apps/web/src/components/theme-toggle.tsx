@@ -28,7 +28,7 @@ export function ThemeToggle({ className, variant = 'fixed' }: ThemeToggleProps =
                 className={cn(buttonClasses, className)}
                 aria-label={t('toggle')}
             >
-                <div className="w-5 h-5" />
+                <div className="w-4 h-4" />
             </Button>
         );
     }
@@ -44,7 +44,7 @@ export function ThemeToggle({ className, variant = 'fixed' }: ThemeToggleProps =
         >
             {isDark ? (
                 <svg
-                    className="w-5 h-5 text-text dark:text-text-dark"
+                    className="w-4 h-4 text-text dark:text-text-dark"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -58,7 +58,7 @@ export function ThemeToggle({ className, variant = 'fixed' }: ThemeToggleProps =
                 </svg>
             ) : (
                 <svg
-                    className="w-5 h-5 text-text dark:text-text-dark"
+                    className="w-4 h-4 text-text dark:text-text-dark"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"

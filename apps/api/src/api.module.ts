@@ -22,6 +22,7 @@ import { OAuthModule } from './plugins-capabilities/oauth/oauth.module';
 import { DeployModule } from './plugins-capabilities/deploy/deploy.module';
 import { AiConversationModule } from './ai-conversation/ai-conversation.module';
 import { AccountModule } from './account/account.module';
+import { ActivityLogModule } from './activity-log/activity-log.module';
 import {
     PluginsModule as AgentPluginsModule,
     PluginBootstrapService,
@@ -61,6 +62,7 @@ import { CacheFactory } from '@ever-works/agent/cache';
         DeployModule,
         AiConversationModule,
         AccountModule,
+        ActivityLogModule,
     ],
     providers: [
         {

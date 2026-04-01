@@ -10,6 +10,7 @@ import {
 import { FacadesModule } from '@ever-works/agent/facades';
 import { DirectoryModule } from '@ever-works/agent/services';
 import { AuthModule } from '../auth';
+import { ActivityLogModule } from '@ever-works/agent/activity-log';
 
 import { PluginsController } from './plugins.controller';
 import { PluginValidationService } from './plugin-validation.service';
@@ -25,6 +26,7 @@ import { PluginValidationService } from './plugin-validation.service';
         FacadesModule,
         DirectoryModule,
         AuthModule,
+        ActivityLogModule,
     ],
     controllers: [PluginsController],
     providers: [PluginOperationsService, SettingsSchemaValidatorService, PluginValidationService],
