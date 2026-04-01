@@ -173,8 +173,8 @@ export class DeployController {
                 directoryId: id,
                 actionType: ActivityActionType.DEPLOYMENT,
                 action: 'directory.deployed',
-                status: ActivityStatus.IN_PROGRESS,
-                summary: `Deployed ${directory.name} via ${providerName}`,
+                status: ActivityStatus.COMPLETED,
+                summary: `Triggered deployment for ${directory.name} via ${providerName}`,
             })
             .catch(() => {});
 
@@ -391,8 +391,8 @@ export class DeployController {
                 userId: auth.userId,
                 actionType: ActivityActionType.DEPLOYMENT,
                 action: 'deployment.batch_started',
-                status: ActivityStatus.IN_PROGRESS,
-                summary: `Batch deployed ${batchDeployDto.directories.length} directories`,
+                status: ActivityStatus.COMPLETED,
+                summary: `Triggered batch deploy for ${batchDeployDto.directories.length} directories`,
                 details: {
                     directoryIds: batchDeployDto.directories.map((item) => item.directoryId),
                 },

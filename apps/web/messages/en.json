@@ -346,6 +346,7 @@
         "activity": {
             "title": "Activity Log",
             "subtitle": "Track all operations across your directories",
+            "loading": "Loading...",
             "fetchFailed": "Failed to load activities",
             "exportFailed": "Failed to export activity log",
             "showing": "Showing {from} to {to} of {total}",

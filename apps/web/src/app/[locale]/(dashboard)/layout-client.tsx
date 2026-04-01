@@ -291,7 +291,7 @@ export function DashboardLayoutClient({
                             <button
                                 aria-label="Collapse chat"
                                 onClick={handleCollapse}
-                                className="w-5 h-5 flex -ml-1.5 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white cursor-pointer items-center border rounded-full p-1 justify-center dark:bg-surface-dark"
+                                className="w-5 h-5 flex -ml-1.5 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white cursor-pointer items-center border rounded-full p-1 justify-center bg-white dark:bg-surface-dark"
                             >
                                 <ChevronLeft className="w-4 h-4" />
                             </button>
@@ -305,7 +305,7 @@ export function DashboardLayoutClient({
                             <button
                                 aria-label="Expand chat"
                                 onClick={handleExpand}
-                                className="w-5 h-5 flex -ml-1.5 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white cursor-pointer items-center border rounded-full p-1 justify-center dark:bg-surface-dark"
+                                className="w-5 h-5 flex -ml-1.5 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white cursor-pointer items-center border rounded-full p-1 justify-center bg-white dark:bg-surface-dark"
                             >
                                 <ChevronRight className="w-4 h-4" />
                             </button>

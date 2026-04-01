@@ -8,9 +8,12 @@ export const webSearch = tool({
         "Search the web using the user's configured search provider.",
         'Returns results with title, URL, and relevance score.',
         'If no search provider is configured, returns a setup URL.',
+        'Use natural language queries — do NOT use search operators like site: or inurl:.',
     ].join(' '),
     inputSchema: z.object({
-        query: z.string().describe('The search query'),
+        query: z
+            .string()
+            .describe('Natural language search query. Do not use site: or other search operators.'),
         maxResults: z.number().optional().describe('Maximum number of results (default: 10)'),
     }),
     execute: async ({ query, maxResults }) => {

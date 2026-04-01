@@ -144,14 +144,31 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
     };
 
     const handleExport = async () => {
+        const params = new URLSearchParams();
+        if (actionType) params.set('actionType', actionType);
+        if (status) params.set('status', status);
+        if (debouncedSearch) params.set('search', debouncedSearch);
+        const query = params.toString();
+
         try {
-            const params = new URLSearchParams();
-            if (actionType) params.set('actionType', actionType);
-            if (status) params.set('status', status);
-            if (debouncedSearch) params.set('search', debouncedSearch);
-            const query = params.toString();
-            window.open(`/api/activity-log/export${query ? `?${query}` : ''}`, '_blank');
-        } catch (error) {
+            const response = await fetch(`/api/activity-log/export${query ? `?${query}` : ''}`, {
+                method: 'GET',
+            });
+
+            if (!response.ok) {
+                throw new Error('Export failed');
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'activity-log.csv';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch {
             toast.error(t('exportFailed'));
         }
     };

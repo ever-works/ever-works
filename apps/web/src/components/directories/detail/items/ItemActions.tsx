@@ -40,14 +40,12 @@ import { useItemsContext } from './ItemsContext';
 
 type ItemActionsProps = {
     item: ItemData;
-    isPending: boolean;
-    onDelete: () => void;
+    onDelete?: () => void;
     onUpdate?: (item: Partial<ItemData>) => void;
 };
 
 export const ItemActions = memo(function ItemActions({
     item,
-    isPending,
     onDelete,
     onUpdate,
 }: ItemActionsProps) {
@@ -158,16 +156,10 @@ export const ItemActions = memo(function ItemActions({
                         variant="ghost"
                         size="sm"
                         disabled={
-                            isPending ||
-                            isCapturingScreenshot ||
-                            isCheckingHealth ||
-                            isApplyingSuggestedSource
+                            isCapturingScreenshot || isCheckingHealth || isApplyingSuggestedSource
                         }
                     >
-                        {isPending ||
-                        isCapturingScreenshot ||
-                        isCheckingHealth ||
-                        isApplyingSuggestedSource ? (
+                        {isCapturingScreenshot || isCheckingHealth || isApplyingSuggestedSource ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                             <MoreVertical className="w-4 h-4" />
@@ -381,7 +373,7 @@ type DeleteDialogProps = {
     onOpenChange: (open: boolean) => void;
     item: ItemData;
     directoryId: string;
-    onDeleted: () => void;
+    onDeleted?: () => void;
 };
 
 const DeleteDialog = ({ open, onOpenChange, item, directoryId, onDeleted }: DeleteDialogProps) => {
@@ -400,7 +392,7 @@ const DeleteDialog = ({ open, onOpenChange, item, directoryId, onDeleted }: Dele
 
                 if (result.status === 'success') {
                     toast.success(result.message || t('deleteSuccess'));
-                    onDeleted();
+                    onDeleted?.();
                     onOpenChange(false);
                 } else {
                     toast.error(result.message || t('deleteFailed'));
