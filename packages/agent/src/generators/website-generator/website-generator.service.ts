@@ -17,6 +17,36 @@ export class WebsiteGeneratorService {
         private readonly branchSyncService: BranchSyncService,
     ) {}
 
+    private async ensureTemplateDefaultBranch(directory: Directory, userId: string): Promise<void> {
+        const targetBranch = WEBSITE_TEMPLATE_CONFIG.branch;
+
+        try {
+            const branches = await this.gitFacade.listBranches(
+                directory.getRepoOwner(),
+                directory.getWebsiteRepo(),
+                { userId, providerId: directory.gitProvider },
+            );
+
+            if (!branches.some((branch) => branch.name === targetBranch)) {
+                this.logger.warn(
+                    `Cannot set default branch to '${targetBranch}' for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()} because the branch does not exist yet`,
+                );
+                return;
+            }
+
+            await this.gitFacade.updateRepository(
+                directory.getRepoOwner(),
+                directory.getWebsiteRepo(),
+                { defaultBranch: targetBranch },
+                { userId, providerId: directory.gitProvider },
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Failed to set default branch for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+    }
+
     private async duplicate(directory: Directory, user: User) {
         const directoryOwner = getDirectoryOwner(directory);
         const committer = directory.resolveCommitter(user);
@@ -66,21 +96,7 @@ export class WebsiteGeneratorService {
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
-        // Explicitly set default branch to 'main' regardless of the user's GitHub account settings.
-        // This is best-effort: downstream syncAllBranchesFromTemplate pushes the 'main' branch
-        // regardless, so the repo content is always correct even if this API call fails.
-        await this.gitFacade
-            .updateRepository(
-                directory.getRepoOwner(),
-                directory.getWebsiteRepo(),
-                { defaultBranch: WEBSITE_TEMPLATE_CONFIG.branch },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
-            )
-            .catch((error) =>
-                this.logger.warn(
-                    `Failed to set default branch for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}: ${error instanceof Error ? error.message : String(error)}`,
-                ),
-            );
+        await this.ensureTemplateDefaultBranch(directory, directoryOwner.id);
 
         return templateDir;
     }
@@ -98,19 +114,6 @@ export class WebsiteGeneratorService {
             },
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
-
-        await this.gitFacade
-            .updateRepository(
-                directory.getRepoOwner(),
-                directory.getWebsiteRepo(),
-                { defaultBranch: WEBSITE_TEMPLATE_CONFIG.branch },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
-            )
-            .catch((error) =>
-                this.logger.warn(
-                    `Failed to set default branch for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}: ${error instanceof Error ? error.message : String(error)}`,
-                ),
-            );
     }
 
     async initialize(
@@ -119,6 +122,8 @@ export class WebsiteGeneratorService {
         operation: WebsiteRepositoryCreationMethod = WebsiteRepositoryCreationMethod.DUPLICATE,
     ) {
         let path: string | undefined;
+        const directoryOwner = getDirectoryOwner(directory);
+
         try {
             if (operation === WebsiteRepositoryCreationMethod.DUPLICATE) {
                 path = await this.duplicate(directory, user);
@@ -133,6 +138,7 @@ export class WebsiteGeneratorService {
             }
 
             await this.syncAllBranchesFromTemplate(directory, user, true);
+            await this.ensureTemplateDefaultBranch(directory, directoryOwner.id);
         } finally {
             if (path) {
                 await fs.rm(path, { recursive: true, force: true });
