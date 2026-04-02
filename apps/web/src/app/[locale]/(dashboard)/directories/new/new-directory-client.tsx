@@ -54,12 +54,12 @@ export default function NewDirectoryClient({
                     </p>
                 </div>
 
-                <div className="grid grid-cols-1 @md/main:grid-cols-2 @lg/main:grid-cols-3 gap-6">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-6">
                     {/* AI Creation Card */}
                     <button
                         onClick={() => setCreationMode('ai')}
                         className={cn(
-                            'rounded-b-lg p-4 rounded-t-lg rounded-tr-lg text-left transition-all shadow-sm',
+                            'rounded-lg p-4 text-left transition-all shadow-sm',
                             'bg-white dark:bg-card-primary-dark',
                             'border border-card-border dark:border-white/9',
                             'hover:border-primary-500/50 dark:hover:border-white/20',
@@ -98,7 +98,7 @@ export default function NewDirectoryClient({
                     <button
                         onClick={() => setCreationMode('manual')}
                         className={cn(
-                            'rounded-b-lg p-4 rounded-t-lg rounded-tr-lg text-left transition-all shadow-sm',
+                            'rounded-lg p-4 text-left transition-all shadow-sm',
                             'bg-white dark:bg-card-primary-dark',
                             'border border-card-border dark:border-white/9',
                             'hover:border-primary-500/50 dark:hover:border-white/20',
@@ -137,7 +137,7 @@ export default function NewDirectoryClient({
                     <button
                         onClick={() => setCreationMode('import')}
                         className={cn(
-                            'rounded-b-lg p-4 rounded-t-lg rounded-tr-lg text-left transition-all shadow-sm',
+                            'rounded-lg p-4 text-left transition-all shadow-sm',
                             'bg-white dark:bg-card-primary-dark',
                             'border border-card-border dark:border-white/9',
                             'hover:border-primary-500/50 dark:hover:border-white/20',
@@ -177,9 +177,53 @@ export default function NewDirectoryClient({
     }
 
     return (
-        <div className="flex gap-6 w-full">
+        <div className="flex flex-wrap justify-between gap-6 w-full">
+            {/* Provider Selector Sidebar — full-width at top on small, sticky right column on @lg/main+ */}
+                <aside className="order-top order-first @lg/main:order-last w-full @lg/main:w-[280px] shrink-0 @lg/main:sticky @lg/main:top-8 self-start">
+                <div
+                    className={cn(
+                        'p-1 rounded-lg space-y-6 shadow-xs',
+                        'bg-card/10 dark:bg-card-primary-dark/30',
+                        'border border-card-border dark:border-border-secondary-dark',
+                    )}
+                >
+                    <div
+                        className={cn(
+                            'p-4 rounded-sm relative overflow-hidden',
+                            'bg-card dark:bg-card-secondary-dark/30',
+                            'border border-card-border dark:border-border-secondary-dark',
+                        )}
+                    >
+                        <div className="absolute -top-5 -right-6 w-30 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/10 blur-xl pointer-events-none" />
+                        <div className="relative z-20 mb-4">
+                            <h3 className="font-bold text-sm text-text dark:text-text-dark mb-2">
+                                {t('sidebar.selectedProvider')}
+                            </h3>
+                            <GitProviderSelector
+                                providers={providers}
+                                selectedProviderId={selectedProviderId}
+                                onSelect={setSelectedProviderId}
+                                compact
+                            />
+                        </div>
+                        {deployProviders.length > 0 && (
+                            <div className="relative z-20 mb-4">
+                                <h3 className="font-bold text-sm text-text dark:text-text-dark mb-2">
+                                    {t('sidebar.selectedDeployProvider')}
+                                </h3>
+                                <DeployProviderSelector
+                                    providers={deployProviders}
+                                    selectedProviderId={selectedDeployProviderId}
+                                    onSelect={setSelectedDeployProviderId}
+                                    compact
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </aside>
             {/* Main Content */}
-            <div className="flex-1">
+            <div className="flex-1 min-w-96">
                 <div className="mb-8">
                     <button
                         onClick={() => setCreationMode(null)}
@@ -225,94 +269,7 @@ export default function NewDirectoryClient({
                     />
                 )}
             </div>
-
-            {/* Git Provider Selector Sidebar */}
-            <aside className="hidden md:block w-80 shrink-0">
-                <div
-                    className={cn(
-                        'sticky top-8 p-1 rounded-lg space-y-6 shadow-xs',
-                        'bg-card/10 dark:bg-card-primary-dark/30',
-                        'border border-card-border dark:border-border-secondary-dark',
-                    )}
-                >
-                    <div
-                        className={cn(
-                            'p-6 rounded-sm relative overflow-hidden',
-                            'bg-card dark:bg-card-secondary-dark/30',
-                            'border border-card-border dark:border-border-secondary-dark',
-                        )}
-                    >
-                        <div className="absolute -top-5 -right-6 w-30 h-30 rounded-full dark:bg-accent-indigo/10 bg-accent-indigo/10  blur-xl pointer-events-none" />
-                        <div className="relative z-20 mb-4">
-                            <h3 className="font-bold text-sm text-text dark:text-text-dark mb-2">
-                                {t('sidebar.selectedProvider')}
-                            </h3>
-                            <GitProviderSelector
-                                providers={providers}
-                                selectedProviderId={selectedProviderId}
-                                onSelect={setSelectedProviderId}
-                                compact
-                            />
-                        </div>
-                        {deployProviders.length > 0 && (
-                            <div className="relative z-20 mb-4">
-                                <h3 className="font-bold text-sm text-text dark:text-text-dark mb-2">
-                                    {t('sidebar.selectedDeployProvider')}
-                                </h3>
-                                <DeployProviderSelector
-                                    providers={deployProviders}
-                                    selectedProviderId={selectedDeployProviderId}
-                                    onSelect={setSelectedDeployProviderId}
-                                    compact
-                                />
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </aside>
-            {/* Mobile: provider selector below content */}
-            <div className="block md:hidden mt-6">
-                <div
-                    className={cn(
-                        'p-1 rounded-lg space-y-6 shadow-xs',
-                        'bg-card/10 dark:bg-card-primary-dark/30',
-                        'border border-card-border dark:border-border-secondary-dark',
-                    )}
-                >
-                    <div
-                        className={cn(
-                            'p-4 rounded-sm relative overflow-hidden',
-                            'bg-card dark:bg-card-secondary-dark/30',
-                            'border border-card-border dark:border-border-secondary-dark',
-                        )}
-                    >
-                        <div className="relative z-20 mb-4">
-                            <h3 className="font-bold text-sm text-text dark:text-text-dark mb-2">
-                                {t('sidebar.selectedProvider')}
-                            </h3>
-                            <GitProviderSelector
-                                providers={providers}
-                                selectedProviderId={selectedProviderId}
-                                onSelect={setSelectedProviderId}
-                                compact
-                            />
-                        </div>
-                        {deployProviders.length > 0 && (
-                            <div className="relative z-20 mb-4">
-                                <h3 className="font-bold text-sm text-text dark:text-text-dark mb-2">
-                                    {t('sidebar.selectedDeployProvider')}
-                                </h3>
-                                <DeployProviderSelector
-                                    providers={deployProviders}
-                                    selectedProviderId={selectedDeployProviderId}
-                                    onSelect={setSelectedDeployProviderId}
-                                    compact
-                                />
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
+            
         </div>
     );
 }
