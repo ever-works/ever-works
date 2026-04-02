@@ -69,22 +69,33 @@ export function DeployProviderSelector({
                                 )}
                             >
                                 <div className="w-7 h-7 rounded-lg bg-white/8 dark:bg-white/8 flex items-center justify-center shrink-0">
-                                    <PluginIcon icon={provider.icon} name={provider.name} size={14} />
+                                    <PluginIcon
+                                        icon={provider.icon}
+                                        name={provider.name}
+                                        size={14}
+                                    />
                                 </div>
                                 <div className="flex flex-col min-w-0 flex-1">
                                     <span className="text-xs font-medium text-text dark:text-text-dark leading-none">
                                         {provider.name}
                                     </span>
-                                    <span className={cn(
-                                        'text-[11px] mt-0.5 leading-none',
-                                        provider.enabled
-                                            ? 'text-emerald-500 dark:text-emerald-400'
-                                            : 'text-text-muted dark:text-text-muted-dark',
-                                    )}>
+                                    <span
+                                        className={cn(
+                                            'text-[11px] mt-0.5 leading-none',
+                                            provider.enabled
+                                                ? 'text-emerald-500 dark:text-emerald-400'
+                                                : 'text-text-muted dark:text-text-muted-dark',
+                                        )}
+                                    >
                                         {provider.enabled ? t('configured') : t('notConfigured')}
                                     </span>
                                 </div>
-                                {isSelected && <Check className="w-3 h-3 text-primary shrink-0" strokeWidth={2.5} />}
+                                {isSelected && (
+                                    <Check
+                                        className="w-3 h-3 text-primary shrink-0"
+                                        strokeWidth={2.5}
+                                    />
+                                )}
                             </button>
 
                             {isSelected && !provider.enabled && (
@@ -132,16 +143,23 @@ export function DeployProviderSelector({
                                 <span className="text-sm font-medium text-text dark:text-text-dark leading-none">
                                     {provider.name}
                                 </span>
-                                <span className={cn(
-                                    'text-[11px] mt-0.5 leading-none',
-                                    provider.enabled
-                                        ? 'text-emerald-500 dark:text-emerald-400'
-                                        : 'text-text-muted dark:text-text-muted-dark',
-                                )}>
+                                <span
+                                    className={cn(
+                                        'text-[11px] mt-0.5 leading-none',
+                                        provider.enabled
+                                            ? 'text-emerald-500 dark:text-emerald-400'
+                                            : 'text-text-muted dark:text-text-muted-dark',
+                                    )}
+                                >
                                     {provider.enabled ? t('configured') : t('notConfigured')}
                                 </span>
                             </div>
-                            {isSelected && <Check className="w-3.5 h-3.5 text-primary ml-1 shrink-0" strokeWidth={2.5} />}
+                            {isSelected && (
+                                <Check
+                                    className="w-3.5 h-3.5 text-primary ml-1 shrink-0"
+                                    strokeWidth={2.5}
+                                />
+                            )}
                         </button>
 
                         {isSelected && !provider.enabled && (

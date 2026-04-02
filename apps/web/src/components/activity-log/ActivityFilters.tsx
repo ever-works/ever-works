@@ -53,8 +53,7 @@ export function ActivityFilters({
 }: ActivityFiltersProps) {
     const t = useTranslations('dashboard.activity');
 
-    const selectClass =
-        'min-w-[220px]';
+    const selectClass = 'min-w-[220px]';
 
     return (
         <div className="flex flex-wrap gap-3 items-center">
