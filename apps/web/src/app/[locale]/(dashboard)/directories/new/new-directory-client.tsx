@@ -179,7 +179,7 @@ export default function NewDirectoryClient({
     return (
         <div className="flex flex-wrap justify-between gap-6 w-full">
             {/* Provider Selector Sidebar — full-width at top on small, sticky right column on @lg/main+ */}
-            <aside className="order-top order-first @lg/main:order-last w-full @lg/main:w-[280px] shrink-0 @lg/main:sticky @lg/main:top-8 self-start">
+            <aside className="order-first @lg/main:order-last w-full @lg/main:w-[280px] shrink-0 @lg/main:sticky @lg/main:top-8 self-start">
                 <div
                     className={cn(
                         'p-1 rounded-lg space-y-6 shadow-xs',
