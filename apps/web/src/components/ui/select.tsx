@@ -208,7 +208,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                     className={cn(
                         'w-full flex items-center justify-between rounded-lg border text-sm',
                         'transition-colors outline-none text-left cursor-pointer',
-                        'bg-surface dark:bg-surface-secondary-dark/20',
+                        'bg-white dark:bg-surface-secondary-dark/20',
                         'border-card-border dark:border-border-secondary-dark',
                         'hover:border-white/40 focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white/20',
                         'disabled:cursor-not-allowed disabled:opacity-50',
