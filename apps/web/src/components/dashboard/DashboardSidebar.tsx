@@ -285,7 +285,10 @@ export function DashboardSidebar({
                                             isCollapsed && 'justify-center',
                                         )}
                                     >
-                                        <ConditionalTooltip show={isCollapsed} content={user.username}>
+                                        <ConditionalTooltip
+                                            show={isCollapsed}
+                                            content={user.username}
+                                        >
                                             <div
                                                 className={cn(
                                                     'relative w-8 h-8 rounded-full shrink-0 flex items-center justify-center overflow-hidden',
@@ -320,7 +323,11 @@ export function DashboardSidebar({
                                         )}
                                     </div>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent side="top" align="start" className="w-56 bg-white">
+                                <DropdownMenuContent
+                                    side="top"
+                                    align="start"
+                                    className="w-56 bg-white"
+                                >
                                     <DropdownMenuLabel className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark">
                                         <p className="truncate">{user.username}</p>
                                         <p className="text-xs font-normal text-text-muted dark:text-text-muted-dark truncate">
