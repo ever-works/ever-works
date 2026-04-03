@@ -102,39 +102,42 @@ export function LoginClient({ availableSocialProviders }: LoginClientProps) {
         setError('');
         setShowResetSuccess(false);
 
-        startTransition(async () => {
-            try {
-                const response = await fetch('/api/auth/provider/sign-in/email', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        email: formData.email,
-                        password: formData.password,
-                        rememberMe: true,
-                    }),
-                });
+        startTransition(() => {
+            void (async () => {
+                try {
+                    const response = await fetch('/api/auth/provider/sign-in/email', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            email: formData.email,
+                            password: formData.password,
+                            rememberMe: true,
+                        }),
+                    });
 
-                const payload = (await response.json().catch(() => null)) as {
-                    message?: string;
-                } | null;
+                    const payload = (await response.json().catch(() => null)) as {
+                        message?: string;
+                    } | null;
 
-                if (!response.ok) {
-                    const message = payload?.message || t('errors.invalidCredentials');
-                    setError(message);
-                    return;
+                    if (!response.ok) {
+                        const message = payload?.message || t('errors.invalidCredentials');
+                        setError(message);
+                        return;
+                    }
+
+                    const destination =
+                        redirectUrl && isValidRedirectUrl(redirectUrl)
+                            ? redirectUrl
+                            : ROUTES.DASHBOARD;
+
+                    window.location.assign(getLocalizedInternalUrl(destination));
+                } catch (error) {
+                    console.error('Failed to sign in with email/password:', error);
+                    setError(t('errors.invalidCredentials'));
                 }
-
-                const destination =
-                    redirectUrl && isValidRedirectUrl(redirectUrl) ? redirectUrl : ROUTES.DASHBOARD;
-
-                window.location.assign(getLocalizedInternalUrl(destination));
-            } catch (error) {
-                console.error('Failed to sign in with email/password:', error);
-                setError(t('errors.invalidCredentials'));
-                return;
-            }
+            })();
         });
     };
 

@@ -85,9 +85,9 @@ export function DashboardSidebar({
         onCollapsedChange?.(v);
     };
 
-    const handleLogout = async () => {
-        startTransition(async () => {
-            await logout();
+    const handleLogout = () => {
+        startTransition(() => {
+            void logout();
         });
     };
 
