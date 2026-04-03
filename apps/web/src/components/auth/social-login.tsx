@@ -30,10 +30,7 @@ const GITHUB_INTEGRATION_SCOPES = [
     'project',
 ] as const;
 
-export function SocialLoginButtons({
-    providers,
-    mode = 'login',
-}: SocialLoginButtonsProps) {
+export function SocialLoginButtons({ providers, mode = 'login' }: SocialLoginButtonsProps) {
     const t = useTranslations('auth.login');
     const locale = useLocale();
     const [loading, setLoading] = useState<SocialProvider | null>(null);
