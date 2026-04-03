@@ -14,6 +14,16 @@ import {
 import { Button } from '@/components/ui/button';
 
 const DISMISS_KEY_PREFIX = 'github_connect_dismissed';
+const GITHUB_INTEGRATION_SCOPES = [
+    'user:email',
+    'read:user',
+    'repo',
+    'delete_repo',
+    'workflow',
+    'write:repo_hook',
+    'read:org',
+    'project',
+] as const;
 
 interface ConnectGithubModalProps {
     userId: string;
@@ -58,6 +68,7 @@ export function ConnectGithubModal({ userId, hasGithubConnected }: ConnectGithub
                     provider: 'github',
                     callbackURL,
                     disableRedirect: true,
+                    scopes: [...GITHUB_INTEGRATION_SCOPES],
                 }),
             });
 

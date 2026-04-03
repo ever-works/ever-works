@@ -14,11 +14,26 @@ type SocialAuthResponse = {
 
 interface SocialLoginButtonsProps {
     providers: SocialProvider[];
+    mode?: 'login' | 'register';
 }
 
 const PROVIDER_ORDER: SocialProvider[] = ['google', 'github', 'linkedin', 'facebook', 'twitter'];
+const GITHUB_LOGIN_SCOPES = ['user:email', 'read:user'] as const;
+const GITHUB_INTEGRATION_SCOPES = [
+    'user:email',
+    'read:user',
+    'repo',
+    'delete_repo',
+    'workflow',
+    'write:repo_hook',
+    'read:org',
+    'project',
+] as const;
 
-export function SocialLoginButtons({ providers }: SocialLoginButtonsProps) {
+export function SocialLoginButtons({
+    providers,
+    mode = 'login',
+}: SocialLoginButtonsProps) {
     const t = useTranslations('auth.login');
     const locale = useLocale();
     const [loading, setLoading] = useState<SocialProvider | null>(null);
@@ -45,6 +60,12 @@ export function SocialLoginButtons({ providers }: SocialLoginButtonsProps) {
                     callbackURL,
                     newUserCallbackURL: newUserCallbackURL.toString(),
                     disableRedirect: true,
+                    ...(provider === 'github' && {
+                        scopes:
+                            mode === 'login'
+                                ? [...GITHUB_LOGIN_SCOPES]
+                                : [...GITHUB_INTEGRATION_SCOPES],
+                    }),
                 }),
             });
 

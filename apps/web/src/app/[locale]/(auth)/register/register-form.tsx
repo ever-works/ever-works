@@ -191,7 +191,7 @@ export default function RegisterForm({ availableSocialProviders }: RegisterFormP
                     </div>
                 </div>
 
-                <SocialLoginButtons providers={availableSocialProviders} />
+                <SocialLoginButtons providers={availableSocialProviders} mode="register" />
 
                 <p className="text-center text-sm text-text-secondary dark:text-text-secondary-dark">
                     {t('signIn.text')}{' '}

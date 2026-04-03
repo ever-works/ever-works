@@ -221,7 +221,7 @@ export function LoginClient({ availableSocialProviders }: LoginClientProps) {
                     </div>
                 </div>
 
-                <SocialLoginButtons providers={availableSocialProviders} />
+                <SocialLoginButtons providers={availableSocialProviders} mode="login" />
 
                 <p className="text-center text-sm text-text-secondary dark:text-text-secondary-dark">
                     {t('signUp.text')}{' '}
