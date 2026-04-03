@@ -43,36 +43,37 @@ export default function RegisterForm({ availableSocialProviders }: RegisterFormP
             return;
         }
 
-        startTransition(async () => {
-            try {
-                const response = await fetch('/api/auth/provider/sign-up/email', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        name: formData.name,
-                        email: formData.email,
-                        password: formData.password,
-                        rememberMe: true,
-                    }),
-                });
+        startTransition(() => {
+            void (async () => {
+                try {
+                    const response = await fetch('/api/auth/provider/sign-up/email', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            name: formData.name,
+                            email: formData.email,
+                            password: formData.password,
+                            rememberMe: true,
+                        }),
+                    });
 
-                const payload = (await response.json().catch(() => null)) as {
-                    message?: string;
-                } | null;
+                    const payload = (await response.json().catch(() => null)) as {
+                        message?: string;
+                    } | null;
 
-                if (!response.ok) {
-                    setError(payload?.message || t('errors.generic'));
-                    return;
+                    if (!response.ok) {
+                        setError(payload?.message || t('errors.generic'));
+                        return;
+                    }
+
+                    window.location.assign(`/${locale}?newUser=true`);
+                } catch (error) {
+                    console.error('Failed to register with email/password:', error);
+                    setError(t('errors.generic'));
                 }
-
-                window.location.assign(`/${locale}?newUser=true`);
-            } catch (error) {
-                console.error('Failed to register with email/password:', error);
-                setError(t('errors.generic'));
-                return;
-            }
+            })();
         });
     };
 

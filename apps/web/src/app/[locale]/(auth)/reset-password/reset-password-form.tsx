@@ -89,12 +89,13 @@ function ResetPasswordContent() {
             return;
         }
 
-        startTransition(async () => {
-            const response = await resetPasswordAction(token!, formData.password);
-            if (!response.success) {
-                setErrors({ general: response.error || t('errors.failed') });
-                return;
-            }
+        startTransition(() => {
+            void (async () => {
+                const response = await resetPasswordAction(token!, formData.password);
+                if (!response.success) {
+                    setErrors({ general: response.error || t('errors.failed') });
+                }
+            })();
         });
     };
 

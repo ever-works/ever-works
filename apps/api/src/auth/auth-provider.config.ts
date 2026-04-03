@@ -174,7 +174,6 @@ export function createAuthProviderInstance(deps: AuthProviderDeps) {
                     github: {
                         clientId: config.github.clientId()!,
                         clientSecret: config.github.clientSecret()!,
-                        prompt: 'select_account' as const,
                         scope: [...GITHUB_SCOPES],
                     },
                 }),
