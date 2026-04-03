@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, Get, Post, UseGuards } from '@ne
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ScreenshotFacadeService } from '@ever-works/agent/facades';
 import { CurrentUser, SessionAuthGuard } from '../../auth';
-import { AuthenticatedUser } from '../../auth/types/jwt.types';
+import { AuthenticatedUser } from '../../auth/types/auth-user.types';
 import { CaptureScreenshotDto, GetScreenshotUrlDto } from './dto/screenshot.dto';
 
 @ApiTags('Screenshot')

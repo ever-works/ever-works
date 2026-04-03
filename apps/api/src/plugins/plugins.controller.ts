@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { SessionAuthGuard, CurrentUser } from '../auth';
-import { AuthenticatedUser } from '@src/auth/types/jwt.types';
+import { AuthenticatedUser } from '@src/auth/types/auth-user.types';
 import { DirectoryOwnershipService } from '@ever-works/agent/services';
 import { PluginOperationsService } from '@ever-works/agent/plugins';
 import {

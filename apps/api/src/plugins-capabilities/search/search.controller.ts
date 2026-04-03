@@ -6,7 +6,7 @@ import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import type { JsonSchema } from '@ever-works/plugin';
 import { CurrentUser } from '../../auth';
 import { SessionAuthGuard } from '../../auth/guards/session-auth.guard';
-import { AuthenticatedUser } from '../../auth/types/jwt.types';
+import { AuthenticatedUser } from '../../auth/types/auth-user.types';
 import { SearchDto } from './dto/search.dto';
 
 @ApiTags('Search')

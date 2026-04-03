@@ -22,7 +22,7 @@ import {
 import { NotificationService } from '@ever-works/agent/notifications';
 import { NotificationCategory } from '@ever-works/agent/entities';
 import { CurrentUser, SessionAuthGuard } from '../auth';
-import { AuthenticatedUser } from '@src/auth/types/jwt.types';
+import { AuthenticatedUser } from '@src/auth/types/auth-user.types';
 
 @ApiTags('Notifications')
 @ApiBearerAuth('JWT-auth')

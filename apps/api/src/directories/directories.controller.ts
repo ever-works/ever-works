@@ -83,7 +83,7 @@ import { UpdateWebsiteRepositoryResponseDto } from '@ever-works/agent/generators
 import { CommunityPrProcessorService } from '@ever-works/agent/community-pr';
 import { DirectoryRepository } from '@ever-works/agent/database';
 import { AuthService, CurrentUser, SessionAuthGuard } from '../auth';
-import { AuthenticatedUser } from '@src/auth/types/jwt.types';
+import { AuthenticatedUser } from '@src/auth/types/auth-user.types';
 import { GenerateDirectoryDetailDto } from './dto/generate-detail.dto';
 import { GenerateManualComparisonDto } from './dto/generate-manual-comparison.dto';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';

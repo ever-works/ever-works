@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { SessionAuthGuard, CurrentUser } from '../../auth';
-import { AuthenticatedUser } from '../../auth/types/jwt.types';
+import { AuthenticatedUser } from '../../auth/types/auth-user.types';
 import { DeployFacadeService } from '@ever-works/agent/facades';
 import { DirectoryOwnershipService } from '@ever-works/agent/services';
 import { DeployService } from './deploy.service';

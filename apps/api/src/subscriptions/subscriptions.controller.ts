@@ -11,7 +11,7 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SessionAuthGuard, AuthService, CurrentUser } from '@src/auth';
 import { SubscriptionService } from '@ever-works/agent/subscriptions';
-import { AuthenticatedUser } from '@src/auth/types/jwt.types';
+import { AuthenticatedUser } from '@src/auth/types/auth-user.types';
 import { SubscriptionPlanCode } from '@ever-works/agent/entities';
 import { IsEnum } from 'class-validator';
 

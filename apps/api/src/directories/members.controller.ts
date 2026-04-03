@@ -14,7 +14,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagg
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DirectoryMemberService } from '@ever-works/agent/services';
 import { AuthService, CurrentUser, SessionAuthGuard } from '../auth';
-import { AuthenticatedUser } from '@src/auth/types/jwt.types';
+import { AuthenticatedUser } from '@src/auth/types/auth-user.types';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { MemberInvitedEvent } from '../events';

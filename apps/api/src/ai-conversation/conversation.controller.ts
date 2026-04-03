@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/user.decorator';
-import { AuthenticatedUser } from '../auth/types/jwt.types';
+import { AuthenticatedUser } from '../auth/types/auth-user.types';
 import { ConversationRepository } from '@ever-works/agent/database';
 import { ConversationTitleService } from './conversation-title.service';
 

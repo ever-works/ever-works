@@ -4,7 +4,7 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { ApiKeyService } from '../services/api-key.service';
 import { AuthProviderService } from '../services/auth-provider.service';
 import { UserRepository } from '@ever-works/agent/database';
-import type { AuthenticatedUser } from '../types/jwt.types';
+import type { AuthenticatedUser } from '../types/auth-user.types';
 
 const API_KEY_PREFIX = 'ew_live_';
 
