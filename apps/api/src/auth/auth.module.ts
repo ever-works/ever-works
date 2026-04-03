@@ -7,6 +7,7 @@ import { AuthController } from './controllers/auth.controller';
 import { ApiKeysController } from './controllers/api-keys.controller';
 import { AuthProviderController } from './controllers/auth-provider.controller';
 import { SessionAuthGuard } from './guards/session-auth.guard';
+import { ActivityLogModule } from '@ever-works/agent/activity-log';
 import {
     DatabaseModule,
     ApiKeyRepository,
@@ -15,7 +16,7 @@ import {
 } from '@ever-works/agent/database';
 
 @Module({
-    imports: [DatabaseModule, HttpModule],
+    imports: [DatabaseModule, HttpModule, ActivityLogModule],
     providers: [
         AuthService,
         ApiKeyService,

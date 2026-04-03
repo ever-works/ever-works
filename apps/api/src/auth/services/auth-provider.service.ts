@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserRepository, OAuthTokenRepository } from '@ever-works/agent/database';
+import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { createAuthProviderInstance, AuthProviderInstance } from '../auth-provider.config';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class AuthProviderService implements OnModuleInit {
         @InjectDataSource() private dataSource: DataSource,
         private readonly userRepository: UserRepository,
         private readonly oauthTokenRepository: OAuthTokenRepository,
+        private readonly activityLogService: ActivityLogService,
         private readonly eventEmitter: EventEmitter2,
     ) {}
 
@@ -21,6 +23,7 @@ export class AuthProviderService implements OnModuleInit {
             dataSource: this.dataSource,
             userRepository: this.userRepository,
             oauthTokenRepository: this.oauthTokenRepository,
+            activityLogService: this.activityLogService,
             eventEmitter: this.eventEmitter,
         });
     }

@@ -5,6 +5,8 @@ import { config, AuthProvider } from '../config/constants';
 import { GITHUB_SCOPES } from './config/github-scopes.config';
 import { AuthUser, AuthSession, AuthAccount, AuthVerification } from '@ever-works/agent/entities';
 import { UserRepository, OAuthTokenRepository } from '@ever-works/agent/database';
+import { ActivityLogService } from '@ever-works/agent/activity-log';
+import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserConfirmedEvent, UserCreatedEvent, UserForgotPasswordEvent } from '../events';
 import { Logger } from '@nestjs/common';
@@ -17,11 +19,13 @@ export interface AuthProviderDeps {
     dataSource: DataSource;
     userRepository: UserRepository;
     oauthTokenRepository: OAuthTokenRepository;
+    activityLogService: ActivityLogService;
     eventEmitter: EventEmitter2;
 }
 
 export function createAuthProviderInstance(deps: AuthProviderDeps) {
-    const { dataSource, userRepository, oauthTokenRepository, eventEmitter } = deps;
+    const { dataSource, userRepository, oauthTokenRepository, activityLogService, eventEmitter } =
+        deps;
     const webAppUrl = config.webAppUrl();
 
     return betterAuth({
@@ -371,6 +375,19 @@ export function createAuthProviderInstance(deps: AuthProviderDeps) {
                                 lastLoginAt: new Date(),
                                 lastLoginIp: session.ipAddress || undefined,
                             });
+
+                            const appUser = await userRepository.findById(appUserId);
+                            if (appUser) {
+                                await activityLogService.log({
+                                    userId: appUser.id,
+                                    actionType: ActivityActionType.USER_LOGIN,
+                                    action: 'user.login',
+                                    status: ActivityStatus.COMPLETED,
+                                    summary: `Signed in via ${appUser.registrationProvider || 'email'}`,
+                                    ipAddress: session.ipAddress || undefined,
+                                    userAgent: session.userAgent || undefined,
+                                });
+                            }
                         } catch (error) {
                             logger.error(
                                 `Failed to update lastLoginAt for user ${session.userId}:`,
