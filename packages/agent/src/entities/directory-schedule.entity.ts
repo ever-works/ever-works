@@ -66,6 +66,9 @@ export class DirectorySchedule {
     @Column({ type: 'boolean', default: false })
     alwaysCreatePullRequest: boolean;
 
+    @TimestampColumn({ nullable: true })
+    scheduledFor?: Date | null;
+
     @Column({ type: 'simple-json', nullable: true })
     providerOverrides?: ProvidersDto | null;
 

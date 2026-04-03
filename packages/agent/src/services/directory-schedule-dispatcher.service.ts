@@ -39,13 +39,14 @@ export class DirectoryScheduleDispatcherService {
                 await this.directoryGenerationService.runScheduledUpdate(reservedSchedule);
                 dispatched += 1;
             } catch (error) {
+                // Schedule finalization (markRunFailed) is handled by the inner methods:
+                // - finalizeGeneration (for generation errors)
+                // - handleSyncFailure (for sync errors)
+                // - updateItemsGenerator early-exit (for config errors)
+                // We only log here to avoid double-counting failures.
                 this.logger.error(
                     `Failed to dispatch scheduled update for directory ${schedule.directoryId}`,
                     error as Error,
-                );
-                await this.directoryScheduleService.markRunFailed(
-                    schedule.id,
-                    (error as Error)?.message,
                 );
             }
         }

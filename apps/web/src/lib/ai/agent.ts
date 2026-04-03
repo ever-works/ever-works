@@ -7,7 +7,7 @@ import {
     type StreamTextOnFinishCallback,
 } from 'ai';
 import { createBackendProvider } from './provider';
-import { chatTools } from './tools';
+import { buildChatTools, type ChatTools } from './tools';
 import { API_URL } from '@/lib/constants';
 
 const MAX_TOOL_STEPS = 50;
@@ -19,10 +19,12 @@ ALWAYS use tools to fetch or mutate data — never guess or make up information.
 ## RULES
 
 1. **Always summarize** after a tool call — tell the user what happened in plain language.
-2. **navigate and reloadPage are silent** — never write text after calling them.
-3. **After mutations** (create, update, delete, enable, disable, deploy, generate) — write summary first, then call reloadPage as the last action.
-4. **Ask before acting** when details are missing — never pick random values. Ask for name, cadence, URL, etc.
-5. **Use context** — if the URL contains a directory UUID, use it. Never ask for what's in the URL.
+2. **Be user-friendly** — never expose internal IDs, UUIDs, or technical details unless the user explicitly asks. Use directory/item names, not IDs. Keep responses concise and conversational.
+3. **navigate and reloadPage are silent** — never write text after calling them.
+4. **After mutations** (create, update, delete, enable, disable, deploy, generate) — write summary first, then call reloadPage as the last action.
+5. **Navigate when asked to show or view** — when the user says "show me", "go to", "open", or wants to see a page (directories, items, settings, etc.), use the navigate tool to take them there. Don't just list data in chat — navigate to the relevant page.
+6. **Ask before acting** when details are missing — never pick random values. Ask for name, cadence, URL, etc.
+7. **Use context** — if the URL contains a directory UUID, use it. Never ask for what's in the URL.
 
 ## PREREQUISITES
 
@@ -42,6 +44,12 @@ For first-time generation or when user wants to change pipeline:
 For retries or re-runs:
 - Just call generateItems(directoryId) — it automatically reuses the last prompt, pipeline, providers, and plugin config.
 
+## SEARCH & SUGGESTIONS
+
+- **webSearch**: Search the web for information. Requires a configured search plugin.
+- **getUserInfo**: Get the current user's profile (name, email).
+- **suggestDirectories**: A research subagent that autonomously looks up the user, searches the web for their interests, and returns personalized directory suggestions. Use when the user asks "what should I create?", "suggest directories", or "help me get started". This tool may take a moment as it runs multiple searches.
+
 ## CURRENT CONTEXT
 {context}
 
@@ -54,7 +62,7 @@ interface AgentOptions {
     directoryId?: string;
     conversationId?: string;
     currentPageUrl?: string;
-    onFinish?: StreamTextOnFinishCallback<typeof chatTools>;
+    onFinish?: StreamTextOnFinishCallback<ChatTools>;
 }
 
 export async function runAgent({
@@ -78,11 +86,14 @@ export async function runAgent({
         ? `The user is currently viewing: ${currentPageUrl}`
         : 'The user is on the dashboard.';
 
+    const model = provider.chatModel('auto');
+    const tools = buildChatTools(model);
+
     return streamText({
-        model: provider.chatModel('auto'),
+        model,
         system: SYSTEM_PROMPT.replace('{context}', context),
         messages: await convertToModelMessages(messages),
-        tools: chatTools,
+        tools,
         stopWhen: stepCountIs(MAX_TOOL_STEPS),
         onFinish,
     });

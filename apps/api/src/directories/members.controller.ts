@@ -19,6 +19,8 @@ import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { MemberInvitedEvent } from '../events';
 import { config } from '../config/constants';
+import { ActivityLogService } from '@ever-works/agent/activity-log';
+import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 
 @ApiTags('Members')
 @ApiBearerAuth('JWT-auth')
@@ -29,6 +31,7 @@ export class MembersController {
         private readonly memberService: DirectoryMemberService,
         private readonly authService: AuthService,
         private readonly eventEmitter: EventEmitter2,
+        private readonly activityLogService: ActivityLogService,
     ) {}
 
     @Get()
@@ -117,6 +120,18 @@ export class MembersController {
             dto,
         );
 
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId,
+                actionType: ActivityActionType.MEMBER_ROLE_CHANGED,
+                action: 'member.role_changed',
+                status: ActivityStatus.COMPLETED,
+                summary: `Changed member role to ${dto.role}`,
+                details: { memberId, role: dto.role },
+            })
+            .catch(() => {});
+
         return {
             status: 'success',
             member,
@@ -134,6 +149,18 @@ export class MembersController {
     ) {
         const user = await this.authService.getUser(auth.userId);
         await this.memberService.removeMember(directoryId, user.id, memberId);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId,
+                actionType: ActivityActionType.MEMBER_REMOVED,
+                action: 'member.removed',
+                status: ActivityStatus.COMPLETED,
+                summary: `Removed member from directory`,
+                details: { memberId },
+            })
+            .catch(() => {});
 
         return {
             status: 'success',

@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { AuthUser } from '@/lib/auth';
 import { logout } from '@/app/actions/auth';
 import { cn } from '@/lib/utils/cn';
-import { ROUTES } from '@/lib/constants';
+import { ROUTES, getSiteConfig } from '@/lib/constants';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import {
     Home,
@@ -20,6 +20,7 @@ import {
     HelpCircle,
     MessageSquare,
     Keyboard,
+    Activity,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { LogoEverWork } from '../logos';
+import { LogoEverWork, FaviconEverWork } from '../logos';
 import { useDirectoryDetail } from '../directories/detail/DirectoryDetailContext';
 import { ChatPanelExpandButton } from '@/components/ai/ChatPanel';
 
@@ -45,6 +46,7 @@ interface DashboardSidebarProps {
     onOpenHelp?: () => void;
     chatOpen?: boolean;
     onOpenChat?: () => void;
+    onInteraction?: () => void;
 }
 
 function ConditionalTooltip({
@@ -73,6 +75,7 @@ export function DashboardSidebar({
     onOpenHelp,
     chatOpen,
     onOpenChat,
+    onInteraction,
 }: DashboardSidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
@@ -95,6 +98,7 @@ export function DashboardSidebar({
         { name: t('navigation.dashboard'), href: ROUTES.DASHBOARD, icon: Home },
         { name: t('navigation.directories'), href: ROUTES.DASHBOARD_DIRECTORIES, icon: Folder },
         { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
+        { name: t('navigation.activity'), href: ROUTES.DASHBOARD_ACTIVITY, icon: Activity },
         { name: t('navigation.settings'), href: ROUTES.DASHBOARD_SETTINGS, icon: Settings },
     ];
 
@@ -115,12 +119,18 @@ export function DashboardSidebar({
                 {/* Logo + controls */}
                 <div
                     className={cn(
-                        'h-14 flex items-center shrink-0',
-                        isCollapsed ? 'justify-center px-2' : 'px-5',
+                        'h-15 flex items-center shrink-0',
+                        isCollapsed ? 'justify-center px-2' : 'px-4',
                     )}
                 >
-                    <div className="flex items-center justify-between w-full">
-                        {!isCollapsed && <LogoEverWork config={config} />}
+                    <div className="w-full relative">
+                        <div className={cn('flex items-center -ml-2')}>
+                            <FaviconEverWork
+                                config={config}
+                                className={cn(isCollapsed ? 'w-11 ml-[5px]' : 'w-12')}
+                            />
+                            <LogoEverWork config={config} className={cn(isCollapsed && 'hidden')} />
+                        </div>
                         <div
                             className={cn(
                                 'flex items-center gap-0.5',
@@ -128,25 +138,35 @@ export function DashboardSidebar({
                             )}
                         >
                             {onCollapsedChange && (
-                                <Tooltip
-                                    content={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                                    position="right"
+                                <div
+                                    className={cn(
+                                        isCollapsed
+                                            ? 'absolute -right-5 top-2'
+                                            : 'absolute -right-1 top-2',
+                                    )}
                                 >
-                                    <button
-                                        onClick={() => handleCollapsedChange(!isCollapsed)}
-                                        className={cn(
-                                            'flex items-center justify-center w-7 h-7 rounded-md transition-colors',
-                                            'text-text-muted dark:text-text-muted-dark',
-                                            'hover:text-text dark:hover:text-white hover:bg-surface-secondary dark:hover:bg-white/5',
-                                        )}
+                                    <Tooltip
+                                        content={
+                                            isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+                                        }
+                                        position="right"
                                     >
-                                        {isCollapsed ? (
-                                            <PanelLeftOpen className="w-4 h-4" />
-                                        ) : (
-                                            <PanelLeftClose className="w-4 h-4" />
-                                        )}
-                                    </button>
-                                </Tooltip>
+                                        <button
+                                            onClick={() => handleCollapsedChange(!isCollapsed)}
+                                            className={cn(
+                                                'flex items-center justify-center w-5 h-5 rounded-md transition-colors cursor-pointer',
+                                                'text-text-muted dark:text-text-muted-dark',
+                                                'hover:text-text dark:hover:text-white hover:bg-surface-secondary dark:hover:bg-white/5',
+                                            )}
+                                        >
+                                            {isCollapsed ? (
+                                                <PanelLeftOpen className="w-4 h-4" />
+                                            ) : (
+                                                <PanelLeftClose className="w-4 h-4" />
+                                            )}
+                                        </button>
+                                    </Tooltip>
+                                </div>
                             )}
                             {!isCollapsed && (
                                 <Button
@@ -164,7 +184,7 @@ export function DashboardSidebar({
 
                 {/* New Directory */}
                 <div
-                    className={cn(isCollapsed ? 'px-2 py-3 flex justify-center' : 'px-4 pt-2 pb-6')}
+                    className={cn(isCollapsed ? 'px-2 py-3 flex justify-center' : 'px-4 pt-5 pb-6')}
                 >
                     {isCollapsed ? (
                         <ConditionalTooltip show content={t('newDirectory')}>
@@ -172,7 +192,8 @@ export function DashboardSidebar({
                                 href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
                                 variant="primary"
                                 size="icon"
-                                className="w-9 h-9 shadow-sm rounded-xl"
+                                className="w-8 h-8 shadow-sm rounded-xl"
+                                onClick={() => onInteraction?.()}
                             >
                                 <Plus className="w-5 h-5" />
                             </Button>
@@ -184,6 +205,7 @@ export function DashboardSidebar({
                             size="sm"
                             fullWidth
                             className="shadow-s dark:border"
+                            onClick={() => onInteraction?.()}
                         >
                             <Plus className="w-5 h-5" />
                             <span className="font-medium">{t('newDirectory')}</span>
@@ -212,6 +234,7 @@ export function DashboardSidebar({
                                     <ConditionalTooltip show={isCollapsed} content={item.name}>
                                         <Link
                                             href={item.href}
+                                            onClick={() => onInteraction?.()}
                                             className={cn(
                                                 'flex items-center rounded-sm transition-colors border border-transparent',
                                                 isCollapsed
@@ -237,17 +260,17 @@ export function DashboardSidebar({
                 {/* Bottom section: user menu */}
                 <div
                     className={cn(
-                        'mt-auto shrink-0 border-t border-border dark:border-border-dark z-999999',
+                        'mt-auto shrink-0 border-t h-16 border-border dark:border-border-dark z-999999',
                         isCollapsed ? 'px-2' : 'px-4',
                     )}
                 >
-                    <div className="py-2">
+                    <div className="flex items-center gap-2 py-1 relative">
                         <DropdownMenu>
                             <DropdownMenuTrigger
                                 className={cn(
-                                    'w-full rounded-md transition-colors cursor-pointer focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:border-transparent focus-visible:border-transparent',
+                                    'w-full mx-auto rounded-md transition-colors cursor-pointer focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:border-transparent focus-visible:border-transparent',
                                     'hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark',
-                                    isCollapsed ? 'p-1 flex justify-center' : 'p-2',
+                                    isCollapsed ? 'p-2 flex justify-center' : 'p-2',
                                 )}
                             >
                                 <div
@@ -302,7 +325,10 @@ export function DashboardSidebar({
                                 </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                    onClick={() => router.push(ROUTES.DASHBOARD_SETTINGS)}
+                                    onClick={() => {
+                                        onInteraction?.();
+                                        router.push(ROUTES.DASHBOARD_SETTINGS);
+                                    }}
                                     className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
                                 >
                                     <Settings className="w-4 h-4 mr-2 shrink-0" />
@@ -310,6 +336,7 @@ export function DashboardSidebar({
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                     onClick={() => {
+                                        onInteraction?.();
                                         window.open('https://docs.ever.works', '_blank');
                                     }}
                                     className="cursor-pointer px-3 rounded-sm hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
@@ -319,6 +346,7 @@ export function DashboardSidebar({
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                     onClick={() => {
+                                        onInteraction?.();
                                         window.open(
                                             'https://github.com/ever-works/ever-works/issues',
                                             '_blank',
@@ -330,7 +358,10 @@ export function DashboardSidebar({
                                     {t('profileMenu.support')}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                    onClick={onOpenHelp}
+                                    onClick={() => {
+                                        onInteraction?.();
+                                        onOpenHelp?.();
+                                    }}
                                     disabled={!onOpenHelp}
                                     className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
                                 >
@@ -339,7 +370,10 @@ export function DashboardSidebar({
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                    onClick={handleLogout}
+                                    onClick={() => {
+                                        onInteraction?.();
+                                        handleLogout();
+                                    }}
                                     disabled={isPending}
                                     className="text-danger hover:bg-danger/10 cursor-pointer px-3"
                                 >

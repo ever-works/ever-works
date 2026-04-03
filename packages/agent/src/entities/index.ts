@@ -13,6 +13,8 @@ export * from './directory-schedule.entity';
 export * from './usage-ledger-entry.entity';
 export * from './notification.entity';
 export * from './notification.types';
+export * from './activity-log.entity';
+export * from './activity-log.types';
 export * from './conversation.entity';
 export * from './conversation-message.entity';
 export * from './types';

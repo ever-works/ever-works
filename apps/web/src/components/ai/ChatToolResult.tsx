@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter, usePathname, Link } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
@@ -64,6 +64,20 @@ interface DeployConnectionOutput {
     setupUrl?: string;
 }
 
+interface WebSearchOutput {
+    success?: boolean;
+    results?: Array<{ title: string; url: string; score?: number; publishedDate?: string }>;
+    resultCount?: number;
+    message?: string;
+    setupUrl?: string;
+}
+
+interface UserInfoOutput {
+    success?: boolean;
+    user?: { username: string; email: string; avatar?: string | null };
+    message?: string;
+}
+
 interface GenericToolOutput {
     success?: boolean;
     error?: string;
@@ -100,6 +114,9 @@ const LABELS: Record<string, string> = {
     setSchedule: 'Updating schedule',
     runScheduleNow: 'Running schedule',
     cancelSchedule: 'Cancelling schedule',
+    webSearch: 'Searching the web',
+    getUserInfo: 'Loading user profile',
+    suggestDirectories: 'Researching directory ideas',
     navigate: 'Navigating',
     reloadPage: 'Refreshing',
 };
@@ -112,12 +129,20 @@ export function ChatToolResult({ toolName, state, output, errorText }: ChatToolR
     const isDone = state === 'output-available';
     const isError = state === 'output-error';
 
-    // Auto-navigate or reload
+    // Track whether this tool was live (seen running) vs loaded from history.
+    // Only auto-navigate/reload for live tool executions, not replayed results.
+    const wasLive = useRef(false);
     useEffect(() => {
-        if (!isDone || !output) return;
+        if (isRunning) {
+            wasLive.current = true;
+        }
+    }, [isRunning]);
+
+    useEffect(() => {
+        if (!isDone || !output || !wasLive.current) return;
         if (toolName === 'navigate') {
             const data = output as NavigateOutput;
-            if (data.url) router.push(data.url);
+            if (data.url && data.url.startsWith('/')) router.push(data.url);
         }
         if (toolName === 'reloadPage') {
             router.refresh();
@@ -175,6 +200,10 @@ export function ChatToolResult({ toolName, state, output, errorText }: ChatToolR
             return <GitConnection output={output} />;
         case 'checkDeployConnection':
             return <DeployConnection output={output} />;
+        case 'webSearch':
+            return <WebSearchResult output={output} />;
+        case 'getUserInfo':
+            return <UserInfo output={output} />;
         default: {
             // Generic completed indicator for tools without custom UI
             const label = LABELS[toolName];
@@ -392,6 +421,89 @@ function DeployConnection({ output }: { output: unknown }) {
                     {t('configureDeployProvider')}
                 </Link>
             )}
+        </div>
+    );
+}
+
+function WebSearchResult({ output }: { output: unknown }) {
+    const data = output as WebSearchOutput;
+    if (!data) return null;
+
+    if (!data.success) {
+        return (
+            <div className="mt-2 p-3 rounded-lg border border-warning/20 bg-warning/5">
+                <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="w-4 h-4 text-warning" />
+                    <span className="text-xs font-medium text-text dark:text-text-dark">
+                        Search unavailable
+                    </span>
+                </div>
+                <p className="text-[11px] text-text-muted dark:text-text-muted-dark mb-2">
+                    {data.message}
+                </p>
+                {data.setupUrl && (
+                    <Link
+                        href={data.setupUrl}
+                        className={cn(
+                            'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium',
+                            'bg-primary text-white hover:bg-primary-hover transition-colors',
+                        )}
+                    >
+                        <ExternalLink className="w-3 h-3" />
+                        Configure search provider
+                    </Link>
+                )}
+            </div>
+        );
+    }
+
+    if (!data.results?.length) {
+        return (
+            <span className="inline-flex items-center gap-1 text-[10px] text-text-muted dark:text-text-muted-dark">
+                <Check className="w-2.5 h-2.5" />
+                No results found
+            </span>
+        );
+    }
+
+    return (
+        <div className="mt-1 space-y-0.5">
+            {data.results.slice(0, 5).map((result, i) => (
+                <a
+                    key={i}
+                    href={result.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(
+                        'flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px]',
+                        'hover:bg-surface-secondary dark:hover:bg-white/[0.04]',
+                        'text-text dark:text-text-dark transition-colors',
+                    )}
+                >
+                    <Compass className="w-3 h-3 text-primary dark:text-primary-400 shrink-0" />
+                    <span className="flex-1 min-w-0 truncate">{result.title}</span>
+                    <ExternalLink className="w-2.5 h-2.5 text-text-muted shrink-0" />
+                </a>
+            ))}
+            {data.results.length > 5 && (
+                <span className="block px-2.5 text-[10px] text-text-muted dark:text-text-muted-dark">
+                    +{data.results.length - 5} more results
+                </span>
+            )}
+        </div>
+    );
+}
+
+function UserInfo({ output }: { output: unknown }) {
+    const data = output as UserInfoOutput;
+    if (!data?.success || !data.user) return null;
+
+    return (
+        <div className="flex items-center gap-2 mt-1 px-2.5 py-1.5 rounded-md text-[11px] text-text dark:text-text-dark">
+            <Check className="w-3 h-3 text-success shrink-0" />
+            <span className="truncate">
+                {data.user.username} ({data.user.email})
+            </span>
         </div>
     );
 }

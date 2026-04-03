@@ -30,11 +30,9 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
     const [showModal, setShowModal] = useState(false);
     const [toggleError, setToggleError] = useState<string | null>(null);
 
-    // Plugin must be enabled at user level to be enabled at directory level
     const canEnable = plugin.installed && plugin.enabled;
     const isEnabled = plugin.directoryEnabled;
 
-    // Determine if plugin has directory-scoped settings
     const hasDirectorySettings = useMemo(() => {
         if (!plugin.settingsSchema?.properties) return false;
         return Object.values(plugin.settingsSchema.properties).some((prop) => {
@@ -47,19 +45,14 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
     const isClickable = isEnabled && hasDirectorySettings;
 
     const handleToggle = async () => {
-        if (!canEnable && !isEnabled) {
-            return;
-        }
+        if (!canEnable && !isEnabled) return;
 
         setToggleError(null);
         startTransition(async () => {
             try {
-                let result;
-                if (isEnabled) {
-                    result = await disableDirectoryPlugin(directoryId, plugin.pluginId);
-                } else {
-                    result = await enableDirectoryPlugin(directoryId, plugin.pluginId);
-                }
+                const result = isEnabled
+                    ? await disableDirectoryPlugin(directoryId, plugin.pluginId)
+                    : await enableDirectoryPlugin(directoryId, plugin.pluginId);
 
                 if (result.success) {
                     router.refresh();
@@ -74,10 +67,12 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
     };
 
     const handleCardClick = () => {
-        if (isClickable) {
-            setShowModal(true);
-        }
+        if (isClickable) setShowModal(true);
     };
+
+    const visibleCaps = plugin.capabilities.filter(
+        (cap) => cap !== plugin.category && !HIDDEN_CAPABILITIES.has(cap),
+    );
 
     return (
         <>
@@ -96,90 +91,40 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                         : undefined
                 }
                 className={cn(
-                    'bg-surface dark:bg-surface-dark rounded-lg border border-card-border dark:border-border-secondary-dark p-4',
-                    'transition-all',
+                    'rounded-lg border p-4',
+                    'bg-surface dark:bg-surface-dark',
+                    'border-card-border dark:border-border-secondary-dark',
+                    'transition-all flex flex-col h-full',
                     isEnabled && 'ring-1 ring-primary/20',
                     !canEnable && !isEnabled && 'opacity-60',
                     isClickable && 'cursor-pointer hover:border-primary/40',
                 )}
             >
-                <div className="flex items-start gap-3">
-                    <PluginIcon icon={plugin.icon} name={plugin.name} size={40} />
-
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                            <h3 className="font-medium text-text dark:text-text-dark truncate">
-                                {plugin.name}
-                            </h3>
-                            {isEnabled && (
-                                <span className="text-xs px-1.5 py-0.5 rounded bg-success/20 text-success">
-                                    {t('active')}
-                                </span>
-                            )}
-                        </div>
-                        <p className="text-sm text-text-muted dark:text-text-muted-dark mt-0.5">
+                {/* Header */}
+                <div className="flex items-center gap-3 mb-3">
+                    <PluginIcon icon={plugin.icon} name={plugin.name} size={36} />
+                    <div className="min-w-0">
+                        <h3 className="font-medium text-sm leading-snug text-text dark:text-text-dark">
+                            {plugin.name}
+                        </h3>
+                        <p className="text-[11px] text-text-muted dark:text-text-muted-dark mt-0.5">
                             v{plugin.version}
+                            {isEnabled && (
+                                <span className="ml-1 text-success">&middot; {t('active')}</span>
+                            )}
                         </p>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                        {isClickable && (
-                            <Settings className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
-                        )}
-                        {plugin.systemPlugin ? (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-1">
-                                <Shield className="w-3 h-3" />
-                                {t('system')}
-                            </span>
-                        ) : (
-                            <Button
-                                variant={isEnabled ? 'ghost' : 'primary'}
-                                size="sm"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggle();
-                                }}
-                                disabled={isPending || (!canEnable && !isEnabled)}
-                                loading={isPending}
-                                className={cn(
-                                    isEnabled && 'text-danger hover:text-danger hover:bg-danger/10',
-                                )}
-                                title={
-                                    !canEnable && !isEnabled
-                                        ? t('enableAtUserLevelFirst')
-                                        : isEnabled
-                                          ? t('disableForDirectory')
-                                          : t('enableForDirectory')
-                                }
-                            >
-                                {isEnabled ? (
-                                    <>
-                                        <PowerOff className="w-4 h-4" />
-                                        <span className="sr-only @lg/main:not-sr-only @lg/main:ml-1">
-                                            {t('disable')}
-                                        </span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Power className="w-4 h-4" />
-                                        <span className="sr-only @lg/main:not-sr-only @lg/main:ml-1">
-                                            {t('enable')}
-                                        </span>
-                                    </>
-                                )}
-                            </Button>
-                        )}
                     </div>
                 </div>
 
+                {/* Warnings */}
                 {!canEnable && !isEnabled && !plugin.systemPlugin && (
-                    <p className="text-xs text-warning mt-2">
+                    <p className="text-xs text-warning mb-2">
                         {plugin.installed ? t('disabledByUser') : t('enableAtUserLevelFirst')}
                     </p>
                 )}
 
                 {toggleError && (
-                    <div className="text-xs text-danger mt-2">
+                    <div className="text-xs text-danger mb-2">
                         <p>{toggleError}</p>
                         {toggleError.includes('User-level required settings') && (
                             <Link
@@ -193,51 +138,89 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                     </div>
                 )}
 
+                {/* Description */}
                 {plugin.description && (
-                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-3 line-clamp-2">
+                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark leading-relaxed line-clamp-2 mb-3">
                         {plugin.description}
                     </p>
                 )}
 
-                <div className="flex flex-wrap gap-1.5 my-2">
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
+                {/* Tags */}
+                <div className="flex flex-wrap gap-1 mb-auto">
+                    <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
                         {getCategoryLabel(plugin.category)}
                     </span>
-                    {(() => {
-                        const visible = plugin.capabilities.filter(
-                            (cap) => cap !== plugin.category && !HIDDEN_CAPABILITIES.has(cap),
-                        );
-                        return (
-                            <>
-                                {visible.slice(0, 2).map((cap) => (
-                                    <span
-                                        key={cap}
-                                        className={cn(
-                                            'text-xs px-2 py-0.5 rounded-full',
-                                            plugin.activeCapability === cap
-                                                ? 'bg-primary/20 text-primary'
-                                                : 'bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark',
-                                        )}
-                                    >
-                                        {getCapabilityLabel(cap)}
-                                        {plugin.activeCapability === cap && ' ✓'}
-                                    </span>
-                                ))}
-                                {visible.length > 2 && (
-                                    <span className="text-xs px-2 py-0.5 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
-                                        +{visible.length - 2}
-                                    </span>
-                                )}
-                            </>
-                        );
-                    })()}
+                    {visibleCaps.slice(0, 2).map((cap) => (
+                        <span
+                            key={cap}
+                            className={cn(
+                                'text-[11px] px-1.5 py-0.5 rounded-md',
+                                plugin.activeCapability === cap
+                                    ? 'bg-primary/15 text-primary'
+                                    : 'bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark',
+                            )}
+                        >
+                            {getCapabilityLabel(cap)}
+                            {plugin.activeCapability === cap && ' \u2713'}
+                        </span>
+                    ))}
+                    {visibleCaps.length > 2 && (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
+                            +{visibleCaps.length - 2}
+                        </span>
+                    )}
                 </div>
 
-                {isClickable && (
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark mt-2">
-                        {t('clickToConfigure')}
-                    </p>
-                )}
+                {/* Footer */}
+                <div className="flex items-center gap-2 pt-3 mt-3 border-t border-border dark:border-border-dark">
+                    {isClickable && (
+                        <span className="text-xs text-text-muted dark:text-text-muted-dark flex items-center gap-1">
+                            <Settings className="w-3 h-3" />
+                            {t('clickToConfigure')}
+                        </span>
+                    )}
+
+                    {plugin.systemPlugin ? (
+                        <span className="ml-auto text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-1">
+                            <Shield className="w-3 h-3" />
+                            {t('system')}
+                        </span>
+                    ) : (
+                        <Button
+                            variant={isEnabled ? 'ghost' : 'primary'}
+                            size="sm"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggle();
+                            }}
+                            disabled={isPending || (!canEnable && !isEnabled)}
+                            loading={isPending}
+                            className={cn(
+                                'ml-auto shrink-0 px-2.5 py-1 text-xs rounded-md gap-1',
+                                isEnabled && 'text-danger hover:text-danger hover:bg-danger/10',
+                            )}
+                            title={
+                                !canEnable && !isEnabled
+                                    ? t('enableAtUserLevelFirst')
+                                    : isEnabled
+                                      ? t('disableForDirectory')
+                                      : t('enableForDirectory')
+                            }
+                        >
+                            {isEnabled ? (
+                                <>
+                                    <PowerOff className="w-3 h-3" />
+                                    {t('disable')}
+                                </>
+                            ) : (
+                                <>
+                                    <Power className="w-3 h-3" />
+                                    {t('enable')}
+                                </>
+                            )}
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {isClickable && (

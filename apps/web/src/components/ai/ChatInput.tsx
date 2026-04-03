@@ -47,10 +47,10 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
             <form onSubmit={handleSubmit}>
                 <div
                     className={cn(
-                        'relative flex flex-col rounded-xl border transition-colors',
+                        'relative flex flex-col rounded-xl border transition-colors  max-w-200 mx-auto',
                         'bg-white dark:bg-surface-dark',
-                        'border-border dark:border-white/8',
-                        'focus-within:border-primary/40 dark:focus-within:border-white/15',
+                        'border-border dark:border-white/20',
+                        'focus-within:border-primary/60 dark:focus-within:border-white/30',
                         'shadow-sm',
                     )}
                 >
@@ -89,6 +89,7 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
                             <button
                                 type="button"
                                 onClick={onStop}
+                                aria-label="Stop generating"
                                 className="flex cursor-pointer items-center justify-center w-7 h-7 rounded-lg bg-danger/10 text-danger hover:bg-danger/20 transition-all duration-150"
                             >
                                 <Square className="w-3 h-3" />
@@ -96,6 +97,7 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
                         ) : (
                             <button
                                 type="submit"
+                                aria-label={t('sendButton')}
                                 className={cn(
                                     'flex cursor-pointer items-center justify-center w-7 h-7 rounded-lg transition-all duration-150',
                                     'bg-primary dark:bg-primary/80 text-white hover:bg-primary-hover dark:hover:bg-primary/90 shadow-sm',

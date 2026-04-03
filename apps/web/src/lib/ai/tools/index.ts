@@ -1,3 +1,4 @@
+import type { LanguageModel } from 'ai';
 import {
     listDirectories,
     getDirectoryDetails,
@@ -32,55 +33,70 @@ import {
     regenerateMarkdownTool,
 } from './items.tools';
 import { setSchedule, runScheduleNow, cancelSchedule } from './schedule.tools';
+import { webSearch } from './search.tools';
+import { getUserInfo } from './user.tools';
+import { createSuggestDirectoriesTool } from './suggest.tools';
 
-export const chatTools = {
-    // Read
-    listDirectories,
-    getDirectoryDetails,
-    getStats,
-    getDirectoryItemsSummary,
-    getDirectoryConfig,
-    getGenerationHistory,
-    getScheduleStatus,
+/**
+ * Build the full tool set for the chat agent.
+ * The model parameter is needed by the suggestDirectories subagent
+ * which runs its own generateText loop internally.
+ */
+export function buildChatTools(model: LanguageModel) {
+    return {
+        // Read
+        listDirectories,
+        getDirectoryDetails,
+        getStats,
+        getDirectoryItemsSummary,
+        getDirectoryConfig,
+        getGenerationHistory,
+        getScheduleStatus,
 
-    // Create
-    createDirectoryManual,
-    createDirectoryWithAI: createDirectoryWithAITool,
-    importDirectory: importDirectoryTool,
-    analyzeImportSource,
+        // Create
+        createDirectoryManual,
+        createDirectoryWithAI: createDirectoryWithAITool,
+        importDirectory: importDirectoryTool,
+        analyzeImportSource,
 
-    // Update / Delete
-    updateDirectory: updateDirectoryTool,
-    deleteDirectory: deleteDirectoryTool,
-    syncDirectory,
+        // Update / Delete
+        updateDirectory: updateDirectoryTool,
+        deleteDirectory: deleteDirectoryTool,
+        syncDirectory,
 
-    // Providers
-    checkGitConnection,
-    checkDeployConnection,
-    listGitProviders,
-    listAvailablePipelines,
+        // Providers
+        checkGitConnection,
+        checkDeployConnection,
+        listGitProviders,
+        listAvailablePipelines,
 
-    // Items
-    addItem: addItemTool,
-    removeItem: removeItemTool,
-    updateItem: updateItemTool,
-    generateItems: generateItemsTool,
-    checkItemHealth: checkItemHealthTool,
-    regenerateMarkdown: regenerateMarkdownTool,
+        // Items
+        addItem: addItemTool,
+        removeItem: removeItemTool,
+        updateItem: updateItemTool,
+        generateItems: generateItemsTool,
+        checkItemHealth: checkItemHealthTool,
+        regenerateMarkdown: regenerateMarkdownTool,
 
-    // Deploy
-    deployDirectory,
-    checkDeploymentStatus,
-    listDomains,
+        // Deploy
+        deployDirectory,
+        checkDeploymentStatus,
+        listDomains,
 
-    // Schedule
-    setSchedule,
-    runScheduleNow,
-    cancelSchedule,
+        // Schedule
+        setSchedule,
+        runScheduleNow,
+        cancelSchedule,
 
-    // Navigation
-    navigate,
-    reloadPage,
-};
+        // Search & User
+        webSearch,
+        getUserInfo,
+        suggestDirectories: createSuggestDirectoriesTool(model),
 
-export type ChatTools = typeof chatTools;
+        // Navigation
+        navigate,
+        reloadPage,
+    };
+}
+
+export type ChatTools = ReturnType<typeof buildChatTools>;

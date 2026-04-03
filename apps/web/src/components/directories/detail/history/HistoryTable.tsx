@@ -237,6 +237,20 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                                             {entry.changelog.summary}
                                                         </p>
                                                     ) : null}
+                                                    {entry.errorMessage &&
+                                                        statusKey === 'error' && (
+                                                            <p className="max-w-sm text-xs text-red-600 dark:text-red-400">
+                                                                {entry.errorMessage}
+                                                            </p>
+                                                        )}
+                                                    {entry.triggeredBy &&
+                                                        entry.triggeredBy !== 'user' && (
+                                                            <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-text-secondary dark:bg-gray-800 dark:text-text-secondary-dark">
+                                                                {entry.triggeredBy === 'schedule'
+                                                                    ? t('trigger.schedule')
+                                                                    : t('trigger.api')}
+                                                            </span>
+                                                        )}
                                                     {entry.triggerRunId && (
                                                         <a
                                                             href={`https://cloud.trigger.dev/runs/${entry.triggerRunId}`}

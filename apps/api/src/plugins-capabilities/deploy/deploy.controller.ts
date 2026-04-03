@@ -15,6 +15,8 @@ import { DeployFacadeService } from '@ever-works/agent/facades';
 import { DirectoryOwnershipService } from '@ever-works/agent/services';
 import { DeployService } from './deploy.service';
 import { DeploymentVerifierService } from './tasks/deployment-verifier.service';
+import { ActivityLogService } from '@ever-works/agent/activity-log';
+import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 import { DeployDirectoryDto } from './dto/deploy.dto';
 import { BatchDeployDto, BatchDeployResponseDto } from './dto/batch-deploy.dto';
 import { AddDomainDto } from './dto/domain.dto';
@@ -29,6 +31,7 @@ export class DeployController {
         private readonly deployFacade: DeployFacadeService,
         private readonly ownershipService: DirectoryOwnershipService,
         private readonly deploymentVerifier: DeploymentVerifierService,
+        private readonly activityLogService: ActivityLogService,
     ) {}
 
     private getProviderName(deployProvider: string | undefined): string {
@@ -163,6 +166,17 @@ export class DeployController {
                 deployDto.teamScope,
             );
         }
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.DEPLOYMENT,
+                action: 'directory.deployed',
+                status: ActivityStatus.COMPLETED,
+                summary: `Triggered deployment for ${directory.name} via ${providerName}`,
+            })
+            .catch(() => {});
 
         return {
             status: 'pending',
@@ -371,6 +385,19 @@ export class DeployController {
             auth.userId,
             batchDeployDto.teamScope,
         );
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                actionType: ActivityActionType.DEPLOYMENT,
+                action: 'deployment.batch_started',
+                status: ActivityStatus.COMPLETED,
+                summary: `Triggered batch deploy for ${batchDeployDto.directories.length} directories`,
+                details: {
+                    directoryIds: batchDeployDto.directories.map((item) => item.directoryId),
+                },
+            })
+            .catch(() => {});
 
         for (const deployResult of result.results) {
             if (deployResult.status === 'pending' && deployResult.directoryId) {

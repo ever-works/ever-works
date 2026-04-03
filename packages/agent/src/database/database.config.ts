@@ -20,6 +20,7 @@ import {
     AuthSession,
     AuthAccount,
     AuthVerification,
+    ActivityLog,
     Conversation,
     ConversationMessage,
 } from '../entities';
@@ -71,6 +72,7 @@ export const ENTITIES = [
     DirectorySchedule,
     UsageLedgerEntry,
     Notification,
+    ActivityLog,
     Conversation,
     ConversationMessage,
     // Plugin entities

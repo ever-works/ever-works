@@ -7,7 +7,11 @@
         "build": "next build",
         "start": "next start",
         "lint": "eslint .",
-        "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\""
+        "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\"",
+        "test:e2e": "npx playwright test",
+        "test:e2e:ui": "npx playwright test --ui",
+        "test:e2e:headed": "npx playwright test --headed",
+        "test:e2e:debug": "npx playwright test --debug"
     },
     "dependencies": {
         "@ai-sdk/openai-compatible": "^2.0.30",
@@ -43,6 +47,7 @@
     },
     "devDependencies": {
         "@eslint/eslintrc": "^3.3.3",
+        "@playwright/test": "^1.58.2",
         "@tailwindcss/postcss": "^4.2.0",
         "@tailwindcss/typography": "^0.5.19",
         "@types/node": "^20.19.27",

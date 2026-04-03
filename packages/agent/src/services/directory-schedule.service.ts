@@ -31,11 +31,13 @@ import { DataGeneratorService } from '@src/generators/data-generator/data-genera
 import { PluginRegistryService } from '@src/plugins/services/plugin-registry.service';
 import { Directory } from '@src/entities/directory.entity';
 import { NotificationService } from '@src/notifications/notification.service';
+import type { ScheduleRunOutcome } from './types/trigger-context.types';
 
 @Injectable()
 export class DirectoryScheduleService {
     private readonly logger = new Logger(DirectoryScheduleService.name);
     private readonly RETRY_DELAY_MINUTES = 15;
+    private readonly IDEMPOTENT_WINDOW_MINUTES = 5;
 
     constructor(
         private readonly scheduleRepository: DirectoryScheduleRepository,
@@ -251,6 +253,28 @@ export class DirectoryScheduleService {
         return schedule;
     }
 
+    /**
+     * Single entry point for finalizing a schedule run.
+     * Idempotent — safe to call multiple times for the same run.
+     */
+    async finalizeScheduleRun(scheduleId: string, outcome: ScheduleRunOutcome): Promise<void> {
+        switch (outcome.status) {
+            case 'completed':
+                await this.markRunCompleted({
+                    scheduleId,
+                    historyId: outcome.historyId,
+                    status: GenerateStatusType.GENERATED,
+                });
+                break;
+            case 'failed':
+                await this.markRunFailed(scheduleId, outcome.reason);
+                break;
+            case 'skipped':
+                await this.markRunSkipped(scheduleId, outcome.reason);
+                break;
+        }
+    }
+
     async markRunCompleted(options: {
         scheduleId: string;
         historyId?: string;
@@ -261,19 +285,9 @@ export class DirectoryScheduleService {
             return;
         }
 
-        // Fix Drift: Calculate next run based on the intended execution time (nextRunAt),
-        // not the current completion time. Fallback to now() if nextRunAt is missing or too old.
-        let anchorDate =
-            schedule.nextRunAt && schedule.nextRunAt.getTime() > Date.now() - 24 * 60 * 60 * 1000 // Safety: Don't use very old anchors
-                ? schedule.nextRunAt
-                : new Date();
-
-        // Compensate for retry delays to preserve original schedule anchor
-        if (schedule.failureCount && schedule.failureCount > 0) {
-            anchorDate = new Date(
-                anchorDate.getTime() - schedule.failureCount * this.RETRY_DELAY_MINUTES * 60 * 1000,
-            );
-        }
+        // Use the preserved scheduledFor as anchor for drift prevention.
+        // scheduledFor is set by tryMarkDispatched before clearing nextRunAt.
+        const anchorDate = this.resolveAnchorDate(schedule);
 
         const nextRunAt =
             schedule.status === DirectoryScheduleStatus.ACTIVE && schedule.cadence
@@ -285,6 +299,7 @@ export class DirectoryScheduleService {
             lastRunAt: new Date(),
             nextRunAt,
             failureCount: 0,
+            scheduledFor: null,
         });
 
         await this.syncDirectory(schedule.directoryId, {
@@ -309,22 +324,25 @@ export class DirectoryScheduleService {
             return;
         }
 
+        // Idempotent guard: if already marked as ERROR recently, skip the increment.
+        // This prevents double-counting when multiple error handlers fire for the same run.
+        if (this.isAlreadyMarkedFailed(schedule)) {
+            return;
+        }
+
         const failureCount = (schedule.failureCount || 0) + 1;
         const maxFailures =
             schedule.maxFailureBeforePause || config.subscriptions.getMaxFailureBeforePause();
         const reachedLimit = failureCount >= maxFailures;
 
-        // Fix Drift: Even on failure, we want to maintain the cadence anchor if possible.
-        const anchorDate =
-            schedule.nextRunAt && schedule.nextRunAt.getTime() > Date.now() - 24 * 60 * 60 * 1000
-                ? schedule.nextRunAt
-                : new Date();
+        const anchorDate = this.resolveAnchorDate(schedule);
 
         await this.scheduleRepository.updateById(schedule.id, {
             failureCount,
             lastRunStatus: GenerateStatusType.ERROR,
             lastRunAt: new Date(),
             status: reachedLimit ? DirectoryScheduleStatus.PAUSED : schedule.status,
+            scheduledFor: null,
             nextRunAt: reachedLimit
                 ? null
                 : schedule.cadence
@@ -344,7 +362,6 @@ export class DirectoryScheduleService {
                 `Schedule ${schedule.id} paused after ${failureCount} failures${reason ? `: ${reason}` : ''}`,
             );
 
-            // Publish notification for schedule paused due to failures
             const directory = await this.directoryRepository.findById(schedule.directoryId);
             if (directory && this.notificationService) {
                 await this.notificationService.notifySchedulePaused(
@@ -357,10 +374,45 @@ export class DirectoryScheduleService {
         }
     }
 
+    /**
+     * Mark a run as skipped (e.g. directory was already generating).
+     * Does NOT increment failureCount — this isn't a real failure.
+     */
+    private async markRunSkipped(scheduleId: string, reason: string) {
+        const schedule = await this.scheduleRepository.findById(scheduleId);
+        if (!schedule) {
+            return;
+        }
+
+        this.logger.warn(`Schedule ${schedule.id} skipped: ${reason}`);
+
+        // Reschedule using the original cadence — don't penalize the schedule.
+        // If the anchor is in the past, use now() to avoid a rapid retry loop.
+        const anchorDate = this.resolveAnchorDate(schedule);
+        const baseDate = anchorDate.getTime() > Date.now() ? anchorDate : new Date();
+        const nextRunAt =
+            schedule.status === DirectoryScheduleStatus.ACTIVE && schedule.cadence
+                ? new Date(baseDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000)
+                : null;
+
+        await this.scheduleRepository.updateById(schedule.id, {
+            lastRunStatus: null,
+            lastRunAt: new Date(),
+            nextRunAt,
+            scheduledFor: null,
+        });
+
+        await this.syncDirectory(schedule.directoryId, {
+            ...schedule,
+            nextRunAt,
+            lastRunStatus: null,
+        });
+    }
+
     async recoverStuckSchedules() {
-        // Consider "stuck" if generating for more than 1 hour
-        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-        const stuckSchedules = await this.scheduleRepository.findStuckGenerating(oneHourAgo);
+        const timeoutMinutes = config.subscriptions.getScheduleStuckTimeoutMinutes();
+        const threshold = new Date(Date.now() - timeoutMinutes * 60 * 1000);
+        const stuckSchedules = await this.scheduleRepository.findStuckGenerating(threshold);
 
         if (stuckSchedules.length === 0) {
             return 0;
@@ -369,10 +421,44 @@ export class DirectoryScheduleService {
         this.logger.warn(`Found ${stuckSchedules.length} stuck schedules. Recovering...`);
 
         for (const schedule of stuckSchedules) {
-            await this.markRunFailed(schedule.id, 'Stuck in GENERATING state for > 1 hour');
+            await this.markRunFailed(
+                schedule.id,
+                `Stuck in GENERATING state for > ${timeoutMinutes} minutes`,
+            );
         }
 
         return stuckSchedules.length;
+    }
+
+    /**
+     * Resolve the anchor date for next-run calculation.
+     * Uses scheduledFor (the original intended execution time) to prevent drift.
+     */
+    private resolveAnchorDate(schedule: DirectorySchedule): Date {
+        const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+
+        // Prefer scheduledFor — the original nextRunAt preserved at dispatch time
+        if (schedule.scheduledFor && schedule.scheduledFor.getTime() > oneDayAgo) {
+            return schedule.scheduledFor;
+        }
+
+        // Fallback to nextRunAt (for non-dispatched paths like manual pause/resume)
+        if (schedule.nextRunAt && schedule.nextRunAt.getTime() > oneDayAgo) {
+            return schedule.nextRunAt;
+        }
+
+        return new Date();
+    }
+
+    private isAlreadyMarkedFailed(schedule: DirectorySchedule): boolean {
+        if (schedule.lastRunStatus !== GenerateStatusType.ERROR) {
+            return false;
+        }
+        if (!schedule.lastRunAt) {
+            return false;
+        }
+        const windowMs = this.IDEMPOTENT_WINDOW_MINUTES * 60 * 1000;
+        return schedule.lastRunAt.getTime() > Date.now() - windowMs;
     }
 
     async validateRunEntitlement(schedule: DirectorySchedule, user: User): Promise<boolean> {
