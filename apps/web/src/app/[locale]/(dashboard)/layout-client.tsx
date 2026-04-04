@@ -12,12 +12,14 @@ import { HelpDrawer } from '@/components/dashboard/HelpDrawer';
 import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ChatPanel } from '@/components/ai/ChatPanel';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
+import { ConnectGithubModal } from '@/components/auth/connect-github-modal';
 
 interface DashboardLayoutClientProps {
     user: AuthUser;
     children: React.ReactNode;
     initialChatOpen?: boolean;
     initialSidebarCollapsed?: boolean;
+    hasGithubConnected?: boolean;
 }
 
 const COOKIE_OPTS = `path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
@@ -27,6 +29,7 @@ export function DashboardLayoutClient({
     children,
     initialChatOpen = false,
     initialSidebarCollapsed = false,
+    hasGithubConnected = false,
 }: DashboardLayoutClientProps) {
     const DEFAULT_CHAT_WIDTH = 380;
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -221,6 +224,7 @@ export function DashboardLayoutClient({
             <Suspense fallback={null}>
                 <DashboardToasts />
             </Suspense>
+            <ConnectGithubModal userId={user.id} hasGithubConnected={hasGithubConnected} />
 
             <div className="flex h-screen bg-surface dark:bg-surface-dark overflow-hidden">
                 {/* Mobile overlay */}

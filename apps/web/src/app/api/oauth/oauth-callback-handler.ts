@@ -6,6 +6,11 @@ import { getRedirectUrl } from '@/lib/auth/redirect';
 import { ROUTES } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
+import {
+    addConnectGithubParam,
+    isDashboardHref,
+    shouldPromptGithubConnect,
+} from '@/lib/auth/github-connect';
 
 export async function handleOAuthCallback(request: NextRequest, providerId: string) {
     const queryParams = request.nextUrl.searchParams;
@@ -61,6 +66,15 @@ async function loginOauth(
     }
 
     href = await getRedirectUrl(authResponse, href);
+
+    if (
+        authResponse &&
+        provider !== OAuthProvider.GITHUB &&
+        isDashboardHref(href) &&
+        (await shouldPromptGithubConnect(authResponse.access_token))
+    ) {
+        href = addConnectGithubParam(href);
+    }
 
     return redirect({ locale, href });
 }

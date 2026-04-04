@@ -11,6 +11,7 @@ import { isValidRedirectUrl } from '@/lib/utils';
 import { getRedirectUrl } from '@/lib/auth/redirect';
 import { generateHexToken } from '@/lib/utils/random';
 import { OAuthProvider } from '@/lib/api/enums';
+import { addConnectGithubParam, isDashboardHref, shouldPromptGithubConnect } from '@/lib/auth/github-connect';
 
 export async function login(identifier: string, password: string, redirectUrl: string | null) {
     const t = await getTranslations('validation.auth');
@@ -61,6 +62,10 @@ export async function login(identifier: string, password: string, redirectUrl: s
         href = await getRedirectUrl(authResponse, href);
     }
 
+    if (authResponse && isDashboardHref(href) && (await shouldPromptGithubConnect(authResponse.access_token))) {
+        href = addConnectGithubParam(href);
+    }
+
     redirect({ locale: await getLocale(), href });
 
     return {
@@ -96,15 +101,17 @@ export async function register(username: string, email: string, password: string
         };
     }
 
+    let authResponse: AuthResponse | null = null;
+
     try {
-        const response = await authAPI.register({
+        authResponse = await authAPI.register({
             username: validation.data.username,
             email: validation.data.email,
             password: validation.data.password,
             emailVerificationCallbackUrl: withAppUrl(ROUTES.API_AUTH_VERIFY_EMAIL),
         });
 
-        await setAuthCookies(response.access_token);
+        await setAuthCookies(authResponse.access_token);
     } catch (error) {
         console.error(error);
 
@@ -125,9 +132,14 @@ export async function register(username: string, email: string, password: string
         };
     }
 
+    let href = ROUTES.DASHBOARD + '?newUser=true';
+    if (authResponse && (await shouldPromptGithubConnect(authResponse.access_token))) {
+        href = addConnectGithubParam(href);
+    }
+
     redirect({
         locale: await getLocale(),
-        href: ROUTES.DASHBOARD + '?newUser=true',
+        href,
     });
 
     return {

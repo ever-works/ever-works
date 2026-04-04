@@ -57,6 +57,10 @@ export interface UserProfile {
     emailVerified?: boolean;
     committerName?: string | null;
     committerEmail?: string | null;
+    oauthTokens?: Array<{
+        provider: string;
+        createdAt?: string;
+    }>;
 }
 
 export interface OAuthUrlResponse {

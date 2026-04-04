@@ -97,7 +97,7 @@ export function LoginClient({ availableSocialProviders }: LoginClientProps) {
     return (
         <AuthLayout title={t('title')} subtitle={t('subtitle')}>
             <ThemeToggle variant="fixed" />
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form method="post" onSubmit={handleSubmit} className="space-y-4">
                 {showResetSuccess && <PasswordResetSuccessMessage />}
 
                 {error && (
