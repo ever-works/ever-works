@@ -167,7 +167,7 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
             document.body.appendChild(link);
             link.click();
             link.remove();
-            URL.revokeObjectURL(url);
+            setTimeout(() => URL.revokeObjectURL(url), 1000); // Let the browser start the download before revoking the blob URL.
         } catch {
             toast.error(t('exportFailed'));
         }

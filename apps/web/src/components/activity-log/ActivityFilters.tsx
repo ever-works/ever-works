@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { Search, X } from 'lucide-react';
+import { Select } from '../ui/select';
 
 const ACTION_TYPES = [
     { value: '', label: 'allTypes' },
@@ -52,12 +53,11 @@ export function ActivityFilters({
 }: ActivityFiltersProps) {
     const t = useTranslations('dashboard.activity');
 
-    const selectClass =
-        'px-3 py-2 text-sm rounded-lg border border-border dark:border-border-dark bg-card dark:bg-surface-dark text-text dark:text-text-dark focus:outline-none focus:ring-2 focus:ring-primary/20';
+    const selectClass = 'min-w-[220px]';
 
     return (
         <div className="flex flex-wrap gap-3 items-center">
-            <div className="relative flex-1 min-w-[200px]">
+            <div className="relative flex-1 min-w-[450px] w-3/4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted dark:text-text-muted-dark" />
                 <input
                     type="text"
@@ -69,7 +69,7 @@ export function ActivityFilters({
                 />
             </div>
 
-            <select
+            <Select
                 value={actionType}
                 onChange={(e) => onActionTypeChange(e.target.value)}
                 aria-label={t('columns.type')}
@@ -80,9 +80,9 @@ export function ActivityFilters({
                         {t(`filters.types.${type.label}` as any)}
                     </option>
                 ))}
-            </select>
+            </Select>
 
-            <select
+            <Select
                 value={status}
                 onChange={(e) => onStatusChange(e.target.value)}
                 aria-label={t('columns.status')}
@@ -93,7 +93,7 @@ export function ActivityFilters({
                         {t(`filters.statuses.${opt.label}` as any)}
                     </option>
                 ))}
-            </select>
+            </Select>
 
             {hasActiveFilters && (
                 <button
