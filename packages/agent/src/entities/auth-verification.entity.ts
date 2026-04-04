@@ -14,8 +14,8 @@ export class AuthVerification {
     @Column({ type: 'text' })
     value: string;
 
-	@TimestampColumn()
-	expiresAt: Date;
+    @TimestampColumn()
+    expiresAt: Date;
 
     @CreateDateColumn()
     createdAt: Date;

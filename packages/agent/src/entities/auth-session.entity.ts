@@ -14,8 +14,8 @@ export class AuthSession {
     @Column({ type: 'text' })
     token: string;
 
-	@TimestampColumn()
-	expiresAt: Date;
+    @TimestampColumn()
+    expiresAt: Date;
 
     @Column({ type: 'varchar', nullable: true })
     ipAddress?: string | null;
