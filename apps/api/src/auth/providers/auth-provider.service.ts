@@ -6,6 +6,7 @@ import { AuthProvider } from './auth-provider.abstract';
 import { createAuthRuntimeInstance } from './auth-runtime.instance';
 import type { AuthRuntimeContext, AuthRuntimeUser } from './auth-provider.types';
 import { AuthSyncService } from './auth-sync.service';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthProviderService extends AuthProvider {
@@ -19,6 +20,22 @@ export class AuthProviderService extends AuthProvider {
     }
 
     async authenticate(headers: Headers): Promise<AuthenticatedUser | null> {
+        const bearerToken = this.getBearerToken(headers);
+        if (bearerToken) {
+            const context = await this.getContext();
+            const session = await context.internalAdapter.findSession(bearerToken);
+            if (!session) {
+                return null;
+            }
+
+            if ((session.user as AuthRuntimeUser).isActive === false) {
+                await this.signOutAll(session.user.id);
+                throw new UnauthorizedException('User account is suspended');
+            }
+
+            return this.mapAuthenticatedUser(session.user as AuthRuntimeUser);
+        }
+
         const session = await this.auth.api.getSession({ headers });
         if (!session) {
             return null;
@@ -115,26 +132,18 @@ export class AuthProviderService extends AuthProvider {
         newPassword: string,
         headers: Headers,
     ): Promise<void> {
-        const session = await this.auth.api.getSession({ headers });
-        await this.auth.api.changePassword({
-            headers,
-            body: {
-                currentPassword,
-                newPassword,
-                revokeOtherSessions: true,
-            },
-        });
-
-        if (session?.user?.id) {
-            const passwordHash = await this.authSyncService.getCredentialPasswordHash(
-                session.user.id,
-            );
-            if (passwordHash) {
-                await this.userRepository.update(session.user.id, {
-                    password: passwordHash,
-                });
-            }
+        const session = await this.requireSession(headers);
+        const passwordHash = await this.authSyncService.getCredentialPasswordHash(session.user.id);
+        if (!passwordHash) {
+            throw new UnauthorizedException('Password login is not configured for this account');
         }
+
+        const isMatch = await bcrypt.compare(currentPassword, passwordHash);
+        if (!isMatch) {
+            throw new UnauthorizedException('Current password is incorrect');
+        }
+
+        await this.setPassword(session.user.id, newPassword);
     }
 
     async setPassword(userId: string, newPassword: string): Promise<void> {
@@ -167,6 +176,13 @@ export class AuthProviderService extends AuthProvider {
     }
 
     async signOut(headers: Headers): Promise<void> {
+        const bearerToken = this.getBearerToken(headers);
+        if (bearerToken) {
+            const context = await this.getContext();
+            await context.internalAdapter.deleteSession(bearerToken);
+            return;
+        }
+
         await this.auth.api.signOut({ headers });
     }
 
@@ -177,6 +193,21 @@ export class AuthProviderService extends AuthProvider {
 
     private async getContext(): Promise<AuthRuntimeContext> {
         return (await this.auth.$context) as AuthRuntimeContext;
+    }
+
+    private async requireSession(headers: Headers) {
+        const bearerToken = this.getBearerToken(headers);
+        if (!bearerToken) {
+            throw new UnauthorizedException('Missing session token');
+        }
+
+        const context = await this.getContext();
+        const session = await context.internalAdapter.findSession(bearerToken);
+        if (!session) {
+            throw new UnauthorizedException('Invalid session');
+        }
+
+        return session;
     }
 
     private async assertActiveUser(userId: string) {
@@ -191,6 +222,20 @@ export class AuthProviderService extends AuthProvider {
         }
 
         return user;
+    }
+
+    private getBearerToken(headers: Headers): string | null {
+        const authorization = headers.get('authorization');
+        if (!authorization) {
+            return null;
+        }
+
+        const [scheme, token] = authorization.split(' ');
+        if (scheme?.toLowerCase() !== 'bearer' || !token) {
+            return null;
+        }
+
+        return token.trim();
     }
 
     private toTokenResponse(token: string, user: AuthRuntimeUser): TokenResponse {

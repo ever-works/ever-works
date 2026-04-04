@@ -157,18 +157,11 @@ export function createAuthRuntimeInstance() {
                 },
             },
         },
-        session: {
-            modelName: 'auth_sessions',
-        },
         account: {
-            modelName: 'auth_accounts',
             accountLinking: {
                 enabled: true,
                 trustedProviders: ['google', 'github', 'facebook', 'linkedin'],
             },
-        },
-        verification: {
-            modelName: 'auth_verifications',
         },
         emailAndPassword: {
             enabled: true,

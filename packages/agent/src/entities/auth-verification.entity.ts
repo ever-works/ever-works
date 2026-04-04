@@ -1,7 +1,7 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 import { TimestampColumn } from './_types';
 
-@Entity({ name: 'auth_verifications' })
+@Entity({ name: 'verifications' })
 @Index(['identifier'])
 @Index(['value'], { unique: true })
 export class AuthVerification {

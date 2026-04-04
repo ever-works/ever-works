@@ -14,6 +14,11 @@ export interface AuthRuntimeContext {
             userId: string,
             disableRememberMe?: boolean,
         ): Promise<{ token: string } | null>;
+        findSession(token: string): Promise<{
+            session: { token: string; userId: string; expiresAt: Date };
+            user: AuthRuntimeUser;
+        } | null>;
+        deleteSession(token: string): Promise<void>;
         deleteSessions(userId: string): Promise<void>;
         findAccounts(
             userId: string,
