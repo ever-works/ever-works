@@ -22,6 +22,7 @@ import { UserCreatedEvent, UserConfirmedEvent, UserForgotPasswordEvent } from '.
 import { ForgotPasswordDto } from '../dto/email-verification.dto';
 import { GITHUB_SCOPES } from '../config/github-scopes.config';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
+import type { SocialAuthUser } from '../types/social-auth.types';
 
 @Injectable()
 export class AuthService {
@@ -62,6 +63,13 @@ export class AuthService {
         }
 
         return null;
+    }
+
+    async assertCanRegister(email: string) {
+        const existingUser = await this.userRepository.findByEmail(email);
+        if (existingUser) {
+            throw new ConflictException('User with this email already exists');
+        }
     }
 
     async register(registerDto: RegisterDto) {
@@ -152,6 +160,68 @@ export class AuthService {
         await this.userRepository.update(userId, { password: hashedPassword });
 
         return { message: 'Password updated successfully' };
+    }
+
+    async validateSocialUser(socialUser: SocialAuthUser) {
+        const isTrustedEmail = socialUser.emailVerified !== false;
+        let user = await this.userRepository.findByEmail(socialUser.email);
+        const displayName = socialUser.displayName || socialUser.email.split('@')[0];
+
+        if (!user) {
+            const hashedPassword = await this.randomHashedPassword();
+
+            user = await this.userRepository.create({
+                username: socialUser.username || displayName,
+                email: socialUser.email,
+                password: hashedPassword,
+                registrationProvider: socialUser.provider,
+                avatar: socialUser.avatar || undefined,
+                emailVerified: isTrustedEmail,
+                isActive: true,
+                lastLoginAt: new Date(),
+            });
+
+            if (isTrustedEmail) {
+                this.eventEmitter.emit(
+                    UserConfirmedEvent.EVENT_NAME,
+                    new UserConfirmedEvent(user, `${this.webAppUrl}/directories/new`),
+                );
+            }
+        } else {
+            this.ensureUserIsActive(user);
+
+            const existingProviderLink = await this.oauthTokenRepository.findByUserAndProvider(
+                user.id,
+                socialUser.provider,
+            );
+            if (!isTrustedEmail && !existingProviderLink) {
+                throw new UnauthorizedException(
+                    'Unable to link this social account because the provider email is not verified',
+                );
+            }
+
+            user = await this.userRepository.update(user.id, {
+                username: socialUser.username || user.username || displayName,
+                avatar: socialUser.avatar || user.avatar,
+                registrationProvider: socialUser.provider,
+                emailVerified: user.emailVerified || isTrustedEmail,
+                lastLoginAt: new Date(),
+            });
+        }
+
+        await this.oauthTokenRepository.upsert({
+            userId: user.id,
+            username: socialUser.username || undefined,
+            provider: socialUser.provider,
+            accessToken: socialUser.accessToken,
+            refreshToken: socialUser.refreshToken || null,
+            tokenType: socialUser.tokenType || 'Bearer',
+            expiresAt: socialUser.expiresAt || null,
+            scope: socialUser.scope || null,
+            metadata: socialUser.metadata || {},
+        });
+
+        return user;
     }
 
     async validateGithubUser(accessToken: string, refreshToken: string, profile: any) {
@@ -360,10 +430,7 @@ export class AuthService {
             new UserConfirmedEvent(updatedUser, `${this.webAppUrl}/directories/new`),
         );
 
-        const { password, ...userWithoutPassword } = updatedUser;
-
-        // Generate new tokens with emailVerified: true in JWT payload
-        return this.generateTokens(userWithoutPassword);
+        return updatedUser;
     }
 
     async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
@@ -429,6 +496,27 @@ export class AuthService {
         await this.refreshTokenRepository.revokeAllUserTokens(user.id, 'Password reset');
 
         return { message: 'Password reset successfully' };
+    }
+
+    async consumePasswordResetToken(token: string) {
+        const user = await this.userRepository.findOne({
+            where: { passwordResetToken: token },
+        });
+
+        if (!user) {
+            throw new BadRequestException('Invalid reset token');
+        }
+
+        if (user.passwordResetExpires && new Date() > user.passwordResetExpires) {
+            throw new BadRequestException('Reset token expired');
+        }
+
+        await this.userRepository.update(user.id, {
+            passwordResetToken: null,
+            passwordResetExpires: null,
+        });
+
+        return user;
     }
 
     async getUser(userId: string): Promise<User | null> {

@@ -14,10 +14,24 @@ export async function getAuthFromCookie() {
             return null;
         }
         const freshAuth = await getAuthFromRequest();
-        return freshAuth.user || null;
+        if (!freshAuth.isAuthenticated) {
+            return null;
+        }
+
+        if (freshAuth.user) {
+            return freshAuth.user;
+        }
     }
 
-    return auth.user || null;
+    if (auth.user) {
+        return auth.user;
+    }
+
+    try {
+        return await authAPI.getProfile();
+    } catch (error) {
+        return null;
+    }
 }
 
 export async function getAuthFromAPI() {

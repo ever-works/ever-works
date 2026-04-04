@@ -6,6 +6,10 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { ApiKeyService } from '../services/api-key.service';
 import { UserRepository } from '@ever-works/agent/database';
 import type { AuthenticatedUser } from '../types/jwt.types';
+import { AUTH_PROVIDER } from '../providers/auth-provider.constants';
+import { AuthProvider } from '../providers/auth-provider.abstract';
+import { toHeaders } from '../providers/request-headers';
+import { Inject } from '@nestjs/common';
 
 const API_KEY_PREFIX = 'ew_live_';
 
@@ -17,6 +21,8 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     constructor(
         private reflector: Reflector,
         private moduleRef: ModuleRef,
+        @Inject(AUTH_PROVIDER)
+        private readonly authProvider: AuthProvider,
     ) {
         super();
     }
@@ -70,7 +76,14 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
             return true;
         }
 
-        // Fall through to Passport JWT
+        // Try provider-backed session/bearer auth next
+        const providerUser = await this.authProvider.authenticate(toHeaders(request.headers || {}));
+        if (providerUser) {
+            request.user = providerUser;
+            return true;
+        }
+
+        // Fall through to legacy Passport JWT during migration
         const result = super.canActivate(context);
         if (result instanceof Promise) {
             return result as Promise<boolean>;

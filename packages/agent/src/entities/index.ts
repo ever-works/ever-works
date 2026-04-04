@@ -17,4 +17,7 @@ export * from './activity-log.entity';
 export * from './activity-log.types';
 export * from './conversation.entity';
 export * from './conversation-message.entity';
+export * from './auth-account.entity';
+export * from './auth-session.entity';
+export * from './auth-verification.entity';
 export * from './types';

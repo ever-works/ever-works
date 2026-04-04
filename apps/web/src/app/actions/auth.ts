@@ -173,30 +173,11 @@ export async function connectProvider(providerId: OAuthProvider) {
         await setOAuthStateCookie(state);
 
         const callbackUrl = routeWithParams(ROUTES.API_OAUTH_CALLBACK, { providerId });
-
-        switch (providerId) {
-            case OAuthProvider.GITHUB: {
-                const { url } = await authAPI.getGitHubAuthUrl(withAppUrl(callbackUrl), state);
-                return {
-                    success: true,
-                    url,
-                };
-            }
-            case OAuthProvider.GOOGLE: {
-                const { url } = await authAPI.getGoogleAuthUrl(withAppUrl(callbackUrl), state);
-                return {
-                    success: true,
-                    url,
-                };
-            }
-            default: {
-                const t = await getTranslations('api.errors');
-                return {
-                    success: false,
-                    error: t('unsupportedProvider'),
-                };
-            }
-        }
+        const { url } = await authAPI.getOAuthAuthUrl(providerId, withAppUrl(callbackUrl), state);
+        return {
+            success: true,
+            url,
+        };
     } catch (error) {
         console.error(error);
         const t = await getTranslations('api.errors');

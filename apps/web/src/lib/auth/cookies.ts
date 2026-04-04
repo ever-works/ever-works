@@ -71,8 +71,16 @@ export async function removeRefreshCookie() {
 // All cookies
 // =================
 
-export async function setAuthCookies(access_token: string, refresh_token: string) {
-    return Promise.all([setAuthAccessCookie(access_token), setRefreshCookie(refresh_token)]);
+export async function setAuthCookies(access_token: string, refresh_token?: string) {
+    const tasks: Promise<unknown>[] = [setAuthAccessCookie(access_token)];
+
+    if (refresh_token) {
+        tasks.push(setRefreshCookie(refresh_token));
+    } else {
+        tasks.push(removeRefreshCookie());
+    }
+
+    return Promise.all(tasks);
 }
 
 export async function removeAuthAccessCookies() {

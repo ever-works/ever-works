@@ -19,17 +19,31 @@ export type JwtPayload = AuthUser & {
     exp: number;
 };
 
+function isLikelyJwt(token: string) {
+    return token.split('.').length === 3;
+}
+
 export async function getAuthFromRequest(): Promise<{
     isAuthenticated: boolean;
     user?: JwtPayload;
     isExpired: boolean;
     token?: string;
+    isOpaqueToken: boolean;
 }> {
     try {
         const token = await getAuthAccessCookie();
 
         if (!token) {
-            return { isAuthenticated: false, isExpired: false };
+            return { isAuthenticated: false, isExpired: false, isOpaqueToken: false };
+        }
+
+        if (!isLikelyJwt(token)) {
+            return {
+                isAuthenticated: true,
+                isExpired: false,
+                token,
+                isOpaqueToken: true,
+            };
         }
 
         const decoded = jwtDecode<JwtPayload>(token);
@@ -40,8 +54,9 @@ export async function getAuthFromRequest(): Promise<{
             user: decoded,
             isExpired: decoded.exp < now,
             token,
+            isOpaqueToken: false,
         };
     } catch (error) {
-        return { isAuthenticated: false, isExpired: false };
+        return { isAuthenticated: false, isExpired: false, isOpaqueToken: false };
     }
 }

@@ -3,13 +3,13 @@ import { authAPI, AuthResponse } from '@/lib/api';
 import { OAuthProvider } from '@/lib/api/enums';
 import { getOAuthStateCookie, setAuthCookies } from '@/lib/auth';
 import { getRedirectUrl } from '@/lib/auth/redirect';
-import { ROUTES } from '@/lib/constants';
+import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
 
 /**
  * OAuth callback route for user authentication (login/register).
- * This route handles GitHub and Google login only.
+ * This route handles all supported social login providers.
  */
 export async function GET(
     request: NextRequest,
@@ -39,33 +39,26 @@ export async function GET(
     }
 
     // Handle authentication OAuth (login/register)
-    await loginOauth(providerId as OAuthProvider, code, state || '', locale);
+    await loginOauth(providerId as OAuthProvider, code, locale);
     return;
 }
 
 /**
  * Handle OAuth login for authentication.
- * Only supports GitHub and Google for user authentication.
+ * Supports all configured social login providers.
  */
-async function loginOauth(provider: OAuthProvider, code: string, state: string, locale: string) {
+async function loginOauth(provider: OAuthProvider, code: string, locale: string) {
     let href: string = ROUTES.DASHBOARD;
     let authResponse: AuthResponse | null = null;
 
     try {
-        switch (provider) {
-            case OAuthProvider.GITHUB: {
-                const response = await authAPI.connectGitHubCallback(code, state || undefined);
-                authResponse = response;
-                break;
-            }
-            case OAuthProvider.GOOGLE: {
-                const response = await authAPI.connectGoogleCallback(code, state || undefined);
-                authResponse = response;
-                break;
-            }
-            default:
-                href = ROUTES.AUTH_ERROR + '?error=oauth_unsupported_provider';
-                break;
+        if (!Object.values(OAuthProvider).includes(provider)) {
+            href = ROUTES.AUTH_ERROR + '?error=oauth_unsupported_provider';
+        } else {
+            const callbackUrl = withAppUrl(
+                routeWithParams(ROUTES.API_OAUTH_CALLBACK, { providerId: provider }),
+            );
+            authResponse = await authAPI.connectOAuthCallback(provider, code, callbackUrl);
         }
 
         if (authResponse) {

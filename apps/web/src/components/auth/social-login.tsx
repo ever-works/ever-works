@@ -66,6 +66,32 @@ export function SocialLoginButtons() {
 
                 {t('socialLogin.github')}
             </Button>
+
+            <Button
+                type="button"
+                onClick={() => handleConnectProvider(OAuthProvider.FACEBOOK)}
+                disabled={isPending}
+                variant="secondary"
+                className="text-sm"
+            >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 12.073C24 5.404 18.627 0 12 0S0 5.404 0 12.073C0 18.099 4.388 23.094 10.125 24v-8.438H7.078v-3.489h3.047V9.414c0-3.022 1.792-4.693 4.533-4.693 1.313 0 2.686.235 2.686.235v2.969H15.83c-1.491 0-1.956.931-1.956 1.887v2.261h3.328l-.532 3.489h-2.796V24C19.612 23.094 24 18.099 24 12.073z" />
+                </svg>
+                Facebook
+            </Button>
+
+            <Button
+                type="button"
+                onClick={() => handleConnectProvider(OAuthProvider.LINKEDIN)}
+                disabled={isPending}
+                variant="secondary"
+                className="text-sm"
+            >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.026-3.037-1.852-3.037-1.854 0-2.137 1.445-2.137 2.939v5.667H9.35V9h3.414v1.561h.048c.476-.9 1.637-1.85 3.37-1.85 3.601 0 4.266 2.37 4.266 5.455v6.286zM5.337 7.433a2.062 2.062 0 1 1 0-4.124 2.062 2.062 0 0 1 0 4.124zM7.114 20.452H3.556V9h3.558v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                </svg>
+                LinkedIn
+            </Button>
         </div>
     );
 }
