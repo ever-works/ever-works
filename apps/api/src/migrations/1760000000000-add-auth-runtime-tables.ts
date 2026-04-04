@@ -37,12 +37,12 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
                     },
                     {
                         name: 'accessTokenExpiresAt',
-                        type: 'timestamp',
+                        type: 'bigint',
                         isNullable: true,
                     },
                     {
                         name: 'refreshTokenExpiresAt',
-                        type: 'timestamp',
+                        type: 'bigint',
                         isNullable: true,
                     },
                     {
@@ -126,7 +126,7 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
                     },
                     {
                         name: 'expiresAt',
-                        type: 'timestamp',
+                        type: 'bigint',
                     },
                     {
                         name: 'ipAddress',
@@ -203,7 +203,7 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
                     },
                     {
                         name: 'expiresAt',
-                        type: 'timestamp',
+                        type: 'bigint',
                     },
                     {
                         name: 'createdAt',

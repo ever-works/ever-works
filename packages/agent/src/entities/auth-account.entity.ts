@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { TimestampColumn } from './_types';
 
 @Entity({ name: 'auth_accounts' })
 @Index(['providerId', 'accountId'], { unique: true })
@@ -22,11 +23,11 @@ export class AuthAccount {
     @Column({ type: 'text', nullable: true })
     refreshToken?: string | null;
 
-    @Column({ type: 'timestamp', nullable: true })
-    accessTokenExpiresAt?: Date | null;
+	@TimestampColumn({ nullable: true })
+	accessTokenExpiresAt?: Date | null;
 
-    @Column({ type: 'timestamp', nullable: true })
-    refreshTokenExpiresAt?: Date | null;
+	@TimestampColumn({ nullable: true })
+	refreshTokenExpiresAt?: Date | null;
 
     @Column({ type: 'text', nullable: true })
     scope?: string | null;

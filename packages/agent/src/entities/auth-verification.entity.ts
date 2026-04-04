@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { TimestampColumn } from './_types';
 
 @Entity({ name: 'auth_verifications' })
 @Index(['identifier'])
@@ -13,8 +14,8 @@ export class AuthVerification {
     @Column({ type: 'text' })
     value: string;
 
-    @Column({ type: 'timestamp' })
-    expiresAt: Date;
+	@TimestampColumn()
+	expiresAt: Date;
 
     @CreateDateColumn()
     createdAt: Date;
