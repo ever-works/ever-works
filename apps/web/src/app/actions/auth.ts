@@ -3,7 +3,6 @@
 import { z } from 'zod';
 import {
     removeAuthAccessCookies,
-    getRefreshCookie,
     setOAuthStateCookie,
     setAuthCookies,
 } from '@/lib/auth';
@@ -142,10 +141,7 @@ export async function register(username: string, email: string, password: string
 
 export async function logout() {
     try {
-        const refresh_token = await getRefreshCookie();
-        if (refresh_token) {
-            await authAPI.logout({ refreshToken: refresh_token });
-        }
+        await authAPI.logout();
     } catch (error) {
         console.error(error);
     }
