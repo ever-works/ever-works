@@ -19,7 +19,7 @@ import {
     ApiQuery,
 } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
-import { RegisterDto, LoginDto, RefreshTokenDto, UpdatePasswordDto } from '../dto/auth.dto';
+import { RegisterDto, LoginDto, UpdatePasswordDto } from '../dto/auth.dto';
 import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/email-verification.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
@@ -100,33 +100,14 @@ export class AuthController {
         return result;
     }
 
-    @Public()
-    @Post('refresh')
-    @HttpCode(HttpStatus.OK)
-    @ApiOperation({
-        summary: 'Refresh access token',
-        description: 'Get a new access token using a refresh token',
-    })
-    @ApiResponse({ status: 200, description: 'New access token generated' })
-    @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
-    async refresh(@Request() req, @Body() refreshTokenDto: RefreshTokenDto) {
-        const userAgent = req.headers['user-agent'];
-        const ipAddress = req.ip || req.headers['x-forwarded-for'];
-        return this.authService.refreshToken(refreshTokenDto.refreshToken, userAgent, ipAddress);
-    }
-
     @UseGuards(JwtAuthGuard)
     @Post('logout')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: 'Logout', description: 'Invalidate the current authenticated session' })
     @ApiResponse({ status: 200, description: 'Successfully logged out' })
-    async logout(@Request() req, @Body() refreshTokenDto?: RefreshTokenDto) {
+    async logout(@Request() req) {
         await this.authProvider.signOut(toHeaders(req.headers || {}));
-
-        if (refreshTokenDto?.refreshToken) {
-            await this.authService.logout(refreshTokenDto.refreshToken);
-        }
 
         return { message: 'Logged out successfully' };
     }
@@ -141,10 +122,7 @@ export class AuthController {
     })
     @ApiResponse({ status: 200, description: 'Successfully logged out from all devices' })
     async logoutAll(@Request() req) {
-        await Promise.all([
-            this.authProvider.signOutAll(req.user.userId),
-            this.authService.logoutAllDevices(req.user.userId),
-        ]);
+        await this.authProvider.signOutAll(req.user.userId);
         return { message: 'Logged out from all devices successfully' };
     }
 
@@ -251,7 +229,6 @@ export class AuthController {
         const user = await this.authService.consumePasswordResetToken(resetPasswordDto.token);
         await this.authProvider.setPassword(user.id, resetPasswordDto.newPassword);
         await this.authProvider.signOutAll(user.id);
-        await this.authService.logoutAllDevices(user.id);
         return { message: 'Password reset successfully' };
     }
 

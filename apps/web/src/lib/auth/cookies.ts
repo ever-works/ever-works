@@ -5,8 +5,6 @@ import { encrypt, decrypt } from './crypto';
 
 export const AUTH_COOKIE_NAME = 'everworks_auth_token';
 
-export const REFRESH_COOKIE_NAME = 'everworks_refresh_token';
-
 const cookieOptions: Partial<ResponseCookie> = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -40,51 +38,15 @@ export async function removeAuthAccessCookie() {
 }
 
 // =================
-// Refresh Token
-// =================
-
-export async function setRefreshCookie(token: string) {
-    const cookieStore = await cookies();
-    const encryptedToken = await encrypt(token);
-    cookieStore.set(REFRESH_COOKIE_NAME, encryptedToken, cookieOptions);
-}
-
-export async function getRefreshCookie() {
-    const cookieStore = await cookies();
-    const encryptedValue = cookieStore.get(REFRESH_COOKIE_NAME)?.value;
-    if (!encryptedValue) return undefined;
-
-    try {
-        return await decrypt(encryptedValue);
-    } catch (error) {
-        console.error('Failed to decrypt refresh cookie:', error);
-        return undefined;
-    }
-}
-
-export async function removeRefreshCookie() {
-    const cookieStore = await cookies();
-    cookieStore.delete(REFRESH_COOKIE_NAME);
-}
-
-// =================
 // All cookies
 // =================
 
-export async function setAuthCookies(access_token: string, refresh_token?: string) {
-    const tasks: Promise<unknown>[] = [setAuthAccessCookie(access_token)];
-
-    if (refresh_token) {
-        tasks.push(setRefreshCookie(refresh_token));
-    } else {
-        tasks.push(removeRefreshCookie());
-    }
-
-    return Promise.all(tasks);
+export async function setAuthCookies(access_token: string) {
+    await setAuthAccessCookie(access_token);
 }
 
 export async function removeAuthAccessCookies() {
-    await Promise.all([removeAuthAccessCookie(), removeRefreshCookie()]);
+    await removeAuthAccessCookie();
 }
 
 // =================

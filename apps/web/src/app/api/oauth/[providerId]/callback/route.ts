@@ -62,7 +62,7 @@ async function loginOauth(provider: OAuthProvider, code: string, locale: string)
         }
 
         if (authResponse) {
-            await setAuthCookies(authResponse.access_token, authResponse.refresh_token);
+            await setAuthCookies(authResponse.access_token);
         }
     } catch (error) {
         href = ROUTES.AUTH_ERROR + '?error=oauth_callback';

@@ -2,7 +2,6 @@ import { authAPI } from '../api';
 import type { UserProfile } from '../api/auth';
 import { getAuthFromRequest } from './middleware';
 import type { AuthUser, JwtPayload } from './middleware';
-import { refreshAccessToken } from './refresh';
 
 function normalizeJwtUser(user: JwtPayload): AuthUser {
     return {
@@ -28,23 +27,8 @@ function normalizeProfileUser(user: UserProfile): AuthUser {
 
 export async function getAuthFromCookie(): Promise<AuthUser | null> {
     const auth = await getAuthFromRequest();
-    if (!auth.isAuthenticated) {
+    if (!auth.isAuthenticated || auth.isExpired) {
         return null;
-    }
-
-    if (auth.isExpired) {
-        const refreshed = await refreshAccessToken();
-        if (!refreshed) {
-            return null;
-        }
-        const freshAuth = await getAuthFromRequest();
-        if (!freshAuth.isAuthenticated) {
-            return null;
-        }
-
-        if (freshAuth.user) {
-            return normalizeJwtUser(freshAuth.user);
-        }
     }
 
     if (auth.user) {
@@ -60,20 +44,8 @@ export async function getAuthFromCookie(): Promise<AuthUser | null> {
 
 export async function getAuthFromAPI(): Promise<AuthUser | null> {
     const auth = await getAuthFromRequest();
-    if (!auth.isAuthenticated) {
+    if (!auth.isAuthenticated || auth.isExpired) {
         return null;
-    }
-
-    if (auth.isExpired) {
-        const refreshed = await refreshAccessToken();
-        if (!refreshed) {
-            return null;
-        }
-        // Re-verify the refreshed token is valid before making the API call
-        const freshAuth = await getAuthFromRequest();
-        if (!freshAuth.isAuthenticated || freshAuth.isExpired) {
-            return null;
-        }
     }
 
     try {
@@ -85,4 +57,3 @@ export async function getAuthFromAPI(): Promise<AuthUser | null> {
 
 export * from './middleware';
 export * from './cookies';
-export { refreshAccessToken } from './refresh';

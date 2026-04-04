@@ -1,6 +1,5 @@
 import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { ApiKeyService } from '../services/api-key.service';
@@ -14,7 +13,7 @@ import { Inject } from '@nestjs/common';
 const API_KEY_PREFIX = 'ew_live_';
 
 @Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {
+export class JwtAuthGuard {
     private apiKeyService: ApiKeyService;
     private userRepository: UserRepository;
 
@@ -23,9 +22,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
         private moduleRef: ModuleRef,
         @Inject(AUTH_PROVIDER)
         private readonly authProvider: AuthProvider,
-    ) {
-        super();
-    }
+    ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
@@ -83,12 +80,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
             return true;
         }
 
-        // Fall through to legacy Passport JWT during migration
-        const result = super.canActivate(context);
-        if (result instanceof Promise) {
-            return result as Promise<boolean>;
-        }
-        return result as boolean;
+        throw new UnauthorizedException();
     }
 
     private extractApiKey(request: any): string | null {

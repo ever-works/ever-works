@@ -7,15 +7,12 @@ import {
 } from '@nestjs/common';
 import {
     UserRepository,
-    RefreshTokenRepository,
     OAuthTokenRepository,
 } from '@ever-works/agent/database';
-import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { randomBytes, randomUUID } from 'crypto';
-import { jwtConstants, authConstants, AuthProvider, config } from '../../config/constants';
+import { randomBytes } from 'crypto';
+import { authConstants, AuthProvider, config } from '../../config/constants';
 import { User } from '@ever-works/agent/entities';
-import { JwtPayload, TokenResponse } from '../types/jwt.types';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserCreatedEvent, UserConfirmedEvent, UserForgotPasswordEvent } from '../../events';
 import { ForgotPasswordDto } from '../dto/email-verification.dto';
@@ -30,9 +27,7 @@ export class AuthService {
 
     constructor(
         private readonly userRepository: UserRepository,
-        private readonly refreshTokenRepository: RefreshTokenRepository,
         private readonly oauthTokenRepository: OAuthTokenRepository,
-        private readonly jwtService: JwtService,
         private eventEmitter: EventEmitter2,
     ) {
         this.webAppUrl = config.webAppUrl();
@@ -43,39 +38,6 @@ export class AuthService {
         if (existingUser) {
             throw new ConflictException('User with this email already exists');
         }
-    }
-
-    async refreshToken(refreshToken: string, userAgent?: string, ipAddress?: string) {
-        const tokenData = await this.refreshTokenRepository.findByToken(refreshToken);
-
-        if (!tokenData) {
-            throw new UnauthorizedException('Invalid refresh token');
-        }
-
-        // Check if token is expired (skip if expiration is disabled)
-        if (!jwtConstants.isTokenExpirationDisabled() && new Date() > tokenData.expiresAt) {
-            await this.refreshTokenRepository.revokeToken(refreshToken, 'Token expired');
-            throw new UnauthorizedException('Refresh token expired');
-        }
-
-        // Detect token reuse (refresh token rotation security)
-        if (tokenData.revoked) {
-            // This is a serious security issue - revoke all tokens in the family
-            this.logger.warn(`Attempted reuse of revoked token for user ${tokenData.userId}`);
-            await this.refreshTokenRepository.revokeTokenFamily(
-                tokenData.family,
-                'Token reuse detected',
-            );
-            throw new UnauthorizedException('Token reuse detected - all tokens revoked');
-        }
-
-        const user = await this.userRepository.findById(tokenData.userId);
-        if (!user) {
-            throw new UnauthorizedException('User not found');
-        }
-
-        const { password, ...userWithoutPassword } = user;
-        return this.generateTokens(userWithoutPassword, userAgent, ipAddress, refreshToken);
     }
 
     async validateSocialUser(socialUser: SocialAuthUser) {
@@ -138,24 +100,6 @@ export class AuthService {
         });
 
         return user;
-    }
-
-    async logout(refreshToken: string) {
-        try {
-            await this.refreshTokenRepository.revokeToken(refreshToken, 'User logout');
-        } catch (error) {
-            // Token might not exist, but we still want to return success
-            this.logger.debug('Token not found during logout');
-        }
-        return { message: 'Logged out successfully' };
-    }
-
-    async logoutAllDevices(userId: string) {
-        await this.refreshTokenRepository.revokeAllUserTokens(
-            userId,
-            'User logged out from all devices',
-        );
-        return { message: 'Logged out from all devices successfully' };
     }
 
     async sendVerificationEmail(userId: string, callbackUrl?: string) {
@@ -389,91 +333,6 @@ export class AuthService {
             email: user.email,
             expiresAt: user.passwordResetExpires,
         };
-    }
-
-    private async generateTokens(
-        user: Omit<User, 'password' | 'getGitToken' | 'asCommitter'>,
-        userAgent?: string,
-        ipAddress?: string,
-        oldRefreshToken?: string,
-    ): Promise<TokenResponse> {
-        const payload: JwtPayload = {
-            sub: user.id,
-            email: user.email,
-            provider: user.registrationProvider,
-            username: user.username,
-            emailVerified: user.emailVerified,
-            isActive: user.isActive,
-            avatar: user.avatar,
-            iat: Math.floor(Date.now() / 1000),
-            iss: 'ever-works-api',
-            aud: 'ever-works-users',
-        };
-
-        const accessToken = this.jwtService.sign(payload, {
-            expiresIn: jwtConstants.accessTokenExpiration(),
-            secret: jwtConstants.secret(),
-        });
-        const refreshToken = await this.generateRefreshToken(
-            user.id,
-            userAgent,
-            ipAddress,
-            oldRefreshToken,
-        );
-
-        return {
-            access_token: accessToken,
-            refresh_token: refreshToken,
-            user: {
-                id: user.id,
-                email: user.email,
-                username: user.username,
-            },
-        };
-    }
-
-    private async generateRefreshToken(
-        userId: string,
-        userAgent?: string,
-        ipAddress?: string,
-        oldRefreshToken?: string,
-    ): Promise<string> {
-        const token = randomBytes(authConstants.refreshTokenLength).toString('hex');
-
-        let expiresAt: Date;
-        const refreshDays = jwtConstants.refreshTokenExpiration();
-
-        if (refreshDays === -1 || jwtConstants.isTokenExpirationDisabled()) {
-            // Set expiration to 100 years in the future (effectively never)
-            expiresAt = new Date();
-            expiresAt.setFullYear(expiresAt.getFullYear() + 100);
-        } else {
-            expiresAt = new Date();
-            expiresAt.setDate(expiresAt.getDate() + refreshDays);
-        }
-
-        let family: string = randomUUID();
-
-        // If rotating from an old token, use the same family
-        if (oldRefreshToken) {
-            const oldToken = await this.refreshTokenRepository.findByToken(oldRefreshToken);
-            if (oldToken) {
-                family = oldToken.family || family;
-                // Revoke the old token
-                await this.refreshTokenRepository.revokeToken(oldRefreshToken, 'Token rotation');
-            }
-        }
-
-        await this.refreshTokenRepository.create({
-            token,
-            userId,
-            expiresAt,
-            family,
-            userAgent,
-            ipAddress,
-        });
-
-        return token;
     }
 
     private async randomHashedPassword() {

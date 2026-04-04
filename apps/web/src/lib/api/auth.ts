@@ -16,10 +16,6 @@ export interface LoginDto {
     password: string;
 }
 
-export interface RefreshTokenDto {
-    refreshToken: string;
-}
-
 export interface UpdatePasswordDto {
     currentPassword: string;
     newPassword: string;
@@ -50,7 +46,6 @@ export interface ResetPasswordDto {
 // Response Types
 export interface AuthResponse {
     access_token: string;
-    refresh_token?: string;
     user: UserProfile;
 }
 
@@ -95,19 +90,10 @@ export const authAPI = {
         });
     },
 
-    refresh: async (data: RefreshTokenDto) => {
-        return serverMutation<AuthResponse>({
-            endpoint: '/auth/refresh',
-            data,
-            method: 'POST',
-            wrapInData: false,
-        });
-    },
-
-    logout: async (data?: RefreshTokenDto) => {
+    logout: async () => {
         return serverMutation<MessageResponse>({
             endpoint: '/auth/logout',
-            data: data || {},
+            data: {},
             method: 'POST',
             wrapInData: false,
         });

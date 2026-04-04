@@ -43,7 +43,7 @@ export async function login(identifier: string, password: string, redirectUrl: s
             password: validation.data.password,
         });
 
-        await setAuthCookies(authResponse.access_token, authResponse.refresh_token);
+        await setAuthCookies(authResponse.access_token);
     } catch (error) {
         console.error(error);
 
@@ -108,7 +108,7 @@ export async function register(username: string, email: string, password: string
             emailVerificationCallbackUrl: withAppUrl(ROUTES.API_AUTH_VERIFY_EMAIL),
         });
 
-        await setAuthCookies(response.access_token, response.refresh_token);
+        await setAuthCookies(response.access_token);
     } catch (error) {
         console.error(error);
 
