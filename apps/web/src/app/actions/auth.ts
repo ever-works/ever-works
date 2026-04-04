@@ -164,7 +164,7 @@ export async function connectProvider(providerId: OAuthProvider) {
         const state = generateHexToken(16);
         await setOAuthStateCookie(state);
 
-        const callbackUrl = routeWithParams(ROUTES.API_OAUTH_CALLBACK, { providerId });
+        const callbackUrl = routeWithParams(ROUTES.API_AUTH_PROVIDER_CALLBACK, { providerId });
         const { url } = await authAPI.getOAuthAuthUrl(providerId, withAppUrl(callbackUrl), state);
         return {
             success: true,

@@ -103,11 +103,11 @@ export const config = {
         clientSecret: () => process.env.GOOGLE_CLIENT_SECRET,
         callbackUrl: () => {
             const webUrl = config.webAppUrl();
-            return process.env.GOOGLE_CALLBACK_URL || `${webUrl}/api/oauth/google/callback`;
+            return process.env.GOOGLE_CALLBACK_URL || `${webUrl}/api/auth/provider/callback/google`;
         },
         connectCallbackUrl: () => {
             const webUrl = config.webAppUrl();
-            return process.env.GOOGLE_CALLBACK_URL || `${webUrl}/api/oauth/google/callback`;
+            return process.env.GOOGLE_CALLBACK_URL || `${webUrl}/api/auth/provider/callback/google`;
         },
     },
     github: {
@@ -115,7 +115,7 @@ export const config = {
         clientSecret: () => process.env.GH_CLIENT_SECRET,
         callbackUrl: () => {
             const webUrl = config.webAppUrl();
-            return process.env.GH_CALLBACK_URL || `${webUrl}/api/oauth/github/callback`;
+            return process.env.GH_CALLBACK_URL || `${webUrl}/api/auth/provider/callback/github`;
         },
     },
     facebook: {

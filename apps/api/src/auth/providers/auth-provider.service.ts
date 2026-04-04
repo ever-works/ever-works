@@ -1,5 +1,7 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
 import { UserRepository } from '@ever-works/agent/database';
+import { AuthSession, User } from '@ever-works/agent/entities';
 import type { AuthenticatedUser, TokenResponse } from '../types/jwt.types';
 import { AUTH_RUNTIME_INSTANCE } from './auth-provider.constants';
 import { AuthProvider } from './auth-provider.abstract';
@@ -7,6 +9,8 @@ import { createAuthRuntimeInstance } from './auth-runtime.instance';
 import type { AuthRuntimeContext, AuthRuntimeUser } from './auth-provider.types';
 import { AuthSyncService } from './auth-sync.service';
 import * as bcrypt from 'bcrypt';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { DataSource } from 'typeorm';
 
 @Injectable()
 export class AuthProviderService extends AuthProvider {
@@ -15,6 +19,7 @@ export class AuthProviderService extends AuthProvider {
         private readonly auth: ReturnType<typeof createAuthRuntimeInstance>,
         private readonly userRepository: UserRepository,
         private readonly authSyncService: AuthSyncService,
+        @InjectDataSource() private readonly dataSource: DataSource,
     ) {
         super();
     }
@@ -22,18 +27,18 @@ export class AuthProviderService extends AuthProvider {
     async authenticate(headers: Headers): Promise<AuthenticatedUser | null> {
         const bearerToken = this.getBearerToken(headers);
         if (bearerToken) {
-            const context = await this.getContext();
-            const session = await context.internalAdapter.findSession(bearerToken);
+            const session = await this.findSessionRecord(bearerToken);
             if (!session) {
                 return null;
             }
 
-            if ((session.user as AuthRuntimeUser).isActive === false) {
-                await this.signOutAll(session.user.id);
-                throw new UnauthorizedException('User account is suspended');
+            if (session.expiresAt.getTime() <= Date.now()) {
+                await this.deleteSessionRecord(bearerToken);
+                return null;
             }
 
-            return this.mapAuthenticatedUser(session.user as AuthRuntimeUser);
+            const user = await this.assertActiveUser(session.userId);
+            return this.mapAuthenticatedUserFromUser(user);
         }
 
         const session = await this.auth.api.getSession({ headers });
@@ -110,12 +115,7 @@ export class AuthProviderService extends AuthProvider {
 
     async issueSession(userId: string): Promise<TokenResponse> {
         const user = await this.assertActiveUser(userId);
-        const context = await this.getContext();
-        const session = await context.internalAdapter.createSession(user.id);
-
-        if (!session) {
-            throw new UnauthorizedException('Failed to create session');
-        }
+        const session = await this.createSessionRecord(user.id);
 
         return {
             access_token: session.token,
@@ -149,27 +149,7 @@ export class AuthProviderService extends AuthProvider {
     async setPassword(userId: string, newPassword: string): Promise<void> {
         const context = await this.getContext();
         const passwordHash = await context.password.hash(newPassword);
-        const accounts = await context.internalAdapter.findAccounts(userId);
-        const credentialAccount = accounts.find((account) => account.providerId === 'credential');
-
-        if (!credentialAccount) {
-            await context.internalAdapter.createAccount({
-                userId,
-                providerId: 'credential',
-                accountId: userId,
-                password: passwordHash,
-            });
-            const createdPasswordHash =
-                await this.authSyncService.getCredentialPasswordHash(userId);
-            if (createdPasswordHash) {
-                await this.userRepository.update(userId, {
-                    password: createdPasswordHash,
-                });
-            }
-            return;
-        }
-
-        await context.internalAdapter.updatePassword(userId, passwordHash);
+        await this.authSyncService.syncCredentialPassword(userId, passwordHash);
         await this.userRepository.update(userId, {
             password: passwordHash,
         });
@@ -178,8 +158,7 @@ export class AuthProviderService extends AuthProvider {
     async signOut(headers: Headers): Promise<void> {
         const bearerToken = this.getBearerToken(headers);
         if (bearerToken) {
-            const context = await this.getContext();
-            await context.internalAdapter.deleteSession(bearerToken);
+            await this.deleteSessionRecord(bearerToken);
             return;
         }
 
@@ -187,8 +166,7 @@ export class AuthProviderService extends AuthProvider {
     }
 
     async signOutAll(userId: string): Promise<void> {
-        const context = await this.getContext();
-        await context.internalAdapter.deleteSessions(userId);
+        await this.getSessionRepository().delete({ userId });
     }
 
     private async getContext(): Promise<AuthRuntimeContext> {
@@ -201,13 +179,18 @@ export class AuthProviderService extends AuthProvider {
             throw new UnauthorizedException('Missing session token');
         }
 
-        const context = await this.getContext();
-        const session = await context.internalAdapter.findSession(bearerToken);
+        const session = await this.findSessionRecord(bearerToken);
         if (!session) {
             throw new UnauthorizedException('Invalid session');
         }
 
-        return session;
+        if (session.expiresAt.getTime() <= Date.now()) {
+            await this.deleteSessionRecord(bearerToken);
+            throw new UnauthorizedException('Session expired');
+        }
+
+        const user = await this.assertActiveUser(session.userId);
+        return { session, user };
     }
 
     private async assertActiveUser(userId: string) {
@@ -262,5 +245,50 @@ export class AuthProviderService extends AuthProvider {
             iss: 'auth-runtime',
             aud: 'ever-works-users',
         };
+    }
+
+    private mapAuthenticatedUserFromUser(user: User): AuthenticatedUser {
+        return {
+            userId: user.id,
+            email: user.email,
+            username: user.username,
+            provider: user.registrationProvider || 'local',
+            emailVerified: user.emailVerified,
+            isActive: user.isActive !== false,
+            avatar: user.avatar || null,
+            iat: Math.floor(Date.now() / 1000),
+            iss: 'auth-runtime',
+            aud: 'ever-works-users',
+        };
+    }
+
+    private getSessionRepository() {
+        return this.dataSource.getRepository(AuthSession);
+    }
+
+    private async findSessionRecord(token: string) {
+        return this.getSessionRepository().findOne({
+            where: { token },
+        });
+    }
+
+    private async deleteSessionRecord(token: string) {
+        await this.getSessionRepository().delete({ token });
+    }
+
+    private async createSessionRecord(userId: string) {
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
+
+        const session = this.getSessionRepository().create({
+            id: randomUUID(),
+            userId,
+            token: randomBytes(24).toString('base64url'),
+            expiresAt,
+            ipAddress: null,
+            userAgent: null,
+        });
+
+        return this.getSessionRepository().save(session);
     }
 }
