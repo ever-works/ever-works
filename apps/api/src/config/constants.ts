@@ -123,7 +123,9 @@ export const config = {
         clientSecret: () => process.env.FACEBOOK_CLIENT_SECRET,
         callbackUrl: () => {
             const webUrl = config.webAppUrl();
-            return process.env.FACEBOOK_CALLBACK_URL || `${webUrl}/api/oauth/facebook/callback`;
+            return (
+                process.env.FACEBOOK_CALLBACK_URL || `${webUrl}/api/auth/provider/callback/facebook`
+            );
         },
     },
     linkedin: {
@@ -131,7 +133,9 @@ export const config = {
         clientSecret: () => process.env.LINKEDIN_CLIENT_SECRET,
         callbackUrl: () => {
             const webUrl = config.webAppUrl();
-            return process.env.LINKEDIN_CALLBACK_URL || `${webUrl}/api/oauth/linkedin/callback`;
+            return (
+                process.env.LINKEDIN_CALLBACK_URL || `${webUrl}/api/auth/provider/callback/linkedin`
+            );
         },
     },
 

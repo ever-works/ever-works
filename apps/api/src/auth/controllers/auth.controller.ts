@@ -30,16 +30,32 @@ import { AUTH_PROVIDER } from '../providers/auth-provider.constants';
 import { AuthProvider } from '../providers/auth-provider.abstract';
 import { Inject } from '@nestjs/common';
 import { toHeaders } from '../providers/request-headers';
+import { SocialAuthService } from '../services/social-auth.service';
 
 @ApiTags('Auth')
 @Controller('api/auth')
 export class AuthController {
     constructor(
         private authService: AuthService,
+        private readonly socialAuthService: SocialAuthService,
         private activityLogService: ActivityLogService,
         @Inject(AUTH_PROVIDER)
         private readonly authProvider: AuthProvider,
     ) {}
+
+    @Public()
+    @Get('providers')
+    @ApiOperation({
+        summary: 'Get configured auth providers',
+        description: 'Returns the currently configured authentication providers',
+    })
+    @ApiResponse({ status: 200, description: 'Configured auth providers' })
+    getConfiguredProviders() {
+        return {
+            emailPassword: true,
+            socialProviders: this.socialAuthService.getConfiguredProviders(),
+        };
+    }
 
     @Public()
     @Post('register')

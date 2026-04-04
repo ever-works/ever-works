@@ -115,6 +115,15 @@ export class SocialAuthService {
         return getSocialAuthProviderConfig(providerId).displayName;
     }
 
+    getConfiguredProviders(): SocialAuthProviderId[] {
+        return (Object.keys(SOCIAL_AUTH_PROVIDERS) as SocialAuthProviderId[]).filter(
+            (providerId) => {
+                const provider = SOCIAL_AUTH_PROVIDERS[providerId];
+                return Boolean(provider.clientId() && provider.clientSecret());
+            },
+        );
+    }
+
     private async exchangeCodeForTokens(
         providerId: SocialAuthProviderId,
         code: string,
