@@ -2,6 +2,7 @@ import { authAPI } from '../api';
 import type { UserProfile } from '../api/auth';
 import { getAuthFromRequest } from './middleware';
 import type { AuthUser, JwtPayload } from './middleware';
+import { removeAuthAccessCookies } from './cookies';
 
 function normalizeJwtUser(user: JwtPayload): AuthUser {
     return {
@@ -38,6 +39,9 @@ export async function getAuthFromCookie(): Promise<AuthUser | null> {
     try {
         return normalizeProfileUser(await authAPI.getProfile());
     } catch (error) {
+        if (error instanceof Error && error.message.includes('Unauthorized')) {
+            await removeAuthAccessCookies();
+        }
         return null;
     }
 }
@@ -51,6 +55,9 @@ export async function getAuthFromAPI(): Promise<AuthUser | null> {
     try {
         return normalizeProfileUser(await authAPI.getFreshProfile());
     } catch (error) {
+        if (error instanceof Error && error.message.includes('Unauthorized')) {
+            await removeAuthAccessCookies();
+        }
         return null;
     }
 }

@@ -82,7 +82,7 @@ export class AuthProviderService extends AuthProvider {
             });
         }
 
-        return this.toTokenResponse(result.token, result.user as AuthRuntimeUser);
+        return this.issueSession(user.id);
     }
 
     async signUpEmail(
@@ -110,7 +110,7 @@ export class AuthProviderService extends AuthProvider {
             });
         }
 
-        return this.toTokenResponse(result.token || '', result.user as AuthRuntimeUser);
+        return this.issueSession(result.user.id);
     }
 
     async issueSession(userId: string): Promise<TokenResponse> {

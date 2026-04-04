@@ -1,7 +1,7 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 import { TimestampColumn } from './_types';
 
-@Entity({ name: 'sessions' })
+@Entity({ name: 'session' })
 @Index(['token'], { unique: true })
 @Index(['userId'])
 export class AuthSession {

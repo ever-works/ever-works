@@ -33,22 +33,13 @@ export function DashboardLayoutClient({
     const [helpOpen, setHelpOpen] = useState(false);
     const [chatOpen, setChatOpenRaw] = useState(initialChatOpen);
     const [sidebarCollapsed, setSidebarCollapsedRaw] = useState(initialSidebarCollapsed);
-    const [chatWidth, setChatWidth] = useState<number>(() => {
-        try {
-            const v = localStorage.getItem('chat-width');
-            return v ? parseInt(v, 10) : 380;
-        } catch (e) {
-            return 380;
-        }
-    });
+    const [chatWidth, setChatWidth] = useState<number>(DEFAULT_CHAT_WIDTH);
     const [isChatExpanded, setIsChatExpanded] = useState(false);
     const chatRef = useRef<HTMLDivElement | null>(null);
 
     const prevWidthRef = useRef<number | null>(null);
     const [mainStyle, setMainStyle] = useState<React.CSSProperties | undefined>(undefined);
-    const [isMobile, setIsMobile] = useState<boolean>(() =>
-        typeof window !== 'undefined' ? window.innerWidth < 768 : false,
-    );
+    const [isMobile, setIsMobile] = useState<boolean>(false);
 
     const setChatOpen = useCallback((value: boolean, resetOnOpen = true) => {
         setChatOpenRaw(value);
@@ -69,6 +60,18 @@ export function DashboardLayoutClient({
             // If closing chat, clear any main-style overrides so layout returns to normal
             setMainStyle(undefined);
         }
+    }, []);
+
+    useEffect(() => {
+        try {
+            const v = localStorage.getItem('chat-width');
+            const savedWidth = v ? parseInt(v, 10) : DEFAULT_CHAT_WIDTH;
+            setChatWidth(Number.isFinite(savedWidth) ? savedWidth : DEFAULT_CHAT_WIDTH);
+        } catch (e) {}
+
+        try {
+            setIsMobile(window.innerWidth < 768);
+        } catch (e) {}
     }, []);
 
     useEffect(() => {
