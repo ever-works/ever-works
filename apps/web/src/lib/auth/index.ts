@@ -1,8 +1,32 @@
 import { authAPI } from '../api';
+import type { UserProfile } from '../api/auth';
 import { getAuthFromRequest } from './middleware';
+import type { AuthUser, JwtPayload } from './middleware';
 import { refreshAccessToken } from './refresh';
 
-export async function getAuthFromCookie() {
+function normalizeJwtUser(user: JwtPayload): AuthUser {
+    return {
+        id: user.sub,
+        email: user.email,
+        username: user.username,
+        emailVerified: user.emailVerified,
+        avatar: user.avatar,
+        provider: user.provider,
+        isActive: user.isActive,
+    };
+}
+
+function normalizeProfileUser(user: UserProfile): AuthUser {
+    return {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        emailVerified: user.emailVerified ?? false,
+        avatar: user.avatar ?? null,
+    };
+}
+
+export async function getAuthFromCookie(): Promise<AuthUser | null> {
     const auth = await getAuthFromRequest();
     if (!auth.isAuthenticated) {
         return null;
@@ -19,22 +43,22 @@ export async function getAuthFromCookie() {
         }
 
         if (freshAuth.user) {
-            return freshAuth.user;
+            return normalizeJwtUser(freshAuth.user);
         }
     }
 
     if (auth.user) {
-        return auth.user;
+        return normalizeJwtUser(auth.user);
     }
 
     try {
-        return await authAPI.getProfile();
+        return normalizeProfileUser(await authAPI.getProfile());
     } catch (error) {
         return null;
     }
 }
 
-export async function getAuthFromAPI() {
+export async function getAuthFromAPI(): Promise<AuthUser | null> {
     const auth = await getAuthFromRequest();
     if (!auth.isAuthenticated) {
         return null;
@@ -53,7 +77,7 @@ export async function getAuthFromAPI() {
     }
 
     try {
-        return await authAPI.getFreshProfile();
+        return normalizeProfileUser(await authAPI.getFreshProfile());
     } catch (error) {
         return null;
     }

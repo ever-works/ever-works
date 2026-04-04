@@ -3,6 +3,16 @@ import { jwtDecode } from 'jwt-decode';
 import { getAuthAccessCookie } from './cookies';
 
 export type AuthUser = {
+    id: string;
+    email: string;
+    username: string;
+    emailVerified: boolean;
+    avatar: string | null;
+    provider?: string | null;
+    isActive?: boolean;
+};
+
+export type JwtPayload = {
     sub: string;
     email: string;
     provider: string;
@@ -10,9 +20,6 @@ export type AuthUser = {
     emailVerified: boolean;
     isActive: boolean;
     avatar: string | null;
-};
-
-export type JwtPayload = AuthUser & {
     iat: number;
     iss: string;
     aud: string;

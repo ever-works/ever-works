@@ -1,6 +1,7 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import { MessageResponse } from './types';
+import { OAuthProvider } from './enums';
 
 // DTOs - Auth
 export interface RegisterDto {
