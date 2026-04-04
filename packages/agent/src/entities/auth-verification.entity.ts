@@ -4,21 +4,21 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColum
 @Index(['identifier'])
 @Index(['value'], { unique: true })
 export class AuthVerification {
-	@PrimaryColumn({ type: 'varchar' })
-	id: string;
+    @PrimaryColumn({ type: 'varchar' })
+    id: string;
 
-	@Column({ type: 'varchar' })
-	identifier: string;
+    @Column({ type: 'varchar' })
+    identifier: string;
 
-	@Column({ type: 'text' })
-	value: string;
+    @Column({ type: 'text' })
+    value: string;
 
-	@Column({ type: 'timestamp' })
-	expiresAt: Date;
+    @Column({ type: 'timestamp' })
+    expiresAt: Date;
 
-	@CreateDateColumn()
-	createdAt: Date;
+    @CreateDateColumn()
+    createdAt: Date;
 
-	@UpdateDateColumn()
-	updatedAt: Date;
+    @UpdateDateColumn()
+    updatedAt: Date;
 }

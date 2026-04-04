@@ -1,10 +1,4 @@
-import {
-    MigrationInterface,
-    QueryRunner,
-    Table,
-    TableForeignKey,
-    TableIndex,
-} from 'typeorm';
+import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
 
 export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
     name = 'AddAuthRuntimeTables1760000000000';
@@ -69,16 +63,18 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
                     {
                         name: 'createdAt',
                         type: 'datetime',
-                        default: queryRunner.connection.options.type === 'postgres'
-                            ? 'CURRENT_TIMESTAMP'
-                            : 'CURRENT_TIMESTAMP',
+                        default:
+                            queryRunner.connection.options.type === 'postgres'
+                                ? 'CURRENT_TIMESTAMP'
+                                : 'CURRENT_TIMESTAMP',
                     },
                     {
                         name: 'updatedAt',
                         type: 'datetime',
-                        default: queryRunner.connection.options.type === 'postgres'
-                            ? 'CURRENT_TIMESTAMP'
-                            : 'CURRENT_TIMESTAMP',
+                        default:
+                            queryRunner.connection.options.type === 'postgres'
+                                ? 'CURRENT_TIMESTAMP'
+                                : 'CURRENT_TIMESTAMP',
                     },
                 ],
             }),
@@ -145,16 +141,18 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
                     {
                         name: 'createdAt',
                         type: 'datetime',
-                        default: queryRunner.connection.options.type === 'postgres'
-                            ? 'CURRENT_TIMESTAMP'
-                            : 'CURRENT_TIMESTAMP',
+                        default:
+                            queryRunner.connection.options.type === 'postgres'
+                                ? 'CURRENT_TIMESTAMP'
+                                : 'CURRENT_TIMESTAMP',
                     },
                     {
                         name: 'updatedAt',
                         type: 'datetime',
-                        default: queryRunner.connection.options.type === 'postgres'
-                            ? 'CURRENT_TIMESTAMP'
-                            : 'CURRENT_TIMESTAMP',
+                        default:
+                            queryRunner.connection.options.type === 'postgres'
+                                ? 'CURRENT_TIMESTAMP'
+                                : 'CURRENT_TIMESTAMP',
                     },
                 ],
             }),
@@ -210,16 +208,18 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
                     {
                         name: 'createdAt',
                         type: 'datetime',
-                        default: queryRunner.connection.options.type === 'postgres'
-                            ? 'CURRENT_TIMESTAMP'
-                            : 'CURRENT_TIMESTAMP',
+                        default:
+                            queryRunner.connection.options.type === 'postgres'
+                                ? 'CURRENT_TIMESTAMP'
+                                : 'CURRENT_TIMESTAMP',
                     },
                     {
                         name: 'updatedAt',
                         type: 'datetime',
-                        default: queryRunner.connection.options.type === 'postgres'
-                            ? 'CURRENT_TIMESTAMP'
-                            : 'CURRENT_TIMESTAMP',
+                        default:
+                            queryRunner.connection.options.type === 'postgres'
+                                ? 'CURRENT_TIMESTAMP'
+                                : 'CURRENT_TIMESTAMP',
                     },
                 ],
             }),

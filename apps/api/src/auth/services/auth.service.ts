@@ -5,10 +5,7 @@ import {
     BadRequestException,
     Logger,
 } from '@nestjs/common';
-import {
-    UserRepository,
-    OAuthTokenRepository,
-} from '@ever-works/agent/database';
+import { UserRepository, OAuthTokenRepository } from '@ever-works/agent/database';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { authConstants, AuthProvider, config } from '../../config/constants';

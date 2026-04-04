@@ -104,7 +104,10 @@ export class AuthController {
     @Post('logout')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
-    @ApiOperation({ summary: 'Logout', description: 'Invalidate the current authenticated session' })
+    @ApiOperation({
+        summary: 'Logout',
+        description: 'Invalidate the current authenticated session',
+    })
     @ApiResponse({ status: 200, description: 'Successfully logged out' })
     async logout(@Request() req) {
         await this.authProvider.signOut(toHeaders(req.headers || {}));

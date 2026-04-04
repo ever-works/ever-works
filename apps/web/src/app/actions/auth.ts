@@ -1,11 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import {
-    removeAuthAccessCookies,
-    setOAuthStateCookie,
-    setAuthCookies,
-} from '@/lib/auth';
+import { removeAuthAccessCookies, setOAuthStateCookie, setAuthCookies } from '@/lib/auth';
 import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
 import { VALIDATION_RULES } from './validation';
 import { authAPI, AuthResponse } from '@/lib/api';

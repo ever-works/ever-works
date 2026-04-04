@@ -42,9 +42,12 @@ export const config = {
 
     auth: {
         secret: () => {
-            const secret = process.env.AUTH_SECRET || process.env.BETTER_AUTH_SECRET || process.env.JWT_SECRET;
+            const secret =
+                process.env.AUTH_SECRET || process.env.BETTER_AUTH_SECRET || process.env.JWT_SECRET;
             if (!secret) {
-                throw new Error('AUTH_SECRET, BETTER_AUTH_SECRET, or JWT_SECRET environment variable is required');
+                throw new Error(
+                    'AUTH_SECRET, BETTER_AUTH_SECRET, or JWT_SECRET environment variable is required',
+                );
             }
             return secret;
         },
@@ -121,7 +124,7 @@ export const config = {
         callbackUrl: () => {
             const webUrl = config.webAppUrl();
             return process.env.FACEBOOK_CALLBACK_URL || `${webUrl}/api/oauth/facebook/callback`;
-        }
+        },
     },
     linkedin: {
         clientId: () => process.env.LINKEDIN_CLIENT_ID,
@@ -129,7 +132,7 @@ export const config = {
         callbackUrl: () => {
             const webUrl = config.webAppUrl();
             return process.env.LINKEDIN_CALLBACK_URL || `${webUrl}/api/oauth/linkedin/callback`;
-        }
+        },
     },
 
     directory: {
