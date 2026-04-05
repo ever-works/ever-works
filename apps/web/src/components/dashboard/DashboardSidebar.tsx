@@ -89,8 +89,10 @@ export function DashboardSidebar({
     };
 
     const handleLogout = async () => {
-        startTransition(async () => {
-            await logout();
+        startTransition(() => {
+            void (async () => {
+                await logout();
+            })();
         });
     };
 

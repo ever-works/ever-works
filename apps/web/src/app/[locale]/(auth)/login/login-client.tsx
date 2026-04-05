@@ -85,12 +85,14 @@ export function LoginClient({ availableSocialProviders }: LoginClientProps) {
         setError('');
         setShowResetSuccess(false);
 
-        startTransition(async () => {
-            const response = await loginAction(formData.email, formData.password, redirectUrl);
-            if (!response.success) {
-                setError(response.error || t('errors.invalidCredentials'));
-                return;
-            }
+        startTransition(() => {
+            void (async () => {
+                const response = await loginAction(formData.email, formData.password, redirectUrl);
+                if (!response.success) {
+                    setError(response.error || t('errors.invalidCredentials'));
+                    return;
+                }
+            })();
         });
     };
 

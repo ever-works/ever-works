@@ -19,14 +19,16 @@ export function SocialLoginButtons({ providers }: SocialLoginButtonsProps) {
     }
 
     const handleConnectProvider = async (provider: OAuthProvider) => {
-        startTransition(async () => {
-            const response = await connectProvider(provider);
-            if (!response.success || !response.url) {
-                console.error(response.error || 'Failed to connect provider');
-                return;
-            }
+        startTransition(() => {
+            void (async () => {
+                const response = await connectProvider(provider);
+                if (!response.success || !response.url) {
+                    console.error(response.error || 'Failed to connect provider');
+                    return;
+                }
 
-            window.location.href = response.url;
+                window.location.href = response.url;
+            })();
         });
     };
 
