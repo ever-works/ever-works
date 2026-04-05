@@ -41,8 +41,13 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
     async run({ directory, user, dto, historyId, historyStartedAt }: TriggerGenerationOptions) {
         const startTime = this.resolveStartTime(historyStartedAt);
 
-        const logCollector = new GenerationLogCollector(historyId, (hId, logs) =>
-            this.directoryOperations.appendGenerationLogs(hId, logs),
+        const logCollector = new GenerationLogCollector(
+            historyId,
+            (hId, logs) => this.directoryOperations.appendGenerationLogs(hId, logs),
+            {
+                onRecentLogsUpdated: (recentLogs) =>
+                    this.directoryOperations.updateGenerateRecentLogs(directory.id, recentLogs),
+            },
         );
 
         await Promise.all([

@@ -85,6 +85,20 @@ export class DirectoryOperationsService {
         await this.directoryRepository.updateGenerateStatus(id, status);
     }
 
+    async updateGenerateRecentLogs(id: string, recentLogs: GenerationStepLog[]): Promise<void> {
+        const currentStatus = await this.getGenerateStatus(id);
+        if (!currentStatus) {
+            return;
+        }
+
+        const nextStatus: Directory['generateStatus'] = {
+            ...currentStatus,
+            recentLogs,
+        };
+
+        await this.updateGenerateStatus(id, nextStatus);
+    }
+
     async updateLastPullRequest(id: string, payload: Directory['lastPullRequest']): Promise<void> {
         await this.directoryRepository.updateLastPullRequest(id, payload);
     }

@@ -5,11 +5,16 @@ import type {
 } from '@ever-works/contracts/api';
 
 const DEFAULT_RECENT_COUNT = 20;
-const AUTO_FLUSH_INTERVAL_MS = 5_000;
+const AUTO_FLUSH_INTERVAL_MS = 1_000;
 /** Maximum entries kept in the recent ring buffer for live UI */
 const MAX_RECENT_ENTRIES = 50;
 
 export type FlushFn = (historyId: string, logs: GenerationStepLog[]) => Promise<void>;
+export type RecentLogsUpdatedFn = (logs: GenerationStepLog[]) => Promise<void>;
+
+type GenerationLogCollectorOptions = {
+    onRecentLogsUpdated?: RecentLogsUpdatedFn;
+};
 
 export class GenerationLogCollector {
     /** Pending entries waiting to be flushed to DB */
@@ -21,10 +26,12 @@ export class GenerationLogCollector {
     constructor(
         private readonly historyId: string,
         private readonly flushFn: FlushFn,
+        private readonly options: GenerationLogCollectorOptions = {},
     ) {
         this.flushTimer = setInterval(() => {
             this.flush().catch(() => {});
         }, AUTO_FLUSH_INTERVAL_MS);
+        this.flushTimer.unref?.();
     }
 
     log(entry: GenerationStepLog): void {
@@ -114,7 +121,10 @@ export class GenerationLogCollector {
         const toFlush = [...this.buffer];
         this.buffer = [];
 
-        await this.flushFn(this.historyId, toFlush);
+        await Promise.all([
+            this.flushFn(this.historyId, toFlush),
+            this.options.onRecentLogsUpdated?.(this.getRecentLogs()),
+        ]);
     }
 
     async dispose(): Promise<void> {

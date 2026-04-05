@@ -1,4 +1,4 @@
-import { generateText, stepCountIs, ToolSet } from 'ai';
+import { streamText, stepCountIs, ToolSet } from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type {
 	IPlugin,
@@ -65,6 +65,7 @@ import { extractSimpleKeywords, appendToJsonlIndex } from './utils/data-source-h
 import { createToolCallRepairFn, withToolCallingRetry } from './utils/tool-call-resilience.js';
 import { createPrepareStep } from './utils/context-compaction.js';
 import { wrapReasoningFilteredModel } from './utils/model-wrapper.js';
+import { consumeStreamWithLogging } from './utils/stream-text-logging.js';
 
 interface ProcessUrlExecutionResult {
 	url: string;
@@ -91,7 +92,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				description: 'Maximum number of agent tool-calling steps',
 				default: DEFAULT_MAX_STEPS,
 				minimum: 10,
-				maximum: 2000,
+				maximum: 500,
 				'x-hidden': true
 			}
 		}
@@ -524,10 +525,9 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			logger
 		});
 
-		let agentStepIndex = 0;
 		const result = await withToolCallingRetry(
-			() => {
-				return generateText({
+			async () => {
+				const result = streamText({
 					model: parentModel,
 					system: systemPrompt,
 					prompt: userPrompt,
@@ -536,24 +536,16 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 					prepareStep,
 					abortSignal: signal,
 					experimental_repairToolCall: repairToolCall,
-					experimental_telemetry: { isEnabled: true },
-					onStepFinish: (step) => {
-						agentStepIndex++;
-						const toolNames = step.toolCalls.map((tc) => tc.toolName);
-						const toolSummary =
-							toolNames.length > 0
-								? `tools: ${toolNames.join(', ')}`
-								: `text: ${step.text.slice(0, 120)}${step.text.length > 120 ? '…' : ''}`;
-						const tokens = step.usage;
-						this.emitLog(
-							onLogEntry,
-							'message',
-							`Agent step ${agentStepIndex}: ${toolSummary} (${tokens.totalTokens} tokens)`,
-							1,
-							'info'
-						);
-					}
+					experimental_telemetry: { isEnabled: true }
 				});
+
+				await consumeStreamWithLogging(result, {
+					onLogEntry,
+					scope: 'Parent agent',
+					stepIndex: 1,
+					source: 'pipeline'
+				});
+				return result;
 			},
 			{
 				providerName: providerConfig.providerName ?? providerConfig.providerId,
@@ -563,17 +555,23 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			}
 		);
 
-		tokenAccumulator.addParent(result.totalUsage);
+		const [steps, totalUsage, finishReason, text] = await Promise.all([
+			result.steps,
+			result.totalUsage,
+			result.finishReason,
+			result.text
+		]);
+		tokenAccumulator.addParent(totalUsage);
 
 		// Log generation diagnostics
-		const totalToolCalls = result.steps.reduce((sum, step) => sum + step.toolCalls.length, 0);
-		const toolNames = [...new Set(result.steps.flatMap((step) => step.toolCalls.map((tc) => tc.toolName)))];
+		const totalToolCalls = steps.reduce((sum, step) => sum + step.toolCalls.length, 0);
+		const toolNames = [...new Set(steps.flatMap((step) => step.toolCalls.map((tc) => tc.toolName)))];
 		const tokenUsage = tokenAccumulator.toBreakdown();
 
 		const completionMsg =
-			`Agent completed: ${result.steps.length} steps, ${totalToolCalls} tool calls` +
+			`Agent completed: ${steps.length} steps, ${totalToolCalls} tool calls` +
 			(toolNames.length > 0 ? ` (${toolNames.join(', ')})` : ' (no tools used)') +
-			`, finish=${result.finishReason}` +
+			`, finish=${finishReason}` +
 			`, tokens: parent=${tokenUsage.parent.totalTokens}` +
 			`, workers=${tokenUsage.workers.totalTokens}` +
 			`, total=${tokenUsage.total.totalTokens}`;
@@ -584,7 +582,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			logger.warn(
 				`Model "${parentModelName}" returned without making any tool calls. ` +
 					'This usually means the model does not support tool calling or ignored the tools. ' +
-					`Response text: "${result.text.slice(0, 200)}${result.text.length > 200 ? '...' : ''}"`
+					`Response text: "${text.slice(0, 200)}${text.length > 200 ? '...' : ''}"`
 			);
 		}
 
@@ -604,7 +602,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			return `${info.label} was unavailable during generation (${t.reason}). ${info.impact}`;
 		});
 
-		const processUrlFailures = this.collectProcessUrlFailures(result.steps as unknown[]);
+		const processUrlFailures = this.collectProcessUrlFailures(steps as unknown[]);
 		if (processUrlFailures.failedUrls > 0) {
 			const samples =
 				processUrlFailures.sampleErrors.length > 0

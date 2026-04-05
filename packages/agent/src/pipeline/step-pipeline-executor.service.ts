@@ -48,6 +48,29 @@ export interface CheckpointData {
 
 const CHECKPOINT_TTL_MS = 24 * 60 * 60 * 1000;
 const CURRENT_CHECKPOINT_VERSION = 4;
+const STEP_LOG_PREFIX_BY_EVENT: Record<
+    Extract<
+        GenerationStepLog['event'],
+        'step_started' | 'step_completed' | 'step_failed' | 'step_skipped'
+    >,
+    string
+> = {
+    step_started: 'Step started',
+    step_completed: 'Step completed',
+    step_failed: 'Step failed',
+    step_skipped: 'Step skipped',
+};
+
+type EmitLogEntryOptions = {
+    onLogEntry?: (log: GenerationStepLog) => void;
+    event: GenerationStepLog['event'];
+    message: string;
+    stepIndex: number;
+    level: GenerationStepLog['level'];
+    source: GenerationStepLog['source'];
+    durationMs?: number;
+    stepName?: string;
+};
 
 export const PipelineEvents = {
     STARTED: 'pipeline:started',
@@ -268,7 +291,15 @@ export class StepPipelineExecutorService {
             this.logger.debug(`Skipping step "${step.id}" (in skipSteps)`);
             runner.markStepSkipped(step.id, 'skipped by options');
             this.emitStepSkipped(step, stepIndex, totalSteps);
-            this.emitLogEntry(onLogEntry, 'step_skipped', step.name, stepIndex, 'info', 'pipeline');
+            this.emitLogEntry({
+                onLogEntry,
+                event: 'step_skipped',
+                message: step.name,
+                stepIndex,
+                level: 'info',
+                source: 'pipeline',
+                stepName: step.name,
+            });
             return;
         }
 
@@ -282,13 +313,29 @@ export class StepPipelineExecutorService {
             this.logger.debug(`Skipping step "${step.id}" (data already provided)`);
             runner.markStepSkipped(step.id, 'data already provided');
             this.emitStepSkipped(step, stepIndex, totalSteps);
-            this.emitLogEntry(onLogEntry, 'step_skipped', step.name, stepIndex, 'info', 'pipeline');
+            this.emitLogEntry({
+                onLogEntry,
+                event: 'step_skipped',
+                message: step.name,
+                stepIndex,
+                level: 'info',
+                source: 'pipeline',
+                stepName: step.name,
+            });
             return;
         }
 
         runner.startStep(step.id);
         this.emitStepEvent(PipelineEvents.STEP_STARTED, step, stepIndex, totalSteps);
-        this.emitLogEntry(onLogEntry, 'step_started', step.name, stepIndex, 'info', 'pipeline');
+        this.emitLogEntry({
+            onLogEntry,
+            event: 'step_started',
+            message: step.name,
+            stepIndex,
+            level: 'info',
+            source: 'pipeline',
+            stepName: step.name,
+        });
 
         if (onProgress) {
             onProgress({
@@ -325,29 +372,31 @@ export class StepPipelineExecutorService {
             );
 
             this.emitStepCompleted(step, stepIndex, totalSteps, metrics.duration ?? 0);
-            this.emitLogEntry(
+            this.emitLogEntry({
                 onLogEntry,
-                'step_completed',
-                step.name,
+                event: 'step_completed',
+                message: step.name,
                 stepIndex,
-                'info',
-                'pipeline',
+                level: 'info',
+                source: 'pipeline',
                 durationMs,
-            );
+                stepName: step.name,
+            });
         } catch (error) {
             const err = error as Error;
             const metrics = this.createStepMetrics(step, stepStartTime, false, err.message);
             runner.markStepFailed(step.id, err);
 
             this.emitStepFailed(step, stepIndex, totalSteps, err, step.optional ?? false);
-            this.emitLogEntry(
+            this.emitLogEntry({
                 onLogEntry,
-                'step_failed',
-                `${step.name}: ${err.message}`,
+                event: 'step_failed',
+                message: `${step.name}: ${err.message}`,
                 stepIndex,
-                'error',
-                'pipeline',
-            );
+                level: 'error',
+                source: 'pipeline',
+                stepName: step.name,
+            });
 
             if (!options?.continueOnError && !step.optional) {
                 throw err;
@@ -624,22 +673,29 @@ export class StepPipelineExecutorService {
     // Event Emission
     // ============================================================================
 
-    private emitLogEntry(
-        onLogEntry: ((log: GenerationStepLog) => void) | undefined,
-        event: GenerationStepLog['event'],
-        message: string,
-        stepIndex: number,
-        level: GenerationStepLog['level'],
-        source: GenerationStepLog['source'],
-        durationMs?: number,
-    ): void {
+    private emitLogEntry({
+        onLogEntry,
+        event,
+        message,
+        stepIndex,
+        level,
+        source,
+        durationMs,
+        stepName,
+    }: EmitLogEntryOptions): void {
+        const prefixedMessage =
+            event in STEP_LOG_PREFIX_BY_EVENT
+                ? `${STEP_LOG_PREFIX_BY_EVENT[event as keyof typeof STEP_LOG_PREFIX_BY_EVENT]}: ${message}`
+                : message;
+
         onLogEntry?.({
             timestamp: new Date().toISOString(),
             level,
             source,
             event,
-            message: `${event === 'step_started' ? 'Step started' : event === 'step_completed' ? 'Step completed' : event === 'step_failed' ? 'Step failed' : 'Step skipped'}: ${message}`,
+            message: prefixedMessage,
             stepIndex,
+            stepName: stepName ?? null,
             durationMs: durationMs ?? null,
         });
     }

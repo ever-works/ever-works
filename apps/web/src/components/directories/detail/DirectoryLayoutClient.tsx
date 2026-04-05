@@ -60,7 +60,7 @@ export function DirectoryLayoutClient({
 
     useEffect(() => {
         if (isGenerating) {
-            const cleanup = pageIntervalRefresh(router);
+            const cleanup = pageIntervalRefresh(router, 5_000);
             return cleanup;
         }
     }, [isGenerating, router]);

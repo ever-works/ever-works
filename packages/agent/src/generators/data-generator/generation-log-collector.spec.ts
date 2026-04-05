@@ -3,12 +3,14 @@ import type { GenerationStepLog } from '@ever-works/contracts/api';
 
 describe('GenerationLogCollector', () => {
     let flushFn: jest.Mock<ReturnType<FlushFn>, Parameters<FlushFn>>;
+    let onRecentLogsUpdated: jest.Mock<Promise<void>, [GenerationStepLog[]]>;
     let collector: GenerationLogCollector;
 
     beforeEach(() => {
         jest.useFakeTimers();
         flushFn = jest.fn().mockResolvedValue(undefined);
-        collector = new GenerationLogCollector('history-123', flushFn);
+        onRecentLogsUpdated = jest.fn().mockResolvedValue(undefined);
+        collector = new GenerationLogCollector('history-123', flushFn, { onRecentLogsUpdated });
     });
 
     afterEach(async () => {
@@ -107,11 +109,14 @@ describe('GenerationLogCollector', () => {
 
             expect(flushFn).toHaveBeenCalledWith('history-123', expect.any(Array));
             expect(flushFn.mock.calls[0][1]).toHaveLength(2);
+            expect(onRecentLogsUpdated).toHaveBeenCalledWith(expect.any(Array));
 
             // Pending buffer should be cleared (no double-flush)
             flushFn.mockClear();
+            onRecentLogsUpdated.mockClear();
             await collector.flush();
             expect(flushFn).not.toHaveBeenCalled();
+            expect(onRecentLogsUpdated).not.toHaveBeenCalled();
         });
 
         it('should preserve recent ring buffer after flush for live UI', async () => {
@@ -134,14 +139,15 @@ describe('GenerationLogCollector', () => {
     });
 
     describe('auto-flush timer', () => {
-        it('should auto-flush every 5 seconds', async () => {
+        it('should auto-flush every second', async () => {
             collector.message('auto');
 
-            jest.advanceTimersByTime(5_000);
+            jest.advanceTimersByTime(1_000);
             // Allow the promise to resolve
             await Promise.resolve();
 
             expect(flushFn).toHaveBeenCalledTimes(1);
+            expect(onRecentLogsUpdated).toHaveBeenCalledTimes(1);
         });
     });
 

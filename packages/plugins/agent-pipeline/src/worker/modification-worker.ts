@@ -1,4 +1,4 @@
-import { generateText, stepCountIs, ToolSet } from 'ai';
+import { streamText, stepCountIs, ToolSet } from 'ai';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import type { PluginLogger, IPromptFacade, FacadeOptions, PipelineExecutionOptions } from '@ever-works/plugin';
 import type { TemplateVariables } from '@ever-works/plugin';
@@ -9,9 +9,10 @@ import { createFindItemsTool } from '../tools/find-items-tool.js';
 import { createValidateItemJsonTool } from '../tools/validate-json-tools.js';
 import { createPrepareStep } from '../utils/context-compaction.js';
 import { createToolCallRepairFn, withToolCallingRetry } from '../utils/tool-call-resilience.js';
-import { DEFAULT_CONTEXT_BUDGET_RATIO } from '../types.js';
+import { DEFAULT_CONTEXT_BUDGET_RATIO, MODIFICATION_WORKER_MAX_STEPS } from '../types.js';
 import type { TokenUsageAccumulator } from '../types.js';
 import { PROMPT_KEYS } from '../prompt-keys.js';
+import { consumeStreamWithLogging } from '../utils/stream-text-logging.js';
 
 export interface ModificationWorkerContext {
 	model: LanguageModelV3;
@@ -81,8 +82,8 @@ export async function processModification(
 		const systemPrompt = substituteVariables(sysTemplate, buildModificationSystemPromptVariables());
 
 		const result = await withToolCallingRetry(
-			() => {
-				return generateText({
+			async () => {
+				const result = streamText({
 					model,
 					system: systemPrompt,
 					prompt: instructions,
@@ -93,7 +94,7 @@ export async function processModification(
 						updateFile: updateFileTool,
 						validateItemJson: validateItemJsonTool
 					} as ToolSet,
-					stopWhen: stepCountIs(200),
+					stopWhen: stepCountIs(MODIFICATION_WORKER_MAX_STEPS),
 					prepareStep: createPrepareStep({
 						maxContextTokens,
 						budgetRatio: DEFAULT_CONTEXT_BUDGET_RATIO,
@@ -102,27 +103,20 @@ export async function processModification(
 					}),
 					abortSignal: signal,
 					experimental_repairToolCall: repairToolCall,
-					experimental_telemetry: { isEnabled: true },
-					onStepFinish: (step) => {
-						if (ctx.onLogEntry && step.toolCalls.length > 0) {
-							const tools = step.toolCalls.map((tc) => tc.toolName).join(', ');
-							ctx.onLogEntry({
-								timestamp: new Date().toISOString(),
-								level: 'debug',
-								source: 'pipeline',
-								event: 'message',
-								message: `Modification worker: ${tools} (${step.usage.totalTokens} tokens)`,
-								stepIndex: 1,
-								stepName: null,
-								durationMs: null
-							});
-						}
-					}
+					experimental_telemetry: { isEnabled: true }
 				});
+
+				await consumeStreamWithLogging(result, {
+					onLogEntry: ctx.onLogEntry,
+					scope: 'Modification worker',
+					stepIndex: 1,
+					source: 'pipeline'
+				});
+				return result;
 			},
 			{ providerName: 'worker', modelName: 'modification-worker', signal, logger }
 		);
-		ctx.tokenAccumulator?.addWorker(result.totalUsage);
+		ctx.tokenAccumulator?.addWorker(await result.totalUsage);
 
 		logger.log(`Modification worker: ${modifiedFiles.length} files modified`);
 		return { modifiedFiles, count: modifiedFiles.length };
