@@ -42,6 +42,7 @@ function createMockContext(overrides?: Partial<ParentToolContext>): ParentToolCo
 		parentModel: {} as never,
 		parentMaxContextTokens: 128000,
 		directoryContext: { directoryName: 'Test Dir' },
+		existing: { items: [], categories: [], tags: [], brands: [] },
 		onProgress: vi.fn(),
 		totalSteps: 5,
 		logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as PluginLogger,
@@ -141,6 +142,8 @@ describe('createParentTools', () => {
 		it('returns workspace overview', async () => {
 			mockReadOverview.mockResolvedValue({
 				totalItems: 15,
+				newItems: 3,
+				updatedItems: 4,
 				categories: ['Monitoring', 'CI/CD'],
 				tags: ['open-source'],
 				brands: ['CNCF']
@@ -153,6 +156,8 @@ describe('createParentTools', () => {
 			const result = await overview.execute({}, { toolCallId: 'tc1', messages: [] });
 
 			expect(result.totalItems).toBe(15);
+			expect(result.newItems).toBe(3);
+			expect(result.updatedItems).toBe(4);
 			expect(result.categories).toEqual(['Monitoring', 'CI/CD']);
 		});
 	});

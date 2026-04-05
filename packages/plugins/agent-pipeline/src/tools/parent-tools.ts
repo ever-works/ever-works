@@ -8,7 +8,8 @@ import type {
 	FacadeOptions,
 	PipelineProgressCallback,
 	PipelineExecutionOptions,
-	PluginLogger
+	PluginLogger,
+	ExistingItems
 } from '@ever-works/plugin';
 
 import { createSearchTool, createReportProgressTool } from './facade-tools.js';
@@ -33,6 +34,7 @@ export interface ParentToolContext {
 	parentModel: LanguageModelV3;
 	parentMaxContextTokens: number;
 	directoryContext: WorkerPromptOptions;
+	existing: ExistingItems;
 	onProgress: PipelineProgressCallback | undefined;
 	totalSteps: number;
 	logger: PluginLogger;
@@ -107,9 +109,9 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 	});
 
 	const getWorkspaceOverviewTool = tool({
-		description: 'Get workspace overview: item count, categories, tags, brands.',
+		description: 'Get workspace overview: total items, new items, updated items, categories, tags, brands.',
 		inputSchema: z.object({}),
-		execute: () => readWorkspaceOverview(ctx.workspacePath)
+		execute: () => readWorkspaceOverview(ctx.workspacePath, ctx.existing.items)
 	});
 
 	return {

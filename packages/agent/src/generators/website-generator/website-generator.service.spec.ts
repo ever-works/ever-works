@@ -31,11 +31,20 @@ describe('WebsiteGeneratorService', () => {
     const createGitFacadeMock = (): jest.Mocked<GitFacadeService> =>
         ({
             cloneOrPull: jest.fn().mockResolvedValue('/tmp/template'),
-            createRepository: jest.fn().mockResolvedValue({} as any),
-            createRepositoryFromTemplate: jest.fn().mockResolvedValue({} as any),
+            createRepository: jest.fn().mockResolvedValue({
+                owner: 'acme',
+                name: 'test-directory-web',
+                fullName: 'acme/test-directory-web',
+            } as any),
+            createRepositoryFromTemplate: jest.fn().mockResolvedValue({
+                owner: 'acme',
+                name: 'test-directory-web',
+                fullName: 'acme/test-directory-web',
+            } as any),
             getCloneUrl: jest
                 .fn()
                 .mockReturnValue('https://github.com/acme/test-directory-web.git'),
+            getLocalDir: jest.fn().mockReturnValue('/tmp/test-directory-web'),
             replaceRemote: jest.fn().mockResolvedValue(undefined),
             push: jest.fn().mockResolvedValue(undefined),
             updateRepository: jest.fn().mockResolvedValue({} as any),

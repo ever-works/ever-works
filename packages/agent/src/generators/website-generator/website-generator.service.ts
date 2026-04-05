@@ -7,6 +7,7 @@ import { User } from '../../entities/user.entity';
 import { WEBSITE_TEMPLATE_CONFIG } from './config/website-template.config';
 import { getDirectoryOwner } from '../../utils/directory.utils';
 import * as fs from 'node:fs/promises';
+import { cloneFreshRepository } from '../../utils/fresh-repository-clone.utils';
 import { assertCreatedRepositoryTarget } from '../../utils/git-repository.utils';
 
 @Injectable()
@@ -17,6 +18,30 @@ export class WebsiteGeneratorService {
         private readonly gitFacade: GitFacadeService,
         private readonly branchSyncService: BranchSyncService,
     ) {}
+
+    private async waitForTargetRepository(
+        directory: Directory,
+        user: User,
+        owner: string,
+        repo: string,
+    ) {
+        const directoryOwner = getDirectoryOwner(directory);
+        const committer = directory.resolveCommitter(user);
+
+        const repoDir = await cloneFreshRepository(
+            this.gitFacade,
+            {
+                owner,
+                repo,
+                committer,
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+            },
+            this.logger,
+        );
+
+        await fs.rm(repoDir, { recursive: true, force: true }).catch(() => {});
+    }
 
     private async ensureTemplateDefaultBranch(directory: Directory, userId: string): Promise<void> {
         const targetBranch = WEBSITE_TEMPLATE_CONFIG.branch;
@@ -81,6 +106,13 @@ export class WebsiteGeneratorService {
             'Website repository',
         );
 
+        await this.waitForTargetRepository(
+            directory,
+            user,
+            websiteRepository.owner,
+            websiteRepository.name,
+        );
+
         // Push template to target repo
         const targetCloneUrl = this.gitFacade.getCloneUrl(
             directory.gitProvider,
@@ -107,7 +139,7 @@ export class WebsiteGeneratorService {
         return templateDir;
     }
 
-    private async createUsingTemplate(directory: Directory) {
+    private async createUsingTemplate(directory: Directory, user: User) {
         const directoryOwner = getDirectoryOwner(directory);
 
         const createdWebsiteRepository = await this.gitFacade.createRepositoryFromTemplate(
@@ -128,6 +160,13 @@ export class WebsiteGeneratorService {
                 directory.getWebsiteRepo(),
                 'Website repository',
             );
+
+            await this.waitForTargetRepository(
+                directory,
+                user,
+                createdWebsiteRepository.owner,
+                createdWebsiteRepository.name,
+            );
         }
     }
 
@@ -144,7 +183,7 @@ export class WebsiteGeneratorService {
                 path = await this.duplicate(directory, user);
             } else if (operation === WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE) {
                 try {
-                    await this.createUsingTemplate(directory);
+                    await this.createUsingTemplate(directory, user);
                 } catch {
                     path = await this.duplicate(directory, user);
                 }

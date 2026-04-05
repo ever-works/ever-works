@@ -483,6 +483,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			parentModel,
 			parentMaxContextTokens,
 			directoryContext,
+			existing,
 			onProgress,
 			totalSteps: AGENT_PIPELINE_STEP_IDS.length,
 			logger,

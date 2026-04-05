@@ -90,13 +90,13 @@ describe('GenerationLogCollector', () => {
             expect(recent[4].message).toBe('msg 19');
         });
 
-        it('should default to 20 entries', () => {
+        it('should default to 100 entries', () => {
             for (let i = 0; i < 30; i++) {
                 collector.message(`msg ${i}`);
             }
 
             const recent = collector.getRecentLogs();
-            expect(recent).toHaveLength(20);
+            expect(recent).toHaveLength(30);
         });
     });
 
