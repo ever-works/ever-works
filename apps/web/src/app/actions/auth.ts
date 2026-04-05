@@ -81,7 +81,7 @@ export async function register(username: string, email: string, password: string
         email: z.string().email(t('email.invalid')),
         password: z
             .string()
-            .min(6, t('password.minLength', { length: 6 }))
+            .min(8, t('password.minLength', { length: 8 }))
             .regex(/[a-z]/, t('password.lowercase'))
             .regex(/(\d|\W)/, t('password.numberOrSpecial'))
             .regex(/^[^.\n]/, t('password.cannotStartWith')),
@@ -230,7 +230,7 @@ export async function resetPassword(token: string, newPassword: string) {
         token: z.string().min(1, 'Token is required'),
         password: z
             .string()
-            .min(6, t('password.minLength', { length: 6 }))
+            .min(8, t('password.minLength', { length: 8 }))
             .regex(/[a-z]/, t('password.lowercase'))
             .regex(/(\d|\W)/, t('password.numberOrSpecial'))
             .regex(/^[^.\n]/, t('password.cannotStartWith')),

@@ -188,8 +188,7 @@ export class AuthService {
             passwordResetExpires: expires,
         });
 
-        // let callbackUrl = forgotPasswordDto.resetPasswordCallbackUrl;
-        let callbackUrl = null;
+        let callbackUrl = forgotPasswordDto.resetPasswordCallbackUrl || null;
         if (callbackUrl && !callbackUrl.includes('token=')) {
             callbackUrl += `?token=${resetToken}`;
         } else {
