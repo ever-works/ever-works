@@ -372,6 +372,10 @@ export class DataRepository {
         return Promise.all(promises).then((items) => items.filter(Boolean));
     }
 
+    async countItems(): Promise<number> {
+        return this.countNonEmptyDirectories(this.dataDir);
+    }
+
     async getItem(slug: string): Promise<ItemData | null> {
         const ymlPath = path.join(this.getItemPath(slug), `${slug}.yml`);
 
@@ -571,6 +575,10 @@ export class DataRepository {
         }
     }
 
+    async countComparisons(): Promise<number> {
+        return this.countNonEmptyDirectories(this.comparisonsDir);
+    }
+
     async getComparison(slug: string): Promise<ComparisonData | null> {
         const ymlPath = path.join(this.getComparisonPath(slug), `${slug}.yml`);
         try {
@@ -721,6 +729,27 @@ export class DataRepository {
 
     private isDuplicateKeyError(error: unknown): error is Error {
         return error instanceof Error && error.message.includes('Map keys must be unique');
+    }
+
+    private async countNonEmptyDirectories(dir: string): Promise<number> {
+        try {
+            const entries = await fs.readdir(dir, { withFileTypes: true });
+            const counts = await Promise.all(
+                entries
+                    .filter((entry) => entry.isDirectory())
+                    .map(async (entry) => {
+                        const childEntries = await fs.readdir(path.join(dir, entry.name));
+                        return childEntries.length > 0 ? 1 : 0;
+                    }),
+            );
+
+            return counts.reduce((sum, count) => sum + count, 0);
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return 0;
+            }
+            throw err;
+        }
     }
 
     async updateItem(slug: string, updates: Partial<ItemData>): Promise<ItemData | null> {

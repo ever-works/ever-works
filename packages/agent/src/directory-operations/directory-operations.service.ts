@@ -63,6 +63,8 @@ export function buildImportStatsUpdate(
 
 @Injectable()
 export class DirectoryOperationsService {
+    private readonly generateStatusUpdateQueue = new Map<string, Promise<void>>();
+
     constructor(
         private readonly directoryRepository: DirectoryRepository,
         private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
@@ -79,24 +81,29 @@ export class DirectoryOperationsService {
     }
 
     async updateGenerateStatus(id: string, status: Directory['generateStatus']): Promise<void> {
-        if (status?.warnings?.length) {
-            status = { ...status, warnings: [...new Set(status.warnings)] };
-        }
-        await this.directoryRepository.updateGenerateStatus(id, status);
+        await this.runGenerateStatusUpdate(id, async () => {
+            await this.directoryRepository.updateGenerateStatus(
+                id,
+                this.normalizeGenerateStatus(status),
+            );
+        });
     }
 
     async updateGenerateRecentLogs(id: string, recentLogs: GenerationStepLog[]): Promise<void> {
-        const currentStatus = await this.getGenerateStatus(id);
-        if (!currentStatus) {
-            return;
-        }
+        await this.runGenerateStatusUpdate(id, async () => {
+            const currentStatus = await this.getGenerateStatus(id);
+            if (!currentStatus) {
+                return;
+            }
 
-        const nextStatus: Directory['generateStatus'] = {
-            ...currentStatus,
-            recentLogs,
-        };
-
-        await this.updateGenerateStatus(id, nextStatus);
+            await this.directoryRepository.updateGenerateStatus(
+                id,
+                this.normalizeGenerateStatus({
+                    ...currentStatus,
+                    recentLogs,
+                }),
+            );
+        });
     }
 
     async updateLastPullRequest(id: string, payload: Directory['lastPullRequest']): Promise<void> {
@@ -137,5 +144,36 @@ export class DirectoryOperationsService {
         updates: GenerationHistoryUpdateInput,
     ): Promise<void> {
         await this.generationHistoryRepository.updateEntry(historyId, updates);
+    }
+
+    private normalizeGenerateStatus(
+        status: Directory['generateStatus'],
+    ): Directory['generateStatus'] {
+        if (!status?.warnings?.length) {
+            return status;
+        }
+
+        return {
+            ...status,
+            warnings: [...new Set(status.warnings)],
+        };
+    }
+
+    private async runGenerateStatusUpdate(
+        id: string,
+        operation: () => Promise<void>,
+    ): Promise<void> {
+        const previous = this.generateStatusUpdateQueue.get(id) ?? Promise.resolve();
+        const queued = previous.catch(() => undefined).then(operation);
+
+        this.generateStatusUpdateQueue.set(id, queued);
+
+        try {
+            await queued;
+        } finally {
+            if (this.generateStatusUpdateQueue.get(id) === queued) {
+                this.generateStatusUpdateQueue.delete(id);
+            }
+        }
     }
 }

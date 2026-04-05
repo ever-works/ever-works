@@ -798,18 +798,48 @@ export class DataGeneratorService {
     async count(directory: Directory, user: User) {
         const data = await this.repositoryData(directory, user);
 
-        const [categories, tags, items, comparisons] = await Promise.all([
+        const [categories, tags, items, comparisons] = await Promise.allSettled([
             data.getCategories(),
             data.getTags(),
-            data.getItems(),
-            data.getComparisons().catch(() => []),
+            data.countItems(),
+            data.countComparisons(),
         ]);
 
+        const getArrayCount = <T>(
+            result: PromiseSettledResult<T[]>,
+            label: 'categories' | 'tags',
+        ): number => {
+            if (result.status === 'fulfilled') {
+                return result.value.length;
+            }
+
+            this.logger.warn(
+                `Failed to count ${label} for directory ${directory.id}; defaulting to 0.`,
+                result.reason instanceof Error ? result.reason.stack : undefined,
+            );
+            return 0;
+        };
+
+        const getNumberCount = (
+            result: PromiseSettledResult<number>,
+            label: 'items' | 'comparisons',
+        ): number => {
+            if (result.status === 'fulfilled') {
+                return result.value;
+            }
+
+            this.logger.warn(
+                `Failed to count ${label} for directory ${directory.id}; defaulting to 0.`,
+                result.reason instanceof Error ? result.reason.stack : undefined,
+            );
+            return 0;
+        };
+
         return {
-            items: items.length,
-            categories: categories.length,
-            tags: tags.length,
-            comparisons: comparisons.length,
+            items: getNumberCount(items, 'items'),
+            categories: getArrayCount(categories, 'categories'),
+            tags: getArrayCount(tags, 'tags'),
+            comparisons: getNumberCount(comparisons, 'comparisons'),
         };
     }
 
