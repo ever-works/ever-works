@@ -59,6 +59,7 @@ jobs:
           TRIGGER_ENABLED: ${{ secrets.TRIGGER_ENABLED }}
           TRIGGER_SECRET_KEY: ${{ secrets.TRIGGER_SECRET_KEY }}
           TRIGGER_INTERNAL_SECRET: ${{ secrets.TRIGGER_INTERNAL_SECRET }}
+          TRIGGER_MACHINE: ${{ secrets.TRIGGER_MACHINE }}
 
           # GitHub Auth
           GH_CLIENT_ID: ${{ secrets.GH_CLIENT_ID }}
