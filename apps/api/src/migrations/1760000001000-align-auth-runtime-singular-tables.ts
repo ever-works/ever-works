@@ -105,8 +105,12 @@ export class AlignAuthRuntimeSingularTables1760000001000 implements MigrationInt
                 ],
                 indices: [
                     new TableIndex({
-                        name: 'IDX_verification_identifier_value',
-                        columnNames: ['identifier', 'value'],
+                        name: 'IDX_verification_identifier',
+                        columnNames: ['identifier'],
+                    }),
+                    new TableIndex({
+                        name: 'IDX_verification_value',
+                        columnNames: ['value'],
                         isUnique: true,
                     }),
                 ],
@@ -114,6 +118,9 @@ export class AlignAuthRuntimeSingularTables1760000001000 implements MigrationInt
             true,
         );
 
+        const hasAuthAccounts = await queryRunner.hasTable('auth_accounts');
+        const hasAuthSessions = await queryRunner.hasTable('auth_sessions');
+        const hasAuthVerifications = await queryRunner.hasTable('auth_verifications');
         const hasPluralAccounts = await queryRunner.hasTable('accounts');
         const hasPluralSessions = await queryRunner.hasTable('sessions');
         const hasPluralVerifications = await queryRunner.hasTable('verifications');
@@ -128,7 +135,8 @@ export class AlignAuthRuntimeSingularTables1760000001000 implements MigrationInt
             `SELECT COUNT(*) as count FROM "verification"`,
         )) as Array<{ count: number | string }>;
 
-        if (hasPluralAccounts && Number(accountCount) === 0) {
+        if (Number(accountCount) === 0 && (hasAuthAccounts || hasPluralAccounts)) {
+            const sourceTable = hasAuthAccounts ? 'auth_accounts' : 'accounts';
             await queryRunner.query(`
                 INSERT INTO "account" (
                     "id", "userId", "accountId", "providerId", "accessToken", "refreshToken",
@@ -139,30 +147,42 @@ export class AlignAuthRuntimeSingularTables1760000001000 implements MigrationInt
                     "id", "userId", "accountId", "providerId", "accessToken", "refreshToken",
                     "accessTokenExpiresAt", "refreshTokenExpiresAt", "expiresAt", "scope",
                     "password", "idToken", "tokenType", "createdAt", "updatedAt"
-                FROM "accounts"
+                FROM "${sourceTable}"
             `);
         }
 
-        if (hasPluralSessions && Number(sessionCount) === 0) {
+        if (Number(sessionCount) === 0 && (hasAuthSessions || hasPluralSessions)) {
+            const sourceTable = hasAuthSessions ? 'auth_sessions' : 'sessions';
             await queryRunner.query(`
                 INSERT INTO "session" (
                     "id", "userId", "token", "expiresAt", "ipAddress", "userAgent", "createdAt", "updatedAt"
                 )
                 SELECT
                     "id", "userId", "token", "expiresAt", "ipAddress", "userAgent", "createdAt", "updatedAt"
-                FROM "sessions"
+                FROM "${sourceTable}"
             `);
         }
 
-        if (hasPluralVerifications && Number(verificationCount) === 0) {
+        if (Number(verificationCount) === 0 && (hasAuthVerifications || hasPluralVerifications)) {
+            const sourceTable = hasAuthVerifications ? 'auth_verifications' : 'verifications';
             await queryRunner.query(`
                 INSERT INTO "verification" (
                     "id", "identifier", "value", "expiresAt", "createdAt", "updatedAt"
                 )
                 SELECT
                     "id", "identifier", "value", "expiresAt", "createdAt", "updatedAt"
-                FROM "verifications"
+                FROM "${sourceTable}"
             `);
+        }
+
+        if (hasAuthVerifications) {
+            await this.dropLegacyTable(queryRunner, 'auth_verifications');
+        }
+        if (hasAuthSessions) {
+            await this.dropLegacyTable(queryRunner, 'auth_sessions');
+        }
+        if (hasAuthAccounts) {
+            await this.dropLegacyTable(queryRunner, 'auth_accounts');
         }
     }
 
@@ -196,5 +216,21 @@ export class AlignAuthRuntimeSingularTables1760000001000 implements MigrationInt
             }
         }
         await queryRunner.dropTable('account', true);
+    }
+
+    private async dropLegacyTable(queryRunner: QueryRunner, tableName: string): Promise<void> {
+        const table = await queryRunner.getTable(tableName);
+        if (!table) {
+            return;
+        }
+
+        for (const foreignKey of table.foreignKeys) {
+            await queryRunner.dropForeignKey(tableName, foreignKey);
+        }
+        for (const index of table.indices) {
+            await queryRunner.dropIndex(tableName, index);
+        }
+
+        await queryRunner.dropTable(tableName, true);
     }
 }

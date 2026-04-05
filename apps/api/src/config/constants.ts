@@ -1,26 +1,3 @@
-export const jwtConstants = {
-    secret: () => {
-        const secret = process.env.JWT_SECRET;
-        if (!secret) {
-            throw new Error('JWT_SECRET environment variable is required');
-        }
-        return secret;
-    },
-    accessTokenExpiration: (): any => {
-        const expiration = process.env.JWT_ACCESS_TOKEN_EXPIRATION;
-        // Return undefined to disable expiration
-        return expiration === 'never' ? undefined : expiration || '7d';
-    },
-    refreshTokenExpiration: () => {
-        const days = process.env.JWT_REFRESH_TOKEN_EXPIRATION_DAYS;
-        // Return -1 to indicate no expiration
-        return days === 'never' ? -1 : parseInt(days || '14', 10);
-    },
-    isTokenExpirationDisabled: () => {
-        return process.env.JWT_DISABLE_EXPIRATION === 'true';
-    },
-};
-
 export const authConstants = {
     bcryptSaltRounds: 10,
     refreshTokenLength: 32,

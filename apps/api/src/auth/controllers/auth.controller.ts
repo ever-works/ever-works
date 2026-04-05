@@ -22,7 +22,7 @@ import { AuthService } from '../services/auth.service';
 import { RegisterDto, LoginDto, UpdatePasswordDto } from '../dto/auth.dto';
 import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/email-verification.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { AuthSessionGuard } from '../guards/auth-session.guard';
 import { Public } from '../decorators/public.decorator';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
@@ -116,7 +116,7 @@ export class AuthController {
         return result;
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(AuthSessionGuard)
     @Post('logout')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
@@ -131,7 +131,7 @@ export class AuthController {
         return { message: 'Logged out successfully' };
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(AuthSessionGuard)
     @Post('logout-all')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
@@ -145,7 +145,7 @@ export class AuthController {
         return { message: 'Logged out from all devices successfully' };
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(AuthSessionGuard)
     @Get('profile')
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
@@ -157,7 +157,7 @@ export class AuthController {
         return req.user;
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(AuthSessionGuard)
     @Get('profile/fresh')
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
@@ -170,7 +170,7 @@ export class AuthController {
         return this.authService.getUserProfile(req.user.userId);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(AuthSessionGuard)
     @Post('update-password')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
@@ -186,7 +186,7 @@ export class AuthController {
         return { message: 'Password updated successfully' };
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(AuthSessionGuard)
     @Put('profile')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
@@ -199,7 +199,7 @@ export class AuthController {
         return this.authService.updateUserProfile(req.user.userId, updateProfileDto);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(AuthSessionGuard)
     @Post('send-verification')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')

@@ -6,7 +6,7 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.createTable(
             new Table({
-                name: 'auth_accounts',
+                name: 'account',
                 columns: [
                     {
                         name: 'id',
@@ -76,23 +76,23 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
         );
 
         await queryRunner.createIndex(
-            'auth_accounts',
+            'account',
             new TableIndex({
-                name: 'IDX_auth_accounts_provider_account',
+                name: 'IDX_account_provider_account',
                 columnNames: ['providerId', 'accountId'],
                 isUnique: true,
             }),
         );
         await queryRunner.createIndex(
-            'auth_accounts',
+            'account',
             new TableIndex({
-                name: 'IDX_auth_accounts_user_provider',
+                name: 'IDX_account_user_provider',
                 columnNames: ['userId', 'providerId'],
                 isUnique: true,
             }),
         );
         await queryRunner.createForeignKey(
-            'auth_accounts',
+            'account',
             new TableForeignKey({
                 columnNames: ['userId'],
                 referencedTableName: 'users',
@@ -103,7 +103,7 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
 
         await queryRunner.createTable(
             new Table({
-                name: 'auth_sessions',
+                name: 'session',
                 columns: [
                     {
                         name: 'id',
@@ -148,22 +148,22 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
         );
 
         await queryRunner.createIndex(
-            'auth_sessions',
+            'session',
             new TableIndex({
-                name: 'IDX_auth_sessions_token',
+                name: 'IDX_session_token',
                 columnNames: ['token'],
                 isUnique: true,
             }),
         );
         await queryRunner.createIndex(
-            'auth_sessions',
+            'session',
             new TableIndex({
-                name: 'IDX_auth_sessions_user',
+                name: 'IDX_session_userId',
                 columnNames: ['userId'],
             }),
         );
         await queryRunner.createForeignKey(
-            'auth_sessions',
+            'session',
             new TableForeignKey({
                 columnNames: ['userId'],
                 referencedTableName: 'users',
@@ -174,7 +174,7 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
 
         await queryRunner.createTable(
             new Table({
-                name: 'auth_verifications',
+                name: 'verification',
                 columns: [
                     {
                         name: 'id',
@@ -209,16 +209,16 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
         );
 
         await queryRunner.createIndex(
-            'auth_verifications',
+            'verification',
             new TableIndex({
-                name: 'IDX_auth_verifications_identifier',
+                name: 'IDX_verification_identifier',
                 columnNames: ['identifier'],
             }),
         );
         await queryRunner.createIndex(
-            'auth_verifications',
+            'verification',
             new TableIndex({
-                name: 'IDX_auth_verifications_value',
+                name: 'IDX_verification_value',
                 columnNames: ['value'],
                 isUnique: true,
             }),
@@ -226,34 +226,34 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        const verificationTable = await queryRunner.getTable('auth_verifications');
+        const verificationTable = await queryRunner.getTable('verification');
         if (verificationTable) {
             for (const index of verificationTable.indices) {
-                await queryRunner.dropIndex('auth_verifications', index);
+                await queryRunner.dropIndex('verification', index);
             }
         }
-        await queryRunner.dropTable('auth_verifications', true);
+        await queryRunner.dropTable('verification', true);
 
-        const sessionTable = await queryRunner.getTable('auth_sessions');
+        const sessionTable = await queryRunner.getTable('session');
         if (sessionTable) {
             for (const foreignKey of sessionTable.foreignKeys) {
-                await queryRunner.dropForeignKey('auth_sessions', foreignKey);
+                await queryRunner.dropForeignKey('session', foreignKey);
             }
             for (const index of sessionTable.indices) {
-                await queryRunner.dropIndex('auth_sessions', index);
+                await queryRunner.dropIndex('session', index);
             }
         }
-        await queryRunner.dropTable('auth_sessions', true);
+        await queryRunner.dropTable('session', true);
 
-        const accountTable = await queryRunner.getTable('auth_accounts');
+        const accountTable = await queryRunner.getTable('account');
         if (accountTable) {
             for (const foreignKey of accountTable.foreignKeys) {
-                await queryRunner.dropForeignKey('auth_accounts', foreignKey);
+                await queryRunner.dropForeignKey('account', foreignKey);
             }
             for (const index of accountTable.indices) {
-                await queryRunner.dropIndex('auth_accounts', index);
+                await queryRunner.dropIndex('account', index);
             }
         }
-        await queryRunner.dropTable('auth_accounts', true);
+        await queryRunner.dropTable('account', true);
     }
 }

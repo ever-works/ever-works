@@ -21,13 +21,13 @@ import {
 } from '@nestjs/swagger';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { NotificationCategory } from '@ever-works/agent/entities';
-import { CurrentUser, JwtAuthGuard } from '../auth';
-import { AuthenticatedUser } from '@src/auth/types/jwt.types';
+import { CurrentUser, AuthSessionGuard } from '../auth';
+import { AuthenticatedUser } from '@src/auth/types/auth.types';
 
 @ApiTags('Notifications')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/notifications')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AuthSessionGuard)
 export class NotificationsController {
     constructor(private readonly notificationService: NotificationService) {}
 

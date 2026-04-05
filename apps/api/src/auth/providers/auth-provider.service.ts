@@ -2,7 +2,7 @@ import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { UserRepository } from '@ever-works/agent/database';
 import { AuthSession, User } from '@ever-works/agent/entities';
-import type { AuthenticatedUser, TokenResponse } from '../types/jwt.types';
+import type { AuthenticatedUser, TokenResponse } from '../types/auth.types';
 import { AUTH_RUNTIME_INSTANCE } from './auth-provider.constants';
 import { AuthProvider } from './auth-provider.abstract';
 import { createAuthRuntimeInstance } from './auth-runtime.instance';

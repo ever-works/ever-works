@@ -4,14 +4,14 @@ import { SearchFacadeService, NoProviderError } from '@ever-works/agent/facades'
 import { PluginRegistryService, PluginSettingsService } from '@ever-works/agent/plugins';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import type { JsonSchema } from '@ever-works/plugin';
-import { CurrentUser, JwtAuthGuard } from '../../auth';
-import { AuthenticatedUser } from '../../auth/types/jwt.types';
+import { CurrentUser, AuthSessionGuard } from '../../auth';
+import { AuthenticatedUser } from '../../auth/types/auth.types';
 import { SearchDto } from './dto/search.dto';
 
 @ApiTags('Search')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/search')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AuthSessionGuard)
 export class SearchController {
     constructor(
         private readonly searchFacade: SearchFacadeService,

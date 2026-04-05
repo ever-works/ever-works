@@ -1,4 +1,4 @@
-import type { AuthenticatedUser, TokenResponse } from '../types/jwt.types';
+import type { AuthenticatedUser, TokenResponse } from '../types/auth.types';
 
 export abstract class AuthProvider {
     abstract authenticate(headers: Headers): Promise<AuthenticatedUser | null>;

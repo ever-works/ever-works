@@ -10,7 +10,7 @@ import { AuthProviderService } from './providers/auth-provider.service';
 import { AuthSyncService } from './providers/auth-sync.service';
 import { createAuthRuntimeInstance } from './providers/auth-runtime.instance';
 import { SocialAuthService } from './services/social-auth.service';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { AuthSessionGuard } from './guards/auth-session.guard';
 import {
     DatabaseModule,
     ApiKeyRepository,
@@ -27,7 +27,7 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
         AuthProviderService,
         AuthSyncService,
         SocialAuthService,
-        JwtAuthGuard,
+        AuthSessionGuard,
         ApiKeyRepository,
         UserRepository,
         OAuthTokenRepository,
@@ -44,7 +44,7 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
     exports: [
         AuthService,
         ApiKeyService,
-        JwtAuthGuard,
+        AuthSessionGuard,
         AUTH_PROVIDER,
         AUTH_RUNTIME_INSTANCE,
         AuthSyncService,

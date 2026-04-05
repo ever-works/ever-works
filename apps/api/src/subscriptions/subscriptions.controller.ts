@@ -9,9 +9,9 @@ import {
     UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { JwtAuthGuard, AuthService, CurrentUser } from '@src/auth';
+import { AuthSessionGuard, AuthService, CurrentUser } from '@src/auth';
 import { SubscriptionService } from '@ever-works/agent/subscriptions';
-import { AuthenticatedUser } from '@src/auth/types/jwt.types';
+import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { SubscriptionPlanCode } from '@ever-works/agent/entities';
 import { IsEnum } from 'class-validator';
 
@@ -23,7 +23,7 @@ class UpdateSubscriptionPlanDto {
 @ApiTags('Subscriptions')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/subscriptions')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AuthSessionGuard)
 export class SubscriptionsController {
     constructor(
         private readonly subscriptionService: SubscriptionService,

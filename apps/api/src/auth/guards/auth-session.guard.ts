@@ -1,19 +1,17 @@
-import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { ModuleRef } from '@nestjs/core';
-import { Reflector } from '@nestjs/core';
+import { Injectable, ExecutionContext, UnauthorizedException, Inject } from '@nestjs/common';
+import { ModuleRef, Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { ApiKeyService } from '../services/api-key.service';
 import { UserRepository } from '@ever-works/agent/database';
-import type { AuthenticatedUser } from '../types/jwt.types';
+import type { AuthenticatedUser } from '../types/auth.types';
 import { AUTH_PROVIDER } from '../providers/auth-provider.constants';
 import { AuthProvider } from '../providers/auth-provider.abstract';
 import { toHeaders } from '../providers/request-headers';
-import { Inject } from '@nestjs/common';
 
 const API_KEY_PREFIX = 'ew_live_';
 
 @Injectable()
-export class JwtAuthGuard {
+export class AuthSessionGuard {
     private apiKeyService: ApiKeyService;
     private userRepository: UserRepository;
 
@@ -33,12 +31,10 @@ export class JwtAuthGuard {
             return true;
         }
 
-        // Try API key authentication first
         const request = context.switchToHttp().getRequest();
         const apiKey = this.extractApiKey(request);
 
         if (apiKey) {
-            // Lazily resolve dependencies on first API key request
             if (!this.apiKeyService) {
                 this.apiKeyService = this.moduleRef.get(ApiKeyService, { strict: false });
             }
@@ -73,7 +69,6 @@ export class JwtAuthGuard {
             return true;
         }
 
-        // Try provider-backed session/bearer auth next
         const providerUser = await this.authProvider.authenticate(toHeaders(request.headers || {}));
         if (providerUser) {
             request.user = providerUser;
@@ -84,13 +79,11 @@ export class JwtAuthGuard {
     }
 
     private extractApiKey(request: any): string | null {
-        // Check x-api-key header
         const headerKey = request.headers?.['x-api-key'];
         if (headerKey && typeof headerKey === 'string' && headerKey.startsWith(API_KEY_PREFIX)) {
             return headerKey;
         }
 
-        // Check Authorization: Bearer ew_live_...
         const authHeader = request.headers?.authorization;
         if (authHeader && typeof authHeader === 'string') {
             const [scheme, token] = authHeader.split(' ');

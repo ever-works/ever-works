@@ -17,7 +17,7 @@ import {
     ApiParam,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/user.decorator';
-import type { AuthenticatedUser } from '../auth/types/jwt.types';
+import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import type { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 import type { Response } from 'express';
