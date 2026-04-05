@@ -99,9 +99,9 @@ export function EverWorksOnboardingWizard({
         <Dialog open={shouldOpen} onOpenChange={(open) => !open && dismiss()}>
             <DialogContent className="max-w-5xl p-0 overflow-hidden rounded-lg shadow-2xl">
                 {/* Top progress bar */}
-                <div className="absolute top-0 left-0 right-0 h-[3px] bg-border/40 dark:bg-border-dark/40 z-10 rounded-t-lg">
+                <div className="absolute top-0 left-0 right-0 h-[3px] bg-border dark:bg-border-dark z-10 rounded-t-lg">
                     <div
-                        className="h-full bg-primary transition-all duration-500 ease-out rounded-t-2xl"
+                        className="h-full bg-text dark:bg-white/70 transition-all duration-500 ease-out rounded-t-2xl"
                         style={{ width: `${progressPercent}%` }}
                     />
                 </div>
@@ -111,7 +111,7 @@ export function EverWorksOnboardingWizard({
                     <aside className="relative flex flex-col bg-surface-secondary/50 dark:bg-surface-secondary-dark/60 border-r border-border dark:border-border-dark">
                         {/* Brand header */}
                         <div className="px-5 pt-8 pb-5">
-                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2.5 py-1 rounded-full mb-3">
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-text-muted dark:text-text-muted-dark bg-surface-secondary dark:bg-white/5 px-2.5 py-1 rounded-full mb-3">
                                 {t('label')}
                             </span>
                             <DialogHeader className="mt-2 space-y-1">
@@ -151,7 +151,7 @@ export function EverWorksOnboardingWizard({
                                         className={cn(
                                             'w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-all',
                                             isActive
-                                                ? 'bg-primary/10'
+                                                ? 'bg-surface dark:bg-white/5'
                                                 : 'hover:bg-surface dark:hover:bg-surface-dark',
                                         )}
                                     >
@@ -162,7 +162,7 @@ export function EverWorksOnboardingWizard({
                                                 isDone
                                                     ? 'bg-success text-white'
                                                     : isActive
-                                                      ? 'bg-primary text-white shadow-sm shadow-primary/30'
+                                                      ? 'bg-text dark:bg-white text-white dark:text-black'
                                                       : isPast
                                                         ? 'bg-border dark:bg-border-dark text-text-muted dark:text-text-muted-dark'
                                                         : 'border border-border dark:border-border-dark text-text-muted dark:text-text-muted-dark',
@@ -181,7 +181,7 @@ export function EverWorksOnboardingWizard({
                                                 isDone
                                                     ? 'text-success'
                                                     : isActive
-                                                      ? 'font-medium text-primary'
+                                                      ? 'font-medium text-text dark:text-text-dark'
                                                       : 'text-text-secondary dark:text-text-secondary-dark',
                                             )}
                                         >
@@ -212,8 +212,8 @@ export function EverWorksOnboardingWizard({
                             {currentStep.kind === 'welcome' && (
                                 <div className="space-y-6 max-w-2xl">
                                     <div className="flex items-start gap-4">
-                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                                            <BookOpen className="w-5 h-5 text-primary" />
+                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-secondary dark:bg-white/5">
+                                            <BookOpen className="w-5 h-5 text-text-secondary dark:text-text-secondary-dark" />
                                         </div>
                                         <div>
                                             <h3 className="text-lg font-semibold text-text dark:text-text-dark">
@@ -255,9 +255,9 @@ export function EverWorksOnboardingWizard({
                                         ].map((feature) => (
                                             <div
                                                 key={feature.title}
-                                                className="rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-4 hover:border-primary/30 hover:bg-primary/5 transition-all"
+                                                className="rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-4 hover:border-border-secondary dark:hover:border-white/20 hover:bg-surface-secondary dark:hover:bg-white/5 transition-all"
                                             >
-                                                <feature.Icon className="w-4 h-4 text-primary mb-2.5" />
+                                                <feature.Icon className="w-4 h-4 text-text-secondary dark:text-text-secondary-dark mb-2.5" />
                                                 <p className="text-xs font-semibold text-text dark:text-text-dark mb-1">
                                                     {feature.title}
                                                 </p>
@@ -305,8 +305,8 @@ export function EverWorksOnboardingWizard({
                             {currentStep.kind === 'directory' && (
                                 <div className="space-y-5 max-w-lg">
                                     <div className="flex items-start gap-4">
-                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                                            <FolderPlus className="w-5 h-5 text-primary" />
+                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-secondary dark:bg-white/5">
+                                            <FolderPlus className="w-5 h-5 text-text-secondary dark:text-text-secondary-dark" />
                                         </div>
                                         <div>
                                             <h3 className="text-lg font-semibold text-text dark:text-text-dark">
@@ -323,7 +323,7 @@ export function EverWorksOnboardingWizard({
                                         </p>
                                         <Link
                                             href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
-                                            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+                                            className="inline-flex items-center gap-2 rounded-lg bg-black dark:bg-button-primary-dark px-4 py-2.5 text-sm font-medium text-white dark:text-black transition-colors hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark"
                                             onClick={dismiss}
                                         >
                                             {t('steps.directory.action')}
@@ -346,9 +346,9 @@ export function EverWorksOnboardingWizard({
                                         className={cn(
                                             'rounded-full transition-all duration-200',
                                             i === activeStep
-                                                ? 'w-5 h-1.5 bg-primary'
+                                                ? 'w-5 h-1.5 bg-text dark:bg-white'
                                                 : i < activeStep
-                                                  ? 'w-1.5 h-1.5 bg-primary/40'
+                                                  ? 'w-1.5 h-1.5 bg-border-secondary dark:bg-white/20'
                                                   : 'w-1.5 h-1.5 bg-border dark:bg-border-dark',
                                         )}
                                     />
