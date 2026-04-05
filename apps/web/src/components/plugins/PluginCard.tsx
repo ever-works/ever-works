@@ -39,7 +39,7 @@ export function PluginCard({ plugin }: PluginCardProps) {
         enabled: plugin.enabled,
         visibility: plugin.visibility,
     });
-    const isEnabled = optimisticEnabled || plugin.systemPlugin;
+    const isSelected = optimisticEnabled || plugin.systemPlugin;
 
     const visibleCaps = plugin.capabilities.filter(
         (cap) => cap !== plugin.category && !HIDDEN_CAPABILITIES.has(cap),
@@ -54,23 +54,16 @@ export function PluginCard({ plugin }: PluginCardProps) {
                     'border-border dark:border-border-dark',
                     'transition-all hover:shadow-md',
                     'flex flex-col h-full',
-                    (optimisticEnabled || plugin.systemPlugin) && 'ring-1 ring-primary/20',
+                    isSelected && 'ring-1 ring-primary/20 dark:bg-[#111]',
                 )}
             >
                 {/* Header: icon + meta */}
                 <div className="flex items-center gap-3 mb-3">
                     <PluginIcon icon={plugin.icon} name={plugin.name} size={36} />
                     <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                            <h3 className="font-medium text-sm leading-snug text-text dark:text-text-dark">
-                                {plugin.name}
-                            </h3>
-                            {isEnabled && (
-                                <span className="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-900 dark:border-white/10 dark:bg-[#111] dark:text-white">
-                                    {t('enabled')}
-                                </span>
-                            )}
-                        </div>
+                        <h3 className="font-medium text-sm leading-snug text-text dark:text-text-dark">
+                            {plugin.name}
+                        </h3>
                         <p className="text-[11px] text-text-muted dark:text-text-muted-dark mt-0.5">
                             v{plugin.version}
                             {plugin.systemPlugin && (
