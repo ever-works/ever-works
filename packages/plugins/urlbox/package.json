@@ -14,7 +14,7 @@
 		}
 	},
 	"scripts": {
-		"build": "tsup",
+		"build": "tsc --noEmit && tsup",
 		"dev": "tsup --watch",
 		"type-check": "tsc --noEmit",
 		"clean": "rm -rf dist",
