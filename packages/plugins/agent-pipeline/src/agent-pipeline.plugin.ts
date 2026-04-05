@@ -711,15 +711,14 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 
 			for (const toolResult of toolResults) {
 				const tr = toolResult as { toolName?: unknown; output?: unknown };
-				if (tr.toolName !== 'processUrls') continue;
+				if (tr.toolName !== 'processUrl') continue;
 
-				if (!Array.isArray(tr.output)) continue;
-				for (const result of tr.output as ProcessUrlExecutionResult[]) {
-					totalUrls++;
-					if (typeof result?.error === 'string' && result.error.trim()) {
-						failedUrls++;
-						uniqueErrors.add(result.error.trim());
-					}
+				if (!tr.output || typeof tr.output !== 'object') continue;
+				const result = tr.output as ProcessUrlExecutionResult;
+				totalUrls++;
+				if (typeof result.error === 'string' && result.error.trim()) {
+					failedUrls++;
+					uniqueErrors.add(result.error.trim());
 				}
 			}
 		}

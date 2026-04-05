@@ -4,7 +4,6 @@ import {
 	isAgentPipelineStepId,
 	DEFAULT_MAX_STEPS,
 	getWorkerContentBudgetRatio,
-	MAX_URLS_PER_BATCH,
 	MAX_CHUNK_CHARS,
 	getStepsPerChunk,
 	getWorkerTimeoutMs,
@@ -56,10 +55,6 @@ describe('types', () => {
 			expect(getWorkerContentBudgetRatio(64_000)).toBe(0.5);
 			expect(getWorkerContentBudgetRatio(128_000)).toBe(0.55);
 			expect(getWorkerContentBudgetRatio(200_000)).toBe(0.55);
-		});
-
-		it('should have max URLs per batch', () => {
-			expect(MAX_URLS_PER_BATCH).toBe(10);
 		});
 
 		it('should have a practical max chunk chars cap', () => {

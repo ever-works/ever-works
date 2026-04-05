@@ -59,7 +59,7 @@ describe('createParentTools', () => {
 		const { tools } = createParentTools(ctx);
 
 		expect(tools).toHaveProperty('search');
-		expect(tools).toHaveProperty('processUrls');
+		expect(tools).toHaveProperty('processUrl');
 		expect(tools).toHaveProperty('modifyItems');
 		expect(tools).toHaveProperty('getWorkspaceOverview');
 		expect(tools).toHaveProperty('reportProgress');
@@ -73,44 +73,43 @@ describe('createParentTools', () => {
 		expect(typeof breaker.isTripped).toBe('function');
 	});
 
-	describe('processUrls tool', () => {
-		it('processes URLs in parallel', async () => {
-			mockProcessUrl
-				.mockResolvedValueOnce({ url: 'https://a.com', files: ['a.json'], count: 1 })
-				.mockResolvedValueOnce({ url: 'https://b.com', files: ['b.json', 'c.json'], count: 2 });
+	describe('processUrl tool', () => {
+		it('processes a single URL', async () => {
+			mockProcessUrl.mockResolvedValueOnce({
+				url: 'https://a.com',
+				files: ['a.json'],
+				count: 1
+			});
 
 			const ctx = createMockContext();
 			const { tools } = createParentTools(ctx);
-			const processUrls = tools.processUrls as { execute: Function };
+			const processUrl = tools.processUrl as { execute: Function };
 
-			const result = await processUrls.execute(
-				{ urls: ['https://a.com', 'https://b.com'] },
-				{ toolCallId: 'tc1', messages: [] }
+			const result = await processUrl.execute({ url: 'https://a.com' }, { toolCallId: 'tc1', messages: [] });
+
+			expect(result.count).toBe(1);
+			expect(mockProcessUrl).toHaveBeenCalledTimes(1);
+			expect(mockProcessUrl).toHaveBeenCalledWith(
+				'https://a.com',
+				expect.objectContaining({ workspacePath: '/tmp/workspace' })
 			);
-
-			expect(result).toHaveLength(2);
-			expect(result[0].count).toBe(1);
-			expect(result[1].count).toBe(2);
-			expect(mockProcessUrl).toHaveBeenCalledTimes(2);
 		});
 
 		it('handles worker failures gracefully', async () => {
-			mockProcessUrl
-				.mockResolvedValueOnce({ url: 'https://a.com', files: ['a.json'], count: 1 })
-				.mockRejectedValueOnce(new Error('Network error'));
+			mockProcessUrl.mockRejectedValueOnce(new Error('Network error'));
 
 			const ctx = createMockContext();
 			const { tools } = createParentTools(ctx);
-			const processUrls = tools.processUrls as { execute: Function };
+			const processUrl = tools.processUrl as { execute: Function };
 
-			const result = await processUrls.execute(
-				{ urls: ['https://a.com', 'https://b.com'] },
-				{ toolCallId: 'tc1', messages: [] }
-			);
+			const result = await processUrl.execute({ url: 'https://b.com' }, { toolCallId: 'tc1', messages: [] });
 
-			expect(result).toHaveLength(2);
-			expect(result[0].count).toBe(1);
-			expect(result[1].error).toBe('Network error');
+			expect(result).toEqual({
+				url: 'https://b.com',
+				files: [],
+				count: 0,
+				error: 'Network error'
+			});
 		});
 	});
 

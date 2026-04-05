@@ -19,7 +19,6 @@ import { processUrlWorker } from '../worker/url-worker.js';
 import type { WorkerPromptOptions } from '../worker/extraction-prompt.js';
 import { processModification } from '../worker/modification-worker.js';
 import { ToolCircuitBreaker } from '../utils/tool-circuit-breaker.js';
-import { MAX_URLS_PER_BATCH } from '../types.js';
 import type { TokenUsageAccumulator } from '../types.js';
 
 export interface ParentToolContext {
@@ -52,14 +51,13 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 	const breaker = new ToolCircuitBreaker({ logger: ctx.logger });
 	const toolOptions: FacadeToolOptions = { breaker, logger: ctx.logger };
 
-	const processUrlsTool = tool({
-		description: 'Process 1-10 URLs in parallel: extract content, create items, with best-effort deduplication.',
+	const processUrlTool = tool({
+		description:
+			'Process one URL: extract content, create items, and return the result so the parent agent can decide what to do next.',
 		inputSchema: z.object({
-			urls: z.array(z.string().url()).min(1).max(MAX_URLS_PER_BATCH)
+			url: z.string().url()
 		}),
-		// Cross-URL dedup within a batch is best-effort (parallel workers share no state);
-		// duplicates are caught by the post-pipeline metadata merge.
-		execute: async ({ urls }) => {
+		execute: async ({ url }) => {
 			const workerCtx = {
 				workerModel: ctx.workerModel,
 				maxContextTokens: ctx.workerMaxContextTokens,
@@ -75,22 +73,16 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 				onLogEntry: ctx.onLogEntry
 			};
 
-			const mapper = async (url: string) => {
-				try {
-					return await processUrlWorker(url, workerCtx);
-				} catch (error) {
-					return {
-						url,
-						files: [],
-						count: 0,
-						error: error instanceof Error ? error.message : String(error)
-					};
-				}
-			};
-
-			const pMap = (await import('p-map')).default;
-
-			return pMap(urls, mapper, { concurrency: 2 });
+			try {
+				return await processUrlWorker(url, workerCtx);
+			} catch (error) {
+				return {
+					url,
+					files: [],
+					count: 0,
+					error: error instanceof Error ? error.message : String(error)
+				};
+			}
 		}
 	});
 
@@ -124,7 +116,7 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 		tools: {
 			search: createSearchTool(ctx.facades.searchFacade, ctx.facadeOptions, toolOptions),
 			findItems: createFindItemsTool(ctx.workspacePath),
-			processUrls: processUrlsTool,
+			processUrl: processUrlTool,
 			modifyItems: modifyItemsTool,
 			getWorkspaceOverview: getWorkspaceOverviewTool,
 			reportProgress: createReportProgressTool(ctx.onProgress, 1, ctx.totalSteps)

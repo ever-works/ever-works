@@ -10,6 +10,8 @@ import { MarkdownRepository } from './markdown-repository';
 import { GenerationMethod } from '../../items-generator/dto';
 import { DirectoryOperationsService } from '@src/directory-operations';
 import { getDirectoryOwner } from '../../utils/directory.utils';
+import { cloneFreshRepository } from '../../utils/fresh-repository-clone.utils';
+import { assertCreatedRepositoryTarget } from '../../utils/git-repository.utils';
 
 type InitializeOptions = {
     generation_method?: GenerationMethod;
@@ -32,24 +34,32 @@ export class MarkdownGeneratorService {
         const description = directory.description;
 
         // Create repository through facade
-        await this.gitFacade.createRepository(
-            {
-                name: directory.slug,
-                description,
-                organization: directory.organization ? directory.getRepoOwner() : undefined,
-                isPrivate: true,
-            },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+        const markdownRepository = assertCreatedRepositoryTarget(
+            await this.gitFacade.createRepository(
+                {
+                    name: directory.slug,
+                    description,
+                    organization: directory.organization ? directory.getRepoOwner() : undefined,
+                    isPrivate: true,
+                },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
+            ),
+            directory.getRepoOwner(),
+            directory.slug,
+            'Markdown repository',
         );
 
         // Clone markdown repo
-        const markdownPath = await this.gitFacade.cloneOrPull(
+        const markdownPath = await cloneFreshRepository(
+            this.gitFacade,
             {
-                owner: directory.getRepoOwner(),
-                repo: directory.slug,
+                owner: markdownRepository.owner,
+                repo: markdownRepository.name,
                 committer,
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
             },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            this.logger,
         );
 
         // Clone data repo

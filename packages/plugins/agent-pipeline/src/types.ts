@@ -116,8 +116,6 @@ export function getStepsPerChunk(chunkChars: number): number {
 	return Math.min(Math.max(needed, BASE_STEPS_PER_CHUNK), MAX_STEPS_PER_CHUNK);
 }
 
-export const MAX_URLS_PER_BATCH = 10;
-
 export function getWorkerTimeoutMs(stepLimit: number): number {
 	const timeoutMinutes = Math.min(8, Math.max(3, Math.ceil(stepLimit / 25)));
 	return timeoutMinutes * 60 * 1000;

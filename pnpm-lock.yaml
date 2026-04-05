@@ -890,9 +890,6 @@ importers:
       just-bash:
         specifier: ^2.9.8
         version: 2.9.8
-      p-map:
-        specifier: ^7.0.4
-        version: 7.0.4
       stopword:
         specifier: ^3.1.5
         version: 3.1.5

@@ -4,10 +4,10 @@ import type {
     GenerationLogSource,
 } from '@ever-works/contracts/api';
 
-const DEFAULT_RECENT_COUNT = 20;
+const RECENT_LOG_LIMIT = 100;
 const AUTO_FLUSH_INTERVAL_MS = 1_000;
 /** Maximum entries kept in the recent ring buffer for live UI */
-const MAX_RECENT_ENTRIES = 50;
+const MAX_RECENT_ENTRIES = RECENT_LOG_LIMIT;
 
 export type FlushFn = (historyId: string, logs: GenerationStepLog[]) => Promise<void>;
 export type RecentLogsUpdatedFn = (logs: GenerationStepLog[]) => Promise<void>;
@@ -111,7 +111,7 @@ export class GenerationLogCollector {
      * Returns the most recent N log entries for live UI display.
      * This reads from a rolling ring buffer that is NOT cleared by flush().
      */
-    getRecentLogs(n: number = DEFAULT_RECENT_COUNT): GenerationStepLog[] {
+    getRecentLogs(n: number = RECENT_LOG_LIMIT): GenerationStepLog[] {
         return this.recentRing.slice(-n);
     }
 
