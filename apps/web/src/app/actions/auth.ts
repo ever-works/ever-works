@@ -11,7 +11,6 @@ import { isValidRedirectUrl } from '@/lib/utils';
 import { getRedirectUrl } from '@/lib/auth/redirect';
 import { generateHexToken } from '@/lib/utils/random';
 import { OAuthProvider } from '@/lib/api/enums';
-import { addConnectGithubParam, isDashboardHref, shouldPromptGithubConnect } from '@/lib/auth/github-connect';
 
 export async function login(identifier: string, password: string, redirectUrl: string | null) {
     const t = await getTranslations('validation.auth');
@@ -60,10 +59,6 @@ export async function login(identifier: string, password: string, redirectUrl: s
     } else if (authResponse) {
         // Check if we have a redirect URL in a cookie
         href = await getRedirectUrl(authResponse, href);
-    }
-
-    if (authResponse && isDashboardHref(href) && (await shouldPromptGithubConnect(authResponse.access_token))) {
-        href = addConnectGithubParam(href);
     }
 
     redirect({ locale: await getLocale(), href });
@@ -132,14 +127,9 @@ export async function register(username: string, email: string, password: string
         };
     }
 
-    let href = ROUTES.DASHBOARD + '?newUser=true';
-    if (authResponse && (await shouldPromptGithubConnect(authResponse.access_token))) {
-        href = addConnectGithubParam(href);
-    }
-
     redirect({
         locale: await getLocale(),
-        href,
+        href: ROUTES.DASHBOARD + '?newUser=true',
     });
 
     return {

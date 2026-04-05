@@ -88,7 +88,7 @@ export default function DashboardToasts() {
                 url.searchParams.delete('newUser');
                 url.searchParams.delete('verified');
                 url.searchParams.delete('oauth_connected');
-                window.history.replaceState({}, '', url.pathname);
+                window.history.replaceState({}, '', url.pathname + url.search);
             }, 1000);
 
             return () => clearTimeout(timer);
