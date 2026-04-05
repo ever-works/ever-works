@@ -63,18 +63,12 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
                     {
                         name: 'createdAt',
                         type: 'datetime',
-                        default:
-                            queryRunner.connection.options.type === 'postgres'
-                                ? 'CURRENT_TIMESTAMP'
-                                : 'CURRENT_TIMESTAMP',
+                        default: 'CURRENT_TIMESTAMP',
                     },
                     {
                         name: 'updatedAt',
                         type: 'datetime',
-                        default:
-                            queryRunner.connection.options.type === 'postgres'
-                                ? 'CURRENT_TIMESTAMP'
-                                : 'CURRENT_TIMESTAMP',
+                        default: 'CURRENT_TIMESTAMP',
                     },
                 ],
             }),
@@ -141,18 +135,12 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
                     {
                         name: 'createdAt',
                         type: 'datetime',
-                        default:
-                            queryRunner.connection.options.type === 'postgres'
-                                ? 'CURRENT_TIMESTAMP'
-                                : 'CURRENT_TIMESTAMP',
+                        default: 'CURRENT_TIMESTAMP',
                     },
                     {
                         name: 'updatedAt',
                         type: 'datetime',
-                        default:
-                            queryRunner.connection.options.type === 'postgres'
-                                ? 'CURRENT_TIMESTAMP'
-                                : 'CURRENT_TIMESTAMP',
+                        default: 'CURRENT_TIMESTAMP',
                     },
                 ],
             }),
@@ -208,18 +196,12 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
                     {
                         name: 'createdAt',
                         type: 'datetime',
-                        default:
-                            queryRunner.connection.options.type === 'postgres'
-                                ? 'CURRENT_TIMESTAMP'
-                                : 'CURRENT_TIMESTAMP',
+                        default: 'CURRENT_TIMESTAMP',
                     },
                     {
                         name: 'updatedAt',
                         type: 'datetime',
-                        default:
-                            queryRunner.connection.options.type === 'postgres'
-                                ? 'CURRENT_TIMESTAMP'
-                                : 'CURRENT_TIMESTAMP',
+                        default: 'CURRENT_TIMESTAMP',
                     },
                 ],
             }),

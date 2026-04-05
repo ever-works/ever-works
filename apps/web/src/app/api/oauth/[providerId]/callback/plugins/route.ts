@@ -1,6 +1,6 @@
 import { redirect } from '@/i18n/navigation';
 import { oauthAPI } from '@/lib/api';
-import { getOAuthStateCookie } from '@/lib/auth';
+import { getOAuthStateCookie, removeOAuthStateCookie } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
@@ -26,11 +26,14 @@ export async function GET(
 
     const storedState = await getOAuthStateCookie();
     if (state && state !== storedState) {
+        await removeOAuthStateCookie();
         return redirect({
             locale,
             href: ROUTES.AUTH_ERROR + '?error=oauth_invalid_state',
         });
     }
+
+    await removeOAuthStateCookie();
 
     // Build redirect href — redirect() must be called outside try/catch because
     // next-intl's redirect() throws a NEXT_REDIRECT control flow exception internally.

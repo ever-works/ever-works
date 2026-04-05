@@ -1,68 +1,117 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
+
+function timestampColumnType(queryRunner: QueryRunner) {
+    return queryRunner.connection.options.type === 'postgres' ? 'timestamp' : 'datetime';
+}
 
 export class AlignAuthRuntimeSingularTables1760000001000 implements MigrationInterface {
     name = 'AlignAuthRuntimeSingularTables1760000001000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`
-            CREATE TABLE IF NOT EXISTS "account" (
-                "id" varchar PRIMARY KEY NOT NULL,
-                "userId" varchar NOT NULL,
-                "accountId" varchar NOT NULL,
-                "providerId" varchar NOT NULL,
-                "accessToken" text,
-                "refreshToken" text,
-                "accessTokenExpiresAt" datetime,
-                "refreshTokenExpiresAt" datetime,
-                "expiresAt" datetime,
-                "scope" varchar,
-                "password" text,
-                "idToken" text,
-                "tokenType" varchar,
-                "createdAt" datetime NOT NULL DEFAULT (datetime('now')),
-                "updatedAt" datetime NOT NULL DEFAULT (datetime('now')),
-                CONSTRAINT "FK_account_user" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE NO ACTION
-            )
-        `);
-        await queryRunner.query(
-            `CREATE UNIQUE INDEX IF NOT EXISTS "IDX_account_provider_account" ON "account" ("providerId", "accountId")`,
-        );
-        await queryRunner.query(
-            `CREATE UNIQUE INDEX IF NOT EXISTS "IDX_account_user_provider" ON "account" ("userId", "providerId")`,
+        const timestampType = timestampColumnType(queryRunner);
+
+        await queryRunner.createTable(
+            new Table({
+                name: 'account',
+                columns: [
+                    { name: 'id', type: 'varchar', isPrimary: true },
+                    { name: 'userId', type: 'varchar' },
+                    { name: 'accountId', type: 'varchar' },
+                    { name: 'providerId', type: 'varchar' },
+                    { name: 'accessToken', type: 'text', isNullable: true },
+                    { name: 'refreshToken', type: 'text', isNullable: true },
+                    { name: 'accessTokenExpiresAt', type: timestampType, isNullable: true },
+                    { name: 'refreshTokenExpiresAt', type: timestampType, isNullable: true },
+                    { name: 'expiresAt', type: timestampType, isNullable: true },
+                    { name: 'scope', type: 'varchar', isNullable: true },
+                    { name: 'password', type: 'text', isNullable: true },
+                    { name: 'idToken', type: 'text', isNullable: true },
+                    { name: 'tokenType', type: 'varchar', isNullable: true },
+                    { name: 'createdAt', type: timestampType, default: 'CURRENT_TIMESTAMP' },
+                    { name: 'updatedAt', type: timestampType, default: 'CURRENT_TIMESTAMP' },
+                ],
+                foreignKeys: [
+                    new TableForeignKey({
+                        name: 'FK_account_user',
+                        columnNames: ['userId'],
+                        referencedTableName: 'users',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'CASCADE',
+                    }),
+                ],
+                indices: [
+                    new TableIndex({
+                        name: 'IDX_account_provider_account',
+                        columnNames: ['providerId', 'accountId'],
+                        isUnique: true,
+                    }),
+                    new TableIndex({
+                        name: 'IDX_account_user_provider',
+                        columnNames: ['userId', 'providerId'],
+                        isUnique: true,
+                    }),
+                ],
+            }),
+            true,
         );
 
-        await queryRunner.query(`
-            CREATE TABLE IF NOT EXISTS "session" (
-                "id" varchar PRIMARY KEY NOT NULL,
-                "userId" varchar NOT NULL,
-                "token" varchar NOT NULL,
-                "expiresAt" datetime NOT NULL,
-                "ipAddress" varchar,
-                "userAgent" varchar,
-                "createdAt" datetime NOT NULL DEFAULT (datetime('now')),
-                "updatedAt" datetime NOT NULL DEFAULT (datetime('now')),
-                CONSTRAINT "FK_session_user" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE NO ACTION
-            )
-        `);
-        await queryRunner.query(
-            `CREATE UNIQUE INDEX IF NOT EXISTS "IDX_session_token" ON "session" ("token")`,
-        );
-        await queryRunner.query(
-            `CREATE INDEX IF NOT EXISTS "IDX_session_userId" ON "session" ("userId")`,
+        await queryRunner.createTable(
+            new Table({
+                name: 'session',
+                columns: [
+                    { name: 'id', type: 'varchar', isPrimary: true },
+                    { name: 'userId', type: 'varchar' },
+                    { name: 'token', type: 'text' },
+                    { name: 'expiresAt', type: timestampType },
+                    { name: 'ipAddress', type: 'varchar', isNullable: true },
+                    { name: 'userAgent', type: 'varchar', isNullable: true },
+                    { name: 'createdAt', type: timestampType, default: 'CURRENT_TIMESTAMP' },
+                    { name: 'updatedAt', type: timestampType, default: 'CURRENT_TIMESTAMP' },
+                ],
+                foreignKeys: [
+                    new TableForeignKey({
+                        name: 'FK_session_user',
+                        columnNames: ['userId'],
+                        referencedTableName: 'users',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'CASCADE',
+                    }),
+                ],
+                indices: [
+                    new TableIndex({
+                        name: 'IDX_session_token',
+                        columnNames: ['token'],
+                        isUnique: true,
+                    }),
+                    new TableIndex({
+                        name: 'IDX_session_userId',
+                        columnNames: ['userId'],
+                    }),
+                ],
+            }),
+            true,
         );
 
-        await queryRunner.query(`
-            CREATE TABLE IF NOT EXISTS "verification" (
-                "id" varchar PRIMARY KEY NOT NULL,
-                "identifier" varchar NOT NULL,
-                "value" text NOT NULL,
-                "expiresAt" datetime NOT NULL,
-                "createdAt" datetime NOT NULL DEFAULT (datetime('now')),
-                "updatedAt" datetime DEFAULT (datetime('now'))
-            )
-        `);
-        await queryRunner.query(
-            `CREATE UNIQUE INDEX IF NOT EXISTS "IDX_verification_identifier_value" ON "verification" ("identifier", "value")`,
+        await queryRunner.createTable(
+            new Table({
+                name: 'verification',
+                columns: [
+                    { name: 'id', type: 'varchar', isPrimary: true },
+                    { name: 'identifier', type: 'varchar' },
+                    { name: 'value', type: 'text' },
+                    { name: 'expiresAt', type: timestampType },
+                    { name: 'createdAt', type: timestampType, default: 'CURRENT_TIMESTAMP' },
+                    { name: 'updatedAt', type: timestampType, default: 'CURRENT_TIMESTAMP' },
+                ],
+                indices: [
+                    new TableIndex({
+                        name: 'IDX_verification_identifier_value',
+                        columnNames: ['identifier', 'value'],
+                        isUnique: true,
+                    }),
+                ],
+            }),
+            true,
         );
 
         const hasPluralAccounts = await queryRunner.hasTable('accounts');
@@ -118,13 +167,34 @@ export class AlignAuthRuntimeSingularTables1760000001000 implements MigrationInt
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP INDEX IF EXISTS "IDX_verification_identifier_value"`);
-        await queryRunner.query(`DROP TABLE IF EXISTS "verification"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "IDX_session_userId"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "IDX_session_token"`);
-        await queryRunner.query(`DROP TABLE IF EXISTS "session"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "IDX_account_user_provider"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "IDX_account_provider_account"`);
-        await queryRunner.query(`DROP TABLE IF EXISTS "account"`);
+        const verificationTable = await queryRunner.getTable('verification');
+        if (verificationTable) {
+            for (const index of verificationTable.indices) {
+                await queryRunner.dropIndex('verification', index);
+            }
+        }
+        await queryRunner.dropTable('verification', true);
+
+        const sessionTable = await queryRunner.getTable('session');
+        if (sessionTable) {
+            for (const foreignKey of sessionTable.foreignKeys) {
+                await queryRunner.dropForeignKey('session', foreignKey);
+            }
+            for (const index of sessionTable.indices) {
+                await queryRunner.dropIndex('session', index);
+            }
+        }
+        await queryRunner.dropTable('session', true);
+
+        const accountTable = await queryRunner.getTable('account');
+        if (accountTable) {
+            for (const foreignKey of accountTable.foreignKeys) {
+                await queryRunner.dropForeignKey('account', foreignKey);
+            }
+            for (const index of accountTable.indices) {
+                await queryRunner.dropIndex('account', index);
+            }
+        }
+        await queryRunner.dropTable('account', true);
     }
 }

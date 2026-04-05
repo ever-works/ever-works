@@ -82,7 +82,18 @@ export class AuthProviderService extends AuthProvider {
             });
         }
 
-        return this.issueSession(user.id);
+        if (!result.token) {
+            throw new UnauthorizedException('Failed to establish authenticated session');
+        }
+
+        return {
+            access_token: result.token,
+            user: {
+                id: user.id,
+                email: user.email,
+                username: user.username,
+            },
+        };
     }
 
     async signUpEmail(
@@ -108,6 +119,18 @@ export class AuthProviderService extends AuthProvider {
                 registrationProvider: 'local',
                 isActive: true,
             });
+        }
+
+        if (result.token) {
+            const user = await this.assertActiveUser(result.user.id);
+            return {
+                access_token: result.token,
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    username: user.username,
+                },
+            };
         }
 
         return this.issueSession(result.user.id);
@@ -219,17 +242,6 @@ export class AuthProviderService extends AuthProvider {
         }
 
         return token.trim();
-    }
-
-    private toTokenResponse(token: string, user: AuthRuntimeUser): TokenResponse {
-        return {
-            access_token: token,
-            user: {
-                id: user.id,
-                email: user.email,
-                username: user.name,
-            },
-        };
     }
 
     private mapAuthenticatedUser(user: AuthRuntimeUser): AuthenticatedUser {

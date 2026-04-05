@@ -1,7 +1,7 @@
 import { redirect } from '@/i18n/navigation';
 import { authAPI, AuthResponse } from '@/lib/api';
 import { OAuthProvider } from '@/lib/api/enums';
-import { getOAuthStateCookie, setAuthCookies } from '@/lib/auth';
+import { getOAuthStateCookie, removeOAuthStateCookie, setAuthCookies } from '@/lib/auth';
 import { getRedirectUrl } from '@/lib/auth/redirect';
 import { ROUTES } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
@@ -28,11 +28,14 @@ export async function handleOAuthCallback(request: NextRequest, providerId: stri
 
     const storedState = await getOAuthStateCookie();
     if (state !== storedState) {
+        await removeOAuthStateCookie();
         return redirect({
             locale,
             href: ROUTES.AUTH_ERROR + '?error=oauth_invalid_state',
         });
     }
+
+    await removeOAuthStateCookie();
 
     return loginOauth(request, providerId as OAuthProvider, code, locale);
 }

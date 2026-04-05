@@ -37,7 +37,7 @@ function resolveSqliteDatabasePath() {
         return path.join(os.tmpdir(), 'ever-works-api.test.db');
     }
 
-    return path.join(os.tmpdir(), 'ever-works-api.db');
+    return path.join(os.homedir(), '.ever-works', 'ever-works-api.db');
 }
 
 function createDatabaseClient() {
