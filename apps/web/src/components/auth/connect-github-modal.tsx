@@ -28,16 +28,18 @@ export function ConnectGithubModal({ userId, hasGithubConnected }: ConnectGithub
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const shouldForcePrompt = searchParams.get('connectGithub') === '1';
+    const isNewUser = searchParams.get('newUser') === 'true';
+    const shouldBypassDismissal = shouldForcePrompt || isNewUser;
     const dismissKey = `${DISMISS_KEY_PREFIX}:${userId}`;
 
     useEffect(() => {
         if (hasGithubConnected) return;
 
         const dismissed = localStorage.getItem(dismissKey);
-        if (shouldForcePrompt || !dismissed) {
+        if (shouldBypassDismissal || !dismissed) {
             setOpen(true);
         }
-    }, [dismissKey, hasGithubConnected, shouldForcePrompt]);
+    }, [dismissKey, hasGithubConnected, shouldBypassDismissal]);
 
     const handleConnect = async () => {
         setLoading(true);
@@ -58,9 +60,10 @@ export function ConnectGithubModal({ userId, hasGithubConnected }: ConnectGithub
         localStorage.setItem(dismissKey, 'true');
         setOpen(false);
 
-        if (shouldForcePrompt) {
+        if (shouldBypassDismissal) {
             const url = new URL(window.location.href);
             url.searchParams.delete('connectGithub');
+            url.searchParams.delete('newUser');
             window.history.replaceState({}, '', url.pathname + url.search);
         }
     };
