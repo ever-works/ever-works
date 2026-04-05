@@ -19,12 +19,9 @@ export const config = {
 
     auth: {
         secret: () => {
-            const secret =
-                process.env.AUTH_SECRET || process.env.BETTER_AUTH_SECRET || process.env.JWT_SECRET;
+            const secret = process.env.AUTH_SECRET;
             if (!secret) {
-                throw new Error(
-                    'AUTH_SECRET, BETTER_AUTH_SECRET, or JWT_SECRET environment variable is required',
-                );
+                throw new Error('AUTH_SECRET environment variable is required');
             }
             return secret;
         },

@@ -101,9 +101,7 @@ export function createAuthRuntimeInstance() {
     const options: BetterAuthOptions = {
         database: createDatabaseClient(),
         baseURL:
-            process.env.AUTH_URL ||
-            process.env.BETTER_AUTH_URL ||
-            `http://localhost:${process.env.PORT || 3100}${AUTH_RUNTIME_BASE_PATH}`,
+            process.env.AUTH_URL || `http://localhost:${process.env.PORT || 3100}${AUTH_RUNTIME_BASE_PATH}`,
         basePath: AUTH_RUNTIME_BASE_PATH,
         secret: config.auth.secret(),
         trustedOrigins: getTrustedOrigins(),
