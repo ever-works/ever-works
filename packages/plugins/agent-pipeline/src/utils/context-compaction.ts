@@ -87,12 +87,16 @@ const TOOL_SUMMARIZERS: Record<string, Summarizer> = {
 		}
 		return `findItems('${args.query ?? ''}')`;
 	},
-	processUrls: (_args, value) => {
-		if (Array.isArray(value)) {
-			const totalItems = value.reduce((sum: number, r: { count?: number }) => sum + (r?.count ?? 0), 0);
-			return `Processed ${value.length} URLs -> ${totalItems} items`;
+	processUrl: (args, value) => {
+		const url = typeof args.url === 'string' ? args.url : 'unknown URL';
+		if (typeof value === 'object' && value !== null) {
+			const result = value as { count?: number; error?: unknown };
+			if (typeof result.error === 'string' && result.error.trim()) {
+				return `Processed ${url} -> failed (${result.error})`;
+			}
+			return `Processed ${url} -> ${result.count ?? 0} items`;
 		}
-		return 'Processed URLs';
+		return `Processed ${url}`;
 	},
 	modifyItems: (_args, value) => {
 		if (typeof value === 'object' && value !== null) {

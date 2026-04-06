@@ -88,6 +88,17 @@ export function DashboardLayoutClient({
         } catch {}
     }, [chatWidth]);
 
+    useEffect(() => {
+        try {
+            const savedWidth = localStorage.getItem('chat-width');
+            if (savedWidth) {
+                setChatWidth(parseInt(savedWidth, 10));
+            }
+        } catch {}
+
+        setIsMobile(window.innerWidth < 768);
+    }, []);
+
     const computeMainStyle = useCallback(() => {
         if (!isChatExpanded) return undefined;
         if (typeof window === 'undefined') return undefined;

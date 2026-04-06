@@ -1002,6 +1002,22 @@ describe('PluginOperationsService', () => {
             expect(result.categories).toHaveLength(0);
         });
 
+        it('should keep the pipeline category visible even without enabled pipeline plugins', async () => {
+            const pipelinePlugin = createPluginWithSettings('standard-pipeline', 'pipeline');
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([pipelinePlugin]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
+
+            const result = await service.getPluginsForSettingsMenu('user-1');
+
+            expect(result.categories).toHaveLength(1);
+            expect(result.categories[0]).toEqual({
+                category: 'pipeline',
+                label: 'Pipeline',
+                plugins: [],
+            });
+        });
+
         it('should return only enabled plugins with user-configurable settings', async () => {
             const enabledPlugin = createPluginWithSettings('enabled-plugin', 'ai-provider');
             const disabledPlugin = createPluginWithSettings('disabled-plugin', 'deployment');

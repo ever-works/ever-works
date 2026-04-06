@@ -19,6 +19,8 @@ import pMap from 'p-map';
 import { config } from '../../config';
 import { PipelineOrchestratorService } from '../../pipeline';
 import { buildDirectoryChangelog } from '../../utils/directory-changelog.utils';
+import { cloneFreshRepository } from '../../utils/fresh-repository-clone.utils';
+import { assertCreatedRepositoryTarget } from '../../utils/git-repository.utils';
 import type {
     DirectoryReference,
     GenerationRequest,
@@ -188,28 +190,36 @@ export class DataGeneratorService {
         const repo = directory.getDataRepo();
 
         // Creating repository
-        await this.gitFacade.createRepository(
-            {
-                name: repo,
-                description,
-                organization: directory.organization ? owner : undefined,
-                isPrivate: true,
-            },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+        const createdRepository = assertCreatedRepositoryTarget(
+            await this.gitFacade.createRepository(
+                {
+                    name: repo,
+                    description,
+                    organization: directory.organization ? owner : undefined,
+                    isPrivate: true,
+                },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
+            ),
+            owner,
+            repo,
+            'Data repository',
         );
 
-        this.logger.log(`Successfully created repository: ${owner}/${repo}`);
+        this.logger.log(`Successfully created repository: ${createdRepository.fullName}`);
 
         // Cloning repository
         let dest: string;
         try {
-            dest = await this.gitFacade.cloneOrPull(
+            dest = await cloneFreshRepository(
+                this.gitFacade,
                 {
-                    owner,
-                    repo,
+                    owner: createdRepository.owner,
+                    repo: createdRepository.name,
                     committer,
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                this.logger,
             );
         } catch (err) {
             this.logger.error('Failed to clone repository', err);
@@ -217,7 +227,7 @@ export class DataGeneratorService {
                 success: false,
                 error: {
                     code: 'CLONE_FAILED' as const,
-                    message: `Failed to clone repository ${directory.getRepoOwner()}/${repo}`,
+                    message: `Failed to clone repository ${createdRepository.fullName}`,
                     cause: err instanceof Error ? err : new Error(String(err)),
                 },
                 warnings,
@@ -798,18 +808,48 @@ export class DataGeneratorService {
     async count(directory: Directory, user: User) {
         const data = await this.repositoryData(directory, user);
 
-        const [categories, tags, items, comparisons] = await Promise.all([
+        const [categories, tags, items, comparisons] = await Promise.allSettled([
             data.getCategories(),
             data.getTags(),
-            data.getItems(),
-            data.getComparisons().catch(() => []),
+            data.countItems(),
+            data.countComparisons(),
         ]);
 
+        const getArrayCount = <T>(
+            result: PromiseSettledResult<T[]>,
+            label: 'categories' | 'tags',
+        ): number => {
+            if (result.status === 'fulfilled') {
+                return result.value.length;
+            }
+
+            this.logger.warn(
+                `Failed to count ${label} for directory ${directory.id}; defaulting to 0.`,
+                result.reason instanceof Error ? result.reason.stack : undefined,
+            );
+            return 0;
+        };
+
+        const getNumberCount = (
+            result: PromiseSettledResult<number>,
+            label: 'items' | 'comparisons',
+        ): number => {
+            if (result.status === 'fulfilled') {
+                return result.value;
+            }
+
+            this.logger.warn(
+                `Failed to count ${label} for directory ${directory.id}; defaulting to 0.`,
+                result.reason instanceof Error ? result.reason.stack : undefined,
+            );
+            return 0;
+        };
+
         return {
-            items: items.length,
-            categories: categories.length,
-            tags: tags.length,
-            comparisons: comparisons.length,
+            items: getNumberCount(items, 'items'),
+            categories: getArrayCount(categories, 'categories'),
+            tags: getArrayCount(tags, 'tags'),
+            comparisons: getNumberCount(comparisons, 'comparisons'),
         };
     }
 
@@ -1225,20 +1265,32 @@ export class DataGeneratorService {
 
             this.logger.log(`Creating data repo: ${repoOwner}/${repoName}`);
 
-            await this.gitFacade.createRepository(
-                {
-                    name: repoName,
-                    description: directory.description,
-                    organization: directory.organization ? repoOwner : undefined,
-                    isPrivate: true,
-                },
-                { userId: user.id, providerId: directory.gitProvider },
+            const createdRepository = assertCreatedRepositoryTarget(
+                await this.gitFacade.createRepository(
+                    {
+                        name: repoName,
+                        description: directory.description,
+                        organization: directory.organization ? repoOwner : undefined,
+                        isPrivate: true,
+                    },
+                    { userId: user.id, providerId: directory.gitProvider },
+                ),
+                repoOwner,
+                repoName,
+                'Data repository',
             );
 
             // Clone the repository
-            const dest = await this.gitFacade.cloneOrPull(
-                { owner: repoOwner, repo: repoName, committer },
-                { userId: user.id, providerId: directory.gitProvider },
+            const dest = await cloneFreshRepository(
+                this.gitFacade,
+                {
+                    owner: createdRepository.owner,
+                    repo: createdRepository.name,
+                    committer,
+                    userId: user.id,
+                    providerId: directory.gitProvider,
+                },
+                this.logger,
             );
 
             const data = await DataRepository.create(dest);

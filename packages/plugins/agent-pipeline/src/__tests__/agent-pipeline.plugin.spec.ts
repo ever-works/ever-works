@@ -283,23 +283,20 @@ describe('AgentPipelinePlugin', () => {
 			expect(deduped).toHaveLength(1);
 		});
 
-		it('collects processUrls failures from tool results', () => {
+		it('collects processUrl failures from tool results', () => {
 			const steps = [
 				{
 					toolResults: [
 						{
-							toolName: 'processUrls',
-							output: [
-								{ url: 'https://a.com', files: ['a.json'], count: 1 },
-								{ url: 'https://b.com', files: [], count: 0, error: 'timeout' }
-							]
+							toolName: 'processUrl',
+							output: { url: 'https://b.com', files: [], count: 0, error: 'timeout' }
 						}
 					]
 				}
 			];
 
 			const summary = (plugin as any).collectProcessUrlFailures(steps);
-			expect(summary.totalUrls).toBe(2);
+			expect(summary.totalUrls).toBe(1);
 			expect(summary.failedUrls).toBe(1);
 			expect(summary.sampleErrors).toContain('timeout');
 		});

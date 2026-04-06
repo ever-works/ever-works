@@ -69,6 +69,8 @@ spec:
               value: "https://api.trigger.dev"
             - name: TRIGGER_INTERNAL_SECRET
               value: "$TRIGGER_INTERNAL_SECRET"
+            - name: TRIGGER_MACHINE
+              value: "$TRIGGER_MACHINE"
 
             # GitHub Auth
             - name: GH_CLIENT_ID

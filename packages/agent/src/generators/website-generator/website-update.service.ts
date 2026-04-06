@@ -18,6 +18,36 @@ export class WebsiteUpdateService {
         private readonly branchSyncService: BranchSyncService,
     ) {}
 
+    private async ensureTemplateDefaultBranch(directory: Directory, userId: string): Promise<void> {
+        const targetBranch = WEBSITE_TEMPLATE_CONFIG.branch;
+
+        try {
+            const branches = await this.gitFacade.listBranches(
+                directory.getRepoOwner(),
+                directory.getWebsiteRepo(),
+                { userId, providerId: directory.gitProvider },
+            );
+
+            if (!branches.some((branch) => branch.name === targetBranch)) {
+                this.logger.warn(
+                    `Cannot set default branch to '${targetBranch}' for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()} because the branch does not exist yet`,
+                );
+                return;
+            }
+
+            await this.gitFacade.updateRepository(
+                directory.getRepoOwner(),
+                directory.getWebsiteRepo(),
+                { defaultBranch: targetBranch },
+                { userId, providerId: directory.gitProvider },
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Failed to set default branch for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+    }
+
     /**
      * Updates an existing website repository based on the original creation method
      * @param directory - The directory to update
@@ -87,6 +117,7 @@ export class WebsiteUpdateService {
 
         // Sync all branches from template to website repo
         const branchSync = await this.syncAllBranchesFromTemplate(directory, user);
+        await this.ensureTemplateDefaultBranch(directory, directoryOwner.id);
 
         return {
             ...updateResult,

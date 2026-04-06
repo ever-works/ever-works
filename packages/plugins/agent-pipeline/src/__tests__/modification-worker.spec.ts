@@ -4,7 +4,7 @@ import type { ModificationWorkerContext } from '../worker/modification-worker';
 import type { PluginLogger } from '@ever-works/plugin';
 
 vi.mock('ai', () => ({
-	generateText: vi.fn(),
+	streamText: vi.fn(),
 	stepCountIs: vi.fn(() => () => false),
 	tool: vi.fn((opts) => opts),
 	wrapLanguageModel: vi.fn(({ model }) => model)
@@ -48,10 +48,34 @@ vi.mock('just-bash', () => ({
 	ReadWriteFs: vi.fn()
 }));
 
-import { generateText } from 'ai';
+import { streamText } from 'ai';
 import { TokenUsageAccumulator } from '../types';
 
-const mockGenerateText = vi.mocked(generateText);
+const mockStreamText = vi.mocked(streamText);
+
+function createMockStreamResult(overrides?: {
+	onStream?: () => Promise<void>;
+	streamError?: Error;
+	totalUsage?: { inputTokens?: number; outputTokens?: number; totalTokens: number };
+	text?: string;
+}) {
+	const fullStream = {
+		async *[Symbol.asyncIterator]() {
+			if (overrides?.streamError) {
+				throw overrides.streamError;
+			}
+
+			await overrides?.onStream?.();
+		}
+	};
+
+	return {
+		fullStream,
+		steps: Promise.resolve([]),
+		text: Promise.resolve(overrides?.text ?? ''),
+		totalUsage: Promise.resolve(overrides?.totalUsage ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 })
+	} as never;
+}
 
 function createMockContext(overrides?: Partial<ModificationWorkerContext>): ModificationWorkerContext {
 	return {
@@ -68,19 +92,18 @@ describe('processModification', () => {
 		vi.clearAllMocks();
 	});
 
-	it('calls generateText with tools and returns result', async () => {
-		mockGenerateText.mockResolvedValue({
-			steps: [],
-			text: '',
-			finishReason: 'stop',
-			totalUsage: { totalTokens: 500 }
-		} as never);
+	it('calls streamText with tools and returns result', async () => {
+		mockStreamText.mockReturnValue(
+			createMockStreamResult({
+				totalUsage: { totalTokens: 500 }
+			})
+		);
 
 		const ctx = createMockContext();
 		const result = await processModification('Merge categories A and B', ctx);
 
-		expect(mockGenerateText).toHaveBeenCalledOnce();
-		const callArgs = mockGenerateText.mock.calls[0][0] as Record<string, unknown>;
+		expect(mockStreamText).toHaveBeenCalledOnce();
+		const callArgs = mockStreamText.mock.calls[0][0] as Record<string, unknown>;
 		expect(callArgs.tools).toHaveProperty('bash');
 		expect(callArgs.tools).toHaveProperty('readFile');
 		expect(callArgs.tools).toHaveProperty('updateFile');
@@ -90,12 +113,12 @@ describe('processModification', () => {
 	});
 
 	it('returns empty result when no files modified', async () => {
-		mockGenerateText.mockResolvedValue({
-			steps: [],
-			text: 'Nothing to modify',
-			finishReason: 'stop',
-			totalUsage: { totalTokens: 100 }
-		} as never);
+		mockStreamText.mockReturnValue(
+			createMockStreamResult({
+				text: 'Nothing to modify',
+				totalUsage: { totalTokens: 100 }
+			})
+		);
 
 		const ctx = createMockContext();
 		const result = await processModification('Check categories', ctx);
@@ -113,11 +136,15 @@ describe('processModification', () => {
 
 		expect(result.count).toBe(0);
 		expect(result.error).toBe('Aborted');
-		expect(mockGenerateText).not.toHaveBeenCalled();
+		expect(mockStreamText).not.toHaveBeenCalled();
 	});
 
 	it('handles errors gracefully', async () => {
-		mockGenerateText.mockRejectedValue(new Error('Model error'));
+		mockStreamText.mockReturnValue(
+			createMockStreamResult({
+				streamError: new Error('Model error')
+			})
+		);
 
 		const ctx = createMockContext();
 		const result = await processModification('Invalid instruction', ctx);
@@ -127,12 +154,11 @@ describe('processModification', () => {
 	});
 
 	it('accumulates token usage when tokenAccumulator is provided', async () => {
-		mockGenerateText.mockResolvedValue({
-			steps: [],
-			text: '',
-			finishReason: 'stop',
-			totalUsage: { inputTokens: 300, outputTokens: 150, totalTokens: 450 }
-		} as never);
+		mockStreamText.mockReturnValue(
+			createMockStreamResult({
+				totalUsage: { inputTokens: 300, outputTokens: 150, totalTokens: 450 }
+			})
+		);
 
 		const accumulator = new TokenUsageAccumulator();
 		const ctx = createMockContext({ tokenAccumulator: accumulator });

@@ -42,8 +42,10 @@ function createMockContext(overrides?: Partial<ParentToolContext>): ParentToolCo
 		parentModel: {} as never,
 		parentMaxContextTokens: 128000,
 		directoryContext: { directoryName: 'Test Dir' },
+		existing: { items: [], categories: [], tags: [], brands: [] },
 		onProgress: vi.fn(),
 		totalSteps: 5,
+		maxPagesToProcess: 10,
 		logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as PluginLogger,
 		...overrides
 	};
@@ -59,7 +61,7 @@ describe('createParentTools', () => {
 		const { tools } = createParentTools(ctx);
 
 		expect(tools).toHaveProperty('search');
-		expect(tools).toHaveProperty('processUrls');
+		expect(tools).toHaveProperty('processUrl');
 		expect(tools).toHaveProperty('modifyItems');
 		expect(tools).toHaveProperty('getWorkspaceOverview');
 		expect(tools).toHaveProperty('reportProgress');
@@ -73,44 +75,100 @@ describe('createParentTools', () => {
 		expect(typeof breaker.isTripped).toBe('function');
 	});
 
-	describe('processUrls tool', () => {
-		it('processes URLs in parallel', async () => {
-			mockProcessUrl
-				.mockResolvedValueOnce({ url: 'https://a.com', files: ['a.json'], count: 1 })
-				.mockResolvedValueOnce({ url: 'https://b.com', files: ['b.json', 'c.json'], count: 2 });
+	describe('processUrl tool', () => {
+		it('processes a single URL', async () => {
+			mockProcessUrl.mockResolvedValueOnce({
+				url: 'https://a.com',
+				files: ['a.json'],
+				count: 1
+			});
 
 			const ctx = createMockContext();
 			const { tools } = createParentTools(ctx);
-			const processUrls = tools.processUrls as { execute: Function };
+			const processUrl = tools.processUrl as { execute: Function };
 
-			const result = await processUrls.execute(
-				{ urls: ['https://a.com', 'https://b.com'] },
-				{ toolCallId: 'tc1', messages: [] }
+			const result = await processUrl.execute({ url: 'https://a.com' }, { toolCallId: 'tc1', messages: [] });
+
+			expect(result.count).toBe(1);
+			expect(mockProcessUrl).toHaveBeenCalledTimes(1);
+			expect(mockProcessUrl).toHaveBeenCalledWith(
+				'https://a.com',
+				expect.objectContaining({ workspacePath: '/tmp/workspace' })
 			);
-
-			expect(result).toHaveLength(2);
-			expect(result[0].count).toBe(1);
-			expect(result[1].count).toBe(2);
-			expect(mockProcessUrl).toHaveBeenCalledTimes(2);
 		});
 
 		it('handles worker failures gracefully', async () => {
-			mockProcessUrl
-				.mockResolvedValueOnce({ url: 'https://a.com', files: ['a.json'], count: 1 })
-				.mockRejectedValueOnce(new Error('Network error'));
+			mockProcessUrl.mockRejectedValueOnce(new Error('Network error'));
 
 			const ctx = createMockContext();
 			const { tools } = createParentTools(ctx);
-			const processUrls = tools.processUrls as { execute: Function };
+			const processUrl = tools.processUrl as { execute: Function };
 
-			const result = await processUrls.execute(
-				{ urls: ['https://a.com', 'https://b.com'] },
+			const result = await processUrl.execute({ url: 'https://b.com' }, { toolCallId: 'tc1', messages: [] });
+
+			expect(result).toEqual({
+				url: 'https://b.com',
+				files: [],
+				count: 0,
+				error: 'Network error',
+				remainingUrlBudget: 9
+			});
+		});
+
+		it('does not process the same URL twice', async () => {
+			mockProcessUrl.mockResolvedValueOnce({
+				url: 'https://a.com?utm_source=test',
+				files: ['a.json'],
+				count: 1
+			});
+
+			const ctx = createMockContext();
+			const { tools } = createParentTools(ctx);
+			const processUrl = tools.processUrl as { execute: Function };
+
+			const first = await processUrl.execute(
+				{ url: 'https://a.com?utm_source=test' },
 				{ toolCallId: 'tc1', messages: [] }
 			);
+			const second = await processUrl.execute({ url: 'https://a.com' }, { toolCallId: 'tc2', messages: [] });
 
-			expect(result).toHaveLength(2);
-			expect(result[0].count).toBe(1);
-			expect(result[1].error).toBe('Network error');
+			expect(first.count).toBe(1);
+			expect(second).toEqual({
+				url: 'https://a.com',
+				files: [],
+				count: 0,
+				skipped: true,
+				error: 'URL already processed earlier (created). Do not retry it.',
+				previousStatus: 'created',
+				previousCount: 1,
+				remainingUrlBudget: 9
+			});
+			expect(mockProcessUrl).toHaveBeenCalledTimes(1);
+		});
+
+		it('stops processing when the URL budget is exhausted', async () => {
+			mockProcessUrl.mockResolvedValueOnce({
+				url: 'https://a.com',
+				files: ['a.json'],
+				count: 1
+			});
+
+			const ctx = createMockContext({ maxPagesToProcess: 1 });
+			const { tools } = createParentTools(ctx);
+			const processUrl = tools.processUrl as { execute: Function };
+
+			await processUrl.execute({ url: 'https://a.com' }, { toolCallId: 'tc1', messages: [] });
+			const result = await processUrl.execute({ url: 'https://b.com' }, { toolCallId: 'tc2', messages: [] });
+
+			expect(result).toEqual({
+				url: 'https://b.com',
+				files: [],
+				count: 0,
+				skipped: true,
+				error: 'URL budget reached (1/1). Stop processing URLs and finish with the current results.',
+				remainingUrlBudget: 0
+			});
+			expect(mockProcessUrl).toHaveBeenCalledTimes(1);
 		});
 	});
 
@@ -142,6 +200,8 @@ describe('createParentTools', () => {
 		it('returns workspace overview', async () => {
 			mockReadOverview.mockResolvedValue({
 				totalItems: 15,
+				newItems: 3,
+				updatedItems: 4,
 				categories: ['Monitoring', 'CI/CD'],
 				tags: ['open-source'],
 				brands: ['CNCF']
@@ -154,6 +214,8 @@ describe('createParentTools', () => {
 			const result = await overview.execute({}, { toolCallId: 'tc1', messages: [] });
 
 			expect(result.totalItems).toBe(15);
+			expect(result.newItems).toBe(3);
+			expect(result.updatedItems).toBe(4);
 			expect(result.categories).toEqual(['Monitoring', 'CI/CD']);
 		});
 	});

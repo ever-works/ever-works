@@ -140,6 +140,21 @@ const CLAUDE_CODE_SUPPORTED_MODELS: readonly AiModel[] = [
 	}
 ] as const;
 
+const LOG_MESSAGE_MAX_LENGTH = 500;
+const STEP_CONTEXT_BY_ID = new Map(
+	STEP_DEFINITIONS.map((step, stepIndex) => [step.id, { stepIndex, stepName: step.name }])
+);
+type ClaudeCodeGenerationLog = Parameters<NonNullable<PipelineExecutionOptions['onLogEntry']>>[0];
+
+interface ClaudeCodeLogOptions {
+	readonly onLogEntry?: PipelineExecutionOptions['onLogEntry'];
+	readonly event: ClaudeCodeGenerationLog['event'];
+	readonly level: ClaudeCodeGenerationLog['level'];
+	readonly message: string;
+	readonly stepId?: ClaudeCodeStepId;
+	readonly durationMs?: number;
+}
+
 /**
  * Claude Code Generator Plugin
  *
@@ -470,6 +485,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 		const startTime = Date.now();
 		this.abortController = new AbortController();
 		const signal = options?.signal ?? this.abortController.signal;
+		const onLogEntry = options?.onLogEntry;
 
 		this.state = initializeState();
 
@@ -492,16 +508,16 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			const model = settings.model as string | undefined;
 
 			// ── Step 1: Setup Claude Code ──────────────────────────────
-			this.setState('setup-claude-code', 'running');
+			const setupStepStartedAt = this.startStep('setup-claude-code', onLogEntry);
 			reportProgress(onProgress, 0, 0, 'Setup Claude Code');
 
 			const binaryPath = await ensureBinary(version, logger);
-			this.setState('setup-claude-code', 'completed');
+			this.completeStep('setup-claude-code', setupStepStartedAt, onLogEntry);
 
 			if (signal.aborted) return this.handleCancel(startTime);
 
 			// ── Step 2: Prepare Context ────────────────────────────────
-			this.setState('prepare-context', 'running');
+			const prepareContextStepStartedAt = this.startStep('prepare-context', onLogEntry);
 			reportProgress(onProgress, 1, 20, 'Prepare Context');
 
 			const configDir = `${BASE_TEMP_DIR}/${userId}`;
@@ -515,12 +531,12 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				tags: existing.tags,
 				brands: existing.brands
 			});
-			this.setState('prepare-context', 'completed');
+			this.completeStep('prepare-context', prepareContextStepStartedAt, onLogEntry);
 
 			if (signal.aborted) return this.handleCancel(startTime);
 
 			// ── Step 3: Generate Items ─────────────────────────────────
-			this.setState('generate-items', 'running');
+			const generateItemsStepStartedAt = this.startStep('generate-items', onLogEntry);
 			reportProgress(onProgress, 2, 30, 'Generate Items');
 
 			const promptOptions = { directory, request, existing, workspacePath };
@@ -555,61 +571,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 
 			let execResult: ExecuteResult;
 			try {
-				const onLogEntry = options?.onLogEntry;
-				const stdoutLineHandler = onLogEntry
-					? (line: string) => {
-							try {
-								const event = JSON.parse(line);
-								if (event.type === 'assistant' && event.message?.content) {
-									const textParts = (event.message.content as Array<{ type: string; text?: string }>)
-										.filter((p: { type: string }) => p.type === 'text')
-										.map((p: { text?: string }) => p.text)
-										.join('');
-									if (textParts) {
-										onLogEntry({
-											timestamp: new Date().toISOString(),
-											level: 'info',
-											source: 'claude-code',
-											event: 'message',
-											message: textParts.slice(0, 500)
-										});
-									}
-								} else if (event.type === 'tool_use') {
-									onLogEntry({
-										timestamp: new Date().toISOString(),
-										level: 'info',
-										source: 'claude-code',
-										event: 'message',
-										message: `Tool: ${event.tool || event.name || 'unknown'}`
-									});
-								} else if (event.type === 'result') {
-									onLogEntry({
-										timestamp: new Date().toISOString(),
-										level: 'info',
-										source: 'claude-code',
-										event: 'step_completed',
-										message: 'Claude Code session completed',
-										stepIndex: 2,
-										stepName: 'Generate Items'
-									});
-								}
-							} catch {
-								// Not valid JSON — ignore
-							}
-						}
-					: undefined;
-
-				const stderrLineHandler = onLogEntry
-					? (line: string) => {
-							onLogEntry({
-								timestamp: new Date().toISOString(),
-								level: 'error',
-								source: 'claude-code',
-								event: 'message',
-								message: line.slice(0, 500)
-							});
-						}
-					: undefined;
+				const { onStdoutLine, onStderrLine } = this.createClaudeCodeStreamHandlers(onLogEntry);
 
 				const { promise, kill } = executeClaudeCode({
 					binaryPath,
@@ -624,8 +586,8 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 					maxBudgetUsd,
 					model,
 					signal,
-					onStdoutLine: stdoutLineHandler,
-					onStderrLine: stderrLineHandler
+					onStdoutLine,
+					onStderrLine
 				});
 
 				this.killProcess = kill;
@@ -636,7 +598,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			}
 
 			if (execResult.killed || signal.aborted) {
-				this.setState('generate-items', 'failed', 'Cancelled');
+				this.failStep('generate-items', new Error('Cancelled'), onLogEntry);
 				return this.handleCancel(startTime);
 			}
 
@@ -646,17 +608,24 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 
 				logger.warn(`Claude Code exited with code ${execResult.exitCode}: ${detail}`);
 				generationWarning = `Claude Code finished with an error (${detail}).`;
+				this.emitClaudeCodeLog({
+					onLogEntry,
+					stepId: 'generate-items',
+					event: 'message',
+					level: 'warn',
+					message: generationWarning
+				});
 			}
 
-			this.setState('generate-items', 'completed');
+			this.completeStep('generate-items', generateItemsStepStartedAt, onLogEntry);
 
 			// ── Step 4: Collect Results ────────────────────────────────
-			this.setState('collect-results', 'running');
+			const collectResultsStepStartedAt = this.startStep('collect-results', onLogEntry);
 			reportProgress(onProgress, 3, 85, 'Collect Results');
 
 			const items = await readGeneratedItems(workspacePath, logger);
 			const metadata = collectMetadataFromItems(items);
-			this.setState('collect-results', 'completed');
+			this.completeStep('collect-results', collectResultsStepStartedAt, onLogEntry);
 
 			// ── Step 5: Capture Screenshots ────────────────────────────
 			const screenshotWarnings = await this.runScreenshotCapture(
@@ -667,15 +636,16 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				directory.id,
 				signal,
 				onProgress,
-				logger
+				logger,
+				onLogEntry
 			);
 
 			// ── Step 6: Cleanup ────────────────────────────────────────
-			this.setState('cleanup', 'running');
+			const cleanupStepStartedAt = this.startStep('cleanup', onLogEntry);
 			reportProgress(onProgress, 5, 95, 'Cleanup');
 
 			await cleanupWorkspace(userId, directory.id);
-			this.setState('cleanup', 'completed');
+			this.completeStep('cleanup', cleanupStepStartedAt, onLogEntry);
 
 			// ── Build result ───────────────────────────────────────────
 			reportProgress(onProgress, 6, 100, 'Complete');
@@ -702,6 +672,10 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			);
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
+			const runningStepId = this.getRunningStepId();
+			if (runningStepId) {
+				this.failStep(runningStepId, err, onLogEntry);
+			}
 			logger.error(`Claude Code pipeline failed: ${err.message}`);
 			await cleanupWorkspace(userId, directory.id);
 			return this.handleError(err, startTime);
@@ -728,22 +702,27 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 		directoryId: string,
 		signal: AbortSignal,
 		onProgress: PipelineProgressCallback | undefined,
-		logger: { log(...args: unknown[]): void; warn(...args: unknown[]): void }
+		logger: { log(...args: unknown[]): void; warn(...args: unknown[]): void },
+		onLogEntry?: PipelineExecutionOptions['onLogEntry']
 	): Promise<string[]> {
 		const shouldCapture = (request.config || {}).capture_screenshots !== false;
 		const screenshotFacade = execContext?.screenshotFacade;
 
 		if (!shouldCapture || items.length === 0 || signal.aborted || !screenshotFacade) {
-			this.setState('capture-screenshots', 'skipped' as StepStatus);
+			this.skipStep('capture-screenshots', 'Screenshot capture skipped', onLogEntry);
 			return [];
 		}
 
 		if (!screenshotFacade.isAvailable()) {
-			this.setState('capture-screenshots', 'skipped' as StepStatus);
+			this.skipStep(
+				'capture-screenshots',
+				'Screenshot provider is not configured. Enable a screenshot plugin to capture item images.',
+				onLogEntry
+			);
 			return ['Screenshot provider is not configured. Enable a screenshot plugin to capture item images.'];
 		}
 
-		this.setState('capture-screenshots', 'running');
+		const captureScreenshotsStepStartedAt = this.startStep('capture-screenshots', onLogEntry);
 		reportProgress(onProgress, 4, 87, 'Capture Screenshots');
 
 		const { status, errors } = await captureScreenshots(items, {
@@ -752,7 +731,12 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			signal,
 			logger
 		});
-		this.setState('capture-screenshots', status);
+
+		if (status === 'failed') {
+			this.failStep('capture-screenshots', new Error(errors[0] || 'Screenshot capture failed'), onLogEntry);
+		} else {
+			this.completeStep('capture-screenshots', captureScreenshotsStepStartedAt, onLogEntry);
+		}
 
 		if (errors.length > 0) {
 			const facadeOptions = { userId, directoryId };
@@ -762,6 +746,262 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			return [`${label} failed for ${errors.length} item(s): ${unique.join('; ')}`];
 		}
 		return [];
+	}
+
+	private createClaudeCodeStreamHandlers(onLogEntry?: PipelineExecutionOptions['onLogEntry']): {
+		onStdoutLine?: (line: string) => void;
+		onStderrLine?: (line: string) => void;
+	} {
+		if (!onLogEntry) {
+			return {};
+		}
+
+		return {
+			onStdoutLine: (line: string) => {
+				const logEntry = this.buildClaudeCodeLogFromStdout(line);
+				if (!logEntry) {
+					return;
+				}
+
+				this.emitClaudeCodeLog({ onLogEntry, ...logEntry });
+			},
+			onStderrLine: (line: string) => {
+				this.emitClaudeCodeLog({
+					onLogEntry,
+					stepId: 'generate-items',
+					event: 'message',
+					level: 'error',
+					message: this.truncateLogMessage(line)
+				});
+			}
+		};
+	}
+
+	private buildClaudeCodeLogFromStdout(line: string): Omit<ClaudeCodeLogOptions, 'onLogEntry'> | null {
+		const trimmedLine = line.trim();
+		if (!trimmedLine) {
+			return null;
+		}
+
+		try {
+			const event = JSON.parse(trimmedLine) as Record<string, unknown>;
+			const type = this.extractString(event.type);
+
+			switch (type) {
+				case 'assistant': {
+					const text = this.extractClaudeContentText(
+						(event.message as { content?: unknown } | undefined)?.content
+					);
+					return text
+						? {
+								stepId: 'generate-items',
+								event: 'message',
+								level: 'info',
+								message: text
+							}
+						: null;
+				}
+				case 'tool_use': {
+					const toolName = this.extractString(event.tool) || this.extractString(event.name) || 'unknown';
+					return {
+						stepId: 'generate-items',
+						event: 'message',
+						level: 'info',
+						message: `Tool started: ${toolName}`
+					};
+				}
+				case 'tool_result': {
+					const toolName = this.extractString(event.tool) || this.extractString(event.name) || 'unknown';
+					const toolOutput =
+						this.extractString(event.result) ||
+						this.extractString((event.result as { content?: unknown } | undefined)?.content);
+					return {
+						stepId: 'generate-items',
+						event: 'message',
+						level: 'info',
+						message: toolOutput
+							? `Tool finished: ${toolName} (${toolOutput})`
+							: `Tool finished: ${toolName}`
+					};
+				}
+				case 'result': {
+					const detail =
+						this.extractString(event.result) ||
+						this.extractString(event.error) ||
+						'Claude Code session completed';
+					return {
+						stepId: 'generate-items',
+						event: 'message',
+						level: event.is_error === true ? 'warn' : 'info',
+						message: event.is_error === true ? `Claude Code result: ${detail}` : detail
+					};
+				}
+				case 'error': {
+					const detail =
+						this.extractString((event.error as { message?: unknown } | undefined)?.message) ||
+						this.extractString(event.message) ||
+						this.extractString(event.error) ||
+						'Claude Code reported an error';
+					return {
+						stepId: 'generate-items',
+						event: 'message',
+						level: 'error',
+						message: detail
+					};
+				}
+				default: {
+					const message =
+						this.extractString(event.message) ||
+						this.extractString(event.summary) ||
+						(type ? `Claude Code event: ${type}` : undefined);
+					return message
+						? {
+								stepId: 'generate-items',
+								event: 'message',
+								level: 'info',
+								message
+							}
+						: null;
+				}
+			}
+		} catch {
+			return {
+				stepId: 'generate-items',
+				event: 'message',
+				level: 'info',
+				message: trimmedLine
+			};
+		}
+	}
+
+	private extractClaudeContentText(content: unknown): string | undefined {
+		if (typeof content === 'string') {
+			return this.truncateLogMessage(content);
+		}
+
+		if (!Array.isArray(content)) {
+			return undefined;
+		}
+
+		const text = content
+			.filter((part): part is { type?: string; text?: string } => typeof part === 'object' && part !== null)
+			.filter((part) => part.type === 'text' && typeof part.text === 'string')
+			.map((part) => part.text!.trim())
+			.filter(Boolean)
+			.join(' ');
+
+		return text ? this.truncateLogMessage(text) : undefined;
+	}
+
+	private extractString(value: unknown): string | undefined {
+		if (typeof value === 'string') {
+			const trimmedValue = value.trim();
+			return trimmedValue ? this.truncateLogMessage(trimmedValue) : undefined;
+		}
+
+		if (typeof value === 'number' || typeof value === 'boolean') {
+			return this.truncateLogMessage(String(value));
+		}
+
+		return undefined;
+	}
+
+	private truncateLogMessage(message: string): string {
+		return message.trim().slice(0, LOG_MESSAGE_MAX_LENGTH);
+	}
+
+	private startStep(stepId: ClaudeCodeStepId, onLogEntry?: PipelineExecutionOptions['onLogEntry']): number {
+		this.setState(stepId, 'running');
+		this.emitClaudeCodeLog({
+			onLogEntry,
+			stepId,
+			event: 'step_started',
+			level: 'info',
+			message: this.getStepName(stepId)
+		});
+		return Date.now();
+	}
+
+	private completeStep(
+		stepId: ClaudeCodeStepId,
+		startedAt: number,
+		onLogEntry?: PipelineExecutionOptions['onLogEntry']
+	): void {
+		this.setState(stepId, 'completed');
+		this.emitClaudeCodeLog({
+			onLogEntry,
+			stepId,
+			event: 'step_completed',
+			level: 'info',
+			message: this.getStepName(stepId),
+			durationMs: Date.now() - startedAt
+		});
+	}
+
+	private failStep(
+		stepId: ClaudeCodeStepId,
+		error: Error,
+		onLogEntry?: PipelineExecutionOptions['onLogEntry']
+	): void {
+		this.setState(stepId, 'failed', error.message);
+		this.emitClaudeCodeLog({
+			onLogEntry,
+			stepId,
+			event: 'step_failed',
+			level: 'error',
+			message: `${this.getStepName(stepId)}: ${this.truncateLogMessage(error.message)}`
+		});
+	}
+
+	private skipStep(
+		stepId: ClaudeCodeStepId,
+		message: string,
+		onLogEntry?: PipelineExecutionOptions['onLogEntry']
+	): void {
+		this.setState(stepId, 'skipped' as StepStatus);
+		this.emitClaudeCodeLog({
+			onLogEntry,
+			stepId,
+			event: 'step_skipped',
+			level: 'info',
+			message: this.truncateLogMessage(message)
+		});
+	}
+
+	private emitClaudeCodeLog({ onLogEntry, stepId, message, ...log }: ClaudeCodeLogOptions): void {
+		if (!onLogEntry) {
+			return;
+		}
+
+		const stepContext = stepId ? STEP_CONTEXT_BY_ID.get(stepId) : undefined;
+
+		onLogEntry({
+			timestamp: new Date().toISOString(),
+			source: 'claude-code',
+			message: this.truncateLogMessage(message),
+			stepIndex: stepContext?.stepIndex ?? null,
+			stepName: stepContext?.stepName ?? null,
+			...log
+		});
+	}
+
+	private getStepName(stepId: ClaudeCodeStepId): string {
+		return STEP_CONTEXT_BY_ID.get(stepId)?.stepName ?? stepId;
+	}
+
+	private getRunningStepId(): ClaudeCodeStepId | undefined {
+		if (!this.state) {
+			return undefined;
+		}
+
+		for (const stepId of CLAUDE_CODE_STEP_IDS) {
+			const status = this.state.steps.get(stepId)?.status;
+			if (status === 'running') {
+				return stepId;
+			}
+		}
+
+		return undefined;
 	}
 
 	private extractErrorDetail(result: ExecuteResult): string {

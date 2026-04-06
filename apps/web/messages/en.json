@@ -405,7 +405,16 @@
                 "noResultsDescription": "No activities match your current filters. Try adjusting your search or filters."
             },
             "detail": {
-                "title": "Details"
+                "title": "Details",
+                "expand": "Expand details",
+                "collapse": "Collapse details",
+                "event": "Event",
+                "action": "Action",
+                "status": "Status",
+                "created": "Created",
+                "fields": "Details",
+                "metadata": "Metadata",
+                "rawJson": "Raw JSON"
             },
             "pagination": {
                 "previous": "Previous",
