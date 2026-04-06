@@ -4,6 +4,7 @@ import * as yaml from 'yaml';
 import mergeWith from 'lodash/mergeWith';
 import { format } from 'date-fns';
 import semver from 'semver';
+import { Logger } from '@nestjs/common';
 import type {
     Category,
     Collection,
@@ -204,6 +205,7 @@ const createDefaultConfig = (overrides: Partial<IDataConfig> = {}): IDataConfig 
     );
 
 export class DataRepository {
+    private static readonly logger = new Logger(DataRepository.name);
     private config?: IDataConfig;
     private categories?: Category[];
 
@@ -258,7 +260,7 @@ export class DataRepository {
             const stat = await fs.stat(dirpath);
             return stat.isDirectory();
         } catch (err) {
-            if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
+            if ((err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') {
                 return false;
             }
             throw err;
@@ -370,21 +372,25 @@ export class DataRepository {
         return Promise.all(promises).then((items) => items.filter(Boolean));
     }
 
+    async countItems(): Promise<number> {
+        return this.countNonEmptyDirectories(this.dataDir);
+    }
+
     async getItem(slug: string): Promise<ItemData | null> {
         const ymlPath = path.join(this.getItemPath(slug), `${slug}.yml`);
 
         try {
             const content = await fs.readFile(ymlPath, 'utf-8');
-            const item = yaml.parse(content);
+            const item = this.parseItemYaml<Partial<ItemData>>(content, ymlPath);
 
-            return { ...item, slug };
+            return { ...item, slug } as ItemData;
         } catch (err) {
             if (err?.code === 'ENOENT') {
                 const yamlPath = path.join(this.getItemPath(slug), `${slug}.yaml`);
                 try {
                     const content = await fs.readFile(yamlPath, 'utf-8');
-                    const item = yaml.parse(content);
-                    return { ...item, slug };
+                    const item = this.parseItemYaml<Partial<ItemData>>(content, yamlPath);
+                    return { ...item, slug } as ItemData;
                 } catch (yamlErr) {
                     if (yamlErr?.code === 'ENOENT') {
                         return null;
@@ -569,6 +575,10 @@ export class DataRepository {
         }
     }
 
+    async countComparisons(): Promise<number> {
+        return this.countNonEmptyDirectories(this.comparisonsDir);
+    }
+
     async getComparison(slug: string): Promise<ComparisonData | null> {
         const ymlPath = path.join(this.getComparisonPath(slug), `${slug}.yml`);
         try {
@@ -682,7 +692,10 @@ export class DataRepository {
         // Skip write when content is unchanged (avoids spurious Git diffs)
         try {
             const existingContent = await fs.readFile(filepath, 'utf-8');
-            const existingData = yaml.parse(existingContent);
+            const existingData = this.parseItemYaml<Record<string, unknown>>(
+                existingContent,
+                filepath,
+            );
             if (existingData) {
                 const { updated_at: _existingTs, ...existingRest } = existingData;
                 if (yaml.stringify(existingRest) === yaml.stringify(rest)) {
@@ -696,6 +709,47 @@ export class DataRepository {
         const updated_at = format(new Date(), 'yyyy-MM-dd HH:mm');
         const str = yaml.stringify({ ...rest, updated_at });
         await fs.writeFile(filepath, str, 'utf-8');
+    }
+
+    private parseItemYaml<T>(content: string, filepath: string): T {
+        try {
+            return yaml.parse(content) as T;
+        } catch (error) {
+            if (!this.isDuplicateKeyError(error)) {
+                throw error;
+            }
+
+            DataRepository.logger.warn(
+                `Duplicate YAML keys detected in ${filepath}; parsing leniently and keeping the last value for each key.`,
+            );
+
+            return yaml.parse(content, { uniqueKeys: false }) as T;
+        }
+    }
+
+    private isDuplicateKeyError(error: unknown): error is Error {
+        return error instanceof Error && error.message.includes('Map keys must be unique');
+    }
+
+    private async countNonEmptyDirectories(dir: string): Promise<number> {
+        try {
+            const entries = await fs.readdir(dir, { withFileTypes: true });
+            const counts = await Promise.all(
+                entries
+                    .filter((entry) => entry.isDirectory())
+                    .map(async (entry) => {
+                        const childEntries = await fs.readdir(path.join(dir, entry.name));
+                        return childEntries.length > 0 ? 1 : 0;
+                    }),
+            );
+
+            return counts.reduce((sum, count) => sum + count, 0);
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return 0;
+            }
+            throw err;
+        }
     }
 
     async updateItem(slug: string, updates: Partial<ItemData>): Promise<ItemData | null> {

@@ -15,6 +15,14 @@ const WRITE_CONCURRENCY = 64;
 
 const BASE_DIR = join(tmpdir(), 'agent-pipeline');
 
+export function stringifyWorkspaceItem(item: ItemData): string {
+	return JSON.stringify(item, null, 2);
+}
+
+export function hashWorkspaceContent(content: string): string {
+	return createHash('sha256').update(content).digest('hex');
+}
+
 function deduplicateSlug(slug: string, existingSlugs: Set<string>): string {
 	if (!existingSlugs.has(slug)) {
 		return slug;
@@ -65,8 +73,8 @@ export async function createWorkspace(
 		usedSlugs.add(slug);
 
 		const fileName = `${slug}.json`;
-		const content = JSON.stringify(item, null, 2);
-		seededManifest[fileName] = createHash('sha256').update(content).digest('hex');
+		const content = stringifyWorkspaceItem(item);
+		seededManifest[fileName] = hashWorkspaceContent(content);
 		indexLines.push(JSON.stringify({ slug, name: item.name, source_url: item.source_url }));
 
 		itemWrites.push(() => writeFile(join(workspacePath, fileName), content, 'utf-8'));
@@ -153,7 +161,7 @@ export async function collectItemsFromWorkspace(workspacePath: string, logger?: 
 
 				const seededHash = seededHashes[fileName];
 				if (seededHash) {
-					const currentHash = createHash('sha256').update(content).digest('hex');
+					const currentHash = hashWorkspaceContent(content);
 					if (currentHash === seededHash) {
 						return null;
 					}

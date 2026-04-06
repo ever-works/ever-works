@@ -10,6 +10,8 @@ import { MarkdownRepository } from './markdown-repository';
 import { GenerationMethod } from '../../items-generator/dto';
 import { DirectoryOperationsService } from '@src/directory-operations';
 import { getDirectoryOwner } from '../../utils/directory.utils';
+import { cloneFreshRepository } from '../../utils/fresh-repository-clone.utils';
+import { assertCreatedRepositoryTarget } from '../../utils/git-repository.utils';
 
 type InitializeOptions = {
     generation_method?: GenerationMethod;
@@ -32,24 +34,32 @@ export class MarkdownGeneratorService {
         const description = directory.description;
 
         // Create repository through facade
-        await this.gitFacade.createRepository(
-            {
-                name: directory.slug,
-                description,
-                organization: directory.organization ? directory.getRepoOwner() : undefined,
-                isPrivate: true,
-            },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+        const markdownRepository = assertCreatedRepositoryTarget(
+            await this.gitFacade.createRepository(
+                {
+                    name: directory.slug,
+                    description,
+                    organization: directory.organization ? directory.getRepoOwner() : undefined,
+                    isPrivate: true,
+                },
+                { userId: directoryOwner.id, providerId: directory.gitProvider },
+            ),
+            directory.getRepoOwner(),
+            directory.slug,
+            'Markdown repository',
         );
 
         // Clone markdown repo
-        const markdownPath = await this.gitFacade.cloneOrPull(
+        const markdownPath = await cloneFreshRepository(
+            this.gitFacade,
             {
-                owner: directory.getRepoOwner(),
-                repo: directory.slug,
+                owner: markdownRepository.owner,
+                repo: markdownRepository.name,
                 committer,
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
             },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            this.logger,
         );
 
         // Clone data repo
@@ -110,48 +120,63 @@ export class MarkdownGeneratorService {
             const markdowns = new Set<string>(); // will be needed to check if markdown exists before referencing them in README
             const categories = await this.loadCategories(dataRepo);
             const tags = await this.loadTags(dataRepo);
+            const itemWarnings: string[] = [];
 
             const groups = {}; // we want to group items by category, like: { 'open-source': [items], 'commercial': [items] }
             for (const slug of slugs) {
-                const markdown = await dataRepo.getMarkdown(slug);
-                if (markdown) {
-                    await markdownRepo.writeDetails(slug, markdown);
-                    markdowns.add(slug);
-                }
-
-                let item = await dataRepo.getItem(slug);
-                if (!item) {
-                    continue;
-                }
-
-                if (Array.isArray(item.tags)) {
-                    item = {
-                        ...item,
-                        tags: item.tags.map((tag) => this.populate<Tag>(tag, tags)),
-                    };
-                }
-
-                // Normalize category to array of strings
-                const itemCategories: string[] = Array.isArray(item.category)
-                    ? item.category
-                    : [item.category];
-
-                // Ensure each category is in the categories map
-                for (const cat of itemCategories) {
-                    if (!categories.has(cat)) {
-                        categories.set(cat, { id: cat, name: cat });
+                try {
+                    const markdown = await dataRepo.getMarkdown(slug);
+                    if (markdown) {
+                        await markdownRepo.writeDetails(slug, markdown);
+                        markdowns.add(slug);
                     }
-                }
 
-                // Group item by each of its categories
-                for (const cat of itemCategories) {
-                    const group = groups[cat];
-                    if (group) {
-                        group.push(item);
-                    } else {
-                        groups[cat] = [item];
+                    let item = await dataRepo.getItem(slug);
+                    if (!item) {
+                        continue;
                     }
+
+                    if (Array.isArray(item.tags)) {
+                        item = {
+                            ...item,
+                            tags: item.tags.map((tag) => this.populate<Tag>(tag, tags)),
+                        };
+                    }
+
+                    // Normalize category to array of strings
+                    const itemCategories: string[] = Array.isArray(item.category)
+                        ? item.category
+                        : [item.category];
+
+                    // Ensure each category is in the categories map
+                    for (const cat of itemCategories) {
+                        if (!categories.has(cat)) {
+                            categories.set(cat, { id: cat, name: cat });
+                        }
+                    }
+
+                    // Group item by each of its categories
+                    for (const cat of itemCategories) {
+                        const group = groups[cat];
+                        if (group) {
+                            group.push(item);
+                        } else {
+                            groups[cat] = [item];
+                        }
+                    }
+                } catch (error) {
+                    const message = `Skipping item "${slug}" during markdown generation: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`;
+                    itemWarnings.push(message);
+                    this.logger.warn(message);
                 }
+            }
+
+            if (itemWarnings.length > 0) {
+                this.logger.warn(
+                    `Markdown generation completed with ${itemWarnings.length} skipped item(s)`,
+                );
             }
 
             // Remove detail files

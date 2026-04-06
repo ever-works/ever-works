@@ -119,6 +119,10 @@ export class PluginOperationsService {
      */
     async getPluginsForSettingsMenu(userId: string): Promise<SettingsMenuResponse> {
         const allPlugins = this.pluginRegistryService.getAll();
+        const hasVisiblePipelineCategory = allPlugins.some((registered) => {
+            const visibility = registered.manifest?.visibility ?? 'public';
+            return visibility !== 'hidden' && registered.manifest.category === 'pipeline';
+        });
 
         // Get user's plugin installations
         const userPlugins = await this.userPluginRepository.find({
@@ -197,10 +201,16 @@ export class PluginOperationsService {
             categoryMap.set(category, existing);
         }
 
+        // Pipeline settings also expose a global default selector, so the category
+        // should remain visible even when the user has no enabled pipeline plugins yet.
+        if (hasVisiblePipelineCategory && !categoryMap.has('pipeline')) {
+            categoryMap.set('pipeline', []);
+        }
+
         // Convert to array of categories (only non-empty)
         const categories: SettingsMenuCategory[] = [];
         for (const [category, plugins] of categoryMap.entries()) {
-            if (plugins.length > 0) {
+            if (plugins.length > 0 || category === 'pipeline') {
                 categories.push({
                     category: category as any,
                     label: this.getCategoryLabel(category),

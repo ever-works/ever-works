@@ -1,4 +1,4 @@
-# Ever Works 
+# Ever Works
 
 The Workshop for AI — Open Agentic Runtime for Autonomously Built & Maintained Content-Rich Web Apps.
 
@@ -14,9 +14,9 @@ An open-source, extensible, agentic runtime for building content-rich web apps t
 
 ## 🍺 Contribute
 
--   Please give us a :star: on Github, it **helps**!
--   You are more than welcome to submit feature requests in the [separate repo](https://github.com/ever-works/ever-works/issues)
--   Pull requests are always welcome! Please base pull requests against the _develop_ branch and follow the [contributing guide](.github/CONTRIBUTING.MD).
+- Please give us a :star: on Github, it **helps**!
+- You are more than welcome to submit feature requests in the [separate repo](https://github.com/ever-works/ever-works/issues)
+- Pull requests are always welcome! Please base pull requests against the _develop_ branch and follow the [contributing guide](.github/CONTRIBUTING.MD).
 
 ## 💪 Thanks to our Contributors
 

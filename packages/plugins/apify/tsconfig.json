@@ -16,5 +16,5 @@
 		"lib": ["ES2021", "DOM"]
 	},
 	"include": ["src/**/*"],
-	"exclude": ["node_modules", "dist", "**/*.spec.ts"]
+	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
 }

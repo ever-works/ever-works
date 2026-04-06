@@ -50,6 +50,7 @@ export function ChatMessageContent({
                     return (
                         <ChatToolResult
                             key={part.toolCallId}
+                            toolCallId={part.toolCallId}
                             toolName={name}
                             state={part.state}
                             output={part.state === 'output-available' ? part.output : undefined}

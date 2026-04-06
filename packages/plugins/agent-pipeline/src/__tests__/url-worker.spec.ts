@@ -27,7 +27,7 @@ vi.mock('just-bash', () => ({
 }));
 
 vi.mock('ai', () => ({
-	generateText: vi.fn(),
+	streamText: vi.fn(),
 	stepCountIs: vi.fn().mockReturnValue(() => false),
 	wrapLanguageModel: vi.fn().mockImplementation(({ model }) => model),
 	tool: vi.fn().mockImplementation((def) => def)
@@ -62,13 +62,38 @@ vi.mock('../tools/validate-json-tools', () => ({
 	createValidateItemJsonTool: vi.fn().mockReturnValue({ type: 'validateItemJson-tool' })
 }));
 
-import { generateText } from 'ai';
+import { streamText } from 'ai';
 import { createCreateFileTool } from '../tools/file-tools';
 import { ToolCircuitBreaker } from '../utils/tool-circuit-breaker';
 import { TokenUsageAccumulator } from '../types';
 
-const mockGenerateText = vi.mocked(generateText);
+const mockStreamText = vi.mocked(streamText);
 const mockCreateCreateFileTool = vi.mocked(createCreateFileTool);
+
+function createMockStreamResult(overrides?: {
+	onStream?: () => Promise<void>;
+	streamError?: Error;
+	totalUsage?: { inputTokens?: number; outputTokens?: number; totalTokens: number };
+	text?: string;
+	steps?: unknown[];
+}) {
+	const fullStream = {
+		async *[Symbol.asyncIterator]() {
+			if (overrides?.streamError) {
+				throw overrides.streamError;
+			}
+
+			await overrides?.onStream?.();
+		}
+	};
+
+	return {
+		fullStream,
+		steps: Promise.resolve(overrides?.steps ?? []),
+		text: Promise.resolve(overrides?.text ?? ''),
+		totalUsage: Promise.resolve(overrides?.totalUsage ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 })
+	} as never;
+}
 
 function createMockContext(overrides?: Partial<UrlWorkerContext>): UrlWorkerContext {
 	return {
@@ -99,7 +124,7 @@ describe('processUrlWorker', () => {
 		mockSandboxWriteFile.mockResolvedValue(undefined);
 	});
 
-	it('invokes generateText with tools for each chunk', async () => {
+	it('invokes streamText with tools for each chunk', async () => {
 		// Capture the onCreated callback when createCreateFileTool is called
 		let capturedOnCreated: ((path: string, content: string) => Promise<void>) | undefined;
 		mockCreateCreateFileTool.mockImplementation((_sandbox, _cwd, options) => {
@@ -107,17 +132,16 @@ describe('processUrlWorker', () => {
 			return { type: 'createFile-tool' } as never;
 		});
 
-		mockGenerateText.mockImplementation(async () => {
-			// Simulate the agent creating a file during generateText execution
-			if (capturedOnCreated) {
-				await capturedOnCreated('supertool.json', '{"slug":"supertool","name":"SuperTool"}');
-			}
-			return {
-				steps: [],
-				text: '',
+		mockStreamText.mockImplementation(() =>
+			createMockStreamResult({
+				onStream: async () => {
+					if (capturedOnCreated) {
+						await capturedOnCreated('supertool.json', '{"slug":"supertool","name":"SuperTool"}');
+					}
+				},
 				totalUsage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 }
-			} as never;
-		});
+			})
+		);
 
 		const ctx = createMockContext();
 		const result = await processUrlWorker('https://supertool.com', ctx);
@@ -125,10 +149,10 @@ describe('processUrlWorker', () => {
 		expect(result.count).toBe(1);
 		expect(result.files).toEqual(['supertool.json']);
 		expect(result.error).toBeUndefined();
-		expect(mockGenerateText).toHaveBeenCalledTimes(1);
+		expect(mockStreamText).toHaveBeenCalledTimes(1);
 
-		// Verify tools are passed to generateText
-		const callArgs = mockGenerateText.mock.calls[0][0] as Record<string, unknown>;
+		// Verify tools are passed to streamText
+		const callArgs = mockStreamText.mock.calls[0][0] as Record<string, unknown>;
 		expect(callArgs.tools).toHaveProperty('bash');
 		expect(callArgs.tools).toHaveProperty('readFile');
 		expect(callArgs.tools).toHaveProperty('createFile');
@@ -150,11 +174,11 @@ describe('processUrlWorker', () => {
 	});
 
 	it('returns error when no items are created by agent', async () => {
-		mockGenerateText.mockResolvedValue({
-			steps: [],
-			text: '',
-			totalUsage: { inputTokens: 50, outputTokens: 20, totalTokens: 70 }
-		} as never);
+		mockStreamText.mockReturnValue(
+			createMockStreamResult({
+				totalUsage: { inputTokens: 50, outputTokens: 20, totalTokens: 70 }
+			})
+		);
 
 		const ctx = createMockContext();
 		const result = await processUrlWorker('https://example.com', ctx);
@@ -174,8 +198,12 @@ describe('processUrlWorker', () => {
 		expect(result.error).toBe('Aborted');
 	});
 
-	it('handles generateText failure gracefully', async () => {
-		mockGenerateText.mockRejectedValue(new Error('API timeout'));
+	it('handles streamText failure gracefully', async () => {
+		mockStreamText.mockImplementation(() =>
+			createMockStreamResult({
+				streamError: new Error('API timeout')
+			})
+		);
 
 		const ctx = createMockContext();
 		const result = await processUrlWorker('https://example.com', ctx);
@@ -192,32 +220,31 @@ describe('processUrlWorker', () => {
 			return { type: 'createFile-tool' } as never;
 		});
 
-		mockGenerateText.mockImplementation(async () => {
-			// Simulate the agent creating a file during generateText execution
-			if (capturedOnCreated) {
-				await capturedOnCreated('tool-a.json', '{"slug":"tool-a","name":"Tool A"}');
-			}
-			return {
-				steps: [],
-				text: '',
+		mockStreamText.mockImplementation(() =>
+			createMockStreamResult({
+				onStream: async () => {
+					if (capturedOnCreated) {
+						await capturedOnCreated('tool-a.json', '{"slug":"tool-a","name":"Tool A"}');
+					}
+				},
 				totalUsage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 }
-			} as never;
-		});
+			})
+		);
 
 		const ctx = createMockContext();
 		const result = await processUrlWorker('https://example.com', ctx);
 
 		expect(result.count).toBe(1);
 		expect(result.files).toEqual(['tool-a.json']);
-		expect(mockGenerateText).toHaveBeenCalled();
+		expect(mockStreamText).toHaveBeenCalled();
 	});
 
 	it('accumulates token usage when tokenAccumulator is provided', async () => {
-		mockGenerateText.mockResolvedValue({
-			steps: [],
-			text: '',
-			totalUsage: { inputTokens: 200, outputTokens: 100, totalTokens: 300 }
-		} as never);
+		mockStreamText.mockReturnValue(
+			createMockStreamResult({
+				totalUsage: { inputTokens: 200, outputTokens: 100, totalTokens: 300 }
+			})
+		);
 
 		const accumulator = new TokenUsageAccumulator();
 		const ctx = createMockContext({ tokenAccumulator: accumulator });

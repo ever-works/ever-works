@@ -4,11 +4,13 @@ import {
 	isAgentPipelineStepId,
 	DEFAULT_MAX_STEPS,
 	getWorkerContentBudgetRatio,
-	MAX_URLS_PER_BATCH,
 	MAX_CHUNK_CHARS,
 	getStepsPerChunk,
+	getWorkerTimeoutMs,
 	BASE_STEPS_PER_CHUNK,
 	MAX_STEPS_PER_CHUNK,
+	STEPS_PER_ESTIMATED_ITEM,
+	MODIFICATION_WORKER_MAX_STEPS,
 	TokenUsageAccumulator
 } from '../types';
 
@@ -55,12 +57,13 @@ describe('types', () => {
 			expect(getWorkerContentBudgetRatio(200_000)).toBe(0.55);
 		});
 
-		it('should have max URLs per batch', () => {
-			expect(MAX_URLS_PER_BATCH).toBe(10);
-		});
-
 		it('should have a practical max chunk chars cap', () => {
 			expect(MAX_CHUNK_CHARS).toBe(30_000);
+		});
+
+		it('should keep the default and modification worker step budgets intentionally bounded', () => {
+			expect(DEFAULT_MAX_STEPS).toBe(24);
+			expect(MODIFICATION_WORKER_MAX_STEPS).toBe(80);
 		});
 	});
 
@@ -71,18 +74,31 @@ describe('types', () => {
 		});
 
 		it('should scale steps proportionally for medium chunks', () => {
-			// 20K chars → ~100 estimated items → 100 * 4 = 400 steps
-			expect(getStepsPerChunk(20_000)).toBe(400);
+			// 20K chars → ~100 estimated items → 100 * STEPS_PER_ESTIMATED_ITEM
+			expect(getStepsPerChunk(20_000)).toBe(MAX_STEPS_PER_CHUNK);
 		});
 
 		it('should scale for large chunks within cap', () => {
-			// 30K chars → ~150 estimated items → 150 * 4 = 600 steps (under cap)
-			expect(getStepsPerChunk(30_000)).toBe(600);
+			// 30K chars → ~150 estimated items → 150 * STEPS_PER_ESTIMATED_ITEM, capped
+			expect(getStepsPerChunk(30_000)).toBe(MAX_STEPS_PER_CHUNK);
 		});
 
 		it('should cap at MAX_STEPS_PER_CHUNK for very large chunks', () => {
 			expect(getStepsPerChunk(50_000)).toBe(MAX_STEPS_PER_CHUNK);
 			expect(getStepsPerChunk(100_000)).toBe(MAX_STEPS_PER_CHUNK);
+		});
+
+		it('should expose the current scaling factor for maintainability', () => {
+			expect(STEPS_PER_ESTIMATED_ITEM).toBe(2);
+		});
+	});
+
+	describe('getWorkerTimeoutMs', () => {
+		it('should keep worker timeouts within the bounded window', () => {
+			expect(getWorkerTimeoutMs(1)).toBe(3 * 60 * 1000);
+			expect(getWorkerTimeoutMs(40)).toBe(3 * 60 * 1000);
+			expect(getWorkerTimeoutMs(MAX_STEPS_PER_CHUNK)).toBe(7 * 60 * 1000);
+			expect(getWorkerTimeoutMs(500)).toBe(8 * 60 * 1000);
 		});
 	});
 
