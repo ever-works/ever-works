@@ -404,6 +404,7 @@
                 "collapse": "Collapse details",
                 "event": "Event",
                 "action": "Action",
+                "status": "Status",
                 "created": "Created",
                 "fields": "Details",
                 "metadata": "Metadata",

@@ -282,7 +282,7 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                                             </p>
                                                             <p>
                                                                 <span className="font-medium">
-                                                                    Status:
+                                                                    {t('detail.status')}:
                                                                 </span>{' '}
                                                                 {activity.status}
                                                             </p>
