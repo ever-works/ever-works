@@ -196,7 +196,10 @@ export class AlignAuthRuntimeSingularTables1760000001000 implements MigrationInt
         return queryRunner.manager.createQueryBuilder().from(tableName, 't').getCount();
     }
 
-    private async alignAccountTable(queryRunner: QueryRunner, timestampType: string): Promise<void> {
+    private async alignAccountTable(
+        queryRunner: QueryRunner,
+        timestampType: string,
+    ): Promise<void> {
         const table = await queryRunner.getTable('account');
         if (!table) {
             return;
@@ -231,7 +234,10 @@ export class AlignAuthRuntimeSingularTables1760000001000 implements MigrationInt
         await this.changeColumnType(queryRunner, table, 'updatedAt', timestampType);
     }
 
-    private async alignSessionTable(queryRunner: QueryRunner, timestampType: string): Promise<void> {
+    private async alignSessionTable(
+        queryRunner: QueryRunner,
+        timestampType: string,
+    ): Promise<void> {
         const table = await queryRunner.getTable('session');
         if (!table) {
             return;
