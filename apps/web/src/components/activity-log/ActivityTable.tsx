@@ -21,37 +21,50 @@ function hasStructuredData(value?: Record<string, unknown>) {
 
 function DetailValue({ value }: { value: unknown }) {
     if (value === null || value === undefined) {
-        return <span className="text-text-muted dark:text-text-muted-dark italic">—</span>;
+        return <span className="text-text-muted dark:text-text-muted-dark">—</span>;
     }
     if (typeof value === 'boolean') {
-        return <span>{value ? 'Yes' : 'No'}</span>;
+        return (
+            <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                    value
+                        ? 'bg-success/10 text-success'
+                        : 'bg-muted/50 text-text-muted dark:text-text-muted-dark'
+                }`}
+            >
+                {value ? 'Yes' : 'No'}
+            </span>
+        );
     }
     if (typeof value === 'object') {
         return (
-            <pre className="text-xs bg-surface-secondary dark:bg-surface-secondary-dark p-2 rounded-md overflow-x-auto text-text-muted dark:text-text-muted-dark mt-1">
+            <pre className="text-[11px] leading-relaxed font-mono bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-md p-2.5 overflow-x-auto text-text-secondary dark:text-text-secondary-dark mt-1">
                 {JSON.stringify(value, null, 2)}
             </pre>
         );
     }
-    return <span>{String(value)}</span>;
+    return <span className="font-mono text-xs">{String(value)}</span>;
 }
 
 function DetailPanel({ details }: { details: Record<string, unknown> }) {
     const entries = Object.entries(details);
 
     return (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+        <div className="divide-y divide-border dark:divide-border-dark rounded-md border border-border dark:border-border-dark overflow-hidden">
             {entries.map(([key, value]) => (
-                <Fragment key={key}>
-                    <dt className="font-medium text-text-secondary dark:text-text-secondary-dark capitalize whitespace-nowrap">
+                <div
+                    key={key}
+                    className="grid grid-cols-[180px_1fr] items-start bg-card dark:bg-transparent hover:bg-muted/20 dark:hover:bg-muted/10 transition-colors"
+                >
+                    <div className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark border-r border-border dark:border-border-dark bg-muted/30 dark:bg-muted/10 self-stretch flex items-start">
                         {key.replace(/_/g, ' ')}
-                    </dt>
-                    <dd className="text-text dark:text-text-dark break-words">
+                    </div>
+                    <div className="px-3 py-2.5 text-xs text-text dark:text-text-dark min-w-0">
                         <DetailValue value={value} />
-                    </dd>
-                </Fragment>
+                    </div>
+                </div>
             ))}
-        </dl>
+        </div>
     );
 }
 
@@ -262,53 +275,75 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                             </div>
                                         </td>
                                     </tr>
-                                    {hasStructuredContent && isExpanded && (
-                                        <tr className="bg-muted/20 dark:bg-muted/10">
-                                            <td colSpan={6} className="px-6 py-4">
-                                                <div className="space-y-3">
-                                                    <h4 className="text-sm font-semibold text-text dark:text-text-dark">
-                                                        {t('detail.title')}
-                                                    </h4>
-                                                    <div className="rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-dark p-3">
-                                                        <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-                                                            {t('detail.event')}
-                                                        </p>
-                                                        <div className="mt-2 space-y-2 text-sm text-text dark:text-text-dark">
-                                                            <p>
-                                                                <span className="font-medium">
-                                                                    {t('detail.action')}:
-                                                                </span>{' '}
-                                                                {activity.action}
-                                                            </p>
-                                                            <p>
-                                                                <span className="font-medium">
-                                                                    {t('detail.status')}:
-                                                                </span>{' '}
-                                                                {activity.status}
-                                                            </p>
-                                                            <p>
-                                                                <span className="font-medium">
-                                                                    {t('detail.created')}:
-                                                                </span>{' '}
-                                                                {new Date(
-                                                                    activity.createdAt,
-                                                                ).toLocaleString()}
-                                                            </p>
+                                    {hasStructuredContent && (
+                                        <tr
+                                            className={
+                                                isExpanded ? 'bg-muted/20 dark:bg-muted/10' : ''
+                                            }
+                                        >
+                                            <td colSpan={6} style={{ padding: 0 }}>
+                                                <div
+                                                    style={{
+                                                        display: 'grid',
+                                                        gridTemplateRows: isExpanded
+                                                            ? '1fr'
+                                                            : '0fr',
+                                                        transition: 'grid-template-rows 300ms ease',
+                                                    }}
+                                                >
+                                                    <div className="overflow-hidden">
+                                                        <div className="px-6 py-4 space-y-3">
+                                                            <h4 className="text-sm font-semibold text-text dark:text-text-dark">
+                                                                {t('detail.title')}
+                                                            </h4>
+                                                            <div className="rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark/30 p-3">
+                                                                <p className="text-xs mb-4 font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
+                                                                    {t('detail.event')}
+                                                                </p>
+                                                                <div className="mt-2 space-y-2 text-xs text-text dark:text-text-dark">
+                                                                    <p className="mb-3">
+                                                                        <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
+                                                                            {t('detail.action')}:
+                                                                        </span>{' '}
+                                                                        <code className="text-xs font-mono px-2 py-0.5 rounded bg-muted/40 dark:bg-muted/20 text-text dark:text-text-dark border border-border dark:border-border-dark">
+                                                                            {activity.action}
+                                                                        </code>
+                                                                    </p>
+                                                                    <p className="mb-3">
+                                                                        <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
+                                                                            {t('detail.status')}:
+                                                                        </span>{' '}
+                                                                        <ActivityStatusBadge
+                                                                            status={activity.status}
+                                                                        />
+                                                                    </p>
+                                                                    <p>
+                                                                        <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
+                                                                            {t('detail.created')}:
+                                                                        </span>{' '}
+                                                                        <span className="text-[11px] text-text-muted dark:text-text-muted-dark">
+                                                                            {new Date(
+                                                                                activity.createdAt,
+                                                                            ).toLocaleString()}
+                                                                        </span>
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <StructuredSection
+                                                                title={t('detail.fields')}
+                                                                data={activity.details}
+                                                            />
+                                                            <StructuredSection
+                                                                title={t('detail.metadata')}
+                                                                data={activity.metadata}
+                                                            />
+                                                            <RawJsonPanel
+                                                                title={t('detail.rawJson')}
+                                                                details={activity.details}
+                                                                metadata={activity.metadata}
+                                                            />
                                                         </div>
                                                     </div>
-                                                    <StructuredSection
-                                                        title={t('detail.fields')}
-                                                        data={activity.details}
-                                                    />
-                                                    <StructuredSection
-                                                        title={t('detail.metadata')}
-                                                        data={activity.metadata}
-                                                    />
-                                                    <RawJsonPanel
-                                                        title={t('detail.rawJson')}
-                                                        details={activity.details}
-                                                        metadata={activity.metadata}
-                                                    />
                                                 </div>
                                             </td>
                                         </tr>
