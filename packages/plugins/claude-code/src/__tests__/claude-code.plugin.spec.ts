@@ -256,6 +256,106 @@ describe('ClaudeCodePlugin', () => {
 			expect(itemUpdates[2].percent).toBe(46); // 30 + round(3/10 * 53) = 46
 		});
 
+		it('should stream structured Claude Code logs during generation', async () => {
+			const { executeClaudeCode } = await import('../utils/process-runner');
+			vi.mocked(executeClaudeCode).mockImplementationOnce((options) => {
+				options.onStdoutLine?.(
+					JSON.stringify({
+						type: 'assistant',
+						message: {
+							content: [{ type: 'text', text: 'Researching sources' }]
+						}
+					})
+				);
+				options.onStdoutLine?.(JSON.stringify({ type: 'tool_use', tool: 'web_search' }));
+				options.onStdoutLine?.(
+					JSON.stringify({
+						type: 'tool_result',
+						tool: 'web_search',
+						result: 'Fetched 10 results'
+					})
+				);
+				options.onStdoutLine?.('Plain text status update');
+				options.onStderrLine?.('Minor warning from stderr');
+
+				return {
+					promise: Promise.resolve({
+						stdout: '',
+						stderr: '',
+						exitCode: 0,
+						killed: false,
+						duration: 5000
+					}),
+					kill: vi.fn()
+				};
+			});
+
+			const ctx = createMockContext();
+			await plugin.onLoad(ctx);
+
+			const logs: Array<{
+				event: string;
+				message: string;
+				level: string;
+				stepIndex?: number | null;
+				stepName?: string | null;
+			}> = [];
+
+			await plugin.execute(directory, request, existing, {
+				onLogEntry: (log) => logs.push(log)
+			});
+
+			expect(logs).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						event: 'step_started',
+						message: 'Setup Claude Code',
+						stepIndex: 0,
+						stepName: 'Setup Claude Code'
+					}),
+					expect.objectContaining({
+						event: 'step_started',
+						message: 'Generate Items',
+						stepIndex: 2,
+						stepName: 'Generate Items'
+					}),
+					expect.objectContaining({
+						event: 'message',
+						level: 'info',
+						message: 'Researching sources',
+						stepIndex: 2,
+						stepName: 'Generate Items'
+					}),
+					expect.objectContaining({
+						event: 'message',
+						level: 'info',
+						message: 'Tool started: web_search'
+					}),
+					expect.objectContaining({
+						event: 'message',
+						level: 'info',
+						message: 'Tool finished: web_search (Fetched 10 results)'
+					}),
+					expect.objectContaining({
+						event: 'message',
+						level: 'info',
+						message: 'Plain text status update'
+					}),
+					expect.objectContaining({
+						event: 'message',
+						level: 'error',
+						message: 'Minor warning from stderr'
+					}),
+					expect.objectContaining({
+						event: 'step_completed',
+						message: 'Generate Items',
+						stepIndex: 2,
+						stepName: 'Generate Items'
+					})
+				])
+			);
+		});
+
 		it('should include a warning when CLI exits with non-zero code', async () => {
 			const { executeClaudeCode } = await import('../utils/process-runner');
 			vi.mocked(executeClaudeCode).mockReturnValueOnce({

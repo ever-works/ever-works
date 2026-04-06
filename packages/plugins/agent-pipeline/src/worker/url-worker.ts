@@ -1,6 +1,6 @@
 import { appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { generateText, stepCountIs, ToolSet } from 'ai';
+import { streamText, stepCountIs, ToolSet } from 'ai';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import type {
 	IContentExtractorFacade,
@@ -32,10 +32,12 @@ import {
 	MIN_CHUNK_CHARS,
 	MAX_CHUNK_CHARS,
 	DEFAULT_CONTEXT_BUDGET_RATIO,
-	getStepsPerChunk
+	getStepsPerChunk,
+	getWorkerTimeoutMs
 } from '../types.js';
 import type { TokenUsageAccumulator } from '../types.js';
 import { ToolCircuitBreaker } from '../utils/tool-circuit-breaker.js';
+import { consumeStreamWithLogging } from '../utils/stream-text-logging.js';
 
 export interface UrlWorkerContext {
 	workerModel: LanguageModelV3;
@@ -202,11 +204,11 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 			const chunkStepLimit = getStepsPerChunk(chunkText.length);
 			try {
 				const result = await withToolCallingRetry(
-					() => {
-						return generateText({
+					async () => {
+						const result = streamText({
 							model: workerModel,
 							system: systemPrompt,
-							timeout: Math.max(5, Math.ceil(chunkStepLimit / 20)) * 60 * 1000,
+							timeout: getWorkerTimeoutMs(chunkStepLimit),
 							prompt: substituteVariables(
 								chunkTemplate,
 								buildChunkUserPromptVariables(
@@ -232,27 +234,20 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 							}),
 							abortSignal: signal,
 							experimental_repairToolCall: repairToolCall,
-							experimental_telemetry: { isEnabled: true },
-							onStepFinish: (step) => {
-								if (ctx.onLogEntry && step.toolCalls.length > 0) {
-									const tools = step.toolCalls.map((tc) => tc.toolName).join(', ');
-									ctx.onLogEntry({
-										timestamp: new Date().toISOString(),
-										level: 'debug',
-										source: 'pipeline',
-										event: 'message',
-										message: `URL worker [${url}]: ${tools} (${step.usage.totalTokens} tokens)`,
-										stepIndex: 1,
-										stepName: null,
-										durationMs: null
-									});
-								}
-							}
+							experimental_telemetry: { isEnabled: true }
 						});
+
+						await consumeStreamWithLogging(result, {
+							onLogEntry: ctx.onLogEntry,
+							scope: `URL worker [${url}]`,
+							stepIndex: 1,
+							source: 'pipeline'
+						});
+						return result;
 					},
 					{ providerName: 'worker', modelName: 'url-worker', signal, logger }
 				);
-				ctx.tokenAccumulator?.addWorker(result.totalUsage);
+				ctx.tokenAccumulator?.addWorker(await result.totalUsage);
 			} catch (err) {
 				logger.warn(
 					`Worker: chunk ${chunk.index + 1}/${chunk.total} failed: ${err instanceof Error ? err.message : err}`

@@ -35,6 +35,7 @@ import {
     type DirectoryHistoryChangeEntry,
 } from '@ever-works/contracts/api';
 import { buildDirectoryChangelog } from '../utils/directory-changelog.utils';
+import { normalizeGeneratorError } from '../services/utils/error.utils';
 
 const comparisonStructureSchema = z.object({
     title: z.string(),
@@ -165,6 +166,13 @@ export class ComparisonGenerationService {
         };
     }
 
+    private getDirectoryGitOptions(directory: Directory): GitFacadeOptions {
+        return {
+            userId: directory.userId,
+            providerId: directory.gitProvider,
+        };
+    }
+
     /**
      * Generate the next automatic comparison for a directory.
      * Picks the best un-compared pair and generates a full comparison page.
@@ -172,10 +180,7 @@ export class ComparisonGenerationService {
     async generateNextComparison(directoryId: string, userId: string): Promise<ComparisonResult> {
         const directory = await this.findDirectoryOrFail(directoryId);
 
-        const gitOptions: GitFacadeOptions = {
-            userId,
-            providerId: directory.gitProvider,
-        };
+        const gitOptions = this.getDirectoryGitOptions(directory);
 
         const dest = await this.gitFacade.cloneOrPull(
             { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
@@ -224,10 +229,7 @@ export class ComparisonGenerationService {
     async getRemainingCount(directoryId: string, userId: string): Promise<number> {
         const directory = await this.findDirectoryOrFail(directoryId);
 
-        const gitOptions: GitFacadeOptions = {
-            userId,
-            providerId: directory.gitProvider,
-        };
+        const gitOptions = this.getDirectoryGitOptions(directory);
 
         const dest = await this.gitFacade.cloneOrPull(
             { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
@@ -267,10 +269,7 @@ export class ComparisonGenerationService {
     ): Promise<ComparisonResult> {
         const directory = await this.findDirectoryOrFail(directoryId);
 
-        const gitOptions: GitFacadeOptions = {
-            userId,
-            providerId: directory.gitProvider,
-        };
+        const gitOptions = this.getDirectoryGitOptions(directory);
 
         const dest = await this.gitFacade.cloneOrPull(
             { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
@@ -321,17 +320,23 @@ export class ComparisonGenerationService {
     async listComparisons(directoryId: string, userId: string): Promise<ComparisonData[]> {
         const directory = await this.findDirectoryOrFail(directoryId);
 
-        const gitOptions: GitFacadeOptions = {
-            userId,
-            providerId: directory.gitProvider,
-        };
+        const gitOptions = this.getDirectoryGitOptions(directory);
 
-        const dest = await this.gitFacade.cloneOrPull(
-            { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
-            gitOptions,
-        );
-        const dataRepo = await DataRepository.create(dest);
-        return dataRepo.getComparisons();
+        try {
+            const dest = await this.gitFacade.cloneOrPull(
+                { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
+                gitOptions,
+            );
+            const dataRepo = await DataRepository.create(dest);
+            return dataRepo.getComparisons();
+        } catch (error) {
+            const errMessage = normalizeGeneratorError(error);
+            if (errMessage.includes('Repository not found')) {
+                return [];
+            }
+
+            throw error;
+        }
     }
 
     /**
@@ -348,23 +353,29 @@ export class ComparisonGenerationService {
     }> {
         const directory = await this.findDirectoryOrFail(directoryId);
 
-        const gitOptions: GitFacadeOptions = {
-            userId,
-            providerId: directory.gitProvider,
-        };
+        const gitOptions = this.getDirectoryGitOptions(directory);
 
-        const dest = await this.gitFacade.cloneOrPull(
-            { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
-            gitOptions,
-        );
-        const dataRepo = await DataRepository.create(dest);
-        const comparison = await dataRepo.getComparison(slug);
-        const markdown = comparison ? await dataRepo.getComparisonMarkdown(slug) : undefined;
-        const extendedAnalysisMarkdown = comparison
-            ? await dataRepo.getComparisonExtendedMarkdown(slug)
-            : undefined;
+        try {
+            const dest = await this.gitFacade.cloneOrPull(
+                { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
+                gitOptions,
+            );
+            const dataRepo = await DataRepository.create(dest);
+            const comparison = await dataRepo.getComparison(slug);
+            const markdown = comparison ? await dataRepo.getComparisonMarkdown(slug) : undefined;
+            const extendedAnalysisMarkdown = comparison
+                ? await dataRepo.getComparisonExtendedMarkdown(slug)
+                : undefined;
 
-        return { comparison, markdown, extendedAnalysisMarkdown };
+            return { comparison, markdown, extendedAnalysisMarkdown };
+        } catch (error) {
+            const errMessage = normalizeGeneratorError(error);
+            if (errMessage.includes('Repository not found')) {
+                return { comparison: null };
+            }
+
+            throw error;
+        }
     }
 
     /**
@@ -377,10 +388,7 @@ export class ComparisonGenerationService {
     ): Promise<ComparisonResult> {
         const directory = await this.findDirectoryOrFail(directoryId);
 
-        const gitOptions: GitFacadeOptions = {
-            userId,
-            providerId: directory.gitProvider,
-        };
+        const gitOptions = this.getDirectoryGitOptions(directory);
 
         const dest = await this.gitFacade.cloneOrPull(
             { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },

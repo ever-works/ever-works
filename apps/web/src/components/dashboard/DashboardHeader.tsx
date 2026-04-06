@@ -4,6 +4,7 @@ import { AuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils/cn';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NotificationDropdown } from './NotificationDropdown';
+import { DirectorySwitcher } from './DirectorySwitcher';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Menu, HelpCircle } from 'lucide-react';
 
@@ -29,7 +30,7 @@ export function DashboardHeader({
         >
             <div className="px-4 @sm/main:px-6 @3xl/main:px-8">
                 <div className="flex items-center justify-between h-16">
-                    <div className="flex items-center">
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
                         {!isSidebarOpen && (
                             <Tooltip content="Open sidebar" position="bottom">
                                 <button
@@ -45,9 +46,11 @@ export function DashboardHeader({
                                 </button>
                             </Tooltip>
                         )}
+
+                        <DirectorySwitcher />
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex shrink-0 items-center gap-4">
                         <Tooltip content="Notifications" position="bottom">
                             <div>
                                 <NotificationDropdown />
