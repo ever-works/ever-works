@@ -285,7 +285,10 @@ export function DashboardSidebar({
                                             isCollapsed && 'justify-center',
                                         )}
                                     >
-                                        <ConditionalTooltip show={isCollapsed} content={user.username}>
+                                        <ConditionalTooltip
+                                            show={isCollapsed}
+                                            content={user.username}
+                                        >
                                             <div
                                                 className={cn(
                                                     'relative w-8 h-8 rounded-full shrink-0 flex items-center justify-center overflow-hidden',
