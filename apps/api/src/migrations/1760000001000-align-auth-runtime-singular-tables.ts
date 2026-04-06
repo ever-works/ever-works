@@ -1,7 +1,39 @@
-import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
+import {
+    MigrationInterface,
+    QueryRunner,
+    Table,
+    TableColumn,
+    TableForeignKey,
+    TableIndex,
+} from 'typeorm';
 
 function timestampColumnType(queryRunner: QueryRunner) {
     return queryRunner.connection.options.type === 'postgres' ? 'timestamp' : 'datetime';
+}
+
+function normalizeDateValue(value: unknown): Date | null {
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+
+    if (value instanceof Date) {
+        return value;
+    }
+
+    if (typeof value === 'number') {
+        return new Date(value);
+    }
+
+    if (typeof value === 'string') {
+        if (/^\d+$/.test(value)) {
+            return new Date(Number(value));
+        }
+
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    return null;
 }
 
 export class AlignAuthRuntimeSingularTables1760000001000 implements MigrationInterface {
@@ -10,113 +42,9 @@ export class AlignAuthRuntimeSingularTables1760000001000 implements MigrationInt
     public async up(queryRunner: QueryRunner): Promise<void> {
         const timestampType = timestampColumnType(queryRunner);
 
-        await queryRunner.createTable(
-            new Table({
-                name: 'account',
-                columns: [
-                    { name: 'id', type: 'varchar', isPrimary: true },
-                    { name: 'userId', type: 'varchar' },
-                    { name: 'accountId', type: 'varchar' },
-                    { name: 'providerId', type: 'varchar' },
-                    { name: 'accessToken', type: 'text', isNullable: true },
-                    { name: 'refreshToken', type: 'text', isNullable: true },
-                    { name: 'accessTokenExpiresAt', type: timestampType, isNullable: true },
-                    { name: 'refreshTokenExpiresAt', type: timestampType, isNullable: true },
-                    { name: 'expiresAt', type: timestampType, isNullable: true },
-                    { name: 'scope', type: 'varchar', isNullable: true },
-                    { name: 'password', type: 'text', isNullable: true },
-                    { name: 'idToken', type: 'text', isNullable: true },
-                    { name: 'tokenType', type: 'varchar', isNullable: true },
-                    { name: 'createdAt', type: timestampType, default: 'CURRENT_TIMESTAMP' },
-                    { name: 'updatedAt', type: timestampType, default: 'CURRENT_TIMESTAMP' },
-                ],
-                foreignKeys: [
-                    new TableForeignKey({
-                        name: 'FK_account_user',
-                        columnNames: ['userId'],
-                        referencedTableName: 'users',
-                        referencedColumnNames: ['id'],
-                        onDelete: 'CASCADE',
-                    }),
-                ],
-                indices: [
-                    new TableIndex({
-                        name: 'IDX_account_provider_account',
-                        columnNames: ['providerId', 'accountId'],
-                        isUnique: true,
-                    }),
-                    new TableIndex({
-                        name: 'IDX_account_user_provider',
-                        columnNames: ['userId', 'providerId'],
-                        isUnique: true,
-                    }),
-                ],
-            }),
-            true,
-        );
-
-        await queryRunner.createTable(
-            new Table({
-                name: 'session',
-                columns: [
-                    { name: 'id', type: 'varchar', isPrimary: true },
-                    { name: 'userId', type: 'varchar' },
-                    { name: 'token', type: 'text' },
-                    { name: 'expiresAt', type: timestampType },
-                    { name: 'ipAddress', type: 'varchar', isNullable: true },
-                    { name: 'userAgent', type: 'varchar', isNullable: true },
-                    { name: 'createdAt', type: timestampType, default: 'CURRENT_TIMESTAMP' },
-                    { name: 'updatedAt', type: timestampType, default: 'CURRENT_TIMESTAMP' },
-                ],
-                foreignKeys: [
-                    new TableForeignKey({
-                        name: 'FK_session_user',
-                        columnNames: ['userId'],
-                        referencedTableName: 'users',
-                        referencedColumnNames: ['id'],
-                        onDelete: 'CASCADE',
-                    }),
-                ],
-                indices: [
-                    new TableIndex({
-                        name: 'IDX_session_token',
-                        columnNames: ['token'],
-                        isUnique: true,
-                    }),
-                    new TableIndex({
-                        name: 'IDX_session_userId',
-                        columnNames: ['userId'],
-                    }),
-                ],
-            }),
-            true,
-        );
-
-        await queryRunner.createTable(
-            new Table({
-                name: 'verification',
-                columns: [
-                    { name: 'id', type: 'varchar', isPrimary: true },
-                    { name: 'identifier', type: 'varchar' },
-                    { name: 'value', type: 'text' },
-                    { name: 'expiresAt', type: timestampType },
-                    { name: 'createdAt', type: timestampType, default: 'CURRENT_TIMESTAMP' },
-                    { name: 'updatedAt', type: timestampType, default: 'CURRENT_TIMESTAMP' },
-                ],
-                indices: [
-                    new TableIndex({
-                        name: 'IDX_verification_identifier',
-                        columnNames: ['identifier'],
-                    }),
-                    new TableIndex({
-                        name: 'IDX_verification_value',
-                        columnNames: ['value'],
-                        isUnique: true,
-                    }),
-                ],
-            }),
-            true,
-        );
+        await this.alignAccountTable(queryRunner, timestampType);
+        await this.alignSessionTable(queryRunner, timestampType);
+        await this.alignVerificationTable(queryRunner, timestampType);
 
         const hasAuthAccounts = await queryRunner.hasTable('auth_accounts');
         const hasAuthSessions = await queryRunner.hasTable('auth_sessions');
@@ -125,54 +53,100 @@ export class AlignAuthRuntimeSingularTables1760000001000 implements MigrationInt
         const hasPluralSessions = await queryRunner.hasTable('sessions');
         const hasPluralVerifications = await queryRunner.hasTable('verifications');
 
-        const [{ count: accountCount }] = (await queryRunner.query(
-            `SELECT COUNT(*) as count FROM "account"`,
-        )) as Array<{ count: number | string }>;
-        const [{ count: sessionCount }] = (await queryRunner.query(
-            `SELECT COUNT(*) as count FROM "session"`,
-        )) as Array<{ count: number | string }>;
-        const [{ count: verificationCount }] = (await queryRunner.query(
-            `SELECT COUNT(*) as count FROM "verification"`,
-        )) as Array<{ count: number | string }>;
+        const accountCount = await this.getTableCount(queryRunner, 'account');
+        const sessionCount = await this.getTableCount(queryRunner, 'session');
+        const verificationCount = await this.getTableCount(queryRunner, 'verification');
 
-        if (Number(accountCount) === 0 && (hasAuthAccounts || hasPluralAccounts)) {
+        if (accountCount === 0 && (hasAuthAccounts || hasPluralAccounts)) {
             const sourceTable = hasAuthAccounts ? 'auth_accounts' : 'accounts';
-            await queryRunner.query(`
-                INSERT INTO "account" (
-                    "id", "userId", "accountId", "providerId", "accessToken", "refreshToken",
-                    "accessTokenExpiresAt", "refreshTokenExpiresAt", "expiresAt", "scope",
-                    "password", "idToken", "tokenType", "createdAt", "updatedAt"
-                )
-                SELECT
-                    "id", "userId", "accountId", "providerId", "accessToken", "refreshToken",
-                    "accessTokenExpiresAt", "refreshTokenExpiresAt", "expiresAt", "scope",
-                    "password", "idToken", "tokenType", "createdAt", "updatedAt"
-                FROM "${sourceTable}"
-            `);
+            const rows = await queryRunner.manager
+                .createQueryBuilder()
+                .select('*')
+                .from(sourceTable, 'account_source')
+                .getRawMany<Record<string, unknown>>();
+
+            if (rows.length > 0) {
+                await queryRunner.manager
+                    .createQueryBuilder()
+                    .insert()
+                    .into('account')
+                    .values(
+                        rows.map((row) => ({
+                            id: row.id as string,
+                            userId: row.userId as string,
+                            accountId: row.accountId as string,
+                            providerId: row.providerId as string,
+                            accessToken: (row.accessToken as string | null) ?? null,
+                            refreshToken: (row.refreshToken as string | null) ?? null,
+                            accessTokenExpiresAt: normalizeDateValue(row.accessTokenExpiresAt),
+                            refreshTokenExpiresAt: normalizeDateValue(row.refreshTokenExpiresAt),
+                            expiresAt: normalizeDateValue(row.expiresAt),
+                            scope: (row.scope as string | null) ?? null,
+                            password: (row.password as string | null) ?? null,
+                            idToken: (row.idToken as string | null) ?? null,
+                            tokenType: (row.tokenType as string | null) ?? null,
+                            createdAt: normalizeDateValue(row.createdAt) ?? new Date(),
+                            updatedAt: normalizeDateValue(row.updatedAt) ?? new Date(),
+                        })),
+                    )
+                    .execute();
+            }
         }
 
-        if (Number(sessionCount) === 0 && (hasAuthSessions || hasPluralSessions)) {
+        if (sessionCount === 0 && (hasAuthSessions || hasPluralSessions)) {
             const sourceTable = hasAuthSessions ? 'auth_sessions' : 'sessions';
-            await queryRunner.query(`
-                INSERT INTO "session" (
-                    "id", "userId", "token", "expiresAt", "ipAddress", "userAgent", "createdAt", "updatedAt"
-                )
-                SELECT
-                    "id", "userId", "token", "expiresAt", "ipAddress", "userAgent", "createdAt", "updatedAt"
-                FROM "${sourceTable}"
-            `);
+            const rows = await queryRunner.manager
+                .createQueryBuilder()
+                .select('*')
+                .from(sourceTable, 'session_source')
+                .getRawMany<Record<string, unknown>>();
+
+            if (rows.length > 0) {
+                await queryRunner.manager
+                    .createQueryBuilder()
+                    .insert()
+                    .into('session')
+                    .values(
+                        rows.map((row) => ({
+                            id: row.id as string,
+                            userId: row.userId as string,
+                            token: row.token as string,
+                            expiresAt: normalizeDateValue(row.expiresAt) ?? new Date(),
+                            ipAddress: (row.ipAddress as string | null) ?? null,
+                            userAgent: (row.userAgent as string | null) ?? null,
+                            createdAt: normalizeDateValue(row.createdAt) ?? new Date(),
+                            updatedAt: normalizeDateValue(row.updatedAt) ?? new Date(),
+                        })),
+                    )
+                    .execute();
+            }
         }
 
-        if (Number(verificationCount) === 0 && (hasAuthVerifications || hasPluralVerifications)) {
+        if (verificationCount === 0 && (hasAuthVerifications || hasPluralVerifications)) {
             const sourceTable = hasAuthVerifications ? 'auth_verifications' : 'verifications';
-            await queryRunner.query(`
-                INSERT INTO "verification" (
-                    "id", "identifier", "value", "expiresAt", "createdAt", "updatedAt"
-                )
-                SELECT
-                    "id", "identifier", "value", "expiresAt", "createdAt", "updatedAt"
-                FROM "${sourceTable}"
-            `);
+            const rows = await queryRunner.manager
+                .createQueryBuilder()
+                .select('*')
+                .from(sourceTable, 'verification_source')
+                .getRawMany<Record<string, unknown>>();
+
+            if (rows.length > 0) {
+                await queryRunner.manager
+                    .createQueryBuilder()
+                    .insert()
+                    .into('verification')
+                    .values(
+                        rows.map((row) => ({
+                            id: row.id as string,
+                            identifier: row.identifier as string,
+                            value: row.value as string,
+                            expiresAt: normalizeDateValue(row.expiresAt) ?? new Date(),
+                            createdAt: normalizeDateValue(row.createdAt) ?? new Date(),
+                            updatedAt: normalizeDateValue(row.updatedAt) ?? new Date(),
+                        })),
+                    )
+                    .execute();
+            }
         }
 
         if (hasAuthVerifications) {
@@ -216,6 +190,104 @@ export class AlignAuthRuntimeSingularTables1760000001000 implements MigrationInt
             }
         }
         await queryRunner.dropTable('account', true);
+    }
+
+    private async getTableCount(queryRunner: QueryRunner, tableName: string): Promise<number> {
+        return queryRunner.manager.createQueryBuilder().from(tableName, 't').getCount();
+    }
+
+    private async alignAccountTable(queryRunner: QueryRunner, timestampType: string): Promise<void> {
+        const table = await queryRunner.getTable('account');
+        if (!table) {
+            return;
+        }
+
+        await this.ensureColumn(queryRunner, table, 'accessTokenExpiresAt', {
+            name: 'accessTokenExpiresAt',
+            type: timestampType,
+            isNullable: true,
+        });
+        await this.ensureColumn(queryRunner, table, 'refreshTokenExpiresAt', {
+            name: 'refreshTokenExpiresAt',
+            type: timestampType,
+            isNullable: true,
+        });
+        await this.ensureColumn(queryRunner, table, 'expiresAt', {
+            name: 'expiresAt',
+            type: timestampType,
+            isNullable: true,
+        });
+        await this.ensureColumn(queryRunner, table, 'tokenType', {
+            name: 'tokenType',
+            type: 'varchar',
+            isNullable: true,
+        });
+
+        await this.changeColumnType(queryRunner, table, 'accessTokenExpiresAt', timestampType);
+        await this.changeColumnType(queryRunner, table, 'refreshTokenExpiresAt', timestampType);
+        await this.changeColumnType(queryRunner, table, 'expiresAt', timestampType);
+        await this.changeColumnType(queryRunner, table, 'scope', 'varchar');
+        await this.changeColumnType(queryRunner, table, 'createdAt', timestampType);
+        await this.changeColumnType(queryRunner, table, 'updatedAt', timestampType);
+    }
+
+    private async alignSessionTable(queryRunner: QueryRunner, timestampType: string): Promise<void> {
+        const table = await queryRunner.getTable('session');
+        if (!table) {
+            return;
+        }
+
+        await this.changeColumnType(queryRunner, table, 'expiresAt', timestampType);
+        await this.changeColumnType(queryRunner, table, 'createdAt', timestampType);
+        await this.changeColumnType(queryRunner, table, 'updatedAt', timestampType);
+    }
+
+    private async alignVerificationTable(
+        queryRunner: QueryRunner,
+        timestampType: string,
+    ): Promise<void> {
+        const table = await queryRunner.getTable('verification');
+        if (!table) {
+            return;
+        }
+
+        await this.changeColumnType(queryRunner, table, 'expiresAt', timestampType);
+        await this.changeColumnType(queryRunner, table, 'createdAt', timestampType);
+        await this.changeColumnType(queryRunner, table, 'updatedAt', timestampType);
+    }
+
+    private async ensureColumn(
+        queryRunner: QueryRunner,
+        table: Table,
+        columnName: string,
+        column: Omit<TableColumn, '@instanceof'>,
+    ): Promise<void> {
+        if (table.findColumnByName(columnName)) {
+            return;
+        }
+
+        await queryRunner.addColumn(table, new TableColumn(column));
+    }
+
+    private async changeColumnType(
+        queryRunner: QueryRunner,
+        table: Table,
+        columnName: string,
+        type: string,
+    ): Promise<void> {
+        const column = table.findColumnByName(columnName);
+        if (!column || column.type === type) {
+            return;
+        }
+
+        await queryRunner.changeColumn(
+            table,
+            column,
+            new TableColumn({
+                ...column,
+                type,
+            }),
+        );
     }
 
     private async dropLegacyTable(queryRunner: QueryRunner, tableName: string): Promise<void> {

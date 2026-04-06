@@ -1,9 +1,15 @@
 import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
 
+function timestampColumnType(queryRunner: QueryRunner) {
+    return queryRunner.connection.options.type === 'postgres' ? 'timestamp' : 'datetime';
+}
+
 export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
     name = 'AddAuthRuntimeTables1760000000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
+        const timestampType = timestampColumnType(queryRunner);
+
         await queryRunner.createTable(
             new Table({
                 name: 'account',
@@ -37,22 +43,32 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
                     },
                     {
                         name: 'accessTokenExpiresAt',
-                        type: 'bigint',
+                        type: timestampType,
                         isNullable: true,
                     },
                     {
                         name: 'refreshTokenExpiresAt',
-                        type: 'bigint',
+                        type: timestampType,
+                        isNullable: true,
+                    },
+                    {
+                        name: 'expiresAt',
+                        type: timestampType,
                         isNullable: true,
                     },
                     {
                         name: 'scope',
-                        type: 'text',
+                        type: 'varchar',
                         isNullable: true,
                     },
                     {
                         name: 'idToken',
                         type: 'text',
+                        isNullable: true,
+                    },
+                    {
+                        name: 'tokenType',
+                        type: 'varchar',
                         isNullable: true,
                     },
                     {
@@ -62,12 +78,12 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
                     },
                     {
                         name: 'createdAt',
-                        type: 'datetime',
+                        type: timestampType,
                         default: 'CURRENT_TIMESTAMP',
                     },
                     {
                         name: 'updatedAt',
-                        type: 'datetime',
+                        type: timestampType,
                         default: 'CURRENT_TIMESTAMP',
                     },
                 ],
@@ -120,7 +136,7 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
                     },
                     {
                         name: 'expiresAt',
-                        type: 'bigint',
+                        type: timestampType,
                     },
                     {
                         name: 'ipAddress',
@@ -134,12 +150,12 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
                     },
                     {
                         name: 'createdAt',
-                        type: 'datetime',
+                        type: timestampType,
                         default: 'CURRENT_TIMESTAMP',
                     },
                     {
                         name: 'updatedAt',
-                        type: 'datetime',
+                        type: timestampType,
                         default: 'CURRENT_TIMESTAMP',
                     },
                 ],
@@ -191,16 +207,16 @@ export class AddAuthRuntimeTables1760000000000 implements MigrationInterface {
                     },
                     {
                         name: 'expiresAt',
-                        type: 'bigint',
+                        type: timestampType,
                     },
                     {
                         name: 'createdAt',
-                        type: 'datetime',
+                        type: timestampType,
                         default: 'CURRENT_TIMESTAMP',
                     },
                     {
                         name: 'updatedAt',
-                        type: 'datetime',
+                        type: timestampType,
                         default: 'CURRENT_TIMESTAMP',
                     },
                 ],

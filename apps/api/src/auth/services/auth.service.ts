@@ -209,7 +209,7 @@ export class AuthService {
         };
     }
 
-    async consumePasswordResetToken(token: string) {
+    async getUserByPasswordResetToken(token: string) {
         const user = await this.userRepository.findOne({
             where: { passwordResetToken: token },
         });
@@ -221,6 +221,12 @@ export class AuthService {
         if (user.passwordResetExpires && new Date() > user.passwordResetExpires) {
             throw new BadRequestException('Reset token expired');
         }
+
+        return user;
+    }
+
+    async consumePasswordResetToken(token: string) {
+        const user = await this.getUserByPasswordResetToken(token);
 
         await this.userRepository.update(user.id, {
             passwordResetToken: null,
