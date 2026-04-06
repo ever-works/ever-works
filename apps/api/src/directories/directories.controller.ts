@@ -983,6 +983,11 @@ export class DirectoriesController {
                 action: 'directory.synced_from_data_repo',
                 status: ActivityStatus.COMPLETED,
                 summary: `Synced directory data`,
+                details: {
+                    syncStatus: result.status,
+                    updatedFields: result.updated,
+                    message: result.message,
+                },
             })
             .catch(() => {});
 
@@ -1516,6 +1521,11 @@ export class DirectoriesController {
                 action: 'comparison.generated',
                 status: ActivityStatus.COMPLETED,
                 summary: `Generated comparison`,
+                details: {
+                    status: result.status,
+                    slug: result.slug,
+                    message: result.message,
+                },
             })
             .catch(() => {});
         return result;
@@ -1556,6 +1566,13 @@ export class DirectoriesController {
                 action: 'comparison.generated_manual',
                 status: ActivityStatus.COMPLETED,
                 summary: `Generated comparison: ${body.itemASlug} vs ${body.itemBSlug}`,
+                details: {
+                    status: result.status,
+                    slug: result.slug,
+                    itemASlug: body.itemASlug,
+                    itemBSlug: body.itemBSlug,
+                    message: result.message,
+                },
             })
             .catch(() => {});
         return result;
