@@ -124,7 +124,7 @@ export function DirectoryActivity({ directoryId }: DirectoryActivityProps) {
         <div
             className={cn(
                 'rounded-lg border p-6',
-                'bg-card dark:bg-card-dark',
+                'bg-card dark:bg-card-primary-dark/30',
                 'border-card-border dark:border-border-secondary-dark',
             )}
         >

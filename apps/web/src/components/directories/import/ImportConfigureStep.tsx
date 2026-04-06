@@ -243,7 +243,7 @@ export function ImportConfigureStep({
                             onClick={() => onManualSourceTypeChange('awesome_readme')}
                             className={cn(
                                 'p-4 rounded-lg border-2 text-left transition-all',
-                                'bg-card dark:bg-card-dark',
+                                'bg-card dark:bg-card-primary-dark/30',
                                 manualSourceType === 'awesome_readme'
                                     ? 'border-primary shadow-md'
                                     : 'border-card-border dark:border-border-secondary-dark hover:border-primary/50',
@@ -263,7 +263,7 @@ export function ImportConfigureStep({
                             onClick={() => onManualSourceTypeChange('data_repo')}
                             className={cn(
                                 'p-4 rounded-lg border-2 text-left transition-all',
-                                'bg-card dark:bg-card-dark',
+                                'bg-card dark:bg-card-primary-dark/30',
                                 manualSourceType === 'data_repo'
                                     ? 'border-primary shadow-md'
                                     : 'border-card-border dark:border-border-secondary-dark hover:border-primary/50',

@@ -168,7 +168,7 @@ export function GitProviderConnections({
                 <div
                     className={cn(
                         'text-center py-12 rounded-lg',
-                        'bg-card dark:bg-card-dark',
+                        'bg-card dark:bg-card-primary-dark/30',
                         'border border-card-border dark:border-border-secondary-dark',
                     )}
                 >
@@ -260,7 +260,7 @@ function GitProviderCard({
         <div
             className={cn(
                 'rounded-xl overflow-hidden',
-                'bg-card dark:bg-card-dark',
+                'bg-card dark:bg-card-primary-dark/30',
                 'border border-card-border dark:border-border-secondary-dark',
                 'transition-shadow hover:shadow-md',
             )}

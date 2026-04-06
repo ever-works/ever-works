@@ -66,7 +66,7 @@ export function RecentActivity() {
         <div
             className={cn(
                 'rounded-lg',
-                'bg-card dark:bg-card-dark',
+                'bg-card dark:bg-card-primary-dark/30',
                 'border border-card-border dark:border-border-secondary-dark',
             )}
         >

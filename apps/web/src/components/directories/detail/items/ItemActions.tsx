@@ -169,7 +169,7 @@ export const ItemActions = memo(function ItemActions({
 
                 <DropdownMenuContent
                     align="end"
-                    className="w-48 bg-card dark:bg-card-dark border border-border dark:border-border-dark shadow-lg rounded-lg p-1"
+                    className="w-48 bg-card dark:bg-card-primary-dark/30 border border-border dark:border-border-dark shadow-lg rounded-lg p-1"
                 >
                     <DropdownMenuItem
                         onClick={() => setIsDisplayDialogOpen(true)}
