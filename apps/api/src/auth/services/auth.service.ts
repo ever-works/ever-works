@@ -228,10 +228,10 @@ export class AuthService {
     async consumePasswordResetToken(token: string) {
         const user = await this.getUserByPasswordResetToken(token);
 
-        await this.userRepository.update(user.id, {
-            passwordResetToken: null,
-            passwordResetExpires: null,
-        });
+        const consumed = await this.userRepository.clearPasswordResetToken(user.id, token);
+        if (!consumed) {
+            throw new BadRequestException('Invalid reset token');
+        }
 
         return user;
     }
