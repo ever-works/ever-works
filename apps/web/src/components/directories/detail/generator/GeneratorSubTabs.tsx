@@ -50,8 +50,11 @@ export function GeneratorSubTabs({ directoryId }: GeneratorSubTabsProps) {
     ].filter((tab) => tab.visible !== false);
 
     return (
-        <div className="mb-6 border-b border-border dark:border-border-dark">
-            <nav className="-mb-px flex space-x-6" aria-label="Generator tabs">
+        <div className="mb-6">
+            <nav
+                className="inline-flex items-center gap-1 rounded-lg border border-border dark:border-border-dark bg-muted/40 dark:bg-muted/10 p-1"
+                aria-label="Generator tabs"
+            >
                 {tabs.map((tab) => {
                     const Icon = tab.icon;
                     return (
@@ -59,13 +62,20 @@ export function GeneratorSubTabs({ directoryId }: GeneratorSubTabsProps) {
                             key={tab.name}
                             href={tab.href}
                             className={cn(
-                                'flex items-center gap-2 whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium transition-colors',
+                                'relative flex items-center text-xs gap-2 whitespace-nowrap rounded-md px-4 py-1.5 font-medium transition-all duration-200',
                                 tab.isActive
-                                    ? 'border-primary text-primary dark:border-gray-200 dark:text-gray-200'
-                                    : 'border-transparent text-text-secondary dark:text-text-secondary-dark hover:border-border dark:hover:border-border-dark hover:text-text dark:hover:text-text-dark',
+                                    ? 'bg-card dark:bg-button-primary-dark text-button-primary-foreground-dark shadow-sm'
+                                    : 'text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark hover:bg-muted/60 dark:hover:bg-muted/20',
                             )}
                         >
-                            <Icon className="w-4 h-4" />
+                            <Icon
+                                className={cn(
+                                    'w-4 h-4 shrink-0 transition-colors duration-200',
+                                    tab.isActive
+                                        ? 'text-text-muted dark:text-text-muted-dark'
+                                        : 'text-text-muted dark:text-text-muted-dark',
+                                )}
+                            />
                             {tab.name}
                         </Link>
                     );
