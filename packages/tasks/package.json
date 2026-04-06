@@ -21,7 +21,7 @@
         "@ever-works/agent": "workspace:*",
         "@nestjs/cache-manager": "^3.1.0",
         "@nestjs/common": "^11.1.13",
-        "@nestjs/core": "^11.1.13",
+        "@nestjs/core": "^11.1.18",
         "@nestjs/event-emitter": "^3.0.1",
         "@nestjs/microservices": "^11.1.13",
         "@nestjs/platform-express": "^11.1.13",
