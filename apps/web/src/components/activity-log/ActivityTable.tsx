@@ -55,13 +55,7 @@ function DetailPanel({ details }: { details: Record<string, unknown> }) {
     );
 }
 
-function StructuredSection({
-    title,
-    data,
-}: {
-    title: string;
-    data?: Record<string, unknown>;
-}) {
+function StructuredSection({ title, data }: { title: string; data?: Record<string, unknown> }) {
     if (!hasStructuredData(data)) {
         return null;
     }
