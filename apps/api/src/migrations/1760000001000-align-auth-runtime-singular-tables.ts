@@ -3,6 +3,7 @@ import {
     QueryRunner,
     Table,
     TableColumn,
+    type TableColumnOptions,
     TableForeignKey,
     TableIndex,
 } from 'typeorm';
@@ -266,7 +267,7 @@ export class AlignAuthRuntimeSingularTables1760000001000 implements MigrationInt
         queryRunner: QueryRunner,
         table: Table,
         columnName: string,
-        column: Omit<TableColumn, '@instanceof'>,
+        column: TableColumnOptions,
     ): Promise<void> {
         if (table.findColumnByName(columnName)) {
             return;
