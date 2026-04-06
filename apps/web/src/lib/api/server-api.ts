@@ -85,9 +85,14 @@ export async function serverFetch<T>(
         let errorMessage: string | null = null;
         try {
             const errorData = await response.json();
+            const hasStructuredError =
+                errorData &&
+                typeof errorData === 'object' &&
+                !Array.isArray(errorData) &&
+                Object.keys(errorData).length > 0;
 
             // Only log unexpected errors — 404s are expected for missing resources
-            if (response.status !== 404) {
+            if (response.status !== 404 && hasStructuredError) {
                 console.error('API Error:', errorData);
             }
 
@@ -103,6 +108,8 @@ export async function serverFetch<T>(
                 errorMessage = errorData.error.message;
             } else if (typeof errorData.error === 'string') {
                 errorMessage = errorData.error;
+            } else if (!hasStructuredError) {
+                errorMessage = `${response.status} ${response.statusText}`.trim();
             }
         } catch (e) {
             errorMessage = await response.text().catch(() => null);
