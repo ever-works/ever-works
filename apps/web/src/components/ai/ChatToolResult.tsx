@@ -19,6 +19,7 @@ import { connectOAuthProvider } from '@/app/actions/dashboard/oauth';
 import { toast } from 'sonner';
 
 interface ChatToolResultProps {
+    toolCallId: string;
     toolName: string;
     state: string;
     output?: unknown;
@@ -84,6 +85,8 @@ interface GenericToolOutput {
     error?: string;
 }
 
+const executedToolActions = new Set<string>();
+
 const LABELS: Record<string, string> = {
     listDirectories: 'Fetching directories',
     getDirectoryDetails: 'Loading directory',
@@ -122,7 +125,13 @@ const LABELS: Record<string, string> = {
     reloadPage: 'Refreshing',
 };
 
-export function ChatToolResult({ toolName, state, output, errorText }: ChatToolResultProps) {
+export function ChatToolResult({
+    toolCallId,
+    toolName,
+    state,
+    output,
+    errorText,
+}: ChatToolResultProps) {
     const t = useTranslations('dashboard.aiChat');
     const locale = useLocale();
     const router = useRouter();
@@ -141,17 +150,25 @@ export function ChatToolResult({ toolName, state, output, errorText }: ChatToolR
     }, [isRunning]);
 
     useEffect(() => {
-        if (!isDone || !output || !wasLive.current) return;
+        if (!isDone || !output || !wasLive.current || executedToolActions.has(toolCallId)) {
+            return;
+        }
+
         if (toolName === 'navigate') {
             const data = output as NavigateOutput;
             if (data.url && data.url.startsWith('/')) {
+                executedToolActions.add(toolCallId);
                 router.push(getPathname({ href: data.url, locale }));
             }
+            return;
         }
+
         if (toolName === 'reloadPage') {
+            executedToolActions.add(toolCallId);
             router.refresh();
+            return;
         }
-    }, [toolName, isDone, output, router]);
+    }, [toolCallId, toolName, isDone, output, router, locale]);
 
     // Running — only show for known tools
     if (isRunning) {
