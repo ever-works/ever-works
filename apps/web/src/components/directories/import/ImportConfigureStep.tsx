@@ -246,7 +246,7 @@ export function ImportConfigureStep({
                                 'bg-card dark:bg-card-dark',
                                 manualSourceType === 'awesome_readme'
                                     ? 'border-primary shadow-md'
-                                    : 'border-card-border dark:border-card-border-dark hover:border-primary/50',
+                                    : 'border-card-border dark:border-border-secondary-dark hover:border-primary/50',
                             )}
                         >
                             <FileText className="w-6 h-6 text-primary mb-2" />
@@ -266,7 +266,7 @@ export function ImportConfigureStep({
                                 'bg-card dark:bg-card-dark',
                                 manualSourceType === 'data_repo'
                                     ? 'border-primary shadow-md'
-                                    : 'border-card-border dark:border-card-border-dark hover:border-primary/50',
+                                    : 'border-card-border dark:border-border-secondary-dark hover:border-primary/50',
                             )}
                         >
                             <Database className="w-6 h-6 text-primary mb-2" />

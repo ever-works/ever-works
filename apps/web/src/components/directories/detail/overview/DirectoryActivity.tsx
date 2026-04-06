@@ -125,7 +125,7 @@ export function DirectoryActivity({ directoryId }: DirectoryActivityProps) {
             className={cn(
                 'rounded-lg border p-6',
                 'bg-card dark:bg-card-dark',
-                'border-card-border dark:border-card-border-dark',
+                'border-card-border dark:border-border-secondary-dark',
             )}
         >
             <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
