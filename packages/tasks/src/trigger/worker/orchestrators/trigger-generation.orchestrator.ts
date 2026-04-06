@@ -73,7 +73,21 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
             generationWarnings = generated.warnings;
 
             if (generated.success === false) {
-                throw new Error(generated.error.message);
+                const cause = generated.error.cause;
+                const message =
+                    cause instanceof Error &&
+                    cause.message &&
+                    cause.message !== generated.error.message
+                        ? `${generated.error.message}: ${cause.message}`
+                        : generated.error.message;
+
+                const generationError = new Error(message) as Error & { cause?: Error };
+                if (cause) {
+                    generationError.cause = cause;
+                }
+                generationError.name = generated.error.code;
+
+                throw generationError;
             }
 
             logCollector.message('Data generation completed', 'info', 'orchestrator');

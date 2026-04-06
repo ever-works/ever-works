@@ -40,7 +40,8 @@ import {
 	getFormFields as formFields,
 	getFormGroups as formGroups,
 	validateFormInput as formValidate,
-	getDefaultValues as formDefaults
+	getDefaultValues as formDefaults,
+	DEFAULT_MAX_PAGES_TO_PROCESS
 } from './form-schema.js';
 import {
 	buildParentSystemPromptVariables,
@@ -471,6 +472,9 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			requestPrompt: request.prompt
 		};
 
+		const maxPagesToProcess =
+			((request.config || {}).max_pages_to_process as number) || DEFAULT_MAX_PAGES_TO_PROCESS;
+
 		const { tools, breaker } = createParentTools({
 			workspacePath,
 			facades: {
@@ -487,6 +491,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			onProgress,
 			totalSteps: AGENT_PIPELINE_STEP_IDS.length,
 			logger,
+			maxPagesToProcess,
 			tokenAccumulator,
 			signal,
 			promptFacade: execContext.promptFacade,

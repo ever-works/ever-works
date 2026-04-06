@@ -28,7 +28,7 @@ Today is {date}. Use this when formulating search queries to find current, up-to
 ## Your Tools
 1. **search** — Search the web for items relevant to the directory topic. Returns titles, URLs, and scores.
 2. **findItems** — Fuzzy-search existing items by name, slug, or URL (up to 5 matches). Use before modifyItems to check if a specific item already exists.
-3. **processUrl** — Send exactly one URL at a time. The worker content-extracts the page (full page, no truncation), chunks it if needed, analyzes it with AI, best-effort deduplicates against existing items, and writes item JSON files. Returns the result for that URL only.
+3. **processUrl** — Send exactly one URL at a time. The worker content-extracts the page (full page, no truncation), chunks it if needed, analyzes it with AI, best-effort deduplicates against existing items, and writes item JSON files. Returns the result for that URL only. Treat each URL as one-time only: once a URL has been processed, do not send it again even if it returned count=0 or an error.
 4. **modifyItems** — Send a small, focused batch of modification instructions. A worker with file access will execute them. Keep each call to **1-3 related operations** (e.g., one category merge per call). For large reorganizations, make multiple sequential calls.
 5. **getWorkspaceOverview** — Get current workspace state: total items, categories, tags, brands. Lightweight — does not read individual items.
 6. **reportProgress** — Report progress to the user. Call periodically.
@@ -41,9 +41,16 @@ When creating NEW items:
 4. Select the most relevant URLs from search results — only pass REAL URLs directly related to the directory topic.
 5. Use \`processUrl\` one URL at a time. After each result, decide whether to continue, search for more URLs, or stop.
 6. Use \`reportProgress\` to update the user on items created so far.
-7. Repeat searching and processing until all relevant content is exhausted. Do not stop just because you reached the target count — if there are more items available, keep going.
+7. Aim for the target item count first. After you reach it, reassess after each URL and continue only if there are still clearly relevant, distinct URLs worth processing.
 
-**URL budget:** Do not exceed **{maxPages} total URLs** across all processUrl calls. When a URL returns count=0, treat it as exhausted — do not retry it or send very similar URLs. Use getWorkspaceOverview to check progress and diversify search queries if results are sparse.
+**URL discipline:** Process each URL only once. If a URL returns count=0 or an error, treat it as exhausted for this run — do not retry it, and do not resend obvious variants of the same page.
+
+**URL budget:** Do not exceed **{maxPages} total URLs** across all processUrl calls. Use getWorkspaceOverview to check progress and diversify search queries if results are sparse.
+
+**When to stop:** Stop when one of these is true:
+- You reached the target and recent URLs are producing little or no new value.
+- Search results are getting repetitive or are pointing to the same domains/pages again.
+- You are running low on URL budget and do not have clearly strong unexplored URLs left.
 
 **Deduplication is enforced by the pipeline** — workers perform best-effort checks and a final pass removes duplicates by source URL (with name fallback). You do not need to manually check duplicates yourself.
 
@@ -175,13 +182,13 @@ export function buildParentUserPromptVariables(
 	if (hasExisting) {
 		workflowInstructions =
 			`\nThe workspace has existing items. If your task involves creating NEW items, ` +
-			`aim for at least ${targetItems} new items.\n` +
+			`aim for at least ${targetItems} new items, then reassess whether more clearly relevant URLs remain.\n` +
 			'Use reportProgress to update on your progress.';
 	} else if (request.prompt?.includes('## Step')) {
 		workflowInstructions = '\nUse reportProgress to update on your progress.';
 	} else {
 		workflowInstructions =
-			`\nTarget: generate at least ${targetItems} new items. If the source contains more, extract ALL of them.\n` +
+			`\nTarget: generate at least ${targetItems} new items. After you reach that target, continue only if strong unexplored URLs still remain.\n` +
 			'Follow the Generation Workflow in your instructions. ' +
 			'Use reportProgress to update on your progress.';
 	}

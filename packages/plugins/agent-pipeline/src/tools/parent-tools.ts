@@ -38,6 +38,7 @@ export interface ParentToolContext {
 	onProgress: PipelineProgressCallback | undefined;
 	totalSteps: number;
 	logger: PluginLogger;
+	maxPagesToProcess: number;
 	tokenAccumulator?: TokenUsageAccumulator;
 	signal?: AbortSignal;
 	promptFacade?: IPromptFacade;
@@ -52,6 +53,49 @@ export interface ParentToolsResult {
 export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 	const breaker = new ToolCircuitBreaker({ logger: ctx.logger });
 	const toolOptions: FacadeToolOptions = { breaker, logger: ctx.logger };
+	const processedUrls = new Map<string, { status: 'created' | 'empty' | 'error'; count: number }>();
+
+	const normalizeTrackedUrl = (raw: string): string => {
+		const trimmed = raw.trim();
+		if (!trimmed) {
+			return trimmed;
+		}
+
+		try {
+			const parsed = new URL(trimmed);
+			const pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+			const searchParams = [...parsed.searchParams.entries()]
+				.filter(([key]) => !key.toLowerCase().startsWith('utm_'))
+				.sort(([leftKey, leftValue], [rightKey, rightValue]) => {
+					if (leftKey === rightKey) {
+						return leftValue.localeCompare(rightValue);
+					}
+					return leftKey.localeCompare(rightKey);
+				});
+			const search = new URLSearchParams(searchParams).toString();
+
+			return `${parsed.protocol.toLowerCase()}//${parsed.host.toLowerCase()}${pathname}${search ? `?${search}` : ''}`;
+		} catch {
+			return trimmed.toLowerCase().replace(/\/+$/, '');
+		}
+	};
+
+	const classifyProcessedUrlStatus = (result: { count: number; error?: string }): 'created' | 'empty' | 'error' => {
+		if (result.count > 0) {
+			return 'created';
+		}
+
+		const errorMessage = result.error?.toLowerCase() || '';
+		if (
+			errorMessage.includes('no items extracted') ||
+			errorMessage.includes('empty content') ||
+			errorMessage.includes('returned empty content')
+		) {
+			return 'empty';
+		}
+
+		return result.error ? 'error' : 'empty';
+	};
 
 	const processUrlTool = tool({
 		description:
@@ -60,6 +104,34 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 			url: z.string().url()
 		}),
 		execute: async ({ url }) => {
+			const normalizedUrl = normalizeTrackedUrl(url);
+			const existingRecord = processedUrls.get(normalizedUrl);
+			if (existingRecord) {
+				return {
+					url,
+					files: [],
+					count: 0,
+					skipped: true,
+					error: `URL already processed earlier (${existingRecord.status}). Do not retry it.`,
+					previousStatus: existingRecord.status,
+					previousCount: existingRecord.count,
+					remainingUrlBudget: Math.max(0, ctx.maxPagesToProcess - processedUrls.size)
+				};
+			}
+
+			if (processedUrls.size >= ctx.maxPagesToProcess) {
+				return {
+					url,
+					files: [],
+					count: 0,
+					skipped: true,
+					error:
+						`URL budget reached (${ctx.maxPagesToProcess}/${ctx.maxPagesToProcess}). ` +
+						'Stop processing URLs and finish with the current results.',
+					remainingUrlBudget: 0
+				};
+			}
+
 			const workerCtx = {
 				workerModel: ctx.workerModel,
 				maxContextTokens: ctx.workerMaxContextTokens,
@@ -76,13 +148,26 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 			};
 
 			try {
-				return await processUrlWorker(url, workerCtx);
+				const result = await processUrlWorker(url, workerCtx);
+				processedUrls.set(normalizedUrl, {
+					status: classifyProcessedUrlStatus(result),
+					count: result.count
+				});
+				return {
+					...result,
+					remainingUrlBudget: Math.max(0, ctx.maxPagesToProcess - processedUrls.size)
+				};
 			} catch (error) {
+				processedUrls.set(normalizedUrl, {
+					status: 'error',
+					count: 0
+				});
 				return {
 					url,
 					files: [],
 					count: 0,
-					error: error instanceof Error ? error.message : String(error)
+					error: error instanceof Error ? error.message : String(error),
+					remainingUrlBudget: Math.max(0, ctx.maxPagesToProcess - processedUrls.size)
 				};
 			}
 		}

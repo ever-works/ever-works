@@ -45,6 +45,7 @@ function createMockContext(overrides?: Partial<ParentToolContext>): ParentToolCo
 		existing: { items: [], categories: [], tags: [], brands: [] },
 		onProgress: vi.fn(),
 		totalSteps: 5,
+		maxPagesToProcess: 10,
 		logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as PluginLogger,
 		...overrides
 	};
@@ -109,8 +110,65 @@ describe('createParentTools', () => {
 				url: 'https://b.com',
 				files: [],
 				count: 0,
-				error: 'Network error'
+				error: 'Network error',
+				remainingUrlBudget: 9
 			});
+		});
+
+		it('does not process the same URL twice', async () => {
+			mockProcessUrl.mockResolvedValueOnce({
+				url: 'https://a.com?utm_source=test',
+				files: ['a.json'],
+				count: 1
+			});
+
+			const ctx = createMockContext();
+			const { tools } = createParentTools(ctx);
+			const processUrl = tools.processUrl as { execute: Function };
+
+			const first = await processUrl.execute(
+				{ url: 'https://a.com?utm_source=test' },
+				{ toolCallId: 'tc1', messages: [] }
+			);
+			const second = await processUrl.execute({ url: 'https://a.com' }, { toolCallId: 'tc2', messages: [] });
+
+			expect(first.count).toBe(1);
+			expect(second).toEqual({
+				url: 'https://a.com',
+				files: [],
+				count: 0,
+				skipped: true,
+				error: 'URL already processed earlier (created). Do not retry it.',
+				previousStatus: 'created',
+				previousCount: 1,
+				remainingUrlBudget: 9
+			});
+			expect(mockProcessUrl).toHaveBeenCalledTimes(1);
+		});
+
+		it('stops processing when the URL budget is exhausted', async () => {
+			mockProcessUrl.mockResolvedValueOnce({
+				url: 'https://a.com',
+				files: ['a.json'],
+				count: 1
+			});
+
+			const ctx = createMockContext({ maxPagesToProcess: 1 });
+			const { tools } = createParentTools(ctx);
+			const processUrl = tools.processUrl as { execute: Function };
+
+			await processUrl.execute({ url: 'https://a.com' }, { toolCallId: 'tc1', messages: [] });
+			const result = await processUrl.execute({ url: 'https://b.com' }, { toolCallId: 'tc2', messages: [] });
+
+			expect(result).toEqual({
+				url: 'https://b.com',
+				files: [],
+				count: 0,
+				skipped: true,
+				error: 'URL budget reached (1/1). Stop processing URLs and finish with the current results.',
+				remainingUrlBudget: 0
+			});
+			expect(mockProcessUrl).toHaveBeenCalledTimes(1);
 		});
 	});
 
