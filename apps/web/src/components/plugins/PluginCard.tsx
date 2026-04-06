@@ -39,6 +39,7 @@ export function PluginCard({ plugin }: PluginCardProps) {
         enabled: plugin.enabled,
         visibility: plugin.visibility,
     });
+    const isSelected = optimisticEnabled || plugin.systemPlugin;
 
     const visibleCaps = plugin.capabilities.filter(
         (cap) => cap !== plugin.category && !HIDDEN_CAPABILITIES.has(cap),
@@ -53,7 +54,7 @@ export function PluginCard({ plugin }: PluginCardProps) {
                     'border-border dark:border-border-dark',
                     'transition-all hover:shadow-md',
                     'flex flex-col h-full',
-                    (optimisticEnabled || plugin.systemPlugin) && 'ring-1 ring-primary/20',
+                    isSelected && 'ring-1 ring-primary/20 dark:bg-[#111]',
                 )}
             >
                 {/* Header: icon + meta */}

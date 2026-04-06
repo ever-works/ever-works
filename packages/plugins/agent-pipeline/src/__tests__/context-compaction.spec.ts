@@ -92,21 +92,18 @@ describe('createPrepareStep', () => {
 		expect(firstToolMsg.output.value).toMatch(/^Searched 'query-0' -> 2 results$/);
 	});
 
-	it('compacts processUrls results to summary', () => {
+	it('compacts processUrl results to summary', () => {
 		mockEstimate.mockReturnValueOnce(800).mockReturnValue(600);
 
 		const prepareStep = createPrepareStep(defaultOptions());
 
 		const messages = [
 			userMsg('generate'),
-			assistantMsg([toolCall('c1', 'processUrls', { urls: ['https://a.com', 'https://b.com'] })]),
+			assistantMsg([toolCall('c1', 'processUrl', { url: 'https://a.com' })]),
 			toolMsg([
-				toolResult('c1', 'processUrls', {
+				toolResult('c1', 'processUrl', {
 					type: 'json',
-					value: [
-						{ url: 'https://a.com', files: ['a.json'], count: 1 },
-						{ url: 'https://b.com', files: ['b.json', 'c.json'], count: 2 }
-					]
+					value: { url: 'https://a.com', files: ['a.json'], count: 1 }
 				})
 			]),
 			...buildSearchPairs(10, 100)
@@ -118,7 +115,7 @@ describe('createPrepareStep', () => {
 		const compacted = (result!.messages[2] as { role: string; content: unknown[] }).content[0] as {
 			output: { type: string; value: string };
 		};
-		expect(compacted.output.value).toBe('Processed 2 URLs -> 3 items');
+		expect(compacted.output.value).toBe('Processed https://a.com -> 1 items');
 	});
 
 	it('compacts modifyItems results to summary', () => {

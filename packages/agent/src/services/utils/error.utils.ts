@@ -1,5 +1,39 @@
 import { BadRequestException, HttpException, Logger } from '@nestjs/common';
 
+function getErrorMessage(error: unknown): string {
+    if (typeof error === 'object' && error !== null) {
+        return (error as any).message || (error as any).error || String(error);
+    }
+
+    return String(error);
+}
+
+function collectErrorMessages(error: unknown): string[] {
+    const messages: string[] = [];
+    const seen = new Set<object>();
+    let current: unknown = error;
+
+    while (current) {
+        const message = getErrorMessage(current);
+        if (message) {
+            messages.push(message);
+        }
+
+        if (typeof current !== 'object' || current === null) {
+            break;
+        }
+
+        if (seen.has(current)) {
+            break;
+        }
+
+        seen.add(current);
+        current = (current as any).cause;
+    }
+
+    return [...new Set(messages)];
+}
+
 export function rethrowAsNormalized(
     error: unknown,
     logger: Logger,
@@ -24,13 +58,11 @@ export function normalizeGeneratorError(error: any): string {
         return 'Unknown error';
     }
 
-    let message: string = String(error);
+    const messages = collectErrorMessages(error);
+    const message = messages[0] || String(error);
+    const detailedMessage = messages.join(': ');
 
-    if (typeof error === 'object') {
-        message = (error as any).message || (error as any).error || message;
-    }
-
-    const lowerMessage = message.toLowerCase();
+    const lowerMessage = detailedMessage.toLowerCase();
 
     if (lowerMessage.includes('not found')) {
         return 'Repository not found. Please verify the repository exists and try again.';
@@ -51,5 +83,5 @@ export function normalizeGeneratorError(error: any): string {
         return 'Please reconnect your Git account to continue.';
     }
 
-    return message;
+    return detailedMessage || message;
 }

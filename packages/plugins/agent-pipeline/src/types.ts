@@ -74,7 +74,7 @@ export function isAgentPipelineStepId(value: string): value is AgentPipelineStep
 	return (AGENT_PIPELINE_STEP_IDS as readonly string[]).includes(value);
 }
 
-export const DEFAULT_MAX_STEPS = 100;
+export const DEFAULT_MAX_STEPS = 24;
 export const DEFAULT_CONTEXT_BUDGET_RATIO = 0.8;
 
 export const WORKER_PROMPT_OVERHEAD_TOKENS = 2000;
@@ -103,9 +103,10 @@ export function getWorkerContentBudgetRatio(maxContextTokens: number): number {
  * Calculates the worker step limit for a single chunk based on its character count.
  * Larger chunks with more extractable items get proportionally more steps.
  */
-export const BASE_STEPS_PER_CHUNK = 100;
-export const STEPS_PER_ESTIMATED_ITEM = 4;
-export const MAX_STEPS_PER_CHUNK = 800;
+export const BASE_STEPS_PER_CHUNK = 40;
+export const STEPS_PER_ESTIMATED_ITEM = 2;
+export const MAX_STEPS_PER_CHUNK = 160;
+export const MODIFICATION_WORKER_MAX_STEPS = 80;
 
 export function getStepsPerChunk(chunkChars: number): number {
 	// ~200 chars per structured list item (markdown row/entry)
@@ -115,4 +116,7 @@ export function getStepsPerChunk(chunkChars: number): number {
 	return Math.min(Math.max(needed, BASE_STEPS_PER_CHUNK), MAX_STEPS_PER_CHUNK);
 }
 
-export const MAX_URLS_PER_BATCH = 10;
+export function getWorkerTimeoutMs(stepLimit: number): number {
+	const timeoutMinutes = Math.min(8, Math.max(3, Math.ceil(stepLimit / 25)));
+	return timeoutMinutes * 60 * 1000;
+}

@@ -30,6 +30,12 @@ describe('openrouter-model-lookup', () => {
             { id: 'openai/gpt-4o-mini', context_length: 128000, name: 'GPT-4o Mini' },
             { id: 'google/gemini-2.5-flash', context_length: 1048576, name: 'Gemini 2.5 Flash' },
             { id: 'qwen/qwen3-32b', context_length: 40960, name: 'Qwen3 32B' },
+            { id: 'qwen/qwen3.5-9b', context_length: 32768, name: 'Qwen3.5 9B' },
+            {
+                id: 'deepseek/deepseek-coder-v2-16b-lite-instruct',
+                context_length: 65536,
+                name: 'DeepSeek Coder V2 16B Lite Instruct',
+            },
             { id: 'anthropic/claude-sonnet-4', context_length: 200000, name: 'Claude Sonnet 4' },
             { id: 'openai/gpt-4', context_length: 8192, name: 'GPT-4' },
         ];
@@ -66,11 +72,41 @@ describe('openrouter-model-lookup', () => {
             expect(match!.id).toBe('openai/gpt-4o');
         });
 
+        it('should match colon-tagged model IDs to OpenRouter base names', () => {
+            const match = fuzzyMatchModel('qwen/qwen3.5:9b', candidates);
+            expect(match).not.toBeNull();
+            expect(match!.id).toBe('qwen/qwen3.5-9b');
+            expect(match!.context_length).toBe(32768);
+        });
+
+        it('should strip quantization suffixes when matching tagged model IDs', () => {
+            const match = fuzzyMatchModel('deepseek-coder-v2:16b-lite-instruct-q2_K', candidates);
+            expect(match).not.toBeNull();
+            expect(match!.id).toBe('deepseek/deepseek-coder-v2-16b-lite-instruct');
+            expect(match!.context_length).toBe(65536);
+        });
+
+        it('should treat latest tags as the base model', () => {
+            const match = fuzzyMatchModel('openai/gpt-4o:latest', candidates);
+            expect(match).not.toBeNull();
+            expect(match!.id).toBe('openai/gpt-4o');
+        });
+
         it('should not produce false positive (gpt-4 must NOT match gpt-4o)', () => {
             const match = fuzzyMatchModel('gpt-4', candidates);
             expect(match).not.toBeNull();
             expect(match!.id).toBe('openai/gpt-4');
             expect(match!.context_length).toBe(8192);
+        });
+
+        it('should ignore matching entries without a usable context length', () => {
+            const match = fuzzyMatchModel('gpt-4o', [
+                { id: 'other/gpt-4o', context_length: 0 },
+                { id: 'openai/gpt-4o', context_length: 128000 },
+            ]);
+            expect(match).not.toBeNull();
+            expect(match!.id).toBe('openai/gpt-4o');
+            expect(match!.context_length).toBe(128000);
         });
 
         it('should return null when no match', () => {

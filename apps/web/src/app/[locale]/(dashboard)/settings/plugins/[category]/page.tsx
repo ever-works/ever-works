@@ -36,7 +36,7 @@ export default async function PluginCategoryPage({ params }: PageProps) {
         notFound();
     }
 
-    if (plugins.length === 0) {
+    if (category !== 'pipeline' && plugins.length === 0) {
         notFound();
     }
 
@@ -72,9 +72,7 @@ export default async function PluginCategoryPage({ params }: PageProps) {
             </div>
 
             {/* Default pipeline selector — shown only for the pipeline category */}
-            {category === 'pipeline' && plugins.length > 1 && (
-                <PipelineDefaultSelector plugins={plugins} />
-            )}
+            {category === 'pipeline' && <PipelineDefaultSelector plugins={plugins} />}
 
             <div className="space-y-3">
                 {pluginsWithOAuth.map(({ plugin, oauthConnection }) => (

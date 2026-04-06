@@ -63,8 +63,12 @@
     --color-border-secondary-dark: #ffffff17;
 
     /* Button colors */
+    --color-button-primary: #000000;
+    --color-button-primary-hover: #1a1a1a;
+    --color-button-primary-foreground: #ffffff;
     --color-button-primary-dark: #ededed;
     --color-button-primary-hover-dark: #ededede6;
+    --color-button-primary-foreground-dark: #000000;
 
     /* Brand colors */
     --color-brand-purple: #6209bb;

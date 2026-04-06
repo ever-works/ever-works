@@ -8,7 +8,8 @@ import type {
 	FacadeOptions,
 	PipelineProgressCallback,
 	PipelineExecutionOptions,
-	PluginLogger
+	PluginLogger,
+	ExistingItems
 } from '@ever-works/plugin';
 
 import { createSearchTool, createReportProgressTool } from './facade-tools.js';
@@ -19,7 +20,6 @@ import { processUrlWorker } from '../worker/url-worker.js';
 import type { WorkerPromptOptions } from '../worker/extraction-prompt.js';
 import { processModification } from '../worker/modification-worker.js';
 import { ToolCircuitBreaker } from '../utils/tool-circuit-breaker.js';
-import { MAX_URLS_PER_BATCH } from '../types.js';
 import type { TokenUsageAccumulator } from '../types.js';
 
 export interface ParentToolContext {
@@ -34,9 +34,11 @@ export interface ParentToolContext {
 	parentModel: LanguageModelV3;
 	parentMaxContextTokens: number;
 	directoryContext: WorkerPromptOptions;
+	existing: ExistingItems;
 	onProgress: PipelineProgressCallback | undefined;
 	totalSteps: number;
 	logger: PluginLogger;
+	maxPagesToProcess: number;
 	tokenAccumulator?: TokenUsageAccumulator;
 	signal?: AbortSignal;
 	promptFacade?: IPromptFacade;
@@ -51,15 +53,85 @@ export interface ParentToolsResult {
 export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 	const breaker = new ToolCircuitBreaker({ logger: ctx.logger });
 	const toolOptions: FacadeToolOptions = { breaker, logger: ctx.logger };
+	const processedUrls = new Map<string, { status: 'created' | 'empty' | 'error'; count: number }>();
 
-	const processUrlsTool = tool({
-		description: 'Process 1-10 URLs in parallel: extract content, create items, with best-effort deduplication.',
+	const normalizeTrackedUrl = (raw: string): string => {
+		const trimmed = raw.trim();
+		if (!trimmed) {
+			return trimmed;
+		}
+
+		try {
+			const parsed = new URL(trimmed);
+			const pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+			const searchParams = [...parsed.searchParams.entries()]
+				.filter(([key]) => !key.toLowerCase().startsWith('utm_'))
+				.sort(([leftKey, leftValue], [rightKey, rightValue]) => {
+					if (leftKey === rightKey) {
+						return leftValue.localeCompare(rightValue);
+					}
+					return leftKey.localeCompare(rightKey);
+				});
+			const search = new URLSearchParams(searchParams).toString();
+
+			return `${parsed.protocol.toLowerCase()}//${parsed.host.toLowerCase()}${pathname}${search ? `?${search}` : ''}`;
+		} catch {
+			return trimmed.toLowerCase().replace(/\/+$/, '');
+		}
+	};
+
+	const classifyProcessedUrlStatus = (result: { count: number; error?: string }): 'created' | 'empty' | 'error' => {
+		if (result.count > 0) {
+			return 'created';
+		}
+
+		const errorMessage = result.error?.toLowerCase() || '';
+		if (
+			errorMessage.includes('no items extracted') ||
+			errorMessage.includes('empty content') ||
+			errorMessage.includes('returned empty content')
+		) {
+			return 'empty';
+		}
+
+		return result.error ? 'error' : 'empty';
+	};
+
+	const processUrlTool = tool({
+		description:
+			'Process one URL: extract content, create items, and return the result so the parent agent can decide what to do next.',
 		inputSchema: z.object({
-			urls: z.array(z.string().url()).min(1).max(MAX_URLS_PER_BATCH)
+			url: z.string().url()
 		}),
-		// Cross-URL dedup within a batch is best-effort (parallel workers share no state);
-		// duplicates are caught by the post-pipeline metadata merge.
-		execute: async ({ urls }) => {
+		execute: async ({ url }) => {
+			const normalizedUrl = normalizeTrackedUrl(url);
+			const existingRecord = processedUrls.get(normalizedUrl);
+			if (existingRecord) {
+				return {
+					url,
+					files: [],
+					count: 0,
+					skipped: true,
+					error: `URL already processed earlier (${existingRecord.status}). Do not retry it.`,
+					previousStatus: existingRecord.status,
+					previousCount: existingRecord.count,
+					remainingUrlBudget: Math.max(0, ctx.maxPagesToProcess - processedUrls.size)
+				};
+			}
+
+			if (processedUrls.size >= ctx.maxPagesToProcess) {
+				return {
+					url,
+					files: [],
+					count: 0,
+					skipped: true,
+					error:
+						`URL budget reached (${ctx.maxPagesToProcess}/${ctx.maxPagesToProcess}). ` +
+						'Stop processing URLs and finish with the current results.',
+					remainingUrlBudget: 0
+				};
+			}
+
 			const workerCtx = {
 				workerModel: ctx.workerModel,
 				maxContextTokens: ctx.workerMaxContextTokens,
@@ -75,22 +147,29 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 				onLogEntry: ctx.onLogEntry
 			};
 
-			const mapper = async (url: string) => {
-				try {
-					return await processUrlWorker(url, workerCtx);
-				} catch (error) {
-					return {
-						url,
-						files: [],
-						count: 0,
-						error: error instanceof Error ? error.message : String(error)
-					};
-				}
-			};
-
-			const pMap = (await import('p-map')).default;
-
-			return pMap(urls, mapper, { concurrency: 2 });
+			try {
+				const result = await processUrlWorker(url, workerCtx);
+				processedUrls.set(normalizedUrl, {
+					status: classifyProcessedUrlStatus(result),
+					count: result.count
+				});
+				return {
+					...result,
+					remainingUrlBudget: Math.max(0, ctx.maxPagesToProcess - processedUrls.size)
+				};
+			} catch (error) {
+				processedUrls.set(normalizedUrl, {
+					status: 'error',
+					count: 0
+				});
+				return {
+					url,
+					files: [],
+					count: 0,
+					error: error instanceof Error ? error.message : String(error),
+					remainingUrlBudget: Math.max(0, ctx.maxPagesToProcess - processedUrls.size)
+				};
+			}
 		}
 	});
 
@@ -115,16 +194,16 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 	});
 
 	const getWorkspaceOverviewTool = tool({
-		description: 'Get workspace overview: item count, categories, tags, brands.',
+		description: 'Get workspace overview: total items, new items, updated items, categories, tags, brands.',
 		inputSchema: z.object({}),
-		execute: () => readWorkspaceOverview(ctx.workspacePath)
+		execute: () => readWorkspaceOverview(ctx.workspacePath, ctx.existing.items)
 	});
 
 	return {
 		tools: {
 			search: createSearchTool(ctx.facades.searchFacade, ctx.facadeOptions, toolOptions),
 			findItems: createFindItemsTool(ctx.workspacePath),
-			processUrls: processUrlsTool,
+			processUrl: processUrlTool,
 			modifyItems: modifyItemsTool,
 			getWorkspaceOverview: getWorkspaceOverviewTool,
 			reportProgress: createReportProgressTool(ctx.onProgress, 1, ctx.totalSteps)
