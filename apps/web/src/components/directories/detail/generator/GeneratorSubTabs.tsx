@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils/cn';
 import { ROUTES } from '@/lib/constants';
@@ -17,6 +18,9 @@ export function GeneratorSubTabs({ directoryId }: GeneratorSubTabsProps) {
     const pathname = usePathname();
     const { config } = useDirectoryDetail();
     const permissions = useDirectoryPermissions();
+
+    const navRef = useRef<HTMLDivElement>(null);
+    const [pillStyle, setPillStyle] = useState<{ left: number; width: number } | null>(null);
 
     const generatorBase = ROUTES.DASHBOARD_DIRECTORY_GENERATOR(directoryId);
 
@@ -49,33 +53,43 @@ export function GeneratorSubTabs({ directoryId }: GeneratorSubTabsProps) {
         },
     ].filter((tab) => tab.visible !== false);
 
+    useEffect(() => {
+        const nav = navRef.current;
+        if (!nav) return;
+        const activeLink = nav.querySelector('[data-active="true"]') as HTMLElement | null;
+        if (!activeLink) return;
+        setPillStyle({ left: activeLink.offsetLeft, width: activeLink.offsetWidth });
+    }, [pathname]);
+
     return (
         <div className="mb-6">
             <nav
-                className="inline-flex items-center gap-1 rounded-lg border border-border dark:border-border-dark bg-muted/40 dark:bg-muted/10 p-1"
+                ref={navRef}
+                className="relative inline-flex items-center gap-1 rounded-lg border border-border dark:border-border-dark bg-muted/40 dark:bg-muted/10 p-1"
                 aria-label="Generator tabs"
             >
+                {/* Sliding pill background */}
+                {pillStyle && (
+                    <div
+                        className="absolute top-1 bottom-1 rounded-md bg-card dark:bg-button-primary-dark shadow-sm pointer-events-none transition-all duration-200 ease-in-out"
+                        style={{ left: pillStyle.left, width: pillStyle.width }}
+                    />
+                )}
                 {tabs.map((tab) => {
                     const Icon = tab.icon;
                     return (
                         <Link
                             key={tab.name}
                             href={tab.href}
+                            data-active={tab.isActive}
                             className={cn(
-                                'relative flex items-center text-xs gap-2 whitespace-nowrap rounded-md px-4 py-1.5 font-medium transition-all duration-200',
+                                'relative z-10 flex items-center text-xs gap-2 whitespace-nowrap rounded-md px-4 py-1.5 font-medium transition-colors duration-200',
                                 tab.isActive
-                                    ? 'bg-card dark:bg-button-primary-dark text-button-primary-foreground-dark shadow-sm'
-                                    : 'text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark hover:bg-muted/60 dark:hover:bg-muted/20',
+                                    ? 'text-text dark:text-button-primary-foreground-dark'
+                                    : 'text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark',
                             )}
                         >
-                            <Icon
-                                className={cn(
-                                    'w-4 h-4 shrink-0 transition-colors duration-200',
-                                    tab.isActive
-                                        ? 'text-text-muted dark:text-text-muted-dark'
-                                        : 'text-text-muted dark:text-text-muted-dark',
-                                )}
-                            />
+                            <Icon className="w-4 h-4 shrink-0" />
                             {tab.name}
                         </Link>
                     );
