@@ -179,7 +179,7 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                             <tr className="bg-card dark:bg-transparent">
                                 <td
                                     colSpan={6}
-                                    className="px-4 py-10 text-center text-sm text-text-muted dark:text-text-muted-dark"
+                                    className="px-4 py-10 text-center text-xs text-text-muted dark:text-text-muted-dark"
                                 >
                                     {t('loading')}
                                 </td>
@@ -224,7 +224,7 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                         <td className="px-4 py-3">
                                             <ActivityStatusBadge status={activity.status} />
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-text-muted dark:text-text-muted-dark whitespace-nowrap">
+                                        <td className="px-4 py-3 text-xs text-text-muted dark:text-text-muted-dark whitespace-nowrap">
                                             <span
                                                 title={new Date(
                                                     activity.createdAt,
@@ -235,13 +235,13 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                                 })}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-sm">
+                                        <td className="px-4 py-3 text-xs">
                                             {activity.directory ? (
                                                 <Link
                                                     href={ROUTES.DASHBOARD_DIRECTORY(
                                                         activity.directoryId!,
                                                     )}
-                                                    className="text-primary hover:underline font-medium"
+                                                    className="text-primary text-xs hover:underline font-medium"
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
                                                     {activity.directory.name}
@@ -255,7 +255,7 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                         <td className="px-4 py-3">
                                             <ActivityTypeBadge actionType={activity.actionType} />
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-text dark:text-text-dark max-w-md">
+                                        <td className="px-4 py-3 text-xs text-text dark:text-text-dark max-w-md">
                                             <div className="space-y-1">
                                                 <div className="truncate">{activity.summary}</div>
                                                 {hasStructuredContent && (
@@ -293,7 +293,7 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                                 >
                                                     <div className="overflow-hidden">
                                                         <div className="px-6 py-4 space-y-3">
-                                                            <h4 className="text-sm font-semibold text-text dark:text-text-dark">
+                                                            <h4 className="text-xs font-semibold text-text dark:text-text-dark">
                                                                 {t('detail.title')}
                                                             </h4>
                                                             <div className="rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark/30 p-3">
