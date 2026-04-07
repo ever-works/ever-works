@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useLayoutEffect, useState } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils/cn';
 import { ROUTES } from '@/lib/constants';
@@ -53,7 +53,7 @@ export function GeneratorSubTabs({ directoryId }: GeneratorSubTabsProps) {
         },
     ].filter((tab) => tab.visible !== false);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const nav = navRef.current;
         if (!nav) return;
         const activeLink = nav.querySelector('[data-active="true"]') as HTMLElement | null;

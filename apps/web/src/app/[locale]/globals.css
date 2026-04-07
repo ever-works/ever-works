@@ -295,22 +295,6 @@ body {
     animation: pulse-glow 4s ease-in-out infinite;
 }
 
-/* Ever Works: collapse grid animation for activity details */
-.aw-collapse-grid {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows 300ms ease;
-}
-.aw-collapse-grid.open {
-    grid-template-rows: 1fr;
-}
-.aw-collapse-clip {
-    overflow: hidden;
-}
-.aw-collapse-content {
-    padding: 1rem 1.5rem; /* matches px-6 py-4 used in components */
-}
-
 .animate-gradient {
     background-size: 200% 200%;
     animation: gradient-shift 10s ease infinite;

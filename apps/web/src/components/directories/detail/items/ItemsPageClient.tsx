@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useLayoutEffect, useEffect, useMemo } from 'react';
 import {
     ItemData,
     Category,
@@ -52,7 +52,7 @@ export function ItemsPageClient({
     const navRef = useRef<HTMLDivElement>(null);
     const [pillStyle, setPillStyle] = useState<{ left: number; width: number } | null>(null);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const nav = navRef.current;
         if (!nav) return;
         const activeBtn = nav.querySelector('[data-active="true"]') as HTMLElement | null;
