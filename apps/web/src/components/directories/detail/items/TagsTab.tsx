@@ -160,12 +160,12 @@ export function TagsTab({ directoryId, initialTags, items, canEdit }: TagsTabPro
             {/* Tags list */}
             {filteredTags.length === 0 ? (
                 <div className="text-center py-12 rounded-xl border border-border dark:border-border-dark bg-muted/20 dark:bg-muted/5">
-                    <Tags className="w-12 h-12 mx-auto text-text-secondary dark:text-text-secondary-dark mb-4" />
+                    <Tags strokeWidth={0.6} className="w-12 h-12 mx-auto text-text-secondary dark:text-text-secondary-dark mb-4" />
                     <p className="text-text-secondary dark:text-text-secondary-dark">
                         {tags.length === 0 ? t('tags.empty') : t('tags.noMatch')}
                     </p>
                     {canEdit && tags.length === 0 && (
-                        <Button variant="primary" onClick={handleCreate} className="mt-4">
+                        <Button variant="primary" onClick={handleCreate} className="mt-4 text-sm">
                             {t('tags.addFirst')}
                         </Button>
                     )}
@@ -230,7 +230,7 @@ export function TagsTab({ directoryId, initialTags, items, canEdit }: TagsTabPro
                                                         onClick={() => handleEdit(tag)}
                                                         className="p-2"
                                                     >
-                                                        <Pencil className="w-4 h-4" />
+                                                        <Pencil strokeWidth={1.3} className="w-4 h-4" />
                                                     </Button>
                                                     <Button
                                                         variant="ghost"
@@ -239,7 +239,7 @@ export function TagsTab({ directoryId, initialTags, items, canEdit }: TagsTabPro
                                                         disabled={isDeleting === tag.id}
                                                         className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20"
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
+                                                        <Trash2 strokeWidth={1.3} className="w-4 h-4" />
                                                     </Button>
                                                 </div>
                                             </td>

@@ -146,7 +146,7 @@ export function ItemsList({ items: initialItems, addItemRef }: ItemsListProps) {
     return (
         <div className="space-y-6">
             {/* Search and Filter Bar */}
-            <div className="flex flex-col @sm/main:flex-row gap-4">
+            <div className="flex flex-col @sm/main:flex-row @sm/main:items-center gap-4">
                 <div className="flex-1">
                     <Input
                         type="text"
@@ -158,7 +158,7 @@ export function ItemsList({ items: initialItems, addItemRef }: ItemsListProps) {
                     />
                 </div>
 
-                <div className="flex gap-2 items-center border p-1 rounded-xl">
+                <div className="flex gap-2 items-center border p-[3px] rounded-xl">
                     <Select
                         value={selectedCategory || '__all__'}
                         onValueChange={(val) => setSelectedCategory(val === '__all__' ? null : val)}
@@ -188,7 +188,7 @@ export function ItemsList({ items: initialItems, addItemRef }: ItemsListProps) {
                             onClick={() => setViewMode('list')}
                             className="rounded-l-none"
                         >
-                            <ListIcon className="w-3 h-3" />
+                            <ListIcon className="w-4 h-4" />
                         </Button>
                     </div>
                 </div>

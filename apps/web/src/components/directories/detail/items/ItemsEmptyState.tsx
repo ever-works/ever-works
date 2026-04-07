@@ -25,7 +25,7 @@ export function ItemsEmptyState({ directoryId }: ItemsEmptyStateProps) {
                     <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        strokeWidth={2}
+                        strokeWidth={0.6}
                         d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
                     />
                 </svg>
@@ -40,12 +40,13 @@ export function ItemsEmptyState({ directoryId }: ItemsEmptyStateProps) {
                 onClick={() => router.push(`${ROUTES.DASHBOARD_DIRECTORY(directoryId)}/generator`)}
                 variant="primary"
                 size="md"
+                className='text-sm'
             >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        strokeWidth={2}
+                        strokeWidth={1}
                         d="M13 10V3L4 14h7v7l9-11h-7z"
                     />
                 </svg>

@@ -170,12 +170,12 @@ export function CategoriesTab({
             {/* Categories list */}
             {filteredCategories.length === 0 ? (
                 <div className="text-center py-12 rounded-xl border border-border dark:border-border-dark bg-muted/20 dark:bg-muted/5">
-                    <FolderTree className="w-12 h-12 mx-auto text-text-secondary dark:text-text-secondary-dark mb-4" />
+                    <FolderTree strokeWidth={0.6} className="w-12 h-12 mx-auto text-text-secondary dark:text-text-secondary-dark mb-4" />
                     <p className="text-text-secondary dark:text-text-secondary-dark">
                         {categories.length === 0 ? t('categories.empty') : t('categories.noMatch')}
                     </p>
                     {canEdit && categories.length === 0 && (
-                        <Button variant="primary" onClick={handleCreate} className="mt-4">
+                        <Button variant="primary" onClick={handleCreate} className="mt-4 text-sm">
                             {t('categories.addFirst')}
                         </Button>
                     )}
@@ -221,7 +221,7 @@ export function CategoriesTab({
                                                         className="w-6 h-6 rounded"
                                                     />
                                                 ) : (
-                                                    <FolderTree className="w-4 h-4 text-text-muted dark:text-text-muted-dark shrink-0" />
+                                                    <FolderTree strokeWidth={1.3} className="w-4 h-4 text-text-muted dark:text-text-muted-dark shrink-0" />
                                                 )}
                                                 <span className="font-medium text-sm text-text dark:text-text-dark">
                                                     {category.name}
@@ -259,7 +259,7 @@ export function CategoriesTab({
                                                         onClick={() => handleEdit(category)}
                                                         className="p-2"
                                                     >
-                                                        <Pencil className="w-4 h-4" />
+                                                        <Pencil strokeWidth={1.3} className="w-4 h-4" />
                                                     </Button>
                                                     <Button
                                                         variant="ghost"
@@ -268,7 +268,7 @@ export function CategoriesTab({
                                                         disabled={isDeleting === category.id}
                                                         className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20"
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
+                                                        <Trash2 strokeWidth={1.3} className="w-4 h-4" />
                                                     </Button>
                                                 </div>
                                             </td>
