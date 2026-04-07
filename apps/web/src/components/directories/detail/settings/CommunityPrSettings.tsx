@@ -95,7 +95,7 @@ export function CommunityPrSettings() {
                 </div>
 
                 {directory.communityPrEnabled && (
-                    <div className="flex items-center justify-between pt-2 border-t border-card-border dark:border-card-border-dark">
+                    <div className="flex items-center justify-between pt-2 border-t border-card-border dark:border-border-secondary-dark">
                         <div>
                             <h4 className="text-xs font-medium text-text dark:text-text-dark">
                                 {t('communityPrAutoCloseLabel')}

@@ -118,7 +118,7 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
 
                     <div className="space-y-4">
                         {/* Repository options */}
-                        <div className="rounded-lg border border-card-border dark:border-card-border-dark divide-y divide-card-border dark:divide-card-border-dark">
+                        <div className="rounded-lg border border-card-border dark:border-border-secondary-dark divide-y divide-card-border dark:divide-card-border-dark">
                             <div className="px-4 py-3">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
                                     {t('deleteOptions')}

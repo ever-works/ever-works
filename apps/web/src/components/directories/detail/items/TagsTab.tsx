@@ -141,7 +141,7 @@ export function TagsTab({ directoryId, initialTags, items, canEdit }: TagsTabPro
                     <Button
                         variant="primary"
                         onClick={handleCreate}
-                        className="inline-flex items-center gap-2"
+                        className="inline-flex items-center gap-2 text-sm"
                     >
                         <Plus className="w-4 h-4" />
                         {t('tags.add')}
@@ -159,30 +159,33 @@ export function TagsTab({ directoryId, initialTags, items, canEdit }: TagsTabPro
 
             {/* Tags list */}
             {filteredTags.length === 0 ? (
-                <div className="text-center py-12 rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark">
-                    <Tags className="w-12 h-12 mx-auto text-text-secondary dark:text-text-secondary-dark mb-4" />
+                <div className="text-center py-12 rounded-xl border border-border dark:border-border-dark bg-muted/20 dark:bg-muted/5">
+                    <Tags
+                        strokeWidth={0.6}
+                        className="w-12 h-12 mx-auto text-text-secondary dark:text-text-secondary-dark mb-4"
+                    />
                     <p className="text-text-secondary dark:text-text-secondary-dark">
                         {tags.length === 0 ? t('tags.empty') : t('tags.noMatch')}
                     </p>
                     {canEdit && tags.length === 0 && (
-                        <Button variant="primary" onClick={handleCreate} className="mt-4">
+                        <Button variant="primary" onClick={handleCreate} className="mt-4 text-sm">
                             {t('tags.addFirst')}
                         </Button>
                     )}
                 </div>
             ) : (
-                <div className="bg-surface dark:bg-surface-dark rounded-lg border border-border dark:border-border-dark overflow-hidden">
+                <div className="rounded-xl border border-border dark:border-border-dark overflow-hidden">
                     <table className="w-full">
                         <thead>
-                            <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-border dark:border-border-dark">
-                                <th className="text-left px-4 py-3 text-sm font-medium text-text-secondary dark:text-text-secondary-dark">
+                            <tr className="bg-muted/40 dark:bg-muted/10 border-b border-border dark:border-border-dark">
+                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
                                     {t('tags.columns.name')}
                                 </th>
-                                <th className="text-center px-4 py-3 text-sm font-medium text-text-secondary dark:text-text-secondary-dark w-24">
+                                <th className="text-center px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark w-24">
                                     {t('tags.columns.items')}
                                 </th>
                                 {canEdit && (
-                                    <th className="text-right px-4 py-3 text-sm font-medium text-text-secondary dark:text-text-secondary-dark w-24">
+                                    <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark w-24">
                                         {t('tags.columns.actions')}
                                     </th>
                                 )}
@@ -194,15 +197,15 @@ export function TagsTab({ directoryId, initialTags, items, canEdit }: TagsTabPro
                                 return (
                                     <tr
                                         key={tag.id}
-                                        className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
+                                        className="hover:bg-muted/20 dark:hover:bg-muted/10 transition-colors"
                                     >
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-3">
                                                 <span
                                                     className={cn(
-                                                        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-                                                        'bg-gray-100 dark:bg-gray-800',
-                                                        'text-text dark:text-text-dark',
+                                                        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ring-1',
+                                                        'bg-muted/60 dark:bg-muted/20 ring-border dark:ring-border-dark',
+                                                        'text-text-secondary dark:text-text-secondary-dark',
                                                     )}
                                                 >
                                                     {tag.name}
@@ -212,10 +215,10 @@ export function TagsTab({ directoryId, initialTags, items, canEdit }: TagsTabPro
                                         <td className="px-4 py-3 text-center">
                                             <span
                                                 className={cn(
-                                                    'inline-flex items-center justify-center min-w-8 px-2 py-0.5 rounded-full text-xs font-medium',
+                                                    'inline-flex items-center justify-center min-w-8 px-2 py-0.5 rounded-full text-xs font-medium ring-1',
                                                     count > 0
-                                                        ? 'bg-primary/10 text-primary dark:bg-primary-dark/10 dark:text-primary-dark'
-                                                        : 'bg-gray-100 dark:bg-gray-800 text-text-secondary dark:text-text-secondary-dark',
+                                                        ? 'bg-primary/10 text-primary ring-primary/20'
+                                                        : 'bg-muted/60 dark:bg-muted/20 text-text-muted dark:text-text-muted-dark ring-border dark:ring-border-dark',
                                                 )}
                                             >
                                                 {count}
@@ -230,7 +233,10 @@ export function TagsTab({ directoryId, initialTags, items, canEdit }: TagsTabPro
                                                         onClick={() => handleEdit(tag)}
                                                         className="p-2"
                                                     >
-                                                        <Pencil className="w-4 h-4" />
+                                                        <Pencil
+                                                            strokeWidth={1.3}
+                                                            className="w-4 h-4"
+                                                        />
                                                     </Button>
                                                     <Button
                                                         variant="ghost"
@@ -239,7 +245,10 @@ export function TagsTab({ directoryId, initialTags, items, canEdit }: TagsTabPro
                                                         disabled={isDeleting === tag.id}
                                                         className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20"
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
+                                                        <Trash2
+                                                            strokeWidth={1.3}
+                                                            className="w-4 h-4"
+                                                        />
                                                     </Button>
                                                 </div>
                                             </td>
