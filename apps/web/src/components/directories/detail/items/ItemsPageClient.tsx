@@ -124,7 +124,7 @@ export function ItemsPageClient({
                         <Button
                             variant="primary"
                             onClick={() => setIsAddModalOpen(true)}
-                            className={cn('inline-flex items-center gap-2')}
+                            className={cn('inline-flex items-center gap-2', 'text-sm')}
                         >
                             <Plus className="w-4 h-4" />
                             {t('addItem')}
@@ -139,7 +139,7 @@ export function ItemsPageClient({
                     {/* Sliding pill background */}
                     {pillStyle && (
                         <div
-                            className="absolute top-0 bottom-0 rounded-md bg-card dark:bg-button-primary-dark shadow-sm pointer-events-none transition-all duration-200 ease-in-out"
+                            className="absolute top-0 bottom-0 rounded-md bg-button-primary dark:bg-button-primary-dark shadow-sm pointer-events-none transition-all duration-200 ease-in-out"
                             style={{ left: pillStyle.left, width: pillStyle.width }}
                         />
                     )}
@@ -154,7 +154,7 @@ export function ItemsPageClient({
                                 className={cn(
                                     'relative z-10 cursor-pointer flex flex-1 items-center justify-center text-xs gap-2 whitespace-nowrap rounded-md px-4 py-1.5 font-medium transition-colors duration-200',
                                     isActive
-                                        ? 'text-text dark:text-button-primary-foreground-dark'
+                                        ? 'text-white dark:text-button-primary-foreground-dark'
                                         : 'text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark',
                                 )}
                             >

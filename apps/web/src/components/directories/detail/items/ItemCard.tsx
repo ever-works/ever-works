@@ -56,11 +56,11 @@ const ItemCardList = memo(function ItemCardList({
     return (
         <div
             className={cn(
-                'flex items-center gap-3 p-3 rounded-lg border',
-                'bg-card dark:bg-card-primary-dark transition-colors',
+                'group flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200',
+                'shadow-sm',
                 isFeatured
-                    ? 'border-amber-400/50 dark:border-amber-500/30 bg-amber-50/30 dark:bg-amber-900/10'
-                    : 'border-card-border dark:border-white/9 hover:border-primary-500/50 dark:hover:border-white/20',
+                    ? 'border-primary/25 bg-card dark:bg-card-primary-dark/60 dark:border-primary/20 shadow-sm shadow-primary/50 dark:shadow-none'
+                    : 'border-card-border dark:border-border-dark hover:border-primary/30 dark:hover:border-border-secondary-dark hover:shadow-sm',
             )}
         >
             {/* Main content — takes remaining space, truncates */}
@@ -75,7 +75,7 @@ const ItemCardList = memo(function ItemCardList({
                     <ItemHealthBadge item={item} />
                 </div>
                 {item.description && (
-                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark truncate mt-0.5">
+                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark truncate mt-0.5 mr-10">
                         {item.description}
                     </p>
                 )}
@@ -85,12 +85,12 @@ const ItemCardList = memo(function ItemCardList({
             <div className="hidden sm:flex items-center gap-1.5 shrink-0">
                 <ItemBadgesDisplay badges={item.badges} />
                 {item.order != null && (
-                    <span className="px-1.5 py-0.5 text-[11px] font-medium rounded-full bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                    <span className="px-1.5 py-0.5 text-[11px] font-medium rounded-full bg-muted/60 dark:bg-muted/20 text-text-muted dark:text-text-muted-dark ring-1 ring-border dark:ring-border-dark tabular-nums">
                         #{item.order}
                     </span>
                 )}
                 {categoryName && (
-                    <span className="px-1.5 py-0.5 text-[11px] rounded-full bg-primary/10 text-primary truncate max-w-[120px]">
+                    <span className="px-1.5 py-0.5 text-[11px] rounded-full bg-primary/10 text-primary font-medium truncate max-w-[120px]">
                         {categoryName}
                     </span>
                 )}
@@ -103,7 +103,7 @@ const ItemCardList = memo(function ItemCardList({
                         href={`${directoryWebsite}/details/${item.slug}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1 rounded text-text-secondary dark:text-text-secondary-dark hover:text-primary transition-colors"
+                        className="p-1.5 rounded-lg text-text-muted dark:text-text-muted-dark hover:text-primary hover:bg-primary/10 transition-colors"
                         aria-label="View on website"
                     >
                         <Eye className="w-3.5 h-3.5" />
@@ -114,7 +114,7 @@ const ItemCardList = memo(function ItemCardList({
                         href={item.source_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1 rounded text-text-secondary dark:text-text-secondary-dark hover:text-primary transition-colors"
+                        className="p-1.5 rounded-lg text-text-muted dark:text-text-muted-dark hover:text-primary hover:bg-primary/10 transition-colors"
                         aria-label="Open source URL"
                     >
                         <ExternalLink className="w-3.5 h-3.5" />
@@ -144,11 +144,11 @@ const ItemCardGrid = memo(function ItemCardGrid({
     return (
         <div
             className={cn(
-                'flex flex-col p-4 rounded-lg border',
-                'bg-card dark:bg-card-primary-dark transition-colors',
+                'group flex flex-col p-5 rounded-xl border transition-all duration-200',
+                'shadow-sm',
                 isFeatured
-                    ? 'border-amber-400/30 dark:border-amber-500/30'
-                    : 'border-card-border dark:border-white/9 hover:border-primary-500/50 dark:hover:border-white/20',
+                    ? 'border-primary/25 dark:border-primary/20 shadow-sm shadow-primary/50 bg-card dark:bg-card-primary-dark/60 dark:shadow-none'
+                    : 'border-card-border dark:border-border-dark hover:border-primary/30 dark:hover:border-border-secondary-dark hover:shadow-md hover:shadow-black/5 dark:hover:shadow-none',
             )}
         >
             {/* Header: title + actions on same line */}
@@ -157,7 +157,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
                     {isFeatured && (
                         <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
                     )}
-                    <h4 className="font-medium text-sm text-text dark:text-text-dark truncate">
+                    <h4 className="font-semibold text-sm text-text dark:text-text-dark truncate leading-snug">
                         {item.name}
                     </h4>
                     <ItemHealthBadge item={item} />
@@ -174,7 +174,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
 
             {/* Description */}
             {item.description && (
-                <p className="text-xs text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-3 flex-1">
+                <p className="text-xs text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-3 flex-1 leading-relaxed">
                     {item.description}
                 </p>
             )}
@@ -183,12 +183,12 @@ const ItemCardGrid = memo(function ItemCardGrid({
             <div className="flex items-center justify-between mt-auto pt-1">
                 <div className="flex items-center gap-1.5 min-w-0">
                     {item.order != null && (
-                        <span className="px-1.5 py-0.5 text-[11px] font-medium rounded-full bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                        <span className="px-2 py-0.5 text-[11px] font-medium rounded-full bg-muted/60 dark:bg-muted/20 text-text-muted dark:text-text-muted-dark ring-1 ring-border dark:ring-border-dark">
                             #{item.order}
                         </span>
                     )}
                     {categoryName && (
-                        <span className="px-1.5 py-0.5 text-[11px] rounded-full bg-primary/10 text-primary truncate max-w-[100px]">
+                        <span className="px-2 py-0.5 text-[11px] rounded-full bg-primary/10 text-primary font-medium truncate max-w-[120px]">
                             {categoryName}
                         </span>
                     )}
@@ -199,7 +199,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
                             href={`${directoryWebsite}/items/${item.slug}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-text-secondary dark:text-text-secondary-dark hover:text-primary transition-colors flex items-center gap-1"
+                            className="p-1.5 rounded-lg text-text-muted dark:text-text-muted-dark hover:text-primary hover:bg-primary/10 transition-colors"
                             aria-label="View on website"
                         >
                             <Eye className="w-3.5 h-3.5" />
@@ -210,7 +210,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
                             href={item.source_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                            className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
                         >
                             <ExternalLink className="w-3 h-3" />
                             {t('source')}

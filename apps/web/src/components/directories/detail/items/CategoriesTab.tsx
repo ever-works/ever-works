@@ -151,7 +151,7 @@ export function CategoriesTab({
                     <Button
                         variant="primary"
                         onClick={handleCreate}
-                        className="inline-flex items-center gap-2"
+                        className="inline-flex items-center gap-2 text-sm"
                     >
                         <Plus className="w-4 h-4" />
                         {t('categories.add')}
@@ -169,7 +169,7 @@ export function CategoriesTab({
 
             {/* Categories list */}
             {filteredCategories.length === 0 ? (
-                <div className="text-center py-12 rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark">
+                <div className="text-center py-12 rounded-xl border border-border dark:border-border-dark bg-muted/20 dark:bg-muted/5">
                     <FolderTree className="w-12 h-12 mx-auto text-text-secondary dark:text-text-secondary-dark mb-4" />
                     <p className="text-text-secondary dark:text-text-secondary-dark">
                         {categories.length === 0 ? t('categories.empty') : t('categories.noMatch')}
@@ -181,24 +181,24 @@ export function CategoriesTab({
                     )}
                 </div>
             ) : (
-                <div className="bg-surface dark:bg-surface-dark rounded-lg border border-border dark:border-border-dark overflow-hidden">
+                <div className="rounded-xl border border-border dark:border-border-dark overflow-hidden">
                     <table className="w-full">
                         <thead>
-                            <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-border dark:border-border-dark">
-                                <th className="text-left px-4 py-3 text-sm font-medium text-text-secondary dark:text-text-secondary-dark">
+                            <tr className="bg-muted/40 dark:bg-muted/10 border-b border-border dark:border-border-dark">
+                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
                                     {t('categories.columns.name')}
                                 </th>
-                                <th className="text-left px-4 py-3 text-sm font-medium text-text-secondary dark:text-text-secondary-dark hidden @sm/main:table-cell">
+                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark hidden @sm/main:table-cell">
                                     {t('categories.columns.description')}
                                 </th>
-                                <th className="text-center px-4 py-3 text-sm font-medium text-text-secondary dark:text-text-secondary-dark w-24">
+                                <th className="text-center px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark w-24">
                                     {t('categories.columns.items')}
                                 </th>
-                                <th className="text-center px-4 py-3 text-sm font-medium text-text-secondary dark:text-text-secondary-dark w-20">
+                                <th className="text-center px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark w-20">
                                     {t('categories.columns.priority')}
                                 </th>
                                 {canEdit && (
-                                    <th className="text-right px-4 py-3 text-sm font-medium text-text-secondary dark:text-text-secondary-dark w-24">
+                                    <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark w-24">
                                         {t('categories.columns.actions')}
                                     </th>
                                 )}
@@ -210,7 +210,7 @@ export function CategoriesTab({
                                 return (
                                     <tr
                                         key={category.id}
-                                        className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
+                                        className="hover:bg-muted/20 dark:hover:bg-muted/10 transition-colors"
                                     >
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-3">
@@ -221,33 +221,33 @@ export function CategoriesTab({
                                                         className="w-6 h-6 rounded"
                                                     />
                                                 ) : (
-                                                    <FolderTree className="w-5 h-5 text-text-secondary dark:text-text-secondary-dark" />
+                                                    <FolderTree className="w-4 h-4 text-text-muted dark:text-text-muted-dark shrink-0" />
                                                 )}
-                                                <span className="font-medium text-text dark:text-text-dark">
+                                                <span className="font-medium text-sm text-text dark:text-text-dark">
                                                     {category.name}
                                                 </span>
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 hidden @sm/main:table-cell">
                                             <span className="text-sm text-text-secondary dark:text-text-secondary-dark line-clamp-1">
-                                                {category.description || '-'}
+                                                {category.description || '—'}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             <span
                                                 className={cn(
-                                                    'inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded-full text-xs font-medium',
+                                                    'inline-flex items-center justify-center min-w-8 px-2 py-0.5 rounded-full text-xs font-medium ring-1',
                                                     count > 0
-                                                        ? 'bg-primary/10 text-primary dark:bg-primary-dark/10 dark:text-primary-dark'
-                                                        : 'bg-gray-100 dark:bg-gray-800 text-text-secondary dark:text-text-secondary-dark',
+                                                        ? 'bg-primary/10 text-primary ring-primary/20'
+                                                        : 'bg-muted/60 dark:bg-muted/20 text-text-muted dark:text-text-muted-dark ring-border dark:ring-border-dark',
                                                 )}
                                             >
                                                 {count}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-center">
-                                            <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                                                {category.priority ?? '-'}
+                                            <span className="text-sm tabular-nums text-text-secondary dark:text-text-secondary-dark">
+                                                {category.priority ?? '—'}
                                             </span>
                                         </td>
                                         {canEdit && (

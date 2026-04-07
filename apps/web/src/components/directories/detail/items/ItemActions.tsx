@@ -169,11 +169,11 @@ export const ItemActions = memo(function ItemActions({
 
                 <DropdownMenuContent
                     align="end"
-                    className="w-48 bg-card dark:bg-card-primary-dark/30 border border-border dark:border-border-dark shadow-lg rounded-lg p-1"
+                    className="w-48 bg-card dark:bg-zinc-950 border border-border dark:border-white/10 shadow-xl rounded-lg p-1"
                 >
                     <DropdownMenuItem
                         onClick={() => setIsDisplayDialogOpen(true)}
-                        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-primary dark:hover:text-primary focus:bg-surface-secondary dark:focus:bg-surface-secondary-dark transition-colors"
+                        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-zinc-200 hover:bg-muted/60 dark:hover:bg-white/10 hover:text-text dark:hover:text-white focus:bg-muted/60 dark:focus:bg-white/10 transition-colors"
                     >
                         <SlidersHorizontal className="w-4 h-4" />
                         {t('editDisplay', { defaultValue: 'Edit display' })}
@@ -182,7 +182,7 @@ export const ItemActions = memo(function ItemActions({
                         <DropdownMenuItem
                             onClick={handleCheckHealth}
                             disabled={isCheckingHealth}
-                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-primary dark:hover:text-primary focus:bg-surface-secondary dark:focus:bg-surface-secondary-dark transition-colors"
+                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-zinc-200 hover:bg-muted/60 dark:hover:bg-white/10 hover:text-text dark:hover:text-white focus:bg-muted/60 dark:focus:bg-white/10 transition-colors"
                         >
                             {isCheckingHealth ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -196,7 +196,7 @@ export const ItemActions = memo(function ItemActions({
                         <DropdownMenuItem
                             onClick={handleUseSuggestedSource}
                             disabled={isApplyingSuggestedSource}
-                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-primary dark:hover:text-primary focus:bg-surface-secondary dark:focus:bg-surface-secondary-dark transition-colors"
+                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-zinc-200 hover:bg-muted/60 dark:hover:bg-white/10 hover:text-text dark:hover:text-white focus:bg-muted/60 dark:focus:bg-white/10 transition-colors"
                         >
                             {isApplyingSuggestedSource ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -210,7 +210,7 @@ export const ItemActions = memo(function ItemActions({
                         <DropdownMenuItem
                             onClick={handleCaptureScreenshot}
                             disabled={isCapturingScreenshot}
-                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-primary dark:hover:text-primary focus:bg-surface-secondary dark:focus:bg-surface-secondary-dark transition-colors"
+                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-zinc-200 hover:bg-muted/60 dark:hover:bg-white/10 hover:text-text dark:hover:text-white focus:bg-muted/60 dark:focus:bg-white/10 transition-colors"
                         >
                             {isCapturingScreenshot ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -222,7 +222,7 @@ export const ItemActions = memo(function ItemActions({
                     )}
                     <DropdownMenuItem
                         onClick={() => setIsDeleteDialogOpen(true)}
-                        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-danger dark:text-danger-dark hover:bg-danger/10 focus:bg-danger/10 transition-colors"
+                        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-700 dark:hover:text-red-300 focus:bg-red-50 dark:focus:bg-red-500/15 transition-colors"
                     >
                         <Trash2 className="w-4 h-4" />
                         {t('delete')}

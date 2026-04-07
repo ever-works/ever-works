@@ -71,7 +71,7 @@ export function GeneratorSubTabs({ directoryId }: GeneratorSubTabsProps) {
                 {/* Sliding pill background */}
                 {pillStyle && (
                     <div
-                        className="absolute top-1 bottom-1 rounded-md bg-card dark:bg-button-primary-dark shadow-sm pointer-events-none transition-all duration-200 ease-in-out"
+                        className="absolute top-1 bottom-1 rounded-md bg-button-primary dark:bg-button-primary-dark shadow-sm pointer-events-none transition-all duration-200 ease-in-out"
                         style={{ left: pillStyle.left, width: pillStyle.width }}
                     />
                 )}
@@ -85,7 +85,7 @@ export function GeneratorSubTabs({ directoryId }: GeneratorSubTabsProps) {
                             className={cn(
                                 'relative z-10 flex items-center text-xs gap-2 whitespace-nowrap rounded-md px-4 py-1.5 font-medium transition-colors duration-200',
                                 tab.isActive
-                                    ? 'text-text dark:text-button-primary-foreground-dark'
+                                    ? 'text-white dark:text-button-primary-foreground-dark'
                                     : 'text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark',
                             )}
                         >
