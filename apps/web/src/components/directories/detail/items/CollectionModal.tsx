@@ -212,7 +212,12 @@ export function CollectionModal({
                         <Button type="button" variant="ghost" onClick={onClose} className="text-sm">
                             {t('cancel')}
                         </Button>
-                        <Button type="submit" variant="primary" disabled={isSaving} className="text-sm">
+                        <Button
+                            type="submit"
+                            variant="primary"
+                            disabled={isSaving}
+                            className="text-sm"
+                        >
                             {isSaving ? t('saving') : isEditing ? t('save') : t('create')}
                         </Button>
                     </div>

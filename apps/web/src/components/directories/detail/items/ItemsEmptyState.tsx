@@ -40,7 +40,7 @@ export function ItemsEmptyState({ directoryId }: ItemsEmptyStateProps) {
                 onClick={() => router.push(`${ROUTES.DASHBOARD_DIRECTORY(directoryId)}/generator`)}
                 variant="primary"
                 size="md"
-                className='text-sm'
+                className="text-sm"
             >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
