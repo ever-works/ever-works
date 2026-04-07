@@ -459,7 +459,7 @@ function TagsField({ field, value, onChange }: TagsFieldProps) {
                 className={cn(
                     'min-h-[42px] px-3 py-2 rounded-lg border',
                     'bg-card dark:bg-card-primary-dark/30',
-                    'border-card-border dark:border-card-border-dark',
+                    'border-card-border dark:border-border-secondary-dark',
                     'focus-within:ring-2 focus-within:ring-primary/50',
                 )}
             >

@@ -524,7 +524,7 @@ function ScheduleEmptyState({
     onAction: () => void;
 }) {
     return (
-        <div className="rounded-2xl border border-dashed border-border dark:border-border-dark bg-card dark:bg-card-dark p-10 text-center space-y-4">
+        <div className="rounded-2xl border border-dashed border-border dark:border-border-dark bg-card dark:bg-card-primary-dark/30 p-10 text-center space-y-4">
             <Repeat
                 className="mx-auto h-10 w-10 text-text-secondary dark:text-text-secondary-dark"
                 aria-hidden

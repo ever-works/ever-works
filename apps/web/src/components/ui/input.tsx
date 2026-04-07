@@ -49,7 +49,7 @@ const Input = ({
             type={type}
             id={inputId}
             className={cn(
-                'w-full rounded-lg transition-colors outline-none',
+                'w-full text-sm rounded-lg transition-colors outline-none',
                 'bg-white dark:bg-card-primary-dark',
                 'border border-card-border dark:border-white/9',
                 'text-text dark:text-text-dark placeholder-text-muted dark:placeholder-text-muted-dark',

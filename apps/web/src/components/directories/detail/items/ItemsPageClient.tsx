@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useLayoutEffect, useEffect, useMemo } from 'react';
 import {
     ItemData,
     Category,
@@ -49,6 +49,16 @@ export function ItemsPageClient({
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('items');
     const [screenshotAvailable, setScreenshotAvailable] = useState(false);
+    const navRef = useRef<HTMLDivElement>(null);
+    const [pillStyle, setPillStyle] = useState<{ left: number; width: number } | null>(null);
+
+    useLayoutEffect(() => {
+        const nav = navRef.current;
+        if (!nav) return;
+        const activeBtn = nav.querySelector('[data-active="true"]') as HTMLElement | null;
+        if (!activeBtn) return;
+        setPillStyle({ left: activeBtn.offsetLeft, width: activeBtn.offsetWidth });
+    }, [activeTab]);
 
     useEffect(() => {
         if (permissions.canEdit) {
@@ -114,7 +124,7 @@ export function ItemsPageClient({
                         <Button
                             variant="primary"
                             onClick={() => setIsAddModalOpen(true)}
-                            className={cn('inline-flex items-center gap-2')}
+                            className={cn('inline-flex items-center gap-2', 'text-sm')}
                         >
                             <Plus className="w-4 h-4" />
                             {t('addItem')}
@@ -124,19 +134,28 @@ export function ItemsPageClient({
             </div>
 
             {/* Tabs Navigation */}
-            <div className="mb-6 border-b border-border dark:border-border-dark">
-                <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+            <div className="inline-flex items-center gap-1 mb-4 rounded-lg border border-border dark:border-border-dark bg-muted/40 dark:bg-muted/10 p-1">
+                <nav ref={navRef} className="relative flex gap-1" aria-label="Tabs">
+                    {/* Sliding pill background */}
+                    {pillStyle && (
+                        <div
+                            className="absolute top-0 bottom-0 rounded-md bg-button-primary dark:bg-button-primary-dark shadow-sm pointer-events-none transition-all duration-200 ease-in-out"
+                            style={{ left: pillStyle.left, width: pillStyle.width }}
+                        />
+                    )}
                     {tabs.map((tab) => {
                         const Icon = tab.icon;
+                        const isActive = activeTab === tab.id;
                         return (
                             <button
                                 key={tab.id}
+                                data-active={isActive}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={cn(
-                                    'flex items-center gap-2 whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium transition-colors',
-                                    activeTab === tab.id
-                                        ? 'border-primary text-primary dark:border-gray-200 dark:text-gray-200'
-                                        : 'border-transparent text-text-secondary dark:text-text-secondary-dark hover:border-border dark:hover:border-border-dark hover:text-text dark:hover:text-text-dark',
+                                    'relative z-10 cursor-pointer flex flex-1 items-center justify-center text-xs gap-2 whitespace-nowrap rounded-md px-4 py-1.5 font-medium transition-colors duration-200',
+                                    isActive
+                                        ? 'text-white dark:text-button-primary-foreground-dark'
+                                        : 'text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark',
                                 )}
                             >
                                 <Icon className="w-4 h-4" />

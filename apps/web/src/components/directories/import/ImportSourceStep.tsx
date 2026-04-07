@@ -45,7 +45,7 @@ export function ImportSourceStep({
                         'bg-[#0a0a0a] dark:bg-[#0a0a0a]',
                         sourceMethod === 'url'
                             ? 'border-primary-500 shadow-lg'
-                            : 'border-card-border dark:border-card-border-dark hover:border-primary-500/50',
+                            : 'border-card-border dark:border-border-secondary-dark hover:border-primary-500/50',
                     )}
                 >
                     <Link className="w-6 h-6 text-primary-500 mb-2" strokeWidth={1.4} />
@@ -65,7 +65,7 @@ export function ImportSourceStep({
                         'bg-[#0a0a0a] dark:bg-[#0a0a0a]',
                         sourceMethod === 'repository'
                             ? 'border-accent-indigo shadow-lg'
-                            : 'border-card-border dark:border-card-border-dark hover:border-primary-500/50',
+                            : 'border-card-border dark:border-border-secondary-dark hover:border-primary-500/50',
                     )}
                 >
                     <FolderGit2 className="w-6 h-6 text-accent-indigo mb-2" strokeWidth={1.4} />

@@ -198,7 +198,7 @@ export function GitProviderSelector({
                                 'flex items-center gap-2.5 px-3.5 py-2 rounded-xl transition-all',
                                 isSelected
                                     ? 'ring-1 ring-primary/40 bg-primary/5 dark:bg-primary/10'
-                                    : 'ring-1 ring-border dark:ring-border-dark bg-card dark:bg-card-dark hover:ring-primary/30 hover:bg-primary/5 dark:hover:bg-primary/5',
+                                    : 'ring-1 ring-border dark:ring-border-dark bg-card dark:bg-card-primary-dark/30 hover:ring-primary/30 hover:bg-primary/5 dark:hover:bg-primary/5',
                             )}
                         >
                             <div className="w-7 h-7 rounded-lg bg-white/8 dark:bg-white/5 flex items-center justify-center shrink-0">
