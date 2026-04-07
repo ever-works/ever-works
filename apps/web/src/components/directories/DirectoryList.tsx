@@ -97,7 +97,7 @@ function DirectoryListSkeleton() {
             {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div
                     key={i}
-                    className="bg-card dark:bg-card-dark border border-card-border dark:border-card-border-dark rounded-lg p-6"
+                    className="bg-card dark:bg-card-primary-dark/30 border border-card-border dark:border-border-secondary-dark rounded-lg p-6"
                 >
                     <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
