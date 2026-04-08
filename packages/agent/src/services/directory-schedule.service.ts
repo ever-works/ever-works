@@ -356,10 +356,11 @@ export class DirectoryScheduleService {
               : schedule.cadence
                 ? new Date(anchorDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000)
                 : null;
+        const lastRunStatus = preserveExistingNextRun ? null : GenerateStatusType.ERROR;
 
         await this.scheduleRepository.updateById(schedule.id, {
             failureCount,
-            lastRunStatus: GenerateStatusType.ERROR,
+            lastRunStatus,
             lastRunAt: new Date(),
             status: reachedLimit ? DirectoryScheduleStatus.PAUSED : schedule.status,
             scheduledFor: null,
@@ -370,7 +371,7 @@ export class DirectoryScheduleService {
             ...schedule,
             failureCount,
             status: reachedLimit ? DirectoryScheduleStatus.PAUSED : schedule.status,
-            lastRunStatus: GenerateStatusType.ERROR,
+            lastRunStatus,
             nextRunAt,
         });
 

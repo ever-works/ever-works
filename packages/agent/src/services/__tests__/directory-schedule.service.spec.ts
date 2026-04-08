@@ -47,9 +47,9 @@ describe('DirectoryScheduleService', () => {
                 displayName: 'Free',
                 maxDirectories: 10,
             }),
-            getCadenceAllowances: jest.fn().mockResolvedValue([
-                { cadence: DirectoryScheduleCadence.DAILY, allowed: true },
-            ]),
+            getCadenceAllowances: jest
+                .fn()
+                .mockResolvedValue([{ cadence: DirectoryScheduleCadence.DAILY, allowed: true }]),
             getDefaultCadence: jest.fn().mockReturnValue(DirectoryScheduleCadence.DAILY),
             requiresUsageBilling: jest.fn().mockReturnValue(false),
         };
@@ -227,13 +227,62 @@ describe('DirectoryScheduleService', () => {
                 nextRunAt,
                 failureCount: 2,
                 status: DirectoryScheduleStatus.ACTIVE,
-                lastRunStatus: GenerateStatusType.ERROR,
+                lastRunStatus: null,
             }),
         );
         expect(directoryRepository.update).toHaveBeenCalledWith(
             directory.id,
             expect.objectContaining({
                 scheduledNextRunAt: nextRunAt,
+            }),
+        );
+    });
+
+    it('does not let a manual early failure suppress a later scheduled failure', async () => {
+        const futureNextRunAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        const manualRunSchedule = {
+            id: 'schedule-1',
+            directoryId: directory.id,
+            userId: user.id,
+            cadence: DirectoryScheduleCadence.HOURLY,
+            billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
+            status: DirectoryScheduleStatus.ACTIVE,
+            nextRunAt: futureNextRunAt,
+            scheduledFor: null,
+            failureCount: 2,
+            maxFailureBeforePause: 3,
+        };
+        const scheduledRunSchedule = {
+            ...manualRunSchedule,
+            nextRunAt: null,
+            scheduledFor: new Date(Date.now() - 60 * 1000),
+            lastRunStatus: null,
+            lastRunAt: new Date(),
+        };
+
+        scheduleRepository.findById
+            .mockResolvedValueOnce(manualRunSchedule)
+            .mockResolvedValueOnce(scheduledRunSchedule);
+
+        await service.markRunFailed(manualRunSchedule.id, 'manual run failed');
+        await service.markRunFailed(scheduledRunSchedule.id, 'scheduled run failed');
+
+        expect(scheduleRepository.updateById).toHaveBeenNthCalledWith(
+            1,
+            manualRunSchedule.id,
+            expect.objectContaining({
+                failureCount: 2,
+                lastRunStatus: null,
+                nextRunAt: futureNextRunAt,
+            }),
+        );
+        expect(scheduleRepository.updateById).toHaveBeenNthCalledWith(
+            2,
+            scheduledRunSchedule.id,
+            expect.objectContaining({
+                failureCount: 3,
+                lastRunStatus: GenerateStatusType.ERROR,
+                status: DirectoryScheduleStatus.PAUSED,
             }),
         );
     });
