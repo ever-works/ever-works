@@ -19,12 +19,7 @@ interface ShinyTextProps {
     className?: string;
 }
 
-export function ShinyText({
-    text,
-    stagger = 0.06,
-    duration = 1.8,
-    className,
-}: ShinyTextProps) {
+export function ShinyText({ text, stagger = 0.06, duration = 1.8, className }: ShinyTextProps) {
     return (
         <span className={className} aria-label={text}>
             {text.split('').map((char, i) => (

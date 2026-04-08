@@ -26,7 +26,10 @@ export function BackgroundActivityProvider({ children }: { children: React.React
 
     // Detect when the user navigates to /directories
     useEffect(() => {
-        if (pathname === ROUTES.DASHBOARD_DIRECTORIES || pathname?.startsWith(ROUTES.DASHBOARD_DIRECTORIES + '/')) {
+        if (
+            pathname === ROUTES.DASHBOARD_DIRECTORIES ||
+            pathname?.startsWith(ROUTES.DASHBOARD_DIRECTORIES + '/')
+        ) {
             setHasVisitedDirectoriesPage(true);
         }
     }, [pathname]);
@@ -50,7 +53,13 @@ export function BackgroundActivityProvider({ children }: { children: React.React
             markGenerating,
             clearGenerating,
         }),
-        [isGeneratingDirectory, hasVisitedDirectoriesPage, showDirectoryIndicator, markGenerating, clearGenerating],
+        [
+            isGeneratingDirectory,
+            hasVisitedDirectoriesPage,
+            showDirectoryIndicator,
+            markGenerating,
+            clearGenerating,
+        ],
     );
 
     return (
