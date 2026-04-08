@@ -9,7 +9,6 @@ import { ActivityTypeBadge } from './ActivityTypeBadge';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import { getActivityById } from '@/app/actions/activity-log';
 import { TerminalLogViewer } from '@/components/directories/detail/shared/TerminalLogViewer';
 import type { GenerationStepLog } from '@/lib/api/types-only';
 
@@ -146,11 +145,20 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
         let cancelled = false;
 
         const refreshActivity = async (id: string) => {
-            const response = await getActivityById(id);
-            if (!cancelled && response.success && response.activity) {
+            const response = await fetch(`/api/activity-log/${id}`, {
+                method: 'GET',
+                cache: 'no-store',
+            });
+
+            if (!response.ok) {
+                return;
+            }
+
+            const data = (await response.json()) as { activity?: ActivityLogEntry };
+            if (!cancelled && data.activity) {
                 setHydratedActivities((current) => ({
                     ...current,
-                    [id]: response.activity!,
+                    [id]: data.activity!,
                 }));
             }
         };
