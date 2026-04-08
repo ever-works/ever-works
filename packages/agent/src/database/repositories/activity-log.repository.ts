@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { ActivityLog } from '../../entities/activity-log.entity';
 import type {
     ActivityLogQueryOptions,
+    ActivityActionType,
     ActivityStatus,
     CreateActivityLogDto,
 } from '../../entities/activity-log.types';
@@ -35,6 +36,24 @@ export class ActivityLogRepository {
     async findByIdAndUserId(id: string, userId: string): Promise<ActivityLog | null> {
         return this.repository.findOne({
             where: { id, userId },
+            relations: ['directory'],
+        });
+    }
+
+    async findLatestByUserDirectoryActionStatus(params: {
+        userId: string;
+        directoryId?: string;
+        actionType: ActivityActionType;
+        status: ActivityStatus;
+    }): Promise<ActivityLog | null> {
+        return this.repository.findOne({
+            where: {
+                userId: params.userId,
+                directoryId: params.directoryId,
+                actionType: params.actionType,
+                status: params.status,
+            },
+            order: { createdAt: 'DESC' },
             relations: ['directory'],
         });
     }

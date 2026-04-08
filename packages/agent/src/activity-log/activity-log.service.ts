@@ -3,6 +3,7 @@ import { ActivityLogRepository } from '@src/database/repositories/activity-log.r
 import type {
     CreateActivityLogDto,
     ActivityLogQueryOptions,
+    ActivityActionType,
     ActivityStatus,
 } from '../entities/activity-log.types';
 import type { ActivityLog } from '../entities/activity-log.entity';
@@ -46,10 +47,14 @@ export class ActivityLogService {
         id: string,
         status: ActivityStatus,
         details?: Record<string, any>,
+        updates?: Partial<Pick<ActivityLog, 'action' | 'summary' | 'metadata'>>,
     ): Promise<ActivityLog | null> {
         const updateData: Partial<ActivityLog> = { status };
         if (details) {
             updateData.details = details;
+        }
+        if (updates) {
+            Object.assign(updateData, updates);
         }
         const activity = await this.repository.update(id, updateData);
         if (activity) {
@@ -78,6 +83,15 @@ export class ActivityLogService {
 
     async findByIdAndUserId(id: string, userId: string): Promise<ActivityLog | null> {
         return this.repository.findByIdAndUserId(id, userId);
+    }
+
+    async findLatestByUserDirectoryActionStatus(params: {
+        userId: string;
+        directoryId?: string;
+        actionType: ActivityActionType;
+        status: ActivityStatus;
+    }): Promise<ActivityLog | null> {
+        return this.repository.findLatestByUserDirectoryActionStatus(params);
     }
 
     async exportCsv(query: ActivityLogQueryOptions): Promise<string> {
