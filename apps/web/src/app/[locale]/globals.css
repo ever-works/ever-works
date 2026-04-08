@@ -541,67 +541,95 @@ select:-webkit-autofill:focus {
 
 /* Adaptive palette — light uses dark-ink tones, dark uses white-ink tones */
 :root {
-    --gp-ring-stroke:  rgba(15, 23, 42, 0.15);
-    --gp-dot-hi:       rgba(15, 23, 42, 0.55);
-    --gp-dot-mid:      rgba(15, 23, 42, 0.35);
-    --gp-dot-lo:       rgba(15, 23, 42, 0.18);
-    --gp-arc-stroke:   rgba(15, 23, 42, 0.7);
-    --gp-core-bg:      rgba(15, 23, 42, 0.04);
-    --gp-core-shadow:  0 0 0 1px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(15, 23, 42, 0.07);
-    --gp-glow:         rgba(15, 23, 42, 0.05);
-    --gp-pulse-bg:     rgba(15, 23, 42, 0.06);
-    --gp-bar-track:    rgba(15, 23, 42, 0.1);
-    --gp-bar-fill:     rgba(15, 23, 42, 0.55);
-    --gp-bar-shimmer:  rgba(255, 255, 255, 0.45);
-    --gp-hero-glow:    rgba(15, 23, 42, 0.04);
+    --gp-ring-stroke: rgba(15, 23, 42, 0.15);
+    --gp-dot-hi: rgba(15, 23, 42, 0.55);
+    --gp-dot-mid: rgba(15, 23, 42, 0.35);
+    --gp-dot-lo: rgba(15, 23, 42, 0.18);
+    --gp-arc-stroke: rgba(15, 23, 42, 0.7);
+    --gp-core-bg: rgba(15, 23, 42, 0.04);
+    --gp-core-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(15, 23, 42, 0.07);
+    --gp-glow: rgba(15, 23, 42, 0.05);
+    --gp-pulse-bg: rgba(15, 23, 42, 0.06);
+    --gp-bar-track: rgba(15, 23, 42, 0.1);
+    --gp-bar-fill: rgba(15, 23, 42, 0.55);
+    --gp-bar-shimmer: rgba(255, 255, 255, 0.45);
+    --gp-hero-glow: rgba(15, 23, 42, 0.04);
 }
 
 .dark {
-    --gp-ring-stroke:  rgba(255, 255, 255, 0.18);
-    --gp-dot-hi:       rgba(255, 255, 255, 0.7);
-    --gp-dot-mid:      rgba(255, 255, 255, 0.4);
-    --gp-dot-lo:       rgba(255, 255, 255, 0.25);
-    --gp-arc-stroke:   rgba(255, 255, 255, 0.8);
-    --gp-core-bg:      rgba(255, 255, 255, 0.04);
-    --gp-core-shadow:  0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    --gp-glow:         rgba(255, 255, 255, 0.06);
-    --gp-pulse-bg:     rgba(255, 255, 255, 0.08);
-    --gp-bar-track:    rgba(255, 255, 255, 0.1);
-    --gp-bar-fill:     rgba(255, 255, 255, 0.7);
-    --gp-bar-shimmer:  rgba(255, 255, 255, 0.25);
-    --gp-hero-glow:    rgba(255, 255, 255, 0.04);
+    --gp-ring-stroke: rgba(255, 255, 255, 0.18);
+    --gp-dot-hi: rgba(255, 255, 255, 0.7);
+    --gp-dot-mid: rgba(255, 255, 255, 0.4);
+    --gp-dot-lo: rgba(255, 255, 255, 0.25);
+    --gp-arc-stroke: rgba(255, 255, 255, 0.8);
+    --gp-core-bg: rgba(255, 255, 255, 0.04);
+    --gp-core-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --gp-glow: rgba(255, 255, 255, 0.06);
+    --gp-pulse-bg: rgba(255, 255, 255, 0.08);
+    --gp-bar-track: rgba(255, 255, 255, 0.1);
+    --gp-bar-fill: rgba(255, 255, 255, 0.7);
+    --gp-bar-shimmer: rgba(255, 255, 255, 0.25);
+    --gp-hero-glow: rgba(255, 255, 255, 0.04);
 }
 
 /* ─── Keyframes ─────────────────────────────────────────────────────────────── */
 
 @keyframes gp-orbit-cw {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 @keyframes gp-orbit-ccw {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(-360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(-360deg);
+    }
 }
 
 @keyframes gp-arc {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 @keyframes gp-pulse-ring {
-    0%   { transform: scale(0.85); opacity: 0.6; }
-    100% { transform: scale(1.55); opacity: 0; }
+    0% {
+        transform: scale(0.85);
+        opacity: 0.6;
+    }
+    100% {
+        transform: scale(1.55);
+        opacity: 0;
+    }
 }
 
 @keyframes gp-shimmer {
-    0%   { transform: translateX(-100%); }
-    100% { transform: translateX(200%); }
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(200%);
+    }
 }
 
 @keyframes gp-enter {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* ─── Utility classes ────────────────────────────────────────────────────────── */
@@ -619,22 +647,23 @@ select:-webkit-autofill:focus {
 }
 
 /* Orbit animations */
-.gp-orbit-cw  { animation: gp-orbit-cw  9s linear infinite; }
-.gp-orbit-ccw { animation: gp-orbit-ccw 6s linear infinite; }
+.gp-orbit-cw {
+    animation: gp-orbit-cw 9s linear infinite;
+}
+.gp-orbit-ccw {
+    animation: gp-orbit-ccw 6s linear infinite;
+}
 
 /* Spinning arc on core ring */
-.gp-arc { animation: gp-arc 1.8s linear infinite; }
+.gp-arc {
+    animation: gp-arc 1.8s linear infinite;
+}
 
 /* Progress bar shimmer */
 .gp-shimmer {
     position: absolute;
     inset: 0;
-    background: linear-gradient(
-        90deg,
-        transparent 0%,
-        var(--gp-bar-shimmer) 50%,
-        transparent 100%
-    );
+    background: linear-gradient(90deg, transparent 0%, var(--gp-bar-shimmer) 50%, transparent 100%);
     animation: gp-shimmer 2.4s ease-in-out infinite;
 }
 

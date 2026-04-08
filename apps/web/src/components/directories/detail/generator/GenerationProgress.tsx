@@ -12,30 +12,50 @@ import { TerminalLogViewer } from '../shared/TerminalLogViewer';
 
 function GeneratingOrb() {
     return (
-        <div className="relative flex items-center justify-center" style={{ width: 156, height: 156 }}>
+        <div
+            className="relative flex items-center justify-center"
+            style={{ width: 156, height: 156 }}
+        >
             <span className="gp-pulse-ring" aria-hidden />
             <span className="gp-pulse-ring" aria-hidden />
-            <div className="relative flex items-center justify-center" style={{ width: 120, height: 120 }}>
+            <div
+                className="relative flex items-center justify-center"
+                style={{ width: 120, height: 120 }}
+            >
                 <svg
                     className="absolute inset-0 gp-orbit-cw"
-                    width="120" height="120"
+                    width="120"
+                    height="120"
                     viewBox="-60 -60 120 120"
                     aria-hidden
                 >
-                    <circle r="55" fill="none" stroke="var(--gp-ring-stroke)" strokeWidth="1" strokeDasharray="6 5" />
-                    <circle cx="55"  cy="0"   r="3"   fill="var(--gp-dot-hi)" />
-                    <circle cx="-55" cy="0"   r="1.5" fill="var(--gp-dot-lo)" />
-                    <circle cx="0"   cy="55"  r="2"   fill="var(--gp-dot-mid)" />
+                    <circle
+                        r="55"
+                        fill="none"
+                        stroke="var(--gp-ring-stroke)"
+                        strokeWidth="1"
+                        strokeDasharray="6 5"
+                    />
+                    <circle cx="55" cy="0" r="3" fill="var(--gp-dot-hi)" />
+                    <circle cx="-55" cy="0" r="1.5" fill="var(--gp-dot-lo)" />
+                    <circle cx="0" cy="55" r="2" fill="var(--gp-dot-mid)" />
                 </svg>
 
                 <svg
                     className="absolute inset-0 gp-orbit-ccw"
-                    width="120" height="120"
+                    width="120"
+                    height="120"
                     viewBox="-60 -60 120 120"
                     aria-hidden
                 >
-                    <circle r="40" fill="none" stroke="var(--gp-ring-stroke)" strokeWidth="1" strokeDasharray="3 9" />
-                    <circle cx="40"  cy="0"   r="2"   fill="var(--gp-dot-hi)" />
+                    <circle
+                        r="40"
+                        fill="none"
+                        stroke="var(--gp-ring-stroke)"
+                        strokeWidth="1"
+                        strokeDasharray="3 9"
+                    />
+                    <circle cx="40" cy="0" r="2" fill="var(--gp-dot-hi)" />
                     <circle cx="-30" cy="-26" r="1.5" fill="var(--gp-dot-lo)" />
                 </svg>
 
@@ -56,13 +76,19 @@ function GeneratingOrb() {
                 >
                     <svg
                         className="absolute inset-0 gp-arc"
-                        width="72" height="72"
+                        width="72"
+                        height="72"
                         viewBox="-36 -36 72 72"
                         aria-hidden
                     >
-                        <circle r="30" fill="none" stroke="var(--gp-arc-stroke)"
-                            strokeWidth="2" strokeLinecap="round"
-                            strokeDasharray="60 128" />
+                        <circle
+                            r="30"
+                            fill="none"
+                            stroke="var(--gp-arc-stroke)"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeDasharray="60 128"
+                        />
                     </svg>
                 </div>
             </div>
@@ -74,7 +100,10 @@ function GeneratingOrb() {
 
 function ProgressBar({ percentage }: { percentage: number }) {
     return (
-        <div className="relative w-full h-0.75 rounded-full overflow-hidden" style={{ background: 'var(--gp-bar-track)' }}>
+        <div
+            className="relative w-full h-0.75 rounded-full overflow-hidden"
+            style={{ background: 'var(--gp-bar-track)' }}
+        >
             <div
                 className="absolute inset-y-0 left-0 rounded-full overflow-hidden transition-[width] duration-700 ease-out"
                 style={{ width: `${percentage}%`, background: 'var(--gp-bar-fill)' }}
@@ -128,7 +157,8 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
 
                     <div className="mt-5 space-y-1.5">
                         <h2 className="text-lg font-semibold tracking-tight text-text dark:text-text-dark">
-                            {t('title')}{dots}
+                            {t('title')}
+                            {dots}
                         </h2>
                         <p className="text-sm text-text-secondary dark:text-text-secondary-dark max-w-xs mx-auto leading-relaxed">
                             {stepText}
@@ -144,7 +174,9 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
                 {/* ── Progress bar ── */}
                 <div className="px-8 pb-6">
                     <div className="flex justify-between items-center mb-2">
-                        <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('progress')}</span>
+                        <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('progress')}
+                        </span>
                         <span className="text-xs font-semibold tabular-nums text-text dark:text-text-dark">
                             {progressPercentage}%
                         </span>
@@ -166,14 +198,19 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
                         >
                             <Terminal className="h-3.5 w-3.5 transition-transform duration-200 group-hover:scale-110" />
                             {showLogs ? t('hideLogs') : t('showLogs')}
-                            {showLogs
-                                ? <ChevronUp className="h-3 w-3 ml-0.5 opacity-40" />
-                                : <ChevronDown className="h-3 w-3 ml-0.5 opacity-40" />
-                            }
+                            {showLogs ? (
+                                <ChevronUp className="h-3 w-3 ml-0.5 opacity-40" />
+                            ) : (
+                                <ChevronDown className="h-3 w-3 ml-0.5 opacity-40" />
+                            )}
                         </button>
 
                         {showLogs && (
-                            <TerminalLogViewer logs={recentLogs!} title={t('showLogs')} showCursor />
+                            <TerminalLogViewer
+                                logs={recentLogs!}
+                                title={t('showLogs')}
+                                showCursor
+                            />
                         )}
                     </div>
                 )}
