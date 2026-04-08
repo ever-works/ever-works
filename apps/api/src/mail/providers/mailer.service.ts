@@ -6,8 +6,7 @@ import { Resend } from 'resend';
 import { MailerService as SmtpMailerService } from '@nestjs-modules/mailer';
 import { FakerMailerService } from './faker-mailer.service';
 import { config } from '@src/config/constants';
-import { SendMailOptions } from '../types';
-import type { Address } from '@nestjs-modules/mailer/dist/interfaces/send-mail-options.interface';
+import { Address, SendMailOptions } from '../types';
 
 @Injectable()
 export class MailerService {
