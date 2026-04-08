@@ -671,3 +671,87 @@ select:-webkit-autofill:focus {
 .gp-enter {
     animation: gp-enter 0.5s ease both;
 }
+
+/* ─── Animated loading dots ────────────────────────────────────────────────── */
+
+@keyframes shiny-dot {
+    0%,
+    100% {
+        opacity: 0.2;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+.shiny-dot {
+    display: inline-block;
+    animation: shiny-dot 1.2s ease-in-out infinite;
+    animation-fill-mode: backwards;
+    opacity: 0.2;
+    color: var(--color-text-secondary, #64748b);
+}
+
+:is(.dark) .shiny-dot {
+    color: var(--color-text-secondary-dark, #9ca3af);
+}
+
+/* ─── ShinyText: letter-by-letter wave ──────────────────────────────────────── */
+
+@keyframes shiny-letter {
+    0%,
+    100% {
+        color: var(--color-text-secondary);
+        opacity: 0.55;
+    }
+    50% {
+        color: var(--color-text);
+        opacity: 1;
+    }
+}
+
+:is(.dark) .shiny-letter {
+    --color-text-secondary: var(--color-text-secondary-dark, #94a3b8);
+    --color-text: var(--color-text-dark, #f1f5f9);
+}
+
+.shiny-letter {
+    display: inline-block;
+    animation-name: shiny-letter;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    animation-fill-mode: backwards;
+    will-change: color, opacity;
+    --color-text-secondary: #64748b;
+    --color-text: #0f172a;
+    /* Start at the muted state so there's no flash before the first cycle */
+    color: var(--color-text-secondary);
+    opacity: 0.55;
+}
+
+/* ─── Sidebar activity indicator ────────────────────────────────────────────── */
+
+@keyframes sidebar-activity-ping {
+    0% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+    75%,
+    100% {
+        transform: scale(2.2);
+        opacity: 0;
+    }
+}
+
+.sidebar-activity-dot {
+    position: relative;
+}
+
+.sidebar-activity-dot::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: inherit;
+    animation: sidebar-activity-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}

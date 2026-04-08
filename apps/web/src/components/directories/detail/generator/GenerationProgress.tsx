@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { getStepProgress, getStepText, getItemsProcessedText } from '@/lib/utils/generator-steps';
 import { Terminal, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { TerminalLogViewer } from '../shared/TerminalLogViewer';
+import { ShinyText } from '@/components/ui/ShinyText';
 
 // ─── Animated orb ────────────────────────────────────────────────────────────
 
@@ -156,12 +157,11 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
                     <GeneratingOrb />
 
                     <div className="mt-5 space-y-1.5">
-                        <h2 className="text-lg font-semibold tracking-tight text-text dark:text-text-dark">
-                            {t('title')}
-                            {dots}
+                        <h2 className="text-lg font-semibold tracking-tight">
+                            <ShinyText text={`${t('title')}${dots}`} stagger={0.07} duration={2} />
                         </h2>
-                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark max-w-xs mx-auto leading-relaxed">
-                            {stepText}
+                        <p className="text-sm max-w-xs mx-auto leading-relaxed">
+                            <ShinyText text={stepText} stagger={0.04} duration={2.2} />
                         </p>
                         {itemsText && (
                             <p className="text-xs font-medium tabular-nums text-text-muted dark:text-text-muted-dark">
