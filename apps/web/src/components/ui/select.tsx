@@ -177,6 +177,12 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
         const pick = (opt: OptionData) => {
             if (opt.disabled) return;
             onValueChange?.(opt.value);
+            if (onChange) {
+                onChange({
+                    target: { value: opt.value, name: name ?? '' },
+                    currentTarget: { value: opt.value, name: name ?? '' },
+                } as React.ChangeEvent<HTMLSelectElement>);
+            }
             setOpen(false);
         };
 
