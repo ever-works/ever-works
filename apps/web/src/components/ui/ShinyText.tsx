@@ -24,7 +24,7 @@ export function ShinyText({ text, stagger = 0.06, duration = 1.8, className }: S
         <span className={className} aria-label={text}>
             {text.split('').map((char, i) => (
                 <span
-                    key={`${char}-${i}`}
+                    key={i}
                     className="shiny-letter"
                     style={{
                         animationDelay: `${i * stagger}s`,

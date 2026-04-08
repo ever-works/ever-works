@@ -16,7 +16,7 @@ export function SidebarActivityIndicator({ className }: { className?: string }) 
         <span
             className={cn(
                 'sidebar-activity-dot inline-block w-1.5 h-1.5 rounded-full',
-                'bg-amber-600 dark:bg-bg-amber-500',
+                'bg-amber-600 dark:bg-amber-500',
                 className,
             )}
             aria-label="Directory generating"

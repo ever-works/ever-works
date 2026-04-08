@@ -22,7 +22,10 @@ const BackgroundActivityContext = createContext<BackgroundActivityState | null>(
 export function BackgroundActivityProvider({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const [isGeneratingDirectory, setIsGeneratingDirectory] = useState(false);
-    const [hasVisitedDirectoriesPage, setHasVisitedDirectoriesPage] = useState(true);
+    const [hasVisitedDirectoriesPage, setHasVisitedDirectoriesPage] = useState(
+        pathname === ROUTES.DASHBOARD_DIRECTORIES ||
+            pathname?.startsWith(ROUTES.DASHBOARD_DIRECTORIES + '/'),
+    );
 
     // Detect when the user navigates to /directories
     useEffect(() => {
