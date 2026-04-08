@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { FacadesModule } from '../facades/facades.module';
 
@@ -10,10 +9,6 @@ import { PipelineOrchestratorService } from './pipeline-orchestrator.service';
 import { PipelineFacadeService } from './pipeline-facade.service';
 
 const PROVIDERS = [
-    {
-        provide: EventEmitter2,
-        useFactory: () => new EventEmitter2(),
-    },
     PipelineBuilderService,
     StepPipelineExecutorService,
     FullPipelineExecutorService,

@@ -12,6 +12,7 @@ import {
     PluginBootstrapService,
 } from '@ever-works/agent/plugins';
 import { ConfigModule } from './config/config.module';
+import { LocalEventEmitterModule } from './local-event-emitter.module';
 
 // Commands
 import { ConfigCommands } from './commands/config';
@@ -25,6 +26,7 @@ import { CacheFactory } from '@ever-works/agent/cache';
             isGlobal: true,
         }),
         DatabaseConfigurations.cli(),
+        LocalEventEmitterModule,
         AgentPluginsModule.forRoot(),
         ConfigModule,
         DatabaseModule,
