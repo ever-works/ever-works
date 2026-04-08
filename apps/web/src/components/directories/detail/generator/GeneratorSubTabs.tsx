@@ -85,7 +85,7 @@ export function GeneratorSubTabs({ directoryId }: GeneratorSubTabsProps) {
                             className={cn(
                                 'relative z-10 flex items-center text-xs gap-2 whitespace-nowrap rounded-md px-4 py-1.5 font-medium transition-colors duration-200',
                                 tab.isActive
-                                    ? 'text-white dark:text-button-primary-foreground-dark'
+                                    ? 'text-white dark:text-button-primary-foreground-dark bg-button-primary dark:bg-button-primary-dark shadow-sm'
                                     : 'text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark',
                             )}
                         >
