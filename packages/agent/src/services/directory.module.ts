@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataGeneratorModule } from '../generators/data-generator/data-generator.module';
 import { ItemsGeneratorModule } from '../items-generator/items-generator.module';
 import { FacadesModule } from '../facades/facades.module';
@@ -49,6 +50,10 @@ import { NotificationsModule } from '@src/notifications';
         ComparisonGeneratorModule,
     ],
     providers: [
+        {
+            provide: EventEmitter2,
+            useFactory: () => new EventEmitter2(),
+        },
         DirectoryOwnershipService,
         DirectoryQueryService,
         DirectoryLifecycleService,
