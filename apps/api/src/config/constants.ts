@@ -77,11 +77,11 @@ export const config = {
         clientSecret: () => process.env.GOOGLE_CLIENT_SECRET,
         callbackUrl: () => {
             const webUrl = config.webAppUrl();
-            return process.env.GOOGLE_CALLBACK_URL || `${webUrl}/api/auth/provider/callback/google`;
+            return process.env.GOOGLE_CALLBACK_URL || `${webUrl}/api/oauth/google/callback`;
         },
         connectCallbackUrl: () => {
             const webUrl = config.webAppUrl();
-            return process.env.GOOGLE_CALLBACK_URL || `${webUrl}/api/auth/provider/callback/google`;
+            return process.env.GOOGLE_CALLBACK_URL || `${webUrl}/api/oauth/google/callback`;
         },
     },
     github: {
@@ -89,7 +89,7 @@ export const config = {
         clientSecret: () => process.env.GH_CLIENT_SECRET,
         callbackUrl: () => {
             const webUrl = config.webAppUrl();
-            return process.env.GH_CALLBACK_URL || `${webUrl}/api/auth/provider/callback/github`;
+            return process.env.GH_CALLBACK_URL || `${webUrl}/api/oauth/github/callback`;
         },
     },
     facebook: {
@@ -97,9 +97,7 @@ export const config = {
         clientSecret: () => process.env.FACEBOOK_CLIENT_SECRET,
         callbackUrl: () => {
             const webUrl = config.webAppUrl();
-            return (
-                process.env.FACEBOOK_CALLBACK_URL || `${webUrl}/api/auth/provider/callback/facebook`
-            );
+            return process.env.FACEBOOK_CALLBACK_URL || `${webUrl}/api/oauth/facebook/callback`;
         },
     },
     linkedin: {
@@ -107,9 +105,7 @@ export const config = {
         clientSecret: () => process.env.LINKEDIN_CLIENT_SECRET,
         callbackUrl: () => {
             const webUrl = config.webAppUrl();
-            return (
-                process.env.LINKEDIN_CALLBACK_URL || `${webUrl}/api/auth/provider/callback/linkedin`
-            );
+            return process.env.LINKEDIN_CALLBACK_URL || `${webUrl}/api/oauth/linkedin/callback`;
         },
     },
 

@@ -33,7 +33,19 @@ export async function getAuthFromCookie(): Promise<AuthUser | null> {
     }
 
     if (auth.user) {
-        return normalizeJwtUser(auth.user);
+        try {
+            const profile = await authAPI.getProfile();
+            return {
+                ...normalizeProfileUser(profile),
+                provider: auth.user.provider,
+                isActive: auth.user.isActive,
+            };
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('Unauthorized')) {
+                await removeAuthAccessCookies();
+            }
+            return null;
+        }
     }
 
     try {
