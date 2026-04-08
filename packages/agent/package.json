@@ -112,10 +112,10 @@
         "test:cov": "jest --coverage"
     },
     "peerDependencies": {
-        "@nestjs/common": "^11.1",
-        "@nestjs/core": "^11.1",
+        "@nestjs/common": "^11.1.18",
+        "@nestjs/core": "^11.1.18",
         "@nestjs/event-emitter": "^3.0",
-        "@nestjs/platform-express": "^11.1",
+        "@nestjs/platform-express": "^11.1.18",
         "better-sqlite3": "^12.2",
         "mysql2": "^3.14",
         "pg": "^8.16",
