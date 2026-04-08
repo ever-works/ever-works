@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { formatDistanceToNow } from 'date-fns';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
@@ -9,6 +9,9 @@ import { ActivityTypeBadge } from './ActivityTypeBadge';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
+import { getActivityById } from '@/app/actions/activity-log';
+import { TerminalLogViewer } from '@/components/directories/detail/shared/TerminalLogViewer';
+import type { GenerationStepLog } from '@/lib/api/types-only';
 
 interface ActivityTableProps {
     activities: ActivityLogEntry[];
@@ -118,12 +121,53 @@ function RawJsonPanel({
 export function ActivityTable({ activities, loading }: ActivityTableProps) {
     const t = useTranslations('dashboard.activity');
     const [expandedIds, setExpandedIds] = useState<string[]>([]);
+    const [hydratedActivities, setHydratedActivities] = useState<Record<string, ActivityLogEntry>>(
+        {},
+    );
 
     const toggleExpanded = (id: string) => {
         setExpandedIds((current) =>
             current.includes(id) ? current.filter((i) => i !== id) : [...current, id],
         );
     };
+
+    useEffect(() => {
+        const expandedInProgressIds = activities
+            .filter(
+                (activity) =>
+                    expandedIds.includes(activity.id) && activity.status === 'in_progress',
+            )
+            .map((activity) => activity.id);
+
+        if (expandedInProgressIds.length === 0) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const refreshActivity = async (id: string) => {
+            const response = await getActivityById(id);
+            if (!cancelled && response.success && response.activity) {
+                setHydratedActivities((current) => ({
+                    ...current,
+                    [id]: response.activity!,
+                }));
+            }
+        };
+
+        void Promise.all(expandedInProgressIds.map((id) => refreshActivity(id)));
+
+        const interval = setInterval(() => {
+            if (!document.hidden) {
+                void Promise.all(expandedInProgressIds.map((id) => refreshActivity(id)));
+            }
+        }, 3000);
+
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [activities, expandedIds]);
 
     const handleRowKeyDown = (e: React.KeyboardEvent, id: string) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -186,8 +230,19 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                         )}
                         {activities.map((activity) => {
                             const isExpanded = expandedIds.includes(activity.id);
-                            const hasDetails = hasStructuredData(activity.details);
-                            const hasMetadata = hasStructuredData(activity.metadata);
+                            const hydratedActivity = hydratedActivities[activity.id] ?? activity;
+                            const liveLogs = hydratedActivity.details?.liveLogs as
+                                | GenerationStepLog[]
+                                | undefined;
+                            const detailsWithoutLiveLogs = hydratedActivity.details
+                                ? Object.fromEntries(
+                                      Object.entries(hydratedActivity.details).filter(
+                                          ([key]) => key !== 'liveLogs',
+                                      ),
+                                  )
+                                : undefined;
+                            const hasDetails = hasStructuredData(detailsWithoutLiveLogs);
+                            const hasMetadata = hasStructuredData(hydratedActivity.metadata);
                             const hasStructuredContent = hasDetails || hasMetadata;
 
                             return (
@@ -293,7 +348,7 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                                                         {t('detail.action')}:
                                                                     </span>{' '}
                                                                     <code className="text-xs font-mono px-2 py-0.5 rounded bg-muted/40 dark:bg-muted/20 text-text dark:text-text-dark border border-border dark:border-border-dark">
-                                                                        {activity.action}
+                                                                        {hydratedActivity.action}
                                                                     </code>
                                                                 </p>
                                                                 <p className="mb-3">
@@ -301,7 +356,9 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                                                         {t('detail.status')}:
                                                                     </span>{' '}
                                                                     <ActivityStatusBadge
-                                                                        status={activity.status}
+                                                                        status={
+                                                                            hydratedActivity.status
+                                                                        }
                                                                     />
                                                                 </p>
                                                                 <p>
@@ -310,24 +367,40 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                                                     </span>{' '}
                                                                     <span className="text-[11px] text-text-muted dark:text-text-muted-dark">
                                                                         {new Date(
-                                                                            activity.createdAt,
+                                                                            hydratedActivity.createdAt,
                                                                         ).toLocaleString()}
                                                                     </span>
                                                                 </p>
                                                             </div>
                                                         </div>
+                                                        {liveLogs && liveLogs.length > 0 && (
+                                                            <section className="space-y-2">
+                                                                <h5 className="text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
+                                                                    Live Logs
+                                                                </h5>
+                                                                <TerminalLogViewer
+                                                                    logs={liveLogs}
+                                                                    title="Generation"
+                                                                    maxHeight="max-h-72"
+                                                                    showCursor={
+                                                                        hydratedActivity.status ===
+                                                                        'in_progress'
+                                                                    }
+                                                                />
+                                                            </section>
+                                                        )}
                                                         <StructuredSection
                                                             title={t('detail.fields')}
-                                                            data={activity.details}
+                                                            data={detailsWithoutLiveLogs}
                                                         />
                                                         <StructuredSection
                                                             title={t('detail.metadata')}
-                                                            data={activity.metadata}
+                                                            data={hydratedActivity.metadata}
                                                         />
                                                         <RawJsonPanel
                                                             title={t('detail.rawJson')}
-                                                            details={activity.details}
-                                                            metadata={activity.metadata}
+                                                            details={detailsWithoutLiveLogs}
+                                                            metadata={hydratedActivity.metadata}
                                                         />
                                                     </div>
                                                 </div>

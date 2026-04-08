@@ -64,3 +64,23 @@ export async function getActivitySummary(): Promise<{
         };
     }
 }
+
+export async function getActivityById(id: string): Promise<{
+    success: boolean;
+    activity?: ActivityLogEntry;
+    error?: string;
+}> {
+    try {
+        const response = await activityLogAPI.getById(id);
+        return {
+            success: true,
+            activity: response.activity,
+        };
+    } catch (error) {
+        console.error('Failed to get activity by id:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to get activity',
+        };
+    }
+}

@@ -19,6 +19,7 @@ import {
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/jwt.types';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
+import { DirectoryRepository } from '@ever-works/agent/database';
 import type { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 import type { Response } from 'express';
 
@@ -26,7 +27,10 @@ import type { Response } from 'express';
 @ApiBearerAuth('JWT-auth')
 @Controller('api/activity-log')
 export class ActivityLogController {
-    constructor(private readonly activityLogService: ActivityLogService) {}
+    constructor(
+        private readonly activityLogService: ActivityLogService,
+        private readonly directoryRepository: DirectoryRepository,
+    ) {}
 
     @Get()
     @ApiOperation({
@@ -140,6 +144,24 @@ export class ActivityLogController {
         if (!activity) {
             throw new NotFoundException('Activity not found');
         }
-        return { activity };
+
+        let liveLogs = activity.details?.liveLogs;
+
+        if (activity.status === 'in_progress' && activity.directoryId) {
+            const directory = await this.directoryRepository.findById(activity.directoryId);
+            if (directory?.generateStatus?.recentLogs?.length) {
+                liveLogs = directory.generateStatus.recentLogs;
+            }
+        }
+
+        return {
+            activity: {
+                ...activity,
+                details: {
+                    ...(activity.details ?? {}),
+                    ...(liveLogs ? { liveLogs } : {}),
+                },
+            },
+        };
     }
 }
