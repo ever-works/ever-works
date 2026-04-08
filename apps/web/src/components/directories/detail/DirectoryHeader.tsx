@@ -4,7 +4,7 @@ import { Directory } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
 import { useTranslations } from 'next-intl';
-import { DirectoryMemberRole } from '@/lib/api/enums';
+import { DirectoryMemberRole, DirectoryScheduleStatus } from '@/lib/api/enums';
 import { Link as IconLink, Users, Cog, Github, Clock } from 'lucide-react';
 import { useDirectoryDetail, useDirectoryPermissions } from './DirectoryDetailContext';
 import { getStepText, getItemsProcessedText } from '@/lib/utils/generator-steps';
@@ -28,7 +28,11 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
     const statusStyle = getGenerationStatusConfig(directory.generateStatus?.status, {
         hasWarnings,
     });
+    const isScheduled = directory.scheduledStatus === DirectoryScheduleStatus.ACTIVE;
     const StatusIcon = statusStyle.icon;
+    const statusLabel = isScheduled
+        ? `${t(`status.${statusStyle.labelKey}`)} - Scheduled`
+        : t(`status.${statusStyle.labelKey}`);
     const pathSegments = pathname.split('/').filter(Boolean);
     const comparisonsIndex = pathSegments.indexOf('comparisons');
     const comparisonSlug =
@@ -69,7 +73,7 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                             <StatusIcon
                                 className={cn('w-3 h-3', statusStyle.animate && 'animate-spin')}
                             />
-                            {t(`status.${statusStyle.labelKey}`)}
+                            {statusLabel}
                             {directory.generateStatus?.step && statusStyle.animate && (
                                 <span className="text-xs opacity-75">
                                     •{' '}

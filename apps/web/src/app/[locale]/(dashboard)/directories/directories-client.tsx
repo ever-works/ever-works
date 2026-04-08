@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { ROUTES } from '@/lib/constants';
 import { Link, useRouter } from '@/i18n/navigation';
 import { getDirectories } from '@/app/actions/dashboard/directories';
+import { getDirectoryStats } from '@/app/actions/dashboard/directories';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -18,11 +19,17 @@ const DEBOUNCE_MS = 300;
 interface DirectoriesClientProps {
     initialDirectories: Directory[];
     totalDirectories: number;
+    initialStats: {
+        totalDirectories: number;
+        totalItems: number;
+        generatingCount: number;
+    };
 }
 
 export default function DirectoriesClient({
     initialDirectories,
     totalDirectories,
+    initialStats,
 }: DirectoriesClientProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -34,6 +41,7 @@ export default function DirectoriesClient({
     const [searchQuery, setSearchQuery] = useState(initialQuery);
     const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
     const [page, setPage] = useState(1);
+    const [stats, setStats] = useState(initialStats);
     const itemsPerPage = 20;
     const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -93,6 +101,21 @@ export default function DirectoriesClient({
         [itemsPerPage],
     );
 
+    const refreshStats = useCallback(async () => {
+        try {
+            const response = await getDirectoryStats();
+            if (response.success) {
+                setStats({
+                    totalDirectories: response.totalDirectories,
+                    totalItems: response.totalItems,
+                    generatingCount: response.generatingCount,
+                });
+            }
+        } catch (error) {
+            console.error('Failed to refresh directory stats:', error);
+        }
+    }, []);
+
     // Debounce search query
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -122,16 +145,77 @@ export default function DirectoriesClient({
         performSearch(debouncedQuery, newPage);
     };
 
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (!document.hidden) {
+                void refreshStats();
+            }
+        }, 3000);
+
+        return () => clearInterval(interval);
+    }, [refreshStats]);
+
     const totalPages = Math.ceil(total / itemsPerPage);
     const hasDirectories = directories.length > 0;
+    const summaryCards = [
+        {
+            label: t('summary.totalDirectories'),
+            value: stats.totalDirectories,
+            accent: 'text-blue-600 dark:text-blue-300',
+            active: false,
+        },
+        {
+            label: t('summary.generating'),
+            value: stats.generatingCount,
+            accent: 'text-primary',
+            active: stats.generatingCount > 0,
+        },
+        {
+            label: t('summary.totalItems'),
+            value: stats.totalItems,
+            accent: 'text-emerald-600 dark:text-emerald-300',
+            active: false,
+        },
+    ];
 
     return (
         <div className="w-full">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-text dark:text-text-dark">{t('title')}</h1>
-                <p className="mt-2 text-text-secondary dark:text-text-secondary-dark">
-                    {t('subtitle')}
-                </p>
+            <div className="mb-8 flex flex-col gap-4 @lg/main:flex-row @lg/main:items-start @lg/main:justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-text dark:text-text-dark">
+                        {t('title')}
+                    </h1>
+                    <p className="mt-2 text-text-secondary dark:text-text-secondary-dark">
+                        {t('subtitle')}
+                    </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                    {summaryCards.map((card) => (
+                        <div
+                            key={card.label}
+                            className={cn(
+                                'rounded-lg border px-3 py-2 bg-card dark:bg-card-primary-dark text-left min-w-[120px]',
+                                'border-border dark:border-border-dark transition-colors',
+                                card.active &&
+                                    'border-primary/40 shadow-[0_0_0_1px_rgba(59,130,246,0.08)]',
+                            )}
+                        >
+                            <p className="text-[11px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                                {card.label}
+                            </p>
+                            <p
+                                className={cn(
+                                    'mt-1 text-lg font-semibold',
+                                    card.accent,
+                                    card.active && 'animate-pulse',
+                                )}
+                            >
+                                {card.value.toLocaleString()}
+                            </p>
+                        </div>
+                    ))}
+                </div>
             </div>
 
             {/* Search and Actions Bar */}

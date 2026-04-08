@@ -7,6 +7,7 @@ import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import type { Directory } from '@/lib/api/directory';
 import { DirectoryMemberRole } from '@/lib/api/enums';
+import { DirectoryScheduleStatus } from '@/lib/api/enums';
 import { Github, Users, FolderClosed } from 'lucide-react';
 import { ShowDateTime } from '../ui/show-datetime';
 import { Tooltip } from '../ui/tooltip';
@@ -30,18 +31,25 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
     const status = directory.generateStatus?.status;
     const hasWarnings = !!directory.generateStatus?.warnings?.length;
     const statusConfig = getGenerationStatusConfig(status, { hasWarnings });
+    const isScheduled = directory.scheduledStatus === DirectoryScheduleStatus.ACTIVE;
     const userRole = directory.userRole;
     const isShared = userRole && userRole !== DirectoryMemberRole.OWNER;
+    const statusLabel = isScheduled
+        ? `${tStatus(statusConfig.labelKey)} - Scheduled`
+        : tStatus(statusConfig.labelKey);
+    const isGenerating = statusConfig.labelKey === 'generating';
 
     return (
         <Link
             href={ROUTES.DASHBOARD_DIRECTORY(directory.id)}
             className={cn(
-                'flex flex-col rounded-lg p-6 shadow-xs',
+                'relative flex flex-col rounded-lg p-6 shadow-xs overflow-hidden',
                 'bg-card dark:bg-card-primary-dark',
                 'border border-card-border dark:border-white/9',
                 'hover:border-primary-500/50 dark:hover:border-white/20',
                 'transition-colors',
+                isGenerating &&
+                    'ring-1 ring-primary/25 before:absolute before:inset-0 before:rounded-lg before:border before:border-primary/50 before:animate-pulse before:pointer-events-none',
             )}
         >
             <div className="flex items-center justify-between gap-4 mb-3">
@@ -78,7 +86,7 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                         statusConfig.badge,
                     )}
                 >
-                    {tStatus(statusConfig.labelKey)}
+                    {statusLabel}
                 </span>
             </div>
 

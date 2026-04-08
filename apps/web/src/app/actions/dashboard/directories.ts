@@ -491,6 +491,7 @@ export async function getDirectoryStats() {
             totalDirectories: 0,
             totalItems: 0,
             activeWebsites: 0,
+            generatingCount: 0,
         };
     }
 }
