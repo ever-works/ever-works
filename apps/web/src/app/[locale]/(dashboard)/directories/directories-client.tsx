@@ -146,14 +146,17 @@ export default function DirectoriesClient({
     };
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            if (!document.hidden) {
-                void refreshStats();
-            }
-        }, 3000);
+        const interval = setInterval(
+            () => {
+                if (!document.hidden) {
+                    void refreshStats();
+                }
+            },
+            stats.generatingCount > 0 ? 3000 : 30000,
+        );
 
         return () => clearInterval(interval);
-    }, [refreshStats]);
+    }, [refreshStats, stats.generatingCount]);
 
     const totalPages = Math.ceil(total / itemsPerPage);
     const hasDirectories = directories.length > 0;

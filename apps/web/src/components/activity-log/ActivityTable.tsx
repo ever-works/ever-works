@@ -145,21 +145,25 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
         let cancelled = false;
 
         const refreshActivity = async (id: string) => {
-            const response = await fetch(`/api/activity-log/${id}`, {
-                method: 'GET',
-                cache: 'no-store',
-            });
+            try {
+                const response = await fetch(`/api/activity-log/${id}`, {
+                    method: 'GET',
+                    cache: 'no-store',
+                });
 
-            if (!response.ok) {
-                return;
-            }
+                if (!response.ok) {
+                    return;
+                }
 
-            const data = (await response.json()) as { activity?: ActivityLogEntry };
-            if (!cancelled && data.activity) {
-                setHydratedActivities((current) => ({
-                    ...current,
-                    [id]: data.activity!,
-                }));
+                const data = (await response.json()) as { activity?: ActivityLogEntry };
+                if (!cancelled && data.activity) {
+                    setHydratedActivities((current) => ({
+                        ...current,
+                        [id]: data.activity!,
+                    }));
+                }
+            } catch {
+                // Ignore transient network errors during background refresh.
             }
         };
 
