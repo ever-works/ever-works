@@ -198,7 +198,7 @@ export function DirectoryHistoryPageClient({
             <div className="max-w-xs">
                 <Select
                     value={activityFilter}
-                    onChange={(e) => handleFilterChange(e.target.value)}
+                    onValueChange={handleFilterChange}
                     aria-label={t('filters.label')}
                 >
                     <option value="all">{t('filters.all')}</option>
