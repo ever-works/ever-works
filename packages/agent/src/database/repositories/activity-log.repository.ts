@@ -102,4 +102,27 @@ export class ActivityLogRepository {
             where: { userId, status },
         });
     }
+
+    async countByStatuses(userId: string): Promise<Record<ActivityStatus, number>> {
+        const rows = await this.repository
+            .createQueryBuilder('activity')
+            .select('activity.status', 'status')
+            .addSelect('COUNT(*)', 'count')
+            .where('activity.userId = :userId', { userId })
+            .groupBy('activity.status')
+            .getRawMany<{ status: ActivityStatus; count: string }>();
+
+        const counts = {
+            pending: 0,
+            in_progress: 0,
+            completed: 0,
+            failed: 0,
+        } as Record<ActivityStatus, number>;
+
+        for (const row of rows) {
+            counts[row.status] = Number(row.count) || 0;
+        }
+
+        return counts;
+    }
 }

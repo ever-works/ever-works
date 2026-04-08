@@ -70,9 +70,11 @@ function repoLink(directory: Directory, oauthConnection: GitProviderConnectionIn
         return null;
     }
 
-    // Prefer directory owner over git provider username for repo links
-    const username = directory.owner || oauthConnection.username;
-    if (!username) {
+    // Never fall back to the connected personal username for organization-owned directories.
+    // That produces incorrect repo links like user/repo when the directory actually belongs to an org.
+    const owner =
+        directory.owner || (!directory.organization ? oauthConnection.username : undefined);
+    if (!owner) {
         return null;
     }
 
@@ -80,8 +82,8 @@ function repoLink(directory: Directory, oauthConnection: GitProviderConnectionIn
     const baseUrl = providerUrl.replace(/\/$/, '');
 
     return {
-        main: `${baseUrl}/${username}/${directory.slug}`,
-        dataRepo: `${baseUrl}/${username}/${directory.slug}-data`,
-        websiteRepo: `${baseUrl}/${username}/${directory.slug}-website`,
+        main: `${baseUrl}/${owner}/${directory.slug}`,
+        dataRepo: `${baseUrl}/${owner}/${directory.slug}-data`,
+        websiteRepo: `${baseUrl}/${owner}/${directory.slug}-website`,
     };
 }

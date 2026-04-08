@@ -68,6 +68,10 @@ export class ActivityLogService {
         return this.repository.countByStatus(userId, 'in_progress' as ActivityStatus);
     }
 
+    async summarizeStatuses(userId: string): Promise<Record<ActivityStatus, number>> {
+        return this.repository.countByStatuses(userId);
+    }
+
     async findById(id: string): Promise<ActivityLog | null> {
         return this.repository.findById(id);
     }

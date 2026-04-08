@@ -549,6 +549,18 @@ export class DirectoryScheduleService {
                 next.setMinutes(0, 0, 0);
                 next.setHours(next.getHours() + 1);
                 break;
+            case DirectoryScheduleCadence.EVERY_3_HOURS:
+                next.setMinutes(0, 0, 0);
+                next.setHours(next.getHours() + 3);
+                break;
+            case DirectoryScheduleCadence.EVERY_8_HOURS:
+                next.setMinutes(0, 0, 0);
+                next.setHours(next.getHours() + 8);
+                break;
+            case DirectoryScheduleCadence.EVERY_12_HOURS:
+                next.setMinutes(0, 0, 0);
+                next.setHours(next.getHours() + 12);
+                break;
             case DirectoryScheduleCadence.DAILY:
                 next.setDate(next.getDate() + 1);
                 break;

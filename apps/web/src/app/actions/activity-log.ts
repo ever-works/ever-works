@@ -4,6 +4,7 @@ import {
     activityLogAPI,
     type GetActivityLogParams,
     type ActivityLogEntry,
+    type ActivitySummaryResponse,
 } from '@/lib/api/activity-log';
 
 export async function getActivityLog(params?: GetActivityLogParams): Promise<{
@@ -40,5 +41,26 @@ export async function getRunningActivityCount(): Promise<{
     } catch (error) {
         console.error('Failed to get running activity count:', error);
         return { success: false, count: 0 };
+    }
+}
+
+export async function getActivitySummary(): Promise<{
+    success: boolean;
+    counts: ActivitySummaryResponse['counts'];
+}> {
+    try {
+        const response = await activityLogAPI.getSummary();
+        return { success: true, counts: response.counts };
+    } catch (error) {
+        console.error('Failed to get activity summary:', error);
+        return {
+            success: false,
+            counts: {
+                pending: 0,
+                in_progress: 0,
+                completed: 0,
+                failed: 0,
+            },
+        };
     }
 }

@@ -82,6 +82,17 @@ export class ActivityLogController {
         return { count };
     }
 
+    @Get('summary')
+    @ApiOperation({
+        summary: 'Get activity log summary counts',
+        description: 'Returns counts grouped by activity status for the current user',
+    })
+    @ApiResponse({ status: 200, description: 'Activity summary counts' })
+    async getSummary(@CurrentUser() auth: AuthenticatedUser) {
+        const counts = await this.activityLogService.summarizeStatuses(auth.userId);
+        return { counts };
+    }
+
     @Get('export')
     @ApiOperation({
         summary: 'Export activity log as CSV',

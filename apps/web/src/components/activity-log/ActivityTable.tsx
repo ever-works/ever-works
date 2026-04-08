@@ -125,8 +125,7 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
         );
     };
 
-    const handleRowKeyDown = (e: React.KeyboardEvent, id: string, hasDetails: boolean) => {
-        if (!hasDetails) return;
+    const handleRowKeyDown = (e: React.KeyboardEvent, id: string) => {
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             toggleExpanded(id);
@@ -194,32 +193,25 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                             return (
                                 <Fragment key={activity.id}>
                                     <tr
-                                        className={`bg-card dark:bg-transparent hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors ${hasStructuredContent ? 'cursor-pointer' : ''}`}
-                                        onClick={() =>
-                                            hasStructuredContent && toggleExpanded(activity.id)
-                                        }
-                                        onKeyDown={(e) =>
-                                            handleRowKeyDown(e, activity.id, hasStructuredContent)
-                                        }
-                                        tabIndex={hasStructuredContent ? 0 : undefined}
-                                        role={hasStructuredContent ? 'button' : undefined}
-                                        aria-expanded={
-                                            hasStructuredContent ? isExpanded : undefined
-                                        }
+                                        className="bg-card dark:bg-transparent hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors cursor-pointer"
+                                        onClick={() => toggleExpanded(activity.id)}
+                                        onKeyDown={(e) => handleRowKeyDown(e, activity.id)}
+                                        tabIndex={0}
+                                        role="button"
+                                        aria-expanded={isExpanded}
                                     >
                                         <td className="px-3 py-3 text-center">
-                                            {hasStructuredContent &&
-                                                (isExpanded ? (
-                                                    <ChevronDown
-                                                        className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
-                                                        aria-hidden="true"
-                                                    />
-                                                ) : (
-                                                    <ChevronRight
-                                                        className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
-                                                        aria-hidden="true"
-                                                    />
-                                                ))}
+                                            {isExpanded ? (
+                                                <ChevronDown
+                                                    className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
+                                                    aria-hidden="true"
+                                                />
+                                            ) : (
+                                                <ChevronRight
+                                                    className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
+                                                    aria-hidden="true"
+                                                />
+                                            )}
                                         </td>
                                         <td className="px-4 py-3">
                                             <ActivityStatusBadge status={activity.status} />
@@ -257,97 +249,91 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                         </td>
                                         <td className="px-4 py-3 text-xs text-text dark:text-text-dark max-w-md">
                                             <div className="space-y-1">
-                                                <div className="truncate">{activity.summary}</div>
-                                                {hasStructuredContent && (
-                                                    <button
-                                                        type="button"
-                                                        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            toggleExpanded(activity.id);
-                                                        }}
-                                                    >
-                                                        {isExpanded
-                                                            ? t('detail.collapse')
-                                                            : t('detail.expand')}
-                                                    </button>
-                                                )}
+                                                <div className="line-clamp-3 break-words">
+                                                    {activity.summary}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toggleExpanded(activity.id);
+                                                    }}
+                                                >
+                                                    {isExpanded
+                                                        ? t('detail.collapse')
+                                                        : t('detail.expand')}
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
-                                    {hasStructuredContent && (
-                                        <tr
-                                            className={
-                                                isExpanded ? 'bg-muted/20 dark:bg-muted/10' : ''
-                                            }
-                                        >
-                                            <td colSpan={6} style={{ padding: 0 }}>
-                                                <div
-                                                    style={{
-                                                        display: 'grid',
-                                                        gridTemplateRows: isExpanded
-                                                            ? '1fr'
-                                                            : '0fr',
-                                                        transition: 'grid-template-rows 300ms ease',
-                                                    }}
-                                                >
-                                                    <div className="overflow-hidden">
-                                                        <div className="px-6 py-4 space-y-3">
-                                                            <h4 className="text-xs font-semibold text-text dark:text-text-dark">
-                                                                {t('detail.title')}
-                                                            </h4>
-                                                            <div className="rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark/30 p-3">
-                                                                <p className="text-xs mb-4 font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-                                                                    {t('detail.event')}
+                                    <tr
+                                        className={isExpanded ? 'bg-muted/20 dark:bg-muted/10' : ''}
+                                    >
+                                        <td colSpan={6} style={{ padding: 0 }}>
+                                            <div
+                                                style={{
+                                                    display: 'grid',
+                                                    gridTemplateRows: isExpanded ? '1fr' : '0fr',
+                                                    transition: 'grid-template-rows 300ms ease',
+                                                }}
+                                            >
+                                                <div className="overflow-hidden">
+                                                    <div className="px-6 py-4 space-y-3">
+                                                        <h4 className="text-xs font-semibold text-text dark:text-text-dark">
+                                                            {t('detail.title')}
+                                                        </h4>
+                                                        <div className="rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark/30 p-3">
+                                                            <p className="text-xs mb-4 font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
+                                                                {t('detail.event')}
+                                                            </p>
+                                                            <div className="mt-2 space-y-2 text-xs text-text dark:text-text-dark">
+                                                                <p className="mb-3">
+                                                                    <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
+                                                                        {t('detail.action')}:
+                                                                    </span>{' '}
+                                                                    <code className="text-xs font-mono px-2 py-0.5 rounded bg-muted/40 dark:bg-muted/20 text-text dark:text-text-dark border border-border dark:border-border-dark">
+                                                                        {activity.action}
+                                                                    </code>
                                                                 </p>
-                                                                <div className="mt-2 space-y-2 text-xs text-text dark:text-text-dark">
-                                                                    <p className="mb-3">
-                                                                        <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
-                                                                            {t('detail.action')}:
-                                                                        </span>{' '}
-                                                                        <code className="text-xs font-mono px-2 py-0.5 rounded bg-muted/40 dark:bg-muted/20 text-text dark:text-text-dark border border-border dark:border-border-dark">
-                                                                            {activity.action}
-                                                                        </code>
-                                                                    </p>
-                                                                    <p className="mb-3">
-                                                                        <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
-                                                                            {t('detail.status')}:
-                                                                        </span>{' '}
-                                                                        <ActivityStatusBadge
-                                                                            status={activity.status}
-                                                                        />
-                                                                    </p>
-                                                                    <p>
-                                                                        <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
-                                                                            {t('detail.created')}:
-                                                                        </span>{' '}
-                                                                        <span className="text-[11px] text-text-muted dark:text-text-muted-dark">
-                                                                            {new Date(
-                                                                                activity.createdAt,
-                                                                            ).toLocaleString()}
-                                                                        </span>
-                                                                    </p>
-                                                                </div>
+                                                                <p className="mb-3">
+                                                                    <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
+                                                                        {t('detail.status')}:
+                                                                    </span>{' '}
+                                                                    <ActivityStatusBadge
+                                                                        status={activity.status}
+                                                                    />
+                                                                </p>
+                                                                <p>
+                                                                    <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
+                                                                        {t('detail.created')}:
+                                                                    </span>{' '}
+                                                                    <span className="text-[11px] text-text-muted dark:text-text-muted-dark">
+                                                                        {new Date(
+                                                                            activity.createdAt,
+                                                                        ).toLocaleString()}
+                                                                    </span>
+                                                                </p>
                                                             </div>
-                                                            <StructuredSection
-                                                                title={t('detail.fields')}
-                                                                data={activity.details}
-                                                            />
-                                                            <StructuredSection
-                                                                title={t('detail.metadata')}
-                                                                data={activity.metadata}
-                                                            />
-                                                            <RawJsonPanel
-                                                                title={t('detail.rawJson')}
-                                                                details={activity.details}
-                                                                metadata={activity.metadata}
-                                                            />
                                                         </div>
+                                                        <StructuredSection
+                                                            title={t('detail.fields')}
+                                                            data={activity.details}
+                                                        />
+                                                        <StructuredSection
+                                                            title={t('detail.metadata')}
+                                                            data={activity.metadata}
+                                                        />
+                                                        <RawJsonPanel
+                                                            title={t('detail.rawJson')}
+                                                            details={activity.details}
+                                                            metadata={activity.metadata}
+                                                        />
                                                     </div>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    )}
+                                            </div>
+                                        </td>
+                                    </tr>
                                 </Fragment>
                             );
                         })}

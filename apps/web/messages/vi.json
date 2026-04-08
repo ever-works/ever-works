@@ -524,6 +524,9 @@
                     },
                     "cadence": {
                         "hourly": "Mỗi giờ",
+                        "every_3_hours": "Every 3 hours",
+                        "every_8_hours": "Every 8 hours",
+                        "every_12_hours": "Every 12 hours",
                         "daily": "Mỗi ngày",
                         "weekly": "Mỗi tuần",
                         "monthly": "Mỗi tháng"
