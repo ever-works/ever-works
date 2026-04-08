@@ -150,10 +150,7 @@ export class PluginsModule implements OnModuleDestroy {
 
         return {
             module: PluginsModule,
-            imports: [
-                ...(options.imports || []),
-                TypeOrmModule.forFeature(PLUGIN_ENTITIES),
-            ],
+            imports: [...(options.imports || []), TypeOrmModule.forFeature(PLUGIN_ENTITIES)],
             providers: [...asyncProviders, ...PROVIDERS],
             exports: [...EXPORTS, PLUGINS_MODULE_OPTIONS],
         };
