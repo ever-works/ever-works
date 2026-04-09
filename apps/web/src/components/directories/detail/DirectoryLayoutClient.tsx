@@ -11,6 +11,7 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { pageIntervalRefresh } from '@/lib/utils';
 import { syncDirectoryData } from '@/app/actions/dashboard/directories';
+import { useBackgroundActivity } from '@/lib/hooks/use-background-activity';
 
 interface DirectoryLayoutClientProps {
     directory: Directory;
@@ -32,6 +33,16 @@ export function DirectoryLayoutClient({
     const previousGenerateStatus = lastGenerateStatus.current;
     const hasSyncedOnMount = useRef(false);
     const generateStatus = directory.generateStatus?.status;
+    const { markGenerating, clearGenerating } = useBackgroundActivity();
+
+    // Sync generation state with the global sidebar indicator
+    useEffect(() => {
+        if (isGenerating) {
+            markGenerating();
+        } else {
+            clearGenerating();
+        }
+    }, [isGenerating, markGenerating, clearGenerating]);
 
     useEffect(() => {
         const lastStatus = previousGenerateStatus;

@@ -173,7 +173,7 @@ export const ItemActions = memo(function ItemActions({
                 >
                     <DropdownMenuItem
                         onClick={() => setIsDisplayDialogOpen(true)}
-                        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-zinc-200 hover:bg-white/10 hover:text-white focus:bg-white/10 transition-colors"
+                        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/10 hover:text-text dark:hover:text-white focus:bg-black/5 dark:focus:bg-white/10 transition-colors"
                     >
                         <SlidersHorizontal className="w-4 h-4" />
                         {t('editDisplay', { defaultValue: 'Edit display' })}
@@ -182,7 +182,7 @@ export const ItemActions = memo(function ItemActions({
                         <DropdownMenuItem
                             onClick={handleCheckHealth}
                             disabled={isCheckingHealth}
-                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-zinc-200 hover:bg-white/10 hover:text-white focus:bg-white/10 transition-colors"
+                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/10 hover:text-text dark:hover:text-white focus:bg-black/5 dark:focus:bg-white/10 transition-colors"
                         >
                             {isCheckingHealth ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -196,7 +196,7 @@ export const ItemActions = memo(function ItemActions({
                         <DropdownMenuItem
                             onClick={handleUseSuggestedSource}
                             disabled={isApplyingSuggestedSource}
-                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-zinc-200 hover:bg-white/10 hover:text-white focus:bg-white/10 transition-colors"
+                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/10 hover:text-text dark:hover:text-white focus:bg-black/5 dark:focus:bg-white/10 transition-colors"
                         >
                             {isApplyingSuggestedSource ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -210,7 +210,7 @@ export const ItemActions = memo(function ItemActions({
                         <DropdownMenuItem
                             onClick={handleCaptureScreenshot}
                             disabled={isCapturingScreenshot}
-                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-zinc-200 hover:bg-white/10 hover:text-white focus:bg-white/10 transition-colors"
+                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/10 hover:text-text dark:hover:text-white focus:bg-black/5 dark:focus:bg-white/10 transition-colors"
                         >
                             {isCapturingScreenshot ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />

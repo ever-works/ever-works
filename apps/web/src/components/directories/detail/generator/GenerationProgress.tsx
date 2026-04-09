@@ -5,8 +5,115 @@ import { cn } from '@/lib/utils/cn';
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { getStepProgress, getStepText, getItemsProcessedText } from '@/lib/utils/generator-steps';
-import { Terminal } from 'lucide-react';
+import { Terminal, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { TerminalLogViewer } from '../shared/TerminalLogViewer';
+import { ShinyText } from '@/components/ui/ShinyText';
+
+// ─── Animated orb ────────────────────────────────────────────────────────────
+
+function GeneratingOrb() {
+    return (
+        <div
+            className="relative flex items-center justify-center"
+            style={{ width: 156, height: 156 }}
+        >
+            <span className="gp-pulse-ring" aria-hidden />
+            <span className="gp-pulse-ring" aria-hidden />
+            <div
+                className="relative flex items-center justify-center"
+                style={{ width: 120, height: 120 }}
+            >
+                <svg
+                    className="absolute inset-0 gp-orbit-cw"
+                    width="120"
+                    height="120"
+                    viewBox="-60 -60 120 120"
+                    aria-hidden
+                >
+                    <circle
+                        r="55"
+                        fill="none"
+                        stroke="var(--gp-ring-stroke)"
+                        strokeWidth="1"
+                        strokeDasharray="6 5"
+                    />
+                    <circle cx="55" cy="0" r="3" fill="var(--gp-dot-hi)" />
+                    <circle cx="-55" cy="0" r="1.5" fill="var(--gp-dot-lo)" />
+                    <circle cx="0" cy="55" r="2" fill="var(--gp-dot-mid)" />
+                </svg>
+
+                <svg
+                    className="absolute inset-0 gp-orbit-ccw"
+                    width="120"
+                    height="120"
+                    viewBox="-60 -60 120 120"
+                    aria-hidden
+                >
+                    <circle
+                        r="40"
+                        fill="none"
+                        stroke="var(--gp-ring-stroke)"
+                        strokeWidth="1"
+                        strokeDasharray="3 9"
+                    />
+                    <circle cx="40" cy="0" r="2" fill="var(--gp-dot-hi)" />
+                    <circle cx="-30" cy="-26" r="1.5" fill="var(--gp-dot-lo)" />
+                </svg>
+
+                <div
+                    className="absolute rounded-full blur-2xl"
+                    style={{ width: 60, height: 60, background: 'var(--gp-glow)' }}
+                    aria-hidden
+                />
+
+                <div
+                    className="relative z-10 flex items-center justify-center rounded-full"
+                    style={{
+                        width: 72,
+                        height: 72,
+                        background: 'var(--gp-core-bg)',
+                        boxShadow: 'var(--gp-core-shadow)',
+                    }}
+                >
+                    <svg
+                        className="absolute inset-0 gp-arc"
+                        width="72"
+                        height="72"
+                        viewBox="-36 -36 72 72"
+                        aria-hidden
+                    >
+                        <circle
+                            r="30"
+                            fill="none"
+                            stroke="var(--gp-arc-stroke)"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeDasharray="60 128"
+                        />
+                    </svg>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Progress bar ─────────────────────────────────────────────────────────────
+
+function ProgressBar({ percentage }: { percentage: number }) {
+    return (
+        <div
+            className="relative w-full h-0.75 rounded-full overflow-hidden"
+            style={{ background: 'var(--gp-bar-track)' }}
+        >
+            <div
+                className="absolute inset-y-0 left-0 rounded-full overflow-hidden transition-[width] duration-700 ease-out"
+                style={{ width: `${percentage}%`, background: 'var(--gp-bar-fill)' }}
+            >
+                <div className="gp-shimmer" aria-hidden />
+            </div>
+        </div>
+    );
+}
 
 interface GenerationProgressProps {
     directory: Directory;
@@ -21,7 +128,6 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
         const interval = setInterval(() => {
             setDots((prev) => (prev.length >= 3 ? '' : prev + '.'));
         }, 500);
-
         return () => clearInterval(interval);
     }, []);
 
@@ -33,120 +139,87 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
     const hasLogs = recentLogs && recentLogs.length > 0;
 
     return (
-        <div className="max-w-2xl mx-auto py-12">
+        <div className="gp-enter max-w-2xl mx-auto py-12">
             <div
                 className={cn(
-                    'rounded-lg border',
+                    'rounded-xl border overflow-hidden',
                     'bg-card dark:bg-transparent',
                     'border-card-border dark:border-border-secondary-dark',
-                    'overflow-hidden',
                 )}
             >
-                {/* Header */}
-                <div className="p-8 pb-6 text-center">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 dark:bg-primary/20 mb-4">
-                        <svg
-                            className="animate-spin h-8 w-8 text-primary"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                        >
-                            <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                            />
-                            <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            />
-                        </svg>
-                    </div>
-                    <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                        {t('title')}
-                        {dots}
-                    </h2>
-                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                        {stepText}
-                    </p>
-                    {itemsText && (
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
-                            {itemsText}
+                <div className="relative flex flex-col items-center px-8 pt-10 pb-6 text-center overflow-hidden">
+                    <div
+                        className="absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-36 rounded-full blur-3xl pointer-events-none"
+                        style={{ background: 'var(--gp-hero-glow)' }}
+                        aria-hidden
+                    />
+
+                    <GeneratingOrb />
+
+                    <div className="mt-5 space-y-1.5">
+                        <h2 className="text-lg font-semibold tracking-tight">
+                            <ShinyText text={`${t('title')}${dots}`} stagger={0.07} duration={2} />
+                        </h2>
+                        <p className="text-sm max-w-xs mx-auto leading-relaxed">
+                            <ShinyText text={stepText} stagger={0.04} duration={2.2} />
                         </p>
-                    )}
+                        {itemsText && (
+                            <p className="text-xs font-medium tabular-nums text-text-muted dark:text-text-muted-dark">
+                                {itemsText}
+                            </p>
+                        )}
+                    </div>
                 </div>
 
-                {/* Progress & Logs */}
-                <div className="px-8 pb-8">
-                    {/* Progress Bar */}
-                    <div className="mb-6">
-                        <div className="flex items-center justify-between text-xs text-text-muted dark:text-text-muted-dark mb-2">
-                            <span className="font-medium">{t('progress')}</span>
-                            <span className="font-medium">{progressPercentage}%</span>
-                        </div>
-                        <div className="w-full h-2 bg-surface-tertiary dark:bg-surface-tertiary-dark rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
-                                style={{ width: `${progressPercentage}%` }}
-                            >
-                                <div className="h-full bg-linear-to-r from-primary via-primary to-primary/80 animate-gradient" />
-                            </div>
-                        </div>
+                {/* ── Progress bar ── */}
+                <div className="px-8 pb-6">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('progress')}
+                        </span>
+                        <span className="text-xs font-semibold tabular-nums text-text dark:text-text-dark">
+                            {progressPercentage}%
+                        </span>
                     </div>
+                    <ProgressBar percentage={progressPercentage} />
+                </div>
 
-                    {/* View Logs Toggle */}
-                    {hasLogs && (
-                        <div className="mb-4">
-                            <button
-                                type="button"
-                                onClick={() => setShowLogs((prev) => !prev)}
-                                className={cn(
-                                    'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-                                    showLogs
-                                        ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary'
-                                        : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark hover:text-text dark:hover:text-text-dark',
-                                )}
-                            >
-                                <Terminal className="h-3.5 w-3.5" />
-                                {showLogs ? t('hideLogs') : t('showLogs')}
-                            </button>
-                        </div>
-                    )}
+                {hasLogs && (
+                    <div className="px-8 pb-4 space-y-3">
+                        <button
+                            type="button"
+                            onClick={() => setShowLogs((prev) => !prev)}
+                            className={cn(
+                                'group inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-200',
+                                showLogs
+                                    ? 'bg-white/6 text-text dark:text-text-dark ring-1 ring-white/15'
+                                    : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
+                            )}
+                        >
+                            <Terminal className="h-3.5 w-3.5 transition-transform duration-200 group-hover:scale-110" />
+                            {showLogs ? t('hideLogs') : t('showLogs')}
+                            {showLogs ? (
+                                <ChevronUp className="h-3 w-3 ml-0.5 opacity-40" />
+                            ) : (
+                                <ChevronDown className="h-3 w-3 ml-0.5 opacity-40" />
+                            )}
+                        </button>
 
-                    {/* Live Terminal */}
-                    {hasLogs && showLogs && (
-                        <TerminalLogViewer
-                            logs={recentLogs!}
-                            title={t('showLogs')}
-                            showCursor
-                            className="mb-4"
-                        />
-                    )}
-
-                    {/* Info Note */}
-                    <div className="bg-surface-secondary dark:bg-surface-secondary-dark rounded-lg p-4">
-                        <div className="flex items-start gap-3">
-                            <svg
-                                className="w-5 h-5 text-text-muted dark:text-text-muted-dark mt-0.5 shrink-0"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
-                            </svg>
-                            <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                                {t('closeNote')}
-                            </p>
-                        </div>
+                        {showLogs && (
+                            <TerminalLogViewer
+                                logs={recentLogs!}
+                                title={t('showLogs')}
+                                showCursor
+                            />
+                        )}
                     </div>
+                )}
+
+                <div className="mx-8 mb-6 mt-2 flex items-start gap-2.5 rounded-lg bg-surface-secondary dark:bg-surface-secondary-dark px-4 py-3">
+                    <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-text-muted dark:text-text-muted-dark" />
+                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark leading-relaxed">
+                        {t('closeNote')}
+                    </p>
                 </div>
             </div>
         </div>

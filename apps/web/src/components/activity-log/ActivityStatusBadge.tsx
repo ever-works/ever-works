@@ -1,6 +1,7 @@
 'use client';
 
 import { Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { ShinyText } from '@/components/ui/ShinyText';
 
 const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; bg: string }> = {
     pending: {
@@ -28,14 +29,15 @@ const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; bg: str
 export function ActivityStatusBadge({ status }: { status: string }) {
     const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
     const Icon = config.icon;
-    const isSpinning = status === 'in_progress';
+    const isActive = status === 'in_progress' || status === 'pending';
+    const label = status.replaceAll('_', ' ');
 
     return (
         <span
             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${config.color} ${config.bg}`}
         >
-            <Icon className={`w-3 h-3 ${isSpinning ? 'animate-spin' : ''}`} />
-            {status.replaceAll('_', ' ')}
+            <Icon className={`w-3 h-3 ${status === 'in_progress' ? 'animate-spin' : ''}`} />
+            {isActive ? <ShinyText text={label} /> : label}
         </span>
     );
 }

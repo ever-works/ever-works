@@ -54,7 +54,7 @@
         "handlebars": "^4.7.9",
         "helmet": "^8.1.0",
         "mysql2": "^3.16.0",
-        "nodemailer": "^8.0.4",
+        "nodemailer": "^8.0.5",
         "resend": "^6.9.2",
         "passport": "^0.7.0",
         "passport-github2": "^0.1.12",

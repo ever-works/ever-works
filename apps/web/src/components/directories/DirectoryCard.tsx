@@ -11,6 +11,8 @@ import { DirectoryScheduleStatus } from '@/lib/api/enums';
 import { Github, Users, FolderClosed } from 'lucide-react';
 import { ShowDateTime } from '../ui/show-datetime';
 import { Tooltip } from '../ui/tooltip';
+import { ShinyText } from '../ui/ShinyText';
+import { GenerateStatusType } from '@/lib/api/enums';
 
 interface DirectoryCardProps {
     directory: Directory;
@@ -87,7 +89,11 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                         isGenerating && 'animate-pulse',
                     )}
                 >
-                    {statusLabel}
+                    {status === GenerateStatusType.GENERATING ? (
+                        <ShinyText text={statusLabel} />
+                    ) : (
+                        statusLabel
+                    )}
                 </span>
             </div>
 

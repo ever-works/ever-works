@@ -36,6 +36,7 @@ import {
 import { LogoEverWork, FaviconEverWork } from '../logos';
 import { useDirectoryDetail } from '../directories/detail/DirectoryDetailContext';
 import { ChatPanelExpandButton } from '@/components/ai/ChatPanel';
+import { SidebarActivityIndicator } from './SidebarActivityIndicator';
 
 interface DashboardSidebarProps {
     user: AuthUser;
@@ -241,7 +242,7 @@ export function DashboardSidebar({
                                             href={item.href}
                                             onClick={() => onInteraction?.()}
                                             className={cn(
-                                                'flex items-center rounded-sm transition-colors border border-transparent',
+                                                'flex items-center relative rounded-sm transition-colors border border-transparent',
                                                 isCollapsed
                                                     ? 'justify-center w-8 h-8 px-0'
                                                     : 'gap-3 px-4 py-2',
@@ -250,10 +251,17 @@ export function DashboardSidebar({
                                                     : 'text-text dark:text-text-secondary-dark/70 hover:bg-surface-secondary dark:hover:bg-card-primary-dark hover:text-text dark:hover:text-text-dark',
                                             )}
                                         >
-                                            <item.icon className="w-5 h-5 shrink-0" />
+                                            <span className="shrink-0 inline-flex">
+                                                <item.icon className="w-5 h-5" />
+                                            </span>
                                             {!isCollapsed && (
                                                 <span className="text-sm">{item.name}</span>
                                             )}
+                                            <div className="absolute -top-3 -right-0.5">
+                                                {item.href === ROUTES.DASHBOARD_DIRECTORIES && (
+                                                    <SidebarActivityIndicator />
+                                                )}
+                                            </div>
                                         </Link>
                                     </ConditionalTooltip>
                                 </li>
