@@ -94,6 +94,25 @@ function ScheduleForm({
     const t = useTranslations('dashboard.directoryDetail.schedule.card');
     const router = useRouter();
 
+    const getCadenceLabel = (cadence: DirectoryScheduleCadence) => {
+        switch (cadence) {
+            case DirectoryScheduleCadence.HOURLY:
+                return t('cadence.hourly');
+            case DirectoryScheduleCadence.EVERY_3_HOURS:
+                return t('cadence.every_3_hours');
+            case DirectoryScheduleCadence.EVERY_8_HOURS:
+                return t('cadence.every_8_hours');
+            case DirectoryScheduleCadence.EVERY_12_HOURS:
+                return t('cadence.every_12_hours');
+            case DirectoryScheduleCadence.DAILY:
+                return t('cadence.daily');
+            case DirectoryScheduleCadence.WEEKLY:
+                return t('cadence.weekly');
+            case DirectoryScheduleCadence.MONTHLY:
+                return t('cadence.monthly');
+        }
+    };
+
     const showPipelineSelector = pipelineProviders.length > 1;
 
     const allowances = useMemo(
@@ -359,7 +378,7 @@ function ScheduleForm({
                                     !allowances.find((item) => item.cadence === cadence)?.allowed
                                 }
                             >
-                                {t(`cadence.${cadence}`)}
+                                {getCadenceLabel(cadence)}
                             </option>
                         ))}
                     </Select>
@@ -390,7 +409,7 @@ function ScheduleForm({
                                             : 'border-border dark:border-border-dark text-text-secondary/70 dark:text-text-secondary-dark/70',
                                     )}
                                 >
-                                    {t(`cadence.${item.cadence}`)}
+                                    {getCadenceLabel(item.cadence)}
                                 </span>
                             ))}
                         </div>

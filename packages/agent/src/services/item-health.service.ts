@@ -214,7 +214,13 @@ export class ItemHealthService {
         }
 
         const checkLinks = await this.loadChecker();
-        const uniqueUrls = [...new Set(itemsToCheck.map((item) => item.source_url))];
+        const uniqueUrls = [
+            ...new Set(
+                itemsToCheck
+                    .map((item) => item.source_url)
+                    .filter((url): url is string => typeof url === 'string' && url.length > 0),
+            ),
+        ];
         const results = await checkLinks(uniqueUrls, {
             concurrency: 4,
             timeout: { request: 30000 },

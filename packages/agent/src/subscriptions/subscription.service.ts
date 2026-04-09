@@ -53,6 +53,7 @@ const PLAN_SEED_DATA: Array<{
             DirectoryScheduleCadence.MONTHLY,
             DirectoryScheduleCadence.WEEKLY,
             DirectoryScheduleCadence.DAILY,
+            DirectoryScheduleCadence.EVERY_12_HOURS,
         ],
         monthlyPrice: '29',
         overagePricePerRun: '8',
@@ -179,8 +180,8 @@ export class SubscriptionService implements OnModuleInit {
             case DirectoryScheduleCadence.HOURLY:
             case DirectoryScheduleCadence.EVERY_3_HOURS:
             case DirectoryScheduleCadence.EVERY_8_HOURS:
-            case DirectoryScheduleCadence.EVERY_12_HOURS:
                 return 'Premium';
+            case DirectoryScheduleCadence.EVERY_12_HOURS:
             case DirectoryScheduleCadence.DAILY:
             case DirectoryScheduleCadence.WEEKLY:
                 return 'Standard';

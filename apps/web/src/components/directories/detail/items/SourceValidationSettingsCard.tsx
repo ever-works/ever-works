@@ -11,7 +11,13 @@ import { DirectoryScheduleCadence } from '@/lib/api/enums';
 import { updateSourceValidationSettings } from '@/app/actions/dashboard/items';
 import type { SourceValidationSettingsDto } from '@/lib/api/types-only';
 
-const allCadences = [
+type SourceValidationCadence =
+    | DirectoryScheduleCadence.HOURLY
+    | DirectoryScheduleCadence.DAILY
+    | DirectoryScheduleCadence.WEEKLY
+    | DirectoryScheduleCadence.MONTHLY;
+
+const allCadences: SourceValidationCadence[] = [
     DirectoryScheduleCadence.HOURLY,
     DirectoryScheduleCadence.DAILY,
     DirectoryScheduleCadence.WEEKLY,
@@ -28,21 +34,21 @@ export function SourceValidationSettingsCard({
     const t = useTranslations('dashboard.directoryDetail.items.sourceValidationSettings');
     const tCadence = useTranslations('dashboard.directoryDetail.schedule.card');
     const [enabled, setEnabled] = useState(settings.enabled);
-    const availableCadences =
+    const availableCadences: SourceValidationCadence[] =
         settings.allowedCadences.length > 0
             ? allCadences.filter((c) => settings.allowedCadences.some((a) => a.cadence === c))
             : allCadences;
 
     const defaultCadence =
-        (settings.cadence as DirectoryScheduleCadence) ??
+        (settings.cadence as SourceValidationCadence) ??
         availableCadences[availableCadences.length - 1] ??
         DirectoryScheduleCadence.WEEKLY;
 
-    const [cadence, setCadence] = useState<DirectoryScheduleCadence>(defaultCadence);
+    const [cadence, setCadence] = useState<SourceValidationCadence>(defaultCadence);
     const [dirty, setDirty] = useState(false);
     const [isSaving, startSaving] = useTransition();
 
-    const updateForm = (updates: { enabled?: boolean; cadence?: DirectoryScheduleCadence }) => {
+    const updateForm = (updates: { enabled?: boolean; cadence?: SourceValidationCadence }) => {
         setDirty(true);
         if (updates.enabled !== undefined) setEnabled(updates.enabled);
         if (updates.cadence !== undefined) setCadence(updates.cadence);
@@ -63,6 +69,19 @@ export function SourceValidationSettingsCard({
             setDirty(false);
             toast.success(t('saveSuccess'));
         });
+    };
+
+    const getCadenceLabel = (cadence: SourceValidationCadence) => {
+        switch (cadence) {
+            case DirectoryScheduleCadence.HOURLY:
+                return tCadence('cadence.hourly');
+            case DirectoryScheduleCadence.DAILY:
+                return tCadence('cadence.daily');
+            case DirectoryScheduleCadence.WEEKLY:
+                return tCadence('cadence.weekly');
+            case DirectoryScheduleCadence.MONTHLY:
+                return tCadence('cadence.monthly');
+        }
     };
 
     return (
@@ -89,12 +108,12 @@ export function SourceValidationSettingsCard({
                         <Select
                             value={cadence}
                             onValueChange={(val: string) =>
-                                updateForm({ cadence: val as DirectoryScheduleCadence })
+                                updateForm({ cadence: val as SourceValidationCadence })
                             }
                         >
                             {availableCadences.map((c) => (
                                 <option key={c} value={c}>
-                                    {tCadence(`cadence.${c}`)}
+                                    {getCadenceLabel(c)}
                                 </option>
                             ))}
                         </Select>
