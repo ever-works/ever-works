@@ -163,9 +163,17 @@ export class DirectoryScheduleService {
 
         const status = enable ? DirectoryScheduleStatus.ACTIVE : DirectoryScheduleStatus.PAUSED;
 
+        const shouldRecalculateNextRun =
+            status === DirectoryScheduleStatus.ACTIVE &&
+            (!existing ||
+                existing.status !== DirectoryScheduleStatus.ACTIVE ||
+                existing.cadence !== cadence);
+
         const nextRunAt =
             status === DirectoryScheduleStatus.ACTIVE
-                ? this.calculateNextRun(cadence)
+                ? shouldRecalculateNextRun
+                    ? this.calculateNextRun(cadence)
+                    : (existing?.nextRunAt ?? null)
                 : (existing?.nextRunAt ?? null);
 
         const schedule = await this.scheduleRepository.upsert(directory.id, {
@@ -289,10 +297,12 @@ export class DirectoryScheduleService {
         // scheduledFor is set by tryMarkDispatched before clearing nextRunAt.
         const anchorDate = this.resolveAnchorDate(schedule);
 
-        const nextRunAt =
-            schedule.status === DirectoryScheduleStatus.ACTIVE && schedule.cadence
-                ? this.calculateNextRun(schedule.cadence, 0, anchorDate)
-                : null;
+        const preserveExistingNextRun = this.isManualRunAheadOfSchedule(schedule);
+        const nextRunAt = preserveExistingNextRun
+            ? (schedule.nextRunAt ?? null)
+            : schedule.status === DirectoryScheduleStatus.ACTIVE && schedule.cadence
+              ? this.calculateNextRun(schedule.cadence, 0, anchorDate)
+              : null;
 
         await this.scheduleRepository.updateById(schedule.id, {
             lastRunStatus: options.status,
@@ -330,31 +340,39 @@ export class DirectoryScheduleService {
             return;
         }
 
-        const failureCount = (schedule.failureCount || 0) + 1;
+        const preserveExistingNextRun = this.isManualRunAheadOfSchedule(schedule);
+        const failureCount = preserveExistingNextRun
+            ? schedule.failureCount || 0
+            : (schedule.failureCount || 0) + 1;
         const maxFailures =
             schedule.maxFailureBeforePause || config.subscriptions.getMaxFailureBeforePause();
-        const reachedLimit = failureCount >= maxFailures;
+        const reachedLimit = !preserveExistingNextRun && failureCount >= maxFailures;
 
         const anchorDate = this.resolveAnchorDate(schedule);
+        const nextRunAt = preserveExistingNextRun
+            ? (schedule.nextRunAt ?? null)
+            : reachedLimit
+              ? null
+              : schedule.cadence
+                ? new Date(anchorDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000)
+                : null;
+        const lastRunStatus = preserveExistingNextRun ? null : GenerateStatusType.ERROR;
 
         await this.scheduleRepository.updateById(schedule.id, {
             failureCount,
-            lastRunStatus: GenerateStatusType.ERROR,
+            lastRunStatus,
             lastRunAt: new Date(),
             status: reachedLimit ? DirectoryScheduleStatus.PAUSED : schedule.status,
             scheduledFor: null,
-            nextRunAt: reachedLimit
-                ? null
-                : schedule.cadence
-                  ? new Date(anchorDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000)
-                  : null,
+            nextRunAt,
         });
 
         await this.syncDirectory(schedule.directoryId, {
             ...schedule,
             failureCount,
             status: reachedLimit ? DirectoryScheduleStatus.PAUSED : schedule.status,
-            lastRunStatus: GenerateStatusType.ERROR,
+            lastRunStatus,
+            nextRunAt,
         });
 
         if (reachedLimit) {
@@ -388,12 +406,14 @@ export class DirectoryScheduleService {
 
         // Reschedule using the original cadence — don't penalize the schedule.
         // If the anchor is in the past, use now() to avoid a rapid retry loop.
+        const preserveExistingNextRun = this.isManualRunAheadOfSchedule(schedule);
         const anchorDate = this.resolveAnchorDate(schedule);
         const baseDate = anchorDate.getTime() > Date.now() ? anchorDate : new Date();
-        const nextRunAt =
-            schedule.status === DirectoryScheduleStatus.ACTIVE && schedule.cadence
-                ? new Date(baseDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000)
-                : null;
+        const nextRunAt = preserveExistingNextRun
+            ? (schedule.nextRunAt ?? null)
+            : schedule.status === DirectoryScheduleStatus.ACTIVE && schedule.cadence
+              ? new Date(baseDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000)
+              : null;
 
         await this.scheduleRepository.updateById(schedule.id, {
             lastRunStatus: null,
@@ -448,6 +468,18 @@ export class DirectoryScheduleService {
         }
 
         return new Date();
+    }
+
+    /**
+     * Manual "run now" requests can execute before the scheduled slot is due.
+     * In that case, preserve the existing nextRunAt so we don't skip the upcoming run.
+     */
+    private isManualRunAheadOfSchedule(schedule: DirectorySchedule): boolean {
+        return Boolean(
+            !schedule.scheduledFor &&
+            schedule.nextRunAt &&
+            schedule.nextRunAt.getTime() > Date.now(),
+        );
     }
 
     private isAlreadyMarkedFailed(schedule: DirectorySchedule): boolean {
@@ -548,6 +580,18 @@ export class DirectoryScheduleService {
                 // aligned to clean hour boundaries (e.g. 14:00, 15:00, 16:00).
                 next.setMinutes(0, 0, 0);
                 next.setHours(next.getHours() + 1);
+                break;
+            case DirectoryScheduleCadence.EVERY_3_HOURS:
+                next.setMinutes(0, 0, 0);
+                next.setHours(next.getHours() + 3);
+                break;
+            case DirectoryScheduleCadence.EVERY_8_HOURS:
+                next.setMinutes(0, 0, 0);
+                next.setHours(next.getHours() + 8);
+                break;
+            case DirectoryScheduleCadence.EVERY_12_HOURS:
+                next.setMinutes(0, 0, 0);
+                next.setHours(next.getHours() + 12);
                 break;
             case DirectoryScheduleCadence.DAILY:
                 next.setDate(next.getDate() + 1);

@@ -85,9 +85,12 @@ export function TagModal({ isOpen, onClose, onSave, tag, existingNames }: TagMod
                     </h2>
                     <button
                         onClick={onClose}
-                        className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="p-1 cursor-pointer rounded-lg hover:bg-gray-100 dark:hover:bg-white/6 transition-colors"
                     >
-                        <X className="w-5 h-5 text-text-secondary dark:text-text-secondary-dark" />
+                        <X
+                            strokeWidth={1.3}
+                            className="w-4 h-4 text-text-secondary dark:text-text-secondary-dark"
+                        />
                     </button>
                 </div>
 
@@ -125,10 +128,15 @@ export function TagModal({ isOpen, onClose, onSave, tag, existingNames }: TagMod
 
                     {/* Actions */}
                     <div className="flex justify-end gap-3 pt-4">
-                        <Button type="button" variant="ghost" onClick={onClose}>
+                        <Button type="button" variant="ghost" onClick={onClose} className="text-sm">
                             {t('cancel')}
                         </Button>
-                        <Button type="submit" variant="primary" disabled={isSaving}>
+                        <Button
+                            type="submit"
+                            variant="primary"
+                            disabled={isSaving}
+                            className="text-sm"
+                        >
                             {isSaving ? t('saving') : isEditing ? t('save') : t('create')}
                         </Button>
                     </div>

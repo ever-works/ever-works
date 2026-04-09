@@ -146,7 +146,7 @@ export function ItemsList({ items: initialItems, addItemRef }: ItemsListProps) {
     return (
         <div className="space-y-6">
             {/* Search and Filter Bar */}
-            <div className="flex flex-col @sm/main:flex-row gap-4">
+            <div className="flex flex-col @sm/main:flex-row @sm/main:items-center gap-4">
                 <div className="flex-1">
                     <Input
                         type="text"
@@ -158,7 +158,7 @@ export function ItemsList({ items: initialItems, addItemRef }: ItemsListProps) {
                     />
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center border p-[3px] rounded-xl">
                     <Select
                         value={selectedCategory || '__all__'}
                         onValueChange={(val) => setSelectedCategory(val === '__all__' ? null : val)}
@@ -173,14 +173,14 @@ export function ItemsList({ items: initialItems, addItemRef }: ItemsListProps) {
                         ))}
                     </Select>
 
-                    <div className="flex rounded-lg border border-border dark:border-border-dark">
+                    <div className="flex items-center rounded-lg border border-border dark:border-border-dark">
                         <Button
                             variant={viewMode === 'grid' ? 'primary' : 'ghost'}
                             size="sm"
                             onClick={() => setViewMode('grid')}
                             className="rounded-r-none"
                         >
-                            <GridIcon className="w-4 h-4" />
+                            <GridIcon className="w-3 h-3" />
                         </Button>
                         <Button
                             variant={viewMode === 'list' ? 'primary' : 'ghost'}

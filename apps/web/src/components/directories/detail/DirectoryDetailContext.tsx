@@ -70,8 +70,8 @@ function repoLink(directory: Directory, oauthConnection: GitProviderConnectionIn
         return null;
     }
 
-    // Prefer git provider username over platform owner
-    const username = oauthConnection.username || directory.owner;
+    // Prefer directory owner over git provider username for repo links
+    const username = directory.owner || oauthConnection.username;
     if (!username) {
         return null;
     }

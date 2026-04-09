@@ -1,5 +1,4 @@
 import { Module, OnApplicationBootstrap } from '@nestjs/common';
-import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseConfigurations, DatabaseInitService } from '@ever-works/agent/database';
 import { DirectoryModule } from '@ever-works/agent/services';
 import { DatabaseModule } from '@ever-works/agent/database';
@@ -13,6 +12,7 @@ import {
     PluginBootstrapService,
 } from '@ever-works/agent/plugins';
 import { ConfigModule } from './config/config.module';
+import { LocalEventEmitterModule } from './local-event-emitter.module';
 
 // Commands
 import { ConfigCommands } from './commands/config';
@@ -26,7 +26,7 @@ import { CacheFactory } from '@ever-works/agent/cache';
             isGlobal: true,
         }),
         DatabaseConfigurations.cli(),
-        EventEmitterModule.forRoot(),
+        LocalEventEmitterModule,
         AgentPluginsModule.forRoot(),
         ConfigModule,
         DatabaseModule,

@@ -14,13 +14,16 @@ interface HistoryTableProps {
 }
 
 const statusColor: Record<string, string> = {
-    generating: 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200',
-    generated: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200',
-    error: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200',
-    cancelled: 'bg-gray-200 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+    generating:
+        'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20',
+    generated:
+        'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20',
+    error: 'bg-red-50 text-red-700 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/20',
+    cancelled:
+        'bg-muted/60 text-text-muted ring-1 ring-border dark:bg-muted/20 dark:text-text-muted-dark dark:ring-border-dark',
 };
 
-const tdClass = 'px-4 py-4 text-sm text-text dark:text-text-dark align-top';
+const tdClass = 'px-3 py-3 text-xs text-text dark:text-text-dark align-middle tabular-nums';
 
 function formatDuration(seconds?: number | null) {
     if (!seconds || seconds <= 0) {
@@ -142,173 +145,186 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
     }
 
     return (
-        <div className="overflow-hidden rounded-lg border border-border dark:border-border-dark">
-            <table className="min-w-full divide-y divide-border dark:divide-border-dark">
-                <thead className="bg-muted/50 dark:bg-muted/20">
-                    <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-secondary dark:text-text-secondary-dark">
-                            {t('table.run')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-secondary dark:text-text-secondary-dark">
-                            {t('table.startedAt')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-secondary dark:text-text-secondary-dark">
-                            {t('table.duration')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-secondary dark:text-text-secondary-dark">
-                            {t('table.newItems')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-secondary dark:text-text-secondary-dark">
-                            {t('table.updatedItems')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-secondary dark:text-text-secondary-dark">
-                            {t('table.totalItems')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-secondary dark:text-text-secondary-dark">
-                            {t('table.tokens')}
-                        </th>
-                        {/* <th className="px-4 py-3 text-left text-sm font-semibold text-text-secondary dark:text-text-secondary-dark">
+        <div className="w-full overflow-hidden rounded-lg border border-border dark:border-border-dark">
+            <div className="overflow-x-auto">
+                <table className="min-w-[700px] w-full divide-y divide-border dark:divide-border-dark">
+                    <thead className="bg-muted/50 dark:bg-muted/20">
+                        <tr>
+                            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
+                                {t('table.run')}
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
+                                {t('table.startedAt')}
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
+                                {t('table.duration')}
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
+                                {t('table.newItems')}
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
+                                {t('table.updatedItems')}
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
+                                {t('table.totalItems')}
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
+                                {t('table.tokens')}
+                            </th>
+                            {/* <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
                             {t('table.cost')}
                         </th> */}
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-border dark:divide-border-dark">
-                    {entries.map((entry) => {
-                        const statusKey = entry.status?.toLowerCase?.() ?? 'unknown';
-                        const statusClass = statusColor[statusKey] ?? 'bg-gray-100 text-gray-700';
-                        const hasDetails =
-                            (entry.changelog?.entries?.length ?? 0) > 0 ||
-                            (entry.logs?.length ?? 0) > 0;
-                        const isExpanded = expandedIds.includes(entry.id);
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border dark:divide-border-dark">
+                        {entries.map((entry) => {
+                            const statusKey = entry.status?.toLowerCase?.() ?? 'unknown';
+                            const statusClass =
+                                statusColor[statusKey] ?? 'bg-gray-100 text-gray-700';
+                            const hasDetails =
+                                (entry.changelog?.entries?.length ?? 0) > 0 ||
+                                (entry.logs?.length ?? 0) > 0;
+                            const isExpanded = expandedIds.includes(entry.id);
 
-                        const addedEntries =
-                            entry.changelog?.entries?.filter(
-                                (change) => change.action === 'added',
-                            ) ?? [];
-                        const updatedEntries =
-                            entry.changelog?.entries?.filter(
-                                (change) => change.action === 'updated',
-                            ) ?? [];
-                        const removedEntries =
-                            entry.changelog?.entries?.filter(
-                                (change) => change.action === 'removed',
-                            ) ?? [];
+                            const addedEntries =
+                                entry.changelog?.entries?.filter(
+                                    (change) => change.action === 'added',
+                                ) ?? [];
+                            const updatedEntries =
+                                entry.changelog?.entries?.filter(
+                                    (change) => change.action === 'updated',
+                                ) ?? [];
+                            const removedEntries =
+                                entry.changelog?.entries?.filter(
+                                    (change) => change.action === 'removed',
+                                ) ?? [];
 
-                        return (
-                            <Fragment key={entry.id}>
-                                <tr className="bg-card dark:bg-transparent">
-                                    <td className="px-4 py-4 align-top">
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex items-start gap-2">
-                                                {hasDetails ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => toggleExpanded(entry.id)}
-                                                        className="mt-0.5 rounded p-0.5 text-text-secondary transition hover:bg-muted dark:text-text-secondary-dark dark:hover:bg-muted/20"
-                                                        aria-label={
-                                                            isExpanded
-                                                                ? t('detail.collapse')
-                                                                : t('detail.expand')
-                                                        }
-                                                    >
-                                                        {isExpanded ? (
-                                                            <ChevronDown className="h-4 w-4" />
-                                                        ) : (
-                                                            <ChevronRight className="h-4 w-4" />
-                                                        )}
-                                                    </button>
-                                                ) : (
-                                                    <span className="w-5" />
-                                                )}
-                                                <div className="flex flex-col gap-2">
-                                                    <span
-                                                        className={cn(
-                                                            'inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-medium capitalize',
-                                                            statusClass,
-                                                        )}
-                                                    >
-                                                        {getStatusLabel(statusKey, t)}
-                                                    </span>
-                                                    <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                                                        {getActivityLabel(entry.activityType, t)}
-                                                    </span>
-                                                    {entry.changelog?.summary ? (
-                                                        <p className="max-w-sm text-xs text-text-secondary dark:text-text-secondary-dark">
-                                                            {entry.changelog.summary}
-                                                        </p>
-                                                    ) : null}
-                                                    {entry.errorMessage &&
-                                                        statusKey === 'error' && (
-                                                            <p className="max-w-sm text-xs text-red-600 dark:text-red-400">
-                                                                {entry.errorMessage}
-                                                            </p>
-                                                        )}
-                                                    {entry.triggeredBy &&
-                                                        entry.triggeredBy !== 'user' && (
-                                                            <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-text-secondary dark:bg-gray-800 dark:text-text-secondary-dark">
-                                                                {entry.triggeredBy === 'schedule'
-                                                                    ? t('trigger.schedule')
-                                                                    : t('trigger.api')}
-                                                            </span>
-                                                        )}
-                                                    {entry.triggerRunId && (
-                                                        <a
-                                                            href={`https://cloud.trigger.dev/runs/${entry.triggerRunId}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="flex items-center gap-1 text-xs text-primary hover:underline dark:text-primary-dark"
+                            return (
+                                <Fragment key={entry.id}>
+                                    <tr className="bg-card dark:bg-transparent hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors">
+                                        <td className="px-3 py-3 align-top">
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex items-start gap-2">
+                                                    {hasDetails ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleExpanded(entry.id)}
+                                                            className="mt-0.5 rounded-md p-1 text-text-muted dark:text-text-muted-dark transition-colors hover:bg-muted/60 dark:hover:bg-muted/20 hover:text-text dark:hover:text-text-dark"
+                                                            aria-label={
+                                                                isExpanded
+                                                                    ? t('detail.collapse')
+                                                                    : t('detail.expand')
+                                                            }
                                                         >
-                                                            <span>Trigger.dev</span>
-                                                            <ExternalLink className="h-3 w-3" />
-                                                        </a>
+                                                            {isExpanded ? (
+                                                                <ChevronDown className="h-4 w-4" />
+                                                            ) : (
+                                                                <ChevronRight className="h-4 w-4" />
+                                                            )}
+                                                        </button>
+                                                    ) : (
+                                                        <span className="w-5" />
                                                     )}
+                                                    <div className="flex flex-col gap-2">
+                                                        <span
+                                                            className={cn(
+                                                                'inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium capitalize',
+                                                                statusClass,
+                                                            )}
+                                                        >
+                                                            {getStatusLabel(statusKey, t)}
+                                                        </span>
+                                                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                            {getActivityLabel(
+                                                                entry.activityType,
+                                                                t,
+                                                            )}
+                                                        </span>
+                                                        {entry.changelog?.summary ? (
+                                                            <p className="max-w-sm text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                                {entry.changelog.summary}
+                                                            </p>
+                                                        ) : null}
+                                                        {entry.errorMessage &&
+                                                            statusKey === 'error' && (
+                                                                <p className="max-w-sm text-xs text-red-600 dark:text-red-400">
+                                                                    {entry.errorMessage}
+                                                                </p>
+                                                            )}
+                                                        {entry.triggeredBy &&
+                                                            entry.triggeredBy !== 'user' && (
+                                                                <span className="inline-flex items-center rounded-full bg-muted/60 dark:bg-muted/20 px-2 py-0.5 text-[10px] font-medium text-text-muted dark:text-text-muted-dark ring-1 ring-border dark:ring-border-dark">
+                                                                    {entry.triggeredBy ===
+                                                                    'schedule'
+                                                                        ? t('trigger.schedule')
+                                                                        : t('trigger.api')}
+                                                                </span>
+                                                            )}
+                                                        {entry.triggerRunId && (
+                                                            <a
+                                                                href={`https://cloud.trigger.dev/runs/${entry.triggerRunId}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-center gap-1 text-xs text-primary hover:underline dark:text-primary-dark"
+                                                            >
+                                                                <span>Trigger.dev</span>
+                                                                <ExternalLink className="h-3 w-3" />
+                                                            </a>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </td>
+                                        </td>
 
-                                    <td className={tdClass}>
-                                        <ShowDateTime value={entry.startedAt ?? entry.createdAt} />
-                                    </td>
-
-                                    <td className={tdClass}>
-                                        {formatDuration(entry.durationInSeconds)}
-                                    </td>
-                                    <td className={tdClass}>
-                                        {renderMetricCount(entry, entry.newItemsCount, 'new')}
-                                    </td>
-                                    <td className={tdClass}>
-                                        {renderMetricCount(
-                                            entry,
-                                            entry.updatedItemsCount,
-                                            'updated',
-                                        )}
-                                    </td>
-                                    <td className={tdClass}>
-                                        {renderMetricCount(entry, entry.totalItemsCount, 'total')}
-                                    </td>
-                                    <td className={tdClass}>
-                                        {formatTokens(entry.metrics?.total_tokens_used)}
-                                    </td>
-                                    {/* <td className={tdClass}>{formatCost(entry.metrics?.total_cost)}</td> */}
-                                </tr>
-                                {hasDetails && isExpanded ? (
-                                    <tr className="bg-muted/20 dark:bg-muted/10">
-                                        <td colSpan={7} className="px-4 py-4">
-                                            <HistoryExpandedDetail
-                                                entry={entry}
-                                                addedEntries={addedEntries}
-                                                updatedEntries={updatedEntries}
-                                                removedEntries={removedEntries}
+                                        <td className={tdClass}>
+                                            <ShowDateTime
+                                                value={entry.startedAt ?? entry.createdAt}
                                             />
                                         </td>
+
+                                        <td className={tdClass}>
+                                            {formatDuration(entry.durationInSeconds)}
+                                        </td>
+                                        <td className={tdClass}>
+                                            {renderMetricCount(entry, entry.newItemsCount, 'new')}
+                                        </td>
+                                        <td className={tdClass}>
+                                            {renderMetricCount(
+                                                entry,
+                                                entry.updatedItemsCount,
+                                                'updated',
+                                            )}
+                                        </td>
+                                        <td className={tdClass}>
+                                            {renderMetricCount(
+                                                entry,
+                                                entry.totalItemsCount,
+                                                'total',
+                                            )}
+                                        </td>
+                                        <td className={tdClass}>
+                                            {formatTokens(entry.metrics?.total_tokens_used)}
+                                        </td>
+                                        {/* <td className={tdClass}>{formatCost(entry.metrics?.total_cost)}</td> */}
                                     </tr>
-                                ) : null}
-                            </Fragment>
-                        );
-                    })}
-                </tbody>
-            </table>
+                                    {hasDetails && isExpanded ? (
+                                        <tr className="bg-muted/20 dark:bg-muted/10">
+                                            <td colSpan={7} className="px-3 py-4">
+                                                <HistoryExpandedDetail
+                                                    entry={entry}
+                                                    addedEntries={addedEntries}
+                                                    updatedEntries={updatedEntries}
+                                                    removedEntries={removedEntries}
+                                                />
+                                            </td>
+                                        </tr>
+                                    ) : null}
+                                </Fragment>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useLayoutEffect, useState } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils/cn';
 import { ROUTES } from '@/lib/constants';
@@ -17,6 +18,9 @@ export function GeneratorSubTabs({ directoryId }: GeneratorSubTabsProps) {
     const pathname = usePathname();
     const { config } = useDirectoryDetail();
     const permissions = useDirectoryPermissions();
+
+    const navRef = useRef<HTMLDivElement>(null);
+    const [pillStyle, setPillStyle] = useState<{ left: number; width: number } | null>(null);
 
     const generatorBase = ROUTES.DASHBOARD_DIRECTORY_GENERATOR(directoryId);
 
@@ -49,23 +53,43 @@ export function GeneratorSubTabs({ directoryId }: GeneratorSubTabsProps) {
         },
     ].filter((tab) => tab.visible !== false);
 
+    useLayoutEffect(() => {
+        const nav = navRef.current;
+        if (!nav) return;
+        const activeLink = nav.querySelector('[data-active="true"]') as HTMLElement | null;
+        if (!activeLink) return;
+        setPillStyle({ left: activeLink.offsetLeft, width: activeLink.offsetWidth });
+    }, [pathname]);
+
     return (
-        <div className="mb-6 border-b border-border dark:border-border-dark">
-            <nav className="-mb-px flex space-x-6" aria-label="Generator tabs">
+        <div className="mb-6">
+            <nav
+                ref={navRef}
+                className="relative inline-flex items-center gap-1 rounded-lg border border-border dark:border-border-dark bg-muted/40 dark:bg-muted/10 p-1"
+                aria-label="Generator tabs"
+            >
+                {/* Sliding pill background */}
+                {pillStyle && (
+                    <div
+                        className="absolute top-1 bottom-1 rounded-md bg-button-primary dark:bg-button-primary-dark shadow-sm pointer-events-none transition-all duration-200 ease-in-out"
+                        style={{ left: pillStyle.left, width: pillStyle.width }}
+                    />
+                )}
                 {tabs.map((tab) => {
                     const Icon = tab.icon;
                     return (
                         <Link
                             key={tab.name}
                             href={tab.href}
+                            data-active={tab.isActive}
                             className={cn(
-                                'flex items-center gap-2 whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium transition-colors',
+                                'relative z-10 flex items-center text-xs gap-2 whitespace-nowrap rounded-md px-4 py-1.5 font-medium transition-colors duration-200',
                                 tab.isActive
-                                    ? 'border-primary text-primary dark:border-gray-200 dark:text-gray-200'
-                                    : 'border-transparent text-text-secondary dark:text-text-secondary-dark hover:border-border dark:hover:border-border-dark hover:text-text dark:hover:text-text-dark',
+                                    ? 'text-white dark:text-button-primary-foreground-dark bg-button-primary dark:bg-button-primary-dark shadow-sm'
+                                    : 'text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark',
                             )}
                         >
-                            <Icon className="w-4 h-4" />
+                            <Icon className="w-4 h-4 shrink-0" />
                             {tab.name}
                         </Link>
                     );
