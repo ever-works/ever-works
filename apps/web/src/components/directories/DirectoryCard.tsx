@@ -10,6 +10,8 @@ import { DirectoryMemberRole } from '@/lib/api/enums';
 import { Github, Users, FolderClosed } from 'lucide-react';
 import { ShowDateTime } from '../ui/show-datetime';
 import { Tooltip } from '../ui/tooltip';
+import { ShinyText } from '../ui/ShinyText';
+import { GenerateStatusType } from '@/lib/api/enums';
 
 interface DirectoryCardProps {
     directory: Directory;
@@ -78,7 +80,11 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                         statusConfig.badge,
                     )}
                 >
-                    {tStatus(statusConfig.labelKey)}
+                    {status === GenerateStatusType.GENERATING ? (
+                        <ShinyText text={tStatus(statusConfig.labelKey)} />
+                    ) : (
+                        tStatus(statusConfig.labelKey)
+                    )}
                 </span>
             </div>
 

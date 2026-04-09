@@ -12,6 +12,7 @@ import { GenerateStatusType } from '@/lib/api/enums';
 import { getStepProgress, getStepText, getItemsProcessedText } from '@/lib/utils/generator-steps';
 import { Terminal } from 'lucide-react';
 import { TerminalLogViewer } from './shared/TerminalLogViewer';
+import { ShinyText } from '@/components/ui/ShinyText';
 
 interface DirectoryStatusCardProps {
     directory: Directory;
@@ -86,23 +87,34 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
             </>
         ) : null;
 
+        const generatingDescription = itemsText || stepText || t('generating.description');
+
         const configs = {
             [GenerateStatusType.GENERATING]: {
                 title: t('generating.title'),
-                description: itemsText || stepText || t('generating.description'),
+                description: generatingDescription,
                 action: (
                     <div className="w-full space-y-3">
                         <div>
                             <div className="flex items-center justify-between text-xs text-text-muted dark:text-text-muted-dark mb-1">
                                 <span>{t('generating.processing')}</span>
-                                <span className="font-medium">{progressPercentage}%</span>
+                                <span className="font-medium tabular-nums">
+                                    {progressPercentage}%
+                                </span>
                             </div>
-                            <div className="w-full h-1.5 bg-surface-tertiary dark:bg-surface-tertiary-dark rounded-full overflow-hidden">
+                            {/* Progress bar — same palette as GenerationProgress */}
+                            <div
+                                className="relative w-full h-1.5 rounded-full overflow-hidden"
+                                style={{ background: 'var(--gp-bar-track)' }}
+                            >
                                 <div
-                                    className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
-                                    style={{ width: `${progressPercentage}%` }}
+                                    className="absolute inset-y-0 left-0 rounded-full overflow-hidden transition-[width] duration-700 ease-out"
+                                    style={{
+                                        width: `${progressPercentage}%`,
+                                        background: 'var(--gp-bar-fill)',
+                                    }}
                                 >
-                                    <div className="h-full bg-linear-to-r from-primary via-primary to-primary/80 animate-gradient" />
+                                    <div className="gp-shimmer" aria-hidden />
                                 </div>
                             </div>
                         </div>
@@ -219,12 +231,26 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                         )}
                     />
                     <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold text-text dark:text-text-dark leading-snug">
-                            {config.title}
+                        <h3 className="text-sm font-semibold leading-snug">
+                            {statusStyle.animate ? (
+                                <ShinyText text={config.title} stagger={0.06} duration={1.9} />
+                            ) : (
+                                <span className="text-text dark:text-text-dark">
+                                    {config.title}
+                                </span>
+                            )}
                         </h3>
                         {config.description && (
                             <p className="text-sm text-text-muted dark:text-text-muted-dark mt-1">
-                                {config.description}
+                                {statusStyle.animate ? (
+                                    <ShinyText
+                                        text={config.description}
+                                        stagger={0.03}
+                                        duration={2.2}
+                                    />
+                                ) : (
+                                    config.description
+                                )}
                             </p>
                         )}
                         {config.action && <div className="mt-3">{config.action}</div>}
