@@ -33,14 +33,22 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
         <div className="flex-1 min-h-0 relative">
             <div ref={scrollRef} className="h-full overflow-y-auto">
                 <div ref={contentRef} className="px-4 py-3 space-y-3">
-                    {messages.map((message, index) => (
-                        <ChatMessage
-                            key={message.id}
-                            message={message}
-                            isStreaming={isStreaming}
-                            isLastMessage={index === messages.length - 1}
-                        />
-                    ))}
+                    {messages.map((message, index) => {
+                        const duplicateCount = messages
+                            .slice(0, index)
+                            .filter((entry) => entry.id === message.id).length;
+                        const key =
+                            duplicateCount === 0 ? message.id : `${message.id}-${duplicateCount}`;
+
+                        return (
+                            <ChatMessage
+                                key={key}
+                                message={message}
+                                isStreaming={isStreaming}
+                                isLastMessage={index === messages.length - 1}
+                            />
+                        );
+                    })}
 
                     {isWaitingForResponse && <StreamingIndicator label={t('thinking')} />}
                 </div>

@@ -30,6 +30,10 @@ export interface RunningCountResponse {
     count: number;
 }
 
+export interface ActivitySummaryResponse {
+    counts: Record<'pending' | 'in_progress' | 'completed' | 'failed', number>;
+}
+
 export interface GetActivityLogParams {
     actionType?: string;
     directoryId?: string;
@@ -58,6 +62,10 @@ export const activityLogAPI = {
 
     getRunningCount: async (): Promise<RunningCountResponse> => {
         return serverFetch<RunningCountResponse>('/activity-log/running-count');
+    },
+
+    getSummary: async (): Promise<ActivitySummaryResponse> => {
+        return serverFetch<ActivitySummaryResponse>('/activity-log/summary');
     },
 
     getById: async (id: string): Promise<{ activity: ActivityLogEntry }> => {

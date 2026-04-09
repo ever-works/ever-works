@@ -138,9 +138,9 @@ export function PipelineModeSelector({
                             onClick={() => onChange(provider.id)}
                             disabled={!provider.configured}
                             className={cn(
-                                'w-full flex items-start gap-3 px-5 py-3 text-left transition-colors',
+                                'w-full flex items-start gap-3 px-5 py-3 text-left transition-colors cursor-pointer',
                                 isActive
-                                    ? 'bg-primary/5 dark:bg-primary/10'
+                                    ? 'bg-primary/5 dark:bg-surface-secondary/6'
                                     : 'hover:bg-surface-secondary/50 dark:hover:bg-surface-secondary-dark/50',
                                 !provider.configured && 'opacity-50 cursor-not-allowed',
                             )}

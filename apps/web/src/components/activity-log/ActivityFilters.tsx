@@ -71,7 +71,7 @@ export function ActivityFilters({
 
             <Select
                 value={actionType}
-                onChange={(e) => onActionTypeChange(e.target.value)}
+                onValueChange={onActionTypeChange}
                 aria-label={t('columns.type')}
                 className={selectClass}
             >
@@ -84,7 +84,7 @@ export function ActivityFilters({
 
             <Select
                 value={status}
-                onChange={(e) => onStatusChange(e.target.value)}
+                onValueChange={onStatusChange}
                 aria-label={t('columns.status')}
                 className={selectClass}
             >

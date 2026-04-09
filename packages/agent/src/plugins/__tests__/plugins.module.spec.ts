@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
-import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CacheModule } from '@nestjs/cache-manager';
 import { Repository } from 'typeorm';
 import { PluginsModule, PLUGIN_ENTITIES } from '../plugins.module';
@@ -19,6 +18,29 @@ import type { PluginsModuleOptions } from '../interfaces/plugins-module-options.
 
 jest.setTimeout(30000);
 
+jest.mock('@nestjs/event-emitter', () => {
+    const { EventEmitter2 } = require('eventemitter2');
+
+    class MockEventEmitterModule {}
+
+    return {
+        EventEmitter2,
+        EventEmitterModule: {
+            forRoot: () => ({
+                module: MockEventEmitterModule,
+                global: true,
+                providers: [
+                    {
+                        provide: EventEmitter2,
+                        useFactory: () => new EventEmitter2(),
+                    },
+                ],
+                exports: [EventEmitter2],
+            }),
+        },
+    };
+});
+
 const createTestDatabaseModule = () =>
     TypeOrmModule.forRoot({
         type: 'sqljs',
@@ -36,7 +58,6 @@ describe('PluginsModule', () => {
             module = await Test.createTestingModule({
                 imports: [
                     createTestDatabaseModule(),
-                    EventEmitterModule.forRoot(),
                     CacheModule.register({ isGlobal: true }),
                     PluginsModule.forRoot({
                         platformVersion: '1.0.0',
@@ -122,7 +143,6 @@ describe('PluginsModule', () => {
             const module = await Test.createTestingModule({
                 imports: [
                     createTestDatabaseModule(),
-                    EventEmitterModule.forRoot(),
                     CacheModule.register({ isGlobal: true }),
                     PluginsModule.forRootAsync({
                         useFactory: () => ({
@@ -144,7 +164,6 @@ describe('PluginsModule', () => {
             const module = await Test.createTestingModule({
                 imports: [
                     createTestDatabaseModule(),
-                    EventEmitterModule.forRoot(),
                     CacheModule.register({ isGlobal: true }),
                     PluginsModule.forRootAsync({
                         useFactory: async () => {
@@ -171,7 +190,6 @@ describe('PluginsModule', () => {
             const module = await Test.createTestingModule({
                 imports: [
                     createTestDatabaseModule(),
-                    EventEmitterModule.forRoot(),
                     CacheModule.register({ isGlobal: true }),
                     PluginsModule.forRoot({
                         autoLoadBuiltIn: false, // Prevent actual loading during test

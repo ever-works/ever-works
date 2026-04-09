@@ -20,6 +20,9 @@ export const setSchedule = tool({
     execute: async ({ directoryId, enable, cadence }) => {
         const cadenceMap: Record<string, DirectoryScheduleCadence> = {
             hourly: DirectoryScheduleCadence.HOURLY,
+            every_3_hours: DirectoryScheduleCadence.EVERY_3_HOURS,
+            every_8_hours: DirectoryScheduleCadence.EVERY_8_HOURS,
+            every_12_hours: DirectoryScheduleCadence.EVERY_12_HOURS,
             daily: DirectoryScheduleCadence.DAILY,
             weekly: DirectoryScheduleCadence.WEEKLY,
             monthly: DirectoryScheduleCadence.MONTHLY,

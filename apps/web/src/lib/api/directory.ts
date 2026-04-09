@@ -180,6 +180,7 @@ export interface DirectoryStatsResponse {
     totalDirectories: number;
     totalItems: number;
     activeWebsites: number;
+    generatingCount: number;
 }
 
 export interface DeleteDirectoryResponse {
