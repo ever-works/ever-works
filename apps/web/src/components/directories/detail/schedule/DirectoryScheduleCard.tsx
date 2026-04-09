@@ -90,6 +90,7 @@ function ScheduleForm({
     pipelineProviders: ProviderOption[];
     activeProviders: ResolvedProvider[];
 }) {
+    const { directory } = useDirectoryDetail();
     const t = useTranslations('dashboard.directoryDetail.schedule.card');
     const router = useRouter();
 
@@ -131,28 +132,34 @@ function ScheduleForm({
         pipelineOverride: schedule.providerOverrides?.pipeline ?? undefined,
     });
 
-    const [form, setForm] = useState(deriveFormState);
-    const [dirty, setDirty] = useState(false);
-
-    // Stable serialization of object/array deps to avoid reference-equality re-fires
-    const providerOverridesKey = JSON.stringify(schedule.providerOverrides ?? null);
-    const allowedCadencesKey = JSON.stringify(allowances.map((a) => `${a.cadence}:${a.allowed}`));
-
-    useEffect(() => {
-        // Only sync from server when the user has no unsaved changes
-        if (!dirty) {
-            setForm(deriveFormState());
-        }
-    }, [
+    const derivedForm = useMemo(deriveFormState, [
         schedule.status,
         schedule.cadence,
         schedule.billingMode,
         schedule.maxFailureBeforePause,
         schedule.alwaysCreatePullRequest,
-        providerOverridesKey,
-        allowedCadencesKey,
-        dirty,
+        JSON.stringify(schedule.providerOverrides ?? null),
+        JSON.stringify(allowances.map((a) => `${a.cadence}:${a.allowed}`)),
     ]);
+
+    const [form, setForm] = useState(derivedForm);
+    const [dirty, setDirty] = useState(false);
+
+    useEffect(() => {
+        const formKey = JSON.stringify(form);
+        const derivedKey = JSON.stringify(derivedForm);
+
+        if (dirty) {
+            if (formKey === derivedKey) {
+                setDirty(false);
+            }
+            return;
+        }
+
+        if (formKey !== derivedKey) {
+            setForm(derivedForm);
+        }
+    }, [derivedForm, dirty, form]);
 
     const [isSaving, startSaving] = useTransition();
     const [isRunning, startRunning] = useTransition();
@@ -170,6 +177,7 @@ function ScheduleForm({
               : t('plans.unmetered');
 
     const isActive = schedule.status === DirectoryScheduleStatus.ACTIVE;
+    const isGenerationRunning = directory.generateStatus?.status === 'generating';
     const anyBusy = isSaving || isRunning;
 
     const toggleAutomation = () => {
@@ -198,7 +206,8 @@ function ScheduleForm({
                 return;
             }
 
-            setDirty(false);
+            const nextForm = { ...form, enable: !form.enable };
+            setForm(nextForm);
             toast.success(form.enable ? t('success.stopped') : t('success.started'));
             router.refresh();
         });
@@ -254,7 +263,7 @@ function ScheduleForm({
                 return;
             }
 
-            setDirty(false);
+            setForm(form);
             toast.success(result.message || t('success.saved'));
             router.refresh();
         });
@@ -483,7 +492,14 @@ function ScheduleForm({
                 <Button
                     variant="secondary"
                     onClick={runNow}
-                    disabled={anyBusy || !isActive}
+                    disabled={anyBusy || !isActive || isGenerationRunning}
+                    title={
+                        isGenerationRunning
+                            ? 'Generation is running, please wait it to finish'
+                            : !isActive
+                              ? 'Schedule must be active to run now'
+                              : undefined
+                    }
                     className="gap-2"
                 >
                     <PlayCircle className="h-4 w-4" aria-hidden />

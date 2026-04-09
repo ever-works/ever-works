@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { formatDistanceToNow } from 'date-fns';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
@@ -9,6 +9,8 @@ import { ActivityTypeBadge } from './ActivityTypeBadge';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
+import { TerminalLogViewer } from '@/components/directories/detail/shared/TerminalLogViewer';
+import type { GenerationStepLog } from '@/lib/api/types-only';
 
 interface ActivityTableProps {
     activities: ActivityLogEntry[];
@@ -118,6 +120,9 @@ function RawJsonPanel({
 export function ActivityTable({ activities, loading }: ActivityTableProps) {
     const t = useTranslations('dashboard.activity');
     const [expandedIds, setExpandedIds] = useState<string[]>([]);
+    const [hydratedActivities, setHydratedActivities] = useState<Record<string, ActivityLogEntry>>(
+        {},
+    );
 
     const toggleExpanded = (id: string) => {
         setExpandedIds((current) =>
@@ -125,8 +130,58 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
         );
     };
 
-    const handleRowKeyDown = (e: React.KeyboardEvent, id: string, hasDetails: boolean) => {
-        if (!hasDetails) return;
+    useEffect(() => {
+        const expandedInProgressIds = activities
+            .filter(
+                (activity) =>
+                    expandedIds.includes(activity.id) && activity.status === 'in_progress',
+            )
+            .map((activity) => activity.id);
+
+        if (expandedInProgressIds.length === 0) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const refreshActivity = async (id: string) => {
+            try {
+                const response = await fetch(`/api/activity-log/${id}`, {
+                    method: 'GET',
+                    cache: 'no-store',
+                });
+
+                if (!response.ok) {
+                    return;
+                }
+
+                const data = (await response.json()) as { activity?: ActivityLogEntry };
+                if (!cancelled && data.activity) {
+                    setHydratedActivities((current) => ({
+                        ...current,
+                        [id]: data.activity!,
+                    }));
+                }
+            } catch {
+                // Ignore transient network errors during background refresh.
+            }
+        };
+
+        void Promise.all(expandedInProgressIds.map((id) => refreshActivity(id)));
+
+        const interval = setInterval(() => {
+            if (!document.hidden) {
+                void Promise.all(expandedInProgressIds.map((id) => refreshActivity(id)));
+            }
+        }, 3000);
+
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [activities, expandedIds]);
+
+    const handleRowKeyDown = (e: React.KeyboardEvent, id: string) => {
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             toggleExpanded(id);
@@ -187,39 +242,43 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                         )}
                         {activities.map((activity) => {
                             const isExpanded = expandedIds.includes(activity.id);
-                            const hasDetails = hasStructuredData(activity.details);
-                            const hasMetadata = hasStructuredData(activity.metadata);
+                            const hydratedActivity = hydratedActivities[activity.id] ?? activity;
+                            const liveLogs = hydratedActivity.details?.liveLogs as
+                                | GenerationStepLog[]
+                                | undefined;
+                            const detailsWithoutLiveLogs = hydratedActivity.details
+                                ? Object.fromEntries(
+                                      Object.entries(hydratedActivity.details).filter(
+                                          ([key]) => key !== 'liveLogs',
+                                      ),
+                                  )
+                                : undefined;
+                            const hasDetails = hasStructuredData(detailsWithoutLiveLogs);
+                            const hasMetadata = hasStructuredData(hydratedActivity.metadata);
                             const hasStructuredContent = hasDetails || hasMetadata;
 
                             return (
                                 <Fragment key={activity.id}>
                                     <tr
-                                        className={`bg-card dark:bg-transparent hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors ${hasStructuredContent ? 'cursor-pointer' : ''}`}
-                                        onClick={() =>
-                                            hasStructuredContent && toggleExpanded(activity.id)
-                                        }
-                                        onKeyDown={(e) =>
-                                            handleRowKeyDown(e, activity.id, hasStructuredContent)
-                                        }
-                                        tabIndex={hasStructuredContent ? 0 : undefined}
-                                        role={hasStructuredContent ? 'button' : undefined}
-                                        aria-expanded={
-                                            hasStructuredContent ? isExpanded : undefined
-                                        }
+                                        className="bg-card dark:bg-transparent hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors cursor-pointer"
+                                        onClick={() => toggleExpanded(activity.id)}
+                                        onKeyDown={(e) => handleRowKeyDown(e, activity.id)}
+                                        tabIndex={0}
+                                        role="button"
+                                        aria-expanded={isExpanded}
                                     >
                                         <td className="px-3 py-3 text-center">
-                                            {hasStructuredContent &&
-                                                (isExpanded ? (
-                                                    <ChevronDown
-                                                        className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
-                                                        aria-hidden="true"
-                                                    />
-                                                ) : (
-                                                    <ChevronRight
-                                                        className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
-                                                        aria-hidden="true"
-                                                    />
-                                                ))}
+                                            {isExpanded ? (
+                                                <ChevronDown
+                                                    className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
+                                                    aria-hidden="true"
+                                                />
+                                            ) : (
+                                                <ChevronRight
+                                                    className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
+                                                    aria-hidden="true"
+                                                />
+                                            )}
                                         </td>
                                         <td className="px-4 py-3">
                                             <ActivityStatusBadge status={activity.status} />
@@ -257,97 +316,109 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                         </td>
                                         <td className="px-4 py-3 text-xs text-text dark:text-text-dark max-w-md">
                                             <div className="space-y-1">
-                                                <div className="truncate">{activity.summary}</div>
-                                                {hasStructuredContent && (
-                                                    <button
-                                                        type="button"
-                                                        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            toggleExpanded(activity.id);
-                                                        }}
-                                                    >
-                                                        {isExpanded
-                                                            ? t('detail.collapse')
-                                                            : t('detail.expand')}
-                                                    </button>
-                                                )}
+                                                <div className="line-clamp-3 break-words">
+                                                    {activity.summary}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toggleExpanded(activity.id);
+                                                    }}
+                                                >
+                                                    {isExpanded
+                                                        ? t('detail.collapse')
+                                                        : t('detail.expand')}
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
-                                    {hasStructuredContent && (
-                                        <tr
-                                            className={
-                                                isExpanded ? 'bg-muted/20 dark:bg-muted/10' : ''
-                                            }
-                                        >
-                                            <td colSpan={6} style={{ padding: 0 }}>
-                                                <div
-                                                    style={{
-                                                        display: 'grid',
-                                                        gridTemplateRows: isExpanded
-                                                            ? '1fr'
-                                                            : '0fr',
-                                                        transition: 'grid-template-rows 300ms ease',
-                                                    }}
-                                                >
-                                                    <div className="overflow-hidden">
-                                                        <div className="px-6 py-4 space-y-3">
-                                                            <h4 className="text-xs font-semibold text-text dark:text-text-dark">
-                                                                {t('detail.title')}
-                                                            </h4>
-                                                            <div className="rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark/30 p-3">
-                                                                <p className="text-xs mb-4 font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-                                                                    {t('detail.event')}
+                                    <tr
+                                        className={isExpanded ? 'bg-muted/20 dark:bg-muted/10' : ''}
+                                    >
+                                        <td colSpan={6} style={{ padding: 0 }}>
+                                            <div
+                                                style={{
+                                                    display: 'grid',
+                                                    gridTemplateRows: isExpanded ? '1fr' : '0fr',
+                                                    transition: 'grid-template-rows 300ms ease',
+                                                }}
+                                            >
+                                                <div className="overflow-hidden">
+                                                    <div className="px-6 py-4 space-y-3">
+                                                        <h4 className="text-xs font-semibold text-text dark:text-text-dark">
+                                                            {t('detail.title')}
+                                                        </h4>
+                                                        <div className="rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark/30 p-3">
+                                                            <p className="text-xs mb-4 font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
+                                                                {t('detail.event')}
+                                                            </p>
+                                                            <div className="mt-2 space-y-2 text-xs text-text dark:text-text-dark">
+                                                                <p className="mb-3">
+                                                                    <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
+                                                                        {t('detail.action')}:
+                                                                    </span>{' '}
+                                                                    <code className="text-xs font-mono px-2 py-0.5 rounded bg-muted/40 dark:bg-muted/20 text-text dark:text-text-dark border border-border dark:border-border-dark">
+                                                                        {hydratedActivity.action}
+                                                                    </code>
                                                                 </p>
-                                                                <div className="mt-2 space-y-2 text-xs text-text dark:text-text-dark">
-                                                                    <p className="mb-3">
-                                                                        <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
-                                                                            {t('detail.action')}:
-                                                                        </span>{' '}
-                                                                        <code className="text-xs font-mono px-2 py-0.5 rounded bg-muted/40 dark:bg-muted/20 text-text dark:text-text-dark border border-border dark:border-border-dark">
-                                                                            {activity.action}
-                                                                        </code>
-                                                                    </p>
-                                                                    <p className="mb-3">
-                                                                        <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
-                                                                            {t('detail.status')}:
-                                                                        </span>{' '}
-                                                                        <ActivityStatusBadge
-                                                                            status={activity.status}
-                                                                        />
-                                                                    </p>
-                                                                    <p>
-                                                                        <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
-                                                                            {t('detail.created')}:
-                                                                        </span>{' '}
-                                                                        <span className="text-[11px] text-text-muted dark:text-text-muted-dark">
-                                                                            {new Date(
-                                                                                activity.createdAt,
-                                                                            ).toLocaleString()}
-                                                                        </span>
-                                                                    </p>
-                                                                </div>
+                                                                <p className="mb-3">
+                                                                    <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
+                                                                        {t('detail.status')}:
+                                                                    </span>{' '}
+                                                                    <ActivityStatusBadge
+                                                                        status={
+                                                                            hydratedActivity.status
+                                                                        }
+                                                                    />
+                                                                </p>
+                                                                <p>
+                                                                    <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
+                                                                        {t('detail.created')}:
+                                                                    </span>{' '}
+                                                                    <span className="text-[11px] text-text-muted dark:text-text-muted-dark">
+                                                                        {new Date(
+                                                                            hydratedActivity.createdAt,
+                                                                        ).toLocaleString()}
+                                                                    </span>
+                                                                </p>
                                                             </div>
-                                                            <StructuredSection
-                                                                title={t('detail.fields')}
-                                                                data={activity.details}
-                                                            />
-                                                            <StructuredSection
-                                                                title={t('detail.metadata')}
-                                                                data={activity.metadata}
-                                                            />
-                                                            <RawJsonPanel
-                                                                title={t('detail.rawJson')}
-                                                                details={activity.details}
-                                                                metadata={activity.metadata}
-                                                            />
                                                         </div>
+                                                        {liveLogs && liveLogs.length > 0 && (
+                                                            <section className="space-y-2">
+                                                                <h5 className="text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
+                                                                    Live Logs
+                                                                </h5>
+                                                                <TerminalLogViewer
+                                                                    logs={liveLogs}
+                                                                    title="Generation"
+                                                                    maxHeight="max-h-72"
+                                                                    showCursor={
+                                                                        hydratedActivity.status ===
+                                                                        'in_progress'
+                                                                    }
+                                                                />
+                                                            </section>
+                                                        )}
+                                                        <StructuredSection
+                                                            title={t('detail.fields')}
+                                                            data={detailsWithoutLiveLogs}
+                                                        />
+                                                        <StructuredSection
+                                                            title={t('detail.metadata')}
+                                                            data={hydratedActivity.metadata}
+                                                        />
+                                                        <RawJsonPanel
+                                                            title={t('detail.rawJson')}
+                                                            details={detailsWithoutLiveLogs}
+                                                            metadata={hydratedActivity.metadata}
+                                                        />
                                                     </div>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    )}
+                                            </div>
+                                        </td>
+                                    </tr>
                                 </Fragment>
                             );
                         })}

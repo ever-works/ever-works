@@ -419,6 +419,11 @@
         "directories": {
             "title": "Directories",
             "subtitle": "Manage and organize your AI-powered directories",
+            "summary": {
+                "totalDirectories": "Total Directories",
+                "generating": "Generating",
+                "totalItems": "Total Items"
+            },
             "recent": "Recent Directories",
             "viewAll": "View all ({count})",
             "search": "Search directories...",

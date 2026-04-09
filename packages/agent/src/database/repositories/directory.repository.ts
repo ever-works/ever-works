@@ -365,14 +365,16 @@ export class DirectoryRepository {
     /**
      * Get aggregated stats for all directories accessible to a user.
      */
-    async getAccessibleStats(options: {
-        userId: string;
-        memberDirectoryIds?: string[];
-    }): Promise<{ totalDirectories: number; totalItems: number; activeWebsites: number }> {
+    async getAccessibleStats(options: { userId: string; memberDirectoryIds?: string[] }): Promise<{
+        totalDirectories: number;
+        totalItems: number;
+        activeWebsites: number;
+        generatingCount: number;
+    }> {
         const { userId, memberDirectoryIds = [] } = options;
 
         if (!userId) {
-            return { totalDirectories: 0, totalItems: 0, activeWebsites: 0 };
+            return { totalDirectories: 0, totalItems: 0, activeWebsites: 0, generatingCount: 0 };
         }
 
         const queryBuilder = this.repository.createQueryBuilder('directory');
@@ -397,12 +399,17 @@ export class DirectoryRepository {
                 "COALESCE(SUM(CASE WHEN directory.website IS NOT NULL AND directory.website != '' THEN 1 ELSE 0 END), 0)",
                 'activeWebsites',
             )
+            .addSelect(
+                'COALESCE(SUM(CASE WHEN directory.generationStartedAt IS NOT NULL AND directory.generationFinishedAt IS NULL THEN 1 ELSE 0 END), 0)',
+                'generatingCount',
+            )
             .getRawOne();
 
         return {
             totalDirectories: parseInt(result.totalDirectories, 10) || 0,
             totalItems: parseInt(result.totalItems, 10) || 0,
             activeWebsites: parseInt(result.activeWebsites, 10) || 0,
+            generatingCount: parseInt(result.generatingCount, 10) || 0,
         };
     }
 
