@@ -84,6 +84,7 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                     className={cn(
                         'px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap shrink-0',
                         statusConfig.badge,
+                        isGenerating && 'animate-pulse',
                     )}
                 >
                     {statusLabel}
