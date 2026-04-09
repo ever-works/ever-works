@@ -74,11 +74,7 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                             <StatusIcon
                                 className={cn('w-3 h-3', statusStyle.animate && 'animate-spin')}
                             />
-                            {statusStyle.animate ? (
-                                <ShinyText text={statusLabel} />
-                            ) : (
-                                statusLabel
-                            )}
+                            {statusStyle.animate ? <ShinyText text={statusLabel} /> : statusLabel}
                             {directory.generateStatus?.step && statusStyle.animate && (
                                 <span className="text-xs opacity-75">
                                     •{' '}
