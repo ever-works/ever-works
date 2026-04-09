@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { EventEmitterModule } from '@nestjs/event-emitter';
 
 import { FacadesModule } from '../facades/facades.module';
 
@@ -35,7 +34,7 @@ const EXPORTS = [
  * Access them via PluginRegistryService.getByCapability('pipeline').
  */
 @Module({
-    imports: [FacadesModule, EventEmitterModule.forRoot()],
+    imports: [FacadesModule],
     providers: PROVIDERS,
     exports: EXPORTS,
 })

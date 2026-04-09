@@ -17,9 +17,9 @@
 	"dependencies": {
 		"@apidevtools/swagger-parser": "^12.1.0",
 		"@modelcontextprotocol/sdk": "^1.27.1",
-		"@nestjs/common": "^11.1.13",
-		"@nestjs/core": "^11.1.13",
-		"@nestjs/platform-express": "^11.1.13",
+		"@nestjs/common": "^11.1.18",
+		"@nestjs/core": "^11.1.18",
+		"@nestjs/platform-express": "^11.1.18",
 		"@rekog/mcp-nest": "^1.9.6",
 		"reflect-metadata": "^0.2.2",
 		"rxjs": "^7.8.2",

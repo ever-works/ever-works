@@ -24,8 +24,8 @@
 		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
-		"unpdf": "^1.4.0",
-		"axios": "^1.13.5"
+		"axios": "^1.15.0",
+		"unpdf": "^1.4.0"
 	},
 	"peerDependencies": {
 		"@ever-works/plugin": "workspace:*"
