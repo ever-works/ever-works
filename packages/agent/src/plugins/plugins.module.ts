@@ -1,6 +1,6 @@
 import { Module, Global, DynamicModule, Provider, OnModuleDestroy } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { EventEmitterModule } from '@nestjs/event-emitter';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Entities
 import { PluginEntity } from './entities/plugin.entity';
@@ -41,6 +41,10 @@ export const PLUGIN_ENTITIES = [PluginEntity, UserPluginEntity, DirectoryPluginE
  * All plugin-related providers
  */
 const PROVIDERS = [
+    {
+        provide: EventEmitter2,
+        useFactory: () => new EventEmitter2(),
+    },
     // Repositories
     PluginRepository,
     UserPluginRepository,
@@ -117,7 +121,7 @@ export class PluginsModule implements OnModuleDestroy {
     static forRoot(options: PluginsModuleOptions = {}): DynamicModule {
         return {
             module: PluginsModule,
-            imports: [TypeOrmModule.forFeature(PLUGIN_ENTITIES), EventEmitterModule.forRoot()],
+            imports: [TypeOrmModule.forFeature(PLUGIN_ENTITIES)],
             providers: [
                 {
                     provide: PLUGINS_MODULE_OPTIONS,
@@ -146,11 +150,7 @@ export class PluginsModule implements OnModuleDestroy {
 
         return {
             module: PluginsModule,
-            imports: [
-                ...(options.imports || []),
-                TypeOrmModule.forFeature(PLUGIN_ENTITIES),
-                EventEmitterModule.forRoot(),
-            ],
+            imports: [...(options.imports || []), TypeOrmModule.forFeature(PLUGIN_ENTITIES)],
             providers: [...asyncProviders, ...PROVIDERS],
             exports: [...EXPORTS, PLUGINS_MODULE_OPTIONS],
         };

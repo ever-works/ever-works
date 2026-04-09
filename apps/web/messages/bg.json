@@ -524,6 +524,9 @@
                     },
                     "cadence": {
                         "hourly": "На всеки час",
+                        "every_3_hours": "Every 3 hours",
+                        "every_8_hours": "Every 8 hours",
+                        "every_12_hours": "Every 12 hours",
                         "daily": "На всеки ден",
                         "weekly": "На всяка седмица",
                         "monthly": "На всеки месец"

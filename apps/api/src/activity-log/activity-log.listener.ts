@@ -42,6 +42,30 @@ export class ActivityLogListener {
                 directory.generateStatus?.status === 'error'
                     ? ActivityStatus.FAILED
                     : ActivityStatus.COMPLETED;
+            const summary =
+                status === ActivityStatus.FAILED
+                    ? `Generation failed for ${directory.name}`
+                    : `Generated ${itemCount} items for ${directory.name}`;
+            const details = {
+                itemsCount: itemCount,
+                generateStatus: directory.generateStatus,
+            };
+
+            const inProgressEntry =
+                await this.activityLogService.findLatestByUserDirectoryActionStatus({
+                    userId: directory.userId,
+                    directoryId: directory.id,
+                    actionType: ActivityActionType.GENERATION,
+                    status: ActivityStatus.IN_PROGRESS,
+                });
+
+            if (inProgressEntry) {
+                await this.activityLogService.updateStatus(inProgressEntry.id, status, details, {
+                    action: 'generation.completed',
+                    summary,
+                });
+                return;
+            }
 
             await this.activityLogService.log({
                 userId: directory.userId,
@@ -49,14 +73,8 @@ export class ActivityLogListener {
                 actionType: ActivityActionType.GENERATION,
                 action: 'generation.completed',
                 status,
-                summary:
-                    status === ActivityStatus.FAILED
-                        ? `Generation failed for ${directory.name}`
-                        : `Generated ${itemCount} items for ${directory.name}`,
-                details: {
-                    itemsCount: itemCount,
-                    generateStatus: directory.generateStatus,
-                },
+                summary,
+                details,
             });
         } catch (error) {
             this.logger.error('Failed to log generation completed activity:', error);

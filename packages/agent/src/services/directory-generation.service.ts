@@ -75,6 +75,7 @@ import {
     type DirectoryHistoryChangeEntry,
 } from '@ever-works/contracts/api';
 import { buildDirectoryChangelog } from '../utils/directory-changelog.utils';
+import { GenerationLogCollector } from '@src/generators/data-generator/generation-log-collector';
 
 export interface BulkCaptureImagesDto {
     itemSlugs?: string[];
@@ -1242,13 +1243,35 @@ Only include image URLs that are absolute URLs (starting with http).`;
             stats: null,
         };
         let generationError: unknown = null;
+        const logCollector = history?.id
+            ? new GenerationLogCollector(
+                  history.id,
+                  (historyId, logs) => this.generationHistoryRepository.appendLogs(historyId, logs),
+                  {
+                      onRecentLogsUpdated: async (logs) => {
+                          const currentDirectory = await this.directoryRepository.findById(
+                              directory.id,
+                          );
+                          if (!currentDirectory?.generateStatus) {
+                              return;
+                          }
+
+                          await this.directoryRepository.updateGenerateStatus(directory.id, {
+                              ...currentDirectory.generateStatus,
+                              recentLogs: logs,
+                          });
+                      },
+                  },
+              )
+            : undefined;
 
         try {
-            await this.executeGenerationPipeline(directory, user, dto, context, acc);
+            await this.executeGenerationPipeline(directory, user, dto, context, acc, logCollector);
         } catch (error) {
             generationError = error;
         } finally {
             try {
+                await logCollector?.dispose();
                 await this.finalizeGeneration({
                     directoryId: directory.id,
                     startTime,
@@ -1263,9 +1286,10 @@ Only include image URLs that are absolute URLs (starting with http).`;
             }
         }
 
+        const completedDirectory = await this.directoryRepository.findById(directory.id);
         this.eventEmitter.emit(
             DirectoryGenerationCompletedEvent.EVENT_NAME,
-            new DirectoryGenerationCompletedEvent(directory),
+            new DirectoryGenerationCompletedEvent(completedDirectory ?? directory),
         );
 
         if (generationError) {
@@ -1288,9 +1312,11 @@ Only include image URLs that are absolute URLs (starting with http).`;
         dto: CreateItemsGeneratorDto,
         context: GenerationTriggerContext,
         acc: { stats: GenerationStats | null; warnings?: string[] },
+        logCollector?: GenerationLogCollector,
     ): Promise<void> {
         const generated = await this.dataGenerator.initialize(directory, user, dto, {
             tryResume: context.triggeredBy === 'schedule',
+            logCollector,
         });
 
         acc.warnings = generated.warnings;

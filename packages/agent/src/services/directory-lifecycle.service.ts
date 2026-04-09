@@ -168,10 +168,6 @@ export class DirectoryLifecycleService {
                 directory.itemsCount !== snapshot.itemsCount
             ) {
                 updates.itemsCount = snapshot.itemsCount;
-
-                if (snapshot.itemsCount <= 0) {
-                    updates.generateStatus = null;
-                }
             }
 
             const prUpdate = snapshot.prUpdate;

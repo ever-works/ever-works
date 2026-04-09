@@ -22,6 +22,9 @@ const ALL_CADENCES: DirectoryScheduleCadence[] = [
     DirectoryScheduleCadence.MONTHLY,
     DirectoryScheduleCadence.WEEKLY,
     DirectoryScheduleCadence.DAILY,
+    DirectoryScheduleCadence.EVERY_12_HOURS,
+    DirectoryScheduleCadence.EVERY_8_HOURS,
+    DirectoryScheduleCadence.EVERY_3_HOURS,
     DirectoryScheduleCadence.HOURLY,
 ];
 
@@ -50,6 +53,7 @@ const PLAN_SEED_DATA: Array<{
             DirectoryScheduleCadence.MONTHLY,
             DirectoryScheduleCadence.WEEKLY,
             DirectoryScheduleCadence.DAILY,
+            DirectoryScheduleCadence.EVERY_12_HOURS,
         ],
         monthlyPrice: '29',
         overagePricePerRun: '8',
@@ -62,6 +66,9 @@ const PLAN_SEED_DATA: Array<{
             DirectoryScheduleCadence.MONTHLY,
             DirectoryScheduleCadence.WEEKLY,
             DirectoryScheduleCadence.DAILY,
+            DirectoryScheduleCadence.EVERY_12_HOURS,
+            DirectoryScheduleCadence.EVERY_8_HOURS,
+            DirectoryScheduleCadence.EVERY_3_HOURS,
             DirectoryScheduleCadence.HOURLY,
         ],
         monthlyPrice: '99',
@@ -171,7 +178,10 @@ export class SubscriptionService implements OnModuleInit {
     private recommendationForCadence(cadence: DirectoryScheduleCadence): string {
         switch (cadence) {
             case DirectoryScheduleCadence.HOURLY:
+            case DirectoryScheduleCadence.EVERY_3_HOURS:
+            case DirectoryScheduleCadence.EVERY_8_HOURS:
                 return 'Premium';
+            case DirectoryScheduleCadence.EVERY_12_HOURS:
             case DirectoryScheduleCadence.DAILY:
             case DirectoryScheduleCadence.WEEKLY:
                 return 'Standard';

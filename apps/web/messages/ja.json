@@ -524,6 +524,9 @@
                     },
                     "cadence": {
                         "hourly": "毎時",
+                        "every_3_hours": "Every 3 hours",
+                        "every_8_hours": "Every 8 hours",
+                        "every_12_hours": "Every 12 hours",
                         "daily": "毎日",
                         "weekly": "毎週",
                         "monthly": "毎月"

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { getActivityLog } from '@/app/actions/activity-log';
+import { getActivityLog, getActivitySummary } from '@/app/actions/activity-log';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
 import { ActivityTable } from '@/components/activity-log/ActivityTable';
 import { ActivityFilters } from '@/components/activity-log/ActivityFilters';
@@ -38,6 +38,12 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
     const [status, setStatus] = useState<string>(searchParams.get('status') || '');
     const [search, setSearch] = useState(searchParams.get('search') || '');
     const [debouncedSearch, setDebouncedSearch] = useState(search);
+    const [summary, setSummary] = useState({
+        pending: 0,
+        in_progress: 0,
+        completed: 0,
+        failed: 0,
+    });
 
     const requestIdRef = useRef(0);
     const hasMountedRef = useRef(false);
@@ -65,14 +71,18 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
     }, [search]);
 
     const fetchActivities = useCallback(
-        async (currentPage: number, silent = false) => {
+        async (
+            currentPage: number,
+            filters: { actionType: string; status: string; search: string },
+            silent = false,
+        ) => {
             const currentRequestId = ++requestIdRef.current;
             if (!silent) setLoading(true);
             try {
                 const response = await getActivityLog({
-                    actionType: actionType || undefined,
-                    status: status || undefined,
-                    search: debouncedSearch || undefined,
+                    actionType: filters.actionType || undefined,
+                    status: filters.status || undefined,
+                    search: filters.search || undefined,
                     limit: ITEMS_PER_PAGE,
                     offset: (currentPage - 1) * ITEMS_PER_PAGE,
                 });
@@ -92,14 +102,37 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                 }
             }
         },
-        [actionType, status, debouncedSearch, t],
+        [t],
     );
 
-    // Refetch on filter/search change (non-silent)
+    const fetchSummary = useCallback(async () => {
+        const response = await getActivitySummary();
+        if (response.success) {
+            setSummary(response.counts);
+        }
+    }, []);
+
+    // Reset pagination on filter/search change
     useEffect(() => {
         setPage(1);
-        fetchActivities(1);
-    }, [fetchActivities]);
+    }, [actionType, status, debouncedSearch]);
+
+    // Fetch for the current page + filters
+    useEffect(() => {
+        void fetchActivities(
+            page,
+            {
+                actionType,
+                status,
+                search: debouncedSearch,
+            },
+            false,
+        );
+    }, [page, actionType, status, debouncedSearch, fetchActivities]);
+
+    useEffect(() => {
+        void fetchSummary();
+    }, [fetchSummary]);
 
     // Polling — silent refresh, paused when tab is hidden
     useEffect(() => {
@@ -108,7 +141,16 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         const startPolling = () => {
             interval = setInterval(() => {
                 if (!document.hidden) {
-                    fetchActivities(page, true);
+                    void fetchSummary();
+                    void fetchActivities(
+                        page,
+                        {
+                            actionType,
+                            status,
+                            search: debouncedSearch,
+                        },
+                        true,
+                    );
                 }
             }, POLL_INTERVAL);
         };
@@ -117,7 +159,16 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
             clearInterval(interval);
             if (!document.hidden) {
                 // Immediately refresh when returning to tab, then resume polling
-                fetchActivities(page, true);
+                void fetchSummary();
+                void fetchActivities(
+                    page,
+                    {
+                        actionType,
+                        status,
+                        search: debouncedSearch,
+                    },
+                    true,
+                );
                 startPolling();
             }
         };
@@ -129,11 +180,10 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
             clearInterval(interval);
             document.removeEventListener('visibilitychange', handleVisibility);
         };
-    }, [fetchActivities, page]);
+    }, [fetchActivities, fetchSummary, page, actionType, status, debouncedSearch]);
 
     const handlePageChange = (newPage: number) => {
         setPage(newPage);
-        fetchActivities(newPage);
     };
 
     const handleClearFilters = () => {
@@ -174,6 +224,12 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
     };
 
     const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+    const summaryCards = [
+        { key: 'in_progress', count: summary.in_progress, label: t('filters.statuses.inProgress') },
+        { key: 'completed', count: summary.completed, label: t('filters.statuses.completed') },
+        { key: 'pending', count: summary.pending, label: t('filters.statuses.pending') },
+        { key: 'failed', count: summary.failed, label: t('filters.statuses.failed') },
+    ] as const;
 
     return (
         <div className="space-y-6">
@@ -193,6 +249,32 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                     <Download className="w-4 h-4" />
                     {t('actions.export')}
                 </button>
+            </div>
+
+            <div className="grid gap-3 @sm/main:grid-cols-2 @xl/main:grid-cols-4">
+                {summaryCards.map((card) => {
+                    const isActive = status === card.key;
+
+                    return (
+                        <button
+                            key={card.key}
+                            type="button"
+                            onClick={() => setStatus(isActive ? '' : card.key)}
+                            className={`rounded-xl border px-4 py-3 text-left transition-colors ${
+                                isActive
+                                    ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                                    : 'border-border dark:border-border-dark bg-card dark:bg-card-primary-dark/10 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark'
+                            }`}
+                        >
+                            <p className="text-xs uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
+                                {card.label}
+                            </p>
+                            <p className="mt-1 text-2xl font-semibold text-text dark:text-text-dark">
+                                {card.count.toLocaleString()}
+                            </p>
+                        </button>
+                    );
+                })}
             </div>
 
             <ActivityFilters
