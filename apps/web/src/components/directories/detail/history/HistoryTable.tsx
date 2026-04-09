@@ -23,7 +23,7 @@ const statusColor: Record<string, string> = {
         'bg-muted/60 text-text-muted ring-1 ring-border dark:bg-muted/20 dark:text-text-muted-dark dark:ring-border-dark',
 };
 
-const tdClass = 'px-3 py-3 text-sm text-text dark:text-text-dark align-middle tabular-nums';
+const tdClass = 'px-3 py-3 text-xs text-text dark:text-text-dark align-middle tabular-nums';
 
 function formatDuration(seconds?: number | null) {
     if (!seconds || seconds <= 0) {

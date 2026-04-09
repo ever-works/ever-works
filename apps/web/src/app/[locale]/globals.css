@@ -189,7 +189,6 @@ body {
 ::-webkit-scrollbar-corner {
     background: transparent;
 }
-
 .dark ::-webkit-scrollbar-thumb {
     background: rgba(71, 85, 105, 0.4);
 }
@@ -536,4 +535,223 @@ select:-webkit-autofill:focus {
     body {
         @apply bg-background text-foreground;
     }
+}
+
+/* ─── GenerationProgress ──────────────────────────────────────────────────── */
+
+/* Adaptive palette — light uses dark-ink tones, dark uses white-ink tones */
+:root {
+    --gp-ring-stroke: rgba(15, 23, 42, 0.15);
+    --gp-dot-hi: rgba(15, 23, 42, 0.55);
+    --gp-dot-mid: rgba(15, 23, 42, 0.35);
+    --gp-dot-lo: rgba(15, 23, 42, 0.18);
+    --gp-arc-stroke: rgba(15, 23, 42, 0.7);
+    --gp-core-bg: rgba(15, 23, 42, 0.04);
+    --gp-core-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(15, 23, 42, 0.07);
+    --gp-glow: rgba(15, 23, 42, 0.05);
+    --gp-pulse-bg: rgba(15, 23, 42, 0.06);
+    --gp-bar-track: rgba(15, 23, 42, 0.1);
+    --gp-bar-fill: rgba(15, 23, 42, 0.55);
+    --gp-bar-shimmer: rgba(255, 255, 255, 0.45);
+    --gp-hero-glow: rgba(15, 23, 42, 0.04);
+}
+
+.dark {
+    --gp-ring-stroke: rgba(255, 255, 255, 0.18);
+    --gp-dot-hi: rgba(255, 255, 255, 0.7);
+    --gp-dot-mid: rgba(255, 255, 255, 0.4);
+    --gp-dot-lo: rgba(255, 255, 255, 0.25);
+    --gp-arc-stroke: rgba(255, 255, 255, 0.8);
+    --gp-core-bg: rgba(255, 255, 255, 0.04);
+    --gp-core-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --gp-glow: rgba(255, 255, 255, 0.06);
+    --gp-pulse-bg: rgba(255, 255, 255, 0.08);
+    --gp-bar-track: rgba(255, 255, 255, 0.1);
+    --gp-bar-fill: rgba(255, 255, 255, 0.7);
+    --gp-bar-shimmer: rgba(255, 255, 255, 0.25);
+    --gp-hero-glow: rgba(255, 255, 255, 0.04);
+}
+
+/* ─── Keyframes ─────────────────────────────────────────────────────────────── */
+
+@keyframes gp-orbit-cw {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes gp-orbit-ccw {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(-360deg);
+    }
+}
+
+@keyframes gp-arc {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes gp-pulse-ring {
+    0% {
+        transform: scale(0.85);
+        opacity: 0.6;
+    }
+    100% {
+        transform: scale(1.55);
+        opacity: 0;
+    }
+}
+
+@keyframes gp-shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(200%);
+    }
+}
+
+@keyframes gp-enter {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ─── Utility classes ────────────────────────────────────────────────────────── */
+
+/* Pulse rings behind orb */
+.gp-pulse-ring {
+    position: absolute;
+    inset: 12px;
+    border-radius: 9999px;
+    background: var(--gp-pulse-bg);
+    animation: gp-pulse-ring 2.6s ease-out infinite;
+}
+.gp-pulse-ring:nth-child(2) {
+    animation-delay: 0.9s;
+}
+
+/* Orbit animations */
+.gp-orbit-cw {
+    animation: gp-orbit-cw 9s linear infinite;
+}
+.gp-orbit-ccw {
+    animation: gp-orbit-ccw 6s linear infinite;
+}
+
+/* Spinning arc on core ring */
+.gp-arc {
+    animation: gp-arc 1.8s linear infinite;
+}
+
+/* Progress bar shimmer */
+.gp-shimmer {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, var(--gp-bar-shimmer) 50%, transparent 100%);
+    animation: gp-shimmer 2.4s ease-in-out infinite;
+}
+
+/* Entrance animation for progress sections */
+.gp-enter {
+    animation: gp-enter 0.5s ease both;
+}
+
+/* ─── Animated loading dots ────────────────────────────────────────────────── */
+
+@keyframes shiny-dot {
+    0%,
+    100% {
+        opacity: 0.2;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+.shiny-dot {
+    display: inline-block;
+    animation: shiny-dot 1.2s ease-in-out infinite;
+    animation-fill-mode: backwards;
+    opacity: 0.2;
+    color: var(--color-text-secondary, #64748b);
+}
+
+:is(.dark) .shiny-dot {
+    color: var(--color-text-secondary-dark, #9ca3af);
+}
+
+/* ─── ShinyText: letter-by-letter wave ──────────────────────────────────────── */
+
+@keyframes shiny-letter {
+    0%,
+    100% {
+        color: var(--color-text-secondary);
+        opacity: 0.55;
+    }
+    50% {
+        color: var(--color-text);
+        opacity: 1;
+    }
+}
+
+:is(.dark) .shiny-letter {
+    --color-text-secondary: var(--color-text-secondary-dark, #94a3b8);
+    --color-text: var(--color-text-dark, #f1f5f9);
+}
+
+.shiny-letter {
+    display: inline-block;
+    animation-name: shiny-letter;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    animation-fill-mode: backwards;
+    will-change: color, opacity;
+    --color-text-secondary: #64748b;
+    --color-text: #0f172a;
+    /* Start at the muted state so there's no flash before the first cycle */
+    color: var(--color-text-secondary);
+    opacity: 0.55;
+}
+
+/* ─── Sidebar activity indicator ────────────────────────────────────────────── */
+
+@keyframes sidebar-activity-ping {
+    0% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+    75%,
+    100% {
+        transform: scale(2.2);
+        opacity: 0;
+    }
+}
+
+.sidebar-activity-dot {
+    position: relative;
+}
+
+.sidebar-activity-dot::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: inherit;
+    animation: sidebar-activity-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
 }

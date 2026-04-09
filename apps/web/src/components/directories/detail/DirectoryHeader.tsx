@@ -10,6 +10,7 @@ import { useDirectoryDetail, useDirectoryPermissions } from './DirectoryDetailCo
 import { getStepText, getItemsProcessedText } from '@/lib/utils/generator-steps';
 import { buildPublicComparisonUrl } from '@/lib/utils/comparison';
 import { Link, usePathname } from '@/i18n/navigation';
+import { ShinyText } from '@/components/ui/ShinyText';
 
 interface DirectoryHeaderProps {
     directory: Directory;
@@ -69,7 +70,11 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                             <StatusIcon
                                 className={cn('w-3 h-3', statusStyle.animate && 'animate-spin')}
                             />
-                            {t(`status.${statusStyle.labelKey}`)}
+                            {statusStyle.animate ? (
+                                <ShinyText text={t(`status.${statusStyle.labelKey}`)} />
+                            ) : (
+                                t(`status.${statusStyle.labelKey}`)
+                            )}
                             {directory.generateStatus?.step && statusStyle.animate && (
                                 <span className="text-xs opacity-75">
                                     •{' '}
