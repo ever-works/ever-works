@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
-import { refreshAccessToken } from '@/lib/auth/refresh';
 
 async function fetchActivity(id: string, authToken?: string) {
     const headers = new Headers();
@@ -20,15 +19,7 @@ async function fetchActivity(id: string, authToken?: string) {
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const token = await getAuthAccessCookie();
-    let response = await fetchActivity(id, token);
-
-    if (response.status === 401 && token) {
-        const refreshed = await refreshAccessToken();
-        if (refreshed) {
-            const newToken = await getAuthAccessCookie();
-            response = await fetchActivity(id, newToken);
-        }
-    }
+    const response = await fetchActivity(id, token);
 
     if (!response.ok) {
         return NextResponse.json(
