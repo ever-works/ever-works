@@ -105,6 +105,24 @@ describe('process-runner', () => {
 		await run.promise;
 	});
 
+	it('adds the dangerous bypass flag only when explicitly enabled', async () => {
+		const run = executeCodex({
+			prompt: 'Generate items',
+			cwd: '/tmp/workspace',
+			env: {},
+			bypassApprovalsAndSandbox: true
+		});
+
+		expect(spawnMock).toHaveBeenCalledWith(
+			'codex',
+			['exec', '--dangerously-bypass-approvals-and-sandbox', '--skip-git-repo-check', 'Generate items'],
+			expect.any(Object)
+		);
+
+		child.emit('exit', 0);
+		await run.promise;
+	});
+
 	it('kills the child process when aborted', async () => {
 		const controller = new AbortController();
 

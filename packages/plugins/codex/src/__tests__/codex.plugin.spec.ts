@@ -249,6 +249,25 @@ describe('CodexPlugin', () => {
 			);
 		});
 
+		it('passes the unsafe bypass flag to the runner when enabled in settings', async () => {
+			vi.mocked(pipelineHelpers.resolveSettings).mockResolvedValueOnce({
+				apiKey: 'sk-test',
+				model: 'codex-mini-latest',
+				unsafeBypassSandbox: true
+			});
+
+			await plugin.onLoad(createMockContext());
+
+			const result = await plugin.execute(directory, request, existing);
+
+			expect(result.success).toBe(true);
+			expect(processRunner.executeCodex).toHaveBeenCalledWith(
+				expect.objectContaining({
+					bypassApprovalsAndSandbox: true
+				})
+			);
+		});
+
 		it('completes the screenshot step when a screenshot facade is available', async () => {
 			await plugin.onLoad(createMockContext());
 

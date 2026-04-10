@@ -69,7 +69,12 @@ async function main() {
 
 		const result = await runCommand(
 			'codex',
-			['exec', '--full-auto', '--skip-git-repo-check', prompt],
+			[
+				'exec',
+				...(process.env.CODEX_SMOKE_BYPASS_SANDBOX ? ['--dangerously-bypass-approvals-and-sandbox'] : ['--full-auto']),
+				'--skip-git-repo-check',
+				prompt
+			],
 			{
 				cwd: workspace,
 				env: process.env

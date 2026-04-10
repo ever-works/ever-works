@@ -9,6 +9,7 @@ export interface ExecuteOptions {
 	readonly cwd: string;
 	readonly env: Record<string, string>;
 	readonly model?: string;
+	readonly bypassApprovalsAndSandbox?: boolean;
 	readonly signal?: AbortSignal;
 	readonly onStdoutLine?: (line: string) => void;
 	readonly onStderrLine?: (line: string) => void;
@@ -50,7 +51,13 @@ export function executeCodex(options: ExecuteOptions): {
 	const promise = new Promise<ExecuteResult>((resolve, reject) => {
 		const startTime = Date.now();
 
-		const args = ['exec', '--full-auto', '--skip-git-repo-check'];
+		const args = ['exec'];
+		if (options.bypassApprovalsAndSandbox) {
+			args.push('--dangerously-bypass-approvals-and-sandbox');
+		} else {
+			args.push('--full-auto');
+		}
+		args.push('--skip-git-repo-check');
 		if (options.model) {
 			args.push('--model', options.model);
 		}

@@ -142,6 +142,14 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				'x-widget': 'model-select',
 				default: DEFAULT_MODEL,
 				description: 'Model to use for Codex generation'
+			},
+			unsafeBypassSandbox: {
+				type: 'boolean',
+				title: 'Unsafe Sandbox Bypass',
+				description:
+					'Allow Codex to run with --dangerously-bypass-approvals-and-sandbox for hosts where Codex sandboxing is incompatible.',
+				default: false,
+				'x-hidden': true
 			}
 		}
 	};
@@ -204,6 +212,17 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			return {
 				valid: false,
 				errors: [{ path: 'apiKey', message: 'API key must be a string when provided' }]
+			};
+		}
+		if (settings.unsafeBypassSandbox !== undefined && typeof settings.unsafeBypassSandbox !== 'boolean') {
+			return {
+				valid: false,
+				errors: [
+					{
+						path: 'unsafeBypassSandbox',
+						message: 'Unsafe sandbox bypass must be a boolean when provided'
+					}
+				]
 			};
 		}
 
@@ -303,6 +322,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				cwd: workspacePath,
 				env: executionAuth.env,
 				model: typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL,
+				bypassApprovalsAndSandbox: settings.unsafeBypassSandbox === true,
 				prompt,
 				signal,
 				onStdoutLine: (line) => {
