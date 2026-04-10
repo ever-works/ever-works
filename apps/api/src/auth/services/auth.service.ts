@@ -15,6 +15,7 @@ import { UserCreatedEvent, UserConfirmedEvent, UserForgotPasswordEvent } from '.
 import { ForgotPasswordDto } from '../dto/email-verification.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import type { SocialAuthUser } from '../types/social-auth.types';
+import { AuthSyncService } from '../providers/auth-sync.service';
 
 @Injectable()
 export class AuthService {
@@ -25,6 +26,7 @@ export class AuthService {
     constructor(
         private readonly userRepository: UserRepository,
         private readonly oauthTokenRepository: OAuthTokenRepository,
+        private readonly authSyncService: AuthSyncService,
         private eventEmitter: EventEmitter2,
     ) {
         this.webAppUrl = config.webAppUrl();
@@ -95,6 +97,8 @@ export class AuthService {
             scope: socialUser.scope || null,
             metadata: socialUser.metadata || {},
         });
+
+        await this.authSyncService.syncSocialAccount(user.id, socialUser);
 
         return user;
     }
