@@ -11,6 +11,7 @@ import { AuthSyncService } from './providers/auth-sync.service';
 import { createAuthRuntimeInstance } from './providers/auth-runtime.instance';
 import { SocialAuthService } from './services/social-auth.service';
 import { AuthSessionGuard } from './guards/auth-session.guard';
+import { DataSource } from 'typeorm';
 import {
     DatabaseModule,
     ApiKeyRepository,
@@ -37,7 +38,8 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
         },
         {
             provide: AUTH_RUNTIME_INSTANCE,
-            useFactory: createAuthRuntimeInstance,
+            inject: [DataSource],
+            useFactory: (dataSource: DataSource) => createAuthRuntimeInstance(dataSource),
         },
     ],
     controllers: [OAuthController, AuthController, ApiKeysController],

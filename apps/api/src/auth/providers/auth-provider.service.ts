@@ -155,8 +155,8 @@ export class AuthProviderService extends AuthProvider {
         newPassword: string,
         headers: Headers,
     ): Promise<void> {
-        const session = await this.requireSession(headers);
-        const passwordHash = await this.authSyncService.getCredentialPasswordHash(session.user.id);
+        const user = await this.requireAuthenticatedUser(headers);
+        const passwordHash = await this.authSyncService.getCredentialPasswordHash(user.id);
         if (!passwordHash) {
             throw new UnauthorizedException('Password login is not configured for this account');
         }
@@ -166,7 +166,7 @@ export class AuthProviderService extends AuthProvider {
             throw new UnauthorizedException('Current password is incorrect');
         }
 
-        await this.setPassword(session.user.id, newPassword);
+        await this.setPassword(user.id, newPassword);
     }
 
     async setPassword(userId: string, newPassword: string): Promise<void> {
@@ -196,24 +196,33 @@ export class AuthProviderService extends AuthProvider {
         return (await this.auth.$context) as AuthRuntimeContext;
     }
 
-    private async requireSession(headers: Headers) {
+    private async requireAuthenticatedUser(headers: Headers) {
         const bearerToken = this.getBearerToken(headers);
-        if (!bearerToken) {
+        if (bearerToken) {
+            const session = await this.findSessionRecord(bearerToken);
+            if (!session) {
+                throw new UnauthorizedException('Invalid session');
+            }
+
+            if (session.expiresAt.getTime() <= Date.now()) {
+                await this.deleteSessionRecord(bearerToken);
+                throw new UnauthorizedException('Session expired');
+            }
+
+            return this.assertActiveUser(session.userId);
+        }
+
+        const session = await this.auth.api.getSession({ headers });
+        if (!session) {
             throw new UnauthorizedException('Missing session token');
         }
 
-        const session = await this.findSessionRecord(bearerToken);
-        if (!session) {
-            throw new UnauthorizedException('Invalid session');
+        if ((session.user as AuthRuntimeUser).isActive === false) {
+            await this.signOutAll(session.user.id);
+            throw new UnauthorizedException('User account is suspended');
         }
 
-        if (session.expiresAt.getTime() <= Date.now()) {
-            await this.deleteSessionRecord(bearerToken);
-            throw new UnauthorizedException('Session expired');
-        }
-
-        const user = await this.assertActiveUser(session.userId);
-        return { session, user };
+        return this.assertActiveUser(session.user.id);
     }
 
     private async assertActiveUser(userId: string) {

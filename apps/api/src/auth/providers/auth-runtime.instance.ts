@@ -1,12 +1,7 @@
-import * as fs from 'node:fs';
-import * as os from 'node:os';
-import * as path from 'node:path';
-import Database from 'better-sqlite3';
-import { createPool } from 'mysql2/promise';
-import { Pool } from 'pg';
 import { betterAuth } from 'better-auth';
 import type { BetterAuthOptions } from 'better-auth';
 import { bearer } from 'better-auth/plugins';
+import { DataSource } from 'typeorm';
 import { AUTH_RUNTIME_BASE_PATH } from './auth-provider.constants';
 import { config, AuthProvider as RegistrationProvider } from '../../config/constants';
 import * as bcrypt from 'bcrypt';
@@ -14,71 +9,31 @@ import * as bcrypt from 'bcrypt';
 const AUTH_PROVIDER_PLACEHOLDER_PASSWORD_HASH =
     '$2b$10$3FpU5KTq.lf4tUSzT4i0JOuuywnxGPnkKorObPlIEG14V0wl17ANS';
 
-function resolveSqliteDatabasePath() {
-    const explicitPath = process.env.DATABASE_PATH;
-    if (explicitPath && explicitPath !== ':memory:') {
-        return explicitPath;
+function getInitializedDatabaseClient(dataSource: DataSource): any {
+    const driver = dataSource.driver as any;
+
+    switch (dataSource.options.type) {
+        case 'better-sqlite3':
+            if (driver.databaseConnection) {
+                return driver.databaseConnection;
+            }
+            break;
+        case 'postgres':
+            if (driver.master) {
+                return driver.master;
+            }
+            break;
+        case 'mysql':
+        case 'mariadb':
+            if (driver.pool) {
+                return driver.pool;
+            }
+            break;
     }
 
-    if (process.env.DATABASE_IN_MEMORY === 'true') {
-        throw new Error(
-            'Auth runtime requires a persistent shared database. In-memory SQLite is not supported.',
-        );
-    }
-
-    const environment = process.env.NODE_ENV || 'development';
-    const appType = process.env.APP_TYPE || 'api';
-
-    if (appType === 'cli') {
-        return path.join(os.homedir(), '.ever-works', 'ever-works.db');
-    }
-
-    if (environment === 'test') {
-        return path.join(os.tmpdir(), 'ever-works-api.test.db');
-    }
-
-    return path.join(os.homedir(), '.ever-works', 'ever-works-api.db');
-}
-
-function createDatabaseClient() {
-    const dbUrl = process.env.DATABASE_URL;
-    const dbType = process.env.DATABASE_TYPE || 'sqlite';
-
-    if (dbUrl?.startsWith('postgres://') || dbUrl?.startsWith('postgresql://')) {
-        return new Pool({ connectionString: dbUrl });
-    }
-
-    if (dbUrl?.startsWith('mysql://') || dbUrl?.startsWith('mariadb://')) {
-        return createPool(dbUrl);
-    }
-
-    if (dbType.includes('postgres')) {
-        return new Pool({
-            host: process.env.DATABASE_HOST || 'localhost',
-            port: parseInt(process.env.DATABASE_PORT || '5432', 10),
-            user: process.env.DATABASE_USERNAME || 'postgres',
-            password: process.env.DATABASE_PASSWORD || '',
-            database: process.env.DATABASE_NAME || 'ever_works',
-        });
-    }
-
-    if (dbType.includes('mysql') || dbType.includes('mariadb')) {
-        return createPool({
-            host: process.env.DATABASE_HOST || 'localhost',
-            port: parseInt(process.env.DATABASE_PORT || '3306', 10),
-            user: process.env.DATABASE_USERNAME || 'root',
-            password: process.env.DATABASE_PASSWORD || '',
-            database: process.env.DATABASE_NAME || 'ever_works',
-        });
-    }
-
-    const sqlitePath = resolveSqliteDatabasePath();
-    const sqliteDir = path.dirname(sqlitePath);
-    if (!fs.existsSync(sqliteDir)) {
-        fs.mkdirSync(sqliteDir, { recursive: true });
-    }
-
-    return new Database(sqlitePath);
+    throw new Error(
+        `Unable to resolve Better Auth database client from initialized TypeORM driver "${dataSource.options.type}".`,
+    );
 }
 
 function getTrustedOrigins() {
@@ -97,9 +52,13 @@ function getTrustedOrigins() {
     return [...origins];
 }
 
-export function createAuthRuntimeInstance() {
+export function createAuthRuntimeInstance(dataSource: DataSource) {
+    if (!dataSource.isInitialized) {
+        throw new Error('Auth runtime requires an initialized TypeORM DataSource.');
+    }
+
     const options: BetterAuthOptions = {
-        database: createDatabaseClient(),
+        database: getInitializedDatabaseClient(dataSource),
         baseURL:
             process.env.AUTH_URL ||
             `http://localhost:${process.env.PORT || 3100}${AUTH_RUNTIME_BASE_PATH}`,

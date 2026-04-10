@@ -1,5 +1,4 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
-import { TimestampColumn } from './_types';
 
 @Entity({ name: 'session' })
 @Index(['token'], { unique: true })
@@ -11,10 +10,10 @@ export class AuthSession {
     @Column({ type: 'varchar' })
     userId: string;
 
-    @Column({ type: 'text' })
+    @Column({ type: 'varchar' })
     token: string;
 
-    @TimestampColumn()
+    @Column()
     expiresAt: Date;
 
     @Column({ type: 'varchar', nullable: true })
