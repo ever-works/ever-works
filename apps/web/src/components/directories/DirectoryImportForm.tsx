@@ -268,8 +268,8 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
             <div
                 className={cn(
                     'p-6 rounded-lg',
-                    'bg-card dark:bg-card-primary-dark',
-                    'border hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark',
+                    'bg-card dark:bg-transparent',
+                    'border',
                 )}
             >
                 {step === 'source' && (
