@@ -1,9 +1,179 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { PluginContext, PluginSettings } from '@ever-works/plugin';
+
 import { CodexPlugin } from '../codex.plugin.js';
+import * as pipelineHelpers from '../utils/pipeline-helpers.js';
+import * as processRunner from '../utils/process-runner.js';
+import * as workspaceManager from '../utils/workspace-manager.js';
+import * as screenshotCapture from '../utils/screenshot-capture.js';
+
+vi.mock('../utils/pipeline-helpers.js', async () => {
+	const actual = await vi.importActual<typeof import('../utils/pipeline-helpers.js')>(
+		'../utils/pipeline-helpers.js'
+	);
+
+	return {
+		...actual,
+		resolveSettings: vi.fn(),
+		resolveExecutionAuth: vi.fn(),
+		hasLocalCodexAuth: vi.fn()
+	};
+});
+
+vi.mock('../utils/process-runner.js', () => ({
+	executeCodex: vi.fn()
+}));
+
+vi.mock('../utils/workspace-manager.js', async () => {
+	const actual = await vi.importActual<typeof import('../utils/workspace-manager.js')>(
+		'../utils/workspace-manager.js'
+	);
+
+	return {
+		...actual,
+		createWorkspace: vi.fn(),
+		seedExistingItems: vi.fn(),
+		seedMetadata: vi.fn(),
+		readGeneratedItems: vi.fn(),
+		collectMetadataFromItems: vi.fn(),
+		cleanupWorkspace: vi.fn()
+	};
+});
+
+vi.mock('../utils/screenshot-capture.js', () => ({
+	captureScreenshots: vi.fn()
+}));
+
+function createMockContext(settingsOverride?: PluginSettings): PluginContext {
+	return {
+		pluginId: 'codex',
+		logger: {
+			log: vi.fn(),
+			error: vi.fn(),
+			warn: vi.fn(),
+			debug: vi.fn()
+		},
+		cache: {
+			get: vi.fn(),
+			set: vi.fn(),
+			delete: vi.fn(),
+			has: vi.fn(),
+			clear: vi.fn()
+		},
+		http: {
+			get: vi.fn(),
+			post: vi.fn(),
+			put: vi.fn(),
+			patch: vi.fn(),
+			delete: vi.fn()
+		},
+		env: {
+			nodeEnv: 'test',
+			isDevelopment: false,
+			isProduction: false,
+			isTest: true
+		},
+		envVars: {
+			get: vi.fn(),
+			has: vi.fn(),
+			getRequired: vi.fn()
+		},
+		services: {},
+		getSettings: vi.fn().mockResolvedValue(
+			settingsOverride ?? {
+				apiKey: 'sk-test',
+				model: 'codex-mini-latest'
+			}
+		),
+		getResolvedSettings: vi.fn(),
+		onEvent: vi.fn().mockReturnValue({ unsubscribe: vi.fn() }),
+		emitEvent: vi.fn(),
+		registerCustomCapability: vi.fn(),
+		getCustomCapability: vi.fn(),
+		hasCustomCapability: vi.fn(),
+		listCustomCapabilities: vi.fn()
+	} as unknown as PluginContext;
+}
 
 describe('CodexPlugin', () => {
-	it('exposes the expected plugin identity', () => {
-		const plugin = new CodexPlugin();
+	let plugin: CodexPlugin;
 
+	const directory = {
+		id: 'dir1',
+		name: 'Test Directory',
+		slug: 'test-directory',
+		description: 'A test directory',
+		user: { id: 'user1' }
+	};
+
+	const request = {
+		prompt: 'Generate items for testing tools',
+		name: 'Testing Tools'
+	};
+
+	const existing = {
+		items: [],
+		categories: [],
+		tags: []
+	};
+
+	beforeEach(() => {
+		plugin = new CodexPlugin();
+		vi.clearAllMocks();
+
+		vi.mocked(pipelineHelpers.resolveSettings).mockResolvedValue({
+			apiKey: 'sk-test',
+			model: 'codex-mini-latest'
+		});
+		vi.mocked(pipelineHelpers.resolveExecutionAuth).mockResolvedValue({
+			mode: 'api-key',
+			env: { OPENAI_API_KEY: 'sk-test' }
+		});
+		vi.mocked(pipelineHelpers.hasLocalCodexAuth).mockResolvedValue(false);
+
+		vi.mocked(workspaceManager.createWorkspace).mockResolvedValue('/tmp/codex-generator/user1/dir1');
+		vi.mocked(workspaceManager.seedExistingItems).mockResolvedValue(undefined);
+		vi.mocked(workspaceManager.seedMetadata).mockResolvedValue(undefined);
+		vi.mocked(workspaceManager.readGeneratedItems).mockResolvedValue([
+			{
+				name: 'Test Item',
+				description: 'A test item',
+				source_url: 'https://example.com',
+				category: 'Testing',
+				tags: ['test']
+			}
+		]);
+		vi.mocked(workspaceManager.collectMetadataFromItems).mockReturnValue({
+			categories: [{ id: 'testing', name: 'Testing' }],
+			tags: [{ id: 'test', name: 'test' }],
+			brands: [],
+			collections: []
+		});
+		vi.mocked(workspaceManager.cleanupWorkspace).mockResolvedValue(undefined);
+
+		vi.mocked(processRunner.executeCodex).mockReturnValue({
+			promise: Promise.resolve({
+				stdout: 'Done',
+				stderr: '',
+				exitCode: 0,
+				killed: false,
+				duration: 5000
+			}),
+			kill: vi.fn()
+		});
+
+		vi.mocked(screenshotCapture.captureScreenshots).mockResolvedValue({
+			status: 'completed',
+			errors: []
+		});
+	});
+
+	afterEach(async () => {
+		await plugin.onUnload();
+	});
+
+	it('exposes the expected plugin identity', () => {
 		expect(plugin.id).toBe('codex');
 		expect(plugin.category).toBe('pipeline');
 		expect(plugin.capabilities).toContain('pipeline');
@@ -11,9 +181,106 @@ describe('CodexPlugin', () => {
 	});
 
 	it('returns step definitions', () => {
-		const plugin = new CodexPlugin();
-
 		expect(plugin.getStepDefinitions()).toHaveLength(6);
 		expect(plugin.getStepDefinitions()[0]?.id).toBe('setup-codex');
+	});
+
+	describe('execute', () => {
+		it('returns a successful normalized PipelineResult', async () => {
+			await plugin.onLoad(createMockContext());
+
+			const progressUpdates: Array<{ percent: number }> = [];
+			const result = await plugin.execute(directory, request, existing, undefined, (progress) =>
+				progressUpdates.push(progress)
+			);
+
+			expect(result.success).toBe(true);
+			expect(result.outputs.items).toHaveLength(1);
+			expect(result.outputs.items[0].name).toBe('Test Item');
+			expect(result.outputs.categories).toHaveLength(1);
+			expect(result.outputs.tags).toHaveLength(1);
+			expect(result.metrics?.itemsProcessed).toBe(1);
+			expect(progressUpdates.at(-1)?.percent).toBe(100);
+			expect(plugin.getState()?.steps.get('generate-items')?.status).toBe('completed');
+			expect(plugin.getState()?.steps.get('capture-screenshots')?.status).toBe('skipped');
+		});
+
+		it('returns a failed result when Codex exits with non-zero code', async () => {
+			vi.mocked(processRunner.executeCodex).mockReturnValueOnce({
+				promise: Promise.resolve({
+					stdout: '',
+					stderr: 'Error: Codex failed',
+					exitCode: 1,
+					killed: false,
+					duration: 1000
+				}),
+				kill: vi.fn()
+			});
+
+			await plugin.onLoad(createMockContext());
+
+			const result = await plugin.execute(directory, request, existing);
+
+			expect(result.success).toBe(false);
+			expect(String(result.error)).toContain('Codex failed');
+			expect(result.failedStep).toBe('generate-items');
+			expect(plugin.getState()?.steps.get('generate-items')?.status).toBe('failed');
+			expect(workspaceManager.cleanupWorkspace).toHaveBeenCalledWith('user1', 'dir1');
+		});
+
+		it('executes using local auth mode when resolved settings use CODEX_HOME', async () => {
+			vi.mocked(pipelineHelpers.resolveSettings).mockResolvedValueOnce({
+				model: 'codex-mini-latest',
+				codexHome: '/tmp/codex-home'
+			});
+			vi.mocked(pipelineHelpers.resolveExecutionAuth).mockResolvedValueOnce({
+				mode: 'local',
+				codexHome: '/tmp/codex-home',
+				env: { CODEX_HOME: '/tmp/codex-home' }
+			});
+
+			await plugin.onLoad(createMockContext());
+
+			const result = await plugin.execute(directory, request, existing);
+
+			expect(result.success).toBe(true);
+			expect(processRunner.executeCodex).toHaveBeenCalledWith(
+				expect.objectContaining({
+					env: { CODEX_HOME: '/tmp/codex-home' }
+				})
+			);
+		});
+
+		it('completes the screenshot step when a screenshot facade is available', async () => {
+			await plugin.onLoad(createMockContext());
+
+			const mockScreenshotFacade = {
+				isAvailable: () => true,
+				getSmartImage: vi.fn(),
+				capture: vi.fn(),
+				getScreenshotUrl: vi.fn()
+			};
+
+			const result = await plugin.execute(
+				directory,
+				{ ...request, config: { capture_screenshots: true } },
+				existing,
+				{
+					execContext: {
+						aiFacade: {} as never,
+						searchFacade: {} as never,
+						screenshotFacade: mockScreenshotFacade as never,
+						contentExtractorFacade: {} as never,
+						logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+						directory,
+						user: { id: 'user1' }
+					}
+				}
+			);
+
+			expect(result.success).toBe(true);
+			expect(screenshotCapture.captureScreenshots).toHaveBeenCalled();
+			expect(plugin.getState()?.steps.get('capture-screenshots')?.status).toBe('completed');
+		});
 	});
 });
