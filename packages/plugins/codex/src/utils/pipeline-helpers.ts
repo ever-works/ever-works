@@ -1,9 +1,4 @@
-import type {
-	PluginContext,
-	PluginSettings,
-	PipelineProgressCallback,
-	PipelineResult
-} from '@ever-works/plugin';
+import type { PluginContext, PluginSettings, PipelineProgressCallback, PipelineResult } from '@ever-works/plugin';
 import { buildErrorPipelineResult, createEmptyPipelineOutputs } from '@ever-works/plugin';
 import { CODEX_STEP_IDS } from '../types.js';
 

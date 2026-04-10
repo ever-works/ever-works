@@ -21,11 +21,7 @@ import type {
 	PluginManifest,
 	ValidationResult
 } from '@ever-works/plugin';
-import {
-	buildErrorPipelineResult,
-	createEmptyPipelineOutputs,
-	lucideIcon
-} from '@ever-works/plugin';
+import { buildErrorPipelineResult, createEmptyPipelineOutputs, lucideIcon } from '@ever-works/plugin';
 
 import type { CodexStepId } from './types.js';
 import { DEFAULT_MODEL } from './types.js';
@@ -121,10 +117,7 @@ function createFailedState(
 				status: definition.id === failedStep ? ('failed' as const) : ('pending' as const),
 				startedAt: definition.id === failedStep ? startedAt : undefined,
 				completedAt: definition.id === failedStep ? completedAt : undefined,
-				error:
-					definition.id === failedStep
-						? 'Codex pipeline execution is not implemented yet'
-						: undefined
+				error: definition.id === failedStep ? 'Codex pipeline execution is not implemented yet' : undefined
 			}
 		])
 	);

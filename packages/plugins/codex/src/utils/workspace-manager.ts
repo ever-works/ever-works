@@ -34,16 +34,11 @@ export async function seedExistingItems(
 	_existingItems: readonly Record<string, unknown>[]
 ): Promise<void> {}
 
-export async function seedMetadata(
-	_workspacePath: string,
-	_metadata: Record<string, unknown>
-): Promise<void> {}
+export async function seedMetadata(_workspacePath: string, _metadata: Record<string, unknown>): Promise<void> {}
 
 export async function ensureOnboardingConfig(_workspacePath: string): Promise<void> {}
 
-export function collectMetadataFromItems(
-	_items: readonly Record<string, unknown>[]
-): GeneratedItemsMetadata {
+export function collectMetadataFromItems(_items: readonly Record<string, unknown>[]): GeneratedItemsMetadata {
 	return {
 		categories: [],
 		tags: [],
@@ -61,8 +56,5 @@ export function slugify(value: string): string {
 }
 
 export function unslugify(value: string): string {
-	return value
-		.split('-')
-		.filter(Boolean)
-		.join(' ');
+	return value.split('-').filter(Boolean).join(' ');
 }
