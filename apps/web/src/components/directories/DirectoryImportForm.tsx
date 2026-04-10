@@ -265,13 +265,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                 </p>
             </div>
 
-            <div
-                className={cn(
-                    'p-6 rounded-lg',
-                    'bg-card dark:bg-transparent',
-                    'border',
-                )}
-            >
+            <div className={cn('p-6 rounded-lg', 'bg-card dark:bg-transparent', 'border')}>
                 {step === 'source' && (
                     <ImportSourceStep
                         sourceMethod={sourceMethod}
