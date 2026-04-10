@@ -69,7 +69,7 @@ export default function RegisterForm({ availableSocialProviders }: RegisterFormP
             mLeft="lg:-ml-10"
         >
             <ThemeToggle variant="fixed" />
-            <form method="post" onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
                     <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm">
                         {error}

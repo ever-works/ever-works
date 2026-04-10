@@ -9,6 +9,7 @@ import {
     Query,
     HttpCode,
     HttpStatus,
+    Logger,
 } from '@nestjs/common';
 import {
     ApiTags,
@@ -35,6 +36,8 @@ import { SocialAuthService } from '../services/social-auth.service';
 @ApiTags('Auth')
 @Controller('api/auth')
 export class AuthController {
+    private readonly logger = new Logger(AuthController.name);
+
     constructor(
         private authService: AuthService,
         private readonly socialAuthService: SocialAuthService,
@@ -79,7 +82,13 @@ export class AuthController {
                 response.user.id,
                 registerDto.emailVerificationCallbackUrl,
             );
-        } catch {}
+        } catch (error) {
+            this.logger.warn(
+                `Failed to send verification email for user ${response.user.id}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
 
         return response;
     }

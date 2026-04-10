@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { authAPI } from '../api';
 import type { UserProfile } from '../api/auth';
 import { getAuthFromRequest } from './middleware';
@@ -26,7 +27,7 @@ function normalizeProfileUser(user: UserProfile): AuthUser {
     };
 }
 
-export async function getAuthFromCookie(): Promise<AuthUser | null> {
+const getAuthFromCookieImpl = async (): Promise<AuthUser | null> => {
     const auth = await getAuthFromRequest();
     if (!auth.isAuthenticated || auth.isExpired) {
         return null;
@@ -56,9 +57,9 @@ export async function getAuthFromCookie(): Promise<AuthUser | null> {
         }
         return null;
     }
-}
+};
 
-export async function getAuthFromAPI(): Promise<AuthUser | null> {
+const getAuthFromAPIImpl = async (): Promise<AuthUser | null> => {
     const auth = await getAuthFromRequest();
     if (!auth.isAuthenticated || auth.isExpired) {
         return null;
@@ -72,7 +73,11 @@ export async function getAuthFromAPI(): Promise<AuthUser | null> {
         }
         return null;
     }
-}
+};
+
+export const getAuthFromCookie = cache(getAuthFromCookieImpl);
+
+export const getAuthFromAPI = cache(getAuthFromAPIImpl);
 
 export * from './middleware';
 export * from './cookies';

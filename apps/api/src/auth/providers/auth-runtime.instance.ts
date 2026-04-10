@@ -1,13 +1,11 @@
 import { betterAuth } from 'better-auth';
 import type { BetterAuthOptions } from 'better-auth';
 import { bearer } from 'better-auth/plugins';
+import { randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
 import { AUTH_RUNTIME_BASE_PATH } from './auth-provider.constants';
 import { config, AuthProvider as RegistrationProvider } from '../../config/constants';
 import * as bcrypt from 'bcrypt';
-
-const AUTH_PROVIDER_PLACEHOLDER_PASSWORD_HASH =
-    '$2b$10$3FpU5KTq.lf4tUSzT4i0JOuuywnxGPnkKorObPlIEG14V0wl17ANS';
 
 function getInitializedDatabaseClient(dataSource: DataSource): any {
     const driver = dataSource.driver as any;
@@ -142,7 +140,7 @@ export function createAuthRuntimeInstance(dataSource: DataSource) {
                         return {
                             data: {
                                 ...user,
-                                password: AUTH_PROVIDER_PLACEHOLDER_PASSWORD_HASH,
+                                password: await bcrypt.hash(randomUUID(), 10),
                                 registrationProvider: RegistrationProvider.LOCAL,
                                 isActive: true,
                             },
