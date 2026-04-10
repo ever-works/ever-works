@@ -5,16 +5,8 @@ import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import {
-    Loader2,
-    Search,
-    FolderGit2,
-    Lock,
-    Globe,
-    ChevronDown,
-    ChevronUp,
-    RefreshCw,
-} from 'lucide-react';
+import { Loader2, Search, FolderGit2, Lock, Globe, RefreshCw } from 'lucide-react';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { getUserRepositories } from '@/app/actions/dashboard/directories';
 import { getGitProviderOrganizations } from '@/app/actions/dashboard/organizations';
 
@@ -275,7 +267,6 @@ export function RepositorySelector({ providerId, onSelect, selectedUrl }: Reposi
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(false);
-    const [expanded, setExpanded] = useState(true);
     const [selectedOwner, setSelectedOwner] = useState<string | null>(null);
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [orgsLoading, setOrgsLoading] = useState(true);
@@ -391,84 +382,78 @@ export function RepositorySelector({ providerId, onSelect, selectedUrl }: Reposi
     const selectedRepo = repositories.find((r) => r.html_url === selectedUrl);
 
     return (
-        <div
-            className={cn(
-                'rounded-lg',
-                'border border-border dark:border-border-dark',
-                'overflow-hidden',
-            )}
-        >
-            <button
-                type="button"
-                onClick={() => setExpanded(!expanded)}
-                className={cn(
-                    'w-full p-4 flex items-center justify-between',
-                    'bg-surface dark:bg-surface-dark',
-                    'hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark',
-                    'transition-colors',
-                )}
-            >
-                <div className="flex items-center gap-3">
-                    <FolderGit2 className="w-5 h-5 text-primary" />
-                    <div className="text-left">
-                        <h4 className="font-medium text-text dark:text-text-dark">{t('title')}</h4>
-                        {selectedRepo && (
-                            <p className="text-sm text-primary">{selectedRepo.full_name}</p>
+        <div className="rounded-xl border border-border dark:border-border-dark overflow-hidden">
+            <Accordion type="single" collapsible defaultValue="repos">
+                <AccordionItem value="repos" className="border-0">
+                    <AccordionTrigger
+                        className={cn(
+                            'px-4 hover:no-underline',
+                            'bg-card dark:bg-card-primary-dark',
+                            'hover:bg-surface dark:hover:bg-surface-secondary-dark',
                         )}
-                    </div>
-                </div>
-                {expanded ? (
-                    <ChevronUp className="w-5 h-5 text-text-secondary dark:text-text-secondary-dark" />
-                ) : (
-                    <ChevronDown className="w-5 h-5 text-text-secondary dark:text-text-secondary-dark" />
-                )}
-            </button>
-
-            {expanded && (
-                <div className="border-t border-border dark:border-border-dark">
-                    <OwnerFilter
-                        selectedOwner={selectedOwner}
-                        organizations={organizations}
-                        orgsLoading={orgsLoading}
-                        onChange={handleOwnerChange}
-                        t={t}
-                    />
-
-                    <SearchBar
-                        search={search}
-                        loading={loading}
-                        onSearch={handleSearch}
-                        onRefresh={handleRefresh}
-                        t={t}
-                    />
-
-                    <div className="max-h-80 overflow-y-auto">
-                        <RepoList
-                            repositories={repositories}
-                            loading={loading}
-                            error={error}
-                            search={search}
-                            hasMore={hasMore}
-                            selectedUrl={selectedUrl}
-                            onSelect={onSelect}
-                            onRefresh={handleRefresh}
-                            onLoadMore={handleLoadMore}
-                            formatDate={formatDate}
-                            t={t}
-                        />
-                    </div>
-
-                    {repositories.length > 0 && (
-                        <div className="p-2 text-center border-t border-border dark:border-border-dark">
-                            <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                                {selectedOwner
-                                    ? t('showingOrgRepos', { org: selectedOwner })
-                                    : t('showingPersonalRepos')}
-                            </span>
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                <FolderGit2 className="w-4 h-4 text-primary" strokeWidth={1.5} />
+                            </div>
+                            <div className="text-left">
+                                <p className="font-semibold text-text dark:text-text-dark">{t('title')}</p>
+                                {selectedRepo && (
+                                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                                        {selectedRepo.full_name}
+                                    </p>
+                                )}
+                            </div>
                         </div>
-                    )}
-                </div>
-            )}
+                    </AccordionTrigger>
+
+                    <AccordionContent className="p-0">
+                        <div className="border-t border-border dark:border-border-dark">
+                            <OwnerFilter
+                                selectedOwner={selectedOwner}
+                                organizations={organizations}
+                                orgsLoading={orgsLoading}
+                                onChange={handleOwnerChange}
+                                t={t}
+                            />
+
+                            <SearchBar
+                                search={search}
+                                loading={loading}
+                                onSearch={handleSearch}
+                                onRefresh={handleRefresh}
+                                t={t}
+                            />
+
+                            <div className="max-h-80 overflow-y-auto">
+                                <RepoList
+                                    repositories={repositories}
+                                    loading={loading}
+                                    error={error}
+                                    search={search}
+                                    hasMore={hasMore}
+                                    selectedUrl={selectedUrl}
+                                    onSelect={onSelect}
+                                    onRefresh={handleRefresh}
+                                    onLoadMore={handleLoadMore}
+                                    formatDate={formatDate}
+                                    t={t}
+                                />
+                            </div>
+
+                            {repositories.length > 0 && (
+                                <div className="p-2 text-center border-t border-border dark:border-border-dark">
+                                    <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                                        {selectedOwner
+                                            ? t('showingOrgRepos', { org: selectedOwner })
+                                            : t('showingPersonalRepos')}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
         </div>
     );
 }
