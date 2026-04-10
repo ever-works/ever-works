@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import type { PluginContext, PluginSettings } from '@ever-works/plugin';
 
 import { CodexPlugin } from '../codex.plugin.js';
@@ -181,6 +184,29 @@ describe('CodexPlugin', () => {
 	it('returns step definitions', () => {
 		expect(plugin.getStepDefinitions()).toHaveLength(6);
 		expect(plugin.getStepDefinitions()[0]?.id).toBe('setup-codex');
+	});
+
+	it('keeps apiKey as the onboarding completion field when local Codex auth is absent', () => {
+		const previousCodexHome = process.env.CODEX_HOME;
+		const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-manifest-empty-'));
+		process.env.CODEX_HOME = codexHome;
+
+		expect(plugin.getManifest().uiHints?.completionFields).toEqual(['apiKey']);
+
+		process.env.CODEX_HOME = previousCodexHome;
+		fs.rmSync(codexHome, { recursive: true, force: true });
+	});
+
+	it('drops completionFields when local Codex auth is available', () => {
+		const previousCodexHome = process.env.CODEX_HOME;
+		const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-manifest-auth-'));
+		fs.writeFileSync(path.join(codexHome, 'auth.json'), JSON.stringify({ token: 'test' }));
+		process.env.CODEX_HOME = codexHome;
+
+		expect(plugin.getManifest().uiHints?.completionFields).toBeUndefined();
+
+		process.env.CODEX_HOME = previousCodexHome;
+		fs.rmSync(codexHome, { recursive: true, force: true });
 	});
 
 	describe('execute', () => {

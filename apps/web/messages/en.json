@@ -266,6 +266,31 @@
                 }
             }
         },
+        "codexWizard": {
+            "label": "Codex setup",
+            "title": "Set up Codex in three steps",
+            "subtitle": "This flow keeps the recommended configuration visible and verifies the connection before you finish.",
+            "stepIndex": "Step {index}",
+            "continueButton": "Continue",
+            "steps": {
+                "model": {
+                    "title": "Pick a model",
+                    "description": "Choose the Codex model you want to run for end-to-end directory generation."
+                },
+                "credentials": {
+                    "title": "Add credentials",
+                    "description": "Paste your OpenAI API key. If you already authenticated locally with `codex login`, you can also leave the API key empty and use local Codex CLI auth."
+                },
+                "verify": {
+                    "title": "Verify connection",
+                    "description": "Save settings and run a live connection check against Codex before finishing.",
+                    "checkTitle": "Run a live Codex validation",
+                    "checkDescription": "Saving here runs a Codex API-key or local-CLI validation depending on how you configured authentication.",
+                    "button": "Verify and finish setup",
+                    "successDefault": "Codex connection verified."
+                }
+            }
+        },
         "simWizard": {
             "label": "SIM AI setup",
             "title": "Set up SIM AI in two steps",

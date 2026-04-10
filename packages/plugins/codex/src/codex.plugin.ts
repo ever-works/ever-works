@@ -24,6 +24,9 @@ import type {
 	ValidationResult
 } from '@ever-works/plugin';
 import { buildSuccessPipelineResult, lucideIcon } from '@ever-works/plugin';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
 import type { CodexStepId } from './types.js';
 import { DEFAULT_MODEL } from './types.js';
@@ -95,20 +98,100 @@ const MANIFEST: PluginManifest = {
 	builtIn: true,
 	autoEnable: false,
 	visibility: 'public',
+	selectableProviderCategories: ['screenshot'],
 	icon: lucideIcon('sparkles'),
 	uiHints: {
 		byok: {
 			buttonLabel: 'Bring your own key',
 			triggerField: 'apiKey'
 		},
+		onboardingWizard: true,
+		includeInOnboarding: true,
+		onboardingPriority: 2,
+		completionFields: ['apiKey'],
+		onboardingDescription:
+			'Connect Codex with an OpenAI API key or local Codex CLI auth for end-to-end directory generation.',
 		setupLink: {
 			url: 'https://platform.openai.com/account/api-keys',
 			label: 'OpenAI API keys',
 			buttonLabel: 'Get API key',
 			showWhenEmpty: ['apiKey']
 		}
-	}
+	},
+	readme: [
+		'# Codex Generator Plugin',
+		'',
+		'Full pipeline plugin that delegates the entire directory generation to Codex. This plugin runs a single Codex session that researches, creates, and updates directory item JSON files inside a temporary workspace.',
+		'',
+		'## How it works',
+		'',
+		'The plugin runs 6 sequential steps:',
+		'',
+		'1. **Setup Codex** - Resolves authentication and prepares the Codex CLI runtime',
+		'2. **Prepare Context** - Creates a temporary workspace and seeds it with existing items and metadata',
+		'3. **Generate Items** - Executes Codex CLI to research and generate directory items as JSON files',
+		'4. **Collect Results** - Reads the generated JSON files back to build the pipeline result',
+		'5. **Capture Screenshots** - Takes screenshots for items that need images',
+		'6. **Cleanup** - Removes the temporary workspace',
+		'',
+		'## Settings',
+		'',
+		'| Setting                 | Description                                                                 |',
+		'| ----------------------- | --------------------------------------------------------------------------- |',
+		'| `apiKey`                | OpenAI API key used for Codex execution                                     |',
+		'| `model`                 | Codex model to use for generation                                           |',
+		'| `unsafeBypassSandbox`   | Hidden opt-in flag to bypass Codex sandboxing on incompatible host systems  |',
+		'',
+		'### Authentication',
+		'',
+		'Codex supports two authentication modes:',
+		'',
+		'1. **API Key** - Provide `apiKey` in plugin settings.',
+		'2. **Local Codex Auth** - If no `apiKey` is configured, the plugin can reuse local Codex CLI auth from `CODEX_HOME` or `~/.codex/auth.json`.',
+		'',
+		'**API Key**:',
+		'',
+		'Get one from [platform.openai.com/account/api-keys](https://platform.openai.com/account/api-keys)',
+		'',
+		'**Local Codex Auth**:',
+		'',
+		'```bash',
+		'codex login',
+		'```',
+		'',
+		'This signs the local Codex CLI into your OpenAI account and stores reusable local auth for subsequent runs.',
+		'',
+		'### Sandbox Compatibility',
+		'',
+		'Codex normally runs with its own sandboxed execution path. Some host environments may block Codex sandboxing. In those cases, the hidden `unsafeBypassSandbox` setting can opt into `--dangerously-bypass-approvals-and-sandbox`.',
+		'',
+		'Use that mode only in environments that are already externally sandboxed or otherwise trusted.',
+		'',
+		'## Usage',
+		'',
+		"Enable the plugin for a directory and trigger generation with `providers.pipeline: 'codex'`.",
+		'',
+		'## Manual Smoke Test',
+		'',
+		'You can validate the real Codex CLI integration locally with:',
+		'',
+		'```bash',
+		'pnpm --filter @ever-works/codex-plugin smoke',
+		'```',
+		'',
+		'If your host requires the dangerous bypass mode, run:',
+		'',
+		'```bash',
+		'CODEX_SMOKE_BYPASS_SANDBOX=1 pnpm --filter @ever-works/codex-plugin smoke',
+		'```'
+	].join('\n'),
+	homepage: 'https://github.com/openai/codex'
 };
+
+function hasLocalCodexAuthSync(): boolean {
+	const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
+	return fs.existsSync(path.join(codexHome, 'auth.json'));
+}
 
 const LOG_MESSAGE_MAX_LENGTH = 500;
 const STEP_CONTEXT_BY_ID = new Map(
@@ -180,6 +263,16 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	getManifest(): PluginManifest {
+		if (hasLocalCodexAuthSync()) {
+			return {
+				...MANIFEST,
+				uiHints: {
+					...MANIFEST.uiHints,
+					completionFields: undefined
+				}
+			};
+		}
+
 		return MANIFEST;
 	}
 
