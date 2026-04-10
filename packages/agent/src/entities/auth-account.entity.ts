@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { PortableDateColumn } from './_types';
 
 @Entity({ name: 'account' })
 @Index(['providerId', 'accountId'], { unique: true })
@@ -22,10 +23,10 @@ export class AuthAccount {
     @Column({ type: 'text', nullable: true })
     refreshToken?: string | null;
 
-    @Column({ nullable: true })
+    @PortableDateColumn({ nullable: true })
     accessTokenExpiresAt?: Date | null;
 
-    @Column({ nullable: true })
+    @PortableDateColumn({ nullable: true })
     refreshTokenExpiresAt?: Date | null;
 
     @Column({ type: 'text', nullable: true })

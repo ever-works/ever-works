@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { PortableDateColumn } from './_types';
 
 @Entity({ name: 'session' })
 @Index(['token'], { unique: true })
@@ -13,7 +14,7 @@ export class AuthSession {
     @Column({ type: 'varchar' })
     token: string;
 
-    @Column()
+    @PortableDateColumn()
     expiresAt: Date;
 
     @Column({ type: 'varchar', nullable: true })

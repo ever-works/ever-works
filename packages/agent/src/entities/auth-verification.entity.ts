@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { PortableDateColumn } from './_types';
 
 @Entity({ name: 'verification' })
 @Index(['identifier'])
@@ -13,7 +14,7 @@ export class AuthVerification {
     @Column({ type: 'varchar' })
     value: string;
 
-    @Column()
+    @PortableDateColumn()
     expiresAt: Date;
 
     @CreateDateColumn()
