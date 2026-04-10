@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     try {
         authResponse = await authAPI.verifyEmail({ token });
 
-        await setAuthCookies(authResponse.access_token, authResponse.refresh_token);
+        await setAuthCookies(authResponse.access_token);
     } catch (error) {
         href = ROUTES.AUTH_ERROR + '?error=verify_email_invalid_token';
     }

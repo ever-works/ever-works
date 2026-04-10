@@ -4,7 +4,6 @@ import { CacheEntry } from '../entities/cache.entity';
 import {
     ApiKey,
     RefreshToken,
-    OAuthToken,
     User,
     Directory,
     DirectoryAdvancedPrompts,
@@ -19,6 +18,9 @@ import {
     ActivityLog,
     Conversation,
     ConversationMessage,
+    AuthAccount,
+    AuthSession,
+    AuthVerification,
 } from '../entities';
 import { PluginEntity, UserPluginEntity, DirectoryPluginEntity } from '../plugins/entities';
 import { UserSyncConfig } from '../account-transfer/entities/user-sync-config.entity';
@@ -60,7 +62,6 @@ export const ENTITIES = [
     DirectoryMember,
     User,
     RefreshToken,
-    OAuthToken,
     CacheEntry,
     DirectoryGenerationHistory,
     SubscriptionPlan,
@@ -71,6 +72,9 @@ export const ENTITIES = [
     ActivityLog,
     Conversation,
     ConversationMessage,
+    AuthAccount,
+    AuthSession,
+    AuthVerification,
     // Plugin entities
     PluginEntity,
     UserPluginEntity,

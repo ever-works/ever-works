@@ -10,3 +10,10 @@ export const TimestampColumn = ({ nullable = false }: { nullable?: boolean } = {
         },
     });
 };
+
+export const PortableDateColumn = ({ nullable = false }: { nullable?: boolean } = {}) => {
+    return Column({
+        type: Date,
+        nullable,
+    });
+};

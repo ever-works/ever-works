@@ -7,13 +7,13 @@ import {
     ApiParam,
     ApiQuery,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { AuthSessionGuard } from '../../auth/guards/auth-session.guard';
 import { GitProviderService } from './git-provider.service';
 
 @ApiTags('Git Providers')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/git-providers')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AuthSessionGuard)
 export class GitProviderController {
     constructor(private readonly gitProviderService: GitProviderService) {}
 

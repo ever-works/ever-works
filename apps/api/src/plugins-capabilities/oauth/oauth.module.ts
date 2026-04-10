@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { DatabaseModule } from '@ever-works/agent/database';
+import { AuthModule } from '../../auth/auth.module';
 import { OAuthController } from './oauth.controller';
 import { OAuthService } from './oauth.service';
 
@@ -11,7 +12,7 @@ import { OAuthService } from './oauth.service';
  * at the application root level. Do not import PluginsModule directly here.
  */
 @Module({
-    imports: [FacadesModule, DatabaseModule],
+    imports: [FacadesModule, DatabaseModule, AuthModule],
     controllers: [OAuthController],
     providers: [OAuthService],
     exports: [OAuthService],

@@ -49,25 +49,27 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
             return;
         }
 
-        startTransition(async () => {
-            try {
-                const result = await updatePassword({
-                    currentPassword,
-                    newPassword,
-                });
+        startTransition(() => {
+            void (async () => {
+                try {
+                    const result = await updatePassword({
+                        currentPassword,
+                        newPassword,
+                    });
 
-                if (result.success) {
-                    toast.success(t('changePassword.messages.success'));
-                    // Clear the form
-                    setCurrentPassword('');
-                    setNewPassword('');
-                    setConfirmPassword('');
-                } else {
-                    toast.error(result.error || t('changePassword.messages.error'));
+                    if (result.success) {
+                        toast.success(t('changePassword.messages.success'));
+                        // Clear the form
+                        setCurrentPassword('');
+                        setNewPassword('');
+                        setConfirmPassword('');
+                    } else {
+                        toast.error(result.error || t('changePassword.messages.error'));
+                    }
+                } catch (error) {
+                    toast.error(t('changePassword.messages.unexpectedError'));
                 }
-            } catch (error) {
-                toast.error(t('changePassword.messages.unexpectedError'));
-            }
+            })();
         });
     };
 
