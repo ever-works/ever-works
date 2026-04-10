@@ -9,9 +9,7 @@ import * as workspaceManager from '../utils/workspace-manager.js';
 import * as screenshotCapture from '../utils/screenshot-capture.js';
 
 vi.mock('../utils/pipeline-helpers.js', async () => {
-	const actual = await vi.importActual<typeof import('../utils/pipeline-helpers.js')>(
-		'../utils/pipeline-helpers.js'
-	);
+	const actual = await vi.importActual<typeof import('../utils/pipeline-helpers.js')>('../utils/pipeline-helpers.js');
 
 	return {
 		...actual,

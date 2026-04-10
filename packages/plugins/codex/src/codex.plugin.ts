@@ -35,7 +35,7 @@ import {
 	getFormGroups as formGroups,
 	validateFormInput as formValidate
 } from './form-schema.js';
-import { DEFAULT_SYSTEM_PROMPT, DEFAULT_USER_PROMPT } from './prompt/system-prompt.js';
+import { buildSystemPrompt, buildUserPrompt } from './prompt/system-prompt.js';
 import { executeCodex, type ExecuteResult } from './utils/process-runner.js';
 import {
 	cleanupWorkspace,
@@ -297,7 +297,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			const generateStartedAt = this.startStep('generate-items', onLogEntry);
 			reportProgress(onProgress, 2, 30, 'Generate Items');
 
-			const prompt = this.buildExecutionPrompt(directory, request);
+			const prompt = this.buildExecutionPrompt(directory, request, existing, workspacePath);
 			const { promise, kill } = executeCodex({
 				command: 'codex',
 				cwd: workspacePath,
@@ -407,31 +407,26 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		return this.state;
 	}
 
-	private buildExecutionPrompt(directory: DirectoryReference, request: GenerationRequest): string {
-		const targetItems = Number(request.config?.target_items ?? DEFAULT_TARGET_ITEMS);
-		const topic = request.prompt || request.name || directory.name;
+	private buildExecutionPrompt(
+		directory: DirectoryReference,
+		request: GenerationRequest,
+		existing: ExistingItems,
+		workspacePath: string
+	): string {
+		const promptOptions = {
+			directory,
+			request: {
+				...request,
+				config: {
+					target_items: Number(request.config?.target_items ?? DEFAULT_TARGET_ITEMS),
+					...(request.config || {})
+				}
+			},
+			existing,
+			workspacePath
+		};
 
-		return [
-			DEFAULT_SYSTEM_PROMPT.trim(),
-			'',
-			DEFAULT_USER_PROMPT.trim(),
-			'',
-			`Directory name: ${directory.name}`,
-			`Directory slug: ${directory.slug}`,
-			directory.description ? `Directory description: ${directory.description}` : '',
-			topic ? `Generation topic: ${topic}` : '',
-			`Target new items: ${targetItems}`,
-			'',
-			'Workspace contract:',
-			'- Read existing item JSON files in the workspace root.',
-			'- Read metadata from the `_meta` directory.',
-			'- Create or update item JSON files in the workspace root only.',
-			'- Each generated item JSON must include at least: name, description, source_url, category.',
-			'- Avoid duplicates with existing items unless the request explicitly asks for updates.',
-			'- Do not delete metadata files under `_meta`.'
-		]
-			.filter(Boolean)
-			.join('\n');
+		return [buildSystemPrompt(promptOptions), '', buildUserPrompt(promptOptions)].join('\n');
 	}
 
 	private startStep(stepId: CodexStepId, onLogEntry?: PipelineExecutionOptions['onLogEntry']): number {
@@ -473,11 +468,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		});
 	}
 
-	private skipStep(
-		stepId: CodexStepId,
-		message: string,
-		onLogEntry?: PipelineExecutionOptions['onLogEntry']
-	): void {
+	private skipStep(stepId: CodexStepId, message: string, onLogEntry?: PipelineExecutionOptions['onLogEntry']): void {
 		this.setState(stepId, 'skipped' as StepStatus);
 		this.emitCodexLog({
 			onLogEntry,

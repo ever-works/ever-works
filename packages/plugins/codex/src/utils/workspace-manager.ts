@@ -119,7 +119,9 @@ export async function readGeneratedItems(workspacePath: string, logger?: Logger)
 	let entries: string[];
 	try {
 		const dirEntries = await fs.readdir(workspacePath, { withFileTypes: true });
-		entries = dirEntries.filter((entry) => !entry.isDirectory() && entry.name.endsWith('.json')).map((entry) => entry.name);
+		entries = dirEntries
+			.filter((entry) => !entry.isDirectory() && entry.name.endsWith('.json'))
+			.map((entry) => entry.name);
 	} catch {
 		logger?.warn('Could not read Codex workspace directory');
 		return [];
