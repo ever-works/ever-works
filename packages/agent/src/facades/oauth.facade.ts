@@ -9,7 +9,7 @@ import type {
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES, isOAuthPlugin } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
-import { OAuthTokenRepository } from '../database/repositories/oauth-token.repository';
+import { AuthAccountRepository } from '../database/repositories/auth-account.repository';
 import { FacadeError } from './base.facade';
 
 export class OAuthFacadeError extends FacadeError {
@@ -46,7 +46,7 @@ export class OAuthFacadeService implements IOAuthFacade {
 
     constructor(
         private readonly registry: PluginRegistryService,
-        private readonly oauthTokenRepository: OAuthTokenRepository,
+        private readonly authAccountRepository: AuthAccountRepository,
     ) {}
 
     isConfigured(): boolean {
@@ -91,8 +91,11 @@ export class OAuthFacadeService implements IOAuthFacade {
             );
             if (!isEnabled) return false;
 
-            const token = await this.oauthTokenRepository.findByUserAndProvider(userId, providerId);
-            return token !== null && !this.oauthTokenRepository.isTokenExpired(token);
+            const account = await this.authAccountRepository.findProviderAccount(
+                userId,
+                providerId,
+            );
+            return account !== null && !this.authAccountRepository.isAccessTokenExpired(account);
         } catch {
             return false;
         }
@@ -107,14 +110,14 @@ export class OAuthFacadeService implements IOAuthFacade {
             );
             if (!isEnabled) return null;
 
-            const oauthToken = await this.oauthTokenRepository.findByUserAndProvider(
+            const account = await this.authAccountRepository.findProviderAccount(
                 userId,
                 providerId,
             );
-            if (!oauthToken || this.oauthTokenRepository.isTokenExpired(oauthToken)) {
+            if (!account || this.authAccountRepository.isAccessTokenExpired(account)) {
                 return null;
             }
-            return oauthToken.accessToken;
+            return account.accessToken || null;
         } catch {
             return null;
         }
@@ -130,15 +133,18 @@ export class OAuthFacadeService implements IOAuthFacade {
 
         try {
             const plugin = this.getPluginSync(providerId);
-            const token = await this.oauthTokenRepository.findByUserAndProvider(userId, providerId);
-            if (token && plugin.revokeToken) {
-                await plugin.revokeToken(token.accessToken);
+            const account = await this.authAccountRepository.findProviderAccount(
+                userId,
+                providerId,
+            );
+            if (account?.accessToken && plugin.revokeToken) {
+                await plugin.revokeToken(account.accessToken);
             }
         } catch {
             // Continue even if remote revocation fails
         }
 
-        await this.oauthTokenRepository.deleteByUserAndProvider(userId, providerId);
+        await this.authAccountRepository.deleteProviderAccount(userId, providerId);
     }
 
     private getPluginSync(providerId: string): IOAuthPlugin {

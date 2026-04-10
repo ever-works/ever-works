@@ -16,7 +16,7 @@ import {
     DatabaseModule,
     ApiKeyRepository,
     UserRepository,
-    OAuthTokenRepository,
+    AuthAccountRepository,
 } from '@ever-works/agent/database';
 import { ActivityLogModule } from '@ever-works/agent/activity-log';
 
@@ -31,7 +31,7 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
         AuthSessionGuard,
         ApiKeyRepository,
         UserRepository,
-        OAuthTokenRepository,
+        AuthAccountRepository,
         {
             provide: AUTH_PROVIDER,
             useExisting: AuthProviderService,

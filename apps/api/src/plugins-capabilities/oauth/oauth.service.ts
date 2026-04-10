@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { OAuthFacadeService } from '@ever-works/agent/facades';
-import { OAuthTokenRepository } from '@ever-works/agent/database';
+import { AuthAccountRepository } from '@ever-works/agent/database';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
 import type { OAuthConfig, OAuthProviderInfo } from '@ever-works/plugin';
 
@@ -19,7 +19,7 @@ export class OAuthService {
 
     constructor(
         private readonly oauthFacade: OAuthFacadeService,
-        private readonly oauthTokenRepository: OAuthTokenRepository,
+        private readonly authAccountRepository: AuthAccountRepository,
         private readonly pluginSettingsService: PluginSettingsService,
     ) {}
 
@@ -126,14 +126,15 @@ export class OAuthService {
             expiresAt.setSeconds(expiresAt.getSeconds() + token.expiresIn);
         }
 
-        await this.oauthTokenRepository.upsert({
+        await this.authAccountRepository.upsertProviderAccount({
             userId,
-            provider: providerId,
+            providerId,
+            accountId: user.id,
             accessToken: token.accessToken,
             refreshToken: token.refreshToken,
             tokenType: token.tokenType,
             scope: token.scope,
-            expiresAt,
+            accessTokenExpiresAt: expiresAt,
             email: user.email || null,
             username: user.username,
             metadata: {

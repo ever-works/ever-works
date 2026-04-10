@@ -23,6 +23,15 @@ export class AuthAccount {
     @Column({ type: 'text', nullable: true })
     refreshToken?: string | null;
 
+    @Column({ type: 'varchar', nullable: true })
+    username?: string | null;
+
+    @Column({ type: 'varchar', nullable: true })
+    email?: string | null;
+
+    @Column({ type: 'varchar', nullable: true })
+    tokenType?: string | null;
+
     @PortableDateColumn({ nullable: true })
     accessTokenExpiresAt?: Date | null;
 
@@ -37,6 +46,9 @@ export class AuthAccount {
 
     @Column({ type: 'text', nullable: true })
     password?: string | null;
+
+    @Column({ type: 'simple-json', nullable: true })
+    metadata?: Record<string, any> | null;
 
     @CreateDateColumn()
     createdAt: Date;

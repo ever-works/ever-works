@@ -4,7 +4,6 @@ import { CacheEntry } from '../entities/cache.entity';
 import {
     ApiKey,
     RefreshToken,
-    OAuthToken,
     User,
     Directory,
     DirectoryAdvancedPrompts,
@@ -63,7 +62,6 @@ export const ENTITIES = [
     DirectoryMember,
     User,
     RefreshToken,
-    OAuthToken,
     CacheEntry,
     DirectoryGenerationHistory,
     SubscriptionPlan,

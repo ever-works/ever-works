@@ -5,7 +5,7 @@ import {
     BadRequestException,
     Logger,
 } from '@nestjs/common';
-import { UserRepository, OAuthTokenRepository } from '@ever-works/agent/database';
+import { UserRepository, AuthAccountRepository } from '@ever-works/agent/database';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { authConstants, AuthProvider, config } from '../../config/constants';
@@ -15,7 +15,6 @@ import { UserCreatedEvent, UserConfirmedEvent, UserForgotPasswordEvent } from '.
 import { ForgotPasswordDto } from '../dto/email-verification.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import type { SocialAuthUser } from '../types/social-auth.types';
-import { AuthSyncService } from '../providers/auth-sync.service';
 
 @Injectable()
 export class AuthService {
@@ -25,8 +24,7 @@ export class AuthService {
 
     constructor(
         private readonly userRepository: UserRepository,
-        private readonly oauthTokenRepository: OAuthTokenRepository,
-        private readonly authSyncService: AuthSyncService,
+        private readonly authAccountRepository: AuthAccountRepository,
         private eventEmitter: EventEmitter2,
     ) {
         this.webAppUrl = config.webAppUrl();
@@ -67,7 +65,7 @@ export class AuthService {
         } else {
             this.ensureUserIsActive(user);
 
-            const existingProviderLink = await this.oauthTokenRepository.findByUserAndProvider(
+            const existingProviderLink = await this.authAccountRepository.findProviderAccount(
                 user.id,
                 socialUser.provider,
             );
@@ -86,19 +84,22 @@ export class AuthService {
             });
         }
 
-        await this.oauthTokenRepository.upsert({
+        await this.authAccountRepository.upsertProviderAccount({
             userId: user.id,
+            providerId: socialUser.provider,
+            accountId: socialUser.providerUserId,
             username: socialUser.username || undefined,
-            provider: socialUser.provider,
+            email: socialUser.email,
             accessToken: socialUser.accessToken,
             refreshToken: socialUser.refreshToken || null,
             tokenType: socialUser.tokenType || 'Bearer',
-            expiresAt: socialUser.expiresAt || null,
+            accessTokenExpiresAt: socialUser.expiresAt || null,
             scope: socialUser.scope || null,
-            metadata: socialUser.metadata || {},
+            metadata: {
+                providerUserId: socialUser.providerUserId,
+                ...(socialUser.metadata || {}),
+            },
         });
-
-        await this.authSyncService.syncSocialAccount(user.id, socialUser);
 
         return user;
     }
@@ -260,11 +261,12 @@ export class AuthService {
             ...userProfile
         } = user;
 
-        // Get connected providers from OAuth tokens
-        const oauthTokens = await this.oauthTokenRepository.findByUserId(userId);
-        const connectedProviders = oauthTokens.map((token) => ({
-            provider: token.provider,
-            createdAt: token.createdAt,
+        // Get connected providers from account records
+        const providerAccounts =
+            await this.authAccountRepository.findProviderAccountsByUserId(userId);
+        const connectedProviders = providerAccounts.map((account) => ({
+            provider: account.providerId,
+            createdAt: account.createdAt,
         }));
 
         return {

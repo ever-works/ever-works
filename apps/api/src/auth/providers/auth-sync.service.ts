@@ -3,7 +3,6 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
 import { AuthAccount } from '@ever-works/agent/entities';
-import type { SocialAuthUser } from '../types/social-auth.types';
 
 @Injectable()
 export class AuthSyncService {
@@ -50,50 +49,6 @@ export class AuthSyncService {
     async getCredentialPasswordHash(userId: string): Promise<string | null> {
         const account = await this.findCredentialAccount(userId);
         return account?.password || null;
-    }
-
-    async syncSocialAccount(userId: string, socialUser: SocialAuthUser) {
-        const repository = this.getRepository();
-        const existingAccount =
-            (await repository.findOne({
-                where: {
-                    providerId: socialUser.provider,
-                    accountId: socialUser.providerUserId,
-                },
-            })) ||
-            (await repository.findOne({
-                where: {
-                    userId,
-                    providerId: socialUser.provider,
-                },
-            }));
-
-        const accountData = {
-            userId,
-            providerId: socialUser.provider,
-            accountId: socialUser.providerUserId,
-            accessToken: socialUser.accessToken,
-            refreshToken: socialUser.refreshToken || null,
-            accessTokenExpiresAt: socialUser.expiresAt || null,
-            refreshTokenExpiresAt: null,
-            scope: socialUser.scope || null,
-            idToken: null,
-            password: null,
-        };
-
-        if (existingAccount) {
-            await repository.update(existingAccount.id, accountData);
-            return repository.findOneOrFail({
-                where: { id: existingAccount.id },
-            });
-        }
-
-        return repository.save(
-            repository.create({
-                id: randomUUID(),
-                ...accountData,
-            }),
-        );
     }
 
     private getRepository() {
