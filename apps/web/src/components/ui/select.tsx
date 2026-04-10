@@ -209,10 +209,12 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                         'w-full flex items-center justify-between rounded-lg border text-sm',
                         'transition-colors outline-none text-left cursor-pointer',
                         'bg-white dark:bg-surface-secondary-dark/20',
-                        'border-card-border dark:border-border-secondary-dark',
-                        'hover:border-white/40 focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white/20',
+                        'border-border dark:border-border-secondary-dark',
+                        'hover:border-border-secondary dark:hover:border-white/40',
+                        'focus-visible:ring-2 focus-visible:ring-primary/30 dark:focus-visible:ring-white/20 focus-visible:border-border-secondary dark:focus-visible:border-white',
                         'disabled:cursor-not-allowed disabled:opacity-50',
-                        open && 'border-white/9 ring-1 ring-white/20',
+                        open &&
+                            'border-border-secondary dark:border-white/20 ring-1 ring-primary/20 dark:ring-white/10',
                         size === 'default' ? 'h-9 px-3 py-2' : 'h-8 px-2 text-sm',
                     )}
                 >
