@@ -41,18 +41,20 @@ export function ImportSourceStep({
                     type="button"
                     onClick={() => onSourceMethodChange('url')}
                     className={cn(
-                        'p-4 rounded-lg border text-left transition-all cursor-pointer',
-                        'bg-[#0a0a0a] dark:bg-[#0a0a0a]',
+                        'p-5 rounded-xl border text-left transition-all cursor-pointer',
+                        'bg-card dark:bg-card-primary-dark',
                         sourceMethod === 'url'
-                            ? 'border-primary-500 shadow-lg'
-                            : 'border-card-border dark:border-border-secondary-dark hover:border-primary-500/50',
+                            ? 'border-button-primary dark:border-button-primary-dark shadow-sm'
+                            : 'border-card-border dark:border-border-dark hover:border-button-primary dark:hover:border-button-primary-dark',
                     )}
                 >
-                    <Link className="w-6 h-6 text-primary-500 mb-2" strokeWidth={1.4} />
-                    <h4 className="font-medium text-text dark:text-text-dark">
+                    <div className="w-9 h-9 rounded-lg bg-primary-500/10 flex items-center justify-center mb-3">
+                        <Link className="w-5 h-5 text-primary-500" strokeWidth={1.4} />
+                    </div>
+                    <h4 className="font-semibold text-text dark:text-text-dark mb-1">
                         {t('sourceMethod.url.title')}
                     </h4>
-                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark leading-relaxed">
                         {t('sourceMethod.url.description')}
                     </p>
                 </button>
@@ -61,18 +63,20 @@ export function ImportSourceStep({
                     type="button"
                     onClick={() => onSourceMethodChange('repository')}
                     className={cn(
-                        'p-4 rounded-lg border text-left transition-all cursor-pointer',
-                        'bg-[#0a0a0a] dark:bg-[#0a0a0a]',
+                        'p-5 rounded-xl border text-left transition-all cursor-pointer',
+                        'bg-card dark:bg-card-primary-dark',
                         sourceMethod === 'repository'
-                            ? 'border-accent-indigo shadow-lg'
-                            : 'border-card-border dark:border-border-secondary-dark hover:border-primary-500/50',
+                            ? 'border-button-primary dark:border-button-primary-dark shadow-sm'
+                            : 'border-card-border dark:border-border-dark hover:border-button-primary dark:hover:border-button-primary-dark',
                     )}
                 >
-                    <FolderGit2 className="w-6 h-6 text-accent-indigo mb-2" strokeWidth={1.4} />
-                    <h4 className="font-medium text-text dark:text-text-dark">
+                    <div className="w-9 h-9 rounded-lg bg-accent-indigo/10 flex items-center justify-center mb-3">
+                        <FolderGit2 className="w-5 h-5 text-accent-indigo" strokeWidth={1.4} />
+                    </div>
+                    <h4 className="font-semibold text-text dark:text-text-dark mb-1">
                         {t('sourceMethod.repository.title')}
                     </h4>
-                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark leading-relaxed">
                         {t('sourceMethod.repository.description')}
                     </p>
                 </button>

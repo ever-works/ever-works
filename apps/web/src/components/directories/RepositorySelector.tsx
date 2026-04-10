@@ -6,7 +6,12 @@ import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Loader2, Search, FolderGit2, Lock, Globe, RefreshCw } from 'lucide-react';
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import {
+    Accordion,
+    AccordionItem,
+    AccordionTrigger,
+    AccordionContent,
+} from '@/components/ui/accordion';
 import { getUserRepositories } from '@/app/actions/dashboard/directories';
 import { getGitProviderOrganizations } from '@/app/actions/dashboard/organizations';
 
@@ -397,7 +402,9 @@ export function RepositorySelector({ providerId, onSelect, selectedUrl }: Reposi
                                 <FolderGit2 className="w-4 h-4 text-primary" strokeWidth={1.5} />
                             </div>
                             <div className="text-left">
-                                <p className="font-semibold text-text dark:text-text-dark">{t('title')}</p>
+                                <p className="font-semibold text-text dark:text-text-dark">
+                                    {t('title')}
+                                </p>
                                 {selectedRepo && (
                                     <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                                         {selectedRepo.full_name}
