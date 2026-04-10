@@ -200,15 +200,10 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	validateSettings(settings: Record<string, unknown>): ValidationResult {
-		if (typeof settings.apiKey !== 'string' || settings.apiKey.trim().length === 0) {
+		if (settings.apiKey !== undefined && typeof settings.apiKey !== 'string') {
 			return {
 				valid: false,
-				errors: [
-					{
-						path: 'apiKey',
-						message: 'OpenAI API key is required for the Codex plugin'
-					}
-				]
+				errors: [{ path: 'apiKey', message: 'API key must be a string when provided' }]
 			};
 		}
 
