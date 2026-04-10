@@ -50,7 +50,7 @@ describe('process-runner', () => {
 
 		expect(spawnMock).toHaveBeenCalledWith(
 			'codex',
-			['exec', '--full-auto', '--model', 'codex-mini-latest', 'Generate items'],
+			['exec', '--full-auto', '--skip-git-repo-check', '--model', 'codex-mini-latest', 'Generate items'],
 			expect.objectContaining({
 				cwd: '/tmp/workspace',
 				env: expect.objectContaining({ OPENAI_API_KEY: 'sk-test' }),
@@ -97,7 +97,7 @@ describe('process-runner', () => {
 
 		expect(spawnMock).toHaveBeenCalledWith(
 			'/usr/local/bin/codex',
-			['exec', '--full-auto', 'Generate items'],
+			['exec', '--full-auto', '--skip-git-repo-check', 'Generate items'],
 			expect.any(Object)
 		);
 

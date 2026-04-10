@@ -24,7 +24,8 @@
 		"type-check": "tsc --noEmit",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"test:coverage": "vitest run --coverage"
+		"test:coverage": "vitest run --coverage",
+		"smoke": "node ./scripts/smoke-codex.mjs"
 	},
 	"peerDependencies": {
 		"@ever-works/plugin": "workspace:*"

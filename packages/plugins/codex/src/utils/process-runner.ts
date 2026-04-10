@@ -50,7 +50,7 @@ export function executeCodex(options: ExecuteOptions): {
 	const promise = new Promise<ExecuteResult>((resolve, reject) => {
 		const startTime = Date.now();
 
-		const args = ['exec', '--full-auto'];
+		const args = ['exec', '--full-auto', '--skip-git-repo-check'];
 		if (options.model) {
 			args.push('--model', options.model);
 		}
