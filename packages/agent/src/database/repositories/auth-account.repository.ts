@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { Not, Repository } from 'typeorm';
@@ -38,30 +38,52 @@ export class AuthAccountRepository {
             this.resolveAccountId(accountData) ||
             existingAccount?.accountId ||
             `${accountData.userId}:${accountData.providerId}`;
+        const existingProviderAccount = await this.authAccountRepository.findOne({
+            where: {
+                providerId: accountData.providerId,
+                accountId: resolvedAccountId,
+            },
+        });
+
+        if (existingProviderAccount && existingProviderAccount.userId !== accountData.userId) {
+            throw new ConflictException('This provider account is already linked to another user');
+        }
+
+        if (
+            existingAccount &&
+            existingProviderAccount &&
+            existingAccount.id !== existingProviderAccount.id
+        ) {
+            throw new ConflictException(
+                'Unable to link provider account because another account record already exists for this provider',
+            );
+        }
+
+        const targetAccount = existingAccount ?? existingProviderAccount;
 
         const nextAccountData: Partial<AuthAccount> = {
             userId: accountData.userId,
             providerId: accountData.providerId,
             accountId: resolvedAccountId,
-            accessToken: accountData.accessToken ?? existingAccount?.accessToken ?? null,
-            refreshToken: accountData.refreshToken ?? existingAccount?.refreshToken ?? null,
-            username: accountData.username ?? existingAccount?.username ?? null,
-            email: accountData.email ?? existingAccount?.email ?? null,
-            tokenType: accountData.tokenType ?? existingAccount?.tokenType ?? 'Bearer',
+            accessToken: accountData.accessToken ?? targetAccount?.accessToken ?? null,
+            refreshToken: accountData.refreshToken ?? targetAccount?.refreshToken ?? null,
+            username: accountData.username ?? targetAccount?.username ?? null,
+            email: accountData.email ?? targetAccount?.email ?? null,
+            tokenType: accountData.tokenType ?? targetAccount?.tokenType ?? 'Bearer',
             accessTokenExpiresAt:
-                accountData.accessTokenExpiresAt ?? existingAccount?.accessTokenExpiresAt ?? null,
+                accountData.accessTokenExpiresAt ?? targetAccount?.accessTokenExpiresAt ?? null,
             refreshTokenExpiresAt:
-                accountData.refreshTokenExpiresAt ?? existingAccount?.refreshTokenExpiresAt ?? null,
-            scope: accountData.scope ?? existingAccount?.scope ?? null,
-            idToken: accountData.idToken ?? existingAccount?.idToken ?? null,
-            password: existingAccount?.password ?? null,
-            metadata: accountData.metadata ?? existingAccount?.metadata ?? null,
+                accountData.refreshTokenExpiresAt ?? targetAccount?.refreshTokenExpiresAt ?? null,
+            scope: accountData.scope ?? targetAccount?.scope ?? null,
+            idToken: accountData.idToken ?? targetAccount?.idToken ?? null,
+            password: targetAccount?.password ?? null,
+            metadata: accountData.metadata ?? targetAccount?.metadata ?? null,
         };
 
-        if (existingAccount) {
-            await this.authAccountRepository.update(existingAccount.id, nextAccountData);
+        if (targetAccount) {
+            await this.authAccountRepository.update(targetAccount.id, nextAccountData);
             return this.authAccountRepository.findOneOrFail({
-                where: { id: existingAccount.id },
+                where: { id: targetAccount.id },
             });
         } else {
             return this.authAccountRepository.save(

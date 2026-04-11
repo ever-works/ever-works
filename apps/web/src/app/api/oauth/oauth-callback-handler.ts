@@ -11,6 +11,7 @@ import {
     isDashboardHref,
     shouldPromptGithubConnect,
 } from '@/lib/auth/github-connect';
+import { getOAuthRouteErrorCode } from './callback-errors';
 
 export async function handleOAuthCallback(request: NextRequest, providerId: string) {
     const queryParams = request.nextUrl.searchParams;
@@ -61,11 +62,8 @@ async function loginOauth(
             await setAuthCookies(authResponse.access_token);
         }
     } catch (error) {
-        href = ROUTES.AUTH_ERROR + '?error=oauth_callback';
-
-        if (error instanceof Error && error.message.includes('suspended')) {
-            href = ROUTES.AUTH_ERROR + '?error=account_locked';
-        }
+        const errorCode = getOAuthRouteErrorCode(error, 'oauth_callback');
+        href = ROUTES.AUTH_ERROR + `?error=${errorCode}`;
     }
 
     href = await getRedirectUrl(authResponse, href);
