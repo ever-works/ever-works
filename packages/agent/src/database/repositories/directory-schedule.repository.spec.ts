@@ -54,15 +54,28 @@ describe('DirectoryScheduleRepository', () => {
                 lastRunStatus: GenerateStatusType.GENERATING,
                 scheduledFor: nextRunAt,
                 nextRunAt: null,
+                lastRunAt: expect.any(Date),
                 updatedAt: expect.any(Date),
             }),
         );
-        expect(setPayload.lastRunAt).toBeInstanceOf(Date);
+        expect(setPayload.lastRunAt).toBe(setPayload.updatedAt);
         expect(queryBuilder.where).toHaveBeenCalledWith('id = :id', { id: 'schedule-1' });
         expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(1, 'status = :status', {
             status: DirectoryScheduleStatus.ACTIVE,
         });
         expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(2, 'nextRunAt IS NOT NULL');
         expect(result).toBe(nextRunAt);
+    });
+
+    it('returns null when the schedule is already claimed', async () => {
+        repository.findOne.mockResolvedValue({
+            id: 'schedule-1',
+            nextRunAt: new Date('2026-04-11T15:55:12.034Z'),
+        });
+        queryBuilder.execute.mockResolvedValue({ affected: 0 });
+
+        const result = await scheduleRepository.tryMarkDispatched('schedule-1');
+
+        expect(result).toBeNull();
     });
 });
