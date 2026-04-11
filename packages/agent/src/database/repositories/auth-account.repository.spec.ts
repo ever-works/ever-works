@@ -85,4 +85,37 @@ describe('AuthAccountRepository', () => {
         expect(repository.update).not.toHaveBeenCalled();
         expect(repository.save).not.toHaveBeenCalled();
     });
+
+    it('translates unique constraint races into a provider conflict', async () => {
+        repository.findOne
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce({
+                id: 'account-2',
+                userId: 'user-2',
+                providerId: 'github',
+                accountId: '35149259',
+            });
+        repository.create.mockReturnValue({
+            id: 'new-account',
+            userId: 'user-1',
+            providerId: 'github',
+            accountId: '35149259',
+        });
+        repository.save.mockRejectedValue({ code: '23505' });
+
+        const promise = authAccountRepository.upsertProviderAccount({
+            userId: 'user-1',
+            providerId: 'github',
+            accountId: '35149259',
+            accessToken: 'new-token',
+        });
+
+        await expect(promise).rejects.toBeInstanceOf(ConflictException);
+        await expect(promise).rejects.toMatchObject({
+            response: expect.objectContaining({
+                code: 'PROVIDER_ACCOUNT_ALREADY_LINKED',
+            }),
+        });
+    });
 });

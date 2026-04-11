@@ -4,6 +4,13 @@ import { randomUUID } from 'node:crypto';
 import { Not, Repository } from 'typeorm';
 import { AuthAccount } from '../../entities';
 
+const PROVIDER_ACCOUNT_ALREADY_LINKED_CODE = 'PROVIDER_ACCOUNT_ALREADY_LINKED';
+const PROVIDER_ACCOUNT_RECORD_CONFLICT_CODE = 'PROVIDER_ACCOUNT_RECORD_CONFLICT';
+const PROVIDER_ACCOUNT_ALREADY_LINKED_MESSAGE =
+    'This provider account is already linked to another user';
+const PROVIDER_ACCOUNT_RECORD_CONFLICT_MESSAGE =
+    'Unable to link provider account because another account record already exists for this provider';
+
 export type ProviderAccountUpsertData = {
     userId: string;
     providerId: string;
@@ -46,7 +53,7 @@ export class AuthAccountRepository {
         });
 
         if (existingProviderAccount && existingProviderAccount.userId !== accountData.userId) {
-            throw new ConflictException('This provider account is already linked to another user');
+            throw this.createProviderLinkedConflict();
         }
 
         if (
@@ -54,9 +61,7 @@ export class AuthAccountRepository {
             existingProviderAccount &&
             existingAccount.id !== existingProviderAccount.id
         ) {
-            throw new ConflictException(
-                'Unable to link provider account because another account record already exists for this provider',
-            );
+            throw this.createProviderRecordConflict();
         }
 
         const targetAccount = existingAccount ?? existingProviderAccount;
@@ -81,17 +86,25 @@ export class AuthAccountRepository {
         };
 
         if (targetAccount) {
-            await this.authAccountRepository.update(targetAccount.id, nextAccountData);
-            return this.authAccountRepository.findOneOrFail({
-                where: { id: targetAccount.id },
-            });
+            try {
+                await this.authAccountRepository.update(targetAccount.id, nextAccountData);
+                return this.authAccountRepository.findOneOrFail({
+                    where: { id: targetAccount.id },
+                });
+            } catch (error) {
+                throw await this.translateUniqueConstraint(error, accountData, resolvedAccountId);
+            }
         } else {
-            return this.authAccountRepository.save(
-                this.authAccountRepository.create({
-                    id: randomUUID(),
-                    ...nextAccountData,
-                }),
-            );
+            try {
+                return await this.authAccountRepository.save(
+                    this.authAccountRepository.create({
+                        id: randomUUID(),
+                        ...nextAccountData,
+                    }),
+                );
+            } catch (error) {
+                throw await this.translateUniqueConstraint(error, accountData, resolvedAccountId);
+            }
         }
     }
 
@@ -165,5 +178,50 @@ export class AuthAccountRepository {
         }
 
         return accountData.email || accountData.username || null;
+    }
+
+    private async translateUniqueConstraint(
+        error: unknown,
+        accountData: Pick<ProviderAccountUpsertData, 'userId' | 'providerId'>,
+        resolvedAccountId: string,
+    ): Promise<never> {
+        if (!this.isUniqueConstraintError(error)) {
+            throw error;
+        }
+
+        const currentProviderAccount = await this.authAccountRepository.findOne({
+            where: {
+                providerId: accountData.providerId,
+                accountId: resolvedAccountId,
+            },
+        });
+
+        if (currentProviderAccount && currentProviderAccount.userId !== accountData.userId) {
+            throw this.createProviderLinkedConflict();
+        }
+
+        throw this.createProviderRecordConflict();
+    }
+
+    private isUniqueConstraintError(error: unknown): boolean {
+        if (error && typeof error === 'object' && 'code' in error) {
+            const code = (error as { code: string }).code;
+            return code === '23505' || code === 'ER_DUP_ENTRY' || code === 'SQLITE_CONSTRAINT';
+        }
+        return false;
+    }
+
+    private createProviderLinkedConflict(): ConflictException {
+        return new ConflictException({
+            code: PROVIDER_ACCOUNT_ALREADY_LINKED_CODE,
+            message: PROVIDER_ACCOUNT_ALREADY_LINKED_MESSAGE,
+        });
+    }
+
+    private createProviderRecordConflict(): ConflictException {
+        return new ConflictException({
+            code: PROVIDER_ACCOUNT_RECORD_CONFLICT_CODE,
+            message: PROVIDER_ACCOUNT_RECORD_CONFLICT_MESSAGE,
+        });
     }
 }

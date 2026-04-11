@@ -22,7 +22,7 @@ export default function DashboardToasts() {
               .filter(Boolean)
               .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
               .join(' ')
-        : 'Git provider';
+        : t('oauthConnected.defaultProvider');
 
     useEffect(() => {
         if (isNewUser) {

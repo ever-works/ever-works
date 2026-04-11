@@ -313,7 +313,8 @@
             },
             "oauthConnected": {
                 "title": "Account connected",
-                "description": "Your account has been successfully connected to {provider}."
+                "description": "Your account has been successfully connected to {provider}.",
+                "defaultProvider": "Git provider"
             },
             "oauthConflict": {
                 "title": "Provider account already linked",
