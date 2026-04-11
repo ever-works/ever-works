@@ -25,15 +25,15 @@ npm install -D nyc @istanbuljs/nyc-config-typescript
 
 ```typescript
 // playwright.config.ts
-import { defineConfig } from "@playwright/test";
+import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  use: {
-    // Enable coverage collection
-    contextOptions: {
-      // V8 coverage is automatic with the API below
-    },
-  },
+	use: {
+		// Enable coverage collection
+		contextOptions: {
+			// V8 coverage is automatic with the API below
+		}
+	}
 });
 ```
 
@@ -41,44 +41,44 @@ export default defineConfig({
 
 ```typescript
 // fixtures/coverage.ts
-import { test as base, expect } from "@playwright/test";
-import fs from "fs";
-import path from "path";
-import { randomUUID } from "crypto";
+import { test as base, expect } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
+import { randomUUID } from 'crypto';
 
 export const test = base.extend<{}, { collectCoverage: void }>({
-  collectCoverage: [
-    async ({ browser }, use) => {
-      // Start coverage for all pages
-      const context = await browser.newContext();
-      const page = await context.newPage();
+	collectCoverage: [
+		async ({ browser }, use) => {
+			// Start coverage for all pages
+			const context = await browser.newContext();
+			const page = await context.newPage();
 
-      await page.coverage.startJSCoverage();
-      await page.coverage.startCSSCoverage();
+			await page.coverage.startJSCoverage();
+			await page.coverage.startCSSCoverage();
 
-      await use();
+			await use();
 
-      // Collect coverage
-      const [jsCoverage, cssCoverage] = await Promise.all([
-        page.coverage.stopJSCoverage(),
-        page.coverage.stopCSSCoverage(),
-      ]);
+			// Collect coverage
+			const [jsCoverage, cssCoverage] = await Promise.all([
+				page.coverage.stopJSCoverage(),
+				page.coverage.stopCSSCoverage()
+			]);
 
-      // Save coverage data
-      const coverageDir = "./coverage";
-      if (!fs.existsSync(coverageDir)) {
-        fs.mkdirSync(coverageDir, { recursive: true });
-      }
+			// Save coverage data
+			const coverageDir = './coverage';
+			if (!fs.existsSync(coverageDir)) {
+				fs.mkdirSync(coverageDir, { recursive: true });
+			}
 
-      fs.writeFileSync(
-        path.join(coverageDir, `coverage-${randomUUID()}.json`),
-        JSON.stringify([...jsCoverage, ...cssCoverage])
-      );
+			fs.writeFileSync(
+				path.join(coverageDir, `coverage-${randomUUID()}.json`),
+				JSON.stringify([...jsCoverage, ...cssCoverage])
+			);
 
-      await context.close();
-    },
-    { scope: "worker", auto: true },
-  ],
+			await context.close();
+		},
+		{ scope: 'worker', auto: true }
+	]
 });
 ```
 
@@ -87,82 +87,76 @@ export const test = base.extend<{}, { collectCoverage: void }>({
 ### Per-Test Coverage
 
 ```typescript
-test("collect coverage for single test", async ({ page }) => {
-  // Start coverage collection
-  await page.coverage.startJSCoverage({
-    resetOnNavigation: false,
-  });
+test('collect coverage for single test', async ({ page }) => {
+	// Start coverage collection
+	await page.coverage.startJSCoverage({
+		resetOnNavigation: false
+	});
 
-  // Run test
-  await page.goto("/app");
-  await page.getByRole("button", { name: "Submit" }).click();
-  await expect(page.getByText("Success")).toBeVisible();
+	// Run test
+	await page.goto('/app');
+	await page.getByRole('button', { name: 'Submit' }).click();
+	await expect(page.getByText('Success')).toBeVisible();
 
-  // Stop and get coverage
-  const coverage = await page.coverage.stopJSCoverage();
+	// Stop and get coverage
+	const coverage = await page.coverage.stopJSCoverage();
 
-  // Filter to only your source files
-  const appCoverage = coverage.filter((entry) => entry.url.includes("/src/"));
+	// Filter to only your source files
+	const appCoverage = coverage.filter((entry) => entry.url.includes('/src/'));
 
-  console.log(`Covered ${appCoverage.length} source files`);
+	console.log(`Covered ${appCoverage.length} source files`);
 });
 ```
 
 ### Coverage for Specific Files
 
 ```typescript
-test("track specific module coverage", async ({ page }) => {
-  await page.coverage.startJSCoverage();
+test('track specific module coverage', async ({ page }) => {
+	await page.coverage.startJSCoverage();
 
-  await page.goto("/checkout");
-  await page.getByRole("button", { name: "Pay" }).click();
+	await page.goto('/checkout');
+	await page.getByRole('button', { name: 'Pay' }).click();
 
-  const coverage = await page.coverage.stopJSCoverage();
+	const coverage = await page.coverage.stopJSCoverage();
 
-  // Find coverage for checkout module
-  const checkoutCoverage = coverage.find((c) => c.url.includes("checkout.js"));
+	// Find coverage for checkout module
+	const checkoutCoverage = coverage.find((c) => c.url.includes('checkout.js'));
 
-  if (checkoutCoverage) {
-    const totalBytes = checkoutCoverage.text?.length || 0;
-    const coveredBytes = checkoutCoverage.ranges.reduce(
-      (sum, range) => sum + (range.end - range.start),
-      0
-    );
-    const percentage = (coveredBytes / totalBytes) * 100;
+	if (checkoutCoverage) {
+		const totalBytes = checkoutCoverage.text?.length || 0;
+		const coveredBytes = checkoutCoverage.ranges.reduce((sum, range) => sum + (range.end - range.start), 0);
+		const percentage = (coveredBytes / totalBytes) * 100;
 
-    console.log(`Checkout module: ${percentage.toFixed(1)}% covered`);
-    expect(percentage).toBeGreaterThan(80);
-  }
+		console.log(`Checkout module: ${percentage.toFixed(1)}% covered`);
+		expect(percentage).toBeGreaterThan(80);
+	}
 });
 ```
 
 ### CSS Coverage
 
 ```typescript
-test("collect CSS coverage", async ({ page }) => {
-  await page.coverage.startCSSCoverage();
+test('collect CSS coverage', async ({ page }) => {
+	await page.coverage.startCSSCoverage();
 
-  await page.goto("/app");
+	await page.goto('/app');
 
-  // Interact to trigger different CSS states
-  await page.getByRole("button").hover();
-  await page.getByRole("dialog").waitFor();
+	// Interact to trigger different CSS states
+	await page.getByRole('button').hover();
+	await page.getByRole('dialog').waitFor();
 
-  const cssCoverage = await page.coverage.stopCSSCoverage();
+	const cssCoverage = await page.coverage.stopCSSCoverage();
 
-  // Find unused CSS
-  for (const entry of cssCoverage) {
-    const totalBytes = entry.text?.length || 0;
-    const usedBytes = entry.ranges.reduce(
-      (sum, range) => sum + (range.end - range.start),
-      0
-    );
-    const unusedPercentage = ((totalBytes - usedBytes) / totalBytes) * 100;
+	// Find unused CSS
+	for (const entry of cssCoverage) {
+		const totalBytes = entry.text?.length || 0;
+		const usedBytes = entry.ranges.reduce((sum, range) => sum + (range.end - range.start), 0);
+		const unusedPercentage = ((totalBytes - usedBytes) / totalBytes) * 100;
 
-    if (unusedPercentage > 50) {
-      console.warn(`${entry.url}: ${unusedPercentage.toFixed(1)}% unused CSS`);
-    }
-  }
+		if (unusedPercentage > 50) {
+			console.warn(`${entry.url}: ${unusedPercentage.toFixed(1)}% unused CSS`);
+		}
+	}
 });
 ```
 
@@ -172,40 +166,35 @@ test("collect CSS coverage", async ({ page }) => {
 
 ```typescript
 // scripts/convert-coverage.ts
-import { execSync } from "child_process";
-import fs from "fs";
-import path from "path";
-import v8ToIstanbul from "v8-to-istanbul";
+import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import v8ToIstanbul from 'v8-to-istanbul';
 
 async function convertCoverage() {
-  const coverageDir = "./coverage";
-  const files = fs.readdirSync(coverageDir).filter((f) => f.endsWith(".json"));
+	const coverageDir = './coverage';
+	const files = fs.readdirSync(coverageDir).filter((f) => f.endsWith('.json'));
 
-  const istanbulCoverage: any = {};
+	const istanbulCoverage: any = {};
 
-  for (const file of files) {
-    const coverageData = JSON.parse(
-      fs.readFileSync(path.join(coverageDir, file), "utf-8")
-    );
+	for (const file of files) {
+		const coverageData = JSON.parse(fs.readFileSync(path.join(coverageDir, file), 'utf-8'));
 
-    for (const entry of coverageData) {
-      if (!entry.url.startsWith("file://")) continue;
+		for (const entry of coverageData) {
+			if (!entry.url.startsWith('file://')) continue;
 
-      const filePath = entry.url.replace("file://", "");
-      const converter = v8ToIstanbul(filePath);
+			const filePath = entry.url.replace('file://', '');
+			const converter = v8ToIstanbul(filePath);
 
-      await converter.load();
-      converter.applyCoverage(entry.functions || []);
+			await converter.load();
+			converter.applyCoverage(entry.functions || []);
 
-      const istanbul = converter.toIstanbul();
-      Object.assign(istanbulCoverage, istanbul);
-    }
-  }
+			const istanbul = converter.toIstanbul();
+			Object.assign(istanbulCoverage, istanbul);
+		}
+	}
 
-  fs.writeFileSync(
-    path.join(coverageDir, "coverage-final.json"),
-    JSON.stringify(istanbulCoverage)
-  );
+	fs.writeFileSync(path.join(coverageDir, 'coverage-final.json'), JSON.stringify(istanbulCoverage));
 }
 
 convertCoverage();
@@ -233,61 +222,54 @@ npx nyc report --reporter=html --reporter=text --temp-dir=./coverage
 
 ```typescript
 // reporters/coverage-reporter.ts
-import type { Reporter, FullResult } from "@playwright/test/reporter";
-import fs from "fs";
-import path from "path";
+import type { Reporter, FullResult } from '@playwright/test/reporter';
+import fs from 'fs';
+import path from 'path';
 
 class CoverageReporter implements Reporter {
-  private coverageData: any[] = [];
+	private coverageData: any[] = [];
 
-  onEnd(result: FullResult) {
-    // Aggregate all coverage files
-    const coverageDir = "./coverage";
-    const files = fs
-      .readdirSync(coverageDir)
-      .filter((f) => f.endsWith(".json"));
+	onEnd(result: FullResult) {
+		// Aggregate all coverage files
+		const coverageDir = './coverage';
+		const files = fs.readdirSync(coverageDir).filter((f) => f.endsWith('.json'));
 
-    for (const file of files) {
-      const data = JSON.parse(
-        fs.readFileSync(path.join(coverageDir, file), "utf-8")
-      );
-      this.coverageData.push(...data);
-    }
+		for (const file of files) {
+			const data = JSON.parse(fs.readFileSync(path.join(coverageDir, file), 'utf-8'));
+			this.coverageData.push(...data);
+		}
 
-    // Generate summary
-    const summary = this.generateSummary();
-    console.log("\n📊 Coverage Summary:");
-    console.log(`   Files: ${summary.totalFiles}`);
-    console.log(`   Lines: ${summary.lineCoverage.toFixed(1)}%`);
-    console.log(`   Bytes: ${summary.byteCoverage.toFixed(1)}%`);
+		// Generate summary
+		const summary = this.generateSummary();
+		console.log('\n📊 Coverage Summary:');
+		console.log(`   Files: ${summary.totalFiles}`);
+		console.log(`   Lines: ${summary.lineCoverage.toFixed(1)}%`);
+		console.log(`   Bytes: ${summary.byteCoverage.toFixed(1)}%`);
 
-    if (summary.lineCoverage < 80) {
-      console.warn("⚠️  Coverage below 80% threshold!");
-    }
-  }
+		if (summary.lineCoverage < 80) {
+			console.warn('⚠️  Coverage below 80% threshold!');
+		}
+	}
 
-  private generateSummary() {
-    let totalBytes = 0;
-    let coveredBytes = 0;
-    const files = new Set<string>();
+	private generateSummary() {
+		let totalBytes = 0;
+		let coveredBytes = 0;
+		const files = new Set<string>();
 
-    for (const entry of this.coverageData) {
-      if (entry.url.includes("/src/")) {
-        files.add(entry.url);
-        totalBytes += entry.text?.length || 0;
-        coveredBytes += entry.ranges.reduce(
-          (sum: number, r: any) => sum + (r.end - r.start),
-          0
-        );
-      }
-    }
+		for (const entry of this.coverageData) {
+			if (entry.url.includes('/src/')) {
+				files.add(entry.url);
+				totalBytes += entry.text?.length || 0;
+				coveredBytes += entry.ranges.reduce((sum: number, r: any) => sum + (r.end - r.start), 0);
+			}
+		}
 
-    return {
-      totalFiles: files.size,
-      byteCoverage: (coveredBytes / totalBytes) * 100,
-      lineCoverage: (coveredBytes / totalBytes) * 100, // Simplified
-    };
-  }
+		return {
+			totalFiles: files.size,
+			byteCoverage: (coveredBytes / totalBytes) * 100,
+			lineCoverage: (coveredBytes / totalBytes) * 100 // Simplified
+		};
+	}
 }
 
 export default CoverageReporter;
@@ -299,36 +281,31 @@ export default CoverageReporter;
 
 ```typescript
 // tests/coverage.spec.ts
-import { test, expect } from "@playwright/test";
-import fs from "fs";
-import path from "path";
+import { test, expect } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
 
 test.afterAll(async () => {
-  const coverageDir = "./coverage";
-  const files = fs.readdirSync(coverageDir).filter((f) => f.endsWith(".json"));
+	const coverageDir = './coverage';
+	const files = fs.readdirSync(coverageDir).filter((f) => f.endsWith('.json'));
 
-  let totalBytes = 0;
-  let coveredBytes = 0;
+	let totalBytes = 0;
+	let coveredBytes = 0;
 
-  for (const file of files) {
-    const coverage = JSON.parse(
-      fs.readFileSync(path.join(coverageDir, file), "utf-8")
-    );
+	for (const file of files) {
+		const coverage = JSON.parse(fs.readFileSync(path.join(coverageDir, file), 'utf-8'));
 
-    for (const entry of coverage) {
-      if (!entry.url.includes("/src/")) continue;
-      totalBytes += entry.text?.length || 0;
-      coveredBytes += entry.ranges.reduce(
-        (sum: number, r: any) => sum + (r.end - r.start),
-        0
-      );
-    }
-  }
+		for (const entry of coverage) {
+			if (!entry.url.includes('/src/')) continue;
+			totalBytes += entry.text?.length || 0;
+			coveredBytes += entry.ranges.reduce((sum: number, r: any) => sum + (r.end - r.start), 0);
+		}
+	}
 
-  const coveragePercent = (coveredBytes / totalBytes) * 100;
+	const coveragePercent = (coveredBytes / totalBytes) * 100;
 
-  // Enforce threshold
-  expect(coveragePercent).toBeGreaterThan(80);
+	// Enforce threshold
+	expect(coveragePercent).toBeGreaterThan(80);
 });
 ```
 
@@ -337,46 +314,39 @@ test.afterAll(async () => {
 ```typescript
 // coverage-check.ts
 interface CoverageThreshold {
-  pattern: RegExp;
-  minCoverage: number;
+	pattern: RegExp;
+	minCoverage: number;
 }
 
 const thresholds: CoverageThreshold[] = [
-  { pattern: /\/src\/core\//, minCoverage: 90 },
-  { pattern: /\/src\/utils\//, minCoverage: 85 },
-  { pattern: /\/src\/components\//, minCoverage: 70 },
-  { pattern: /\/src\/pages\//, minCoverage: 60 },
+	{ pattern: /\/src\/core\//, minCoverage: 90 },
+	{ pattern: /\/src\/utils\//, minCoverage: 85 },
+	{ pattern: /\/src\/components\//, minCoverage: 70 },
+	{ pattern: /\/src\/pages\//, minCoverage: 60 }
 ];
 
 function checkThresholds(coverage: any[]): string[] {
-  const violations: string[] = [];
+	const violations: string[] = [];
 
-  for (const threshold of thresholds) {
-    const matchingFiles = coverage.filter((c) => threshold.pattern.test(c.url));
+	for (const threshold of thresholds) {
+		const matchingFiles = coverage.filter((c) => threshold.pattern.test(c.url));
 
-    let total = 0;
-    let covered = 0;
+		let total = 0;
+		let covered = 0;
 
-    for (const file of matchingFiles) {
-      total += file.text?.length || 0;
-      covered += file.ranges.reduce(
-        (sum: number, r: any) => sum + (r.end - r.start),
-        0
-      );
-    }
+		for (const file of matchingFiles) {
+			total += file.text?.length || 0;
+			covered += file.ranges.reduce((sum: number, r: any) => sum + (r.end - r.start), 0);
+		}
 
-    const percent = total > 0 ? (covered / total) * 100 : 0;
+		const percent = total > 0 ? (covered / total) * 100 : 0;
 
-    if (percent < threshold.minCoverage) {
-      violations.push(
-        `${threshold.pattern}: ${percent.toFixed(1)}% < ${
-          threshold.minCoverage
-        }%`
-      );
-    }
-  }
+		if (percent < threshold.minCoverage) {
+			violations.push(`${threshold.pattern}: ${percent.toFixed(1)}% < ${threshold.minCoverage}%`);
+		}
+	}
 
-  return violations;
+	return violations;
 }
 ```
 
@@ -386,29 +356,26 @@ function checkThresholds(coverage: any[]): string[] {
 
 ```typescript
 // scripts/merge-coverage.ts
-import fs from "fs";
-import { glob } from "glob";
+import fs from 'fs';
+import { glob } from 'glob';
 
 async function mergeCoverage() {
-  const files = await glob("shard-*/coverage/*.json");
-  const merged = new Map<string, any>();
+	const files = await glob('shard-*/coverage/*.json');
+	const merged = new Map<string, any>();
 
-  for (const file of files) {
-    const data = JSON.parse(fs.readFileSync(file, "utf-8"));
-    for (const entry of data) {
-      if (merged.has(entry.url)) {
-        const existing = merged.get(entry.url);
-        existing.ranges.push(...entry.ranges);
-      } else {
-        merged.set(entry.url, { ...entry });
-      }
-    }
-  }
+	for (const file of files) {
+		const data = JSON.parse(fs.readFileSync(file, 'utf-8'));
+		for (const entry of data) {
+			if (merged.has(entry.url)) {
+				const existing = merged.get(entry.url);
+				existing.ranges.push(...entry.ranges);
+			} else {
+				merged.set(entry.url, { ...entry });
+			}
+		}
+	}
 
-  fs.writeFileSync(
-    "./coverage/merged.json",
-    JSON.stringify([...merged.values()])
-  );
+	fs.writeFileSync('./coverage/merged.json', JSON.stringify([...merged.values()]));
 }
 
 mergeCoverage();
@@ -418,25 +385,23 @@ mergeCoverage();
 
 ```typescript
 // Check coverage only for changed files in CI
-import { execSync } from "child_process";
-import fs from "fs";
+import { execSync } from 'child_process';
+import fs from 'fs';
 
-const changedFiles = execSync("git diff --name-only HEAD~1")
-  .toString()
-  .split("\n")
-  .filter((f) => f.endsWith(".ts"));
+const changedFiles = execSync('git diff --name-only HEAD~1')
+	.toString()
+	.split('\n')
+	.filter((f) => f.endsWith('.ts'));
 
-const coverage = JSON.parse(fs.readFileSync("./coverage/merged.json", "utf-8"));
+const coverage = JSON.parse(fs.readFileSync('./coverage/merged.json', 'utf-8'));
 
 for (const file of changedFiles) {
-  const entry = coverage.find((c: any) => c.url.includes(file));
-  if (entry) {
-    const percent =
-      (entry.ranges.reduce((s: number, r: any) => s + r.end - r.start, 0) /
-        (entry.text?.length || 1)) *
-      100;
-    console.log(`${file}: ${percent.toFixed(1)}%`);
-  }
+	const entry = coverage.find((c: any) => c.url.includes(file));
+	if (entry) {
+		const percent =
+			(entry.ranges.reduce((s: number, r: any) => s + r.end - r.start, 0) / (entry.text?.length || 1)) * 100;
+		console.log(`${file}: ${percent.toFixed(1)}%`);
+	}
 }
 ```
 
@@ -451,34 +416,34 @@ name: Tests with Coverage
 on: [push, pull_request]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
 
-      - run: npm ci
-      - run: npx playwright install --with-deps
+            - run: npm ci
+            - run: npx playwright install --with-deps
 
-      - name: Run tests with coverage
-        run: npm run test:coverage
+            - name: Run tests with coverage
+              run: npm run test:coverage
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: ./coverage/lcov.info
-          fail_ci_if_error: true
+            - name: Upload coverage to Codecov
+              uses: codecov/codecov-action@v3
+              with:
+                  files: ./coverage/lcov.info
+                  fail_ci_if_error: true
 
-      - name: Check coverage threshold
-        run: |
-          COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
-          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-            echo "Coverage $COVERAGE% is below 80% threshold"
-            exit 1
-          fi
+            - name: Check coverage threshold
+              run: |
+                  COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
+                  if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+                    echo "Coverage $COVERAGE% is below 80% threshold"
+                    exit 1
+                  fi
 ```
 
 ## Anti-Patterns to Avoid

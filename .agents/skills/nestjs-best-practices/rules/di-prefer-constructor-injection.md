@@ -15,15 +15,15 @@ Always use constructor injection over property injection. Constructor injection 
 // Property injection - avoid unless necessary
 @Injectable()
 export class UsersService {
-  @Inject()
-  private userRepo: UserRepository; // Hidden dependency
+	@Inject()
+	private userRepo: UserRepository; // Hidden dependency
 
-  @Inject('CONFIG')
-  private config: ConfigType; // Also hidden
+	@Inject('CONFIG')
+	private config: ConfigType; // Also hidden
 
-  async findAll() {
-    return this.userRepo.find();
-  }
+	async findAll() {
+		return this.userRepo.find();
+	}
 }
 
 // Problems:
@@ -38,48 +38,48 @@ export class UsersService {
 // Constructor injection - explicit and testable
 @Injectable()
 export class UsersService {
-  constructor(
-    private readonly userRepo: UserRepository,
-    @Inject('CONFIG') private readonly config: ConfigType,
-  ) {}
+	constructor(
+		private readonly userRepo: UserRepository,
+		@Inject('CONFIG') private readonly config: ConfigType
+	) {}
 
-  async findAll(): Promise<User[]> {
-    return this.userRepo.find();
-  }
+	async findAll(): Promise<User[]> {
+		return this.userRepo.find();
+	}
 }
 
 // Testing is straightforward
 describe('UsersService', () => {
-  let service: UsersService;
-  let mockRepo: jest.Mocked<UserRepository>;
+	let service: UsersService;
+	let mockRepo: jest.Mocked<UserRepository>;
 
-  beforeEach(() => {
-    mockRepo = {
-      find: jest.fn(),
-      save: jest.fn(),
-    } as any;
+	beforeEach(() => {
+		mockRepo = {
+			find: jest.fn(),
+			save: jest.fn()
+		} as any;
 
-    service = new UsersService(mockRepo, { dbUrl: 'test' });
-  });
+		service = new UsersService(mockRepo, { dbUrl: 'test' });
+	});
 
-  it('should find all users', async () => {
-    mockRepo.find.mockResolvedValue([{ id: '1', name: 'Test' }]);
-    const result = await service.findAll();
-    expect(result).toHaveLength(1);
-  });
+	it('should find all users', async () => {
+		mockRepo.find.mockResolvedValue([{ id: '1', name: 'Test' }]);
+		const result = await service.findAll();
+		expect(result).toHaveLength(1);
+	});
 });
 
 // Only use property injection for optional dependencies
 @Injectable()
 export class LoggingService {
-  @Optional()
-  @Inject('ANALYTICS')
-  private analytics?: AnalyticsService;
+	@Optional()
+	@Inject('ANALYTICS')
+	private analytics?: AnalyticsService;
 
-  log(message: string) {
-    console.log(message);
-    this.analytics?.track('log', message); // Optional enhancement
-  }
+	log(message: string) {
+		console.log(message);
+		this.analytics?.track('log', message); // Optional enhancement
+	}
 }
 ```
 

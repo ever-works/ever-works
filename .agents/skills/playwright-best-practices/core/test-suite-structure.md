@@ -22,33 +22,33 @@ npm init playwright@latest
 
 ```typescript
 // playwright.config.ts
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: "./tests",
-  fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: [["html"], ["list"]],
-  use: {
-    baseURL: "http://localhost:3000",
-    trace: "on-first-retry",
-    screenshot: "only-on-failure",
-  },
-  projects: [
-    { name: "setup", testMatch: /.*\.setup\.ts/ },
-    {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-      dependencies: ["setup"],
-    },
-  ],
-  webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
-  },
+	testDir: './tests',
+	fullyParallel: true,
+	forbidOnly: !!process.env.CI,
+	retries: process.env.CI ? 2 : 0,
+	workers: process.env.CI ? 1 : undefined,
+	reporter: [['html'], ['list']],
+	use: {
+		baseURL: 'http://localhost:3000',
+		trace: 'on-first-retry',
+		screenshot: 'only-on-failure'
+	},
+	projects: [
+		{ name: 'setup', testMatch: /.*\.setup\.ts/ },
+		{
+			name: 'chromium',
+			use: { ...devices['Desktop Chrome'] },
+			dependencies: ['setup']
+		}
+	],
+	webServer: {
+		command: 'npm run dev',
+		url: 'http://localhost:3000',
+		reuseExistingServer: !process.env.CI
+	}
 });
 ```
 
@@ -60,44 +60,44 @@ Full user journey tests through the browser.
 
 ```typescript
 // tests/e2e/checkout.spec.ts
-import { test, expect } from "@playwright/test";
+import { test, expect } from '@playwright/test';
 
-test.describe("Checkout Flow", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/products");
-  });
+test.describe('Checkout Flow', () => {
+	test.beforeEach(async ({ page }) => {
+		await page.goto('/products');
+	});
 
-  test("complete purchase as guest", async ({ page }) => {
-    // Add to cart
-    await page.getByRole("button", { name: "Add to Cart" }).first().click();
-    await expect(page.getByTestId("cart-count")).toHaveText("1");
+	test('complete purchase as guest', async ({ page }) => {
+		// Add to cart
+		await page.getByRole('button', { name: 'Add to Cart' }).first().click();
+		await expect(page.getByTestId('cart-count')).toHaveText('1');
 
-    // Go to checkout
-    await page.getByRole("link", { name: "Cart" }).click();
-    await page.getByRole("button", { name: "Checkout" }).click();
+		// Go to checkout
+		await page.getByRole('link', { name: 'Cart' }).click();
+		await page.getByRole('button', { name: 'Checkout' }).click();
 
-    // Fill shipping
-    await page.getByLabel("Email").fill("guest@example.com");
-    await page.getByLabel("Address").fill("123 Test St");
-    await page.getByRole("button", { name: "Continue" }).click();
+		// Fill shipping
+		await page.getByLabel('Email').fill('guest@example.com');
+		await page.getByLabel('Address').fill('123 Test St');
+		await page.getByRole('button', { name: 'Continue' }).click();
 
-    // Payment
-    await page.getByLabel("Card Number").fill("4242424242424242");
-    await page.getByRole("button", { name: "Pay Now" }).click();
+		// Payment
+		await page.getByLabel('Card Number').fill('4242424242424242');
+		await page.getByRole('button', { name: 'Pay Now' }).click();
 
-    // Confirmation
-    await expect(page.getByRole("heading")).toHaveText("Order Confirmed");
-  });
+		// Confirmation
+		await expect(page.getByRole('heading')).toHaveText('Order Confirmed');
+	});
 
-  test("apply discount code", async ({ page }) => {
-    await page.getByRole("button", { name: "Add to Cart" }).first().click();
-    await page.getByRole("link", { name: "Cart" }).click();
+	test('apply discount code', async ({ page }) => {
+		await page.getByRole('button', { name: 'Add to Cart' }).first().click();
+		await page.getByRole('link', { name: 'Cart' }).click();
 
-    await page.getByLabel("Discount Code").fill("SAVE10");
-    await page.getByRole("button", { name: "Apply" }).click();
+		await page.getByLabel('Discount Code').fill('SAVE10');
+		await page.getByRole('button', { name: 'Apply' }).click();
 
-    await expect(page.getByText("10% discount applied")).toBeVisible();
-  });
+		await expect(page.getByText('10% discount applied')).toBeVisible();
+	});
 });
 ```
 
@@ -128,54 +128,54 @@ For E2E tests that need to mock API responses:
 
 ```typescript
 // Mock single endpoint
-test("displays mocked users", async ({ page }) => {
-  await page.route("**/api/users", (route) =>
-    route.fulfill({
-      status: 200,
-      json: [{ id: 1, name: "Test User" }],
-    })
-  );
+test('displays mocked users', async ({ page }) => {
+	await page.route('**/api/users', (route) =>
+		route.fulfill({
+			status: 200,
+			json: [{ id: 1, name: 'Test User' }]
+		})
+	);
 
-  await page.goto("/users");
-  await expect(page.getByText("Test User")).toBeVisible();
+	await page.goto('/users');
+	await expect(page.getByText('Test User')).toBeVisible();
 });
 
 // Mock with different responses
-test("handles API errors", async ({ page }) => {
-  await page.route("**/api/users", (route) =>
-    route.fulfill({
-      status: 500,
-      json: { error: "Server error" },
-    })
-  );
+test('handles API errors', async ({ page }) => {
+	await page.route('**/api/users', (route) =>
+		route.fulfill({
+			status: 500,
+			json: { error: 'Server error' }
+		})
+	);
 
-  await page.goto("/users");
-  await expect(page.getByText("Server error")).toBeVisible();
+	await page.goto('/users');
+	await expect(page.getByText('Server error')).toBeVisible();
 });
 
 // Conditional mocking
-test("mocks based on request", async ({ page }) => {
-  await page.route("**/api/users", (route, request) => {
-    if (request.method() === "GET") {
-      route.fulfill({ json: [{ id: 1, name: "User" }] });
-    } else {
-      route.continue();
-    }
-  });
+test('mocks based on request', async ({ page }) => {
+	await page.route('**/api/users', (route, request) => {
+		if (request.method() === 'GET') {
+			route.fulfill({ json: [{ id: 1, name: 'User' }] });
+		} else {
+			route.continue();
+		}
+	});
 });
 
 // Mock with delay (simulate slow network)
-test("handles slow API", async ({ page }) => {
-  await page.route("**/api/data", (route) =>
-    route.fulfill({
-      json: { data: "test" },
-      delay: 2000, // 2 second delay
-    })
-  );
+test('handles slow API', async ({ page }) => {
+	await page.route('**/api/data', (route) =>
+		route.fulfill({
+			json: { data: 'test' },
+			delay: 2000 // 2 second delay
+		})
+	);
 
-  await page.goto("/dashboard");
-  await expect(page.getByText("Loading...")).toBeVisible();
-  await expect(page.getByText("test")).toBeVisible();
+	await page.goto('/dashboard');
+	await expect(page.getByText('Loading...')).toBeVisible();
+	await expect(page.getByText('test')).toBeVisible();
 });
 ```
 
@@ -189,66 +189,62 @@ Compare screenshots to detect visual changes.
 
 ```typescript
 // tests/visual/homepage.spec.ts
-import { test, expect } from "@playwright/test";
+import { test, expect } from '@playwright/test';
 
-test("homepage visual", async ({ page }) => {
-  await page.goto("/");
-  await expect(page).toHaveScreenshot("homepage.png");
+test('homepage visual', async ({ page }) => {
+	await page.goto('/');
+	await expect(page).toHaveScreenshot('homepage.png');
 });
 
-test("component visual", async ({ page }) => {
-  await page.goto("/components");
+test('component visual', async ({ page }) => {
+	await page.goto('/components');
 
-  const button = page.getByRole("button", { name: "Primary" });
-  await expect(button).toHaveScreenshot("primary-button.png");
+	const button = page.getByRole('button', { name: 'Primary' });
+	await expect(button).toHaveScreenshot('primary-button.png');
 });
 ```
 
 ### Visual Test Options
 
 ```typescript
-test("dashboard visual", async ({ page }) => {
-  await page.goto("/dashboard");
+test('dashboard visual', async ({ page }) => {
+	await page.goto('/dashboard');
 
-  await expect(page).toHaveScreenshot("dashboard.png", {
-    fullPage: true, // Capture entire scrollable page
-    maxDiffPixels: 100, // Allow up to 100 different pixels
-    maxDiffPixelRatio: 0.01, // Or 1% difference
-    threshold: 0.2, // Pixel comparison threshold
-    animations: "disabled", // Disable animations
-    mask: [page.getByTestId("date")], // Mask dynamic content
-  });
+	await expect(page).toHaveScreenshot('dashboard.png', {
+		fullPage: true, // Capture entire scrollable page
+		maxDiffPixels: 100, // Allow up to 100 different pixels
+		maxDiffPixelRatio: 0.01, // Or 1% difference
+		threshold: 0.2, // Pixel comparison threshold
+		animations: 'disabled', // Disable animations
+		mask: [page.getByTestId('date')] // Mask dynamic content
+	});
 });
 ```
 
 ### Handling Dynamic Content
 
 ```typescript
-test("page with dynamic content", async ({ page }) => {
-  await page.goto("/profile");
+test('page with dynamic content', async ({ page }) => {
+	await page.goto('/profile');
 
-  // Mask elements that change
-  await expect(page).toHaveScreenshot("profile.png", {
-    mask: [
-      page.getByTestId("timestamp"),
-      page.getByTestId("avatar"),
-      page.getByRole("img"),
-    ],
-  });
+	// Mask elements that change
+	await expect(page).toHaveScreenshot('profile.png', {
+		mask: [page.getByTestId('timestamp'), page.getByTestId('avatar'), page.getByRole('img')]
+	});
 });
 
 // Or hide elements via CSS
-test("page hiding dynamic elements", async ({ page }) => {
-  await page.goto("/profile");
+test('page hiding dynamic elements', async ({ page }) => {
+	await page.goto('/profile');
 
-  await page.addStyleTag({
-    content: `
+	await page.addStyleTag({
+		content: `
       .dynamic-content { visibility: hidden !important; }
       [data-testid="ad-banner"] { display: none !important; }
-    `,
-  });
+    `
+	});
 
-  await expect(page).toHaveScreenshot("profile-stable.png");
+	await expect(page).toHaveScreenshot('profile-stable.png');
 });
 ```
 
@@ -257,22 +253,22 @@ test("page hiding dynamic elements", async ({ page }) => {
 ```typescript
 // playwright.config.ts
 export default defineConfig({
-  expect: {
-    toHaveScreenshot: {
-      maxDiffPixels: 50,
-      animations: "disabled",
-    },
-  },
-  projects: [
-    {
-      name: "visual-chrome",
-      use: {
-        ...devices["Desktop Chrome"],
-        viewport: { width: 1280, height: 720 },
-      },
-      testMatch: /.*visual.*\.spec\.ts/,
-    },
-  ],
+	expect: {
+		toHaveScreenshot: {
+			maxDiffPixels: 50,
+			animations: 'disabled'
+		}
+	},
+	projects: [
+		{
+			name: 'visual-chrome',
+			use: {
+				...devices['Desktop Chrome'],
+				viewport: { width: 1280, height: 720 }
+			},
+			testMatch: /.*visual.*\.spec\.ts/
+		}
+	]
 });
 ```
 
@@ -330,18 +326,18 @@ tests/
 ### Using Tags
 
 ```typescript
-test("user login @smoke @auth", async ({ page }) => {
-  // ...
+test('user login @smoke @auth', async ({ page }) => {
+	// ...
 });
 
-test("checkout flow @e2e @critical", async ({ page }) => {
-  // ...
+test('checkout flow @e2e @critical', async ({ page }) => {
+	// ...
 });
 
-test.describe("API tests @api", () => {
-  test("create user", async ({ request }) => {
-    // ...
-  });
+test.describe('API tests @api', () => {
+	test('create user', async ({ request }) => {
+		// ...
+	});
 });
 ```
 

@@ -24,10 +24,10 @@ Each package's `package.json` lists exactly what it needs:
 ```json
 // packages/ui/package.json
 {
-  "dependencies": {
-    "react": "^18.0.0",
-    "class-variance-authority": "^0.7.0"
-  }
+	"dependencies": {
+		"react": "^18.0.0",
+		"class-variance-authority": "^0.7.0"
+	}
 }
 ```
 
@@ -58,11 +58,11 @@ Only repository-level tools:
 ```json
 // Root package.json
 {
-  "devDependencies": {
-    "turbo": "latest",
-    "husky": "^8.0.0",
-    "lint-staged": "^15.0.0"
-  }
+	"devDependencies": {
+		"turbo": "latest",
+		"husky": "^8.0.0",
+		"lint-staged": "^15.0.0"
+	}
 }
 ```
 
@@ -149,20 +149,20 @@ npm install typescript@latest --workspaces
 ```yaml
 # pnpm-workspace.yaml
 packages:
-  - "apps/*"
-  - "packages/*"
+    - 'apps/*'
+    - 'packages/*'
 
 catalog:
-  react: ^18.2.0
-  typescript: ^5.3.0
+    react: ^18.2.0
+    typescript: ^5.3.0
 ```
 
 ```json
 // Any package.json
 {
-  "dependencies": {
-    "react": "catalog:" // Uses version from catalog
-  }
+	"dependencies": {
+		"react": "catalog:" // Uses version from catalog
+	}
 }
 ```
 
@@ -195,14 +195,14 @@ For library packages that expect the consumer to provide dependencies:
 ```json
 // packages/ui/package.json
 {
-  "peerDependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
-  },
-  "devDependencies": {
-    "react": "^18.0.0", // For development/testing
-    "react-dom": "^18.0.0"
-  }
+	"peerDependencies": {
+		"react": "^18.0.0",
+		"react-dom": "^18.0.0"
+	},
+	"devDependencies": {
+		"react": "^18.0.0", // For development/testing
+		"react-dom": "^18.0.0"
+	}
 }
 ```
 

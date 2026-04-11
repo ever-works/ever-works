@@ -23,8 +23,8 @@ The AI Gateway is the default global provider, so you can access models using a 
 import { generateText } from 'ai';
 
 const { text } = await generateText({
-  model: 'anthropic/claude-sonnet-4.5',
-  prompt: 'What is love?',
+	model: 'anthropic/claude-sonnet-4.5',
+	prompt: 'What is love?'
 });
 ```
 

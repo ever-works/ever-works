@@ -20,8 +20,8 @@ import { wrapLanguageModel, gateway } from 'ai';
 import { devToolsMiddleware } from '@ai-sdk/devtools';
 
 const model = wrapLanguageModel({
-  model: gateway('anthropic/claude-sonnet-4.5'),
-  middleware: devToolsMiddleware(),
+	model: gateway('anthropic/claude-sonnet-4.5'),
+	middleware: devToolsMiddleware()
 });
 ```
 

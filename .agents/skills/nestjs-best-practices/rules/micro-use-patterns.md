@@ -15,36 +15,36 @@ NestJS microservices support two communication patterns: request-response (Messa
 // Use @MessagePattern for fire-and-forget
 @Controller()
 export class NotificationsController {
-  @MessagePattern('user.created')
-  async handleUserCreated(data: UserCreatedEvent) {
-    // This WAITS for response, blocking the sender
-    await this.emailService.sendWelcome(data.email);
-    // If email fails, sender gets an error (coupling!)
-  }
+	@MessagePattern('user.created')
+	async handleUserCreated(data: UserCreatedEvent) {
+		// This WAITS for response, blocking the sender
+		await this.emailService.sendWelcome(data.email);
+		// If email fails, sender gets an error (coupling!)
+	}
 }
 
 // Use @EventPattern expecting a response
 @Controller()
 export class OrdersController {
-  @EventPattern('inventory.check')
-  async checkInventory(data: CheckInventoryDto) {
-    const available = await this.inventory.check(data);
-    return available; // This return value is IGNORED with @EventPattern!
-  }
+	@EventPattern('inventory.check')
+	async checkInventory(data: CheckInventoryDto) {
+		const available = await this.inventory.check(data);
+		return available; // This return value is IGNORED with @EventPattern!
+	}
 }
 
 // Tight coupling in client
 @Injectable()
 export class UsersService {
-  async createUser(dto: CreateUserDto): Promise<User> {
-    const user = await this.repo.save(dto);
+	async createUser(dto: CreateUserDto): Promise<User> {
+		const user = await this.repo.save(dto);
 
-    // Blocks until notification service responds
-    await this.client.send('user.created', user).toPromise();
-    // If notification service is down, user creation fails!
+		// Blocks until notification service responds
+		await this.client.send('user.created', user).toPromise();
+		// If notification service is down, user creation fails!
 
-    return user;
-  }
+		return user;
+	}
 }
 ```
 

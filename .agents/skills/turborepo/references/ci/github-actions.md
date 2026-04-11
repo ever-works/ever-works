@@ -8,28 +8,28 @@ Complete setup guide for Turborepo with GitHub Actions.
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 2
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 20
 
-      - name: Install dependencies
-        run: npm ci
+            - name: Install dependencies
+              run: npm ci
 
-      - name: Build and Test
-        run: turbo run build test lint
+            - name: Build and Test
+              run: turbo run build test lint
 ```
 
 ## Package Manager Setup
@@ -39,12 +39,12 @@ jobs:
 ```yaml
 - uses: pnpm/action-setup@v3
   with:
-    version: 9
+      version: 9
 
 - uses: actions/setup-node@v4
   with:
-    node-version: 20
-    cache: "pnpm"
+      node-version: 20
+      cache: 'pnpm'
 
 - run: pnpm install --frozen-lockfile
 ```
@@ -54,8 +54,8 @@ jobs:
 ```yaml
 - uses: actions/setup-node@v4
   with:
-    node-version: 20
-    cache: "yarn"
+      node-version: 20
+      cache: 'yarn'
 
 - run: yarn install --frozen-lockfile
 ```
@@ -65,7 +65,7 @@ jobs:
 ```yaml
 - uses: oven-sh/setup-bun@v1
   with:
-    bun-version: latest
+      bun-version: latest
 
 - run: bun install --frozen-lockfile
 ```
@@ -94,11 +94,11 @@ In your GitHub repository settings:
 
 ```yaml
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    env:
-      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+    build:
+        runs-on: ubuntu-latest
+        env:
+            TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+            TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 ```
 
 ## Alternative: actions/cache
@@ -108,10 +108,10 @@ If you can't use remote cache, cache Turborepo's local cache directory:
 ```yaml
 - uses: actions/cache@v4
   with:
-    path: .turbo
-    key: turbo-${{ runner.os }}-${{ hashFiles('**/turbo.json', '**/package-lock.json') }}
-    restore-keys: |
-      turbo-${{ runner.os }}-
+      path: .turbo
+      key: turbo-${{ runner.os }}-${{ hashFiles('**/turbo.json', '**/package-lock.json') }}
+      restore-keys: |
+          turbo-${{ runner.os }}-
 ```
 
 Note: This is less effective than remote cache since it's per-branch.
@@ -122,41 +122,41 @@ Note: This is less effective than remote cache since it's per-branch.
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    env:
-      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+    build:
+        runs-on: ubuntu-latest
+        env:
+            TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+            TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 2
 
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 9
+            - uses: pnpm/action-setup@v3
+              with:
+                  version: 9
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "pnpm"
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: 'pnpm'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: turbo run build --affected
+            - name: Build
+              run: turbo run build --affected
 
-      - name: Test
-        run: turbo run test --affected
+            - name: Test
+              run: turbo run test --affected
 
-      - name: Lint
-        run: turbo run lint --affected
+            - name: Lint
+              run: turbo run lint --affected
 ```

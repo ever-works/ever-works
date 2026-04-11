@@ -14,18 +14,20 @@ TypeScript interfaces are erased at compile time and can't be used as injection 
 ```typescript
 // Interface can't be used as injection token
 interface PaymentGateway {
-  charge(amount: number): Promise<PaymentResult>;
+	charge(amount: number): Promise<PaymentResult>;
 }
 
 @Injectable()
 export class StripeService implements PaymentGateway {
-  charge(amount: number) { /* ... */ }
+	charge(amount: number) {
+		/* ... */
+	}
 }
 
 @Injectable()
 export class OrdersService {
-  // This WON'T work - PaymentGateway doesn't exist at runtime
-  constructor(private payment: PaymentGateway) {}
+	// This WON'T work - PaymentGateway doesn't exist at runtime
+	constructor(private payment: PaymentGateway) {}
 }
 ```
 
@@ -36,65 +38,61 @@ export class OrdersService {
 export const PAYMENT_GATEWAY = Symbol('PAYMENT_GATEWAY');
 
 export interface PaymentGateway {
-  charge(amount: number): Promise<PaymentResult>;
+	charge(amount: number): Promise<PaymentResult>;
 }
 
 @Injectable()
 export class StripeService implements PaymentGateway {
-  async charge(amount: number): Promise<PaymentResult> {
-    // Stripe implementation
-  }
+	async charge(amount: number): Promise<PaymentResult> {
+		// Stripe implementation
+	}
 }
 
 @Injectable()
 export class MockPaymentService implements PaymentGateway {
-  async charge(amount: number): Promise<PaymentResult> {
-    return { success: true, id: 'mock-id' };
-  }
+	async charge(amount: number): Promise<PaymentResult> {
+		return { success: true, id: 'mock-id' };
+	}
 }
 
 // Module registration
 @Module({
-  providers: [
-    {
-      provide: PAYMENT_GATEWAY,
-      useClass: process.env.NODE_ENV === 'test'
-        ? MockPaymentService
-        : StripeService,
-    },
-  ],
-  exports: [PAYMENT_GATEWAY],
+	providers: [
+		{
+			provide: PAYMENT_GATEWAY,
+			useClass: process.env.NODE_ENV === 'test' ? MockPaymentService : StripeService
+		}
+	],
+	exports: [PAYMENT_GATEWAY]
 })
 export class PaymentModule {}
 
 // Injection
 @Injectable()
 export class OrdersService {
-  constructor(
-    @Inject(PAYMENT_GATEWAY) private payment: PaymentGateway,
-  ) {}
+	constructor(@Inject(PAYMENT_GATEWAY) private payment: PaymentGateway) {}
 
-  async createOrder(dto: CreateOrderDto) {
-    await this.payment.charge(dto.amount);
-  }
+	async createOrder(dto: CreateOrderDto) {
+		await this.payment.charge(dto.amount);
+	}
 }
 
 // Option 2: Abstract class (carries runtime type info)
 export abstract class PaymentGateway {
-  abstract charge(amount: number): Promise<PaymentResult>;
+	abstract charge(amount: number): Promise<PaymentResult>;
 }
 
 @Injectable()
 export class StripeService extends PaymentGateway {
-  async charge(amount: number): Promise<PaymentResult> {
-    // Implementation
-  }
+	async charge(amount: number): Promise<PaymentResult> {
+		// Implementation
+	}
 }
 
 // No @Inject needed with abstract class
 @Injectable()
 export class OrdersService {
-  constructor(private payment: PaymentGateway) {}
+	constructor(private payment: PaymentGateway) {}
 }
 ```
 

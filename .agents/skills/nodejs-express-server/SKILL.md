@@ -1,9 +1,9 @@
 ---
 name: nodejs-express-server
 description: >
-  Build production-ready Express.js servers with middleware, authentication,
-  routing, and database integration. Use when creating REST APIs, managing
-  requests/responses, implementing middleware chains, and handling server logic.
+    Build production-ready Express.js servers with middleware, authentication,
+    routing, and database integration. Use when creating REST APIs, managing
+    requests/responses, implementing middleware chains, and handling server logic.
 ---
 
 # Node.js Express Server
@@ -34,7 +34,7 @@ Create robust Express.js applications with proper routing, middleware chains, au
 Minimal working example:
 
 ```javascript
-const express = require("express");
+const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -43,21 +43,21 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.get("/health", (req, res) => {
-  res.json({ status: "OK", timestamp: new Date().toISOString() });
+app.get('/health', (req, res) => {
+	res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 // Error handling
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.status || 500).json({
-    error: err.message,
-    requestId: req.id,
-  });
+	console.error(err.stack);
+	res.status(err.status || 500).json({
+		error: err.message,
+		requestId: req.id
+	});
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+	console.log(`Server running on port ${PORT}`);
 });
 ```
 
@@ -65,15 +65,15 @@ app.listen(PORT, () => {
 
 Detailed implementations in the `references/` directory:
 
-| Guide | Contents |
-|---|---|
-| [Basic Express Setup](references/basic-express-setup.md) | Basic Express Setup |
-| [Middleware Chain Implementation](references/middleware-chain-implementation.md) | Middleware Chain Implementation |
+| Guide                                                                                                            | Contents                                         |
+| ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| [Basic Express Setup](references/basic-express-setup.md)                                                         | Basic Express Setup                              |
+| [Middleware Chain Implementation](references/middleware-chain-implementation.md)                                 | Middleware Chain Implementation                  |
 | [Database Integration (PostgreSQL with Sequelize)](references/database-integration-postgresql-with-sequelize.md) | Database Integration (PostgreSQL with Sequelize) |
-| [Authentication with JWT](references/authentication-with-jwt.md) | Authentication with JWT |
-| [RESTful Routes with CRUD Operations](references/restful-routes-with-crud-operations.md) | RESTful Routes with CRUD Operations |
-| [Error Handling Middleware](references/error-handling-middleware.md) | Error Handling Middleware |
-| [Environment Configuration](references/environment-configuration.md) | Environment Configuration |
+| [Authentication with JWT](references/authentication-with-jwt.md)                                                 | Authentication with JWT                          |
+| [RESTful Routes with CRUD Operations](references/restful-routes-with-crud-operations.md)                         | RESTful Routes with CRUD Operations              |
+| [Error Handling Middleware](references/error-handling-middleware.md)                                             | Error Handling Middleware                        |
+| [Environment Configuration](references/environment-configuration.md)                                             | Environment Configuration                        |
 
 ## Best Practices
 

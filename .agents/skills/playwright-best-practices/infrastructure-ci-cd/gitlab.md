@@ -30,45 +30,45 @@ npx playwright test --reporter=dot    # minimal output for CI logs
 image: mcr.microsoft.com/playwright:v1.48.0-noble
 
 stages:
-  - install
-  - test
-  - report
+    - install
+    - test
+    - report
 
 variables:
-  CI: "true"
-  npm_config_cache: "$CI_PROJECT_DIR/.npm"
+    CI: 'true'
+    npm_config_cache: '$CI_PROJECT_DIR/.npm'
 
 cache:
-  key:
-    files:
-      - package-lock.json
-  paths:
-    - .npm/
-    - node_modules/
+    key:
+        files:
+            - package-lock.json
+    paths:
+        - .npm/
+        - node_modules/
 
 setup:
-  stage: install
-  script:
-    - npm ci
-  artifacts:
-    paths:
-      - node_modules/
-    expire_in: 1 hour
+    stage: install
+    script:
+        - npm ci
+    artifacts:
+        paths:
+            - node_modules/
+        expire_in: 1 hour
 
 e2e:
-  stage: test
-  needs: [setup]
-  script:
-    - npx playwright test
-  artifacts:
-    when: always
-    paths:
-      - playwright-report/
-      - test-results/
-    expire_in: 14 days
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    stage: test
+    needs: [setup]
+    script:
+        - npx playwright test
+    artifacts:
+        when: always
+        paths:
+            - playwright-report/
+            - test-results/
+        expire_in: 14 days
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 ```
 
 ### Sharded Parallel Execution
@@ -80,57 +80,57 @@ e2e:
 image: mcr.microsoft.com/playwright:v1.48.0-noble
 
 stages:
-  - install
-  - test
-  - report
+    - install
+    - test
+    - report
 
 variables:
-  CI: "true"
-  npm_config_cache: "$CI_PROJECT_DIR/.npm"
+    CI: 'true'
+    npm_config_cache: '$CI_PROJECT_DIR/.npm'
 
 cache:
-  key:
-    files:
-      - package-lock.json
-  paths:
-    - .npm/
-    - node_modules/
+    key:
+        files:
+            - package-lock.json
+    paths:
+        - .npm/
+        - node_modules/
 
 setup:
-  stage: install
-  script:
-    - npm ci
-  artifacts:
-    paths:
-      - node_modules/
-    expire_in: 1 hour
+    stage: install
+    script:
+        - npm ci
+    artifacts:
+        paths:
+            - node_modules/
+        expire_in: 1 hour
 
 e2e:
-  stage: test
-  needs: [setup]
-  parallel: 4
-  script:
-    - npx playwright test --shard=$CI_NODE_INDEX/$CI_NODE_TOTAL
-  artifacts:
-    when: always
-    paths:
-      - blob-report/
-    expire_in: 1 hour
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    stage: test
+    needs: [setup]
+    parallel: 4
+    script:
+        - npx playwright test --shard=$CI_NODE_INDEX/$CI_NODE_TOTAL
+    artifacts:
+        when: always
+        paths:
+            - blob-report/
+        expire_in: 1 hour
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 combine-reports:
-  stage: report
-  needs: [e2e]
-  when: always
-  script:
-    - npx playwright merge-reports --reporter=html ./blob-report
-  artifacts:
+    stage: report
+    needs: [e2e]
     when: always
-    paths:
-      - playwright-report/
-    expire_in: 14 days
+    script:
+        - npx playwright merge-reports --reporter=html ./blob-report
+    artifacts:
+        when: always
+        paths:
+            - playwright-report/
+        expire_in: 14 days
 ```
 
 **Config for sharded pipelines:**
@@ -138,9 +138,7 @@ combine-reports:
 ```typescript
 // playwright.config.ts
 export default defineConfig({
-  reporter: process.env.CI
-    ? [["blob"], ["dot"]]
-    : [["html", { open: "on-failure" }]],
+	reporter: process.env.CI ? [['blob'], ['dot']] : [['html', { open: 'on-failure' }]]
 });
 ```
 
@@ -152,32 +150,32 @@ export default defineConfig({
 image: mcr.microsoft.com/playwright:v1.48.0-noble
 
 stages:
-  - test
+    - test
 
 variables:
-  CI: "true"
+    CI: 'true'
 
 e2e:staging:
-  stage: test
-  variables:
-    BASE_URL: $STAGING_URL
-    TEST_PASSWORD: $TEST_PASSWORD
-    API_KEY: $API_KEY
-  before_script:
-    - npm ci
-  script:
-    - npx playwright test
-  artifacts:
-    when: always
-    paths:
-      - playwright-report/
-      - test-results/
-    expire_in: 14 days
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - when: manual
-      allow_failure: true
+    stage: test
+    variables:
+        BASE_URL: $STAGING_URL
+        TEST_PASSWORD: $TEST_PASSWORD
+        API_KEY: $API_KEY
+    before_script:
+        - npm ci
+    script:
+        - npx playwright test
+    artifacts:
+        when: always
+        paths:
+            - playwright-report/
+            - test-results/
+        expire_in: 14 days
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+        - when: manual
+          allow_failure: true
 ```
 
 **Setting variables in GitLab:**
@@ -195,51 +193,51 @@ Navigate to **Settings > CI/CD > Variables** and add:
 image: mcr.microsoft.com/playwright:v1.48.0-noble
 
 stages:
-  - install
-  - test
+    - install
+    - test
 
 variables:
-  CI: "true"
+    CI: 'true'
 
 setup:
-  stage: install
-  script:
-    - npm ci
-  artifacts:
-    paths:
-      - node_modules/
-    expire_in: 1 hour
+    stage: install
+    script:
+        - npm ci
+    artifacts:
+        paths:
+            - node_modules/
+        expire_in: 1 hour
 
 e2e:chromium:
-  stage: test
-  needs: [setup]
-  script:
-    - npx playwright test --project=chromium
-  artifacts:
-    when: always
-    paths:
-      - playwright-report/
-      - test-results/
-    expire_in: 14 days
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    stage: test
+    needs: [setup]
+    script:
+        - npx playwright test --project=chromium
+    artifacts:
+        when: always
+        paths:
+            - playwright-report/
+            - test-results/
+        expire_in: 14 days
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
 e2e:all-browsers:
-  stage: test
-  needs: [setup]
-  parallel:
-    matrix:
-      - PROJECT: [chromium, firefox, webkit]
-  script:
-    - npx playwright test --project=$PROJECT
-  artifacts:
-    when: always
-    paths:
-      - playwright-report/
-      - test-results/
-    expire_in: 14 days
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    stage: test
+    needs: [setup]
+    parallel:
+        matrix:
+            - PROJECT: [chromium, firefox, webkit]
+    script:
+        - npx playwright test --project=$PROJECT
+    artifacts:
+        when: always
+        paths:
+            - playwright-report/
+            - test-results/
+        expire_in: 14 days
+    rules:
+        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 ```
 
 ### Services Integration (Database, Cache)
@@ -248,37 +246,37 @@ e2e:all-browsers:
 
 ```yaml
 stages:
-  - test
+    - test
 
 e2e:integration:
-  stage: test
-  image: mcr.microsoft.com/playwright:v1.48.0-noble
-  services:
-    - name: postgres:latest
-      alias: db
-    - name: redis:latest
-      alias: cache
-  variables:
-    CI: "true"
-    DATABASE_URL: "postgresql://postgres:postgres@db:5432/testdb"
-    REDIS_URL: "redis://cache:6379"
-    POSTGRES_PASSWORD: "postgres"
-    POSTGRES_DB: "testdb"
-  before_script:
-    - npm ci
-    - npx prisma db push
-    - npx prisma db seed
-  script:
-    - npx playwright test
-  artifacts:
-    when: always
-    paths:
-      - playwright-report/
-      - test-results/
-    expire_in: 14 days
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    stage: test
+    image: mcr.microsoft.com/playwright:v1.48.0-noble
+    services:
+        - name: postgres:latest
+          alias: db
+        - name: redis:latest
+          alias: cache
+    variables:
+        CI: 'true'
+        DATABASE_URL: 'postgresql://postgres:postgres@db:5432/testdb'
+        REDIS_URL: 'redis://cache:6379'
+        POSTGRES_PASSWORD: 'postgres'
+        POSTGRES_DB: 'testdb'
+    before_script:
+        - npm ci
+        - npx prisma db push
+        - npx prisma db seed
+    script:
+        - npx playwright test
+    artifacts:
+        when: always
+        paths:
+            - playwright-report/
+            - test-results/
+        expire_in: 14 days
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 ```
 
 ### Scheduled Nightly Regression
@@ -287,19 +285,19 @@ e2e:integration:
 
 ```yaml
 e2e:nightly:
-  stage: test
-  image: mcr.microsoft.com/playwright:v1.48.0-noble
-  before_script:
-    - npm ci
-  script:
-    - npx playwright test --grep @regression
-  artifacts:
-    when: always
-    paths:
-      - playwright-report/
-    expire_in: 30 days
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
+    stage: test
+    image: mcr.microsoft.com/playwright:v1.48.0-noble
+    before_script:
+        - npm ci
+    script:
+        - npx playwright test --grep @regression
+    artifacts:
+        when: always
+        paths:
+            - playwright-report/
+        expire_in: 30 days
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "schedule"
 ```
 
 Set up the schedule in **CI/CD > Schedules**: `0 3 * * 1-5` (3 AM UTC, weekdays).
@@ -320,7 +318,7 @@ Set up the schedule in **CI/CD > Schedules**: `0 3 * * 1-5` (3 AM UTC, weekdays)
 
 | Anti-Pattern                                         | Problem                                                            | Do This Instead                                                           |
 | ---------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------- |
-| Not using the Playwright Docker image                | Installing browsers every run adds 1-2 minutes                     | Use `mcr.microsoft.com/playwright:v1.48.0-noble` as base image                   |
+| Not using the Playwright Docker image                | Installing browsers every run adds 1-2 minutes                     | Use `mcr.microsoft.com/playwright:v1.48.0-noble` as base image            |
 | `artifacts: when: on_failure` only                   | No report when tests pass; can't verify results                    | Use `when: always` to capture reports regardless                          |
 | No `expire_in` on artifacts                          | Artifacts accumulate and consume storage                           | Set `expire_in: 14 days` for reports, `1 hour` for intermediate artifacts |
 | Hardcoding `CI_NODE_TOTAL` in shard flag             | Breaks when you change `parallel:` value                           | Use `--shard=$CI_NODE_INDEX/$CI_NODE_TOTAL`                               |
@@ -348,10 +346,10 @@ image: mcr.microsoft.com/playwright:v1.48.0-noble
 
 ```typescript
 export default defineConfig({
-  workers: process.env.CI ? 2 : undefined,
-  use: {
-    navigationTimeout: process.env.CI ? 30_000 : 15_000,
-  },
+	workers: process.env.CI ? 2 : undefined,
+	use: {
+		navigationTimeout: process.env.CI ? 30_000 : 15_000
+	}
 });
 ```
 
@@ -363,8 +361,8 @@ export default defineConfig({
 
 ```yaml
 rules:
-  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 ```
 
 ### Services (Postgres/Redis) not reachable from tests
@@ -375,11 +373,11 @@ rules:
 
 ```yaml
 services:
-  - name: postgres:latest
-    alias: db
+    - name: postgres:latest
+      alias: db
 
 variables:
-  DATABASE_URL: "postgresql://postgres:postgres@db:5432/testdb"
+    DATABASE_URL: 'postgresql://postgres:postgres@db:5432/testdb'
 ```
 
 ### Merged report is empty after sharded run
@@ -390,8 +388,6 @@ variables:
 
 ```typescript
 export default defineConfig({
-  reporter: process.env.CI
-    ? [["blob"], ["dot"]]
-    : [["html", { open: "on-failure" }]],
+	reporter: process.env.CI ? [['blob'], ['dot']] : [['html', { open: 'on-failure' }]]
 });
 ```

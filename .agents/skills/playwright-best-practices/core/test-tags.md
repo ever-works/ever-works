@@ -17,42 +17,42 @@
 ### Tag via Details Object
 
 ```typescript
-import { test, expect } from "@playwright/test";
+import { test, expect } from '@playwright/test';
 
 test(
-  "test login page",
-  {
-    tag: "@fast",
-  },
-  async ({ page }) => {
-    await page.goto("/login");
-    await expect(page.getByRole("heading")).toBeVisible();
-  }
+	'test login page',
+	{
+		tag: '@fast'
+	},
+	async ({ page }) => {
+		await page.goto('/login');
+		await expect(page.getByRole('heading')).toBeVisible();
+	}
 );
 
 test(
-  "test dashboard",
-  {
-    tag: "@slow",
-  },
-  async ({ page }) => {
-    await page.goto("/dashboard");
-    await expect(page.getByTestId("charts")).toBeVisible();
-  }
+	'test dashboard',
+	{
+		tag: '@slow'
+	},
+	async ({ page }) => {
+		await page.goto('/dashboard');
+		await expect(page.getByTestId('charts')).toBeVisible();
+	}
 );
 ```
 
 ### Tag via Title (not recommended)
 
 ```typescript
-test("test full report @slow", async ({ page }) => {
-  await page.goto("/reports/full");
-  await expect(page.getByText("Report loaded")).toBeVisible();
+test('test full report @slow', async ({ page }) => {
+	await page.goto('/reports/full');
+	await expect(page.getByText('Report loaded')).toBeVisible();
 });
 
-test("quick validation @fast @smoke", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.locator("body")).toBeVisible();
+test('quick validation @fast @smoke', async ({ page }) => {
+	await page.goto('/');
+	await expect(page.locator('body')).toBeVisible();
 });
 ```
 
@@ -62,19 +62,19 @@ test("quick validation @fast @smoke", async ({ page }) => {
 
 ```typescript
 test.describe(
-  "report tests",
-  {
-    tag: "@report",
-  },
-  () => {
-    test("test report header", async ({ page }) => {
-      // Inherits @report tag
-    });
+	'report tests',
+	{
+		tag: '@report'
+	},
+	() => {
+		test('test report header', async ({ page }) => {
+			// Inherits @report tag
+		});
 
-    test("test report footer", async ({ page }) => {
-      // Inherits @report tag
-    });
-  }
+		test('test report footer', async ({ page }) => {
+			// Inherits @report tag
+		});
+	}
 );
 ```
 
@@ -82,25 +82,25 @@ test.describe(
 
 ```typescript
 test.describe(
-  "admin features",
-  {
-    tag: "@admin",
-  },
-  () => {
-    test("admin dashboard", async ({ page }) => {
-      // Has @admin tag
-    });
+	'admin features',
+	{
+		tag: '@admin'
+	},
+	() => {
+		test('admin dashboard', async ({ page }) => {
+			// Has @admin tag
+		});
 
-    test(
-      "admin settings",
-      {
-        tag: ["@slow", "@critical"],
-      },
-      async ({ page }) => {
-        // Has @admin, @slow, @critical tags
-      }
-    );
-  }
+		test(
+			'admin settings',
+			{
+				tag: ['@slow', '@critical']
+			},
+			async ({ page }) => {
+				// Has @admin, @slow, @critical tags
+			}
+		);
+	}
 );
 ```
 
@@ -151,47 +151,47 @@ npx playwright test --grep "@api" --grep-invert "@slow"
 ### Filter in playwright.config.ts
 
 ```typescript
-import { defineConfig } from "@playwright/test";
+import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  grep: /@smoke/,
-  grepInvert: /@flaky/,
+	grep: /@smoke/,
+	grepInvert: /@flaky/
 });
 ```
 
 ### Project-Specific Tags
 
 ```typescript
-import { defineConfig } from "@playwright/test";
+import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  projects: [
-    {
-      name: "smoke",
-      grep: /@smoke/,
-    },
-    {
-      name: "regression",
-      grepInvert: /@smoke/,
-    },
-    {
-      name: "critical-only",
-      grep: /@critical/,
-    },
-  ],
+	projects: [
+		{
+			name: 'smoke',
+			grep: /@smoke/
+		},
+		{
+			name: 'regression',
+			grepInvert: /@smoke/
+		},
+		{
+			name: 'critical-only',
+			grep: /@critical/
+		}
+	]
 });
 ```
 
 ### Environment-Based Filtering
 
 ```typescript
-import { defineConfig } from "@playwright/test";
+import { defineConfig } from '@playwright/test';
 
 const isCI = !!process.env.CI;
 
 export default defineConfig({
-  grep: isCI ? /@smoke|@critical/ : undefined,
-  grepInvert: isCI ? /@flaky/ : undefined,
+	grep: isCI ? /@smoke|@critical/ : undefined,
+	grepInvert: isCI ? /@flaky/ : undefined
 });
 ```
 
@@ -201,42 +201,42 @@ export default defineConfig({
 
 ```typescript
 // Smoke tests - quick validation
-test("homepage loads", { tag: "@smoke" }, async ({ page }) => {});
-test("login works", { tag: "@smoke" }, async ({ page }) => {});
+test('homepage loads', { tag: '@smoke' }, async ({ page }) => {});
+test('login works', { tag: '@smoke' }, async ({ page }) => {});
 
 // Regression tests - comprehensive
-test("full checkout flow", { tag: "@regression" }, async ({ page }) => {});
-test("all payment methods", { tag: "@regression" }, async ({ page }) => {});
+test('full checkout flow', { tag: '@regression' }, async ({ page }) => {});
+test('all payment methods', { tag: '@regression' }, async ({ page }) => {});
 
 // E2E tests - user journeys
-test("complete user journey", { tag: "@e2e" }, async ({ page }) => {});
+test('complete user journey', { tag: '@e2e' }, async ({ page }) => {});
 ```
 
 ### By Priority
 
 ```typescript
 test(
-  "payment processing",
-  {
-    tag: ["@critical", "@p0"],
-  },
-  async ({ page }) => {}
+	'payment processing',
+	{
+		tag: ['@critical', '@p0']
+	},
+	async ({ page }) => {}
 );
 
 test(
-  "user preferences",
-  {
-    tag: ["@p1"],
-  },
-  async ({ page }) => {}
+	'user preferences',
+	{
+		tag: ['@p1']
+	},
+	async ({ page }) => {}
 );
 
 test(
-  "theme customization",
-  {
-    tag: ["@p2"],
-  },
-  async ({ page }) => {}
+	'theme customization',
+	{
+		tag: ['@p2']
+	},
+	async ({ page }) => {}
 );
 ```
 
@@ -244,26 +244,26 @@ test(
 
 ```typescript
 test.describe(
-  "authentication",
-  {
-    tag: "@auth",
-  },
-  () => {
-    test("login @smoke", async ({ page }) => {});
-    test("logout", async ({ page }) => {});
-    test("password reset @slow", async ({ page }) => {});
-  }
+	'authentication',
+	{
+		tag: '@auth'
+	},
+	() => {
+		test('login @smoke', async ({ page }) => {});
+		test('logout', async ({ page }) => {});
+		test('password reset @slow', async ({ page }) => {});
+	}
 );
 
 test.describe(
-  "payments",
-  {
-    tag: "@payments",
-  },
-  () => {
-    test("credit card @critical", async ({ page }) => {});
-    test("paypal @critical", async ({ page }) => {});
-  }
+	'payments',
+	{
+		tag: '@payments'
+	},
+	() => {
+		test('credit card @critical', async ({ page }) => {});
+		test('paypal @critical', async ({ page }) => {});
+	}
 );
 ```
 

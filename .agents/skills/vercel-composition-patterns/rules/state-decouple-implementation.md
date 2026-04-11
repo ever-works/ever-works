@@ -15,19 +15,16 @@ useState, Zustand, or a server sync.
 
 ```tsx
 function ChannelComposer({ channelId }: { channelId: string }) {
-  // UI component knows about global state implementation
-  const state = useGlobalChannelState(channelId)
-  const { submit, updateInput } = useChannelSync(channelId)
+	// UI component knows about global state implementation
+	const state = useGlobalChannelState(channelId);
+	const { submit, updateInput } = useChannelSync(channelId);
 
-  return (
-    <Composer.Frame>
-      <Composer.Input
-        value={state.input}
-        onChange={(text) => sync.updateInput(text)}
-      />
-      <Composer.Submit onPress={() => sync.submit()} />
-    </Composer.Frame>
-  )
+	return (
+		<Composer.Frame>
+			<Composer.Input value={state.input} onChange={(text) => sync.updateInput(text)} />
+			<Composer.Submit onPress={() => sync.submit()} />
+		</Composer.Frame>
+	);
 }
 ```
 
@@ -35,47 +32,37 @@ function ChannelComposer({ channelId }: { channelId: string }) {
 
 ```tsx
 // Provider handles all state management details
-function ChannelProvider({
-  channelId,
-  children,
-}: {
-  channelId: string
-  children: React.ReactNode
-}) {
-  const { state, update, submit } = useGlobalChannel(channelId)
-  const inputRef = useRef(null)
+function ChannelProvider({ channelId, children }: { channelId: string; children: React.ReactNode }) {
+	const { state, update, submit } = useGlobalChannel(channelId);
+	const inputRef = useRef(null);
 
-  return (
-    <Composer.Provider
-      state={state}
-      actions={{ update, submit }}
-      meta={{ inputRef }}
-    >
-      {children}
-    </Composer.Provider>
-  )
+	return (
+		<Composer.Provider state={state} actions={{ update, submit }} meta={{ inputRef }}>
+			{children}
+		</Composer.Provider>
+	);
 }
 
 // UI component only knows about the context interface
 function ChannelComposer() {
-  return (
-    <Composer.Frame>
-      <Composer.Header />
-      <Composer.Input />
-      <Composer.Footer>
-        <Composer.Submit />
-      </Composer.Footer>
-    </Composer.Frame>
-  )
+	return (
+		<Composer.Frame>
+			<Composer.Header />
+			<Composer.Input />
+			<Composer.Footer>
+				<Composer.Submit />
+			</Composer.Footer>
+		</Composer.Frame>
+	);
 }
 
 // Usage
 function Channel({ channelId }: { channelId: string }) {
-  return (
-    <ChannelProvider channelId={channelId}>
-      <ChannelComposer />
-    </ChannelProvider>
-  )
+	return (
+		<ChannelProvider channelId={channelId}>
+			<ChannelComposer />
+		</ChannelProvider>
+	);
 }
 ```
 
@@ -84,28 +71,25 @@ function Channel({ channelId }: { channelId: string }) {
 ```tsx
 // Local state for ephemeral forms
 function ForwardMessageProvider({ children }) {
-  const [state, setState] = useState(initialState)
-  const forwardMessage = useForwardMessage()
+	const [state, setState] = useState(initialState);
+	const forwardMessage = useForwardMessage();
 
-  return (
-    <Composer.Provider
-      state={state}
-      actions={{ update: setState, submit: forwardMessage }}
-    >
-      {children}
-    </Composer.Provider>
-  )
+	return (
+		<Composer.Provider state={state} actions={{ update: setState, submit: forwardMessage }}>
+			{children}
+		</Composer.Provider>
+	);
 }
 
 // Global synced state for channels
 function ChannelProvider({ channelId, children }) {
-  const { state, update, submit } = useGlobalChannel(channelId)
+	const { state, update, submit } = useGlobalChannel(channelId);
 
-  return (
-    <Composer.Provider state={state} actions={{ update, submit }}>
-      {children}
-    </Composer.Provider>
-  )
+	return (
+		<Composer.Provider state={state} actions={{ update, submit }}>
+			{children}
+		</Composer.Provider>
+	);
 }
 ```
 

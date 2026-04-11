@@ -8,15 +8,15 @@ Controls task execution order.
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "dependsOn": [
-        "^build", // Dependencies' build tasks first
-        "codegen", // Same package's codegen task first
-        "shared#build" // Specific package's build task
-      ]
-    }
-  }
+	"tasks": {
+		"build": {
+			"dependsOn": [
+				"^build", // Dependencies' build tasks first
+				"codegen", // Same package's codegen task first
+				"shared#build" // Specific package's build task
+			]
+		}
+	}
 }
 ```
 
@@ -34,11 +34,11 @@ For tasks like `lint` and `check-types` that can run in parallel but need depend
 
 ```json
 {
-  "tasks": {
-    "transit": { "dependsOn": ["^transit"] },
-    "lint": { "dependsOn": ["transit"] },
-    "check-types": { "dependsOn": ["transit"] }
-  }
+	"tasks": {
+		"transit": { "dependsOn": ["^transit"] },
+		"lint": { "dependsOn": ["transit"] },
+		"check-types": { "dependsOn": ["transit"] }
+	}
 }
 ```
 
@@ -53,11 +53,11 @@ Glob patterns for files to cache. **If omitted, nothing is cached.**
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "outputs": ["dist/**", "build/**"]
-    }
-  }
+	"tasks": {
+		"build": {
+			"outputs": ["dist/**", "build/**"]
+		}
+	}
 }
 ```
 
@@ -85,11 +85,11 @@ Files considered when calculating task hash. Defaults to all tracked files in pa
 
 ```json
 {
-  "tasks": {
-    "test": {
-      "inputs": ["src/**", "tests/**", "vitest.config.ts"]
-    }
-  }
+	"tasks": {
+		"test": {
+			"inputs": ["src/**", "tests/**", "vitest.config.ts"]
+		}
+	}
 }
 ```
 
@@ -102,15 +102,11 @@ Files considered when calculating task hash. Defaults to all tracked files in pa
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "!README.md",
-        "$TURBO_ROOT$/tsconfig.base.json"
-      ]
-    }
-  }
+	"tasks": {
+		"build": {
+			"inputs": ["$TURBO_DEFAULT$", "!README.md", "$TURBO_ROOT$/tsconfig.base.json"]
+		}
+	}
 }
 ```
 
@@ -134,16 +130,16 @@ This is different from `globalDependencies`, where files were hashed into the **
 
 ```json
 {
-  "futureFlags": { "globalConfiguration": true },
-  "global": {
-    "inputs": ["tsconfig.json", ".env"]
-  },
-  "tasks": {
-    "build": {},
-    "lint": {
-      "inputs": ["$TURBO_DEFAULT$", "!$TURBO_ROOT$/.env"]
-    }
-  }
+	"futureFlags": { "globalConfiguration": true },
+	"global": {
+		"inputs": ["tsconfig.json", ".env"]
+	},
+	"tasks": {
+		"build": {},
+		"lint": {
+			"inputs": ["$TURBO_DEFAULT$", "!$TURBO_ROOT$/.env"]
+		}
+	}
 }
 ```
 
@@ -160,15 +156,15 @@ Environment variables to include in task hash.
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "env": [
-        "API_URL",
-        "NEXT_PUBLIC_*", // Wildcard matching
-        "!DEBUG" // Exclude from hash
-      ]
-    }
-  }
+	"tasks": {
+		"build": {
+			"env": [
+				"API_URL",
+				"NEXT_PUBLIC_*", // Wildcard matching
+				"!DEBUG" // Exclude from hash
+			]
+		}
+	}
 }
 ```
 
@@ -180,10 +176,10 @@ Enable/disable caching for a task. Default: `true`.
 
 ```json
 {
-  "tasks": {
-    "dev": { "cache": false },
-    "deploy": { "cache": false }
-  }
+	"tasks": {
+		"dev": { "cache": false },
+		"deploy": { "cache": false }
+	}
 }
 ```
 
@@ -195,12 +191,12 @@ Mark long-running tasks that don't exit. Default: `false`.
 
 ```json
 {
-  "tasks": {
-    "dev": {
-      "cache": false,
-      "persistent": true
-    }
-  }
+	"tasks": {
+		"dev": {
+			"cache": false,
+			"persistent": true
+		}
+	}
 }
 ```
 
@@ -212,12 +208,12 @@ Allow task to receive stdin input. Default: `false`.
 
 ```json
 {
-  "tasks": {
-    "login": {
-      "cache": false,
-      "interactive": true
-    }
-  }
+	"tasks": {
+		"login": {
+			"cache": false,
+			"interactive": true
+		}
+	}
 }
 ```
 
@@ -227,11 +223,11 @@ Control when logs are shown. Options: `full`, `hash-only`, `new-only`, `errors-o
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "outputLogs": "new-only" // Only show logs on cache miss
-    }
-  }
+	"tasks": {
+		"build": {
+			"outputLogs": "new-only" // Only show logs on cache miss
+		}
+	}
 }
 ```
 
@@ -241,13 +237,13 @@ Run tasks alongside this task. For long-running tasks that need runtime dependen
 
 ```json
 {
-  "tasks": {
-    "dev": {
-      "with": ["api#dev"],
-      "persistent": true,
-      "cache": false
-    }
-  }
+	"tasks": {
+		"dev": {
+			"with": ["api#dev"],
+			"persistent": true,
+			"cache": false
+		}
+	}
 }
 ```
 
@@ -259,13 +255,13 @@ Allow `turbo watch` to restart the task on changes. Default: `false`.
 
 ```json
 {
-  "tasks": {
-    "dev": {
-      "persistent": true,
-      "interruptible": true,
-      "cache": false
-    }
-  }
+	"tasks": {
+		"dev": {
+			"persistent": true,
+			"interruptible": true,
+			"cache": false
+		}
+	}
 }
 ```
 
@@ -277,11 +273,11 @@ Human-readable description of the task.
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "description": "Compiles the application for production deployment"
-    }
-  }
+	"tasks": {
+		"build": {
+			"description": "Compiles the application for production deployment"
+		}
+	}
 }
 ```
 
@@ -293,11 +289,11 @@ Environment variables available at runtime but NOT included in cache hash.
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "passThroughEnv": ["AWS_SECRET_KEY", "GITHUB_TOKEN"]
-    }
-  }
+	"tasks": {
+		"build": {
+			"passThroughEnv": ["AWS_SECRET_KEY", "GITHUB_TOKEN"]
+		}
+	}
 }
 ```
 
@@ -310,12 +306,12 @@ Control task inheritance in Package Configurations.
 ```json
 // packages/ui/turbo.json
 {
-  "extends": ["//"],
-  "tasks": {
-    "lint": {
-      "extends": false // Exclude from this package
-    }
-  }
+	"extends": ["//"],
+	"tasks": {
+		"lint": {
+			"extends": false // Exclude from this package
+		}
+	}
 }
 ```
 

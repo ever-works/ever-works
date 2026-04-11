@@ -30,12 +30,12 @@ turbo <tasks>
 ```json
 // package.json - ALWAYS use "turbo run"
 {
-  "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev",
-    "lint": "turbo run lint",
-    "test": "turbo run test"
-  }
+	"scripts": {
+		"build": "turbo run build",
+		"dev": "turbo run dev",
+		"lint": "turbo run lint",
+		"test": "turbo run test"
+	}
 }
 ```
 

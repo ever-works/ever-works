@@ -49,8 +49,8 @@ This requires Git history to compute what changed.
 # GitHub Actions
 - uses: actions/checkout@v4
   with:
-    fetch-depth: 2 # Minimum for --affected
-    # Use 0 for full history if merge base is far
+      fetch-depth: 2 # Minimum for --affected
+      # Use 0 for full history if merge base is far
 ```
 
 ### Why Shallow Clones Break --affected

@@ -26,7 +26,7 @@ Tags allow you to create rules for which packages can depend on each other.
 ```json
 // packages/ui/turbo.json
 {
-  "tags": ["internal"]
+	"tags": ["internal"]
 }
 ```
 
@@ -37,15 +37,15 @@ Rules go in root `turbo.json`:
 ```json
 // turbo.json
 {
-  "boundaries": {
-    "tags": {
-      "public": {
-        "dependencies": {
-          "deny": ["internal"]
-        }
-      }
-    }
-  }
+	"boundaries": {
+		"tags": {
+			"public": {
+				"dependencies": {
+					"deny": ["internal"]
+				}
+			}
+		}
+	}
 }
 ```
 
@@ -57,15 +57,15 @@ This prevents `public`-tagged packages from importing `internal`-tagged packages
 
 ```json
 {
-  "boundaries": {
-    "tags": {
-      "public": {
-        "dependencies": {
-          "allow": ["public"]
-        }
-      }
-    }
-  }
+	"boundaries": {
+		"tags": {
+			"public": {
+				"dependencies": {
+					"allow": ["public"]
+				}
+			}
+		}
+	}
 }
 ```
 
@@ -73,15 +73,15 @@ This prevents `public`-tagged packages from importing `internal`-tagged packages
 
 ```json
 {
-  "boundaries": {
-    "tags": {
-      "public": {
-        "dependencies": {
-          "deny": ["internal"]
-        }
-      }
-    }
-  }
+	"boundaries": {
+		"tags": {
+			"public": {
+				"dependencies": {
+					"deny": ["internal"]
+				}
+			}
+		}
+	}
 }
 ```
 
@@ -89,15 +89,15 @@ This prevents `public`-tagged packages from importing `internal`-tagged packages
 
 ```json
 {
-  "boundaries": {
-    "tags": {
-      "private": {
-        "dependents": {
-          "deny": ["public"]
-        }
-      }
-    }
-  }
+	"boundaries": {
+		"tags": {
+			"private": {
+				"dependents": {
+					"deny": ["public"]
+				}
+			}
+		}
+	}
 }
 ```
 
@@ -107,15 +107,15 @@ Package names work in place of tags:
 
 ```json
 {
-  "boundaries": {
-    "tags": {
-      "private": {
-        "dependents": {
-          "deny": ["@repo/my-pkg"]
-        }
-      }
-    }
-  }
+	"boundaries": {
+		"tags": {
+			"private": {
+				"dependents": {
+					"deny": ["@repo/my-pkg"]
+				}
+			}
+		}
+	}
 }
 ```
 

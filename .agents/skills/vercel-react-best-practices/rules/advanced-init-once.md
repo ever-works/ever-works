@@ -13,29 +13,29 @@ Do not put app-wide initialization that must run once per app load inside `useEf
 
 ```tsx
 function Comp() {
-  useEffect(() => {
-    loadFromStorage()
-    checkAuthToken()
-  }, [])
+	useEffect(() => {
+		loadFromStorage();
+		checkAuthToken();
+	}, []);
 
-  // ...
+	// ...
 }
 ```
 
 **Correct (once per app load):**
 
 ```tsx
-let didInit = false
+let didInit = false;
 
 function Comp() {
-  useEffect(() => {
-    if (didInit) return
-    didInit = true
-    loadFromStorage()
-    checkAuthToken()
-  }, [])
+	useEffect(() => {
+		if (didInit) return;
+		didInit = true;
+		loadFromStorage();
+		checkAuthToken();
+	}, []);
 
-  // ...
+	// ...
 }
 ```
 

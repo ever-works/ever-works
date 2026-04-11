@@ -8,7 +8,7 @@ Environment variables affecting all task hashes.
 
 ```json
 {
-  "globalEnv": ["CI", "NODE_ENV", "VERCEL_*"]
+	"globalEnv": ["CI", "NODE_ENV", "VERCEL_*"]
 }
 ```
 
@@ -20,7 +20,7 @@ Files that affect all task hashes.
 
 ```json
 {
-  "globalDependencies": ["tsconfig.json", ".env", "pnpm-lock.yaml"]
+	"globalDependencies": ["tsconfig.json", ".env", "pnpm-lock.yaml"]
 }
 ```
 
@@ -32,7 +32,7 @@ Variables available to tasks but not included in hash.
 
 ```json
 {
-  "globalPassThroughEnv": ["AWS_SECRET_KEY", "GITHUB_TOKEN"]
+	"globalPassThroughEnv": ["AWS_SECRET_KEY", "GITHUB_TOKEN"]
 }
 ```
 
@@ -44,7 +44,7 @@ Custom cache location. Default: `node_modules/.cache/turbo`.
 
 ```json
 {
-  "cacheDir": ".turbo/cache"
+	"cacheDir": ".turbo/cache"
 }
 ```
 
@@ -86,12 +86,12 @@ Configure remote caching.
 
 ```json
 {
-  "remoteCache": {
-    "enabled": true,
-    "signature": true,
-    "timeout": 30,
-    "uploadTimeout": 60
-  }
+	"remoteCache": {
+		"enabled": true,
+		"signature": true,
+		"timeout": 30,
+		"uploadTimeout": 60
+	}
 }
 ```
 
@@ -129,9 +129,9 @@ Enable experimental features that will become default in future versions.
 
 ```json
 {
-  "futureFlags": {
-    "errorsOnlyShowHash": true
-  }
+	"futureFlags": {
+		"errorsOnlyShowHash": true
+	}
 }
 ```
 
@@ -157,23 +157,23 @@ When enabled:
 
 ```json
 {
-  "futureFlags": { "globalConfiguration": true },
-  "global": {
-    "inputs": ["tsconfig.json", ".env"],
-    "env": ["CI", "NODE_ENV"],
-    "passThroughEnv": ["AWS_SECRET_KEY"],
-    "ui": "tui",
-    "envMode": "strict",
-    "cacheDir": ".turbo/cache",
-    "remoteCache": { "enabled": true },
-    "concurrency": "50%"
-  },
-  "tasks": {
-    "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
-    }
-  }
+	"futureFlags": { "globalConfiguration": true },
+	"global": {
+		"inputs": ["tsconfig.json", ".env"],
+		"env": ["CI", "NODE_ENV"],
+		"passThroughEnv": ["AWS_SECRET_KEY"],
+		"ui": "tui",
+		"envMode": "strict",
+		"cacheDir": ".turbo/cache",
+		"remoteCache": { "enabled": true },
+		"concurrency": "50%"
+	},
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build"],
+			"outputs": ["dist/**"]
+		}
+	}
 }
 ```
 
@@ -204,7 +204,7 @@ Disable update notifications when new turbo versions are available.
 
 ```json
 {
-  "noUpdateNotifier": true
+	"noUpdateNotifier": true
 }
 ```
 
@@ -214,7 +214,7 @@ Bypass the `packageManager` field requirement. Use for incremental migration.
 
 ```json
 {
-  "dangerouslyDisablePackageManagerCheck": true
+	"dangerouslyDisablePackageManagerCheck": true
 }
 ```
 

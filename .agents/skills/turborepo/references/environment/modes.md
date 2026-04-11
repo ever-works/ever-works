@@ -78,11 +78,11 @@ Or exclude specific patterns in config:
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "env": ["!NEXT_PUBLIC_*"]
-    }
-  }
+	"tasks": {
+		"build": {
+			"env": ["!NEXT_PUBLIC_*"]
+		}
+	}
 }
 ```
 

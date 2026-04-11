@@ -8,9 +8,9 @@ Basic flex container:
 
 ```html
 <div class="flex items-center justify-between">
-  <div>Left</div>
-  <div>Center</div>
-  <div>Right</div>
+	<div>Left</div>
+	<div>Center</div>
+	<div>Right</div>
 </div>
 ```
 
@@ -18,9 +18,9 @@ Responsive flex direction:
 
 ```html
 <div class="flex flex-col md:flex-row gap-4">
-  <div class="flex-1">Item 1</div>
-  <div class="flex-1">Item 2</div>
-  <div class="flex-1">Item 3</div>
+	<div class="flex-1">Item 1</div>
+	<div class="flex-1">Item 2</div>
+	<div class="flex-1">Item 3</div>
 </div>
 ```
 
@@ -29,19 +29,19 @@ Common flex patterns:
 ```html
 <!-- Center content -->
 <div class="flex items-center justify-center min-h-screen">
-  <div>Centered Content</div>
+	<div>Centered Content</div>
 </div>
 
 <!-- Space between items -->
 <div class="flex justify-between items-center">
-  <span>Left</span>
-  <span>Right</span>
+	<span>Left</span>
+	<span>Right</span>
 </div>
 
 <!-- Vertical stack with gap -->
 <div class="flex flex-col gap-4">
-  <div>Item 1</div>
-  <div>Item 2</div>
+	<div>Item 1</div>
+	<div>Item 2</div>
 </div>
 ```
 
@@ -51,9 +51,9 @@ Basic grid:
 
 ```html
 <div class="grid grid-cols-3 gap-4">
-  <div>Column 1</div>
-  <div>Column 2</div>
-  <div>Column 3</div>
+	<div>Column 1</div>
+	<div>Column 2</div>
+	<div>Column 3</div>
 </div>
 ```
 
@@ -61,11 +61,11 @@ Responsive grid:
 
 ```html
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-  <!-- 1 column mobile, 2 tablet, 4 desktop -->
-  <div>Item 1</div>
-  <div>Item 2</div>
-  <div>Item 3</div>
-  <div>Item 4</div>
+	<!-- 1 column mobile, 2 tablet, 4 desktop -->
+	<div>Item 1</div>
+	<div>Item 2</div>
+	<div>Item 3</div>
+	<div>Item 4</div>
 </div>
 ```
 
@@ -73,7 +73,7 @@ Auto-fit columns:
 
 ```html
 <div class="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-4">
-  <!-- Automatically fit columns based on container width -->
+	<!-- Automatically fit columns based on container width -->
 </div>
 ```
 
@@ -83,7 +83,7 @@ Centered container with max width:
 
 ```html
 <div class="container mx-auto px-4 max-w-7xl">
-  <!-- Centered content with padding -->
+	<!-- Centered content with padding -->
 </div>
 ```
 
@@ -91,7 +91,7 @@ Responsive max width:
 
 ```html
 <div class="w-full max-w-md mx-auto">
-  <!-- Max 448px width, centered -->
+	<!-- Max 448px width, centered -->
 </div>
 ```
 
@@ -112,7 +112,7 @@ Individual sides:
 
 ```html
 <div class="pt-4 pr-8 pb-4 pl-8">
-  <!-- Top 1rem, Right 2rem, Bottom 1rem, Left 2rem -->
+	<!-- Top 1rem, Right 2rem, Bottom 1rem, Left 2rem -->
 </div>
 ```
 
@@ -120,7 +120,7 @@ Axis-based spacing:
 
 ```html
 <div class="px-4 py-8">
-  <!-- Horizontal padding 1rem, Vertical padding 2rem -->
+	<!-- Horizontal padding 1rem, Vertical padding 2rem -->
 </div>
 ```
 
@@ -128,7 +128,7 @@ Responsive spacing:
 
 ```html
 <div class="p-4 md:p-8 lg:p-12">
-  <!-- Increases padding at larger breakpoints -->
+	<!-- Increases padding at larger breakpoints -->
 </div>
 ```
 
@@ -136,9 +136,9 @@ Space between children:
 
 ```html
 <div class="space-y-4">
-  <div>Item 1</div>
-  <div>Item 2</div>
-  <div>Item 3</div>
+	<div>Item 1</div>
+	<div>Item 2</div>
+	<div>Item 3</div>
 </div>
 ```
 
@@ -158,25 +158,19 @@ Space between children:
 Responsive typography:
 
 ```html
-<h1 class="text-2xl md:text-4xl lg:text-6xl font-bold">
-  Responsive Heading
-</h1>
+<h1 class="text-2xl md:text-4xl lg:text-6xl font-bold">Responsive Heading</h1>
 ```
 
 ### Line Height & Letter Spacing
 
 ```html
-<p class="leading-relaxed tracking-wide">
-  Text with relaxed line height and wide letter spacing
-</p>
+<p class="leading-relaxed tracking-wide">Text with relaxed line height and wide letter spacing</p>
 ```
 
 ### Text Alignment
 
 ```html
-<p class="text-left md:text-center">
-  Left aligned on mobile, centered on tablet+
-</p>
+<p class="text-left md:text-center">Left aligned on mobile, centered on tablet+</p>
 ```
 
 ---
@@ -188,9 +182,7 @@ Responsive typography:
 ```html
 <div class="bg-blue-500">Blue background</div>
 <div class="bg-gray-100">Light gray background</div>
-<div class="bg-gradient-to-r from-blue-500 to-purple-600">
-  Gradient background
-</div>
+<div class="bg-gradient-to-r from-blue-500 to-purple-600">Gradient background</div>
 ```
 
 ### Text Colors
@@ -204,19 +196,17 @@ Responsive typography:
 ### Opacity
 
 ```html
-<div class="bg-blue-500 bg-opacity-50">
-  Semi-transparent blue
-</div>
+<div class="bg-blue-500 bg-opacity-50">Semi-transparent blue</div>
 ```
 
 ---
 
 ## Responsive Breakpoints Reference
 
-| Prefix | Min Width | CSS Equivalent |
-|--------|-----------|----------------|
-| `sm:` | 640px | `@media (min-width: 640px)` |
-| `md:` | 768px | `@media (min-width: 768px)` |
-| `lg:` | 1024px | `@media (min-width: 1024px)` |
-| `xl:` | 1280px | `@media (min-width: 1280px)` |
-| `2xl:` | 1536px | `@media (min-width: 1536px)` |
+| Prefix | Min Width | CSS Equivalent               |
+| ------ | --------- | ---------------------------- |
+| `sm:`  | 640px     | `@media (min-width: 640px)`  |
+| `md:`  | 768px     | `@media (min-width: 768px)`  |
+| `lg:`  | 1024px    | `@media (min-width: 1024px)` |
+| `xl:`  | 1280px    | `@media (min-width: 1280px)` |
+| `2xl:` | 1536px    | `@media (min-width: 1536px)` |

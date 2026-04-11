@@ -40,12 +40,12 @@ my-monorepo/
 ```json
 // apps/web/package.json
 {
-  "name": "web",
-  "private": true,
-  "dependencies": {
-    "@repo/ui": "workspace:*",
-    "next": "latest"
-  }
+	"name": "web",
+	"private": true,
+	"dependencies": {
+		"@repo/ui": "workspace:*",
+		"next": "latest"
+	}
 }
 ```
 
@@ -58,11 +58,11 @@ my-monorepo/
 ```json
 // packages/ui/package.json
 {
-  "name": "@repo/ui",
-  "exports": {
-    "./button": "./src/button.tsx",
-    "./card": "./src/card.tsx"
-  }
+	"name": "@repo/ui",
+	"exports": {
+		"./button": "./src/button.tsx",
+		"./card": "./src/card.tsx"
+	}
 }
 ```
 
@@ -74,10 +74,10 @@ Export TypeScript directly; let the app's bundler compile it.
 
 ```json
 {
-  "name": "@repo/ui",
-  "exports": {
-    "./button": "./src/button.tsx"
-  }
+	"name": "@repo/ui",
+	"exports": {
+		"./button": "./src/button.tsx"
+	}
 }
 ```
 
@@ -90,16 +90,16 @@ Package compiles itself with `tsc` or bundler.
 
 ```json
 {
-  "name": "@repo/ui",
-  "exports": {
-    "./button": {
-      "types": "./src/button.tsx",
-      "default": "./dist/button.js"
-    }
-  },
-  "scripts": {
-    "build": "tsc"
-  }
+	"name": "@repo/ui",
+	"exports": {
+		"./button": {
+			"types": "./src/button.tsx",
+			"default": "./dist/button.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc"
+	}
 }
 ```
 
@@ -146,11 +146,11 @@ Use workspace protocol for internal packages:
 
 ```json
 {
-  "exports": {
-    ".": "./src/index.ts",
-    "./button": "./src/button.tsx",
-    "./utils": "./src/utils.ts"
-  }
+	"exports": {
+		".": "./src/index.ts",
+		"./button": "./src/button.tsx",
+		"./utils": "./src/utils.ts"
+	}
 }
 ```
 
@@ -192,10 +192,10 @@ export * from './modal';
 
 ```typescript
 // BAD: Reaching into another package
-import { Button } from "../../packages/ui/src/button";
+import { Button } from '../../packages/ui/src/button';
 
 // GOOD: Install and import properly
-import { Button } from "@repo/ui/button";
+import { Button } from '@repo/ui/button';
 ```
 
 ### Shared Code in Apps

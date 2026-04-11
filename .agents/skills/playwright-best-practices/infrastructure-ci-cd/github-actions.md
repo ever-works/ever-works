@@ -31,60 +31,60 @@ npx playwright merge-reports ./blob-report  # combine shard reports
 name: E2E Tests
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
 
 concurrency:
-  group: e2e-${{ github.ref }}
-  cancel-in-progress: true
+    group: e2e-${{ github.ref }}
+    cancel-in-progress: true
 
 env:
-  CI: true
+    CI: true
 
 jobs:
-  test:
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
+    test:
+        timeout-minutes: 30
+        runs-on: ubuntu-latest
 
-    steps:
-      - uses: actions/checkout@v4
+        steps:
+            - uses: actions/checkout@v4
 
-      - run: npm ci
+            - run: npm ci
 
-      - name: Cache browsers
-        id: browser-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+            - name: Cache browsers
+              id: browser-cache
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Install browsers
-        if: steps.browser-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps
+            - name: Install browsers
+              if: steps.browser-cache.outputs.cache-hit != 'true'
+              run: npx playwright install --with-deps
 
-      - name: Install OS dependencies
-        if: steps.browser-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps
+            - name: Install OS dependencies
+              if: steps.browser-cache.outputs.cache-hit == 'true'
+              run: npx playwright install-deps
 
-      - run: npx playwright test
+            - run: npx playwright test
 
-      - name: Upload report
-        uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: test-report
-          path: playwright-report/
-          retention-days: 14
+            - name: Upload report
+              uses: actions/upload-artifact@v4
+              if: ${{ !cancelled() }}
+              with:
+                  name: test-report
+                  path: playwright-report/
+                  retention-days: 14
 
-      - name: Upload traces
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: traces
-          path: test-results/
-          retention-days: 7
+            - name: Upload traces
+              uses: actions/upload-artifact@v4
+              if: failure()
+              with:
+                  name: traces
+                  path: test-results/
+                  retention-days: 7
 ```
 
 ### Sharded Execution
@@ -97,84 +97,84 @@ jobs:
 name: E2E Tests (Sharded)
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
 
 concurrency:
-  group: e2e-${{ github.ref }}
-  cancel-in-progress: true
+    group: e2e-${{ github.ref }}
+    cancel-in-progress: true
 
 env:
-  CI: true
+    CI: true
 
 jobs:
-  test:
-    timeout-minutes: 20
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1/4, 2/4, 3/4, 4/4]
+    test:
+        timeout-minutes: 20
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                shard: [1/4, 2/4, 3/4, 4/4]
 
-    steps:
-      - uses: actions/checkout@v4
+        steps:
+            - uses: actions/checkout@v4
 
-      - run: npm ci
+            - run: npm ci
 
-      - name: Cache browsers
-        id: browser-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+            - name: Cache browsers
+              id: browser-cache
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Install browsers
-        if: steps.browser-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps
+            - name: Install browsers
+              if: steps.browser-cache.outputs.cache-hit != 'true'
+              run: npx playwright install --with-deps
 
-      - name: Install OS dependencies
-        if: steps.browser-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps
+            - name: Install OS dependencies
+              if: steps.browser-cache.outputs.cache-hit == 'true'
+              run: npx playwright install-deps
 
-      - name: Run tests (shard ${{ matrix.shard }})
-        run: npx playwright test --shard=${{ matrix.shard }}
+            - name: Run tests (shard ${{ matrix.shard }})
+              run: npx playwright test --shard=${{ matrix.shard }}
 
-      - name: Upload blob report
-        uses: actions/upload-artifact@v4
+            - name: Upload blob report
+              uses: actions/upload-artifact@v4
+              if: ${{ !cancelled() }}
+              with:
+                  name: blob-${{ strategy.job-index }}
+                  path: blob-report/
+                  retention-days: 1
+
+    merge:
         if: ${{ !cancelled() }}
-        with:
-          name: blob-${{ strategy.job-index }}
-          path: blob-report/
-          retention-days: 1
+        needs: test
+        runs-on: ubuntu-latest
 
-  merge:
-    if: ${{ !cancelled() }}
-    needs: test
-    runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
 
-    steps:
-      - uses: actions/checkout@v4
+            - run: npm ci
 
-      - run: npm ci
+            - name: Download blob reports
+              uses: actions/download-artifact@v4
+              with:
+                  path: all-blobs
+                  pattern: blob-*
+                  merge-multiple: true
 
-      - name: Download blob reports
-        uses: actions/download-artifact@v4
-        with:
-          path: all-blobs
-          pattern: blob-*
-          merge-multiple: true
+            - name: Merge reports
+              run: npx playwright merge-reports --reporter=html ./all-blobs
 
-      - name: Merge reports
-        run: npx playwright merge-reports --reporter=html ./all-blobs
-
-      - name: Upload merged report
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-report
-          path: playwright-report/
-          retention-days: 14
+            - name: Upload merged report
+              uses: actions/upload-artifact@v4
+              with:
+                  name: test-report
+                  path: playwright-report/
+                  retention-days: 14
 ```
 
 **Config for sharding**—enable blob reporter:
@@ -184,9 +184,7 @@ jobs:
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  reporter: process.env.CI
-    ? [['blob'], ['github']]
-    : [['html', { open: 'on-failure' }]],
+	reporter: process.env.CI ? [['blob'], ['github']] : [['html', { open: 'on-failure' }]]
 });
 ```
 
@@ -200,32 +198,32 @@ export default defineConfig({
 name: E2E Tests (Container)
 
 on:
-  pull_request:
-    branches: [main]
+    pull_request:
+        branches: [main]
 
 jobs:
-  test:
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    container:
-      image: mcr.microsoft.com/playwright:v1.48.0-noble
+    test:
+        timeout-minutes: 30
+        runs-on: ubuntu-latest
+        container:
+            image: mcr.microsoft.com/playwright:v1.48.0-noble
 
-    steps:
-      - uses: actions/checkout@v4
+        steps:
+            - uses: actions/checkout@v4
 
-      - run: npm ci
+            - run: npm ci
 
-      - name: Run tests
-        run: npx playwright test
-        env:
-          HOME: /root
+            - name: Run tests
+              run: npx playwright test
+              env:
+                  HOME: /root
 
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: test-report
-          path: playwright-report/
-          retention-days: 14
+            - uses: actions/upload-artifact@v4
+              if: ${{ !cancelled() }}
+              with:
+                  name: test-report
+                  path: playwright-report/
+                  retention-days: 14
 ```
 
 ### Environment Secrets
@@ -238,51 +236,51 @@ jobs:
 name: Staging Tests
 
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+    push:
+        branches: [main]
+    workflow_dispatch:
 
 jobs:
-  test:
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    environment: staging
+    test:
+        timeout-minutes: 30
+        runs-on: ubuntu-latest
+        environment: staging
 
-    env:
-      CI: true
-      BASE_URL: ${{ vars.STAGING_URL }}
-      TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
-      API_TOKEN: ${{ secrets.API_TOKEN }}
+        env:
+            CI: true
+            BASE_URL: ${{ vars.STAGING_URL }}
+            TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+            API_TOKEN: ${{ secrets.API_TOKEN }}
 
-    steps:
-      - uses: actions/checkout@v4
+        steps:
+            - uses: actions/checkout@v4
 
-      - run: npm ci
+            - run: npm ci
 
-      - name: Cache browsers
-        id: browser-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+            - name: Cache browsers
+              id: browser-cache
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Install browsers
-        if: steps.browser-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps
+            - name: Install browsers
+              if: steps.browser-cache.outputs.cache-hit != 'true'
+              run: npx playwright install --with-deps
 
-      - name: Install OS dependencies
-        if: steps.browser-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps
+            - name: Install OS dependencies
+              if: steps.browser-cache.outputs.cache-hit == 'true'
+              run: npx playwright install-deps
 
-      - name: Run smoke tests
-        run: npx playwright test --grep @smoke
+            - name: Run smoke tests
+              run: npx playwright test --grep @smoke
 
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: staging-report
-          path: playwright-report/
-          retention-days: 14
+            - uses: actions/upload-artifact@v4
+              if: ${{ !cancelled() }}
+              with:
+                  name: staging-report
+                  path: playwright-report/
+                  retention-days: 14
 ```
 
 ### Scheduled Runs
@@ -295,47 +293,47 @@ jobs:
 name: Nightly Regression
 
 on:
-  schedule:
-    - cron: '0 3 * * 1-5'
-  workflow_dispatch:
+    schedule:
+        - cron: '0 3 * * 1-5'
+    workflow_dispatch:
 
 jobs:
-  test:
-    timeout-minutes: 60
-    runs-on: ubuntu-latest
+    test:
+        timeout-minutes: 60
+        runs-on: ubuntu-latest
 
-    env:
-      CI: true
-      BASE_URL: ${{ vars.STAGING_URL }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - run: npm ci
-
-      - name: Install browsers
-        run: npx playwright install --with-deps
-
-      - name: Run full regression
-        run: npx playwright test --grep @regression
-
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: nightly-${{ github.run_number }}
-          path: playwright-report/
-          retention-days: 30
-
-      - name: Notify on failure
-        if: failure()
-        uses: slackapi/slack-github-action@latest
-        with:
-          payload: |
-            {
-              "text": "Nightly regression failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+            CI: true
+            BASE_URL: ${{ vars.STAGING_URL }}
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - run: npm ci
+
+            - name: Install browsers
+              run: npx playwright install --with-deps
+
+            - name: Run full regression
+              run: npx playwright test --grep @regression
+
+            - uses: actions/upload-artifact@v4
+              if: ${{ !cancelled() }}
+              with:
+                  name: nightly-${{ github.run_number }}
+                  path: playwright-report/
+                  retention-days: 30
+
+            - name: Notify on failure
+              if: failure()
+              uses: slackapi/slack-github-action@latest
+              with:
+                  payload: |
+                      {
+                        "text": "Nightly regression failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                      }
+              env:
+                  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 ```
 
 ### Reusable Workflow
@@ -348,64 +346,64 @@ jobs:
 name: Playwright Reusable
 
 on:
-  workflow_call:
-    inputs:
-      node-version:
-        type: string
-        default: 'lts/*'
-      test-command:
-        type: string
-        default: 'npx playwright test'
-    secrets:
-      BASE_URL:
-        required: false
-      TEST_PASSWORD:
-        required: false
+    workflow_call:
+        inputs:
+            node-version:
+                type: string
+                default: 'lts/*'
+            test-command:
+                type: string
+                default: 'npx playwright test'
+        secrets:
+            BASE_URL:
+                required: false
+            TEST_PASSWORD:
+                required: false
 
 jobs:
-  test:
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
+    test:
+        timeout-minutes: 30
+        runs-on: ubuntu-latest
 
-    env:
-      CI: true
-      BASE_URL: ${{ secrets.BASE_URL }}
-      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+        env:
+            CI: true
+            BASE_URL: ${{ secrets.BASE_URL }}
+            TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
 
-    steps:
-      - uses: actions/checkout@v4
+        steps:
+            - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ inputs.node-version }}
-          cache: npm
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ inputs.node-version }}
+                  cache: npm
 
-      - run: npm ci
+            - run: npm ci
 
-      - name: Cache browsers
-        id: browser-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+            - name: Cache browsers
+              id: browser-cache
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Install browsers
-        if: steps.browser-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps
+            - name: Install browsers
+              if: steps.browser-cache.outputs.cache-hit != 'true'
+              run: npx playwright install --with-deps
 
-      - name: Install OS dependencies
-        if: steps.browser-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps
+            - name: Install OS dependencies
+              if: steps.browser-cache.outputs.cache-hit == 'true'
+              run: npx playwright install-deps
 
-      - name: Run tests
-        run: ${{ inputs.test-command }}
+            - name: Run tests
+              run: ${{ inputs.test-command }}
 
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: test-report
-          path: playwright-report/
-          retention-days: 14
+            - uses: actions/upload-artifact@v4
+              if: ${{ !cancelled() }}
+              with:
+                  name: test-report
+                  path: playwright-report/
+                  retention-days: 14
 ```
 
 **Calling the reusable workflow:**
@@ -414,45 +412,45 @@ jobs:
 # .github/workflows/ci.yml
 name: CI
 on:
-  pull_request:
-    branches: [main]
+    pull_request:
+        branches: [main]
 
 jobs:
-  e2e:
-    uses: ./.github/workflows/pw-reusable.yml
-    with:
-      node-version: 'lts/*'
-    secrets:
-      BASE_URL: ${{ secrets.STAGING_URL }}
-      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+    e2e:
+        uses: ./.github/workflows/pw-reusable.yml
+        with:
+            node-version: 'lts/*'
+        secrets:
+            BASE_URL: ${{ secrets.STAGING_URL }}
+            TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
 ```
 
 ## Scenario Guide
 
-| Scenario | Approach |
-|---|---|
-| Small suite (< 5 min) | Single job, no sharding |
-| Medium suite (5-20 min) | 2-4 shards with matrix |
-| Large suite (20+ min) | 4-8 shards + blob merge |
-| Cross-browser on PRs | Chromium only on PRs; all browsers on main |
-| Staging/prod smoke tests | Separate workflow with `environment:` |
-| Nightly full regression | `schedule` trigger + `workflow_dispatch` |
-| Multiple repos, same setup | Reusable workflow with `workflow_call` |
-| Reproducible env needed | Container job with Playwright image |
+| Scenario                   | Approach                                   |
+| -------------------------- | ------------------------------------------ |
+| Small suite (< 5 min)      | Single job, no sharding                    |
+| Medium suite (5-20 min)    | 2-4 shards with matrix                     |
+| Large suite (20+ min)      | 4-8 shards + blob merge                    |
+| Cross-browser on PRs       | Chromium only on PRs; all browsers on main |
+| Staging/prod smoke tests   | Separate workflow with `environment:`      |
+| Nightly full regression    | `schedule` trigger + `workflow_dispatch`   |
+| Multiple repos, same setup | Reusable workflow with `workflow_call`     |
+| Reproducible env needed    | Container job with Playwright image        |
 
 ## Common Mistakes
 
-| Mistake | Problem | Fix |
-|---|---|---|
-| No `concurrency` group | Duplicate runs waste minutes | Add `concurrency: { group: ..., cancel-in-progress: true }` |
-| `fail-fast: true` with sharding | One failure cancels others | Set `fail-fast: false` |
-| No browser caching | 60-90 seconds wasted per run | Cache `~/.cache/ms-playwright` |
-| No `timeout-minutes` | Stuck jobs run for 6 hours | Set explicit timeout: 20-30 minutes |
-| Artifacts only on failure | No report when tests pass | Use `if: ${{ !cancelled() }}` |
-| Hardcoded secrets | Security risk | Use GitHub Secrets and Environments |
-| All browsers on every PR | 3x CI cost | Chromium on PR; cross-browser on main |
-| No artifact retention | Default 90-day fills storage | Set `retention-days: 7-14` |
-| Missing `--with-deps` | Browser launch failures | Always use `npx playwright install --with-deps` |
+| Mistake                         | Problem                      | Fix                                                         |
+| ------------------------------- | ---------------------------- | ----------------------------------------------------------- |
+| No `concurrency` group          | Duplicate runs waste minutes | Add `concurrency: { group: ..., cancel-in-progress: true }` |
+| `fail-fast: true` with sharding | One failure cancels others   | Set `fail-fast: false`                                      |
+| No browser caching              | 60-90 seconds wasted per run | Cache `~/.cache/ms-playwright`                              |
+| No `timeout-minutes`            | Stuck jobs run for 6 hours   | Set explicit timeout: 20-30 minutes                         |
+| Artifacts only on failure       | No report when tests pass    | Use `if: ${{ !cancelled() }}`                               |
+| Hardcoded secrets               | Security risk                | Use GitHub Secrets and Environments                         |
+| All browsers on every PR        | 3x CI cost                   | Chromium on PR; cross-browser on main                       |
+| No artifact retention           | Default 90-day fills storage | Set `retention-days: 7-14`                                  |
+| Missing `--with-deps`           | Browser launch failures      | Always use `npx playwright install --with-deps`             |
 
 ## Troubleshooting
 
@@ -479,11 +477,11 @@ jobs:
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  workers: process.env.CI ? '50%' : undefined,
-  use: {
-    actionTimeout: process.env.CI ? 15_000 : 10_000,
-    navigationTimeout: process.env.CI ? 30_000 : 15_000,
-  },
+	workers: process.env.CI ? '50%' : undefined,
+	use: {
+		actionTimeout: process.env.CI ? 15_000 : 10_000,
+		navigationTimeout: process.env.CI ? 30_000 : 15_000
+	}
 });
 ```
 
@@ -497,15 +495,15 @@ export default defineConfig({
 # Upload in each shard
 - uses: actions/upload-artifact@v4
   with:
-    name: blob-${{ strategy.job-index }}
-    path: blob-report/
+      name: blob-${{ strategy.job-index }}
+      path: blob-report/
 
 # Download in merge job
 - uses: actions/download-artifact@v4
   with:
-    path: all-blobs
-    pattern: blob-*
-    merge-multiple: true
+      path: all-blobs
+      pattern: blob-*
+      merge-multiple: true
 ```
 
 ### `webServer` fails: "port already in use"
@@ -530,9 +528,7 @@ export default defineConfig({
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  reporter: process.env.CI
-    ? [['html', { open: 'never' }], ['github']]
-    : [['html', { open: 'on-failure' }]],
+	reporter: process.env.CI ? [['html', { open: 'never' }], ['github']] : [['html', { open: 'on-failure' }]]
 });
 ```
 

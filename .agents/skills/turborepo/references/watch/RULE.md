@@ -30,12 +30,12 @@ If your tool has built-in watching (like `next dev`), use its watcher:
 
 ```json
 {
-  "tasks": {
-    "dev": {
-      "persistent": true,
-      "cache": false
-    }
-  }
+	"tasks": {
+		"dev": {
+			"persistent": true,
+			"cache": false
+		}
+	}
 }
 ```
 
@@ -45,13 +45,13 @@ For tools that don't detect dependency changes, use `interruptible`:
 
 ```json
 {
-  "tasks": {
-    "dev": {
-      "persistent": true,
-      "interruptible": true,
-      "cache": false
-    }
-  }
+	"tasks": {
+		"dev": {
+			"persistent": true,
+			"interruptible": true,
+			"cache": false
+		}
+	}
 }
 ```
 

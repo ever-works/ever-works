@@ -42,18 +42,18 @@ Get your token from Vercel dashboard → Settings → Tokens.
 - name: Build
   run: npx turbo build
   env:
-    TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-    TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 ```
 
 ## Configuration in turbo.json
 
 ```json
 {
-  "remoteCache": {
-    "enabled": true,
-    "signature": false
-  }
+	"remoteCache": {
+		"enabled": true,
+		"signature": false
+	}
 }
 ```
 
@@ -75,9 +75,9 @@ Enable in config:
 
 ```json
 {
-  "remoteCache": {
-    "signature": true
-  }
+	"remoteCache": {
+		"signature": true
+	}
 }
 ```
 

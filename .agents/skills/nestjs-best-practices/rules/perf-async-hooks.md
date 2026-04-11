@@ -15,26 +15,26 @@ NestJS lifecycle hooks (`onModuleInit`, `onApplicationBootstrap`, etc.) support 
 // Fire-and-forget async without await
 @Injectable()
 export class DatabaseService implements OnModuleInit {
-  onModuleInit() {
-    // This runs but doesn't block - app starts before DB is ready!
-    this.connect();
-  }
+	onModuleInit() {
+		// This runs but doesn't block - app starts before DB is ready!
+		this.connect();
+	}
 
-  private async connect() {
-    await this.pool.connect();
-    console.log('Database connected');
-  }
+	private async connect() {
+		await this.pool.connect();
+		console.log('Database connected');
+	}
 }
 
 // Heavy blocking operations in constructor
 @Injectable()
 export class ConfigService {
-  private config: Config;
+	private config: Config;
 
-  constructor() {
-    // BLOCKS entire module instantiation synchronously
-    this.config = fs.readFileSync('config.json');
-  }
+	constructor() {
+		// BLOCKS entire module instantiation synchronously
+		this.config = fs.readFileSync('config.json');
+	}
 }
 ```
 
@@ -44,65 +44,65 @@ export class ConfigService {
 // Return promise from async hooks
 @Injectable()
 export class DatabaseService implements OnModuleInit {
-  private pool: Pool;
+	private pool: Pool;
 
-  async onModuleInit(): Promise<void> {
-    // NestJS waits for this to complete before continuing
-    await this.pool.connect();
-    console.log('Database connected');
-  }
+	async onModuleInit(): Promise<void> {
+		// NestJS waits for this to complete before continuing
+		await this.pool.connect();
+		console.log('Database connected');
+	}
 
-  async onModuleDestroy(): Promise<void> {
-    // Clean up resources on shutdown
-    await this.pool.end();
-    console.log('Database disconnected');
-  }
+	async onModuleDestroy(): Promise<void> {
+		// Clean up resources on shutdown
+		await this.pool.end();
+		console.log('Database disconnected');
+	}
 }
 
 // Use onApplicationBootstrap for cross-module dependencies
 @Injectable()
 export class CacheWarmerService implements OnApplicationBootstrap {
-  constructor(
-    private cache: CacheService,
-    private products: ProductsService,
-  ) {}
+	constructor(
+		private cache: CacheService,
+		private products: ProductsService
+	) {}
 
-  async onApplicationBootstrap(): Promise<void> {
-    // All modules are initialized, safe to warm cache
-    const products = await this.products.findPopular();
-    await this.cache.warmup(products);
-  }
+	async onApplicationBootstrap(): Promise<void> {
+		// All modules are initialized, safe to warm cache
+		const products = await this.products.findPopular();
+		await this.cache.warmup(products);
+	}
 }
 
 // Heavy init in async hooks, not constructor
 @Injectable()
 export class ConfigService implements OnModuleInit {
-  private config: Config;
+	private config: Config;
 
-  constructor() {
-    // Keep constructor synchronous and fast
-  }
+	constructor() {
+		// Keep constructor synchronous and fast
+	}
 
-  async onModuleInit(): Promise<void> {
-    // Async loading in lifecycle hook
-    this.config = await this.loadConfig();
-  }
+	async onModuleInit(): Promise<void> {
+		// Async loading in lifecycle hook
+		this.config = await this.loadConfig();
+	}
 
-  private async loadConfig(): Promise<Config> {
-    const file = await fs.promises.readFile('config.json');
-    return JSON.parse(file.toString());
-  }
+	private async loadConfig(): Promise<Config> {
+		const file = await fs.promises.readFile('config.json');
+		return JSON.parse(file.toString());
+	}
 
-  get<T>(key: string): T {
-    return this.config[key];
-  }
+	get<T>(key: string): T {
+		return this.config[key];
+	}
 }
 
 // Enable shutdown hooks in main.ts
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  app.enableShutdownHooks(); // Enable SIGTERM/SIGINT handling
-  await app.listen(3000);
+	const app = await NestFactory.create(AppModule);
+	app.enableShutdownHooks(); // Enable SIGTERM/SIGINT handling
+	await app.listen(3000);
 }
 ```
 

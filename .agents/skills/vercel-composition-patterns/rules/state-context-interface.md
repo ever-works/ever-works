@@ -19,9 +19,9 @@ dependency-injectable.
 
 ```tsx
 function ComposerInput() {
-  // Tightly coupled to a specific hook
-  const { input, setInput } = useChannelComposerState()
-  return <TextInput value={input} onChangeText={setInput} />
+	// Tightly coupled to a specific hook
+	const { input, setInput } = useChannelComposerState();
+	return <TextInput value={input} onChangeText={setInput} />;
 }
 ```
 
@@ -30,47 +30,47 @@ function ComposerInput() {
 ```tsx
 // Define a GENERIC interface that any provider can implement
 interface ComposerState {
-  input: string
-  attachments: Attachment[]
-  isSubmitting: boolean
+	input: string;
+	attachments: Attachment[];
+	isSubmitting: boolean;
 }
 
 interface ComposerActions {
-  update: (updater: (state: ComposerState) => ComposerState) => void
-  submit: () => void
+	update: (updater: (state: ComposerState) => ComposerState) => void;
+	submit: () => void;
 }
 
 interface ComposerMeta {
-  inputRef: React.RefObject<TextInput>
+	inputRef: React.RefObject<TextInput>;
 }
 
 interface ComposerContextValue {
-  state: ComposerState
-  actions: ComposerActions
-  meta: ComposerMeta
+	state: ComposerState;
+	actions: ComposerActions;
+	meta: ComposerMeta;
 }
 
-const ComposerContext = createContext<ComposerContextValue | null>(null)
+const ComposerContext = createContext<ComposerContextValue | null>(null);
 ```
 
 **UI components consume the interface, not the implementation:**
 
 ```tsx
 function ComposerInput() {
-  const {
-    state,
-    actions: { update },
-    meta,
-  } = use(ComposerContext)
+	const {
+		state,
+		actions: { update },
+		meta
+	} = use(ComposerContext);
 
-  // This component works with ANY provider that implements the interface
-  return (
-    <TextInput
-      ref={meta.inputRef}
-      value={state.input}
-      onChangeText={(text) => update((s) => ({ ...s, input: text }))}
-    />
-  )
+	// This component works with ANY provider that implements the interface
+	return (
+		<TextInput
+			ref={meta.inputRef}
+			value={state.input}
+			onChangeText={(text) => update((s) => ({ ...s, input: text }))}
+		/>
+	);
 }
 ```
 
@@ -79,39 +79,39 @@ function ComposerInput() {
 ```tsx
 // Provider A: Local state for ephemeral forms
 function ForwardMessageProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState(initialState)
-  const inputRef = useRef(null)
-  const submit = useForwardMessage()
+	const [state, setState] = useState(initialState);
+	const inputRef = useRef(null);
+	const submit = useForwardMessage();
 
-  return (
-    <ComposerContext
-      value={{
-        state,
-        actions: { update: setState, submit },
-        meta: { inputRef },
-      }}
-    >
-      {children}
-    </ComposerContext>
-  )
+	return (
+		<ComposerContext
+			value={{
+				state,
+				actions: { update: setState, submit },
+				meta: { inputRef }
+			}}
+		>
+			{children}
+		</ComposerContext>
+	);
 }
 
 // Provider B: Global synced state for channels
 function ChannelProvider({ channelId, children }: Props) {
-  const { state, update, submit } = useGlobalChannel(channelId)
-  const inputRef = useRef(null)
+	const { state, update, submit } = useGlobalChannel(channelId);
+	const inputRef = useRef(null);
 
-  return (
-    <ComposerContext
-      value={{
-        state,
-        actions: { update, submit },
-        meta: { inputRef },
-      }}
-    >
-      {children}
-    </ComposerContext>
-  )
+	return (
+		<ComposerContext
+			value={{
+				state,
+				actions: { update, submit },
+				meta: { inputRef }
+			}}
+		>
+			{children}
+		</ComposerContext>
+	);
 }
 ```
 
@@ -143,43 +143,43 @@ to be within the provider.
 
 ```tsx
 function ForwardMessageDialog() {
-  return (
-    <ForwardMessageProvider>
-      <Dialog>
-        {/* The composer UI */}
-        <Composer.Frame>
-          <Composer.Input placeholder="Add a message, if you'd like." />
-          <Composer.Footer>
-            <Composer.Formatting />
-            <Composer.Emojis />
-          </Composer.Footer>
-        </Composer.Frame>
+	return (
+		<ForwardMessageProvider>
+			<Dialog>
+				{/* The composer UI */}
+				<Composer.Frame>
+					<Composer.Input placeholder="Add a message, if you'd like." />
+					<Composer.Footer>
+						<Composer.Formatting />
+						<Composer.Emojis />
+					</Composer.Footer>
+				</Composer.Frame>
 
-        {/* Custom UI OUTSIDE the composer, but INSIDE the provider */}
-        <MessagePreview />
+				{/* Custom UI OUTSIDE the composer, but INSIDE the provider */}
+				<MessagePreview />
 
-        {/* Actions at the bottom of the dialog */}
-        <DialogActions>
-          <CancelButton />
-          <ForwardButton />
-        </DialogActions>
-      </Dialog>
-    </ForwardMessageProvider>
-  )
+				{/* Actions at the bottom of the dialog */}
+				<DialogActions>
+					<CancelButton />
+					<ForwardButton />
+				</DialogActions>
+			</Dialog>
+		</ForwardMessageProvider>
+	);
 }
 
 // This button lives OUTSIDE Composer.Frame but can still submit based on its context!
 function ForwardButton() {
-  const {
-    actions: { submit },
-  } = use(ComposerContext)
-  return <Button onPress={submit}>Forward</Button>
+	const {
+		actions: { submit }
+	} = use(ComposerContext);
+	return <Button onPress={submit}>Forward</Button>;
 }
 
 // This preview lives OUTSIDE Composer.Frame but can read composer's state!
 function MessagePreview() {
-  const { state } = use(ComposerContext)
-  return <Preview message={state.input} attachments={state.attachments} />
+	const { state } = use(ComposerContext);
+	return <Preview message={state.input} attachments={state.attachments} />;
 }
 ```
 
