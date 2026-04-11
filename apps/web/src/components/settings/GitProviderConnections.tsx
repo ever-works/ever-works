@@ -216,26 +216,30 @@ function GitProviderCard({
     const getReturnPath = () => returnPath || pathname || ROUTES.DASHBOARD_SETTINGS;
 
     const handleConnect = () => {
-        startTransition(async () => {
-            const result = await connectOAuthProvider(provider.id, getReturnPath());
+        startTransition(() => {
+            void (async () => {
+                const result = await connectOAuthProvider(provider.id, getReturnPath());
 
-            if (result.success && result.url) {
-                window.location.href = result.url;
-            } else {
-                toast.error(result.error || 'Failed to connect');
-            }
+                if (result.success && result.url) {
+                    window.location.href = result.url;
+                } else {
+                    toast.error(result.error || 'Failed to connect');
+                }
+            })();
         });
     };
 
     const handleReconnect = () => {
-        startTransition(async () => {
-            const result = await connectOAuthProvider(provider.id, getReturnPath(), true);
+        startTransition(() => {
+            void (async () => {
+                const result = await connectOAuthProvider(provider.id, getReturnPath(), true);
 
-            if (result.success && result.url) {
-                window.location.href = result.url;
-            } else {
-                toast.error(result.error || 'Failed to reconnect');
-            }
+                if (result.success && result.url) {
+                    window.location.href = result.url;
+                } else {
+                    toast.error(result.error || 'Failed to reconnect');
+                }
+            })();
         });
     };
 
@@ -244,15 +248,17 @@ function GitProviderCard({
             return;
         }
 
-        startTransition(async () => {
-            const result = await disconnectOAuthProvider(provider.id);
+        startTransition(() => {
+            void (async () => {
+                const result = await disconnectOAuthProvider(provider.id);
 
-            if (result.success) {
-                toast.success(`${provider.name} disconnected`);
-                window.location.reload();
-            } else {
-                toast.error(result.error || 'Failed to disconnect');
-            }
+                if (result.success) {
+                    toast.success(`${provider.name} disconnected`);
+                    window.location.reload();
+                } else {
+                    toast.error(result.error || 'Failed to disconnect');
+                }
+            })();
         });
     };
 

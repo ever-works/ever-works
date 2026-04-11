@@ -4,14 +4,14 @@ import {
     PluginRegistryService,
     type RegisteredPlugin,
 } from '../../plugins/services/plugin-registry.service';
-import { OAuthTokenRepository } from '../../database/repositories/oauth-token.repository';
+import { AuthAccountRepository } from '../../database/repositories/auth-account.repository';
 import type { IOAuthPlugin, PluginManifest, PluginState } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
 describe('OAuthFacadeService', () => {
     let service: OAuthFacadeService;
     let registry: jest.Mocked<PluginRegistryService>;
-    let oauthTokenRepository: jest.Mocked<OAuthTokenRepository>;
+    let authAccountRepository: jest.Mocked<AuthAccountRepository>;
 
     const createMockOAuthPlugin = (id: string, name: string): IOAuthPlugin =>
         ({
@@ -63,17 +63,17 @@ describe('OAuthFacadeService', () => {
             isPluginEnabledForScope: jest.fn().mockResolvedValue(true),
         } as any;
 
-        oauthTokenRepository = {
-            findByUserAndProvider: jest.fn(),
-            deleteByUserAndProvider: jest.fn(),
-            isTokenExpired: jest.fn().mockReturnValue(false),
+        authAccountRepository = {
+            findProviderAccount: jest.fn(),
+            deleteProviderAccount: jest.fn(),
+            isAccessTokenExpired: jest.fn().mockReturnValue(false),
         } as any;
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 OAuthFacadeService,
                 { provide: PluginRegistryService, useValue: registry },
-                { provide: OAuthTokenRepository, useValue: oauthTokenRepository },
+                { provide: AuthAccountRepository, useValue: authAccountRepository },
             ],
         }).compile();
 
@@ -170,8 +170,8 @@ describe('OAuthFacadeService', () => {
     describe('hasValidCredentials', () => {
         it('should return true when valid token exists', async () => {
             const token = { accessToken: 'token', userId: 'user-1', provider: 'github' };
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(token as any);
-            oauthTokenRepository.isTokenExpired.mockReturnValue(false);
+            authAccountRepository.findProviderAccount.mockResolvedValue(token as any);
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
 
             const result = await service.hasValidCredentials('user-1', 'github');
 
@@ -180,8 +180,8 @@ describe('OAuthFacadeService', () => {
 
         it('should return false when token is expired', async () => {
             const token = { accessToken: 'token', userId: 'user-1', provider: 'github' };
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(token as any);
-            oauthTokenRepository.isTokenExpired.mockReturnValue(true);
+            authAccountRepository.findProviderAccount.mockResolvedValue(token as any);
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(true);
 
             const result = await service.hasValidCredentials('user-1', 'github');
 
@@ -189,7 +189,7 @@ describe('OAuthFacadeService', () => {
         });
 
         it('should return false when no token exists', async () => {
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            authAccountRepository.findProviderAccount.mockResolvedValue(null);
 
             const result = await service.hasValidCredentials('user-1', 'github');
 
@@ -200,8 +200,8 @@ describe('OAuthFacadeService', () => {
     describe('getAccessToken', () => {
         it('should return access token when valid', async () => {
             const token = { accessToken: 'token-123', userId: 'user-1', provider: 'github' };
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(token as any);
-            oauthTokenRepository.isTokenExpired.mockReturnValue(false);
+            authAccountRepository.findProviderAccount.mockResolvedValue(token as any);
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
 
             const result = await service.getAccessToken('user-1', 'github');
 
@@ -210,8 +210,8 @@ describe('OAuthFacadeService', () => {
 
         it('should return null when token expired', async () => {
             const token = { accessToken: 'token-123', userId: 'user-1', provider: 'github' };
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(token as any);
-            oauthTokenRepository.isTokenExpired.mockReturnValue(true);
+            authAccountRepository.findProviderAccount.mockResolvedValue(token as any);
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(true);
 
             const result = await service.getAccessToken('user-1', 'github');
 
@@ -226,12 +226,12 @@ describe('OAuthFacadeService', () => {
             registry.getByCapability.mockReturnValue([registered]);
 
             const token = { accessToken: 'token-123', userId: 'user-1', provider: 'github' };
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(token as any);
+            authAccountRepository.findProviderAccount.mockResolvedValue(token as any);
 
             await service.revokeToken('user-1', 'github');
 
             expect(oauthPlugin.revokeToken).toHaveBeenCalledWith('token-123');
-            expect(oauthTokenRepository.deleteByUserAndProvider).toHaveBeenCalledWith(
+            expect(authAccountRepository.deleteProviderAccount).toHaveBeenCalledWith(
                 'user-1',
                 'github',
             );
@@ -244,11 +244,11 @@ describe('OAuthFacadeService', () => {
             registry.getByCapability.mockReturnValue([registered]);
 
             const token = { accessToken: 'token-123', userId: 'user-1', provider: 'github' };
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(token as any);
+            authAccountRepository.findProviderAccount.mockResolvedValue(token as any);
 
             await service.revokeToken('user-1', 'github');
 
-            expect(oauthTokenRepository.deleteByUserAndProvider).toHaveBeenCalledWith(
+            expect(authAccountRepository.deleteProviderAccount).toHaveBeenCalledWith(
                 'user-1',
                 'github',
             );

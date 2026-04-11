@@ -1,6 +1,7 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import { MessageResponse } from './types';
+import { OAuthProvider } from './enums';
 
 // DTOs - Auth
 export interface RegisterDto {
@@ -13,10 +14,6 @@ export interface RegisterDto {
 export interface LoginDto {
     email: string;
     password: string;
-}
-
-export interface RefreshTokenDto {
-    refreshToken: string;
 }
 
 export interface UpdatePasswordDto {
@@ -49,7 +46,6 @@ export interface ResetPasswordDto {
 // Response Types
 export interface AuthResponse {
     access_token: string;
-    refresh_token: string;
     user: UserProfile;
 }
 
@@ -61,6 +57,10 @@ export interface UserProfile {
     emailVerified?: boolean;
     committerName?: string | null;
     committerEmail?: string | null;
+    oauthTokens?: Array<{
+        provider: string;
+        createdAt?: string;
+    }>;
 }
 
 export interface OAuthUrlResponse {
@@ -94,19 +94,10 @@ export const authAPI = {
         });
     },
 
-    refresh: async (data: RefreshTokenDto) => {
-        return serverMutation<AuthResponse>({
-            endpoint: '/auth/refresh',
-            data,
-            method: 'POST',
-            wrapInData: false,
-        });
-    },
-
-    logout: async (data: RefreshTokenDto) => {
+    logout: async () => {
         return serverMutation<MessageResponse>({
             endpoint: '/auth/logout',
-            data,
+            data: {},
             method: 'POST',
             wrapInData: false,
         });
@@ -149,34 +140,17 @@ export const authAPI = {
     },
 
     // OAuth URLs
-    getGitHubAuthUrl: async (callbackUrl?: string, state?: string) => {
+    getOAuthAuthUrl: async (providerId: OAuthProvider, callbackUrl?: string, state?: string) => {
         const params = new URLSearchParams();
         if (callbackUrl) params.append('callbackUrl', callbackUrl);
         if (state) params.append('state', state);
         const query = params.toString() ? `?${params.toString()}` : '';
-        return serverFetch<OAuthUrlResponse>(`/oauth/github/url${query}`);
+        return serverFetch<OAuthUrlResponse>(`/oauth/${providerId}/url${query}`);
     },
 
-    getGoogleAuthUrl: async (callbackUrl?: string, state?: string) => {
-        const params = new URLSearchParams();
-        if (callbackUrl) params.append('callbackUrl', callbackUrl);
-        if (state) params.append('state', state);
-        const query = params.toString() ? `?${params.toString()}` : '';
-        return serverFetch<OAuthUrlResponse>(`/oauth/google/url${query}`);
-    },
-
-    connectGoogleCallback: async (code: string, state?: string) => {
-        const params = new URLSearchParams({ code });
-        if (state) params.append('state', state);
-
-        return serverFetch<AuthResponse>(`/oauth/google/callback?${params.toString()}`);
-    },
-
-    connectGitHubCallback: async (code: string, state?: string) => {
-        const params = new URLSearchParams({ code });
-        if (state) params.append('state', state);
-
-        return serverFetch<AuthResponse>(`/oauth/github/callback?${params.toString()}`);
+    connectOAuthCallback: async (providerId: OAuthProvider, code: string, callbackUrl: string) => {
+        const params = new URLSearchParams({ code, callbackUrl });
+        return serverFetch<AuthResponse>(`/oauth/${providerId}/callback?${params.toString()}`);
     },
 
     // Email Verification

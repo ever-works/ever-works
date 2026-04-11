@@ -31,24 +31,28 @@ export function GitHubSync() {
     }, []);
 
     const loadStatus = () => {
-        startTransition(async () => {
-            const result = await getSyncStatus();
-            if (result.success && result.data) {
-                setStatus(result.data);
-            }
+        startTransition(() => {
+            void (async () => {
+                const result = await getSyncStatus();
+                if (result.success && result.data) {
+                    setStatus(result.data);
+                }
+            })();
         });
     };
 
     const handleCreateNew = () => {
-        startTransition(async () => {
-            const result = await configureSyncRepo({ createNew: true });
-            if (result.success && result.data) {
-                setStatus(result.data);
-                setShowConfigure(false);
-                toast.success(t('configureSuccess'));
-            } else {
-                toast.error(result.error || t('configureError'));
-            }
+        startTransition(() => {
+            void (async () => {
+                const result = await configureSyncRepo({ createNew: true });
+                if (result.success && result.data) {
+                    setStatus(result.data);
+                    setShowConfigure(false);
+                    toast.success(t('configureSuccess'));
+                } else {
+                    toast.error(result.error || t('configureError'));
+                }
+            })();
         });
     };
 
@@ -58,52 +62,60 @@ export function GitHubSync() {
             return;
         }
 
-        startTransition(async () => {
-            const result = await configureSyncRepo({ repoFullName: repoName.trim() });
-            if (result.success && result.data) {
-                setStatus(result.data);
-                setShowConfigure(false);
-                setRepoName('');
-                toast.success(t('configureSuccess'));
-            } else {
-                toast.error(result.error || t('configureError'));
-            }
+        startTransition(() => {
+            void (async () => {
+                const result = await configureSyncRepo({ repoFullName: repoName.trim() });
+                if (result.success && result.data) {
+                    setStatus(result.data);
+                    setShowConfigure(false);
+                    setRepoName('');
+                    toast.success(t('configureSuccess'));
+                } else {
+                    toast.error(result.error || t('configureError'));
+                }
+            })();
         });
     };
 
     const handlePush = () => {
-        startTransition(async () => {
-            const result = await pushToGitHub({ includeSecrets });
-            if (result.success) {
-                toast.success(t('pushSuccess'));
-                loadStatus();
-            } else {
-                toast.error(result.error || t('pushError'));
-            }
+        startTransition(() => {
+            void (async () => {
+                const result = await pushToGitHub({ includeSecrets });
+                if (result.success) {
+                    toast.success(t('pushSuccess'));
+                    loadStatus();
+                } else {
+                    toast.error(result.error || t('pushError'));
+                }
+            })();
         });
     };
 
     const handlePull = () => {
-        startTransition(async () => {
-            const result = await pullFromGitHub();
-            if (result.success && result.data) {
-                setPullPreview(result.data);
-                setShowPullImport(true);
-            } else {
-                toast.error(result.error || t('pullError'));
-            }
+        startTransition(() => {
+            void (async () => {
+                const result = await pullFromGitHub();
+                if (result.success && result.data) {
+                    setPullPreview(result.data);
+                    setShowPullImport(true);
+                } else {
+                    toast.error(result.error || t('pullError'));
+                }
+            })();
         });
     };
 
     const handleDisconnect = () => {
-        startTransition(async () => {
-            const result = await removeSyncConfig();
-            if (result.success) {
-                setStatus({ configured: false, hasOAuth: status?.hasOAuth || false });
-                toast.success(t('disconnectSuccess'));
-            } else {
-                toast.error(result.error || t('disconnectError'));
-            }
+        startTransition(() => {
+            void (async () => {
+                const result = await removeSyncConfig();
+                if (result.success) {
+                    setStatus({ configured: false, hasOAuth: status?.hasOAuth || false });
+                    toast.success(t('disconnectSuccess'));
+                } else {
+                    toast.error(result.error || t('disconnectError'));
+                }
+            })();
         });
     };
 

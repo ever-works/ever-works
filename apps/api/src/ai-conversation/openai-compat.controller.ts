@@ -11,7 +11,7 @@ import {
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CurrentUser } from '../auth/decorators/user.decorator';
-import { AuthenticatedUser } from '../auth/types/jwt.types';
+import { AuthenticatedUser } from '../auth/types/auth.types';
 import { OpenAiChatCompletionRequestDto } from './dto/openai-compat.dto';
 import { OpenAiCompatService } from './openai-compat.service';
 

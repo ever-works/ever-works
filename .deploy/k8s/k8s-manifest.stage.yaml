@@ -52,6 +52,8 @@ spec:
               value: https://apistage.ever.works
             - name: ALLOWED_ORIGINS
               value: https://appstage.ever.works,https://apistage.ever.works
+            - name: AUTH_SECRET
+              value: "$AUTH_SECRET"
             - name: JWT_SECRET
               value: "$JWT_SECRET"
 

@@ -290,6 +290,12 @@
     },
     "dashboard": {
         "title": "Dashboard",
+        "connectGithub": {
+            "title": "Connect your GitHub account",
+            "description": "GitHub is required for creating and managing directory repositories. Connect your account to get started.",
+            "connect": "Connect GitHub",
+            "dismiss": "I'll do this later"
+        },
         "toasts": {
             "newUser": {
                 "title": "Welcome to {companyName}! 🎉",

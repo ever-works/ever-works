@@ -82,8 +82,8 @@ import {
 import { UpdateWebsiteRepositoryResponseDto } from '@ever-works/agent/generators';
 import { CommunityPrProcessorService } from '@ever-works/agent/community-pr';
 import { DirectoryRepository } from '@ever-works/agent/database';
-import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
-import { AuthenticatedUser } from '@src/auth/types/jwt.types';
+import { AuthService, CurrentUser, AuthSessionGuard } from '../auth';
+import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { GenerateDirectoryDetailDto } from './dto/generate-detail.dto';
 import { GenerateManualComparisonDto } from './dto/generate-manual-comparison.dto';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
@@ -98,7 +98,7 @@ let CACHE_TTL = 1000 * 60 * 10; // 10 minutes
 @ApiTags('Directories')
 @ApiBearerAuth('JWT-auth')
 @Controller('api')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AuthSessionGuard)
 export class DirectoriesController {
     constructor(
         @Inject(CACHE_MANAGER) private cacheManager: Cache,

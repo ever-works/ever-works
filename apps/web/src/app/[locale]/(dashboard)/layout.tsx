@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { getAuthFromCookie } from '@/lib/auth';
 import { DashboardLayoutClient } from './layout-client';
+import { authAPI } from '@/lib/api';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
     const user = await getAuthFromCookie();
@@ -8,6 +9,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     if (!user) {
         return null;
     }
+
+    const profile = await authAPI.getFreshProfile().catch(() => null);
+    const hasGithubConnected =
+        profile?.oauthTokens?.some((token) => token.provider === 'github') ?? false;
 
     const cookieStore = await cookies();
     const chatCookie = cookieStore.get('chat-panel-open')?.value;
@@ -20,6 +25,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             user={user}
             initialChatOpen={chatPanelOpen}
             initialSidebarCollapsed={sidebarCollapsed}
+            hasGithubConnected={hasGithubConnected}
         >
             {children}
         </DashboardLayoutClient>

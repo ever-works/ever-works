@@ -42,7 +42,7 @@ export class ActivityLogRepository {
 
     async findLatestByUserDirectoryActionStatus(params: {
         userId: string;
-        directoryId?: string;
+        directoryId: string;
         actionType: ActivityActionType;
         status: ActivityStatus;
     }): Promise<ActivityLog | null> {
@@ -131,7 +131,7 @@ export class ActivityLogRepository {
             .groupBy('activity.status')
             .getRawMany<{ status: ActivityStatus; count: string }>();
 
-        const counts = {
+        let counts = {
             pending: 0,
             in_progress: 0,
             completed: 0,

@@ -14,7 +14,6 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
-import { OAuthTokenRepository } from '../database/repositories/oauth-token.repository';
 import { GitFacadeService } from './git.facade';
 import { DirectoryCustomDomainRepository } from '../database/repositories/directory-custom-domain.repository';
 import { FacadeError, NoProviderError, ProviderNotFoundError } from './base.facade';
@@ -82,7 +81,6 @@ export class DeployFacadeService implements IDeployFacade {
         private readonly settingsService: PluginSettingsService,
         private readonly directoryRepository: DirectoryRepository,
         private readonly gitFacade: GitFacadeService,
-        private readonly oauthTokenRepository: OAuthTokenRepository,
         private readonly domainRepository: DirectoryCustomDomainRepository,
         private readonly directoryPluginRepository?: DirectoryPluginRepository,
     ) {}

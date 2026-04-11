@@ -10,8 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { OAuthProvider } from '@/lib/api/enums';
 
-export default function RegisterForm() {
+interface RegisterFormProps {
+    availableSocialProviders: OAuthProvider[];
+}
+
+export default function RegisterForm({ availableSocialProviders }: RegisterFormProps) {
     const t = useTranslations('auth.register');
     const [isPending, startTransition] = useTransition();
 
@@ -39,13 +44,19 @@ export default function RegisterForm() {
             return;
         }
 
-        startTransition(async () => {
-            const response = await registerAction(formData.name, formData.email, formData.password);
+        startTransition(() => {
+            void (async () => {
+                const response = await registerAction(
+                    formData.name,
+                    formData.email,
+                    formData.password,
+                );
 
-            if (!response.success) {
-                setError(response.error || t('errors.generic'));
-                return;
-            }
+                if (!response.success) {
+                    setError(response.error || t('errors.generic'));
+                    return;
+                }
+            })();
         });
     };
 
@@ -151,19 +162,23 @@ export default function RegisterForm() {
                     {isPending ? t('form.submitting') : t('form.submit')}
                 </Button>
 
-                <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-border dark:border-border-dark" />
-                    </div>
+                {availableSocialProviders.length > 0 && (
+                    <>
+                        <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-border dark:border-border-dark" />
+                            </div>
 
-                    <div className="relative flex justify-center text-sm">
-                        <span className="bg-background dark:bg-background-dark px-2 text-text-muted dark:text-text-muted-dark">
-                            {t('socialSignUp.divider')}
-                        </span>
-                    </div>
-                </div>
+                            <div className="relative flex justify-center text-sm">
+                                <span className="bg-background dark:bg-background-dark px-2 text-text-muted dark:text-text-muted-dark">
+                                    {t('socialSignUp.divider')}
+                                </span>
+                            </div>
+                        </div>
 
-                <SocialLoginButtons />
+                        <SocialLoginButtons providers={availableSocialProviders} />
+                    </>
+                )}
 
                 <p className="text-center text-sm text-text-secondary dark:text-text-secondary-dark">
                     {t('signIn.text')}{' '}

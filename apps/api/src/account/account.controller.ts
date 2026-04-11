@@ -10,7 +10,7 @@ import {
     Header,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/user.decorator';
-import type { AuthenticatedUser } from '../auth/types/jwt.types';
+import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
     AccountExportService,
     AccountImportService,

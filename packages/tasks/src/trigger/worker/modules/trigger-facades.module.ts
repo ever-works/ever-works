@@ -8,7 +8,7 @@ import {
     GitFacadeService,
     PromptFacadeService,
 } from '@ever-works/agent/facades';
-import { OAuthTokenRepository } from '@ever-works/agent/database';
+import { AuthAccountRepository } from '@ever-works/agent/database';
 import { TriggerInternalModule } from './trigger-internal.module';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
@@ -25,19 +25,19 @@ const FACADES = [
 
 /**
  * Facades module for Trigger.dev context.
- * OAuthTokenRepository is proxied to the API; `isTokenExpired` runs locally (sync).
+ * AuthAccountRepository is proxied to the API; `isAccessTokenExpired` runs locally (sync).
  */
 @Module({
     imports: [TriggerInternalModule],
     providers: [
         ...FACADES,
         {
-            provide: OAuthTokenRepository,
+            provide: AuthAccountRepository,
             useFactory: (apiClient: TriggerInternalApiClient) =>
-                createRemoteProxy(apiClient, 'OAuthTokenRepository', {
-                    isTokenExpired(token: { expiresAt?: Date | string | null }) {
-                        if (!token.expiresAt) return false;
-                        return new Date() > new Date(token.expiresAt);
+                createRemoteProxy(apiClient, 'AuthAccountRepository', {
+                    isAccessTokenExpired(account: { accessTokenExpiresAt?: Date | string | null }) {
+                        if (!account.accessTokenExpiresAt) return false;
+                        return new Date() > new Date(account.accessTokenExpiresAt);
                     },
                 }),
             inject: [TriggerInternalApiClient],
