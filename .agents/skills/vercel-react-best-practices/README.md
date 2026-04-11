@@ -5,48 +5,51 @@ A structured repository for creating and maintaining React Best Practices optimi
 ## Structure
 
 - `rules/` - Individual rule files (one per rule)
-  - `_sections.md` - Section metadata (titles, impacts, descriptions)
-  - `_template.md` - Template for creating new rules
-  - `area-description.md` - Individual rule files
+    - `_sections.md` - Section metadata (titles, impacts, descriptions)
+    - `_template.md` - Template for creating new rules
+    - `area-description.md` - Individual rule files
 - `src/` - Build scripts and utilities
 - `metadata.json` - Document metadata (version, organization, abstract)
-- __`AGENTS.md`__ - Compiled output (generated)
-- __`test-cases.json`__ - Test cases for LLM evaluation (generated)
+- **`AGENTS.md`** - Compiled output (generated)
+- **`test-cases.json`** - Test cases for LLM evaluation (generated)
 
 ## Getting Started
 
 1. Install dependencies:
-   ```bash
-   pnpm install
-   ```
+
+    ```bash
+    pnpm install
+    ```
 
 2. Build AGENTS.md from rules:
-   ```bash
-   pnpm build
-   ```
+
+    ```bash
+    pnpm build
+    ```
 
 3. Validate rule files:
-   ```bash
-   pnpm validate
-   ```
+
+    ```bash
+    pnpm validate
+    ```
 
 4. Extract test cases:
-   ```bash
-   pnpm extract-tests
-   ```
+    ```bash
+    pnpm extract-tests
+    ```
 
 ## Creating a New Rule
 
 1. Copy `rules/_template.md` to `rules/area-description.md`
 2. Choose the appropriate area prefix:
-   - `async-` for Eliminating Waterfalls (Section 1)
-   - `bundle-` for Bundle Size Optimization (Section 2)
-   - `server-` for Server-Side Performance (Section 3)
-   - `client-` for Client-Side Data Fetching (Section 4)
-   - `rerender-` for Re-render Optimization (Section 5)
-   - `rendering-` for Rendering Performance (Section 6)
-   - `js-` for JavaScript Performance (Section 7)
-   - `advanced-` for Advanced Patterns (Section 8)
+    - `async-` for Eliminating Waterfalls (Section 1)
+    - `bundle-` for Bundle Size Optimization (Section 2)
+    - `server-` for Server-Side Performance (Section 3)
+    - `client-` for Client-Side Data Fetching (Section 4)
+    - `rerender-` for Re-render Optimization (Section 5)
+    - `rendering-` for Rendering Performance (Section 6)
+    - `js-` for JavaScript Performance (Section 7)
+    - `advanced-` for Advanced Patterns (Section 8)
 3. Fill in the frontmatter and content
 4. Ensure you have clear examples with explanations
 5. Run `pnpm build` to regenerate AGENTS.md and test-cases.json
@@ -55,7 +58,7 @@ A structured repository for creating and maintaining React Best Practices optimi
 
 Each rule file should follow this structure:
 
-```markdown
+````markdown
 ---
 title: Rule Title Here
 impact: MEDIUM
@@ -72,6 +75,7 @@ Brief explanation of the rule and why it matters.
 ```typescript
 // Bad code example
 ```
+````
 
 **Correct (description of what's right):**
 

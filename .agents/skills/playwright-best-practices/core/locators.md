@@ -27,29 +27,29 @@ Most robust approach - matches how users and assistive technology perceive the p
 
 ```typescript
 // Buttons
-page.getByRole("button", { name: "Submit", exact: true }); // exact accessible name
-page.getByRole("button", { name: /submit/i }); // flexible case-insensitive match
+page.getByRole('button', { name: 'Submit', exact: true }); // exact accessible name
+page.getByRole('button', { name: /submit/i }); // flexible case-insensitive match
 
 // Links
-page.getByRole("link", { name: "Home" });
+page.getByRole('link', { name: 'Home' });
 
 // Form elements
-page.getByRole("textbox", { name: "Email" });
-page.getByRole("checkbox", { name: "Remember me" });
-page.getByRole("combobox", { name: "Country" });
-page.getByRole("radio", { name: "Option A" });
+page.getByRole('textbox', { name: 'Email' });
+page.getByRole('checkbox', { name: 'Remember me' });
+page.getByRole('combobox', { name: 'Country' });
+page.getByRole('radio', { name: 'Option A' });
 
 // Headings
-page.getByRole("heading", { name: "Welcome", level: 1 });
+page.getByRole('heading', { name: 'Welcome', level: 1 });
 
 // Lists & items
-page.getByRole("list").getByRole("listitem");
+page.getByRole('list').getByRole('listitem');
 
 // Navigation & regions
-page.getByRole("navigation");
-page.getByRole("main");
-page.getByRole("dialog");
-page.getByRole("alert");
+page.getByRole('navigation');
+page.getByRole('main');
+page.getByRole('dialog');
+page.getByRole('alert');
 ```
 
 ### getByLabel
@@ -58,19 +58,19 @@ For form elements with associated labels.
 
 ```typescript
 // Input with <label for="email">
-page.getByLabel("Email address");
+page.getByLabel('Email address');
 
 // Input with aria-label
-page.getByLabel("Search");
+page.getByLabel('Search');
 
 // Exact match
-page.getByLabel("Email", { exact: true });
+page.getByLabel('Email', { exact: true });
 ```
 
 ### getByPlaceholder
 
 ```typescript
-page.getByPlaceholder("Enter your email");
+page.getByPlaceholder('Enter your email');
 page.getByPlaceholder(/email/i);
 ```
 
@@ -78,10 +78,10 @@ page.getByPlaceholder(/email/i);
 
 ```typescript
 // Partial match (default)
-page.getByText("Welcome");
+page.getByText('Welcome');
 
 // Exact match
-page.getByText("Welcome to our site", { exact: true });
+page.getByText('Welcome to our site', { exact: true });
 
 // Regex
 page.getByText(/welcome/i);
@@ -93,7 +93,7 @@ Configure custom test ID attribute in `playwright.config.ts`:
 
 ```typescript
 use: {
-  testIdAttribute: "data-testid"; // default
+	testIdAttribute: 'data-testid'; // default
 }
 ```
 
@@ -101,7 +101,7 @@ Usage:
 
 ```typescript
 // HTML: <button data-testid="submit-btn">Submit</button>
-page.getByTestId("submit-btn");
+page.getByTestId('submit-btn');
 ```
 
 ## Filtering & Chaining
@@ -112,40 +112,39 @@ Narrow down locators:
 
 ```typescript
 // Filter by text
-page.getByRole("listitem").filter({ hasText: "Product" });
+page.getByRole('listitem').filter({ hasText: 'Product' });
 
 // Filter by NOT having text
-page.getByRole("listitem").filter({ hasNotText: "Out of stock" });
+page.getByRole('listitem').filter({ hasNotText: 'Out of stock' });
 
 // Filter by child locator
-page.getByRole("listitem").filter({
-  has: page.getByRole("button", { name: "Buy" }),
+page.getByRole('listitem').filter({
+	has: page.getByRole('button', { name: 'Buy' })
 });
 
 // Combine filters
-page
-  .getByRole("listitem")
-  .filter({ hasText: "Product" })
-  .filter({ has: page.getByText("$9.99") });
+page.getByRole('listitem')
+	.filter({ hasText: 'Product' })
+	.filter({ has: page.getByText('$9.99') });
 ```
 
 ### Chaining
 
 ```typescript
 // Navigate down the DOM tree
-page.getByRole("article").getByRole("heading");
+page.getByRole('article').getByRole('heading');
 
 // Get parent/ancestor
-page.getByText("Child").locator("..");
-page.getByText("Child").locator("xpath=ancestor::article");
+page.getByText('Child').locator('..');
+page.getByText('Child').locator('xpath=ancestor::article');
 ```
 
 ### nth() and first()/last()
 
 ```typescript
-page.getByRole("listitem").first();
-page.getByRole("listitem").last();
-page.getByRole("listitem").nth(2); // 0-indexed
+page.getByRole('listitem').first();
+page.getByRole('listitem').last();
+page.getByRole('listitem').nth(2); // 0-indexed
 ```
 
 ## Dynamic Content
@@ -155,8 +154,8 @@ page.getByRole("listitem").nth(2); // 0-indexed
 Locators auto-wait for actionability by default. For explicit state waiting:
 
 ```typescript
-await page.getByRole("button").waitFor({ state: "visible" });
-await page.getByText("Loading").waitFor({ state: "hidden" });
+await page.getByRole('button').waitFor({ state: 'visible' });
+await page.getByText('Loading').waitFor({ state: 'hidden' });
 ```
 
 > **For comprehensive waiting strategies** (element state, navigation, network, polling with `toPass()`), see [assertions-waiting.md](assertions-waiting.md#waiting-strategies).
@@ -165,12 +164,12 @@ await page.getByText("Loading").waitFor({ state: "hidden" });
 
 ```typescript
 // Wait for specific count
-await expect(page.getByRole("listitem")).toHaveCount(5);
+await expect(page.getByRole('listitem')).toHaveCount(5);
 
 // Get all matching elements
-const items = await page.getByRole("listitem").all();
+const items = await page.getByRole('listitem').all();
 for (const item of items) {
-  await expect(item).toBeVisible();
+	await expect(item).toBeVisible();
 }
 ```
 
@@ -180,10 +179,10 @@ Playwright pierces shadow DOM by default:
 
 ```typescript
 // Automatically finds elements inside shadow roots
-page.getByRole("button", { name: "Shadow Button" });
+page.getByRole('button', { name: 'Shadow Button' });
 
 // Explicit shadow DOM traversal (if needed)
-page.locator("my-component").locator("internal:shadow=button");
+page.locator('my-component').locator('internal:shadow=button');
 ```
 
 ## Iframes
@@ -191,27 +190,27 @@ page.locator("my-component").locator("internal:shadow=button");
 ```typescript
 // By frame name or URL
 const frame = page.frameLocator('iframe[name="content"]');
-await frame.getByRole("button").click();
+await frame.getByRole('button').click();
 
 // By index
-const frame = page.frameLocator("iframe").first();
+const frame = page.frameLocator('iframe').first();
 
 // Nested iframes
-const nestedFrame = page.frameLocator("#outer").frameLocator("#inner");
-await nestedFrame.getByText("Content").click();
+const nestedFrame = page.frameLocator('#outer').frameLocator('#inner');
+await nestedFrame.getByText('Content').click();
 ```
 
 ## Debugging Locators
 
 ```typescript
 // Highlight element in headed mode
-await page.getByRole("button").highlight();
+await page.getByRole('button').highlight();
 
 // Count matches
-const count = await page.getByRole("listitem").count();
+const count = await page.getByRole('listitem').count();
 
 // Check if exists without waiting
-const exists = (await page.getByRole("button").count()) > 0;
+const exists = (await page.getByRole('button').count()) > 0;
 
 // Use Playwright Inspector
 // PWDEBUG=1 npx playwright test

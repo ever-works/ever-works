@@ -7,9 +7,9 @@ lifting state, and composing internals.
 ## Structure
 
 - `rules/` - Individual rule files (one per rule)
-  - `_sections.md` - Section metadata (titles, impacts, descriptions)
-  - `_template.md` - Template for creating new rules
-  - `area-description.md` - Individual rule files
+    - `_sections.md` - Section metadata (titles, impacts, descriptions)
+    - `_template.md` - Template for creating new rules
+    - `area-description.md` - Individual rule files
 - `metadata.json` - Document metadata (version, organization, abstract)
 - **`AGENTS.md`** - Compiled output (generated)
 
@@ -47,9 +47,9 @@ lifting state, and composing internals.
 
 1. Copy `rules/_template.md` to `rules/area-description.md`
 2. Choose the appropriate area prefix:
-   - `architecture-` for Component Architecture
-   - `state-` for State Management
-   - `patterns-` for Implementation Patterns
+    - `architecture-` for Component Architecture
+    - `state-` for State Management
+    - `patterns-` for Implementation Patterns
 3. Fill in the frontmatter and content
 4. Ensure you have clear examples with explanations
 

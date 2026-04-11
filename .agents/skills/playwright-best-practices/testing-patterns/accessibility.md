@@ -19,41 +19,39 @@ npm install -D @axe-core/playwright
 ### Basic A11y Test
 
 ```typescript
-import { test, expect } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
+import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
-test("homepage should have no a11y violations", async ({ page }) => {
-  await page.goto("/");
+test('homepage should have no a11y violations', async ({ page }) => {
+	await page.goto('/');
 
-  const results = await new AxeBuilder({ page }).analyze();
+	const results = await new AxeBuilder({ page }).analyze();
 
-  expect(results.violations).toEqual([]);
+	expect(results.violations).toEqual([]);
 });
 ```
 
 ### Scoped Analysis
 
 ```typescript
-test("form accessibility", async ({ page }) => {
-  await page.goto("/contact");
+test('form accessibility', async ({ page }) => {
+	await page.goto('/contact');
 
-  // Analyze only the form
-  const results = await new AxeBuilder({ page })
-    .include("#contact-form")
-    .analyze();
+	// Analyze only the form
+	const results = await new AxeBuilder({ page }).include('#contact-form').analyze();
 
-  expect(results.violations).toEqual([]);
+	expect(results.violations).toEqual([]);
 });
 
-test("ignore known issues", async ({ page }) => {
-  await page.goto("/legacy-page");
+test('ignore known issues', async ({ page }) => {
+	await page.goto('/legacy-page');
 
-  const results = await new AxeBuilder({ page })
-    .exclude(".legacy-widget") // Skip legacy component
-    .disableRules(["color-contrast"]) // Disable specific rule
-    .analyze();
+	const results = await new AxeBuilder({ page })
+		.exclude('.legacy-widget') // Skip legacy component
+		.disableRules(['color-contrast']) // Disable specific rule
+		.analyze();
 
-  expect(results.violations).toEqual([]);
+	expect(results.violations).toEqual([]);
 });
 ```
 
@@ -61,51 +59,44 @@ test("ignore known issues", async ({ page }) => {
 
 ```typescript
 // fixtures/a11y.fixture.ts
-import { test as base } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
+import { test as base } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 type A11yFixtures = {
-  makeAxeBuilder: () => AxeBuilder;
+	makeAxeBuilder: () => AxeBuilder;
 };
 
 export const test = base.extend<A11yFixtures>({
-  makeAxeBuilder: async ({ page }, use) => {
-    await use(() =>
-      new AxeBuilder({ page }).withTags([
-        "wcag2a",
-        "wcag2aa",
-        "wcag21a",
-        "wcag21aa",
-      ]),
-    );
-  },
+	makeAxeBuilder: async ({ page }, use) => {
+		await use(() => new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']));
+	}
 });
 
 // Usage
-test("dashboard a11y", async ({ page, makeAxeBuilder }) => {
-  await page.goto("/dashboard");
-  const results = await makeAxeBuilder().analyze();
-  expect(results.violations).toEqual([]);
+test('dashboard a11y', async ({ page, makeAxeBuilder }) => {
+	await page.goto('/dashboard');
+	const results = await makeAxeBuilder().analyze();
+	expect(results.violations).toEqual([]);
 });
 ```
 
 ### Detailed Violation Reporting
 
 ```typescript
-test("report a11y issues", async ({ page }) => {
-  await page.goto("/");
+test('report a11y issues', async ({ page }) => {
+	await page.goto('/');
 
-  const results = await new AxeBuilder({ page }).analyze();
+	const results = await new AxeBuilder({ page }).analyze();
 
-  // Custom failure message with details
-  const violations = results.violations.map((v) => ({
-    id: v.id,
-    impact: v.impact,
-    description: v.description,
-    nodes: v.nodes.map((n) => n.html),
-  }));
+	// Custom failure message with details
+	const violations = results.violations.map((v) => ({
+		id: v.id,
+		impact: v.impact,
+		description: v.description,
+		nodes: v.nodes.map((n) => n.html)
+	}));
 
-  expect(violations, JSON.stringify(violations, null, 2)).toHaveLength(0);
+	expect(violations, JSON.stringify(violations, null, 2)).toHaveLength(0);
 });
 ```
 
@@ -114,75 +105,75 @@ test("report a11y issues", async ({ page }) => {
 ### Tab Order Testing
 
 ```typescript
-test("correct tab order in form", async ({ page }) => {
-  await page.goto("/signup");
+test('correct tab order in form', async ({ page }) => {
+	await page.goto('/signup');
 
-  // Start from the beginning
-  await page.keyboard.press("Tab");
-  await expect(page.getByLabel("Email")).toBeFocused();
+	// Start from the beginning
+	await page.keyboard.press('Tab');
+	await expect(page.getByLabel('Email')).toBeFocused();
 
-  await page.keyboard.press("Tab");
-  await expect(page.getByLabel("Password")).toBeFocused();
+	await page.keyboard.press('Tab');
+	await expect(page.getByLabel('Password')).toBeFocused();
 
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Sign up" })).toBeFocused();
+	await page.keyboard.press('Tab');
+	await expect(page.getByRole('button', { name: 'Sign up' })).toBeFocused();
 });
 ```
 
 ### Keyboard-Only Interaction
 
 ```typescript
-test("complete flow with keyboard only", async ({ page }) => {
-  await page.goto("/products");
+test('complete flow with keyboard only', async ({ page }) => {
+	await page.goto('/products');
 
-  // Navigate to product with keyboard
-  await page.keyboard.press("Tab"); // Skip to main content
-  await page.keyboard.press("Tab"); // First product
-  await page.keyboard.press("Enter"); // Open product
+	// Navigate to product with keyboard
+	await page.keyboard.press('Tab'); // Skip to main content
+	await page.keyboard.press('Tab'); // First product
+	await page.keyboard.press('Enter'); // Open product
 
-  await expect(page).toHaveURL(/\/products\/\d+/);
+	await expect(page).toHaveURL(/\/products\/\d+/);
 
-  // Add to cart with keyboard
-  await page.keyboard.press("Tab");
-  await page.keyboard.press("Tab"); // Navigate to "Add to Cart"
-  await page.keyboard.press("Enter");
+	// Add to cart with keyboard
+	await page.keyboard.press('Tab');
+	await page.keyboard.press('Tab'); // Navigate to "Add to Cart"
+	await page.keyboard.press('Enter');
 
-  await expect(page.getByRole("alert")).toContainText("Added to cart");
+	await expect(page.getByRole('alert')).toContainText('Added to cart');
 });
 ```
 
 ### Skip Links
 
 ```typescript
-test("skip link works", async ({ page }) => {
-  await page.goto("/");
+test('skip link works', async ({ page }) => {
+	await page.goto('/');
 
-  await page.keyboard.press("Tab");
-  const skipLink = page.getByRole("link", { name: /skip to main/i });
-  await expect(skipLink).toBeFocused();
+	await page.keyboard.press('Tab');
+	const skipLink = page.getByRole('link', { name: /skip to main/i });
+	await expect(skipLink).toBeFocused();
 
-  await page.keyboard.press("Enter");
+	await page.keyboard.press('Enter');
 
-  // Focus should move to main content
-  await expect(page.getByRole("main")).toBeFocused();
+	// Focus should move to main content
+	await expect(page.getByRole('main')).toBeFocused();
 });
 ```
 
 ### Escape Key Handling
 
 ```typescript
-test("escape closes modal", async ({ page }) => {
-  await page.goto("/dashboard");
-  await page.getByRole("button", { name: "Settings" }).click();
+test('escape closes modal', async ({ page }) => {
+	await page.goto('/dashboard');
+	await page.getByRole('button', { name: 'Settings' }).click();
 
-  const modal = page.getByRole("dialog");
-  await expect(modal).toBeVisible();
+	const modal = page.getByRole('dialog');
+	await expect(modal).toBeVisible();
 
-  await page.keyboard.press("Escape");
+	await page.keyboard.press('Escape');
 
-  await expect(modal).toBeHidden();
-  // Focus should return to trigger
-  await expect(page.getByRole("button", { name: "Settings" })).toBeFocused();
+	await expect(modal).toBeHidden();
+	// Focus should return to trigger
+	await expect(page.getByRole('button', { name: 'Settings' })).toBeFocused();
 });
 ```
 
@@ -191,55 +182,55 @@ test("escape closes modal", async ({ page }) => {
 ### Role Verification
 
 ```typescript
-test("correct ARIA roles", async ({ page }) => {
-  await page.goto("/dashboard");
+test('correct ARIA roles', async ({ page }) => {
+	await page.goto('/dashboard');
 
-  // Verify landmark roles
-  await expect(page.getByRole("navigation")).toBeVisible();
-  await expect(page.getByRole("main")).toBeVisible();
-  await expect(page.getByRole("contentinfo")).toBeVisible(); // footer
+	// Verify landmark roles
+	await expect(page.getByRole('navigation')).toBeVisible();
+	await expect(page.getByRole('main')).toBeVisible();
+	await expect(page.getByRole('contentinfo')).toBeVisible(); // footer
 
-  // Verify interactive roles
-  await expect(page.getByRole("button", { name: "Menu" })).toBeVisible();
-  await expect(page.getByRole("search")).toBeVisible();
+	// Verify interactive roles
+	await expect(page.getByRole('button', { name: 'Menu' })).toBeVisible();
+	await expect(page.getByRole('search')).toBeVisible();
 });
 ```
 
 ### ARIA States
 
 ```typescript
-test("aria-expanded updates correctly", async ({ page }) => {
-  await page.goto("/faq");
+test('aria-expanded updates correctly', async ({ page }) => {
+	await page.goto('/faq');
 
-  const accordion = page.getByRole("button", { name: "Shipping" });
+	const accordion = page.getByRole('button', { name: 'Shipping' });
 
-  // Initially collapsed
-  await expect(accordion).toHaveAttribute("aria-expanded", "false");
+	// Initially collapsed
+	await expect(accordion).toHaveAttribute('aria-expanded', 'false');
 
-  await accordion.click();
+	await accordion.click();
 
-  // Now expanded
-  await expect(accordion).toHaveAttribute("aria-expanded", "true");
+	// Now expanded
+	await expect(accordion).toHaveAttribute('aria-expanded', 'true');
 
-  // Content is visible
-  const panel = page.getByRole("region", { name: "Shipping" });
-  await expect(panel).toBeVisible();
+	// Content is visible
+	const panel = page.getByRole('region', { name: 'Shipping' });
+	await expect(panel).toBeVisible();
 });
 ```
 
 ### Live Regions
 
 ```typescript
-test("live region announces updates", async ({ page }) => {
-  await page.goto("/checkout");
+test('live region announces updates', async ({ page }) => {
+	await page.goto('/checkout');
 
-  // Find live region
-  const liveRegion = page.locator('[aria-live="polite"]');
+	// Find live region
+	const liveRegion = page.locator('[aria-live="polite"]');
 
-  await page.getByLabel("Quantity").fill("3");
+	await page.getByLabel('Quantity').fill('3');
 
-  // Live region should update with new total
-  await expect(liveRegion).toContainText("Total: $29.97");
+	// Live region should update with new total
+	await expect(liveRegion).toContainText('Total: $29.97');
 });
 ```
 
@@ -248,41 +239,39 @@ test("live region announces updates", async ({ page }) => {
 ### Focus Trap in Modal
 
 ```typescript
-test("focus trapped in modal", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Open Modal" }).click();
+test('focus trapped in modal', async ({ page }) => {
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Open Modal' }).click();
 
-  const modal = page.getByRole("dialog");
-  await expect(modal).toBeVisible();
+	const modal = page.getByRole('dialog');
+	await expect(modal).toBeVisible();
 
-  // Get all focusable elements in modal
-  const focusableElements = modal.locator(
-    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-  );
-  const count = await focusableElements.count();
+	// Get all focusable elements in modal
+	const focusableElements = modal.locator('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+	const count = await focusableElements.count();
 
-  // Tab through all elements, should stay in modal
-  for (let i = 0; i < count + 1; i++) {
-    await page.keyboard.press("Tab");
-    const focused = page.locator(":focus");
-    await expect(modal).toContainText((await focused.textContent()) || "");
-  }
+	// Tab through all elements, should stay in modal
+	for (let i = 0; i < count + 1; i++) {
+		await page.keyboard.press('Tab');
+		const focused = page.locator(':focus');
+		await expect(modal).toContainText((await focused.textContent()) || '');
+	}
 });
 ```
 
 ### Focus Restoration
 
 ```typescript
-test("focus returns after modal close", async ({ page }) => {
-  await page.goto("/");
+test('focus returns after modal close', async ({ page }) => {
+	await page.goto('/');
 
-  const trigger = page.getByRole("button", { name: "Delete Item" });
-  await trigger.click();
+	const trigger = page.getByRole('button', { name: 'Delete Item' });
+	await trigger.click();
 
-  await page.getByRole("button", { name: "Cancel" }).click();
+	await page.getByRole('button', { name: 'Cancel' }).click();
 
-  // Focus should return to the trigger
-  await expect(trigger).toBeFocused();
+	// Focus should return to the trigger
+	await expect(trigger).toBeFocused();
 });
 ```
 
@@ -291,33 +280,31 @@ test("focus returns after modal close", async ({ page }) => {
 ### High Contrast Mode
 
 ```typescript
-test("works in high contrast mode", async ({ page }) => {
-  await page.emulateMedia({ forcedColors: "active" });
-  await page.goto("/");
+test('works in high contrast mode', async ({ page }) => {
+	await page.emulateMedia({ forcedColors: 'active' });
+	await page.goto('/');
 
-  // Verify key elements are visible
-  await expect(page.getByRole("navigation")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign In" })).toBeVisible();
+	// Verify key elements are visible
+	await expect(page.getByRole('navigation')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
 
-  // Take screenshot for visual verification
-  await expect(page).toHaveScreenshot("high-contrast.png");
+	// Take screenshot for visual verification
+	await expect(page).toHaveScreenshot('high-contrast.png');
 });
 ```
 
 ### Reduced Motion
 
 ```typescript
-test("respects reduced motion preference", async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
+test('respects reduced motion preference', async ({ page }) => {
+	await page.emulateMedia({ reducedMotion: 'reduce' });
+	await page.goto('/');
 
-  // Animations should be disabled
-  const hero = page.getByTestId("hero-animation");
-  const animation = await hero.evaluate(
-    (el) => getComputedStyle(el).animationDuration,
-  );
+	// Animations should be disabled
+	const hero = page.getByTestId('hero-animation');
+	const animation = await hero.evaluate((el) => getComputedStyle(el).animationDuration);
 
-  expect(animation).toBe("0s");
+	expect(animation).toBe('0s');
 });
 ```
 
@@ -328,13 +315,13 @@ test("respects reduced motion preference", async ({ page }) => {
 ```typescript
 // playwright.config.ts
 export default defineConfig({
-  projects: [
-    {
-      name: "a11y",
-      testMatch: /.*\.a11y\.spec\.ts/,
-      use: { ...devices["Desktop Chrome"] },
-    },
-  ],
+	projects: [
+		{
+			name: 'a11y',
+			testMatch: /.*\.a11y\.spec\.ts/,
+			use: { ...devices['Desktop Chrome'] }
+		}
+	]
 });
 ```
 

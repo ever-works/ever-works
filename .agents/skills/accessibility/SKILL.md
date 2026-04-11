@@ -3,8 +3,8 @@ name: accessibility
 description: Audit and improve web accessibility following WCAG 2.2 guidelines. Use when asked to "improve accessibility", "a11y audit", "WCAG compliance", "screen reader support", "keyboard navigation", or "make accessible".
 license: MIT
 metadata:
-  author: web-quality-skills
-  version: "1.1"
+    author: web-quality-skills
+    version: '1.1'
 ---
 
 # Accessibility (a11y)
@@ -13,20 +13,20 @@ Comprehensive accessibility guidelines based on WCAG 2.2 and Lighthouse accessib
 
 ## WCAG Principles: POUR
 
-| Principle | Description |
-|-----------|-------------|
-| **P**erceivable | Content can be perceived through different senses |
-| **O**perable | Interface can be operated by all users |
-| **U**nderstandable | Content and interface are understandable |
-| **R**obust | Content works with assistive technologies |
+| Principle          | Description                                       |
+| ------------------ | ------------------------------------------------- |
+| **P**erceivable    | Content can be perceived through different senses |
+| **O**perable       | Interface can be operated by all users            |
+| **U**nderstandable | Content and interface are understandable          |
+| **R**obust         | Content works with assistive technologies         |
 
 ## Conformance levels
 
-| Level | Requirement | Target |
-|-------|-------------|--------|
-| **A** | Minimum accessibility | Must pass |
-| **AA** | Standard compliance | Should pass (legal requirement in many jurisdictions) |
-| **AAA** | Enhanced accessibility | Nice to have |
+| Level   | Requirement            | Target                                                |
+| ------- | ---------------------- | ----------------------------------------------------- |
+| **A**   | Minimum accessibility  | Must pass                                             |
+| **AA**  | Standard compliance    | Should pass (legal requirement in many jurisdictions) |
+| **AAA** | Enhanced accessibility | Nice to have                                          |
 
 ---
 
@@ -35,99 +35,108 @@ Comprehensive accessibility guidelines based on WCAG 2.2 and Lighthouse accessib
 ### Text alternatives (1.1)
 
 **Images require alt text:**
+
 ```html
 <!-- ❌ Missing alt -->
-<img src="chart.png">
+<img src="chart.png" />
 
 <!-- ✅ Descriptive alt -->
-<img src="chart.png" alt="Bar chart showing 40% increase in Q3 sales">
+<img src="chart.png" alt="Bar chart showing 40% increase in Q3 sales" />
 
 <!-- ✅ Decorative image (empty alt) -->
-<img src="decorative-border.png" alt="" role="presentation">
+<img src="decorative-border.png" alt="" role="presentation" />
 
 <!-- ✅ Complex image with longer description -->
 <figure>
-  <img src="infographic.png" alt="2024 market trends infographic" 
-       aria-describedby="infographic-desc">
-  <figcaption id="infographic-desc">
-    <!-- Detailed description -->
-  </figcaption>
+	<img src="infographic.png" alt="2024 market trends infographic" aria-describedby="infographic-desc" />
+	<figcaption id="infographic-desc">
+		<!-- Detailed description -->
+	</figcaption>
 </figure>
 ```
 
 **Icon buttons need accessible names:**
+
 ```html
 <!-- ❌ No accessible name -->
-<button><svg><!-- menu icon --></svg></button>
+<button>
+	<svg><!-- menu icon --></svg>
+</button>
 
 <!-- ✅ Using aria-label -->
 <button aria-label="Open menu">
-  <svg aria-hidden="true"><!-- menu icon --></svg>
+	<svg aria-hidden="true"><!-- menu icon --></svg>
 </button>
 
 <!-- ✅ Using visually hidden text -->
 <button>
-  <svg aria-hidden="true"><!-- menu icon --></svg>
-  <span class="visually-hidden">Open menu</span>
+	<svg aria-hidden="true"><!-- menu icon --></svg>
+	<span class="visually-hidden">Open menu</span>
 </button>
 ```
 
 **Visually hidden class:**
+
 ```css
 .visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
 }
 ```
 
 ### Color contrast (1.4.3, 1.4.6)
 
-| Text Size | AA minimum | AAA enhanced |
-|-----------|------------|--------------|
-| Normal text (< 18px / < 14px bold) | 4.5:1 | 7:1 |
-| Large text (≥ 18px / ≥ 14px bold) | 3:1 | 4.5:1 |
-| UI components & graphics | 3:1 | 3:1 |
+| Text Size                          | AA minimum | AAA enhanced |
+| ---------------------------------- | ---------- | ------------ |
+| Normal text (< 18px / < 14px bold) | 4.5:1      | 7:1          |
+| Large text (≥ 18px / ≥ 14px bold)  | 3:1        | 4.5:1        |
+| UI components & graphics           | 3:1        | 3:1          |
 
 ```css
 /* ❌ Low contrast (2.5:1) */
 .low-contrast {
-  color: #999;
-  background: #fff;
+	color: #999;
+	background: #fff;
 }
 
 /* ✅ Sufficient contrast (7:1) */
 .high-contrast {
-  color: #333;
-  background: #fff;
+	color: #333;
+	background: #fff;
 }
 
 /* ✅ Focus states need contrast too */
 :focus-visible {
-  outline: 2px solid #005fcc;
-  outline-offset: 2px;
+	outline: 2px solid #005fcc;
+	outline-offset: 2px;
 }
 ```
 
 **Don't rely on color alone:**
+
 ```html
 <!-- ❌ Only color indicates error -->
-<input class="error-border">
-<style>.error-border { border-color: red; }</style>
+<input class="error-border" />
+<style>
+	.error-border {
+		border-color: red;
+	}
+</style>
 
 <!-- ✅ Color + icon + text -->
 <div class="field-error">
-  <input aria-invalid="true" aria-describedby="email-error">
-  <span id="email-error" class="error-message">
-    <svg aria-hidden="true"><!-- error icon --></svg>
-    Please enter a valid email address
-  </span>
+	<input aria-invalid="true" aria-describedby="email-error" />
+	<span id="email-error" class="error-message">
+		<svg aria-hidden="true"><!-- error icon --></svg>
+		Please enter a valid email address
+	</span>
 </div>
 ```
 
@@ -136,18 +145,18 @@ Comprehensive accessibility guidelines based on WCAG 2.2 and Lighthouse accessib
 ```html
 <!-- Video with captions -->
 <video controls>
-  <source src="video.mp4" type="video/mp4">
-  <track kind="captions" src="captions.vtt" srclang="en" label="English" default>
-  <track kind="descriptions" src="descriptions.vtt" srclang="en" label="Descriptions">
+	<source src="video.mp4" type="video/mp4" />
+	<track kind="captions" src="captions.vtt" srclang="en" label="English" default />
+	<track kind="descriptions" src="descriptions.vtt" srclang="en" label="Descriptions" />
 </video>
 
 <!-- Audio with transcript -->
 <audio controls>
-  <source src="podcast.mp3" type="audio/mp3">
+	<source src="podcast.mp3" type="audio/mp3" />
 </audio>
 <details>
-  <summary>Transcript</summary>
-  <p>Full transcript text...</p>
+	<summary>Transcript</summary>
+	<p>Full transcript text...</p>
 </details>
 ```
 
@@ -158,6 +167,7 @@ Comprehensive accessibility guidelines based on WCAG 2.2 and Lighthouse accessib
 ### Keyboard accessible (2.1)
 
 **All functionality must be keyboard accessible:**
+
 ```javascript
 // ❌ Only handles click
 element.addEventListener('click', handleAction);
@@ -165,10 +175,10 @@ element.addEventListener('click', handleAction);
 // ✅ Handles both click and keyboard
 element.addEventListener('click', handleAction);
 element.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault();
-    handleAction();
-  }
+	if (e.key === 'Enter' || e.key === ' ') {
+		e.preventDefault();
+		handleAction();
+	}
 });
 ```
 
@@ -178,21 +188,23 @@ element.addEventListener('keydown', (e) => {
 
 ```css
 /* ❌ Never remove focus outlines */
-*:focus { outline: none; }
+*:focus {
+	outline: none;
+}
 
 /* ✅ Use :focus-visible for keyboard-only focus */
 :focus {
-  outline: none;
+	outline: none;
 }
 
 :focus-visible {
-  outline: 2px solid #005fcc;
-  outline-offset: 2px;
+	outline: 2px solid #005fcc;
+	outline-offset: 2px;
 }
 
 /* ✅ Or custom focus styles */
 button:focus-visible {
-  box-shadow: 0 0 0 3px rgba(0, 95, 204, 0.5);
+	box-shadow: 0 0 0 3px rgba(0, 95, 204, 0.5);
 }
 ```
 
@@ -203,13 +215,13 @@ When an element receives keyboard focus, it must not be entirely hidden by other
 ```css
 /* ✅ Account for sticky headers when scrolling to focused elements */
 :target {
-  scroll-margin-top: 80px;
+	scroll-margin-top: 80px;
 }
 
 /* ✅ Ensure focused items clear fixed/sticky bars */
 :focus {
-  scroll-margin-top: 80px;
-  scroll-margin-bottom: 60px;
+	scroll-margin-top: 80px;
+	scroll-margin-bottom: 60px;
 }
 ```
 
@@ -224,20 +236,20 @@ Interactive targets must be at least **24 × 24 CSS pixels** (AA). Exceptions: i
 ```css
 /* ✅ Minimum target size */
 button,
-[role="button"],
-input[type="checkbox"] + label,
-input[type="radio"] + label {
-  min-width: 24px;
-  min-height: 24px;
+[role='button'],
+input[type='checkbox'] + label,
+input[type='radio'] + label {
+	min-width: 24px;
+	min-height: 24px;
 }
 
 /* ✅ Comfortable target size (recommended 44×44) */
 .touch-target {
-  min-width: 44px;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+	min-width: 44px;
+	min-height: 44px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 }
 ```
 
@@ -250,15 +262,15 @@ Any action that requires dragging must have a single-pointer alternative (e.g., 
 ```javascript
 // Allow users to extend time limits
 function showSessionWarning() {
-  const modal = createModal({
-    title: 'Session Expiring',
-    content: 'Your session will expire in 2 minutes.',
-    actions: [
-      { label: 'Extend session', action: extendSession },
-      { label: 'Log out', action: logout }
-    ],
-    timeout: 120000
-  });
+	const modal = createModal({
+		title: 'Session Expiring',
+		content: 'Your session will expire in 2 minutes.',
+		actions: [
+			{ label: 'Extend session', action: extendSession },
+			{ label: 'Log out', action: logout }
+		],
+		timeout: 120000
+	});
 }
 ```
 
@@ -267,14 +279,14 @@ function showSessionWarning() {
 ```css
 /* Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
 }
 ```
 
@@ -287,12 +299,12 @@ function showSessionWarning() {
 ```html
 <!-- ❌ No language specified -->
 <html>
-
-<!-- ✅ Language specified -->
-<html lang="en">
-
-<!-- ✅ Language changes within page -->
-<p>The French word for hello is <span lang="fr">bonjour</span>.</p>
+	<!-- ✅ Language specified -->
+	<html lang="en">
+		<!-- ✅ Language changes within page -->
+		<p>The French word for hello is <span lang="fr">bonjour</span>.</p>
+	</html>
+</html>
 ```
 
 ### Consistent navigation (3.2.3)
@@ -300,11 +312,11 @@ function showSessionWarning() {
 ```html
 <!-- Navigation should be consistent across pages -->
 <nav aria-label="Main">
-  <ul>
-    <li><a href="/" aria-current="page">Home</a></li>
-    <li><a href="/products">Products</a></li>
-    <li><a href="/about">About</a></li>
-  </ul>
+	<ul>
+		<li><a href="/" aria-current="page">Home</a></li>
+		<li><a href="/products">Products</a></li>
+		<li><a href="/about">About</a></li>
+	</ul>
 </nav>
 ```
 
@@ -327,25 +339,26 @@ Don't force users to re-enter information they already provided in the same sess
 ```html
 <!-- ✅ Auto-fill shipping address from billing -->
 <fieldset>
-  <legend>Shipping address</legend>
-  <label>
-    <input type="checkbox" id="same-as-billing" checked>
-    Same as billing address
-  </label>
-  <!-- Fields auto-populated when checked -->
+	<legend>Shipping address</legend>
+	<label>
+		<input type="checkbox" id="same-as-billing" checked />
+		Same as billing address
+	</label>
+	<!-- Fields auto-populated when checked -->
 </fieldset>
 ```
 
 ### Accessible authentication (3.3.8) — new in 2.2
 
 Login flows must not rely on cognitive function tests (e.g., remembering a password, solving a puzzle) unless at least one of:
+
 - A copy-paste or autofill mechanism is available
 - An alternative method exists (e.g., passkey, SSO, email link)
 - The test uses object recognition or personal content (AA only; AAA removes this exception)
 
 ```html
 <!-- ✅ Allow paste in password fields -->
-<input type="password" id="password" autocomplete="current-password">
+<input type="password" id="password" autocomplete="current-password" />
 
 <!-- ✅ Offer passwordless alternatives -->
 <button type="button">Sign in with passkey</button>
@@ -359,6 +372,7 @@ Login flows must not rely on cognitive function tests (e.g., remembering a passw
 ### ARIA usage (4.1.2)
 
 **Prefer native elements:**
+
 ```html
 <!-- ❌ ARIA role on div -->
 <div role="button" tabindex="0">Click me</div>
@@ -370,7 +384,7 @@ Login flows must not rely on cognitive function tests (e.g., remembering a passw
 <div role="checkbox" aria-checked="false">Option</div>
 
 <!-- ✅ Native checkbox -->
-<label><input type="checkbox"> Option</label>
+<label><input type="checkbox" /> Option</label>
 ```
 
 **When ARIA is needed,** use the correct roles and states. See the [ARIA tabs pattern](references/A11Y-PATTERNS.md#aria-tabs) for a complete tablist example.
@@ -384,6 +398,7 @@ Use `aria-live` regions to announce dynamic content changes without moving focus
 ## Testing checklist
 
 ### Automated testing
+
 ```bash
 # Lighthouse accessibility audit
 npx lighthouse https://example.com --only-categories=accessibility
@@ -410,6 +425,7 @@ See the [screen reader commands reference](references/A11Y-PATTERNS.md#screen-re
 ## Common issues by impact
 
 ### Critical (fix immediately)
+
 1. Missing form labels
 2. Missing image alt text
 3. Insufficient color contrast
@@ -417,6 +433,7 @@ See the [screen reader commands reference](references/A11Y-PATTERNS.md#screen-re
 5. No focus indicators
 
 ### Serious (fix before launch)
+
 1. Missing page language
 2. Missing heading structure
 3. Non-descriptive link text
@@ -424,6 +441,7 @@ See the [screen reader commands reference](references/A11Y-PATTERNS.md#screen-re
 5. Missing skip links
 
 ### Moderate (fix soon)
+
 1. Missing ARIA labels on icons
 2. Inconsistent navigation
 3. Missing error identification

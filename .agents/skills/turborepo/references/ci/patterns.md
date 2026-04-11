@@ -47,8 +47,8 @@ Best performance - shared across all CI runs and developers:
 
 ```yaml
 env:
-  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+    TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+    TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 ```
 
 ### actions/cache Fallback
@@ -58,11 +58,11 @@ When remote cache isn't available:
 ```yaml
 - uses: actions/cache@v4
   with:
-    path: .turbo
-    key: turbo-${{ runner.os }}-${{ github.sha }}
-    restore-keys: |
-      turbo-${{ runner.os }}-${{ github.ref }}-
-      turbo-${{ runner.os }}-
+      path: .turbo
+      key: turbo-${{ runner.os }}-${{ github.sha }}
+      restore-keys: |
+          turbo-${{ runner.os }}-${{ github.ref }}-
+          turbo-${{ runner.os }}-
 ```
 
 Limitations:
@@ -77,15 +77,15 @@ Test across Node versions:
 
 ```yaml
 strategy:
-  matrix:
-    node: [18, 20, 22]
+    matrix:
+        node: [18, 20, 22]
 
 steps:
-  - uses: actions/setup-node@v4
-    with:
-      node-version: ${{ matrix.node }}
+    - uses: actions/setup-node@v4
+      with:
+          node-version: ${{ matrix.node }}
 
-  - run: turbo run test
+    - run: turbo run test
 ```
 
 ## Parallelizing Across Jobs
@@ -94,21 +94,21 @@ Split tasks into separate jobs:
 
 ```yaml
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - run: turbo run lint --affected
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            - run: turbo run lint --affected
 
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - run: turbo run test --affected
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - run: turbo run test --affected
 
-  build:
-    runs-on: ubuntu-latest
-    needs: [lint, test]
-    steps:
-      - run: turbo run build
+    build:
+        runs-on: ubuntu-latest
+        needs: [lint, test]
+        steps:
+            - run: turbo run build
 ```
 
 ### Cache Considerations
@@ -122,8 +122,8 @@ When parallelizing:
 ```yaml
 - uses: actions/cache@v4
   with:
-    path: .turbo
-    key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
+      path: .turbo
+      key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
 ```
 
 ## Conditional Tasks

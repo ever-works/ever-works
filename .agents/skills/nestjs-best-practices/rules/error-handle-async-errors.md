@@ -55,70 +55,70 @@ async dailyCleanup(): Promise<void> {
 // Handle fire-and-forget with explicit catch
 @Injectable()
 export class UsersService {
-  private readonly logger = new Logger(UsersService.name);
+	private readonly logger = new Logger(UsersService.name);
 
-  async createUser(dto: CreateUserDto): Promise<User> {
-    const user = await this.repo.save(dto);
+	async createUser(dto: CreateUserDto): Promise<User> {
+		const user = await this.repo.save(dto);
 
-    // Explicitly catch and log errors
-    this.emailService.sendWelcome(user.email).catch((error) => {
-      this.logger.error('Failed to send welcome email', error.stack);
-      // Optionally queue for retry
-    });
+		// Explicitly catch and log errors
+		this.emailService.sendWelcome(user.email).catch((error) => {
+			this.logger.error('Failed to send welcome email', error.stack);
+			// Optionally queue for retry
+		});
 
-    return user;
-  }
+		return user;
+	}
 }
 
 // Properly handle async event handlers
 @Injectable()
 export class OrdersService {
-  private readonly logger = new Logger(OrdersService.name);
+	private readonly logger = new Logger(OrdersService.name);
 
-  @OnEvent('order.created')
-  async handleOrderCreated(event: OrderCreatedEvent): Promise<void> {
-    try {
-      await this.processOrder(event);
-    } catch (error) {
-      this.logger.error('Failed to process order', { event, error });
-      // Don't rethrow - would crash the process
-      await this.deadLetterQueue.add('order.created', event);
-    }
-  }
+	@OnEvent('order.created')
+	async handleOrderCreated(event: OrderCreatedEvent): Promise<void> {
+		try {
+			await this.processOrder(event);
+		} catch (error) {
+			this.logger.error('Failed to process order', { event, error });
+			// Don't rethrow - would crash the process
+			await this.deadLetterQueue.add('order.created', event);
+		}
+	}
 }
 
 // Safe scheduled tasks
 @Injectable()
 export class CleanupService {
-  private readonly logger = new Logger(CleanupService.name);
+	private readonly logger = new Logger(CleanupService.name);
 
-  @Cron('0 0 * * *')
-  async dailyCleanup(): Promise<void> {
-    try {
-      await this.cleanupService.run();
-      this.logger.log('Daily cleanup completed');
-    } catch (error) {
-      this.logger.error('Daily cleanup failed', error.stack);
-      // Alert or retry logic
-    }
-  }
+	@Cron('0 0 * * *')
+	async dailyCleanup(): Promise<void> {
+		try {
+			await this.cleanupService.run();
+			this.logger.log('Daily cleanup completed');
+		} catch (error) {
+			this.logger.error('Daily cleanup failed', error.stack);
+			// Alert or retry logic
+		}
+	}
 }
 
 // Global unhandled rejection handler in main.ts
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  const logger = new Logger('Bootstrap');
+	const app = await NestFactory.create(AppModule);
+	const logger = new Logger('Bootstrap');
 
-  process.on('unhandledRejection', (reason, promise) => {
-    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  });
+	process.on('unhandledRejection', (reason, promise) => {
+		logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+	});
 
-  process.on('uncaughtException', (error) => {
-    logger.error('Uncaught Exception:', error);
-    process.exit(1);
-  });
+	process.on('uncaughtException', (error) => {
+		logger.error('Uncaught Exception:', error);
+		process.exit(1);
+	});
 
-  await app.listen(3000);
+	await app.listen(3000);
 }
 ```
 

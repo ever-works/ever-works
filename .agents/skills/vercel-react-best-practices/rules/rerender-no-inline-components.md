@@ -17,28 +17,23 @@ A common reason developers do this is to access parent variables without passing
 
 ```tsx
 function UserProfile({ user, theme }) {
-  // Defined inside to access `theme` - BAD
-  const Avatar = () => (
-    <img
-      src={user.avatarUrl}
-      className={theme === 'dark' ? 'avatar-dark' : 'avatar-light'}
-    />
-  )
+	// Defined inside to access `theme` - BAD
+	const Avatar = () => <img src={user.avatarUrl} className={theme === 'dark' ? 'avatar-dark' : 'avatar-light'} />;
 
-  // Defined inside to access `user` - BAD
-  const Stats = () => (
-    <div>
-      <span>{user.followers} followers</span>
-      <span>{user.posts} posts</span>
-    </div>
-  )
+	// Defined inside to access `user` - BAD
+	const Stats = () => (
+		<div>
+			<span>{user.followers} followers</span>
+			<span>{user.posts} posts</span>
+		</div>
+	);
 
-  return (
-    <div>
-      <Avatar />
-      <Stats />
-    </div>
-  )
+	return (
+		<div>
+			<Avatar />
+			<Stats />
+		</div>
+	);
 }
 ```
 
@@ -48,34 +43,30 @@ Every time `UserProfile` renders, `Avatar` and `Stats` are new component types. 
 
 ```tsx
 function Avatar({ src, theme }: { src: string; theme: string }) {
-  return (
-    <img
-      src={src}
-      className={theme === 'dark' ? 'avatar-dark' : 'avatar-light'}
-    />
-  )
+	return <img src={src} className={theme === 'dark' ? 'avatar-dark' : 'avatar-light'} />;
 }
 
 function Stats({ followers, posts }: { followers: number; posts: number }) {
-  return (
-    <div>
-      <span>{followers} followers</span>
-      <span>{posts} posts</span>
-    </div>
-  )
+	return (
+		<div>
+			<span>{followers} followers</span>
+			<span>{posts} posts</span>
+		</div>
+	);
 }
 
 function UserProfile({ user, theme }) {
-  return (
-    <div>
-      <Avatar src={user.avatarUrl} theme={theme} />
-      <Stats followers={user.followers} posts={user.posts} />
-    </div>
-  )
+	return (
+		<div>
+			<Avatar src={user.avatarUrl} theme={theme} />
+			<Stats followers={user.followers} posts={user.posts} />
+		</div>
+	);
 }
 ```
 
 **Symptoms of this bug:**
+
 - Input fields lose focus on every keystroke
 - Animations restart unexpectedly
 - `useEffect` cleanup/setup runs on every parent render

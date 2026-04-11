@@ -10,11 +10,11 @@ Turbo does NOT read `.env` files. Your framework (Next.js, Vite, etc.) or `doten
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "env": ["DATABASE_URL"]
-    }
-  }
+	"tasks": {
+		"build": {
+			"env": ["DATABASE_URL"]
+		}
+	}
 }
 ```
 
@@ -22,12 +22,12 @@ Turbo does NOT read `.env` files. Your framework (Next.js, Vite, etc.) or `doten
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "env": ["DATABASE_URL"],
-      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local", ".env.production"]
-    }
-  }
+	"tasks": {
+		"build": {
+			"env": ["DATABASE_URL"],
+			"inputs": ["$TURBO_DEFAULT$", ".env", ".env.local", ".env.production"]
+		}
+	}
 }
 ```
 
@@ -41,7 +41,7 @@ In strict mode, CI provider variables (GITHUB_TOKEN, GITLAB_CI, etc.) are filter
 
 ```json
 {
-  "globalPassThroughEnv": ["GITHUB_TOKEN", "GITLAB_CI", "CI"]
+	"globalPassThroughEnv": ["GITHUB_TOKEN", "GITLAB_CI", "CI"]
 }
 ```
 
@@ -53,11 +53,11 @@ Variables in `passThroughEnv` are available at runtime but changes WON'T trigger
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "passThroughEnv": ["API_URL"]
-    }
-  }
+	"tasks": {
+		"build": {
+			"passThroughEnv": ["API_URL"]
+		}
+	}
 }
 ```
 
@@ -92,19 +92,19 @@ If you use `.env.development` and `.env.production`, both should be in inputs.
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        ".env",
-        ".env.local",
-        ".env.development",
-        ".env.development.local",
-        ".env.production",
-        ".env.production.local"
-      ]
-    }
-  }
+	"tasks": {
+		"build": {
+			"inputs": [
+				"$TURBO_DEFAULT$",
+				".env",
+				".env.local",
+				".env.development",
+				".env.development.local",
+				".env.production",
+				".env.production.local"
+			]
+		}
+	}
 }
 ```
 
@@ -112,24 +112,18 @@ If you use `.env.development` and `.env.production`, both should be in inputs.
 
 ```json
 {
-  "$schema": "https://v2-9-6.turborepo.dev/schema.json",
-  "globalEnv": ["CI", "NODE_ENV", "VERCEL"],
-  "globalPassThroughEnv": ["GITHUB_TOKEN", "VERCEL_URL"],
-  "tasks": {
-    "build": {
-      "dependsOn": ["^build"],
-      "env": ["DATABASE_URL", "NEXT_PUBLIC_*", "!NEXT_PUBLIC_ANALYTICS_ID"],
-      "passThroughEnv": ["SENTRY_AUTH_TOKEN"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        ".env",
-        ".env.local",
-        ".env.production",
-        ".env.production.local"
-      ],
-      "outputs": [".next/**", "!.next/cache/**"]
-    }
-  }
+	"$schema": "https://v2-9-6.turborepo.dev/schema.json",
+	"globalEnv": ["CI", "NODE_ENV", "VERCEL"],
+	"globalPassThroughEnv": ["GITHUB_TOKEN", "VERCEL_URL"],
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build"],
+			"env": ["DATABASE_URL", "NEXT_PUBLIC_*", "!NEXT_PUBLIC_ANALYTICS_ID"],
+			"passThroughEnv": ["SENTRY_AUTH_TOKEN"],
+			"inputs": ["$TURBO_DEFAULT$", ".env", ".env.local", ".env.production", ".env.production.local"],
+			"outputs": [".next/**", "!.next/cache/**"]
+		}
+	}
 }
 ```
 
@@ -146,21 +140,21 @@ The same config using the `global` key. The `.env` files move to `global.inputs`
 
 ```json
 {
-  "$schema": "https://v2-9-6.turborepo.dev/schema.json",
-  "futureFlags": { "globalConfiguration": true },
-  "global": {
-    "env": ["CI", "NODE_ENV", "VERCEL"],
-    "passThroughEnv": ["GITHUB_TOKEN", "VERCEL_URL"],
-    "inputs": [".env", ".env.local", ".env.production", ".env.production.local"]
-  },
-  "tasks": {
-    "build": {
-      "dependsOn": ["^build"],
-      "env": ["DATABASE_URL", "NEXT_PUBLIC_*", "!NEXT_PUBLIC_ANALYTICS_ID"],
-      "passThroughEnv": ["SENTRY_AUTH_TOKEN"],
-      "outputs": [".next/**", "!.next/cache/**"]
-    }
-  }
+	"$schema": "https://v2-9-6.turborepo.dev/schema.json",
+	"futureFlags": { "globalConfiguration": true },
+	"global": {
+		"env": ["CI", "NODE_ENV", "VERCEL"],
+		"passThroughEnv": ["GITHUB_TOKEN", "VERCEL_URL"],
+		"inputs": [".env", ".env.local", ".env.production", ".env.production.local"]
+	},
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build"],
+			"env": ["DATABASE_URL", "NEXT_PUBLIC_*", "!NEXT_PUBLIC_ANALYTICS_ID"],
+			"passThroughEnv": ["SENTRY_AUTH_TOKEN"],
+			"outputs": [".next/**", "!.next/cache/**"]
+		}
+	}
 }
 ```
 

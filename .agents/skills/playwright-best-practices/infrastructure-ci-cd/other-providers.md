@@ -190,56 +190,56 @@ pipeline {
 version: 2.1
 
 executors:
-  pw:
-    docker:
-      - image: mcr.microsoft.com/playwright:v1.48.0-noble
-    working_directory: ~/app
+    pw:
+        docker:
+            - image: mcr.microsoft.com/playwright:v1.48.0-noble
+        working_directory: ~/app
 
 jobs:
-  install:
-    executor: pw
-    steps:
-      - checkout
-      - restore_cache:
-          keys:
-            - deps-{{ checksum "package-lock.json" }}
-      - run: npm ci
-      - save_cache:
-          key: deps-{{ checksum "package-lock.json" }}
-          paths:
-            - node_modules
-      - persist_to_workspace:
-          root: .
-          paths:
-            - node_modules
+    install:
+        executor: pw
+        steps:
+            - checkout
+            - restore_cache:
+                  keys:
+                      - deps-{{ checksum "package-lock.json" }}
+            - run: npm ci
+            - save_cache:
+                  key: deps-{{ checksum "package-lock.json" }}
+                  paths:
+                      - node_modules
+            - persist_to_workspace:
+                  root: .
+                  paths:
+                      - node_modules
 
-  test:
-    executor: pw
-    parallelism: 4
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - run:
-          name: Run tests
-          command: |
-            npx playwright test --shard=$((CIRCLE_NODE_INDEX + 1))/$CIRCLE_NODE_TOTAL
-      - store_artifacts:
-          path: pw-report
-          destination: pw-report
-      - store_artifacts:
-          path: results
-          destination: results
-      - store_test_results:
-          path: results/junit.xml
+    test:
+        executor: pw
+        parallelism: 4
+        steps:
+            - checkout
+            - attach_workspace:
+                  at: .
+            - run:
+                  name: Run tests
+                  command: |
+                      npx playwright test --shard=$((CIRCLE_NODE_INDEX + 1))/$CIRCLE_NODE_TOTAL
+            - store_artifacts:
+                  path: pw-report
+                  destination: pw-report
+            - store_artifacts:
+                  path: results
+                  destination: results
+            - store_test_results:
+                  path: results/junit.xml
 
 workflows:
-  test:
-    jobs:
-      - install
-      - test:
-          requires:
+    test:
+        jobs:
             - install
+            - test:
+                  requires:
+                      - install
 ```
 
 ### Using Orbs
@@ -249,32 +249,32 @@ workflows:
 version: 2.1
 
 orbs:
-  node: circleci/node@latest
+    node: circleci/node@latest
 
 executors:
-  pw:
-    docker:
-      - image: mcr.microsoft.com/playwright:v1.48.0-noble
+    pw:
+        docker:
+            - image: mcr.microsoft.com/playwright:v1.48.0-noble
 
 jobs:
-  e2e:
-    executor: pw
-    parallelism: 4
-    steps:
-      - checkout
-      - node/install-packages
-      - run:
-          name: Run tests
-          command: npx playwright test --shard=$((CIRCLE_NODE_INDEX + 1))/$CIRCLE_NODE_TOTAL
-      - store_artifacts:
-          path: pw-report
-      - store_test_results:
-          path: results/junit.xml
+    e2e:
+        executor: pw
+        parallelism: 4
+        steps:
+            - checkout
+            - node/install-packages
+            - run:
+                  name: Run tests
+                  command: npx playwright test --shard=$((CIRCLE_NODE_INDEX + 1))/$CIRCLE_NODE_TOTAL
+            - store_artifacts:
+                  path: pw-report
+            - store_test_results:
+                  path: results/junit.xml
 
 workflows:
-  main:
-    jobs:
-      - e2e
+    main:
+        jobs:
+            - e2e
 ```
 
 ## Azure DevOps
@@ -284,61 +284,61 @@ workflows:
 ```yaml
 # azure-pipelines.yml
 trigger:
-  branches:
-    include:
-      - main
+    branches:
+        include:
+            - main
 
 pr:
-  branches:
-    include:
-      - main
+    branches:
+        include:
+            - main
 
 pool:
-  vmImage: "ubuntu-latest"
+    vmImage: 'ubuntu-latest'
 
 variables:
-  CI: "true"
-  npm_config_cache: $(Pipeline.Workspace)/.npm
+    CI: 'true'
+    npm_config_cache: $(Pipeline.Workspace)/.npm
 
 steps:
-  - task: NodeTool@0
-    inputs:
-      versionSpec: "20.x"
-    displayName: "Install Node.js"
+    - task: NodeTool@0
+      inputs:
+          versionSpec: '20.x'
+      displayName: 'Install Node.js'
 
-  - task: Cache@2
-    inputs:
-      key: 'npm | "$(Agent.OS)" | package-lock.json'
-      restoreKeys: |
-        npm | "$(Agent.OS)"
-      path: $(npm_config_cache)
-    displayName: "Cache npm"
+    - task: Cache@2
+      inputs:
+          key: 'npm | "$(Agent.OS)" | package-lock.json'
+          restoreKeys: |
+              npm | "$(Agent.OS)"
+          path: $(npm_config_cache)
+      displayName: 'Cache npm'
 
-  - script: npm ci
-    displayName: "Install dependencies"
+    - script: npm ci
+      displayName: 'Install dependencies'
 
-  - script: npx playwright install --with-deps
-    displayName: "Install browsers"
+    - script: npx playwright install --with-deps
+      displayName: 'Install browsers'
 
-  - script: npx playwright test
-    displayName: "Run tests"
+    - script: npx playwright test
+      displayName: 'Run tests'
 
-  - task: PublishTestResults@2
-    condition: always()
-    inputs:
-      testResultsFormat: "JUnit"
-      testResultsFiles: "results/junit.xml"
-      mergeTestResults: true
-      testRunTitle: "E2E Tests"
-    displayName: "Publish results"
+    - task: PublishTestResults@2
+      condition: always()
+      inputs:
+          testResultsFormat: 'JUnit'
+          testResultsFiles: 'results/junit.xml'
+          mergeTestResults: true
+          testRunTitle: 'E2E Tests'
+      displayName: 'Publish results'
 
-  - task: PublishPipelineArtifact@1
-    condition: always()
-    inputs:
-      targetPath: pw-report
-      artifact: pw-report
-      publishLocation: "pipeline"
-    displayName: "Upload report"
+    - task: PublishPipelineArtifact@1
+      condition: always()
+      inputs:
+          targetPath: pw-report
+          artifact: pw-report
+          publishLocation: 'pipeline'
+      displayName: 'Upload report'
 ```
 
 ### With Sharding
@@ -346,84 +346,84 @@ steps:
 ```yaml
 # azure-pipelines.yml
 trigger:
-  branches:
-    include:
-      - main
+    branches:
+        include:
+            - main
 
 pr:
-  branches:
-    include:
-      - main
+    branches:
+        include:
+            - main
 
 variables:
-  CI: "true"
+    CI: 'true'
 
 stages:
-  - stage: Test
-    jobs:
-      - job: E2E
-        pool:
-          vmImage: "ubuntu-latest"
-        strategy:
-          matrix:
-            shard1:
-              SHARD: "1/4"
-            shard2:
-              SHARD: "2/4"
-            shard3:
-              SHARD: "3/4"
-            shard4:
-              SHARD: "4/4"
-        steps:
-          - task: NodeTool@0
-            inputs:
-              versionSpec: "20.x"
+    - stage: Test
+      jobs:
+          - job: E2E
+            pool:
+                vmImage: 'ubuntu-latest'
+            strategy:
+                matrix:
+                    shard1:
+                        SHARD: '1/4'
+                    shard2:
+                        SHARD: '2/4'
+                    shard3:
+                        SHARD: '3/4'
+                    shard4:
+                        SHARD: '4/4'
+            steps:
+                - task: NodeTool@0
+                  inputs:
+                      versionSpec: '20.x'
 
-          - script: npm ci
-            displayName: "Install dependencies"
+                - script: npm ci
+                  displayName: 'Install dependencies'
 
-          - script: npx playwright install --with-deps
-            displayName: "Install browsers"
+                - script: npx playwright install --with-deps
+                  displayName: 'Install browsers'
 
-          - script: npx playwright test --shard=$(SHARD)
-            displayName: "Run tests (shard $(SHARD))"
+                - script: npx playwright test --shard=$(SHARD)
+                  displayName: 'Run tests (shard $(SHARD))'
 
-          - task: PublishPipelineArtifact@1
-            condition: always()
-            inputs:
-              targetPath: blob-report
-              artifact: blob-report-$(System.JobPositionInPhase)
-            displayName: "Upload blob report"
+                - task: PublishPipelineArtifact@1
+                  condition: always()
+                  inputs:
+                      targetPath: blob-report
+                      artifact: blob-report-$(System.JobPositionInPhase)
+                  displayName: 'Upload blob report'
 
-  - stage: Report
-    dependsOn: Test
-    condition: always()
-    jobs:
-      - job: MergeReports
-        pool:
-          vmImage: "ubuntu-latest"
-        steps:
-          - task: NodeTool@0
-            inputs:
-              versionSpec: "20.x"
+    - stage: Report
+      dependsOn: Test
+      condition: always()
+      jobs:
+          - job: MergeReports
+            pool:
+                vmImage: 'ubuntu-latest'
+            steps:
+                - task: NodeTool@0
+                  inputs:
+                      versionSpec: '20.x'
 
-          - script: npm ci
-            displayName: "Install dependencies"
+                - script: npm ci
+                  displayName: 'Install dependencies'
 
-          - task: DownloadPipelineArtifact@2
-            inputs:
-              patterns: "blob-report-*/**"
-              path: all-blob-reports
-            displayName: "Download blob reports"
+                - task: DownloadPipelineArtifact@2
+                  inputs:
+                      patterns: 'blob-report-*/**'
+                      path: all-blob-reports
+                  displayName: 'Download blob reports'
 
-          - script: npx playwright merge-reports --reporter=html ./all-blob-reports
-            displayName: "Merge reports"
+                - script: npx playwright merge-reports --reporter=html ./all-blob-reports
+                  displayName: 'Merge reports'
 
-          - task: PublishPipelineArtifact@1
-            inputs:
-              targetPath: pw-report
-              artifact: pw-report
-            displayName: "Upload merged report"
+                - task: PublishPipelineArtifact@1
+                  inputs:
+                      targetPath: pw-report
+                      artifact: pw-report
+                  displayName: 'Upload merged report'
 ```
 
 ## JUnit Reporter Config
@@ -432,16 +432,12 @@ All platforms benefit from JUnit output for native test result display:
 
 ```typescript
 // playwright.config.ts
-import { defineConfig } from "@playwright/test";
+import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  reporter: process.env.CI
-    ? [
-        ["dot"],
-        ["html", { open: "never" }],
-        ["junit", { outputFile: "results/junit.xml" }],
-      ]
-    : [["html", { open: "on-failure" }]],
+	reporter: process.env.CI
+		? [['dot'], ['html', { open: 'never' }], ['junit', { outputFile: 'results/junit.xml' }]]
+		: [['html', { open: 'on-failure' }]]
 });
 ```
 
@@ -481,7 +477,7 @@ Image version mismatch with `@playwright/test` version. Use `latest` tag or matc
 
 ```yaml
 docker:
-  - image: mcr.microsoft.com/playwright:v1.48.0-noble
+    - image: mcr.microsoft.com/playwright:v1.48.0-noble
 ```
 
 ### Azure DevOps: Test results not showing
@@ -496,8 +492,8 @@ reporter: [['junit', { outputFile: 'results/junit.xml' }]],
 - task: PublishTestResults@2
   condition: always()
   inputs:
-    testResultsFormat: "JUnit"
-    testResultsFiles: "results/junit.xml"
+      testResultsFormat: 'JUnit'
+      testResultsFiles: 'results/junit.xml'
 ```
 
 ### Shard index off by one

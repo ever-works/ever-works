@@ -10,11 +10,11 @@ Variables that affect a specific task's hash. When these change, only that task 
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "env": ["DATABASE_URL", "API_KEY"]
-    }
-  }
+	"tasks": {
+		"build": {
+			"env": ["DATABASE_URL", "API_KEY"]
+		}
+	}
 }
 ```
 
@@ -24,7 +24,7 @@ Variables that affect EVERY task's hash. When these change, all tasks rebuild.
 
 ```json
 {
-  "globalEnv": ["CI", "NODE_ENV"]
+	"globalEnv": ["CI", "NODE_ENV"]
 }
 ```
 
@@ -34,11 +34,11 @@ Variables available at runtime but NOT included in hash. **Use with caution** - 
 
 ```json
 {
-  "tasks": {
-    "deploy": {
-      "passThroughEnv": ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
-    }
-  }
+	"tasks": {
+		"deploy": {
+			"passThroughEnv": ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
+		}
+	}
 }
 ```
 
@@ -48,7 +48,7 @@ Same as `passThroughEnv` but for all tasks.
 
 ```json
 {
-  "globalPassThroughEnv": ["GITHUB_TOKEN"]
+	"globalPassThroughEnv": ["GITHUB_TOKEN"]
 }
 ```
 
@@ -60,7 +60,7 @@ Match multiple variables with `*`:
 
 ```json
 {
-  "env": ["MY_API_*", "FEATURE_FLAG_*"]
+	"env": ["MY_API_*", "FEATURE_FLAG_*"]
 }
 ```
 
@@ -72,7 +72,7 @@ Exclude variables (useful with framework inference):
 
 ```json
 {
-  "env": ["!NEXT_PUBLIC_ANALYTICS_ID"]
+	"env": ["!NEXT_PUBLIC_ANALYTICS_ID"]
 }
 ```
 
@@ -89,17 +89,17 @@ When the `globalConfiguration` future flag is enabled, global environment keys m
 
 ```json
 {
-  "futureFlags": { "globalConfiguration": true },
-  "global": {
-    "env": ["CI", "NODE_ENV"],
-    "passThroughEnv": ["GITHUB_TOKEN", "NPM_TOKEN"]
-  },
-  "tasks": {
-    "build": {
-      "env": ["DATABASE_URL", "API_*"],
-      "passThroughEnv": ["SENTRY_AUTH_TOKEN"]
-    }
-  }
+	"futureFlags": { "globalConfiguration": true },
+	"global": {
+		"env": ["CI", "NODE_ENV"],
+		"passThroughEnv": ["GITHUB_TOKEN", "NPM_TOKEN"]
+	},
+	"tasks": {
+		"build": {
+			"env": ["DATABASE_URL", "API_*"],
+			"passThroughEnv": ["SENTRY_AUTH_TOKEN"]
+		}
+	}
 }
 ```
 
@@ -107,17 +107,17 @@ When the `globalConfiguration` future flag is enabled, global environment keys m
 
 ```json
 {
-  "$schema": "https://v2-9-6.turborepo.dev/schema.json",
-  "globalEnv": ["CI", "NODE_ENV"],
-  "globalPassThroughEnv": ["GITHUB_TOKEN", "NPM_TOKEN"],
-  "tasks": {
-    "build": {
-      "env": ["DATABASE_URL", "API_*"],
-      "passThroughEnv": ["SENTRY_AUTH_TOKEN"]
-    },
-    "test": {
-      "env": ["TEST_DATABASE_URL"]
-    }
-  }
+	"$schema": "https://v2-9-6.turborepo.dev/schema.json",
+	"globalEnv": ["CI", "NODE_ENV"],
+	"globalPassThroughEnv": ["GITHUB_TOKEN", "NPM_TOKEN"],
+	"tasks": {
+		"build": {
+			"env": ["DATABASE_URL", "API_*"],
+			"passThroughEnv": ["SENTRY_AUTH_TOKEN"]
+		},
+		"test": {
+			"env": ["TEST_DATABASE_URL"]
+		}
+	}
 }
 ```

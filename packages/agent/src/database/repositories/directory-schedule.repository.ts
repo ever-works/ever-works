@@ -117,6 +117,7 @@ export class DirectoryScheduleRepository {
         }
 
         const originalNextRunAt = schedule.nextRunAt;
+        const dispatchedAt = new Date();
 
         const result = await this.repository
             .createQueryBuilder()
@@ -125,8 +126,8 @@ export class DirectoryScheduleRepository {
                 lastRunStatus: GenerateStatusType.GENERATING,
                 scheduledFor: originalNextRunAt,
                 nextRunAt: null,
-                lastRunAt: () => 'CURRENT_TIMESTAMP',
-                updatedAt: () => 'CURRENT_TIMESTAMP',
+                lastRunAt: dispatchedAt,
+                updatedAt: dispatchedAt,
             })
             .where('id = :id', { id: scheduleId })
             .andWhere('status = :status', { status: DirectoryScheduleStatus.ACTIVE })

@@ -55,11 +55,11 @@ Check if an env var in the `env` key changed:
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "env": ["API_URL", "NODE_ENV"]
-    }
-  }
+	"tasks": {
+		"build": {
+			"env": ["API_URL", "NODE_ENV"]
+		}
+	}
 }
 ```
 
@@ -71,11 +71,11 @@ Different `API_URL` between runs = cache miss.
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"]
-    }
-  }
+	"tasks": {
+		"build": {
+			"inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"]
+		}
+	}
 }
 ```
 
@@ -83,7 +83,7 @@ Or use `globalDependencies` for repo-wide env files:
 
 ```json
 {
-  "globalDependencies": [".env"]
+	"globalDependencies": [".env"]
 }
 ```
 
@@ -91,10 +91,10 @@ With `futureFlags.globalConfiguration`, use `global.inputs` instead. The key dif
 
 ```json
 {
-  "futureFlags": { "globalConfiguration": true },
-  "global": {
-    "inputs": [".env"]
-  }
+	"futureFlags": { "globalConfiguration": true },
+	"global": {
+		"inputs": [".env"]
+	}
 }
 ```
 
@@ -127,11 +127,11 @@ Fix: add to task config:
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "env": ["API_URL"]
-    }
-  }
+	"tasks": {
+		"build": {
+			"env": ["API_URL"]
+		}
+	}
 }
 ```
 
@@ -141,14 +141,14 @@ Task reads a file outside default inputs:
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "../../shared-config.json" // file outside package
-      ]
-    }
-  }
+	"tasks": {
+		"build": {
+			"inputs": [
+				"$TURBO_DEFAULT$",
+				"../../shared-config.json" // file outside package
+			]
+		}
+	}
 }
 ```
 

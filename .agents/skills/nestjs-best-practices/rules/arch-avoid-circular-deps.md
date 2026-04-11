@@ -1,7 +1,7 @@
 ---
 title: Avoid Circular Dependencies
 impact: CRITICAL
-impactDescription: "#1 cause of runtime crashes"
+impactDescription: '#1 cause of runtime crashes'
 tags: architecture, modules, dependencies
 ---
 
@@ -14,17 +14,17 @@ Circular dependencies occur when Module A imports Module B, and Module B imports
 ```typescript
 // users.module.ts
 @Module({
-  imports: [OrdersModule], // Orders needs Users, Users needs Orders = circular
-  providers: [UsersService],
-  exports: [UsersService],
+	imports: [OrdersModule], // Orders needs Users, Users needs Orders = circular
+	providers: [UsersService],
+	exports: [UsersService]
 })
 export class UsersModule {}
 
 // orders.module.ts
 @Module({
-  imports: [UsersModule], // Circular dependency!
-  providers: [OrdersService],
-  exports: [OrdersService],
+	imports: [UsersModule], // Circular dependency!
+	providers: [OrdersService],
+	exports: [OrdersService]
 })
 export class OrdersModule {}
 ```
@@ -35,22 +35,22 @@ export class OrdersModule {}
 // Option 1: Extract shared logic to a third module
 // shared.module.ts
 @Module({
-  providers: [SharedService],
-  exports: [SharedService],
+	providers: [SharedService],
+	exports: [SharedService]
 })
 export class SharedModule {}
 
 // users.module.ts
 @Module({
-  imports: [SharedModule],
-  providers: [UsersService],
+	imports: [SharedModule],
+	providers: [UsersService]
 })
 export class UsersModule {}
 
 // orders.module.ts
 @Module({
-  imports: [SharedModule],
-  providers: [OrdersService],
+	imports: [SharedModule],
+	providers: [OrdersService]
 })
 export class OrdersModule {}
 
@@ -58,22 +58,22 @@ export class OrdersModule {}
 // users.service.ts
 @Injectable()
 export class UsersService {
-  constructor(private eventEmitter: EventEmitter2) {}
+	constructor(private eventEmitter: EventEmitter2) {}
 
-  async createUser(data: CreateUserDto) {
-    const user = await this.userRepo.save(data);
-    this.eventEmitter.emit('user.created', user);
-    return user;
-  }
+	async createUser(data: CreateUserDto) {
+		const user = await this.userRepo.save(data);
+		this.eventEmitter.emit('user.created', user);
+		return user;
+	}
 }
 
 // orders.service.ts
 @Injectable()
 export class OrdersService {
-  @OnEvent('user.created')
-  handleUserCreated(user: User) {
-    // React to user creation without direct dependency
-  }
+	@OnEvent('user.created')
+	handleUserCreated(user: User) {
+		// React to user creation without direct dependency
+	}
 }
 ```
 

@@ -15,23 +15,23 @@ Implement liveness and readiness probes using `@nestjs/terminus`. Liveness check
 // Simple ping that doesn't check dependencies
 @Controller('health')
 export class HealthController {
-  @Get()
-  check(): string {
-    return 'OK'; // Service might be unhealthy but returns OK
-  }
+	@Get()
+	check(): string {
+		return 'OK'; // Service might be unhealthy but returns OK
+	}
 }
 
 // Health check that blocks on slow dependencies
 @Controller('health')
 export class HealthController {
-  @Get()
-  async check(): Promise<string> {
-    // If database is slow, health check times out
-    await this.userRepo.findOne({ where: { id: '1' } });
-    await this.redis.ping();
-    await this.externalApi.healthCheck();
-    return 'OK';
-  }
+	@Get()
+	async check(): Promise<string> {
+		// If database is slow, health check times out
+		await this.userRepo.findOne({ where: { id: '1' } });
+		await this.redis.ping();
+		await this.externalApi.healthCheck();
+		return 'OK';
+	}
 }
 ```
 
@@ -189,38 +189,38 @@ readiness() {
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: api-service
+    name: api-service
 spec:
-  template:
-    spec:
-      containers:
-        - name: api
-          image: api-service:latest
-          ports:
-            - containerPort: 3000
-          livenessProbe:
-            httpGet:
-              path: /health/live
-              port: 3000
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
-          readinessProbe:
-            httpGet:
-              path: /health/ready
-              port: 3000
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 3
-          startupProbe:
-            httpGet:
-              path: /health/live
-              port: 3000
-            initialDelaySeconds: 0
-            periodSeconds: 5
-            failureThreshold: 30
+    template:
+        spec:
+            containers:
+                - name: api
+                  image: api-service:latest
+                  ports:
+                      - containerPort: 3000
+                  livenessProbe:
+                      httpGet:
+                          path: /health/live
+                          port: 3000
+                      initialDelaySeconds: 30
+                      periodSeconds: 10
+                      timeoutSeconds: 5
+                      failureThreshold: 3
+                  readinessProbe:
+                      httpGet:
+                          path: /health/ready
+                          port: 3000
+                      initialDelaySeconds: 5
+                      periodSeconds: 5
+                      timeoutSeconds: 3
+                      failureThreshold: 3
+                  startupProbe:
+                      httpGet:
+                          path: /health/live
+                          port: 3000
+                      initialDelaySeconds: 0
+                      periodSeconds: 5
+                      failureThreshold: 30
 ```
 
 Reference: [NestJS Terminus](https://docs.nestjs.com/recipes/terminus)

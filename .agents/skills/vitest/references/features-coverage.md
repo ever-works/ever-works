@@ -17,41 +17,36 @@ vitest run --coverage
 ```ts
 // vitest.config.ts
 defineConfig({
-  test: {
-    coverage: {
-      // Provider: 'v8' (default, faster) or 'istanbul' (more compatible)
-      provider: 'v8',
-      
-      // Enable coverage
-      enabled: true,
-      
-      // Reporters
-      reporter: ['text', 'json', 'html'],
-      
-      // Files to include
-      include: ['src/**/*.{ts,tsx}'],
-      
-      // Files to exclude
-      exclude: [
-        'node_modules/',
-        'tests/',
-        '**/*.d.ts',
-        '**/*.test.ts',
-      ],
-      
-      // Report uncovered files
-      all: true,
-      
-      // Thresholds
-      thresholds: {
-        lines: 80,
-        functions: 80,
-        branches: 80,
-        statements: 80,
-      },
-    },
-  },
-})
+	test: {
+		coverage: {
+			// Provider: 'v8' (default, faster) or 'istanbul' (more compatible)
+			provider: 'v8',
+
+			// Enable coverage
+			enabled: true,
+
+			// Reporters
+			reporter: ['text', 'json', 'html'],
+
+			// Files to include
+			include: ['src/**/*.{ts,tsx}'],
+
+			// Files to exclude
+			exclude: ['node_modules/', 'tests/', '**/*.d.ts', '**/*.test.ts'],
+
+			// Report uncovered files
+			all: true,
+
+			// Thresholds
+			thresholds: {
+				lines: 80,
+				functions: 80,
+				branches: 80,
+				statements: 80
+			}
+		}
+	}
+});
 ```
 
 ## Providers
@@ -104,10 +99,10 @@ coverage: {
     functions: 75,
     branches: 70,
     statements: 80,
-    
+
     // Per-file thresholds
     perFile: true,
-    
+
     // Auto-update thresholds (for gradual improvement)
     autoUpdate: true,
   },
@@ -121,7 +116,7 @@ coverage: {
 ```ts
 /* v8 ignore next -- @preserve */
 function ignored() {
-  return 'not covered'
+	return 'not covered';
 }
 
 /* v8 ignore start -- @preserve */
@@ -137,7 +132,7 @@ function ignored() {}
 
 /* istanbul ignore if -- @preserve */
 if (condition) {
-  // ignored
+	// ignored
 }
 ```
 
@@ -147,11 +142,11 @@ Note: `@preserve` keeps comments through esbuild.
 
 ```json
 {
-  "scripts": {
-    "test": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "test:coverage:watch": "vitest --coverage"
-  }
+	"scripts": {
+		"test": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"test:coverage:watch": "vitest --coverage"
+	}
 }
 ```
 
@@ -178,7 +173,7 @@ Run with `vitest --ui` to view coverage visually.
 - name: Upload coverage to Codecov
   uses: codecov/codecov-action@v3
   with:
-    files: ./coverage/lcov.info
+      files: ./coverage/lcov.info
 ```
 
 ## Coverage with Sharding
@@ -201,7 +196,7 @@ vitest --merge-reports --coverage --reporter=json
 - Set thresholds to enforce minimum coverage
 - Use `@preserve` comment to keep ignore hints
 
-<!-- 
+<!--
 Source references:
 - https://vitest.dev/guide/coverage.html
 -->

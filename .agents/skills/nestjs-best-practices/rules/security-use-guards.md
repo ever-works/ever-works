@@ -15,27 +15,27 @@ Guards determine whether a request should be handled based on authentication sta
 // Manual auth checks in every handler
 @Controller('admin')
 export class AdminController {
-  @Get('users')
-  async getUsers(@Request() req) {
-    if (!req.user) {
-      throw new UnauthorizedException();
-    }
-    if (!req.user.roles.includes('admin')) {
-      throw new ForbiddenException();
-    }
-    return this.adminService.getUsers();
-  }
+	@Get('users')
+	async getUsers(@Request() req) {
+		if (!req.user) {
+			throw new UnauthorizedException();
+		}
+		if (!req.user.roles.includes('admin')) {
+			throw new ForbiddenException();
+		}
+		return this.adminService.getUsers();
+	}
 
-  @Delete('users/:id')
-  async deleteUser(@Request() req, @Param('id') id: string) {
-    if (!req.user) {
-      throw new UnauthorizedException();
-    }
-    if (!req.user.roles.includes('admin')) {
-      throw new ForbiddenException();
-    }
-    return this.adminService.deleteUser(id);
-  }
+	@Delete('users/:id')
+	async deleteUser(@Request() req, @Param('id') id: string) {
+		if (!req.user) {
+			throw new UnauthorizedException();
+		}
+		if (!req.user.roles.includes('admin')) {
+			throw new ForbiddenException();
+		}
+		return this.adminService.deleteUser(id);
+	}
 }
 ```
 
@@ -45,56 +45,56 @@ export class AdminController {
 // JWT Auth Guard
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(
-    private jwtService: JwtService,
-    private reflector: Reflector,
-  ) {}
+	constructor(
+		private jwtService: JwtService,
+		private reflector: Reflector
+	) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    // Check for @Public() decorator
-    const isPublic = this.reflector.getAllAndOverride<boolean>('isPublic', [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    if (isPublic) return true;
+	async canActivate(context: ExecutionContext): Promise<boolean> {
+		// Check for @Public() decorator
+		const isPublic = this.reflector.getAllAndOverride<boolean>('isPublic', [
+			context.getHandler(),
+			context.getClass()
+		]);
+		if (isPublic) return true;
 
-    const request = context.switchToHttp().getRequest();
-    const token = this.extractToken(request);
+		const request = context.switchToHttp().getRequest();
+		const token = this.extractToken(request);
 
-    if (!token) {
-      throw new UnauthorizedException('No token provided');
-    }
+		if (!token) {
+			throw new UnauthorizedException('No token provided');
+		}
 
-    try {
-      request.user = await this.jwtService.verifyAsync(token);
-      return true;
-    } catch {
-      throw new UnauthorizedException('Invalid token');
-    }
-  }
+		try {
+			request.user = await this.jwtService.verifyAsync(token);
+			return true;
+		} catch {
+			throw new UnauthorizedException('Invalid token');
+		}
+	}
 
-  private extractToken(request: Request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
-  }
+	private extractToken(request: Request): string | undefined {
+		const [type, token] = request.headers.authorization?.split(' ') ?? [];
+		return type === 'Bearer' ? token : undefined;
+	}
 }
 
 // Roles Guard
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+	constructor(private reflector: Reflector) {}
 
-  canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.getAllAndOverride<Role[]>('roles', [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+	canActivate(context: ExecutionContext): boolean {
+		const requiredRoles = this.reflector.getAllAndOverride<Role[]>('roles', [
+			context.getHandler(),
+			context.getClass()
+		]);
 
-    if (!requiredRoles) return true;
+		if (!requiredRoles) return true;
 
-    const { user } = context.switchToHttp().getRequest();
-    return requiredRoles.some((role) => user.roles?.includes(role));
-  }
+		const { user } = context.switchToHttp().getRequest();
+		return requiredRoles.some((role) => user.roles?.includes(role));
+	}
 }
 
 // Decorators
@@ -103,10 +103,10 @@ export const Roles = (...roles: Role[]) => SetMetadata('roles', roles);
 
 // Register guards globally
 @Module({
-  providers: [
-    { provide: APP_GUARD, useClass: JwtAuthGuard },
-    { provide: APP_GUARD, useClass: RolesGuard },
-  ],
+	providers: [
+		{ provide: APP_GUARD, useClass: JwtAuthGuard },
+		{ provide: APP_GUARD, useClass: RolesGuard }
+	]
 })
 export class AppModule {}
 
@@ -114,21 +114,21 @@ export class AppModule {}
 @Controller('admin')
 @Roles(Role.Admin) // Applied to all routes
 export class AdminController {
-  @Get('users')
-  getUsers(): Promise<User[]> {
-    return this.adminService.getUsers();
-  }
+	@Get('users')
+	getUsers(): Promise<User[]> {
+		return this.adminService.getUsers();
+	}
 
-  @Delete('users/:id')
-  deleteUser(@Param('id') id: string): Promise<void> {
-    return this.adminService.deleteUser(id);
-  }
+	@Delete('users/:id')
+	deleteUser(@Param('id') id: string): Promise<void> {
+		return this.adminService.deleteUser(id);
+	}
 
-  @Public() // Override: no auth required
-  @Get('health')
-  health() {
-    return { status: 'ok' };
-  }
+	@Public() // Override: no auth required
+	@Get('health')
+	health() {
+		return { status: 'ok' };
+	}
 }
 ```
 

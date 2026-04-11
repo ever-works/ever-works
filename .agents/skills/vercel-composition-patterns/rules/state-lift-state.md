@@ -15,29 +15,29 @@ or awkward refs.
 
 ```tsx
 function ForwardMessageComposer() {
-  const [state, setState] = useState(initialState)
-  const forwardMessage = useForwardMessage()
+	const [state, setState] = useState(initialState);
+	const forwardMessage = useForwardMessage();
 
-  return (
-    <Composer.Frame>
-      <Composer.Input />
-      <Composer.Footer />
-    </Composer.Frame>
-  )
+	return (
+		<Composer.Frame>
+			<Composer.Input />
+			<Composer.Footer />
+		</Composer.Frame>
+	);
 }
 
 // Problem: How does this button access composer state?
 function ForwardMessageDialog() {
-  return (
-    <Dialog>
-      <ForwardMessageComposer />
-      <MessagePreview /> {/* Needs composer state */}
-      <DialogActions>
-        <CancelButton />
-        <ForwardButton /> {/* Needs to call submit */}
-      </DialogActions>
-    </Dialog>
-  )
+	return (
+		<Dialog>
+			<ForwardMessageComposer />
+			<MessagePreview /> {/* Needs composer state */}
+			<DialogActions>
+				<CancelButton />
+				<ForwardButton /> {/* Needs to call submit */}
+			</DialogActions>
+		</Dialog>
+	);
 }
 ```
 
@@ -45,20 +45,20 @@ function ForwardMessageDialog() {
 
 ```tsx
 function ForwardMessageDialog() {
-  const [input, setInput] = useState('')
-  return (
-    <Dialog>
-      <ForwardMessageComposer onInputChange={setInput} />
-      <MessagePreview input={input} />
-    </Dialog>
-  )
+	const [input, setInput] = useState('');
+	return (
+		<Dialog>
+			<ForwardMessageComposer onInputChange={setInput} />
+			<MessagePreview input={input} />
+		</Dialog>
+	);
 }
 
 function ForwardMessageComposer({ onInputChange }) {
-  const [state, setState] = useState(initialState)
-  useEffect(() => {
-    onInputChange(state.input) // Sync on every change 😬
-  }, [state.input])
+	const [state, setState] = useState(initialState);
+	useEffect(() => {
+		onInputChange(state.input); // Sync on every change 😬
+	}, [state.input]);
 }
 ```
 
@@ -66,13 +66,13 @@ function ForwardMessageComposer({ onInputChange }) {
 
 ```tsx
 function ForwardMessageDialog() {
-  const stateRef = useRef(null)
-  return (
-    <Dialog>
-      <ForwardMessageComposer stateRef={stateRef} />
-      <ForwardButton onPress={() => submit(stateRef.current)} />
-    </Dialog>
-  )
+	const stateRef = useRef(null);
+	return (
+		<Dialog>
+			<ForwardMessageComposer stateRef={stateRef} />
+			<ForwardButton onPress={() => submit(stateRef.current)} />
+		</Dialog>
+	);
 }
 ```
 
@@ -80,39 +80,35 @@ function ForwardMessageDialog() {
 
 ```tsx
 function ForwardMessageProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState(initialState)
-  const forwardMessage = useForwardMessage()
-  const inputRef = useRef(null)
+	const [state, setState] = useState(initialState);
+	const forwardMessage = useForwardMessage();
+	const inputRef = useRef(null);
 
-  return (
-    <Composer.Provider
-      state={state}
-      actions={{ update: setState, submit: forwardMessage }}
-      meta={{ inputRef }}
-    >
-      {children}
-    </Composer.Provider>
-  )
+	return (
+		<Composer.Provider state={state} actions={{ update: setState, submit: forwardMessage }} meta={{ inputRef }}>
+			{children}
+		</Composer.Provider>
+	);
 }
 
 function ForwardMessageDialog() {
-  return (
-    <ForwardMessageProvider>
-      <Dialog>
-        <ForwardMessageComposer />
-        <MessagePreview /> {/* Custom components can access state and actions */}
-        <DialogActions>
-          <CancelButton />
-          <ForwardButton /> {/* Custom components can access state and actions */}
-        </DialogActions>
-      </Dialog>
-    </ForwardMessageProvider>
-  )
+	return (
+		<ForwardMessageProvider>
+			<Dialog>
+				<ForwardMessageComposer />
+				<MessagePreview /> {/* Custom components can access state and actions */}
+				<DialogActions>
+					<CancelButton />
+					<ForwardButton /> {/* Custom components can access state and actions */}
+				</DialogActions>
+			</Dialog>
+		</ForwardMessageProvider>
+	);
 }
 
 function ForwardButton() {
-  const { actions } = use(Composer.Context)
-  return <Button onPress={actions.submit}>Forward</Button>
+	const { actions } = use(Composer.Context);
+	return <Button onPress={actions.submit}>Forward</Button>;
 }
 ```
 

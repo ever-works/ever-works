@@ -23,8 +23,8 @@ These affect ALL tasks in the repo:
 
 ```json
 {
-  "globalDependencies": [".env", "tsconfig.base.json"],
-  "globalEnv": ["CI", "NODE_ENV"]
+	"globalDependencies": [".env", "tsconfig.base.json"],
+	"globalEnv": ["CI", "NODE_ENV"]
 }
 ```
 
@@ -41,13 +41,13 @@ These affect specific tasks:
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "dependsOn": ["^build"],
-      "inputs": ["src/**", "package.json", "tsconfig.json"],
-      "env": ["API_URL"]
-    }
-  }
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build"],
+			"inputs": ["src/**", "package.json", "tsconfig.json"],
+			"env": ["API_URL"]
+		}
+	}
 }
 ```
 
@@ -79,18 +79,18 @@ task cache key = hash(global hash, task hash)
 
 ```json
 {
-  "futureFlags": { "globalConfiguration": true },
-  "global": {
-    "inputs": ["tsconfig.json", ".env"]
-  },
-  "tasks": {
-    "build": {
-      "outputs": ["dist/**"]
-    },
-    "lint": {
-      "inputs": ["$TURBO_DEFAULT$", "!$TURBO_ROOT$/tsconfig.json"]
-    }
-  }
+	"futureFlags": { "globalConfiguration": true },
+	"global": {
+		"inputs": ["tsconfig.json", ".env"]
+	},
+	"tasks": {
+		"build": {
+			"outputs": ["dist/**"]
+		},
+		"lint": {
+			"inputs": ["$TURBO_DEFAULT$", "!$TURBO_ROOT$/tsconfig.json"]
+		}
+	}
 }
 ```
 
@@ -103,11 +103,11 @@ In this example, changing `tsconfig.json` invalidates `build` (it's in the task'
 
 ```json
 {
-  "tasks": {
-    "build": {
-      "outputs": ["dist/**", ".next/**"]
-    }
-  }
+	"tasks": {
+		"build": {
+			"outputs": ["dist/**", ".next/**"]
+		}
+	}
 }
 ```
 

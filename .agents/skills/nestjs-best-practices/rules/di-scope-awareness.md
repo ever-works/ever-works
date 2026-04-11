@@ -15,25 +15,25 @@ NestJS has three provider scopes: DEFAULT (singleton), REQUEST (per-request inst
 // Request-scoped when not needed (performance hit)
 @Injectable({ scope: Scope.REQUEST })
 export class UsersService {
-  // This creates a new instance for EVERY request
-  // All dependencies also become request-scoped
-  async findAll() {
-    return this.userRepo.find();
-  }
+	// This creates a new instance for EVERY request
+	// All dependencies also become request-scoped
+	async findAll() {
+		return this.userRepo.find();
+	}
 }
 
 // Singleton with mutable request state
 @Injectable() // Default: singleton
 export class RequestContextService {
-  private userId: string; // DANGER: Shared across all requests!
+	private userId: string; // DANGER: Shared across all requests!
 
-  setUser(userId: string) {
-    this.userId = userId; // Overwrites for all concurrent requests
-  }
+	setUser(userId: string) {
+		this.userId = userId; // Overwrites for all concurrent requests
+	}
 
-  getUser() {
-    return this.userId; // Returns wrong user!
-  }
+	getUser() {
+		return this.userId; // Returns wrong user!
+	}
 }
 ```
 
@@ -43,25 +43,25 @@ export class RequestContextService {
 // Singleton for stateless services (default, most common)
 @Injectable()
 export class UsersService {
-  constructor(private readonly userRepo: UserRepository) {}
+	constructor(private readonly userRepo: UserRepository) {}
 
-  async findById(id: string): Promise<User> {
-    return this.userRepo.findOne({ where: { id } });
-  }
+	async findById(id: string): Promise<User> {
+		return this.userRepo.findOne({ where: { id } });
+	}
 }
 
 // Request-scoped ONLY when you need request context
 @Injectable({ scope: Scope.REQUEST })
 export class RequestContextService {
-  private userId: string;
+	private userId: string;
 
-  setUser(userId: string) {
-    this.userId = userId;
-  }
+	setUser(userId: string) {
+		this.userId = userId;
+	}
 
-  getUser(): string {
-    return this.userId;
-  }
+	getUser(): string {
+		return this.userId;
+	}
 }
 
 // Better: Use NestJS built-in request context
@@ -70,11 +70,11 @@ import { Request } from 'express';
 
 @Injectable({ scope: Scope.REQUEST })
 export class AuditService {
-  constructor(@Inject(REQUEST) private request: Request) {}
+	constructor(@Inject(REQUEST) private request: Request) {}
 
-  log(action: string) {
-    console.log(`User ${this.request.user?.id} performed ${action}`);
-  }
+	log(action: string) {
+		console.log(`User ${this.request.user?.id} performed ${action}`);
+	}
 }
 
 // Best: Use ClsModule for async context (no scope bubble-up)
@@ -82,12 +82,12 @@ import { ClsService } from 'nestjs-cls';
 
 @Injectable() // Stays singleton!
 export class AuditService {
-  constructor(private cls: ClsService) {}
+	constructor(private cls: ClsService) {}
 
-  log(action: string) {
-    const userId = this.cls.get('userId');
-    console.log(`User ${userId} performed ${action}`);
-  }
+	log(action: string) {
+		const userId = this.cls.get('userId');
+		console.log(`User ${userId} performed ${action}`);
+	}
 }
 ```
 
