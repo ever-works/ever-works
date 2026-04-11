@@ -9,8 +9,8 @@ import {
     UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
-import { JwtAuthGuard, CurrentUser } from '../../auth';
-import { AuthenticatedUser } from '../../auth/types/jwt.types';
+import { AuthSessionGuard, CurrentUser } from '../../auth';
+import { AuthenticatedUser } from '../../auth/types/auth.types';
 import { DeployFacadeService } from '@ever-works/agent/facades';
 import { DirectoryOwnershipService } from '@ever-works/agent/services';
 import { DeployService } from './deploy.service';
@@ -24,7 +24,7 @@ import { AddDomainDto } from './dto/domain.dto';
 @ApiTags('Deploy')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/deploy')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AuthSessionGuard)
 export class DeployController {
     constructor(
         private readonly deployService: DeployService,

@@ -1,14 +1,14 @@
-export interface JwtPayload {
-    sub: string; // User ID (JWT standard)
+export interface AuthTokenPayload {
+    sub: string;
     email: string;
-    provider: string; // Registration provider
+    provider: string;
     username: string;
     emailVerified: boolean;
     isActive: boolean;
     avatar: string | null;
-    iat: number; // Issued at timestamp
-    iss: string; // Issuer
-    aud: string; // Audience
+    iat: number;
+    iss: string;
+    aud: string;
 }
 
 export interface AuthenticatedUser {
@@ -26,7 +26,6 @@ export interface AuthenticatedUser {
 
 export interface TokenResponse {
     access_token: string;
-    refresh_token: string;
     user: {
         id: string;
         email: string;

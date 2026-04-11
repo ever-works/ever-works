@@ -25,7 +25,7 @@ import type {
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
-import { OAuthTokenRepository } from '../database/repositories/oauth-token.repository';
+import { AuthAccountRepository } from '../database/repositories/auth-account.repository';
 import { FacadeError } from './base.facade';
 
 // Facade-specific types that don't require token (facade resolves token internally)
@@ -67,7 +67,7 @@ export class GitProviderNotFoundError extends GitFacadeError {
 export class NoGitCredentialsError extends GitFacadeError {
     constructor(providerId: string, userId: string) {
         super(
-            `No OAuth token found for user ${userId} with provider ${providerId}`,
+            `No connected account found for user ${userId} with provider ${providerId}`,
             'getCredentials',
             providerId,
         );
@@ -104,7 +104,7 @@ export class GitFacadeService implements IGitFacade {
 
     constructor(
         private readonly registry: PluginRegistryService,
-        private readonly oauthTokenRepository: OAuthTokenRepository,
+        private readonly authAccountRepository: AuthAccountRepository,
         private readonly settingsService: PluginSettingsService,
     ) {}
 
@@ -136,12 +136,12 @@ export class GitFacadeService implements IGitFacade {
                 options.directoryId,
             );
 
-            // Check OAuth token first
-            const oauthToken = await this.oauthTokenRepository.findByUserAndProvider(
+            // Check connected provider account first
+            const account = await this.authAccountRepository.findProviderAccount(
                 options.userId,
                 plugin.id,
             );
-            if (oauthToken && !this.oauthTokenRepository.isTokenExpired(oauthToken)) {
+            if (account && !this.authAccountRepository.isAccessTokenExpired(account)) {
                 return true;
             }
 
@@ -168,13 +168,13 @@ export class GitFacadeService implements IGitFacade {
                 options.directoryId,
             );
 
-            // Try OAuth token first
-            const oauthToken = await this.oauthTokenRepository.findByUserAndProvider(
+            // Try connected provider account first
+            const account = await this.authAccountRepository.findProviderAccount(
                 options.userId,
                 plugin.id,
             );
-            if (oauthToken && !this.oauthTokenRepository.isTokenExpired(oauthToken)) {
-                return oauthToken.accessToken;
+            if (account && !this.authAccountRepository.isAccessTokenExpired(account)) {
+                return account.accessToken || null;
             }
 
             // Try plugin settings for PAT
@@ -194,14 +194,19 @@ export class GitFacadeService implements IGitFacade {
                 options.directoryId,
             );
 
-            // Try to get committer info from OAuth token first
-            const oauthToken = await this.oauthTokenRepository.findByUserAndProvider(
+            // Try to get committer info from the connected provider account first
+            const account = await this.authAccountRepository.findProviderAccount(
                 options.userId,
                 plugin.id,
             );
-            if (oauthToken) {
-                const username = oauthToken.metadata?.login || oauthToken.username;
-                const email = oauthToken.email;
+            if (account) {
+                const username =
+                    ((account.metadata as Record<string, unknown> | null | undefined)?.login as
+                        | string
+                        | undefined) ||
+                    account.username ||
+                    undefined;
+                const email = account.email || undefined;
                 if (username && email) {
                     return { name: username, email };
                 }
@@ -743,13 +748,17 @@ export class GitFacadeService implements IGitFacade {
             );
         }
 
-        // 1. Try OAuth token first (for OAuth-based plugins like GitHub)
-        const oauthToken = await this.oauthTokenRepository.findByUserAndProvider(
+        // 1. Try the connected provider account first (for OAuth-based plugins like GitHub)
+        const account = await this.authAccountRepository.findProviderAccount(
             options.userId,
             plugin.id,
         );
-        if (oauthToken && !this.oauthTokenRepository.isTokenExpired(oauthToken)) {
-            return { plugin, token: oauthToken.accessToken };
+        if (
+            account &&
+            !this.authAccountRepository.isAccessTokenExpired(account) &&
+            account.accessToken
+        ) {
+            return { plugin, token: account.accessToken };
         }
 
         // 2. Try plugin user settings (for PAT-based plugins like GitLab)

@@ -1,17 +1,12 @@
 import { consumeStream, type UIMessage } from 'ai';
 import { runAgent } from '@/lib/ai/agent';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
-import { refreshAccessToken } from '@/lib/auth/refresh';
 import { saveConversationMessages, type MessageUsage } from '@/lib/ai/persistence';
 
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-    let token = await getAuthAccessCookie();
-    if (!token) {
-        const refreshed = await refreshAccessToken();
-        if (refreshed) token = await getAuthAccessCookie();
-    }
+    const token = await getAuthAccessCookie();
     if (!token) {
         return new Response('Unauthorized', { status: 401 });
     }

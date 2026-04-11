@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
-import { refreshAccessToken } from '@/lib/auth/refresh';
 
 async function fetchExportCsv(request: NextRequest, authToken?: string) {
     const headers = new Headers();
@@ -19,15 +18,7 @@ async function fetchExportCsv(request: NextRequest, authToken?: string) {
 
 export async function GET(request: NextRequest) {
     const token = await getAuthAccessCookie();
-    let response = await fetchExportCsv(request, token);
-
-    if (response.status === 401 && token) {
-        const refreshed = await refreshAccessToken();
-        if (refreshed) {
-            const newToken = await getAuthAccessCookie();
-            response = await fetchExportCsv(request, newToken);
-        }
-    }
+    const response = await fetchExportCsv(request, token);
 
     if (!response.ok) {
         return NextResponse.json(

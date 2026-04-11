@@ -1,50 +1,83 @@
+import { cache } from 'react';
 import { authAPI } from '../api';
+import type { UserProfile } from '../api/auth';
 import { getAuthFromRequest } from './middleware';
-import { refreshAccessToken } from './refresh';
+import type { AuthUser, JwtPayload } from './middleware';
+import { removeAuthAccessCookies } from './cookies';
 
-export async function getAuthFromCookie() {
-    const auth = await getAuthFromRequest();
-    if (!auth.isAuthenticated) {
-        return null;
-    }
-
-    if (auth.isExpired) {
-        const refreshed = await refreshAccessToken();
-        if (!refreshed) {
-            return null;
-        }
-        const freshAuth = await getAuthFromRequest();
-        return freshAuth.user || null;
-    }
-
-    return auth.user || null;
+function normalizeJwtUser(user: JwtPayload): AuthUser {
+    return {
+        id: user.sub,
+        email: user.email,
+        username: user.username,
+        emailVerified: user.emailVerified,
+        avatar: user.avatar,
+        provider: user.provider,
+        isActive: user.isActive,
+    };
 }
 
-export async function getAuthFromAPI() {
+function normalizeProfileUser(user: UserProfile): AuthUser {
+    return {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        emailVerified: user.emailVerified ?? false,
+        avatar: user.avatar ?? null,
+    };
+}
+
+const getAuthFromCookieImpl = async (): Promise<AuthUser | null> => {
     const auth = await getAuthFromRequest();
-    if (!auth.isAuthenticated) {
+    if (!auth.isAuthenticated || auth.isExpired) {
         return null;
     }
 
-    if (auth.isExpired) {
-        const refreshed = await refreshAccessToken();
-        if (!refreshed) {
-            return null;
-        }
-        // Re-verify the refreshed token is valid before making the API call
-        const freshAuth = await getAuthFromRequest();
-        if (!freshAuth.isAuthenticated || freshAuth.isExpired) {
+    if (auth.user) {
+        try {
+            const profile = await authAPI.getProfile();
+            return {
+                ...normalizeProfileUser(profile),
+                provider: auth.user.provider,
+                isActive: auth.user.isActive,
+            };
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('Unauthorized')) {
+                await removeAuthAccessCookies();
+            }
             return null;
         }
     }
 
     try {
-        return await authAPI.getFreshProfile();
+        return normalizeProfileUser(await authAPI.getProfile());
     } catch (error) {
+        if (error instanceof Error && error.message.includes('Unauthorized')) {
+            await removeAuthAccessCookies();
+        }
         return null;
     }
-}
+};
+
+const getAuthFromAPIImpl = async (): Promise<AuthUser | null> => {
+    const auth = await getAuthFromRequest();
+    if (!auth.isAuthenticated || auth.isExpired) {
+        return null;
+    }
+
+    try {
+        return normalizeProfileUser(await authAPI.getFreshProfile());
+    } catch (error) {
+        if (error instanceof Error && error.message.includes('Unauthorized')) {
+            await removeAuthAccessCookies();
+        }
+        return null;
+    }
+};
+
+export const getAuthFromCookie = cache(getAuthFromCookieImpl);
+
+export const getAuthFromAPI = cache(getAuthFromAPIImpl);
 
 export * from './middleware';
 export * from './cookies';
-export { refreshAccessToken } from './refresh';

@@ -87,7 +87,7 @@ export class ActivityLogService {
 
     async findLatestByUserDirectoryActionStatus(params: {
         userId: string;
-        directoryId?: string;
+        directoryId: string;
         actionType: ActivityActionType;
         status: ActivityStatus;
     }): Promise<ActivityLog | null> {

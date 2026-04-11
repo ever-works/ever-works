@@ -2,7 +2,6 @@ import 'server-only';
 import { API_URL, WEB_URL } from '../constants';
 import { headers } from 'next/headers';
 import { getAuthAccessCookie } from '../auth/cookies';
-import { refreshAccessToken } from '../auth/refresh';
 import { getTranslations } from 'next-intl/server';
 
 export async function handleServerError(error: unknown): Promise<never> {
@@ -65,16 +64,7 @@ export async function serverFetch<T>(
     };
 
     const token = await getAuthAccessCookie();
-    let response = await doFetch(token);
-
-    // On 401, attempt a single token refresh and retry
-    if (response.status === 401 && token) {
-        const refreshed = await refreshAccessToken();
-        if (refreshed) {
-            const newToken = await getAuthAccessCookie();
-            response = await doFetch(newToken);
-        }
-    }
+    const response = await doFetch(token);
 
     // Return raw response for streaming
     if (rawResponse) {

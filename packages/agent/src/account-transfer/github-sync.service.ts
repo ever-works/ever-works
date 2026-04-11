@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { GitFacadeService } from '../facades/git.facade';
-import { OAuthTokenRepository } from '../database/repositories/oauth-token.repository';
+import { AuthAccountRepository } from '../database/repositories/auth-account.repository';
 import { UserRepository } from '../database/repositories/user.repository';
 import { UserSyncConfigRepository } from './repositories/user-sync-config.repository';
 import { AccountExportService } from './account-export.service';
@@ -26,7 +26,7 @@ export class GitHubSyncService {
 
     constructor(
         private readonly gitFacade: GitFacadeService,
-        private readonly oauthTokenRepository: OAuthTokenRepository,
+        private readonly authAccountRepository: AuthAccountRepository,
         private readonly userRepository: UserRepository,
         private readonly syncConfigRepository: UserSyncConfigRepository,
         private readonly exportService: AccountExportService,
@@ -441,8 +441,8 @@ export class GitHubSyncService {
     }
 
     private async hasGitHubOAuth(userId: string): Promise<boolean> {
-        const token = await this.oauthTokenRepository.findByUserAndProvider(userId, PROVIDER_ID);
-        return !!token;
+        const account = await this.authAccountRepository.findProviderAccount(userId, PROVIDER_ID);
+        return !!account?.accessToken;
     }
 
     private async ensureGitHubOAuth(userId: string): Promise<void> {

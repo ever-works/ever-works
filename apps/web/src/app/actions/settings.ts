@@ -87,7 +87,7 @@ export async function updatePassword(data: { currentPassword: string; newPasswor
         currentPassword: z.string().min(1, t('currentRequired')),
         newPassword: z
             .string()
-            .min(6, tAuth('password.minLength', { length: 6 }))
+            .min(8, tAuth('password.minLength', { length: 8 }))
             .regex(/[a-z]/, tAuth('password.lowercase'))
             .regex(/(\d|\W)/, tAuth('password.numberOrSpecial'))
             .regex(/^[^.\n]/, tAuth('password.cannotStartWith')),

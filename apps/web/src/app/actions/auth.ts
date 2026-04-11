@@ -1,12 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import {
-    removeAuthAccessCookies,
-    getRefreshCookie,
-    setOAuthStateCookie,
-    setAuthCookies,
-} from '@/lib/auth';
+import { removeAuthAccessCookies, setOAuthStateCookie, setAuthCookies } from '@/lib/auth';
 import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
 import { VALIDATION_RULES } from './validation';
 import { authAPI, AuthResponse } from '@/lib/api';
@@ -44,7 +39,7 @@ export async function login(identifier: string, password: string, redirectUrl: s
             password: validation.data.password,
         });
 
-        await setAuthCookies(authResponse.access_token, authResponse.refresh_token);
+        await setAuthCookies(authResponse.access_token);
     } catch (error) {
         console.error(error);
 
@@ -86,7 +81,7 @@ export async function register(username: string, email: string, password: string
         email: z.string().email(t('email.invalid')),
         password: z
             .string()
-            .min(6, t('password.minLength', { length: 6 }))
+            .min(8, t('password.minLength', { length: 8 }))
             .regex(/[a-z]/, t('password.lowercase'))
             .regex(/(\d|\W)/, t('password.numberOrSpecial'))
             .regex(/^[^.\n]/, t('password.cannotStartWith')),
@@ -101,15 +96,17 @@ export async function register(username: string, email: string, password: string
         };
     }
 
+    let authResponse: AuthResponse | null = null;
+
     try {
-        const response = await authAPI.register({
+        authResponse = await authAPI.register({
             username: validation.data.username,
             email: validation.data.email,
             password: validation.data.password,
             emailVerificationCallbackUrl: withAppUrl(ROUTES.API_AUTH_VERIFY_EMAIL),
         });
 
-        await setAuthCookies(response.access_token, response.refresh_token);
+        await setAuthCookies(authResponse.access_token);
     } catch (error) {
         console.error(error);
 
@@ -142,10 +139,7 @@ export async function register(username: string, email: string, password: string
 
 export async function logout() {
     try {
-        const refresh_token = await getRefreshCookie();
-        if (refresh_token) {
-            await authAPI.logout({ refreshToken: refresh_token });
-        }
+        await authAPI.logout();
     } catch (error) {
         console.error(error);
     }
@@ -173,30 +167,11 @@ export async function connectProvider(providerId: OAuthProvider) {
         await setOAuthStateCookie(state);
 
         const callbackUrl = routeWithParams(ROUTES.API_OAUTH_CALLBACK, { providerId });
-
-        switch (providerId) {
-            case OAuthProvider.GITHUB: {
-                const { url } = await authAPI.getGitHubAuthUrl(withAppUrl(callbackUrl), state);
-                return {
-                    success: true,
-                    url,
-                };
-            }
-            case OAuthProvider.GOOGLE: {
-                const { url } = await authAPI.getGoogleAuthUrl(withAppUrl(callbackUrl), state);
-                return {
-                    success: true,
-                    url,
-                };
-            }
-            default: {
-                const t = await getTranslations('api.errors');
-                return {
-                    success: false,
-                    error: t('unsupportedProvider'),
-                };
-            }
-        }
+        const { url } = await authAPI.getOAuthAuthUrl(providerId, withAppUrl(callbackUrl), state);
+        return {
+            success: true,
+            url,
+        };
     } catch (error) {
         console.error(error);
         const t = await getTranslations('api.errors');
@@ -255,7 +230,7 @@ export async function resetPassword(token: string, newPassword: string) {
         token: z.string().min(1, 'Token is required'),
         password: z
             .string()
-            .min(6, t('password.minLength', { length: 6 }))
+            .min(8, t('password.minLength', { length: 8 }))
             .regex(/[a-z]/, t('password.lowercase'))
             .regex(/(\d|\W)/, t('password.numberOrSpecial'))
             .regex(/^[^.\n]/, t('password.cannotStartWith')),

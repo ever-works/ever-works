@@ -28,17 +28,19 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
     const t = useTranslations('dashboard.settings.profile');
 
     const handleResendVerification = () => {
-        startResendTransition(async () => {
-            try {
-                const result = await resendVerificationEmail();
-                if (result.success) {
-                    toast.success(t('emailVerification.sent'));
-                } else {
-                    toast.error(result.error || t('emailVerification.sendFailed'));
+        startResendTransition(() => {
+            void (async () => {
+                try {
+                    const result = await resendVerificationEmail();
+                    if (result.success) {
+                        toast.success(t('emailVerification.sent'));
+                    } else {
+                        toast.error(result.error || t('emailVerification.sendFailed'));
+                    }
+                } catch (error) {
+                    toast.error(t('emailVerification.sendFailed'));
                 }
-            } catch (error) {
-                toast.error(t('emailVerification.sendFailed'));
-            }
+            })();
         });
     };
 
@@ -48,22 +50,24 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
             return;
         }
 
-        startTransition(async () => {
-            try {
-                const result = await updateProfile({
-                    username: username.trim(),
-                    committerName: committerName.trim() || null,
-                    committerEmail: committerEmail.trim() || null,
-                });
+        startTransition(() => {
+            void (async () => {
+                try {
+                    const result = await updateProfile({
+                        username: username.trim(),
+                        committerName: committerName.trim() || null,
+                        committerEmail: committerEmail.trim() || null,
+                    });
 
-                if (result.success) {
-                    toast.success(t('messages.success'));
-                } else {
-                    toast.error(result.error || t('messages.error'));
+                    if (result.success) {
+                        toast.success(t('messages.success'));
+                    } else {
+                        toast.error(result.error || t('messages.error'));
+                    }
+                } catch (error) {
+                    toast.error(t('messages.unexpectedError'));
                 }
-            } catch (error) {
-                toast.error(t('messages.unexpectedError'));
-            }
+            })();
         });
     };
 

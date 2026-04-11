@@ -46,16 +46,6 @@ export class LoginDto {
     password: string;
 }
 
-export class RefreshTokenDto {
-    @ApiProperty({
-        description: 'Refresh token obtained from login',
-        example: 'eyJhbGciOiJIUzI1NiIs...',
-    })
-    @IsString()
-    @IsNotEmpty()
-    refreshToken: string;
-}
-
 export class UpdatePasswordDto {
     @ApiProperty({ description: 'Current password for verification', example: 'OldPassword123!' })
     @IsString()

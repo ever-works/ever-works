@@ -5,7 +5,9 @@
         "moduleResolution": "Node",
         "baseUrl": "./",
         "paths": {
-            "@src/*": ["../../packages/agent/src/*"]
+            "@src/*": ["../../packages/agent/src/*"],
+            "@ever-works/contracts": ["../../packages/contracts/dist/index.d.ts"],
+            "@ever-works/contracts/*": ["../../packages/contracts/dist/*"]
         }
     }
 }

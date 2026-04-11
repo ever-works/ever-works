@@ -19,6 +19,7 @@ import { useLocalStorage } from '@/lib/hooks/use-local-storage';
 import { Link } from '@/i18n/navigation';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { OnboardingPluginStep } from './OnboardingPluginStep';
+import { useMounted } from '@/lib/hooks/use-mounted';
 import type { UserPlugin } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 
@@ -64,6 +65,7 @@ export function EverWorksOnboardingWizard({
     oauthConnections,
 }: EverWorksOnboardingWizardProps) {
     const t = useTranslations('onboarding');
+    const mounted = useMounted();
     const [storedState, setStoredState] = useLocalStorage<OnboardingState>(
         ONBOARDING_STORAGE_KEY,
         DEFAULT_STATE,
@@ -90,7 +92,7 @@ export function EverWorksOnboardingWizard({
     const dismiss = () => setStoredState({ ...storedState, dismissed: true });
     const goNext = () => setStep(Math.min(activeStep + 1, steps.length - 1));
 
-    if (!shouldOpen) return null;
+    if (!mounted || !shouldOpen) return null;
 
     const currentStep = steps[activeStep];
     const progressPercent = Math.round(((activeStep + 1) / steps.length) * 100);

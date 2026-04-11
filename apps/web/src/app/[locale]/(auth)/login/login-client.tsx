@@ -11,6 +11,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { REDIRECT_SEARCH_PARAM, ROUTES } from '@/lib/constants';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { OAuthProvider } from '@/lib/api/enums';
+
+interface LoginClientProps {
+    availableSocialProviders: OAuthProvider[];
+}
 
 function PasswordResetSuccessMessage() {
     const t = useTranslations('auth.login');
@@ -46,7 +51,7 @@ function PasswordResetSuccessMessage() {
     );
 }
 
-export function LoginClient() {
+export function LoginClient({ availableSocialProviders }: LoginClientProps) {
     const searchParams = useSearchParams();
     const t = useTranslations('auth.login');
     const [isPending, startTransition] = useTransition();
@@ -80,19 +85,21 @@ export function LoginClient() {
         setError('');
         setShowResetSuccess(false);
 
-        startTransition(async () => {
-            const response = await loginAction(formData.email, formData.password, redirectUrl);
-            if (!response.success) {
-                setError(response.error || t('errors.invalidCredentials'));
-                return;
-            }
+        startTransition(() => {
+            void (async () => {
+                const response = await loginAction(formData.email, formData.password, redirectUrl);
+                if (!response.success) {
+                    setError(response.error || t('errors.invalidCredentials'));
+                    return;
+                }
+            })();
         });
     };
 
     return (
         <AuthLayout title={t('title')} subtitle={t('subtitle')}>
             <ThemeToggle variant="fixed" />
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form method="post" onSubmit={handleSubmit} className="space-y-4">
                 {showResetSuccess && <PasswordResetSuccessMessage />}
 
                 {error && (
@@ -158,18 +165,22 @@ export function LoginClient() {
                     {isPending ? t('form.submitting') : t('form.submit')}
                 </Button>
 
-                <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-border dark:border-border-dark" />
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                        <span className="bg-background dark:bg-background-dark px-2 text-text-muted dark:text-text-muted-dark">
-                            {t('socialLogin.divider')}
-                        </span>
-                    </div>
-                </div>
+                {availableSocialProviders.length > 0 && (
+                    <>
+                        <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-border dark:border-border-dark" />
+                            </div>
+                            <div className="relative flex justify-center text-sm">
+                                <span className="bg-background dark:bg-background-dark px-2 text-text-muted dark:text-text-muted-dark">
+                                    {t('socialLogin.divider')}
+                                </span>
+                            </div>
+                        </div>
 
-                <SocialLoginButtons />
+                        <SocialLoginButtons providers={availableSocialProviders} />
+                    </>
+                )}
 
                 <p className="text-center text-sm text-text-secondary dark:text-text-secondary-dark">
                     {t('signUp.text')}{' '}

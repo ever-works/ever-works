@@ -227,7 +227,7 @@ export default function NewDirectoryClient({
                 <div className="mb-8">
                     <button
                         onClick={() => setCreationMode(null)}
-                        className="flex items-center gap-2 text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark transition-colors mb-4"
+                        className="flex cursor-pointer items-center gap-2 text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark transition-colors mb-4"
                     >
                         <svg
                             className="w-5 h-5"

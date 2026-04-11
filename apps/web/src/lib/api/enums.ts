@@ -11,6 +11,8 @@ export {
 export enum OAuthProvider {
     GITHUB = 'github',
     GOOGLE = 'google',
+    FACEBOOK = 'facebook',
+    LINKEDIN = 'linkedin',
 }
 
 /**

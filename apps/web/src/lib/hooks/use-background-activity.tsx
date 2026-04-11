@@ -5,10 +5,6 @@ import { usePathname } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 
 interface BackgroundActivityState {
-    /** At least one directory is currently generating */
-    isGeneratingDirectory: boolean;
-    /** User has visited /directories since the last generation started */
-    hasVisitedDirectoriesPage: boolean;
     /** Show the sidebar indicator? */
     showDirectoryIndicator: boolean;
     /** Call when a generation starts (or is detected) */
@@ -50,19 +46,11 @@ export function BackgroundActivityProvider({ children }: { children: React.React
 
     const value = useMemo(
         () => ({
-            isGeneratingDirectory,
-            hasVisitedDirectoriesPage,
             showDirectoryIndicator,
             markGenerating,
             clearGenerating,
         }),
-        [
-            isGeneratingDirectory,
-            hasVisitedDirectoriesPage,
-            showDirectoryIndicator,
-            markGenerating,
-            clearGenerating,
-        ],
+        [showDirectoryIndicator, markGenerating, clearGenerating],
     );
 
     return (

@@ -6,6 +6,7 @@ import { TwentyCrmService } from './services/twenty-crm.service';
 import { CrmTenantService } from './services/crm-tenant.service';
 import { ClientService } from './services/client.service';
 import { CompaniesController } from './controllers/companies.service';
+import { AuthModule } from '@src/auth';
 
 /**
  * Twenty CRM integration module
@@ -23,6 +24,7 @@ export class TwentyCrmModule {
                     maxRedirects: 5,
                 }),
                 ConfigModule,
+                AuthModule,
             ],
             providers: [
                 CrmConfigService,
@@ -52,6 +54,7 @@ export class TwentyCrmModule {
                     maxRedirects: 5,
                 }),
                 ConfigModule,
+                AuthModule,
             ],
             providers: [
                 CrmConfigService,
