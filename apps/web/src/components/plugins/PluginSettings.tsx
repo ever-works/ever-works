@@ -53,7 +53,11 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
         }) => {
             const result = await updatePluginSettings(plugin.pluginId, data);
             if (!result.success) {
-                throw new Error(result.error);
+                const errorMessage = result.error || t('saveError');
+                if (errorMessage.includes('not installed for this user')) {
+                    return { validationError: t('enableFirstToSave') };
+                }
+                throw new Error(errorMessage);
             }
 
             const validation = (result.data as Record<string, unknown>)?.validation as
@@ -68,7 +72,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                 return { validationSuccess: validation.message };
             }
         },
-        [plugin.pluginId],
+        [plugin.pluginId, t],
     );
 
     const {

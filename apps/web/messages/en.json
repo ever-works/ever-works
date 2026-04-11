@@ -2561,6 +2561,7 @@
             "cancel": "Cancel",
             "missingRequiredFields": "Missing required fields: {fields}",
             "saveError": "Failed to save settings. Please try again.",
+            "enableFirstToSave": "Enable this plugin first, then save its settings.",
             "goToPluginSettings": "Go to plugin settings",
             "userLevelRequiredError": "User-level required settings must be configured first",
             "modelSelect": {
