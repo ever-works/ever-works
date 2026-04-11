@@ -209,6 +209,38 @@ describe('CodexPlugin', () => {
 		fs.rmSync(codexHome, { recursive: true, force: true });
 	});
 
+	it('fails API key validation when the key cannot be verified', async () => {
+		const validateApiKeySpy = vi
+			.spyOn(plugin as never, 'validateApiKey')
+			.mockResolvedValue(false as never);
+
+		const result = await plugin.validateConnection({
+			apiKey: 'sk-test',
+			model: 'codex-mini-latest'
+		});
+
+		expect(result.success).toBe(false);
+		expect(result.message).toContain('validation failed');
+
+		validateApiKeySpy.mockRestore();
+	});
+
+	it('verifies local Codex auth through the CLI validation path', async () => {
+		vi.mocked(pipelineHelpers.hasLocalCodexAuth).mockResolvedValue(true);
+		const validateCliAuthSpy = vi
+			.spyOn(plugin as never, 'validateCliAuth')
+			.mockResolvedValue(true as never);
+
+		const result = await plugin.validateConnection({
+			model: 'codex-mini-latest'
+		});
+
+		expect(result.success).toBe(true);
+		expect(result.message).toContain('Local Codex CLI auth verified');
+
+		validateCliAuthSpy.mockRestore();
+	});
+
 	describe('execute', () => {
 		it('returns a successful normalized PipelineResult', async () => {
 			await plugin.onLoad(createMockContext());
@@ -250,6 +282,27 @@ describe('CodexPlugin', () => {
 			expect(result.failedStep).toBe('generate-items');
 			expect(plugin.getState()?.steps.get('generate-items')?.status).toBe('failed');
 			expect(workspaceManager.cleanupWorkspace).toHaveBeenCalledWith('user1', 'dir1');
+		});
+
+		it('translates stdin-interactive Codex failures into a clearer auth message', async () => {
+			vi.mocked(processRunner.executeCodex).mockReturnValueOnce({
+				promise: Promise.resolve({
+					stdout: '',
+					stderr: 'Reading additional input from stdin...',
+					exitCode: 1,
+					killed: false,
+					duration: 1000
+				}),
+				kill: vi.fn()
+			});
+
+			await plugin.onLoad(createMockContext());
+
+			const result = await plugin.execute(directory, request, existing);
+
+			expect(result.success).toBe(false);
+			expect(String(result.error)).toContain('interactive input');
+			expect(String(result.error)).toContain('codex login');
 		});
 
 		it('executes using local auth mode when resolved settings use CODEX_HOME', async () => {

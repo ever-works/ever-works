@@ -27,6 +27,7 @@ import { buildSuccessPipelineResult, lucideIcon } from '@ever-works/plugin';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import * as https from 'https';
 
 import type { CodexStepId } from './types.js';
 import { DEFAULT_MODEL } from './types.js';
@@ -257,7 +258,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	async healthCheck(): Promise<PluginHealthCheck> {
 		return {
 			status: 'healthy',
-			message: 'Codex Generator plugin scaffold is loaded',
+			message: 'Codex Generator plugin is ready',
 			checkedAt: Date.now()
 		};
 	}
@@ -278,6 +279,18 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 	async listModels(): Promise<readonly AiModel[]> {
 		return CODEX_SUPPORTED_MODELS;
+	}
+
+	async isAvailable(settings?: Record<string, unknown>): Promise<boolean> {
+		const resolved = settings || {};
+		const apiKey = typeof resolved.apiKey === 'string' ? resolved.apiKey.trim() : '';
+		const model = typeof resolved.model === 'string' ? resolved.model : DEFAULT_MODEL;
+
+		if (apiKey) {
+			return this.validateApiKey(apiKey, model);
+		}
+
+		return this.validateCliAuth(resolved);
 	}
 
 	getStepDefinitions(): readonly PipelineStepDefinition<CodexStepId>[] {
@@ -324,18 +337,27 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
 		const apiKey = typeof settings.apiKey === 'string' ? settings.apiKey.trim() : '';
+		const model = typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL;
 		if (apiKey) {
-			return {
-				success: true,
-				message: 'Codex API key is configured'
-			};
+			const valid = await this.validateApiKey(apiKey, model);
+			return valid
+				? { success: true, message: 'OpenAI API key verified for Codex.' }
+				: {
+						success: false,
+						message:
+							'OpenAI API key validation failed. Verify the key, model access, and billing, or use local `codex login`.'
+					};
 		}
 
 		if (await hasLocalCodexAuth(settings)) {
-			return {
-				success: true,
-				message: 'Local Codex CLI auth is available'
-			};
+			const valid = await this.validateCliAuth(settings);
+			return valid
+				? { success: true, message: 'Local Codex CLI auth verified.' }
+				: {
+						success: false,
+						message:
+							'Local Codex CLI auth could not be verified. Re-run `codex login` or provide an OpenAI API key.'
+					};
 		}
 
 		return {
@@ -648,13 +670,90 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	private extractErrorDetail(result: ExecuteResult): string {
-		if (result.stderr?.trim()) {
-			return result.stderr.trim().split('\n')[0].slice(0, LOG_MESSAGE_MAX_LENGTH);
+		const stderr = result.stderr?.trim();
+		const stdout = result.stdout?.trim();
+		const combined = [stderr, stdout].filter(Boolean).join('\n');
+
+		if (combined.includes('Reading additional input from stdin')) {
+			return 'Codex requested interactive input. Your API key may be invalid, missing model/billing access, or you may need to run `codex login`.';
 		}
-		if (result.stdout?.trim()) {
-			return result.stdout.trim().split('\n')[0].slice(0, LOG_MESSAGE_MAX_LENGTH);
+
+		if (stderr) {
+			return stderr.split('\n')[0].slice(0, LOG_MESSAGE_MAX_LENGTH);
+		}
+		if (stdout) {
+			return stdout.split('\n')[0].slice(0, LOG_MESSAGE_MAX_LENGTH);
 		}
 		return `exit code ${result.exitCode}`;
+	}
+
+	private async validateApiKey(apiKey: string, model: string): Promise<boolean> {
+		const payload = JSON.stringify({
+			model,
+			input: 'Reply with OK.',
+			max_output_tokens: 8
+		});
+
+		return new Promise<boolean>((resolve) => {
+			const request = https.request(
+				'https://api.openai.com/v1/responses',
+				{
+					method: 'POST',
+					headers: {
+						'content-type': 'application/json',
+						'content-length': Buffer.byteLength(payload),
+						authorization: `Bearer ${apiKey}`
+					}
+				},
+				(response) => {
+					response.resume();
+					resolve((response.statusCode || 500) < 400);
+				}
+			);
+
+			request.setTimeout(10_000, () => {
+				request.destroy();
+				resolve(false);
+			});
+			request.on('error', () => resolve(false));
+			request.write(payload);
+			request.end();
+		});
+	}
+
+	private async validateCliAuth(settings: Record<string, unknown>): Promise<boolean> {
+		const executionAuth = await resolveExecutionAuth(settings);
+		if (!executionAuth || executionAuth.mode !== 'local') {
+			return false;
+		}
+
+		const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-validate-'));
+		const abortController = new AbortController();
+		const timeout = setTimeout(() => abortController.abort(), 12_000);
+
+		try {
+			const { promise, kill } = executeCodex({
+				command: 'codex',
+				cwd: workspacePath,
+				env: executionAuth.env,
+				model: typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL,
+				bypassApprovalsAndSandbox: settings.unsafeBypassSandbox === true,
+				prompt:
+					'Reply with exactly OK and do not read from stdin, ask follow-up questions, or modify files.',
+				signal: abortController.signal
+			});
+
+			abortController.signal.addEventListener('abort', kill, { once: true });
+
+			const result = await promise;
+			const detail = this.extractErrorDetail(result);
+			return result.exitCode === 0 && !detail.includes('interactive input');
+		} catch {
+			return false;
+		} finally {
+			clearTimeout(timeout);
+			fs.rmSync(workspacePath, { recursive: true, force: true });
+		}
 	}
 
 	private handleError(error: Error, startTime: number): PipelineResult {
