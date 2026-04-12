@@ -353,7 +353,8 @@ describe('CodexPlugin', () => {
 			vi.mocked(processRunner.executeCodex)
 				.mockReturnValueOnce({
 					promise: Promise.resolve({
-						stdout: 'If the sandbox issue is resolved, I can write the full JSON files immediately.',
+						stdout:
+							'If you want the fastest recovery path, re-run this task in a session where local file tools are working and I can write the JSON files directly. If needed, I can also paste the full 12 ready-to-save JSON objects in the next reply.',
 						stderr: 'tokens used',
 						exitCode: 0,
 						killed: false,

@@ -21,6 +21,95 @@ interface Logger {
 
 const WRITE_CONCURRENCY = 64;
 
+function stripMarkdownCodeFence(content: string): string {
+	const fencedMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/iu);
+	return fencedMatch?.[1]?.trim() || content;
+}
+
+function extractWrappedItem(data: unknown): Record<string, unknown> | null {
+	if (!data || typeof data !== 'object') {
+		return null;
+	}
+
+	const record = data as Record<string, unknown>;
+	if (typeof record.name === 'string' || typeof record.description === 'string') {
+		return record;
+	}
+
+	for (const key of ['item', 'data', 'result']) {
+		const nested = record[key];
+		if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+			return nested as Record<string, unknown>;
+		}
+	}
+
+	return record;
+}
+
+function findValidNestedItem(data: unknown, depth = 0): Record<string, unknown> | null {
+	if (!data || typeof data !== 'object' || depth > 4) {
+		return null;
+	}
+
+	const record = data as Record<string, unknown>;
+	if (validateRequiredItemFields(record)) {
+		return record;
+	}
+
+	for (const value of Object.values(record)) {
+		if (value && typeof value === 'object' && !Array.isArray(value)) {
+			const nested = findValidNestedItem(value, depth + 1);
+			if (nested) {
+				return nested;
+			}
+		}
+	}
+
+	return null;
+}
+
+function coerceToItemRecord(data: Record<string, unknown>): Record<string, unknown> {
+	if (validateRequiredItemFields(data)) {
+		return data;
+	}
+
+	const nested = findValidNestedItem(data);
+	if (nested) {
+		return nested;
+	}
+
+	return data;
+}
+
+function parseWorkspaceItemContent(content: string): Record<string, unknown> {
+	const candidates = [content, stripMarkdownCodeFence(content)];
+
+	for (const candidate of candidates) {
+		try {
+			return extractWrappedItem(JSON.parse(candidate)) ?? {};
+		} catch {
+			// keep trying
+		}
+
+		try {
+			return extractWrappedItem(JSON.parse(jsonrepair(candidate))) ?? {};
+		} catch {
+			// keep trying
+		}
+	}
+
+	const objectMatch = stripMarkdownCodeFence(content).match(/\{[\s\S]*\}/u);
+	if (objectMatch) {
+		try {
+			return extractWrappedItem(JSON.parse(jsonrepair(objectMatch[0]))) ?? {};
+		} catch {
+			// fall through
+		}
+	}
+
+	throw new Error('invalid JSON');
+}
+
 function deduplicateSlug(slug: string, existingSlugs: Set<string>): string {
 	if (!existingSlugs.has(slug)) {
 		return slug;
@@ -152,22 +241,15 @@ export async function readGeneratedItems(workspacePath: string, logger?: Logger)
 					}
 				}
 
-				let data: unknown;
-				try {
-					data = JSON.parse(content);
-				} catch {
-					const repaired = jsonrepair(content);
-					data = JSON.parse(repaired);
-					logger?.warn(`Repaired malformed JSON in ${fileName}`);
-				}
+				const data = coerceToItemRecord(parseWorkspaceItemContent(content));
 
-				if (!validateRequiredItemFields(data as Record<string, unknown>)) {
+				if (!validateRequiredItemFields(data)) {
 					logger?.warn(`Skipping ${fileName}: missing required fields`);
 					return null;
 				}
 
-				normalizeItemTags(data as Record<string, unknown>);
-				return data as ItemData;
+				normalizeItemTags(data);
+				return data as unknown as ItemData;
 			} catch (error) {
 				logger?.warn(`Skipping ${fileName}: ${error instanceof Error ? error.message : 'invalid JSON'}`);
 				return null;

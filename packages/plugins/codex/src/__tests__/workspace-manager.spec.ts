@@ -128,6 +128,41 @@ describe('workspace-manager', () => {
 		expect(items[0].description).toBe('Updated item');
 	});
 
+	it('parses fenced or wrapped JSON item files', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-workspace-fenced-'));
+		cleanupPaths.push(tempRoot);
+		await fs.mkdir(path.join(tempRoot, '_meta'), { recursive: true });
+
+		await fs.writeFile(
+			path.join(tempRoot, 'wrapped-item.json'),
+			[
+				'Here is the final item:',
+				'```json',
+				JSON.stringify(
+					{
+						item: {
+							name: 'Wrapped Item',
+							description: 'Recovered from fenced JSON',
+							source_url: 'https://example.com/wrapped',
+							category: 'Testing',
+							tags: ['wrapped']
+						}
+					},
+					null,
+					2
+				),
+				'```'
+			].join('\n'),
+			'utf-8'
+		);
+
+		const items = await readGeneratedItems(tempRoot, { warn: () => {} });
+
+		expect(items).toHaveLength(1);
+		expect(items[0].name).toBe('Wrapped Item');
+		expect(items[0].source_url).toBe('https://example.com/wrapped');
+	});
+
 	it('describes visible workspace outputs', async () => {
 		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-workspace-outputs-'));
 		cleanupPaths.push(tempRoot);
