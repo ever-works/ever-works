@@ -336,6 +336,60 @@ describe('CodexPlugin', () => {
 			expect(result.outputs.items[0].name).toBe('Recovered Item');
 		});
 
+		it('retries once with sandbox bypass when Codex reports file writes were blocked', async () => {
+			const recoverySpy = vi.spyOn(plugin as never, 'recoverItemsFromStructuredOutput').mockResolvedValue([] as never);
+			vi.mocked(workspaceManager.readGeneratedItems)
+				.mockResolvedValueOnce([])
+				.mockResolvedValueOnce([
+					{
+						name: 'Bypass Item',
+						description: 'Created after bypass retry',
+						source_url: 'https://example.com/bypass',
+						category: 'Testing',
+						tags: ['test']
+					}
+				] as never);
+
+			vi.mocked(processRunner.executeCodex)
+				.mockReturnValueOnce({
+					promise: Promise.resolve({
+						stdout: 'If the sandbox issue is resolved, I can write the full JSON files immediately.',
+						stderr: 'tokens used',
+						exitCode: 0,
+						killed: false,
+						duration: 1000
+					}),
+					kill: vi.fn()
+				})
+				.mockReturnValueOnce({
+					promise: Promise.resolve({
+						stdout: 'Files written',
+						stderr: '',
+						exitCode: 0,
+						killed: false,
+						duration: 1000
+					}),
+					kill: vi.fn()
+				});
+
+			await plugin.onLoad(createMockContext());
+
+			await plugin.execute(directory, request, existing);
+
+			expect(processRunner.executeCodex).toHaveBeenNthCalledWith(
+				2,
+				expect.objectContaining({
+					bypassApprovalsAndSandbox: true
+				})
+			);
+			expect(recoverySpy).toHaveBeenCalledWith(
+				expect.objectContaining({
+					preferBypass: true
+				})
+			);
+			recoverySpy.mockRestore();
+		});
+
 		it('translates stdin-interactive Codex failures into a clearer auth message', async () => {
 			vi.mocked(processRunner.executeCodex).mockReturnValueOnce({
 				promise: Promise.resolve({

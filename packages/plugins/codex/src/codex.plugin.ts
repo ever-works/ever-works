@@ -480,36 +480,16 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			reportProgress(onProgress, 2, 30, 'Generate Items');
 
 			const prompt = this.buildExecutionPrompt(directory, request, existing, workspacePath);
-			const { promise, kill } = executeCodex({
-				command: 'codex',
-				cwd: workspacePath,
-				env: executionAuth.env,
+			let executionResult = await this.runCodexPrompt({
+				workspacePath,
+				executionAuthEnv: executionAuth.env,
 				model: typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL,
 				bypassApprovalsAndSandbox: settings.unsafeBypassSandbox === true,
 				prompt,
 				signal,
-				onStdoutLine: (line) => {
-					this.emitCodexLog({
-						onLogEntry,
-						stepId: 'generate-items',
-						event: 'message',
-						level: 'info',
-						message: line
-					});
-				},
-				onStderrLine: (line) => {
-					this.emitCodexLog({
-						onLogEntry,
-						stepId: 'generate-items',
-						event: 'message',
-						level: 'warn',
-						message: line
-					});
-				}
+				onLogEntry,
+				stepId: 'generate-items'
 			});
-			this.killProcess = kill;
-			const executionResult = await promise;
-			this.killProcess = null;
 
 			if (signal.aborted || executionResult.killed) {
 				return this.handleCancel(startTime);
@@ -528,6 +508,41 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			let items = await readGeneratedItems(workspacePath, logger);
 			const requestedTargetItems = Number(request.config?.target_items ?? DEFAULT_TARGET_ITEMS);
 			if (items.length === 0 && (requestedTargetItems > 0 || existing.items.length === 0)) {
+				const shouldRetryWithBypass =
+					settings.unsafeBypassSandbox !== true && this.detectSandboxWriteBlock(executionResult);
+
+				if (shouldRetryWithBypass) {
+					this.emitCodexLog({
+						onLogEntry,
+						stepId: 'generate-items',
+						event: 'message',
+						level: 'warn',
+						message: 'Codex reported sandboxed file-write blockage; retrying once with sandbox bypass'
+					});
+
+					executionResult = await this.runCodexPrompt({
+						workspacePath,
+						executionAuthEnv: executionAuth.env,
+						model: typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL,
+						bypassApprovalsAndSandbox: true,
+						prompt,
+						signal,
+						onLogEntry,
+						stepId: 'generate-items',
+						logPrefix: '[retry:bypass] '
+					});
+
+					if (signal.aborted || executionResult.killed) {
+						return this.handleCancel(startTime);
+					}
+
+					if (executionResult.exitCode !== 0) {
+						throw new Error(this.extractErrorDetail(executionResult));
+					}
+
+					items = await readGeneratedItems(workspacePath, logger);
+				}
+
 				const recoveredItems = await this.recoverItemsFromStructuredOutput({
 					directory,
 					request,
@@ -535,6 +550,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 					workspacePath,
 					settings,
 					executionAuthEnv: executionAuth.env,
+					preferBypass: shouldRetryWithBypass,
 					onLogEntry,
 					signal
 				});
@@ -647,6 +663,61 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		return [buildSystemPrompt(promptOptions), '', buildUserPrompt(promptOptions)].join('\n');
 	}
 
+	private async runCodexPrompt({
+		workspacePath,
+		executionAuthEnv,
+		model,
+		bypassApprovalsAndSandbox,
+		prompt,
+		signal,
+		onLogEntry,
+		stepId,
+		logPrefix = ''
+	}: {
+		readonly workspacePath: string;
+		readonly executionAuthEnv: Record<string, string>;
+		readonly model: string;
+		readonly bypassApprovalsAndSandbox: boolean;
+		readonly prompt: string;
+		readonly signal: AbortSignal;
+		readonly onLogEntry?: PipelineExecutionOptions['onLogEntry'];
+		readonly stepId: CodexStepId;
+		readonly logPrefix?: string;
+	}): Promise<ExecuteResult> {
+		const { promise, kill } = executeCodex({
+			command: 'codex',
+			cwd: workspacePath,
+			env: executionAuthEnv,
+			model,
+			bypassApprovalsAndSandbox,
+			prompt,
+			signal,
+			onStdoutLine: (line) => {
+				this.emitCodexLog({
+					onLogEntry,
+					stepId,
+					event: 'message',
+					level: 'info',
+					message: `${logPrefix}${line}`
+				});
+			},
+			onStderrLine: (line) => {
+				this.emitCodexLog({
+					onLogEntry,
+					stepId,
+					event: 'message',
+					level: 'warn',
+					message: `${logPrefix}${line}`
+				});
+			}
+		});
+
+		this.killProcess = kill;
+		const result = await promise;
+		this.killProcess = null;
+		return result;
+	}
+
 	private async recoverItemsFromStructuredOutput({
 		directory,
 		request,
@@ -654,6 +725,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		workspacePath,
 		settings,
 		executionAuthEnv,
+		preferBypass,
 		onLogEntry,
 		signal
 	}: {
@@ -663,6 +735,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		readonly workspacePath: string;
 		readonly settings: Record<string, unknown>;
 		readonly executionAuthEnv: Record<string, string>;
+		readonly preferBypass: boolean;
 		readonly onLogEntry?: PipelineExecutionOptions['onLogEntry'];
 		readonly signal: AbortSignal;
 	}): Promise<ExistingItems['items']> {
@@ -686,7 +759,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			cwd: workspacePath,
 			env: executionAuthEnv,
 			model: typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL,
-			bypassApprovalsAndSandbox: settings.unsafeBypassSandbox === true,
+			bypassApprovalsAndSandbox: settings.unsafeBypassSandbox === true || preferBypass,
 			outputSchemaPath: recoverySchemaPath,
 			outputLastMessagePath: recoveryOutputPath,
 			prompt: recoveryPrompt,
@@ -774,6 +847,22 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			.join('\n');
 
 		return contextParts;
+	}
+
+	private detectSandboxWriteBlock(result: ExecuteResult): boolean {
+		const combined = [result.stderr, result.stdout]
+			.filter(Boolean)
+			.join('\n')
+			.toLowerCase();
+
+		return (
+			combined.includes('sandbox issue') ||
+			combined.includes('sandboxed file-write blockage') ||
+			combined.includes('file writes were blocked') ||
+			combined.includes('local file writes were blocked') ||
+			combined.includes('write the full json files immediately') ||
+			combined.includes('insufficient to finish the task because local file writes were blocked')
+		);
 	}
 
 	private normalizeRecoveredItem(item: unknown, logger: { warn(message: string): void }): ItemData | null {
