@@ -55,6 +55,13 @@ Do NOT edit files inside \`_meta/\`. Use them only as reference data.
 6. Avoid duplicates with existing items unless the request is explicitly about modifying them.
 7. File names should be clean slugs like \`my-tool.json\`.
 
+## Completion Requirements
+- Do not stop after research only. The task is complete only when valid item \`.json\` files exist in the workspace root.
+- Do not return only a textual summary in Codex output. Your primary deliverable is the set of item files.
+- Before finishing, verify that at least one new or updated item \`.json\` file exists in the workspace root.
+- If you research candidates but cannot confidently create any valid items, explicitly continue researching rather than exiting early with zero files.
+- Never write final items into \`_meta/\`, nested folders, markdown files, or plain text notes.
+
 ## Quality Rules
 - Descriptions must be factual, concise, and useful, not marketing copy.
 - Tags should be specific and helpful for filtering.
@@ -110,6 +117,7 @@ export const DEFAULT_USER_PROMPT = `{userInstruction}
 {directoryDescription}
 
 Follow the workspace rules from the system prompt. Research thoroughly, write each final item as a JSON file in the workspace root, and preserve consistency with the existing taxonomy when it fits.
+Do not finish with zero output files. Before completing the task, verify that valid item JSON files exist in the workspace root.
 
 Target: generate approximately {targetItems} new items.`;
 

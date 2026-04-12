@@ -54,6 +54,7 @@ describe('codex prompts', () => {
 		expect(prompt).toContain('Item JSON Schema');
 		expect(prompt).toContain('"source_url": "string (required)');
 		expect(prompt).toContain('Aim to generate approximately **25** new items');
+		expect(prompt).toContain('The task is complete only when valid item `.json` files exist');
 	});
 
 	it('builds user prompt variables and prompt text', () => {
@@ -65,5 +66,6 @@ describe('codex prompts', () => {
 		expect(vars.targetItems).toBe('25');
 		expect(prompt).toContain('Generate tools for AI engineering teams');
 		expect(prompt).toContain('Target: generate approximately 25 new items.');
+		expect(prompt).toContain('Do not finish with zero output files.');
 	});
 });

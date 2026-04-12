@@ -210,9 +210,7 @@ describe('CodexPlugin', () => {
 	});
 
 	it('fails API key validation when the key cannot be verified', async () => {
-		const validateApiKeySpy = vi
-			.spyOn(plugin as never, 'validateApiKey')
-			.mockResolvedValue(false as never);
+		const validateApiKeySpy = vi.spyOn(plugin as never, 'validateApiKey').mockResolvedValue(false as never);
 
 		const result = await plugin.validateConnection({
 			apiKey: 'sk-test',
@@ -227,9 +225,7 @@ describe('CodexPlugin', () => {
 
 	it('verifies local Codex auth through the CLI validation path', async () => {
 		vi.mocked(pipelineHelpers.hasLocalCodexAuth).mockResolvedValue(true);
-		const validateCliAuthSpy = vi
-			.spyOn(plugin as never, 'validateCliAuth')
-			.mockResolvedValue(true as never);
+		const validateCliAuthSpy = vi.spyOn(plugin as never, 'validateCliAuth').mockResolvedValue(true as never);
 
 		const result = await plugin.validateConnection({
 			model: 'codex-mini-latest'
@@ -286,6 +282,16 @@ describe('CodexPlugin', () => {
 
 		it('fails when Codex finishes without producing any valid item JSON files', async () => {
 			vi.mocked(workspaceManager.readGeneratedItems).mockResolvedValueOnce([]);
+			vi.mocked(processRunner.executeCodex).mockReturnValueOnce({
+				promise: Promise.resolve({
+					stdout: 'Research complete\nNo files created',
+					stderr: '',
+					exitCode: 0,
+					killed: false,
+					duration: 1000
+				}),
+				kill: vi.fn()
+			});
 			vi.mocked(workspaceManager.createWorkspace).mockResolvedValueOnce('/tmp/codex-generator/user1/dir1');
 			vi.mocked(workspaceManager.cleanupWorkspace).mockResolvedValue(undefined);
 
@@ -296,6 +302,7 @@ describe('CodexPlugin', () => {
 			expect(result.success).toBe(false);
 			expect(String(result.error)).toContain('without producing any valid item JSON files');
 			expect(String(result.error)).toContain('Visible workspace entries');
+			expect(String(result.error)).toContain('Codex output excerpt');
 		});
 
 		it('translates stdin-interactive Codex failures into a clearer auth message', async () => {

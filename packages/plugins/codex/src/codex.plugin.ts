@@ -495,8 +495,16 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				const workspaceOutputs = await describeWorkspaceOutputs(workspacePath);
 				const outputSummary =
 					workspaceOutputs.length > 0 ? workspaceOutputs.join(', ') : 'no visible files created';
+				const stderrExcerpt = executionResult.stderr?.trim().split('\n').filter(Boolean).slice(-2).join(' | ');
+				const stdoutExcerpt = executionResult.stdout?.trim().split('\n').filter(Boolean).slice(-2).join(' | ');
+				const cliSummaryParts = [
+					stderrExcerpt ? `stderr: ${stderrExcerpt}` : '',
+					stdoutExcerpt ? `stdout: ${stdoutExcerpt}` : ''
+				].filter(Boolean);
+				const cliSummary =
+					cliSummaryParts.length > 0 ? ` Codex output excerpt: ${cliSummaryParts.join(' ; ')}.` : '';
 				throw new Error(
-					`Codex completed without producing any valid item JSON files in the workspace root. Visible workspace entries: ${outputSummary}.`
+					`Codex completed without producing any valid item JSON files in the workspace root. Visible workspace entries: ${outputSummary}.${cliSummary}`
 				);
 			}
 			const metadata = collectMetadataFromItems(items);
@@ -759,8 +767,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				env: executionAuth.env,
 				model: typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL,
 				bypassApprovalsAndSandbox: settings.unsafeBypassSandbox === true,
-				prompt:
-					'Reply with exactly OK and do not read from stdin, ask follow-up questions, or modify files.',
+				prompt: 'Reply with exactly OK and do not read from stdin, ask follow-up questions, or modify files.',
 				signal: abortController.signal
 			});
 
