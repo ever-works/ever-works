@@ -855,6 +855,21 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			.join('\n')
 			.toLowerCase();
 
+		const mentionsSandbox = combined.includes('sandbox');
+		const mentionsWriteBlock =
+			combined.includes('write the json files directly') ||
+			combined.includes('write the full json files immediately') ||
+			combined.includes('ready-to-save json') ||
+			combined.includes('paste the full') ||
+			combined.includes('next reply') ||
+			combined.includes('local file tools are working') ||
+			combined.includes('local execution tools') ||
+			combined.includes('permission error') ||
+			combined.includes('permission denied') ||
+			combined.includes('could not actually create or verify') ||
+			combined.includes('could not complete') ||
+			combined.includes('write the researched json files directly');
+
 		return (
 			combined.includes('sandbox issue') ||
 			combined.includes('sandboxed file-write blockage') ||
@@ -867,7 +882,8 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			combined.includes('paste the full') ||
 			combined.includes('next reply') ||
 			combined.includes('re-run this task in a session where local file tools are working') ||
-			combined.includes('insufficient to finish the task because local file writes were blocked')
+			combined.includes('insufficient to finish the task because local file writes were blocked') ||
+			(mentionsSandbox && mentionsWriteBlock)
 		);
 	}
 
