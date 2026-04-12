@@ -45,6 +45,7 @@ import {
 	cleanupWorkspace,
 	collectMetadataFromItems,
 	createWorkspace,
+	describeWorkspaceOutputs,
 	readGeneratedItems,
 	seedExistingItems,
 	seedMetadata
@@ -63,6 +64,17 @@ import {
 } from './utils/pipeline-helpers.js';
 
 const CODEX_SUPPORTED_MODELS: readonly AiModel[] = [
+	{
+		id: 'gpt-5.4',
+		name: 'GPT-5.4',
+		capabilities: {
+			supportsStructuredOutput: true,
+			supportsStreaming: true,
+			supportsToolCalling: true,
+			supportsVision: true,
+			maxContextLength: 400000
+		}
+	},
 	{
 		id: 'codex-mini-latest',
 		name: 'Codex Mini Latest',
@@ -478,6 +490,15 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			reportProgress(onProgress, 3, 85, 'Collect Results');
 
 			const items = await readGeneratedItems(workspacePath, logger);
+			const requestedTargetItems = Number(request.config?.target_items ?? DEFAULT_TARGET_ITEMS);
+			if (items.length === 0 && (requestedTargetItems > 0 || existing.items.length === 0)) {
+				const workspaceOutputs = await describeWorkspaceOutputs(workspacePath);
+				const outputSummary =
+					workspaceOutputs.length > 0 ? workspaceOutputs.join(', ') : 'no visible files created';
+				throw new Error(
+					`Codex completed without producing any valid item JSON files in the workspace root. Visible workspace entries: ${outputSummary}.`
+				);
+			}
 			const metadata = collectMetadataFromItems(items);
 			this.completeStep('collect-results', collectStartedAt, onLogEntry);
 

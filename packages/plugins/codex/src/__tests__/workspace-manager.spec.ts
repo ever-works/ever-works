@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
 	createWorkspace,
+	describeWorkspaceOutputs,
 	getWorkspacePath,
 	readGeneratedItems,
 	seedExistingItems,
@@ -125,5 +126,17 @@ describe('workspace-manager', () => {
 
 		expect(items).toHaveLength(1);
 		expect(items[0].description).toBe('Updated item');
+	});
+
+	it('describes visible workspace outputs', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-workspace-outputs-'));
+		cleanupPaths.push(tempRoot);
+		await fs.mkdir(path.join(tempRoot, '_meta'), { recursive: true });
+		await fs.writeFile(path.join(tempRoot, 'alpha.json'), '{}', 'utf-8');
+		await fs.mkdir(path.join(tempRoot, 'notes'), { recursive: true });
+
+		const outputs = await describeWorkspaceOutputs(tempRoot);
+
+		expect(outputs).toEqual(['_meta/', 'alpha.json', 'notes/']);
 	});
 });

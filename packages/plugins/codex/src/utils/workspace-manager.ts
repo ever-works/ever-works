@@ -178,6 +178,18 @@ export async function readGeneratedItems(workspacePath: string, logger?: Logger)
 	return results.filter((item): item is ItemData => item !== null);
 }
 
+export async function describeWorkspaceOutputs(workspacePath: string): Promise<string[]> {
+	try {
+		const dirEntries = await fs.readdir(workspacePath, { withFileTypes: true });
+		return dirEntries
+			.filter((entry) => !entry.name.startsWith('.'))
+			.map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name))
+			.sort();
+	} catch {
+		return [];
+	}
+}
+
 export async function ensureOnboardingConfig(_configDir: string): Promise<void> {}
 
 export async function cleanupWorkspace(userId: string, directoryId: string): Promise<void> {

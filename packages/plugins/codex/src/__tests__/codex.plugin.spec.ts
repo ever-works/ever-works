@@ -284,6 +284,20 @@ describe('CodexPlugin', () => {
 			expect(workspaceManager.cleanupWorkspace).toHaveBeenCalledWith('user1', 'dir1');
 		});
 
+		it('fails when Codex finishes without producing any valid item JSON files', async () => {
+			vi.mocked(workspaceManager.readGeneratedItems).mockResolvedValueOnce([]);
+			vi.mocked(workspaceManager.createWorkspace).mockResolvedValueOnce('/tmp/codex-generator/user1/dir1');
+			vi.mocked(workspaceManager.cleanupWorkspace).mockResolvedValue(undefined);
+
+			await plugin.onLoad(createMockContext());
+
+			const result = await plugin.execute(directory, request, existing);
+
+			expect(result.success).toBe(false);
+			expect(String(result.error)).toContain('without producing any valid item JSON files');
+			expect(String(result.error)).toContain('Visible workspace entries');
+		});
+
 		it('translates stdin-interactive Codex failures into a clearer auth message', async () => {
 			vi.mocked(processRunner.executeCodex).mockReturnValueOnce({
 				promise: Promise.resolve({

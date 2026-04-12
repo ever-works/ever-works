@@ -20,4 +20,4 @@ export function isCodexStepId(value: string): value is CodexStepId {
 }
 
 export const BASE_TEMP_DIR = '/tmp/codex-generator';
-export const DEFAULT_MODEL = 'codex-mini-latest';
+export const DEFAULT_MODEL = 'gpt-5.4';
