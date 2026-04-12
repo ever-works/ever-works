@@ -337,7 +337,9 @@ describe('CodexPlugin', () => {
 		});
 
 		it('retries once with sandbox bypass when Codex reports file writes were blocked', async () => {
-			const recoverySpy = vi.spyOn(plugin as never, 'recoverItemsFromStructuredOutput').mockResolvedValue([] as never);
+			const recoverySpy = vi
+				.spyOn(plugin as never, 'recoverItemsFromStructuredOutput')
+				.mockResolvedValue([] as never);
 			vi.mocked(workspaceManager.readGeneratedItems)
 				.mockResolvedValueOnce([])
 				.mockResolvedValueOnce([
@@ -353,8 +355,7 @@ describe('CodexPlugin', () => {
 			vi.mocked(processRunner.executeCodex)
 				.mockReturnValueOnce({
 					promise: Promise.resolve({
-						stdout:
-							'If you want the fastest recovery path, re-run this task in a session where local file tools are working and I can write the JSON files directly. If needed, I can also paste the full 12 ready-to-save JSON objects in the next reply.',
+						stdout: 'If you want the fastest recovery path, re-run this task in a session where local file tools are working and I can write the JSON files directly. If needed, I can also paste the full 12 ready-to-save JSON objects in the next reply.',
 						stderr: 'tokens used',
 						exitCode: 0,
 						killed: false,

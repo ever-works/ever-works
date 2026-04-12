@@ -1346,7 +1346,9 @@ Only include image URLs that are absolute URLs (starting with http).`;
                     dto.website_repository_creation_method,
                 );
             } catch (error) {
-                if (this.isNonFatalWebsiteGenerationError(error, newItemsCount, updatedItemsCount)) {
+                if (
+                    this.isNonFatalWebsiteGenerationError(error, newItemsCount, updatedItemsCount)
+                ) {
                     const warning = `Website repository setup skipped: ${normalizeGeneratorError(error)}`;
                     acc.warnings = [...(acc.warnings || []), warning];
                     this.logger.warn(warning);

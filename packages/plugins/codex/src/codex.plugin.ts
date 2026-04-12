@@ -564,8 +564,18 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 					const workspaceOutputs = await describeWorkspaceOutputs(workspacePath);
 					const outputSummary =
 						workspaceOutputs.length > 0 ? workspaceOutputs.join(', ') : 'no visible files created';
-					const stderrExcerpt = executionResult.stderr?.trim().split('\n').filter(Boolean).slice(-2).join(' | ');
-					const stdoutExcerpt = executionResult.stdout?.trim().split('\n').filter(Boolean).slice(-2).join(' | ');
+					const stderrExcerpt = executionResult.stderr
+						?.trim()
+						.split('\n')
+						.filter(Boolean)
+						.slice(-2)
+						.join(' | ');
+					const stdoutExcerpt = executionResult.stdout
+						?.trim()
+						.split('\n')
+						.filter(Boolean)
+						.slice(-2)
+						.join(' | ');
 					const cliSummaryParts = [
 						stderrExcerpt ? `stderr: ${stderrExcerpt}` : '',
 						stdoutExcerpt ? `stdout: ${stdoutExcerpt}` : ''
@@ -850,10 +860,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	private detectSandboxWriteBlock(result: ExecuteResult): boolean {
-		const combined = [result.stderr, result.stdout]
-			.filter(Boolean)
-			.join('\n')
-			.toLowerCase();
+		const combined = [result.stderr, result.stdout].filter(Boolean).join('\n').toLowerCase();
 
 		const mentionsSandbox = combined.includes('sandbox');
 		const mentionsWriteBlock =
