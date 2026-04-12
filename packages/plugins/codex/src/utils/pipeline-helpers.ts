@@ -137,7 +137,35 @@ export async function hasLocalCodexAuth(settings: PluginSettings): Promise<boole
 }
 
 export async function resolveExecutionAuth(settings: PluginSettings): Promise<ResolvedExecutionAuth | null> {
+	const authMode = typeof settings.authMode === 'string' ? settings.authMode : undefined;
 	const apiKey = typeof settings.apiKey === 'string' ? settings.apiKey.trim() : '';
+
+	if (authMode === 'api-key') {
+		if (!apiKey) {
+			return null;
+		}
+
+		return {
+			mode: 'api-key',
+			env: { OPENAI_API_KEY: apiKey }
+		};
+	}
+
+	if (authMode === 'local') {
+		if (!(await hasLocalCodexAuth(settings))) {
+			return null;
+		}
+
+		const codexHome = resolveCodexHome(settings);
+		return {
+			mode: 'local',
+			codexHome,
+			env: {
+				CODEX_HOME: codexHome
+			}
+		};
+	}
+
 	if (apiKey) {
 		return {
 			mode: 'api-key',

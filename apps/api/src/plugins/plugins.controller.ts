@@ -10,6 +10,7 @@ import {
     UseGuards,
     HttpCode,
     HttpStatus,
+    BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard, CurrentUser } from '../auth';
@@ -32,6 +33,7 @@ import {
 import { PluginValidationService } from './plugin-validation.service';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
+import { CodexLocalAuthService, type CodexLocalAuthStatus } from './codex-local-auth.service';
 
 @ApiTags('Plugins')
 @ApiBearerAuth('JWT-auth')
@@ -43,6 +45,7 @@ export class PluginsController {
         private readonly ownershipService: DirectoryOwnershipService,
         private readonly pluginValidationService: PluginValidationService,
         private readonly activityLogService: ActivityLogService,
+        private readonly codexLocalAuthService: CodexLocalAuthService,
     ) {}
 
     // ============================================
@@ -252,6 +255,40 @@ export class PluginsController {
         return this.pluginValidationService.validateUserPluginConnection(pluginId, auth.userId);
     }
 
+    @Get('plugins/:pluginId/local-auth-status')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get local auth status for a plugin',
+        description:
+            'Returns machine-local authentication status for plugins that support local CLI auth.',
+    })
+    @ApiParam({ name: 'pluginId', description: 'Plugin ID' })
+    @ApiResponse({ status: 200, description: 'Local auth status' })
+    async getLocalAuthStatus(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('pluginId') pluginId: string,
+    ): Promise<CodexLocalAuthStatus> {
+        this.ensureCodexPlugin(pluginId);
+        return this.codexLocalAuthService.getStatus(auth.userId);
+    }
+
+    @Post('plugins/:pluginId/start-local-auth')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Start local auth for a plugin',
+        description:
+            'Starts a machine-local CLI device-auth flow for plugins that support local authentication.',
+    })
+    @ApiParam({ name: 'pluginId', description: 'Plugin ID' })
+    @ApiResponse({ status: 200, description: 'Local auth session started' })
+    async startLocalAuth(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('pluginId') pluginId: string,
+    ): Promise<CodexLocalAuthStatus> {
+        this.ensureCodexPlugin(pluginId);
+        return this.codexLocalAuthService.startDeviceAuth(auth.userId);
+    }
+
     // ============================================
     // Directory Plugin Management
     // ============================================
@@ -274,6 +311,12 @@ export class PluginsController {
     ): Promise<DirectoryPluginListResponseDto> {
         await this.ownershipService.ensureCanView(directoryId, auth.userId);
         return this.pluginsService.listDirectoryPlugins(directoryId, auth.userId);
+    }
+
+    private ensureCodexPlugin(pluginId: string): void {
+        if (pluginId !== 'codex') {
+            throw new BadRequestException(`Local auth is not supported for plugin "${pluginId}".`);
+        }
     }
 
     @Post('directories/:directoryId/plugins/:pluginId/enable')

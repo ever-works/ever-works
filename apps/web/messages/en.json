@@ -279,7 +279,26 @@
                 },
                 "credentials": {
                     "title": "Add credentials",
-                    "description": "Paste your OpenAI API key. If you already authenticated locally with `codex login`, you can also leave the API key empty and use local Codex CLI auth."
+                    "description": "Choose whether Codex should use an OpenAI API key or the machine-local Codex CLI login.",
+                    "api": {
+                        "title": "OpenAI API key",
+                        "description": "Use a standard OpenAI API key for Codex requests."
+                    },
+                    "local": {
+                        "title": "Local Codex login",
+                        "description": "Reuse the Codex CLI session on the machine running Ever Works.",
+                        "machineTitle": "Machine-local Codex authentication",
+                        "machineDescription": "This checks `codex login status` and the local Codex auth file on the machine running the backend.",
+                        "connected": "Connected",
+                        "pending": "Pending",
+                        "connectButton": "Connect local Codex",
+                        "retryButton": "Open login again",
+                        "connectedButton": "Connected on this machine",
+                        "notInstalled": "Codex CLI is not installed on this machine.",
+                        "codeLabel": "Device code",
+                        "pathLabel": "Auth file: {path}",
+                        "error": "Failed to read local Codex authentication status."
+                    }
                 },
                 "verify": {
                     "title": "Verify connection",

@@ -34,6 +34,27 @@ describe('pipeline-helpers', () => {
 		});
 	});
 
+	it('honors explicit local auth mode even when an api key exists', async () => {
+		const codexHome = await makeTempDir();
+		await fs.writeFile(path.join(codexHome, 'auth.json'), '{"ok":true}', 'utf-8');
+
+		const auth = await resolveExecutionAuth({
+			authMode: 'local',
+			apiKey: 'sk-test',
+			codexHome
+		});
+
+		expect(auth).toEqual({
+			mode: 'local',
+			codexHome,
+			env: { CODEX_HOME: codexHome }
+		});
+	});
+
+	it('requires an api key when api-key mode is selected explicitly', async () => {
+		expect(await resolveExecutionAuth({ authMode: 'api-key' })).toBeNull();
+	});
+
 	it('detects local Codex auth from auth.json', async () => {
 		const codexHome = await makeTempDir();
 		await fs.writeFile(path.join(codexHome, 'auth.json'), '{"ok":true}', 'utf-8');

@@ -259,6 +259,15 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {
+			authMode: {
+				type: 'string',
+				title: 'Authentication Mode',
+				description: 'Choose whether Codex uses an OpenAI API key or local Codex CLI auth.',
+				enum: ['api-key', 'local'],
+				default: 'api-key',
+				'x-scope': 'user',
+				'x-hidden': true
+			},
 			apiKey: {
 				type: 'string',
 				title: 'API Key',
@@ -331,8 +340,17 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 	async isAvailable(settings?: Record<string, unknown>): Promise<boolean> {
 		const resolved = settings || {};
+		const authMode = typeof resolved.authMode === 'string' ? resolved.authMode : undefined;
 		const apiKey = typeof resolved.apiKey === 'string' ? resolved.apiKey.trim() : '';
 		const model = typeof resolved.model === 'string' ? resolved.model : DEFAULT_MODEL;
+
+		if (authMode === 'api-key') {
+			return apiKey ? this.validateApiKey(apiKey, model) : false;
+		}
+
+		if (authMode === 'local') {
+			return this.validateCliAuth(resolved);
+		}
 
 		if (apiKey) {
 			return this.validateApiKey(apiKey, model);
@@ -362,6 +380,12 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	validateSettings(settings: Record<string, unknown>): ValidationResult {
+		if (settings.authMode !== undefined && settings.authMode !== 'api-key' && settings.authMode !== 'local') {
+			return {
+				valid: false,
+				errors: [{ path: 'authMode', message: 'Authentication mode must be "api-key" or "local"' }]
+			};
+		}
 		if (settings.apiKey !== undefined && typeof settings.apiKey !== 'string') {
 			return {
 				valid: false,
@@ -384,8 +408,45 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const authMode = typeof settings.authMode === 'string' ? settings.authMode : undefined;
 		const apiKey = typeof settings.apiKey === 'string' ? settings.apiKey.trim() : '';
 		const model = typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL;
+		if (authMode === 'api-key') {
+			if (!apiKey) {
+				return {
+					success: false,
+					message: 'Provide an OpenAI API key or switch to local Codex auth first.'
+				};
+			}
+
+			const valid = await this.validateApiKey(apiKey, model);
+			return valid
+				? { success: true, message: 'OpenAI API key verified for Codex.' }
+				: {
+						success: false,
+						message:
+							'OpenAI API key validation failed. Verify the key, model access, and billing, or switch to local `codex login`.'
+					};
+		}
+
+		if (authMode === 'local') {
+			if (!(await hasLocalCodexAuth(settings))) {
+				return {
+					success: false,
+					message: 'Local Codex CLI auth is not connected on this machine yet.'
+				};
+			}
+
+			const valid = await this.validateCliAuth(settings);
+			return valid
+				? { success: true, message: 'Local Codex CLI auth verified.' }
+				: {
+						success: false,
+						message:
+							'Local Codex CLI auth could not be verified. Re-run `codex login` or switch to an OpenAI API key.'
+					};
+		}
+
 		if (apiKey) {
 			const valid = await this.validateApiKey(apiKey, model);
 			return valid

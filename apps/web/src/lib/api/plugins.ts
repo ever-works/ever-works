@@ -35,6 +35,16 @@ export type SettingsMenuResponse = ISettingsMenuResponse;
 export type SettingsMenuCategory = ISettingsMenuCategory;
 export type SettingsMenuPlugin = ISettingsMenuPlugin;
 
+export interface CodexLocalAuthStatus {
+    installed: boolean;
+    connected: boolean;
+    pending: boolean;
+    authPath: string;
+    verificationUri?: string;
+    userCode?: string;
+    message: string;
+}
+
 // ============================================
 // API Client
 // ============================================
@@ -152,6 +162,19 @@ export const pluginsAPI = {
             details?: Record<string, unknown>;
         }>({
             endpoint: `/plugins/${pluginId}/validate-connection`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    getLocalAuthStatus: async (pluginId: string): Promise<CodexLocalAuthStatus> => {
+        return serverFetch<CodexLocalAuthStatus>(`/plugins/${pluginId}/local-auth-status`);
+    },
+
+    startLocalAuth: async (pluginId: string): Promise<CodexLocalAuthStatus> => {
+        return serverMutation<CodexLocalAuthStatus>({
+            endpoint: `/plugins/${pluginId}/start-local-auth`,
             data: {},
             method: 'POST',
             wrapInData: false,

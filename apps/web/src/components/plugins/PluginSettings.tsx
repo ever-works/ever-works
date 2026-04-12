@@ -310,6 +310,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                             ) : plugin.pluginId === 'codex' ? (
                                 <CodexOnboardingWizard
                                     pluginId={plugin.pluginId}
+                                    initialSettings={plugin.settings || {}}
                                     visibleProperties={visibleProperties}
                                     getFieldValue={getFieldValue}
                                     handleFieldChange={handleFieldChange}

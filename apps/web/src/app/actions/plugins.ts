@@ -2,6 +2,7 @@
 
 import { pluginsAPI } from '@/lib/api/plugins';
 import { revalidatePath } from 'next/cache';
+import type { CodexLocalAuthStatus } from '@/lib/api/plugins';
 
 export interface ActionResult<T = unknown> {
     success: boolean;
@@ -203,6 +204,38 @@ export async function setGlobalPipelineDefault(
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to set global pipeline default',
+        };
+    }
+}
+
+export async function getCodexLocalAuthStatus(
+    pluginId: string,
+): Promise<ActionResult<CodexLocalAuthStatus>> {
+    try {
+        const result = await pluginsAPI.getLocalAuthStatus(pluginId);
+        return { success: true, data: result };
+    } catch (error) {
+        console.error('Failed to get local auth status:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to get local auth status',
+        };
+    }
+}
+
+export async function startCodexLocalAuth(
+    pluginId: string,
+): Promise<ActionResult<CodexLocalAuthStatus>> {
+    try {
+        const result = await pluginsAPI.startLocalAuth(pluginId);
+        revalidatePath('/plugins');
+        revalidatePath(`/plugins/${pluginId}`);
+        return { success: true, data: result };
+    } catch (error) {
+        console.error('Failed to start local auth:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to start local auth',
         };
     }
 }
