@@ -23,7 +23,7 @@ import type {
 	StepStatus,
 	ValidationResult
 } from '@ever-works/plugin';
-import { buildSuccessPipelineResult, lucideIcon } from '@ever-works/plugin';
+import { buildSuccessPipelineResult, lucideIcon, normalizeItemTags, type ItemData } from '@ever-works/plugin';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -48,7 +48,8 @@ import {
 	describeWorkspaceOutputs,
 	readGeneratedItems,
 	seedExistingItems,
-	seedMetadata
+	seedMetadata,
+	writeGeneratedItems
 } from './utils/workspace-manager.js';
 import { captureScreenshots } from './utils/screenshot-capture.js';
 import {
@@ -207,9 +208,44 @@ function hasLocalCodexAuthSync(): boolean {
 }
 
 const LOG_MESSAGE_MAX_LENGTH = 500;
+const RECOVERY_ITEMS_SCHEMA_FILE = 'recovered-items.schema.json';
+const RECOVERY_ITEMS_OUTPUT_FILE = 'recovered-items.json';
 const STEP_CONTEXT_BY_ID = new Map(
 	STEP_DEFINITIONS.map((step, stepIndex) => [step.id, { stepIndex, stepName: step.name }])
 );
+
+const RECOVERY_OUTPUT_SCHEMA = {
+	type: 'object',
+	additionalProperties: false,
+	required: ['items'],
+	properties: {
+		items: {
+			type: 'array',
+			minItems: 1,
+			items: {
+				type: 'object',
+				additionalProperties: true,
+				required: ['name', 'description', 'source_url', 'category', 'tags'],
+				properties: {
+					name: { type: 'string' },
+					description: { type: 'string' },
+					source_url: { type: 'string' },
+					category: { type: 'string' },
+					tags: {
+						type: 'array',
+						items: { type: 'string' }
+					},
+					brand: { type: 'string' },
+					markdown: { type: 'string' },
+					image_url: { type: 'string' },
+					website_url: { type: 'string' },
+					pricing_json: {},
+					extra: {}
+				}
+			}
+		}
+	}
+} as const;
 
 export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider {
 	readonly id = 'codex';
@@ -489,23 +525,41 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			const collectStartedAt = this.startStep('collect-results', onLogEntry);
 			reportProgress(onProgress, 3, 85, 'Collect Results');
 
-			const items = await readGeneratedItems(workspacePath, logger);
+			let items = await readGeneratedItems(workspacePath, logger);
 			const requestedTargetItems = Number(request.config?.target_items ?? DEFAULT_TARGET_ITEMS);
 			if (items.length === 0 && (requestedTargetItems > 0 || existing.items.length === 0)) {
-				const workspaceOutputs = await describeWorkspaceOutputs(workspacePath);
-				const outputSummary =
-					workspaceOutputs.length > 0 ? workspaceOutputs.join(', ') : 'no visible files created';
-				const stderrExcerpt = executionResult.stderr?.trim().split('\n').filter(Boolean).slice(-2).join(' | ');
-				const stdoutExcerpt = executionResult.stdout?.trim().split('\n').filter(Boolean).slice(-2).join(' | ');
-				const cliSummaryParts = [
-					stderrExcerpt ? `stderr: ${stderrExcerpt}` : '',
-					stdoutExcerpt ? `stdout: ${stdoutExcerpt}` : ''
-				].filter(Boolean);
-				const cliSummary =
-					cliSummaryParts.length > 0 ? ` Codex output excerpt: ${cliSummaryParts.join(' ; ')}.` : '';
-				throw new Error(
-					`Codex completed without producing any valid item JSON files in the workspace root. Visible workspace entries: ${outputSummary}.${cliSummary}`
-				);
+				const recoveredItems = await this.recoverItemsFromStructuredOutput({
+					directory,
+					request,
+					existing,
+					workspacePath,
+					settings,
+					executionAuthEnv: executionAuth.env,
+					onLogEntry,
+					signal
+				});
+
+				if (recoveredItems.length > 0) {
+					await writeGeneratedItems(workspacePath, recoveredItems);
+					items = await readGeneratedItems(workspacePath, logger);
+				}
+
+				if (items.length === 0) {
+					const workspaceOutputs = await describeWorkspaceOutputs(workspacePath);
+					const outputSummary =
+						workspaceOutputs.length > 0 ? workspaceOutputs.join(', ') : 'no visible files created';
+					const stderrExcerpt = executionResult.stderr?.trim().split('\n').filter(Boolean).slice(-2).join(' | ');
+					const stdoutExcerpt = executionResult.stdout?.trim().split('\n').filter(Boolean).slice(-2).join(' | ');
+					const cliSummaryParts = [
+						stderrExcerpt ? `stderr: ${stderrExcerpt}` : '',
+						stdoutExcerpt ? `stdout: ${stdoutExcerpt}` : ''
+					].filter(Boolean);
+					const cliSummary =
+						cliSummaryParts.length > 0 ? ` Codex output excerpt: ${cliSummaryParts.join(' ; ')}.` : '';
+					throw new Error(
+						`Codex completed without producing any valid item JSON files in the workspace root. Visible workspace entries: ${outputSummary}.${cliSummary}`
+					);
+				}
 			}
 			const metadata = collectMetadataFromItems(items);
 			this.completeStep('collect-results', collectStartedAt, onLogEntry);
@@ -591,6 +645,168 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		};
 
 		return [buildSystemPrompt(promptOptions), '', buildUserPrompt(promptOptions)].join('\n');
+	}
+
+	private async recoverItemsFromStructuredOutput({
+		directory,
+		request,
+		existing,
+		workspacePath,
+		settings,
+		executionAuthEnv,
+		onLogEntry,
+		signal
+	}: {
+		readonly directory: DirectoryReference;
+		readonly request: GenerationRequest;
+		readonly existing: ExistingItems;
+		readonly workspacePath: string;
+		readonly settings: Record<string, unknown>;
+		readonly executionAuthEnv: Record<string, string>;
+		readonly onLogEntry?: PipelineExecutionOptions['onLogEntry'];
+		readonly signal: AbortSignal;
+	}): Promise<ExistingItems['items']> {
+		const logger = this.context?.logger ?? console;
+		const recoverySchemaPath = path.join(workspacePath, '_meta', RECOVERY_ITEMS_SCHEMA_FILE);
+		const recoveryOutputPath = path.join(workspacePath, '_meta', RECOVERY_ITEMS_OUTPUT_FILE);
+
+		await fs.promises.writeFile(recoverySchemaPath, JSON.stringify(RECOVERY_OUTPUT_SCHEMA, null, 2), 'utf-8');
+
+		this.emitCodexLog({
+			onLogEntry,
+			stepId: 'collect-results',
+			event: 'message',
+			level: 'warn',
+			message: 'Codex produced no item files; attempting structured JSON recovery'
+		});
+
+		const recoveryPrompt = this.buildStructuredRecoveryPrompt(directory, request, existing);
+		const { promise, kill } = executeCodex({
+			command: 'codex',
+			cwd: workspacePath,
+			env: executionAuthEnv,
+			model: typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL,
+			bypassApprovalsAndSandbox: settings.unsafeBypassSandbox === true,
+			outputSchemaPath: recoverySchemaPath,
+			outputLastMessagePath: recoveryOutputPath,
+			prompt: recoveryPrompt,
+			signal,
+			onStdoutLine: (line) => {
+				this.emitCodexLog({
+					onLogEntry,
+					stepId: 'collect-results',
+					event: 'message',
+					level: 'info',
+					message: `[recovery] ${line}`
+				});
+			},
+			onStderrLine: (line) => {
+				this.emitCodexLog({
+					onLogEntry,
+					stepId: 'collect-results',
+					event: 'message',
+					level: 'warn',
+					message: `[recovery] ${line}`
+				});
+			}
+		});
+
+		this.killProcess = kill;
+		const recoveryResult = await promise;
+		this.killProcess = null;
+
+		if (signal.aborted || recoveryResult.killed || recoveryResult.exitCode !== 0) {
+			return [];
+		}
+
+		try {
+			const payloadText = await fs.promises.readFile(recoveryOutputPath, 'utf-8');
+			const payload = JSON.parse(payloadText) as { items?: unknown[] };
+			if (!Array.isArray(payload.items) || payload.items.length === 0) {
+				return [];
+			}
+
+			const recoveredItems = payload.items
+				.map((item) => this.normalizeRecoveredItem(item, logger))
+				.filter((item): item is ExistingItems['items'][number] => item !== null);
+
+			if (recoveredItems.length > 0) {
+				this.emitCodexLog({
+					onLogEntry,
+					stepId: 'collect-results',
+					event: 'message',
+					level: 'info',
+					message: `Recovered ${recoveredItems.length} items from structured Codex output`
+				});
+			}
+
+			return recoveredItems;
+		} catch (error) {
+			logger.warn(
+				`Failed to parse structured Codex recovery output: ${error instanceof Error ? error.message : String(error)}`
+			);
+			return [];
+		}
+	}
+
+	private buildStructuredRecoveryPrompt(
+		directory: DirectoryReference,
+		request: GenerationRequest,
+		existing: ExistingItems
+	): string {
+		const targetItems = Number(request.config?.target_items ?? DEFAULT_TARGET_ITEMS);
+		const contextParts = [
+			'The previous Codex run completed research but failed to persist item files in the workspace.',
+			'This recovery run must return the final items directly as structured JSON matching the provided schema.',
+			'Do not explain your work. Do not ask for another message. Do not mention sandbox limitations.',
+			`Directory: ${directory.name}`,
+			directory.description ? `Directory description: ${directory.description}` : '',
+			request.prompt ? `Requested topic: ${request.prompt}` : '',
+			request.name ? `Requested name: ${request.name}` : '',
+			existing.items.length > 0
+				? `Existing items already present: ${existing.items.length}. Avoid duplicates and focus on new or improved items only.`
+				: 'No existing items are present yet.',
+			`Return approximately ${targetItems} high-confidence items.`,
+			'Each item must include: name, description, source_url, category, tags.',
+			'Use official canonical URLs only. Tags must be an array of strings.'
+		]
+			.filter(Boolean)
+			.join('\n');
+
+		return contextParts;
+	}
+
+	private normalizeRecoveredItem(item: unknown, logger: { warn(message: string): void }): ItemData | null {
+		if (!item || typeof item !== 'object') {
+			return null;
+		}
+
+		const normalized = item as Record<string, unknown>;
+		if (!this.hasRequiredRecoveredFields(normalized)) {
+			return null;
+		}
+
+		normalizeItemTags(normalized);
+		if (!Array.isArray(normalized.tags)) {
+			logger.warn('Recovered Codex item had invalid tags and was skipped');
+			return null;
+		}
+
+		return normalized as unknown as ItemData;
+	}
+
+	private hasRequiredRecoveredFields(item: Record<string, unknown>): boolean {
+		return (
+			typeof item.name === 'string' &&
+			item.name.trim().length > 0 &&
+			typeof item.description === 'string' &&
+			item.description.trim().length > 0 &&
+			typeof item.source_url === 'string' &&
+			item.source_url.trim().length > 0 &&
+			typeof item.category === 'string' &&
+			item.category.trim().length > 0 &&
+			Array.isArray(item.tags)
+		);
 	}
 
 	private startStep(stepId: CodexStepId, onLogEntry?: PipelineExecutionOptions['onLogEntry']): number {

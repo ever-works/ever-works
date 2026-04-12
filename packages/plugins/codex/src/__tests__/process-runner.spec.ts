@@ -64,6 +64,34 @@ describe('process-runner', () => {
 		expect(result.killed).toBe(false);
 	});
 
+	it('passes output schema and last-message paths when provided', async () => {
+		const run = executeCodex({
+			prompt: 'Return JSON items',
+			cwd: '/tmp/workspace',
+			env: {},
+			outputSchemaPath: '/tmp/workspace/_meta/schema.json',
+			outputLastMessagePath: '/tmp/workspace/_meta/output.json'
+		});
+
+		expect(spawnMock).toHaveBeenCalledWith(
+			'codex',
+			[
+				'exec',
+				'--full-auto',
+				'--skip-git-repo-check',
+				'--output-schema',
+				'/tmp/workspace/_meta/schema.json',
+				'--output-last-message',
+				'/tmp/workspace/_meta/output.json',
+				'Return JSON items'
+			],
+			expect.any(Object)
+		);
+
+		child.emit('exit', 0);
+		await run.promise;
+	});
+
 	it('streams stdout and stderr lines to callbacks', async () => {
 		const stdoutLines: string[] = [];
 		const stderrLines: string[] = [];

@@ -38,6 +38,7 @@ vi.mock('../utils/workspace-manager.js', async () => {
 		seedMetadata: vi.fn(),
 		readGeneratedItems: vi.fn(),
 		collectMetadataFromItems: vi.fn(),
+		writeGeneratedItems: vi.fn(),
 		cleanupWorkspace: vi.fn()
 	};
 });
@@ -151,6 +152,7 @@ describe('CodexPlugin', () => {
 			brands: [],
 			collections: []
 		});
+		vi.mocked(workspaceManager.writeGeneratedItems).mockResolvedValue(undefined);
 		vi.mocked(workspaceManager.cleanupWorkspace).mockResolvedValue(undefined);
 
 		vi.mocked(processRunner.executeCodex).mockReturnValue({
@@ -281,6 +283,9 @@ describe('CodexPlugin', () => {
 		});
 
 		it('fails when Codex finishes without producing any valid item JSON files', async () => {
+			const recoverySpy = vi
+				.spyOn(plugin as never, 'recoverItemsFromStructuredOutput')
+				.mockResolvedValue([] as never);
 			vi.mocked(workspaceManager.readGeneratedItems).mockResolvedValueOnce([]);
 			vi.mocked(processRunner.executeCodex).mockReturnValueOnce({
 				promise: Promise.resolve({
@@ -303,6 +308,32 @@ describe('CodexPlugin', () => {
 			expect(String(result.error)).toContain('without producing any valid item JSON files');
 			expect(String(result.error)).toContain('Visible workspace entries');
 			expect(String(result.error)).toContain('Codex output excerpt');
+			recoverySpy.mockRestore();
+		});
+
+		it('recovers items from structured output when Codex research completes but writes no files', async () => {
+			const recoveredItems = [
+				{
+					name: 'Recovered Item',
+					description: 'Recovered from structured output',
+					source_url: 'https://example.com/recovered',
+					category: 'Testing',
+					tags: ['test']
+				}
+			];
+
+			vi.spyOn(plugin as never, 'recoverItemsFromStructuredOutput').mockResolvedValue(recoveredItems as never);
+			vi.mocked(workspaceManager.readGeneratedItems)
+				.mockResolvedValueOnce([])
+				.mockResolvedValueOnce(recoveredItems as never);
+
+			await plugin.onLoad(createMockContext());
+
+			const result = await plugin.execute(directory, request, existing);
+
+			expect(result.success).toBe(true);
+			expect(result.outputs.items).toHaveLength(1);
+			expect(result.outputs.items[0].name).toBe('Recovered Item');
 		});
 
 		it('translates stdin-interactive Codex failures into a clearer auth message', async () => {

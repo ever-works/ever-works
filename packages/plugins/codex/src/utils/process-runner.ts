@@ -10,6 +10,8 @@ export interface ExecuteOptions {
 	readonly env: Record<string, string>;
 	readonly model?: string;
 	readonly bypassApprovalsAndSandbox?: boolean;
+	readonly outputSchemaPath?: string;
+	readonly outputLastMessagePath?: string;
 	readonly signal?: AbortSignal;
 	readonly onStdoutLine?: (line: string) => void;
 	readonly onStderrLine?: (line: string) => void;
@@ -60,6 +62,12 @@ export function executeCodex(options: ExecuteOptions): {
 		args.push('--skip-git-repo-check');
 		if (options.model) {
 			args.push('--model', options.model);
+		}
+		if (options.outputSchemaPath) {
+			args.push('--output-schema', options.outputSchemaPath);
+		}
+		if (options.outputLastMessagePath) {
+			args.push('--output-last-message', options.outputLastMessagePath);
 		}
 		args.push(options.prompt);
 

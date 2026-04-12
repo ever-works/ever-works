@@ -190,6 +190,37 @@ export async function describeWorkspaceOutputs(workspacePath: string): Promise<s
 	}
 }
 
+export async function writeGeneratedItems(workspacePath: string, items: readonly ItemData[]): Promise<void> {
+	if (!items.length) {
+		return;
+	}
+
+	const existingEntries = await fs.readdir(workspacePath, { withFileTypes: true }).catch(() => []);
+	const usedSlugs = new Set(
+		existingEntries
+			.filter((entry) => !entry.isDirectory() && entry.name.endsWith('.json'))
+			.map((entry) => entry.name.replace(/\.json$/u, ''))
+	);
+
+	const writes: (() => Promise<void>)[] = [];
+	for (const item of items) {
+		const baseSlug = item.slug || slugify(item.name);
+		const slug = deduplicateSlug(baseSlug, usedSlugs);
+		usedSlugs.add(slug);
+
+		const normalizedItem: ItemData = {
+			...item,
+			slug
+		};
+
+		writes.push(() =>
+			fs.writeFile(path.join(workspacePath, `${slug}.json`), JSON.stringify(normalizedItem, null, 2), 'utf-8')
+		);
+	}
+
+	await parallelBatch(writes, WRITE_CONCURRENCY);
+}
+
 export async function ensureOnboardingConfig(_configDir: string): Promise<void> {}
 
 export async function cleanupWorkspace(userId: string, directoryId: string): Promise<void> {
