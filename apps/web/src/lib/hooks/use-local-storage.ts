@@ -73,9 +73,7 @@ export function useLocalStorage<T>(
                     setValueState(defaultValueRef.current);
                 } else {
                     const parsed = deserializeRef.current(e.newValue);
-                    setValueState(
-                        validateRef.current(parsed) ? parsed : defaultValueRef.current,
-                    );
+                    setValueState(validateRef.current(parsed) ? parsed : defaultValueRef.current);
                 }
             } catch {
                 setValueState(defaultValueRef.current);
