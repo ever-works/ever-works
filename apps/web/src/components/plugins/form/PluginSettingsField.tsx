@@ -42,6 +42,7 @@ export function PluginSettingsField({
 
     // Check if the current value is a masked placeholder from the API
     const isMaskedValue = isSecret && typeof value === 'string' && value.includes('••••');
+    const isEffectivelyEditing = isEditing && !isMaskedValue;
 
     // Determine input type for string/number inputs
     const getInputType = () => {
@@ -179,7 +180,7 @@ export function PluginSettingsField({
         // Secret field with existing masked value: show a placeholder with "Modify" button
         // instead of putting masked characters in the input (which caused ByteString errors
         // when masked values were accidentally saved back).
-        if (isMaskedValue && !isEditing) {
+        if (isMaskedValue && !isEffectivelyEditing) {
             return (
                 <div className="flex items-center gap-2">
                     <div
@@ -225,8 +226,8 @@ export function PluginSettingsField({
                         onChange={(e) => onChange(e.currentTarget.value)}
                         maxLength={schema.maxLength}
                         required={required}
-                        autoFocus={isEditing}
-                        placeholder={isEditing ? t('enterNewValue') : undefined}
+                        autoFocus={isEffectivelyEditing}
+                        placeholder={isEffectivelyEditing ? t('enterNewValue') : undefined}
                         variant="form"
                         className={cn(isSecret && 'pr-10')}
                     />
@@ -244,7 +245,7 @@ export function PluginSettingsField({
                         </button>
                     )}
                 </div>
-                {isEditing && previousMaskedValue && (
+                {isEffectivelyEditing && previousMaskedValue && (
                     <button
                         type="button"
                         onClick={() => {

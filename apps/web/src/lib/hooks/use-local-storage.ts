@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 
 // On the server useLayoutEffect is a no-op; on the client it runs synchronously
 // after DOM mutations but *before* the browser paints — eliminating any flash.
@@ -19,10 +19,9 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
  * browser paints, so the correct persisted value is applied without any
  * visible flash when the page is refreshed.
  *
- * `serialize`, `deserialize`, and `validate` are stored in refs so that the
- * latest versions are always used inside effects and callbacks without
- * requiring them as dependencies (the "latest ref" pattern). This avoids
- * stale-closure bugs when callers pass inline function literals.
+ * `serialize`, `deserialize`, and `validate` use the "latest ref" pattern so
+ * effects do not re-run when callers pass inline function literals, while the
+ * latest callback implementations are still used.
  */
 export function useLocalStorage<T>(
     key: string,
@@ -33,12 +32,17 @@ export function useLocalStorage<T>(
         validate?: (value: T) => boolean;
     },
 ): [T, (value: T) => void] {
-    const serialize = useMemo(() => options?.serialize ?? String, [options?.serialize]);
-    const deserialize = useMemo(
-        () => options?.deserialize ?? ((raw: string) => raw as unknown as T),
-        [options?.deserialize],
+    const serializeRef = useRef<(value: T) => string>(options?.serialize ?? String);
+    const deserializeRef = useRef<(raw: string) => T>(
+        options?.deserialize ?? ((raw: string) => raw as unknown as T),
     );
-    const validate = useMemo(() => options?.validate ?? (() => true), [options?.validate]);
+    const validateRef = useRef<(value: T) => boolean>(options?.validate ?? (() => true));
+
+    useEffect(() => {
+        serializeRef.current = options?.serialize ?? String;
+        deserializeRef.current = options?.deserialize ?? ((raw: string) => raw as unknown as T);
+        validateRef.current = options?.validate ?? (() => true);
+    }, [options?.deserialize, options?.serialize, options?.validate]);
 
     // Always start with defaultValue — safe for SSR and matches server HTML.
     const [value, setValueState] = useState<T>(defaultValue);
@@ -49,12 +53,12 @@ export function useLocalStorage<T>(
         try {
             const raw = localStorage.getItem(key);
             if (raw === null) return;
-            const parsed = deserialize(raw);
-            if (validate(parsed)) setValueState(parsed);
+            const parsed = deserializeRef.current(raw);
+            if (validateRef.current(parsed)) setValueState(parsed);
         } catch {
             // localStorage unavailable — keep defaultValue
         }
-    }, [deserialize, key, validate]);
+    }, [key]);
 
     // Sync with storage changes from other tabs/windows.
     // Only re-registers when `key` changes; refs give access to the latest
@@ -66,8 +70,8 @@ export function useLocalStorage<T>(
                 if (e.newValue === null) {
                     setValueState(defaultValue);
                 } else {
-                    const parsed = deserialize(e.newValue);
-                    setValueState(validate(parsed) ? parsed : defaultValue);
+                    const parsed = deserializeRef.current(e.newValue);
+                    setValueState(validateRef.current(parsed) ? parsed : defaultValue);
                 }
             } catch {
                 setValueState(defaultValue);
@@ -75,18 +79,18 @@ export function useLocalStorage<T>(
         };
         window.addEventListener('storage', handler);
         return () => window.removeEventListener('storage', handler);
-    }, [defaultValue, deserialize, key, validate]);
+    }, [defaultValue, key]);
 
     const setValue = useCallback(
         (next: T) => {
             setValueState(next);
             try {
-                localStorage.setItem(key, serialize(next));
+                localStorage.setItem(key, serializeRef.current(next));
             } catch {
                 // localStorage may be unavailable (e.g. private browsing quota)
             }
         },
-        [key, serialize],
+        [key],
     );
 
     return [value, setValue];

@@ -43,10 +43,10 @@ export function DirectoryList({
 
     useEffect(() => {
         // If no initial directories provided, fetch them
-        if (initialDirectories.length === 0 && !loading) {
+        if (initialDirectories.length === 0) {
             void fetchDirectories();
         }
-    }, [fetchDirectories, initialDirectories.length, loading]);
+    }, [fetchDirectories, initialDirectories.length]);
 
     if (loading && directories.length === 0) {
         return <DirectoryListSkeleton />;
