@@ -52,6 +52,7 @@
         "@types/node": "^20.19.27",
         "@types/react": "^19.2.7",
         "@types/react-dom": "^19.2.3",
+        "eslint-config-next": "16.2.3",
         "shadcn": "^3.8.5",
         "tailwindcss": "^4.2.2",
         "typescript": "^5.9.3"
