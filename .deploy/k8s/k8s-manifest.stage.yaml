@@ -214,6 +214,8 @@ spec:
           env:
             - name: AUTH_SECRET
               value: "$AUTH_SECRET"
+            - name: WEB_URL
+              value: "https://appstage.ever.works"
             - name: API_URL
               value: "http://ever-works-api-stage:3100"
             - name: NEXT_PUBLIC_WEB_URL

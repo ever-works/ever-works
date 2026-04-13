@@ -57,7 +57,8 @@ export const GET_DIRECTORY_LIST_LIMIT = parseInt(
 export const ONBOARDING_STORAGE_KEY = 'ever-works-onboarding';
 
 // App URL
-export const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+export const WEB_URL =
+    process.env.NEXT_PUBLIC_WEB_URL || process.env.WEB_URL || 'http://localhost:3000';
 
 // AUTH Secret
 export const AUTH_SECRET = process.env.COOKIE_SECRET || process.env.AUTH_SECRET;

@@ -211,7 +211,8 @@
             },
             "oauthConnected": {
                 "title": "Konto mit GitHub verbunden",
-                "description": "Ihr Konto wurde erfolgreich mit GitHub verbunden."
+                "description": "Ihr Konto wurde erfolgreich mit GitHub verbunden.",
+                "defaultProvider": "Git-Anbieter"
             }
         },
         "header": {

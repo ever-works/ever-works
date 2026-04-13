@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { removeAuthAccessCookies, setOAuthStateCookie, setAuthCookies } from '@/lib/auth';
-import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
+import { ROUTES, withAppUrl } from '@/lib/constants';
 import { VALIDATION_RULES } from './validation';
 import { authAPI, AuthResponse } from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
@@ -166,8 +166,7 @@ export async function connectProvider(providerId: OAuthProvider) {
         const state = generateHexToken(16);
         await setOAuthStateCookie(state);
 
-        const callbackUrl = routeWithParams(ROUTES.API_OAUTH_CALLBACK, { providerId });
-        const { url } = await authAPI.getOAuthAuthUrl(providerId, withAppUrl(callbackUrl), state);
+        const { url } = await authAPI.getOAuthAuthUrl(providerId, state);
         return {
             success: true,
             url,

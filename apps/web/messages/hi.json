@@ -211,7 +211,8 @@
             },
             "oauthConnected": {
                 "title": "GitHub से खाता जुड़ा",
-                "description": "आपका खाता GitHub से सफलतापूर्वक जुड़ गया है।"
+                "description": "आपका खाता GitHub से सफलतापूर्वक जुड़ गया है।",
+                "defaultProvider": "Git प्रदाता"
             }
         },
         "header": {

@@ -211,7 +211,8 @@
             },
             "oauthConnected": {
                 "title": "Hesap GitHub'a bağlandı",
-                "description": "Hesabınız GitHub'a başarıyla bağlandı."
+                "description": "Hesabınız GitHub'a başarıyla bağlandı.",
+                "defaultProvider": "Git sağlayıcısı"
             }
         },
         "header": {

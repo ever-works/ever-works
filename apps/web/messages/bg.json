@@ -211,7 +211,8 @@
             },
             "oauthConnected": {
                 "title": "Акаунтът е свързан с GitHub",
-                "description": "Вашият акаунт е успешно свързан с GitHub."
+                "description": "Вашият акаунт е успешно свързан с GitHub.",
+                "defaultProvider": "Git доставчик"
             }
         },
         "header": {

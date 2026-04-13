@@ -211,7 +211,8 @@
             },
             "oauthConnected": {
                 "title": "Akun terhubung ke GitHub",
-                "description": "Akun Anda telah berhasil terhubung ke GitHub."
+                "description": "Akun Anda telah berhasil terhubung ke GitHub.",
+                "defaultProvider": "Penyedia Git"
             }
         },
         "header": {
