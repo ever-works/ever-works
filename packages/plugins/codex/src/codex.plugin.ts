@@ -31,6 +31,7 @@ import * as https from 'https';
 
 import type { CodexStepId } from './types.js';
 import { DEFAULT_MODEL } from './types.js';
+import { DEFAULT_CLI_VERSION } from './types.js';
 import { STEP_DEFINITIONS } from './steps.js';
 import {
 	DEFAULT_TARGET_ITEMS,
@@ -41,6 +42,7 @@ import {
 } from './form-schema.js';
 import { buildSystemPrompt, buildUserPrompt } from './prompt/system-prompt.js';
 import { executeCodex, type ExecuteResult } from './utils/process-runner.js';
+import { ensureBinary } from './utils/binary-manager.js';
 import {
 	cleanupWorkspace,
 	collectMetadataFromItems,
@@ -141,7 +143,7 @@ const MANIFEST: PluginManifest = {
 		'',
 		'The plugin runs 6 sequential steps:',
 		'',
-		'1. **Setup Codex** - Resolves authentication and prepares the Codex CLI runtime',
+		'1. **Setup Codex** - Downloads and caches the Codex CLI, then resolves authentication',
 		'2. **Prepare Context** - Creates a temporary workspace and seeds it with existing items and metadata',
 		'3. **Generate Items** - Executes Codex CLI to research and generate directory items as JSON files',
 		'4. **Collect Results** - Reads the generated JSON files back to build the pipeline result',
@@ -299,6 +301,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	private state: PipelineState<CodexStepId> | null = null;
 	private abortController: AbortController | null = null;
 	private killProcess: (() => void) | null = null;
+	private codexCommandPath: string | null = null;
 
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
@@ -512,6 +515,8 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 					'No Codex authentication available. Configure an OpenAI API key or sign in locally with Codex CLI.'
 				);
 			}
+
+			this.codexCommandPath = await ensureBinary(DEFAULT_CLI_VERSION, this.context?.logger);
 
 			this.emitCodexLog({
 				onLogEntry,
@@ -756,7 +761,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		readonly logPrefix?: string;
 	}): Promise<ExecuteResult> {
 		const { promise, kill } = executeCodex({
-			command: 'codex',
+			command: this.codexCommandPath ?? 'codex',
 			cwd: workspacePath,
 			env: executionAuthEnv,
 			model,
@@ -826,7 +831,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 		const recoveryPrompt = this.buildStructuredRecoveryPrompt(directory, request, existing);
 		const { promise, kill } = executeCodex({
-			command: 'codex',
+			command: this.codexCommandPath ?? 'codex',
 			cwd: workspacePath,
 			env: executionAuthEnv,
 			model: typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL,
@@ -1156,8 +1161,9 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		const timeout = setTimeout(() => abortController.abort(), 12_000);
 
 		try {
+			this.codexCommandPath = await ensureBinary(DEFAULT_CLI_VERSION, this.context?.logger);
 			const { promise, kill } = executeCodex({
-				command: 'codex',
+				command: this.codexCommandPath ?? 'codex',
 				cwd: workspacePath,
 				env: executionAuth.env,
 				model: typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL,

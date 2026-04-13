@@ -10,6 +10,7 @@ import * as pipelineHelpers from '../utils/pipeline-helpers.js';
 import * as processRunner from '../utils/process-runner.js';
 import * as workspaceManager from '../utils/workspace-manager.js';
 import * as screenshotCapture from '../utils/screenshot-capture.js';
+import * as binaryManager from '../utils/binary-manager.js';
 
 vi.mock('../utils/pipeline-helpers.js', async () => {
 	const actual = await vi.importActual<typeof import('../utils/pipeline-helpers.js')>('../utils/pipeline-helpers.js');
@@ -45,6 +46,10 @@ vi.mock('../utils/workspace-manager.js', async () => {
 
 vi.mock('../utils/screenshot-capture.js', () => ({
 	captureScreenshots: vi.fn()
+}));
+
+vi.mock('../utils/binary-manager.js', () => ({
+	ensureBinary: vi.fn()
 }));
 
 function createMockContext(settingsOverride?: PluginSettings): PluginContext {
@@ -133,6 +138,7 @@ describe('CodexPlugin', () => {
 			env: { OPENAI_API_KEY: 'sk-test' }
 		});
 		vi.mocked(pipelineHelpers.hasLocalCodexAuth).mockResolvedValue(false);
+		vi.mocked(binaryManager.ensureBinary).mockResolvedValue('/tmp/codex-generator/bin/codex');
 
 		vi.mocked(workspaceManager.createWorkspace).mockResolvedValue('/tmp/codex-generator/user1/dir1');
 		vi.mocked(workspaceManager.seedExistingItems).mockResolvedValue(undefined);
