@@ -3,6 +3,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { ensureCodexBinary } from './codex-binary';
 
 type LocalAuthSession = {
     process: ChildProcessWithoutNullStreams;
@@ -27,6 +28,10 @@ export interface CodexLocalAuthStatus {
 export class CodexLocalAuthService {
     private readonly logger = new Logger(CodexLocalAuthService.name);
     private readonly sessionByUser = new Map<string, LocalAuthSession>();
+
+    private async getCodexCommand(): Promise<string> {
+        return ensureCodexBinary(this.logger);
+    }
 
     async getStatus(userId: string): Promise<CodexLocalAuthStatus> {
         const installed = await this.isCodexInstalled();
@@ -90,7 +95,8 @@ export class CodexLocalAuthService {
             };
         }
 
-        const child = spawn('codex', ['login', '--device-auth'], {
+        const codexCommand = await this.getCodexCommand();
+        const child = spawn(codexCommand, ['login', '--device-auth'], {
             cwd: process.cwd(),
             env: process.env,
             stdio: ['ignore', 'pipe', 'pipe'],
@@ -207,16 +213,21 @@ export class CodexLocalAuthService {
     }
 
     private async isCodexInstalled(): Promise<boolean> {
-        return new Promise((resolve) => {
-            const child = spawn('codex', ['--version'], {
-                cwd: process.cwd(),
-                env: process.env,
-                stdio: ['ignore', 'ignore', 'ignore'],
-            });
+        try {
+            const codexCommand = await this.getCodexCommand();
+            return await new Promise((resolve) => {
+                const child = spawn(codexCommand, ['--version'], {
+                    cwd: process.cwd(),
+                    env: process.env,
+                    stdio: ['ignore', 'ignore', 'ignore'],
+                });
 
-            child.on('exit', (code) => resolve(code === 0));
-            child.on('error', () => resolve(false));
-        });
+                child.on('exit', (code) => resolve(code === 0));
+                child.on('error', () => resolve(false));
+            });
+        } catch {
+            return false;
+        }
     }
 
     private async isConnected(): Promise<boolean> {
@@ -224,26 +235,31 @@ export class CodexLocalAuthService {
             return true;
         }
 
-        return new Promise((resolve) => {
-            const child = spawn('codex', ['login', 'status'], {
-                cwd: process.cwd(),
-                env: process.env,
-                stdio: ['ignore', 'pipe', 'pipe'],
-            });
+        try {
+            const codexCommand = await this.getCodexCommand();
+            return await new Promise((resolve) => {
+                const child = spawn(codexCommand, ['login', 'status'], {
+                    cwd: process.cwd(),
+                    env: process.env,
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                });
 
-            let output = '';
-            child.stdout.on('data', (chunk) => {
-                output += chunk.toString('utf-8');
-            });
-            child.stderr.on('data', (chunk) => {
-                output += chunk.toString('utf-8');
-            });
+                let output = '';
+                child.stdout.on('data', (chunk) => {
+                    output += chunk.toString('utf-8');
+                });
+                child.stderr.on('data', (chunk) => {
+                    output += chunk.toString('utf-8');
+                });
 
-            child.on('exit', (code) => {
-                resolve(code === 0 && output.toLowerCase().includes('logged in'));
+                child.on('exit', (code) => {
+                    resolve(code === 0 && output.toLowerCase().includes('logged in'));
+                });
+                child.on('error', () => resolve(false));
             });
-            child.on('error', () => resolve(false));
-        });
+        } catch {
+            return false;
+        }
     }
 
     private async hasAuthFile(): Promise<boolean> {

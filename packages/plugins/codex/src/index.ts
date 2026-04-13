@@ -9,6 +9,7 @@
  */
 
 export { CodexPlugin } from './codex.plugin.js';
+export { ensureBinary } from './utils/binary-manager.js';
 
 export type { CodexStepId } from './types.js';
 export { CODEX_STEP_IDS, isCodexStepId } from './types.js';

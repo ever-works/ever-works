@@ -66,7 +66,12 @@ async function findBinary(rootDir: string, binaryName: string): Promise<string |
 	const entries = await fs.readdir(rootDir, { withFileTypes: true });
 	for (const entry of entries) {
 		const candidate = path.join(rootDir, entry.name);
-		if (entry.isFile() && entry.name === binaryName) {
+		if (
+			entry.isFile() &&
+			(entry.name === binaryName ||
+				entry.name === path.basename(binaryName) ||
+				entry.name.startsWith(`${binaryName}-`))
+		) {
 			return candidate;
 		}
 		if (entry.isDirectory()) {
@@ -80,10 +85,7 @@ async function findBinary(rootDir: string, binaryName: string): Promise<string |
 	return null;
 }
 
-export async function ensureBinary(
-	version: string = DEFAULT_CLI_VERSION,
-	logger?: Logger
-): Promise<string> {
+export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger?: Logger): Promise<string> {
 	const platform = detectPlatform();
 	const binaryPath = getBinaryPath(version, platform.platformString);
 
@@ -103,20 +105,23 @@ export async function ensureBinary(
 
 	const archiveBuffer = await fetchBuffer(assetUrl);
 	const tempDir = await fs.mkdtemp(path.join(path.dirname(binaryPath), 'codex-download-'));
-	const archivePath = path.join(tempDir, platform.assetName);
-	await fs.writeFile(archivePath, archiveBuffer);
-	await extractTarGz(archivePath, tempDir);
+	try {
+		const archivePath = path.join(tempDir, platform.assetName);
+		await fs.writeFile(archivePath, archiveBuffer);
+		await extractTarGz(archivePath, tempDir);
 
-	const extractedBinary = await findBinary(tempDir, 'codex');
-	if (!extractedBinary) {
-		throw new Error(`Downloaded Codex archive did not contain a codex binary for ${platform.platformString}.`);
+		const extractedBinary = await findBinary(tempDir, 'codex');
+		if (!extractedBinary) {
+			throw new Error(`Downloaded Codex archive did not contain a codex binary for ${platform.platformString}.`);
+		}
+
+		await fs.chmod(extractedBinary, 0o755);
+		await fs.copyFile(extractedBinary, binaryPath);
+		await fs.chmod(binaryPath, 0o755);
+
+		logger?.log(`Codex CLI ${version} ready at ${binaryPath}`);
+		return binaryPath;
+	} finally {
+		await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
 	}
-
-	await fs.chmod(extractedBinary, 0o755);
-	await fs.copyFile(extractedBinary, binaryPath);
-	await fs.chmod(binaryPath, 0o755);
-	await fs.rm(tempDir, { recursive: true, force: true });
-
-	logger?.log(`Codex CLI ${version} ready at ${binaryPath}`);
-	return binaryPath;
 }
