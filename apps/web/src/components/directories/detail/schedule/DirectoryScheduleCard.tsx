@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition, type ReactNode } from 'react';
+import { useMemo, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { AlertCircle, CheckCircle2, CircleStop, PlayCircle, Repeat, Square } from 'lucide-react';
@@ -119,8 +119,8 @@ function ScheduleForm({
         () => (schedule.allowedCadences?.length ? schedule.allowedCadences : defaultAllowances),
         [schedule.allowedCadences],
     );
-
-    const deriveFormState = () => ({
+    const providerOverridePipeline = schedule.providerOverrides?.pipeline;
+    const initialForm = {
         enable: schedule.status === DirectoryScheduleStatus.ACTIVE,
         cadence:
             schedule.cadence ??
@@ -129,37 +129,70 @@ function ScheduleForm({
         billingMode: schedule.billingMode ?? DirectoryScheduleBillingMode.SUBSCRIPTION,
         maxFailureBeforePause: schedule.maxFailureBeforePause ?? 3,
         alwaysCreatePullRequest: schedule.alwaysCreatePullRequest ?? false,
-        pipelineOverride: schedule.providerOverrides?.pipeline ?? undefined,
+        pipelineOverride: providerOverridePipeline ?? undefined,
+    };
+    const scheduleKey = JSON.stringify({
+        status: schedule.status,
+        cadence: schedule.cadence,
+        billingMode: schedule.billingMode,
+        maxFailureBeforePause: schedule.maxFailureBeforePause,
+        alwaysCreatePullRequest: schedule.alwaysCreatePullRequest,
+        providerOverridePipeline,
+        allowances,
     });
 
-    const derivedForm = useMemo(deriveFormState, [
-        schedule.status,
-        schedule.cadence,
-        schedule.billingMode,
-        schedule.maxFailureBeforePause,
-        schedule.alwaysCreatePullRequest,
-        JSON.stringify(schedule.providerOverrides ?? null),
-        JSON.stringify(allowances.map((a) => `${a.cadence}:${a.allowed}`)),
-    ]);
+    return (
+        <ScheduleFormContent
+            key={scheduleKey}
+            directoryId={directoryId}
+            directory={directory}
+            schedule={schedule}
+            allowances={allowances}
+            pipelineProviders={pipelineProviders}
+            activeProviders={activeProviders}
+            showPipelineSelector={showPipelineSelector}
+            getCadenceLabel={getCadenceLabel}
+            initialForm={initialForm}
+            t={t}
+            router={router}
+        />
+    );
+}
 
-    const [form, setForm] = useState(derivedForm);
+function ScheduleFormContent({
+    directoryId,
+    directory,
+    schedule,
+    allowances,
+    pipelineProviders,
+    activeProviders,
+    showPipelineSelector,
+    getCadenceLabel,
+    initialForm,
+    t,
+    router,
+}: {
+    directoryId: string;
+    directory: ReturnType<typeof useDirectoryDetail>['directory'];
+    schedule: DirectoryScheduleDto;
+    allowances: { cadence: DirectoryScheduleCadence; allowed: boolean }[];
+    pipelineProviders: ProviderOption[];
+    activeProviders: ResolvedProvider[];
+    showPipelineSelector: boolean;
+    getCadenceLabel: (cadence: DirectoryScheduleCadence) => string;
+    initialForm: {
+        enable: boolean;
+        cadence: DirectoryScheduleCadence;
+        billingMode: DirectoryScheduleBillingMode;
+        maxFailureBeforePause: number;
+        alwaysCreatePullRequest: boolean;
+        pipelineOverride?: string;
+    };
+    t: ReturnType<typeof useTranslations<'dashboard.directoryDetail.schedule.card'>>;
+    router: ReturnType<typeof useRouter>;
+}) {
+    const [form, setForm] = useState(initialForm);
     const [dirty, setDirty] = useState(false);
-
-    useEffect(() => {
-        const formKey = JSON.stringify(form);
-        const derivedKey = JSON.stringify(derivedForm);
-
-        if (dirty) {
-            if (formKey === derivedKey) {
-                setDirty(false);
-            }
-            return;
-        }
-
-        if (formKey !== derivedKey) {
-            setForm(derivedForm);
-        }
-    }, [derivedForm, dirty, form]);
 
     const [isSaving, startSaving] = useTransition();
     const [isRunning, startRunning] = useTransition();

@@ -28,8 +28,8 @@
         "iron-session": "^8.0.4",
         "jwt-decode": "^4.0.0",
         "lucide-react": "^0.542.0",
-        "next": "16.1.7",
-        "next-intl": "^4.6.1",
+        "next": "16.2.3",
+        "next-intl": "^4.9.1",
         "nextjs-toploader": "^3.9.17",
         "path-to-regexp": "^8.4.2",
         "radix-ui": "^1.4.3",
@@ -52,6 +52,7 @@
         "@types/node": "^20.19.27",
         "@types/react": "^19.2.7",
         "@types/react-dom": "^19.2.3",
+        "eslint-config-next": "16.2.3",
         "shadcn": "^3.8.5",
         "tailwindcss": "^4.2.2",
         "typescript": "^5.9.3"

@@ -19,10 +19,9 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
  * browser paints, so the correct persisted value is applied without any
  * visible flash when the page is refreshed.
  *
- * `serialize`, `deserialize`, and `validate` are stored in refs so that the
- * latest versions are always used inside effects and callbacks without
- * requiring them as dependencies (the "latest ref" pattern). This avoids
- * stale-closure bugs when callers pass inline function literals.
+ * `serialize`, `deserialize`, and `validate` use the "latest ref" pattern so
+ * effects do not re-run when callers pass inline function literals, while the
+ * latest callback implementations are still used.
  */
 export function useLocalStorage<T>(
     key: string,
@@ -33,18 +32,19 @@ export function useLocalStorage<T>(
         validate?: (value: T) => boolean;
     },
 ): [T, (value: T) => void] {
-    // Keep refs up-to-date on every render so closures always call the latest
-    // version, even when the caller passes new inline function references.
-    const serializeRef = useRef(options?.serialize ?? String);
-    const deserializeRef = useRef(options?.deserialize ?? ((raw: string) => raw as unknown as T));
-    const validateRef = useRef(options?.validate ?? (() => true));
-
-    serializeRef.current = options?.serialize ?? String;
-    deserializeRef.current = options?.deserialize ?? ((raw: string) => raw as unknown as T);
-    validateRef.current = options?.validate ?? (() => true);
-
+    const serializeRef = useRef<(value: T) => string>(options?.serialize ?? String);
+    const deserializeRef = useRef<(raw: string) => T>(
+        options?.deserialize ?? ((raw: string) => raw as unknown as T),
+    );
+    const validateRef = useRef<(value: T) => boolean>(options?.validate ?? (() => true));
     const defaultValueRef = useRef(defaultValue);
-    defaultValueRef.current = defaultValue;
+
+    useIsomorphicLayoutEffect(() => {
+        serializeRef.current = options?.serialize ?? String;
+        deserializeRef.current = options?.deserialize ?? ((raw: string) => raw as unknown as T);
+        validateRef.current = options?.validate ?? (() => true);
+        defaultValueRef.current = defaultValue;
+    }, [defaultValue, options?.deserialize, options?.serialize, options?.validate]);
 
     // Always start with defaultValue — safe for SSR and matches server HTML.
     const [value, setValueState] = useState<T>(defaultValue);

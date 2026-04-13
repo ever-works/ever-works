@@ -30,7 +30,6 @@ export function DirectoryLayoutClient({
     const t = useTranslations('dashboard.directoryDetail');
     const isGenerating = directory.generateStatus?.status === GenerateStatusType.GENERATING;
     const lastGenerateStatus = useRef(directory.generateStatus?.status);
-    const previousGenerateStatus = lastGenerateStatus.current;
     const hasSyncedOnMount = useRef(false);
     const generateStatus = directory.generateStatus?.status;
     const { markGenerating, clearGenerating } = useBackgroundActivity();
@@ -45,7 +44,7 @@ export function DirectoryLayoutClient({
     }, [isGenerating, markGenerating, clearGenerating]);
 
     useEffect(() => {
-        const lastStatus = previousGenerateStatus;
+        const lastStatus = lastGenerateStatus.current;
         const currentStatus = directory.generateStatus?.status;
 
         if (lastStatus !== currentStatus && currentStatus === GenerateStatusType.ERROR) {
@@ -67,7 +66,7 @@ export function DirectoryLayoutClient({
         }
 
         lastGenerateStatus.current = directory.generateStatus?.status;
-    }, [directory.generateStatus?.status, previousGenerateStatus, t]);
+    }, [directory.generateStatus?.status, t]);
 
     useEffect(() => {
         if (isGenerating) {
@@ -88,6 +87,7 @@ export function DirectoryLayoutClient({
     }, [directory.id]);
 
     useEffect(() => {
+        const previousGenerateStatus = lastGenerateStatus.current;
         if (
             previousGenerateStatus === GenerateStatusType.GENERATING &&
             generateStatus === GenerateStatusType.GENERATED
@@ -96,7 +96,7 @@ export function DirectoryLayoutClient({
                 // Silent fail; best effort
             });
         }
-    }, [directory.id, generateStatus, previousGenerateStatus]);
+    }, [directory.id, generateStatus]);
 
     return (
         <DirectoryDetailProvider

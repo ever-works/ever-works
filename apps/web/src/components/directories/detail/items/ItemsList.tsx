@@ -28,10 +28,7 @@ function useColumnCount(viewMode: 'grid' | 'list') {
     const [columns, setColumns] = useState(3);
 
     useEffect(() => {
-        if (viewMode === 'list') {
-            setColumns(1);
-            return;
-        }
+        if (viewMode === 'list') return;
 
         const container = document.getElementById('main-content');
         if (!container) return;
@@ -54,7 +51,7 @@ function useColumnCount(viewMode: 'grid' | 'list') {
         return () => observer.disconnect();
     }, [viewMode]);
 
-    return columns;
+    return viewMode === 'list' ? 1 : columns;
 }
 
 export function ItemsList({ items: initialItems, addItemRef }: ItemsListProps) {

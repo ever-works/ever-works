@@ -37,6 +37,7 @@ import { LogoEverWork, FaviconEverWork } from '../logos';
 import { useDirectoryDetail } from '../directories/detail/DirectoryDetailContext';
 import { ChatPanelExpandButton } from '@/components/ai/ChatPanel';
 import { SidebarActivityIndicator } from './SidebarActivityIndicator';
+import { useMounted } from '@/lib/hooks/use-mounted';
 
 interface DashboardSidebarProps {
     user: AuthUser;
@@ -82,13 +83,9 @@ export function DashboardSidebar({
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [avatarError, setAvatarError] = useState(false);
-    const [mounted, setMounted] = useState(false);
+    const mounted = useMounted();
     const t = useTranslations('dashboard.sidebar');
     const { config } = useDirectoryDetail();
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
 
     const handleCollapsedChange = (v: boolean) => {
         onCollapsedChange?.(v);

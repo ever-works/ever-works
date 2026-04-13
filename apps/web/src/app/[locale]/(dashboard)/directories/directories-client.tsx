@@ -98,7 +98,7 @@ export default function DirectoriesClient({
                 }
             }
         },
-        [itemsPerPage],
+        [itemsPerPage, t],
     );
 
     const refreshStats = useCallback(async () => {

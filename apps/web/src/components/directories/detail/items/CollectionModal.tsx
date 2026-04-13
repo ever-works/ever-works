@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Collection } from '@/lib/api/types-only';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,33 +23,34 @@ export function CollectionModal({
     collection,
     existingNames,
 }: CollectionModalProps) {
+    if (!isOpen) return null;
+
+    return (
+        <CollectionModalContent
+            key={collection?.id ?? 'new'}
+            onClose={onClose}
+            onSave={onSave}
+            collection={collection}
+            existingNames={existingNames}
+        />
+    );
+}
+
+function CollectionModalContent({
+    onClose,
+    onSave,
+    collection,
+    existingNames,
+}: Omit<CollectionModalProps, 'isOpen'>) {
     const t = useTranslations('dashboard.directoryDetail.items.taxonomy.collections.modal');
-    const [name, setName] = useState('');
-    const [description, setDescription] = useState('');
-    const [iconUrl, setIconUrl] = useState('');
-    const [priority, setPriority] = useState<string>('');
+    const [name, setName] = useState(() => collection?.name ?? '');
+    const [description, setDescription] = useState(() => collection?.description ?? '');
+    const [iconUrl, setIconUrl] = useState(() => collection?.icon_url ?? '');
+    const [priority, setPriority] = useState(() => collection?.priority?.toString() ?? '');
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const isEditing = !!collection;
-
-    // Reset form when modal opens/closes or collection changes
-    useEffect(() => {
-        if (isOpen) {
-            if (collection) {
-                setName(collection.name);
-                setDescription(collection.description || '');
-                setIconUrl(collection.icon_url || '');
-                setPriority(collection.priority?.toString() || '');
-            } else {
-                setName('');
-                setDescription('');
-                setIconUrl('');
-                setPriority('');
-            }
-            setError(null);
-        }
-    }, [isOpen, collection]);
 
     const validateName = (value: string): string | null => {
         if (!value.trim()) {
@@ -87,8 +88,6 @@ export function CollectionModal({
             onClose();
         }
     };
-
-    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">

@@ -113,7 +113,7 @@ export const AddItemModal = memo(function AddItemModal({
                 }
             });
         },
-        [formData, directoryId, categories, onClose, onItemAdded, t, updateWithPR],
+        [formData, directoryId, onClose, onItemAdded, t, updateWithPR],
     );
 
     return (

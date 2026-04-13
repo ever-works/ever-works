@@ -68,6 +68,8 @@ const EXPANSION_OPTIONS = [
     { value: 5, label: '5x' },
 ];
 
+const ALLOWED_IMPORT_PIPELINES = ['agent-pipeline', 'claude-code'];
+
 export function ImportConfigureStep({
     analysisResult,
     sourceUrl,
@@ -85,9 +87,6 @@ export function ImportConfigureStep({
     onImport,
 }: ImportConfigureStepProps) {
     const t = useTranslations('dashboard.directoryCreation.import');
-
-    // Pipeline plugins allowed for import enrichment
-    const ALLOWED_IMPORT_PIPELINES = ['agent-pipeline', 'claude-code'];
 
     // Provider/pipeline selection state
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
@@ -141,7 +140,7 @@ export function ImportConfigureStep({
             }
         }
         loadSchema();
-    }, [isAwesomeReadme, selectedProviders.pipeline, syncResolvedPipeline]);
+    }, [formSchema, isAwesomeReadme, selectedProviders.pipeline, syncResolvedPipeline]);
 
     const seedCount = analysisResult?.structure?.itemCount ?? 0;
     const targetCount = Math.ceil(seedCount * expansionFactor);

@@ -33,32 +33,40 @@ interface DomainManagementProps {
 }
 
 export function DomainManagement({ directory }: DomainManagementProps) {
+    return <DomainManagementContent key={directory.id} directory={directory} />;
+}
+
+function DomainManagementContent({ directory }: DomainManagementProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy.domains');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
-    const [domains, setDomains] = useState<DeploymentDomain[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [domains, setDomains] = useState<DeploymentDomain[] | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [newDomain, setNewDomain] = useState('');
     const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
-        setIsLoading(true);
-        setLoadError(null);
+
         getDomains(directory.id).then((result) => {
             if (cancelled) return;
+
             if (result.success) {
                 setDomains(result.domains);
+                setLoadError(null);
             } else {
+                setDomains([]);
                 setLoadError(result.error ?? t('loadFailed'));
             }
-            setIsLoading(false);
         });
+
         return () => {
             cancelled = true;
         };
     }, [directory.id, t]);
+
+    const isLoading = domains === null;
+    const visibleDomains = domains ?? [];
 
     const handleAddDomain = () => {
         const domain = newDomain.trim();
@@ -67,7 +75,7 @@ export function DomainManagement({ directory }: DomainManagementProps) {
         startTransition(async () => {
             const result = await addDomainAction(directory.id, domain);
             if (result.success && result.domain) {
-                setDomains((prev) => [...prev, result.domain!]);
+                setDomains((prev) => [...(prev ?? []), result.domain!]);
                 setNewDomain('');
                 if (result.verified) {
                     toast.success(t('addedAndVerified'));
@@ -86,7 +94,7 @@ export function DomainManagement({ directory }: DomainManagementProps) {
         startTransition(async () => {
             const result = await removeDomainAction(directory.id, domain);
             if (result.success) {
-                setDomains((prev) => prev.filter((d) => d.name !== domain));
+                setDomains((prev) => (prev ?? []).filter((d) => d.name !== domain));
                 toast.success(t('removed'));
                 router.refresh();
             } else {
@@ -99,7 +107,9 @@ export function DomainManagement({ directory }: DomainManagementProps) {
         startTransition(async () => {
             const result = await verifyDomainAction(directory.id, domain);
             if (result.success && result.domain) {
-                setDomains((prev) => prev.map((d) => (d.name === domain ? result.domain! : d)));
+                setDomains((prev) =>
+                    (prev ?? []).map((d) => (d.name === domain ? result.domain! : d)),
+                );
                 if (result.domain.verified) {
                     toast.success(t('verified'));
                     router.refresh();
@@ -177,13 +187,13 @@ export function DomainManagement({ directory }: DomainManagementProps) {
                         </div>
                     ) : loadError ? (
                         <p className="text-sm text-error dark:text-error-dark py-2">{loadError}</p>
-                    ) : domains.length === 0 ? (
+                    ) : visibleDomains.length === 0 ? (
                         <p className="text-sm text-text-secondary dark:text-text-secondary-dark py-2">
                             {t('noDomains')}
                         </p>
                     ) : (
                         <div className="space-y-2">
-                            {domains.map((domain) => (
+                            {visibleDomains.map((domain) => (
                                 <div
                                     key={domain.name}
                                     className="border border-border dark:border-border-dark rounded-lg"

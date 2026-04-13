@@ -33,22 +33,25 @@ type CachedHistoryPage = {
     limit: number;
 };
 
-export function DirectoryHistoryPageClient({
-    directoryId,
-    initialHistory,
-}: DirectoryHistoryPageClientProps) {
-    const t = useTranslations('dashboard.directoryDetail.history');
-    const locale = useLocale();
+type HistoryViewState = {
+    entries: DirectoryGenerationHistoryEntry[];
+    total: number;
+    limit: number;
+    currentPage: number;
+    activityFilter: HistoryActivityFilter;
+    pageCache: Record<string, CachedHistoryPage>;
+};
 
-    const [entries, setEntries] = useState<DirectoryGenerationHistoryEntry[]>(
-        initialHistory?.history ?? [],
-    );
-    const [total, setTotal] = useState(initialHistory?.total ?? 0);
-    const [limit, setLimit] = useState(initialHistory?.limit ?? 10);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [activityFilter, setActivityFilter] = useState<HistoryActivityFilter>('all');
-    const [pageCache, setPageCache] = useState<Record<string, CachedHistoryPage>>(
-        initialHistory?.history
+function buildInitialState(
+    initialHistory: DirectoryGenerationHistoryResponse | null,
+): HistoryViewState {
+    return {
+        entries: initialHistory?.history ?? [],
+        total: initialHistory?.total ?? 0,
+        limit: initialHistory?.limit ?? 10,
+        currentPage: 1,
+        activityFilter: 'all',
+        pageCache: initialHistory?.history
             ? {
                   'all:1': {
                       entries: initialHistory.history,
@@ -57,29 +60,54 @@ export function DirectoryHistoryPageClient({
                   },
               }
             : {},
+    };
+}
+
+export function DirectoryHistoryPageClient({
+    directoryId,
+    initialHistory,
+}: DirectoryHistoryPageClientProps) {
+    const historyKey = useMemo(
+        () =>
+            JSON.stringify({
+                total: initialHistory?.total ?? 0,
+                limit: initialHistory?.limit ?? 10,
+                ids: (initialHistory?.history ?? []).map((entry) => entry.id),
+            }),
+        [initialHistory],
+    );
+
+    return (
+        <DirectoryHistoryPageClientContent
+            key={historyKey}
+            directoryId={directoryId}
+            initialHistory={initialHistory}
+        />
+    );
+}
+
+function DirectoryHistoryPageClientContent({
+    directoryId,
+    initialHistory,
+}: DirectoryHistoryPageClientProps) {
+    const t = useTranslations('dashboard.directoryDetail.history');
+    const locale = useLocale();
+
+    const [entries, setEntries] = useState<DirectoryGenerationHistoryEntry[]>(
+        () => buildInitialState(initialHistory).entries,
+    );
+    const [total, setTotal] = useState(() => buildInitialState(initialHistory).total);
+    const [limit, setLimit] = useState(() => buildInitialState(initialHistory).limit);
+    const [currentPage, setCurrentPage] = useState(
+        () => buildInitialState(initialHistory).currentPage,
+    );
+    const [activityFilter, setActivityFilter] = useState<HistoryActivityFilter>(
+        () => buildInitialState(initialHistory).activityFilter,
+    );
+    const [pageCache, setPageCache] = useState<Record<string, CachedHistoryPage>>(
+        () => buildInitialState(initialHistory).pageCache,
     );
     const [isPending, startTransition] = useTransition();
-
-    useEffect(() => {
-        if (initialHistory) {
-            setEntries(initialHistory.history);
-            setTotal(initialHistory.total);
-            setLimit(initialHistory.limit);
-            setCurrentPage(1);
-            setActivityFilter('all');
-            setPageCache(
-                initialHistory.history
-                    ? {
-                          'all:1': {
-                              entries: initialHistory.history,
-                              total: initialHistory.total,
-                              limit: initialHistory.limit,
-                          },
-                      }
-                    : {},
-            );
-        }
-    }, [initialHistory]);
 
     const totalPages = useMemo(() => {
         if (total <= 0) {
