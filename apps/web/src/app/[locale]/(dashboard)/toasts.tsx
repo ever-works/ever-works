@@ -13,6 +13,16 @@ export default function DashboardToasts() {
     const isNewUser = searchParams.get('newUser') === 'true';
     const isVerified = searchParams.get('verified') === 'true';
     const isOAuthConnected = searchParams.get('oauth_connected') === 'true';
+    const oauthError = searchParams.get('oauth_error');
+    const oauthProvider = searchParams.get('oauth_provider');
+
+    const providerLabel = oauthProvider
+        ? oauthProvider
+              .split(/[-_]/)
+              .filter(Boolean)
+              .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+              .join(' ')
+        : t('oauthConnected.defaultProvider');
 
     useEffect(() => {
         if (isNewUser) {
@@ -65,7 +75,7 @@ export default function DashboardToasts() {
 
         if (isOAuthConnected) {
             toast.success(t('oauthConnected.title'), {
-                description: t('oauthConnected.description'),
+                description: t('oauthConnected.description', { provider: providerLabel }),
                 duration: 5000,
                 icon: (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,20 +90,34 @@ export default function DashboardToasts() {
             });
         }
 
+        if (oauthError === 'oauth_provider_conflict') {
+            toast.error(t('oauthConflict.title'), {
+                description: t('oauthConflict.description', { provider: providerLabel }),
+                duration: 6000,
+            });
+        } else if (oauthError) {
+            toast.error(t('oauthConnectFailed.title'), {
+                description: t('oauthConnectFailed.description', { provider: providerLabel }),
+                duration: 6000,
+            });
+        }
+
         // Clean up URL after showing toasts
-        if (isNewUser || isVerified || isOAuthConnected) {
+        if (isNewUser || isVerified || isOAuthConnected || oauthError) {
             const timer = setTimeout(() => {
                 // Remove query params without page refresh
                 const url = new URL(window.location.href);
                 url.searchParams.delete('newUser');
                 url.searchParams.delete('verified');
                 url.searchParams.delete('oauth_connected');
+                url.searchParams.delete('oauth_error');
+                url.searchParams.delete('oauth_provider');
                 window.history.replaceState({}, '', url.pathname + url.search);
             }, 1000);
 
             return () => clearTimeout(timer);
         }
-    }, [isNewUser, isVerified, isOAuthConnected, t]);
+    }, [isNewUser, isVerified, isOAuthConnected, oauthError, providerLabel, t]);
 
     return null; // This component doesn't render anything
 }

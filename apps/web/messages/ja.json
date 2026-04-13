@@ -211,7 +211,8 @@
             },
             "oauthConnected": {
                 "title": "GitHub アカウントと接続完了",
-                "description": "アカウントが GitHub と正常に接続されました。"
+                "description": "アカウントが GitHub と正常に接続されました。",
+                "defaultProvider": "Git プロバイダー"
             }
         },
         "header": {

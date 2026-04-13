@@ -211,7 +211,8 @@
             },
             "oauthConnected": {
                 "title": "חשבון חובר ל-GitHub",
-                "description": "חשבונך חובר בהצלחה ל-GitHub."
+                "description": "חשבונך חובר בהצלחה ל-GitHub.",
+                "defaultProvider": "ספק Git"
             }
         },
         "header": {

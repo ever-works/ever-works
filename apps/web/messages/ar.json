@@ -211,7 +211,8 @@
             },
             "oauthConnected": {
                 "title": "تم ربط الحساب بـ GitHub",
-                "description": "تم ربط حسابك بـ GitHub بنجاح."
+                "description": "تم ربط حسابك بـ GitHub بنجاح.",
+                "defaultProvider": "موفر Git"
             }
         },
         "header": {

@@ -4,6 +4,7 @@ import { getOAuthStateCookie, removeOAuthStateCookie } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
+import { appendQueryParams, getOAuthRouteErrorCode } from '../../../callback-errors';
 
 export async function GET(
     request: NextRequest,
@@ -14,13 +15,18 @@ export async function GET(
     const code = queryParams.get('code');
     const state = queryParams.get('state');
     const returnPath = queryParams.get('returnPath');
+    const defaultPath = ROUTES.DASHBOARD_SETTINGS_PLUGIN_CATEGORY('git-provider');
+    const targetPath = returnPath || defaultPath;
 
     const locale = await getLocale();
 
     if (!code) {
         return redirect({
             locale,
-            href: ROUTES.AUTH_ERROR + '?error=oauth_missing_code',
+            href: appendQueryParams(targetPath, {
+                oauth_error: 'oauth_missing_code',
+                oauth_provider: providerId,
+            }),
         });
     }
 
@@ -29,7 +35,10 @@ export async function GET(
         await removeOAuthStateCookie();
         return redirect({
             locale,
-            href: ROUTES.AUTH_ERROR + '?error=oauth_invalid_state',
+            href: appendQueryParams(targetPath, {
+                oauth_error: 'oauth_invalid_state',
+                oauth_provider: providerId,
+            }),
         });
     }
 
@@ -40,11 +49,16 @@ export async function GET(
     let href: string;
     try {
         await oauthAPI.connectCallback(providerId, code, state || undefined);
-        const defaultPath = ROUTES.DASHBOARD_SETTINGS_PLUGIN_CATEGORY('git-provider');
-        href = (returnPath || defaultPath) + '?oauth_connected=true';
+        href = appendQueryParams(targetPath, {
+            oauth_connected: 'true',
+            oauth_provider: providerId,
+        });
     } catch (error) {
         console.error(`Failed to connect OAuth provider ${providerId}:`, error);
-        href = ROUTES.AUTH_ERROR + '?error=oauth_failed';
+        href = appendQueryParams(targetPath, {
+            oauth_error: getOAuthRouteErrorCode(error, 'oauth_connect_failed'),
+            oauth_provider: providerId,
+        });
     }
 
     return redirect({ locale, href });

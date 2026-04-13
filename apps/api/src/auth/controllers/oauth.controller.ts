@@ -23,19 +23,10 @@ export class OAuthController {
         summary: 'Get OAuth URL',
         description: 'Generate an OAuth authorization URL for a supported provider',
     })
-    @ApiQuery({
-        name: 'callbackUrl',
-        required: false,
-        description: 'URL to redirect after authentication',
-    })
     @ApiQuery({ name: 'state', required: false, description: 'Optional state parameter' })
     @ApiResponse({ status: 200, description: 'Returns the OAuth URL' })
-    async getAuthUrl(
-        @Param('providerId') providerId: string,
-        @Query('callbackUrl') callbackUrl?: string,
-        @Query('state') state?: string,
-    ) {
-        const url = this.socialAuthService.getAuthorizationUrl(providerId, callbackUrl, state);
+    async getAuthUrl(@Param('providerId') providerId: string, @Query('state') state?: string) {
+        const url = this.socialAuthService.getAuthorizationUrl(providerId, undefined, state);
         return { url };
     }
 
@@ -49,12 +40,11 @@ export class OAuthController {
     async authRedirect(
         @Param('providerId') providerId: string,
         @Query('code') code: string,
-        @Query('callbackUrl') callbackUrl: string | undefined,
         @Request() req,
     ) {
         const userAgent = req.headers['user-agent'];
         const ipAddress = req.ip || req.headers['x-forwarded-for'];
-        const user = await this.socialAuthService.authenticate(providerId, code, callbackUrl);
+        const user = await this.socialAuthService.authenticate(providerId, code);
         const result = await this.authProvider.issueSession(user.id);
 
         this.activityLogService

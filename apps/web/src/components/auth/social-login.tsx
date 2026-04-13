@@ -3,6 +3,7 @@
 import { connectProvider } from '@/app/actions/auth';
 import { Button } from '@/components/ui/button';
 import { OAuthProvider } from '@/lib/api/enums';
+import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 
@@ -13,6 +14,7 @@ interface SocialLoginButtonsProps {
 export function SocialLoginButtons({ providers }: SocialLoginButtonsProps) {
     const t = useTranslations('auth.login');
     const [isPending, startTransition] = useTransition();
+    const isSingleProvider = providers.length === 1;
 
     if (providers.length === 0) {
         return null;
@@ -33,7 +35,12 @@ export function SocialLoginButtons({ providers }: SocialLoginButtonsProps) {
     };
 
     return (
-        <div className="grid grid-cols-2 gap-3">
+        <div
+            className={cn(
+                'grid gap-3',
+                isSingleProvider ? 'grid-cols-1 justify-items-center' : 'grid-cols-2',
+            )}
+        >
             {providers.includes(OAuthProvider.GOOGLE) && (
                 <Button
                     type="button"
