@@ -25,10 +25,7 @@ export class OAuthController {
     })
     @ApiQuery({ name: 'state', required: false, description: 'Optional state parameter' })
     @ApiResponse({ status: 200, description: 'Returns the OAuth URL' })
-    async getAuthUrl(
-        @Param('providerId') providerId: string,
-        @Query('state') state?: string,
-    ) {
+    async getAuthUrl(@Param('providerId') providerId: string, @Query('state') state?: string) {
         const url = this.socialAuthService.getAuthorizationUrl(providerId, undefined, state);
         return { url };
     }
