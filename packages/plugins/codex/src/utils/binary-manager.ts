@@ -8,6 +8,31 @@ import { detectPlatform, getBinaryPath } from './platform.js';
 interface Logger {
 	log(message: string, ...args: unknown[]): void;
 	debug(message: string, ...args: unknown[]): void;
+	warn?(message: string, ...args: unknown[]): void;
+}
+
+async function canExecute(command: string): Promise<{ ok: boolean; error?: string }> {
+	return new Promise((resolve) => {
+		const child = spawn(command, ['--version'], {
+			stdio: ['ignore', 'ignore', 'pipe']
+		});
+
+		let stderr = '';
+		child.stderr?.on('data', (chunk: Buffer) => {
+			stderr += chunk.toString('utf-8');
+		});
+
+		child.on('error', (error) => {
+			resolve({ ok: false, error: error.message });
+		});
+
+		child.on('exit', (code) => {
+			resolve({
+				ok: code === 0,
+				error: code === 0 ? undefined : stderr.trim() || `codex exited with code ${code}`
+			});
+		});
+	});
 }
 
 function fetchBuffer(url: string, maxRedirects = 5): Promise<Buffer> {
@@ -91,8 +116,13 @@ export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger
 
 	try {
 		await fs.access(binaryPath, fs.constants.X_OK);
-		logger?.debug(`Codex binary already cached at ${binaryPath}`);
-		return binaryPath;
+		const cachedBinary = await canExecute(binaryPath);
+		if (cachedBinary.ok) {
+			logger?.debug(`Codex binary already cached at ${binaryPath}`);
+			return binaryPath;
+		}
+
+		logger?.warn?.(`Cached Codex binary at ${binaryPath} is not runnable: ${cachedBinary.error}`);
 	} catch {
 		// continue with download
 	}
@@ -119,9 +149,26 @@ export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger
 		await fs.copyFile(extractedBinary, binaryPath);
 		await fs.chmod(binaryPath, 0o755);
 
-		logger?.log(`Codex CLI ${version} ready at ${binaryPath}`);
-		return binaryPath;
+		const downloadedBinary = await canExecute(binaryPath);
+		if (downloadedBinary.ok) {
+			logger?.log(`Codex CLI ${version} ready at ${binaryPath}`);
+			return binaryPath;
+		}
+
+		logger?.warn?.(
+			`Downloaded Codex binary at ${binaryPath} is not runnable on this host: ${downloadedBinary.error}`
+		);
 	} finally {
 		await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
 	}
+
+	const systemBinary = await canExecute('codex');
+	if (systemBinary.ok) {
+		logger?.log('Using system Codex CLI from PATH because the managed release binary is not compatible.');
+		return 'codex';
+	}
+
+	throw new Error(
+		`Failed to resolve a runnable Codex CLI. System codex error: ${systemBinary.error ?? 'unavailable'}`
+	);
 }
