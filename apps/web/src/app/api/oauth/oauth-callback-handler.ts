@@ -3,7 +3,7 @@ import { authAPI, AuthResponse } from '@/lib/api';
 import { OAuthProvider } from '@/lib/api/enums';
 import { getOAuthStateCookie, removeOAuthStateCookie, setAuthCookies } from '@/lib/auth';
 import { getRedirectUrl } from '@/lib/auth/redirect';
-import { ROUTES, withAppUrl } from '@/lib/constants';
+import { ROUTES } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
 import {
@@ -54,8 +54,7 @@ async function loginOauth(
         if (!Object.values(OAuthProvider).includes(provider)) {
             href = ROUTES.AUTH_ERROR + '?error=oauth_unsupported_provider';
         } else {
-            const callbackUrl = withAppUrl(request.nextUrl.pathname);
-            authResponse = await authAPI.connectOAuthCallback(provider, code, callbackUrl);
+            authResponse = await authAPI.connectOAuthCallback(provider, code);
         }
 
         if (authResponse) {

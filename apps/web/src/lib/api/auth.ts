@@ -140,16 +140,15 @@ export const authAPI = {
     },
 
     // OAuth URLs
-    getOAuthAuthUrl: async (providerId: OAuthProvider, callbackUrl?: string, state?: string) => {
+    getOAuthAuthUrl: async (providerId: OAuthProvider, state?: string) => {
         const params = new URLSearchParams();
-        if (callbackUrl) params.append('callbackUrl', callbackUrl);
         if (state) params.append('state', state);
         const query = params.toString() ? `?${params.toString()}` : '';
         return serverFetch<OAuthUrlResponse>(`/oauth/${providerId}/url${query}`);
     },
 
-    connectOAuthCallback: async (providerId: OAuthProvider, code: string, callbackUrl: string) => {
-        const params = new URLSearchParams({ code, callbackUrl });
+    connectOAuthCallback: async (providerId: OAuthProvider, code: string) => {
+        const params = new URLSearchParams({ code });
         return serverFetch<AuthResponse>(`/oauth/${providerId}/callback?${params.toString()}`);
     },
 
