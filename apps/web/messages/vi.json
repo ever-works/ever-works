@@ -211,7 +211,8 @@
             },
             "oauthConnected": {
                 "title": "Đã kết nối tài khoản với GitHub",
-                "description": "Tài khoản của bạn đã được kết nối thành công với GitHub."
+                "description": "Tài khoản của bạn đã được kết nối thành công với GitHub.",
+                "defaultProvider": "Nhà cung cấp Git"
             }
         },
         "header": {

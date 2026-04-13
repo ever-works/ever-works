@@ -211,7 +211,8 @@
             },
             "oauthConnected": {
                 "title": "GitHub 계정 연결됨",
-                "description": "계정이 GitHub에 성공적으로 연결되었습니다."
+                "description": "계정이 GitHub에 성공적으로 연결되었습니다.",
+                "defaultProvider": "Git 제공업체"
             }
         },
         "header": {
