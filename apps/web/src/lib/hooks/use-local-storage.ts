@@ -37,12 +37,14 @@ export function useLocalStorage<T>(
         options?.deserialize ?? ((raw: string) => raw as unknown as T),
     );
     const validateRef = useRef<(value: T) => boolean>(options?.validate ?? (() => true));
+    const defaultValueRef = useRef(defaultValue);
 
-    useEffect(() => {
+    useIsomorphicLayoutEffect(() => {
         serializeRef.current = options?.serialize ?? String;
         deserializeRef.current = options?.deserialize ?? ((raw: string) => raw as unknown as T);
         validateRef.current = options?.validate ?? (() => true);
-    }, [options?.deserialize, options?.serialize, options?.validate]);
+        defaultValueRef.current = defaultValue;
+    }, [defaultValue, options?.deserialize, options?.serialize, options?.validate]);
 
     // Always start with defaultValue — safe for SSR and matches server HTML.
     const [value, setValueState] = useState<T>(defaultValue);
@@ -68,18 +70,20 @@ export function useLocalStorage<T>(
             if (e.key !== key) return;
             try {
                 if (e.newValue === null) {
-                    setValueState(defaultValue);
+                    setValueState(defaultValueRef.current);
                 } else {
                     const parsed = deserializeRef.current(e.newValue);
-                    setValueState(validateRef.current(parsed) ? parsed : defaultValue);
+                    setValueState(
+                        validateRef.current(parsed) ? parsed : defaultValueRef.current,
+                    );
                 }
             } catch {
-                setValueState(defaultValue);
+                setValueState(defaultValueRef.current);
             }
         };
         window.addEventListener('storage', handler);
         return () => window.removeEventListener('storage', handler);
-    }, [defaultValue, key]);
+    }, [key]);
 
     const setValue = useCallback(
         (next: T) => {
