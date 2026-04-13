@@ -88,7 +88,7 @@ export function DirectoryAICreator({
             }
         }
         loadSchema();
-    }, [providers.pipeline, syncResolvedPipeline, handleProviderChange]);
+    }, [formSchema, providers.pipeline, syncResolvedPipeline, handleProviderChange]);
 
     const handlePluginConfigChange = useCallback((values: Record<string, unknown>) => {
         setPluginConfig(values);

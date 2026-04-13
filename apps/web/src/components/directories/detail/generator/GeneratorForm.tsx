@@ -139,7 +139,15 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             }
         }
         loadFormSchema();
-    }, [directoryId, t, providers.pipeline, syncResolvedPipeline, handleProviderChange]);
+    }, [
+        directoryId,
+        formSchema,
+        handleProviderChange,
+        lastRequestData?.providers?.pipeline,
+        providers.pipeline,
+        syncResolvedPipeline,
+        t,
+    ]);
 
     const handleCoreDataChange = useCallback((updates: Partial<typeof coreData>) => {
         setCoreData((prev) => ({ ...prev, ...updates }));
