@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
 
 // On the server useLayoutEffect is a no-op; on the client it runs synchronously
 // after DOM mutations but *before* the browser paints — eliminating any flash.
@@ -33,18 +33,12 @@ export function useLocalStorage<T>(
         validate?: (value: T) => boolean;
     },
 ): [T, (value: T) => void] {
-    // Keep refs up-to-date on every render so closures always call the latest
-    // version, even when the caller passes new inline function references.
-    const serializeRef = useRef(options?.serialize ?? String);
-    const deserializeRef = useRef(options?.deserialize ?? ((raw: string) => raw as unknown as T));
-    const validateRef = useRef(options?.validate ?? (() => true));
-
-    serializeRef.current = options?.serialize ?? String;
-    deserializeRef.current = options?.deserialize ?? ((raw: string) => raw as unknown as T);
-    validateRef.current = options?.validate ?? (() => true);
-
-    const defaultValueRef = useRef(defaultValue);
-    defaultValueRef.current = defaultValue;
+    const serialize = useMemo(() => options?.serialize ?? String, [options?.serialize]);
+    const deserialize = useMemo(
+        () => options?.deserialize ?? ((raw: string) => raw as unknown as T),
+        [options?.deserialize],
+    );
+    const validate = useMemo(() => options?.validate ?? (() => true), [options?.validate]);
 
     // Always start with defaultValue — safe for SSR and matches server HTML.
     const [value, setValueState] = useState<T>(defaultValue);
@@ -55,12 +49,12 @@ export function useLocalStorage<T>(
         try {
             const raw = localStorage.getItem(key);
             if (raw === null) return;
-            const parsed = deserializeRef.current(raw);
-            if (validateRef.current(parsed)) setValueState(parsed);
+            const parsed = deserialize(raw);
+            if (validate(parsed)) setValueState(parsed);
         } catch {
             // localStorage unavailable — keep defaultValue
         }
-    }, [key]);
+    }, [deserialize, key, validate]);
 
     // Sync with storage changes from other tabs/windows.
     // Only re-registers when `key` changes; refs give access to the latest
@@ -70,29 +64,29 @@ export function useLocalStorage<T>(
             if (e.key !== key) return;
             try {
                 if (e.newValue === null) {
-                    setValueState(defaultValueRef.current);
+                    setValueState(defaultValue);
                 } else {
-                    const parsed = deserializeRef.current(e.newValue);
-                    setValueState(validateRef.current(parsed) ? parsed : defaultValueRef.current);
+                    const parsed = deserialize(e.newValue);
+                    setValueState(validate(parsed) ? parsed : defaultValue);
                 }
             } catch {
-                setValueState(defaultValueRef.current);
+                setValueState(defaultValue);
             }
         };
         window.addEventListener('storage', handler);
         return () => window.removeEventListener('storage', handler);
-    }, [key]);
+    }, [defaultValue, deserialize, key, validate]);
 
     const setValue = useCallback(
         (next: T) => {
             setValueState(next);
             try {
-                localStorage.setItem(key, serializeRef.current(next));
+                localStorage.setItem(key, serialize(next));
             } catch {
                 // localStorage may be unavailable (e.g. private browsing quota)
             }
         },
-        [key],
+        [key, serialize],
     );
 
     return [value, setValue];

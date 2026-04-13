@@ -26,10 +26,6 @@ export function GitHubSync() {
     const [showPullImport, setShowPullImport] = useState(false);
     const [includeSecrets, setIncludeSecrets] = useState(false);
 
-    useEffect(() => {
-        loadStatus();
-    }, []);
-
     const loadStatus = () => {
         startTransition(() => {
             void (async () => {
@@ -40,6 +36,10 @@ export function GitHubSync() {
             })();
         });
     };
+
+    useEffect(() => {
+        loadStatus();
+    }, []);
 
     const handleCreateNew = () => {
         startTransition(() => {

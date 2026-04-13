@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useMounted } from '@/lib/hooks/use-mounted';
 import { cn } from '@/lib/utils/cn';
 import { ChatInterface } from './ChatInterface';
 import { Bot } from 'lucide-react';
@@ -27,19 +27,13 @@ export function ChatPanel({
     className,
     style,
 }: ChatPanelProps & { className?: string; style?: React.CSSProperties }) {
-    // Skip transition on first render to avoid flash when restoring from localStorage
-    const hasMounted = useRef(false);
-    useEffect(() => {
-        requestAnimationFrame(() => {
-            hasMounted.current = true;
-        });
-    }, []);
+    const mounted = useMounted();
 
     return (
         <div
             className={cn(
                 'relative h-full shrink-0',
-                hasMounted.current && 'transition-all duration-200',
+                mounted && 'transition-all duration-200',
                 className,
             )}
             style={style}
@@ -49,7 +43,7 @@ export function ChatPanel({
                     'absolute inset-0 flex flex-col overflow-hidden',
                     'bg-white dark:bg-surface-dark',
                     'border-r border-border dark:border-border-dark',
-                    hasMounted.current && 'transition-opacity duration-200',
+                    mounted && 'transition-opacity duration-200',
                     open ? 'opacity-100' : 'opacity-0 pointer-events-none',
                 )}
             >

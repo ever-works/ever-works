@@ -56,6 +56,17 @@ function getProviderIcon(providerId: string) {
     }
 }
 
+function renderProviderIcon(providerId: string, className?: string) {
+    switch (providerId.toLowerCase()) {
+        case 'github':
+            return <Github className={className} />;
+        case 'gitlab':
+            return <GitlabIcon className={className} />;
+        default:
+            return <Boxes className={className} />;
+    }
+}
+
 function buildProviderUrl(homepage: string | undefined, path: string): string {
     if (!homepage) return '#';
     return `${homepage.replace(/\/$/, '')}/${path}`;
@@ -209,7 +220,6 @@ function GitProviderCard({
     const username = connectionInfo?.username;
     const avatarUrl = connectionInfo?.avatarUrl || userAvatar;
 
-    const ProviderIcon = getProviderIcon(provider.id);
     const brandColors = getProviderBrandColors(provider.id);
 
     // Use provided returnPath or fall back to current page (locale-free via usePathname)
@@ -282,7 +292,7 @@ function GitProviderCard({
                                 'shadow-sm',
                             )}
                         >
-                            <ProviderIcon className={cn('w-6 h-6', brandColors.icon)} />
+                            {renderProviderIcon(provider.id, cn('w-6 h-6', brandColors.icon))}
                         </div>
                         <div>
                             <h3 className="font-semibold text-text dark:text-text-dark">

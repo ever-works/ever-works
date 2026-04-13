@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 import { PluginsApiIcon } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
 import { Plug } from 'lucide-react';
@@ -10,21 +10,28 @@ import * as LucideIcons from 'lucide-react';
  * Observes the `dark` class on `<html>` so the component re-renders
  * in real time when the user toggles the theme.
  */
+function subscribeToThemeChange(onStoreChange: () => void) {
+    if (typeof document === 'undefined') {
+        return () => {};
+    }
+
+    const root = document.documentElement;
+    const observer = new MutationObserver(onStoreChange);
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+
+    return () => observer.disconnect();
+}
+
+function getIsDarkSnapshot() {
+    if (typeof document === 'undefined') {
+        return false;
+    }
+
+    return document.documentElement.classList.contains('dark');
+}
+
 function useIsDark(): boolean {
-    const [isDark, setIsDark] = useState(false);
-
-    useEffect(() => {
-        const root = document.documentElement;
-        setIsDark(root.classList.contains('dark'));
-
-        const observer = new MutationObserver(() => {
-            setIsDark(root.classList.contains('dark'));
-        });
-        observer.observe(root, { attributes: true, attributeFilter: ['class'] });
-        return () => observer.disconnect();
-    }, []);
-
-    return isDark;
+    return useSyncExternalStore(subscribeToThemeChange, getIsDarkSnapshot, () => false);
 }
 
 interface PluginIconProps {

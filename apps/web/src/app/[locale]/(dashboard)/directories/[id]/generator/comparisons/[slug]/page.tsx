@@ -22,18 +22,20 @@ type Params = { params: Promise<{ id: string; slug: string }> };
 
 export default async function ComparisonDetailPage({ params }: Params) {
     const { id, slug } = await params;
+    let result;
 
     try {
-        const result = await directoryAPI.getComparison(id, slug);
-        return (
-            <ComparisonDetailClient
-                directoryId={id}
-                comparison={result.comparison}
-                markdown={result.markdown}
-                extendedAnalysisMarkdown={result.extendedAnalysisMarkdown}
-            />
-        );
+        result = await directoryAPI.getComparison(id, slug);
     } catch {
         notFound();
     }
+
+    return (
+        <ComparisonDetailClient
+            directoryId={id}
+            comparison={result.comparison}
+            markdown={result.markdown}
+            extendedAnalysisMarkdown={result.extendedAnalysisMarkdown}
+        />
+    );
 }

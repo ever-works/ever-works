@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils/cn';
 import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Eye, EyeOff, Pencil, X, KeyRound } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { PluginModelSelect } from './PluginModelSelect';
 import { PluginSettingsObjectField } from './PluginSettingsObjectField';
 import { PluginSettingsArrayField } from './PluginSettingsArrayField';
@@ -33,7 +33,7 @@ export function PluginSettingsField({
     const t = useTranslations('dashboard.plugins.settingsField');
     const [showSecret, setShowSecret] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const previousMaskedValue = useRef<string | null>(null);
+    const [previousMaskedValue, setPreviousMaskedValue] = useState<string | null>(null);
 
     const label = schema.title || name;
     const description = schema.description;
@@ -42,14 +42,6 @@ export function PluginSettingsField({
 
     // Check if the current value is a masked placeholder from the API
     const isMaskedValue = isSecret && typeof value === 'string' && value.includes('••••');
-
-    // Reset editing mode when a new masked value arrives (after save + router refresh)
-    useEffect(() => {
-        if (isMaskedValue) {
-            setIsEditing(false);
-            previousMaskedValue.current = null;
-        }
-    }, [isMaskedValue]);
 
     // Determine input type for string/number inputs
     const getInputType = () => {
@@ -203,7 +195,7 @@ export function PluginSettingsField({
                     <button
                         type="button"
                         onClick={() => {
-                            previousMaskedValue.current = String(value);
+                            setPreviousMaskedValue(String(value));
                             setIsEditing(true);
                             onChange('');
                         }}
@@ -252,12 +244,12 @@ export function PluginSettingsField({
                         </button>
                     )}
                 </div>
-                {isEditing && previousMaskedValue.current && (
+                {isEditing && previousMaskedValue && (
                     <button
                         type="button"
                         onClick={() => {
-                            onChange(previousMaskedValue.current);
-                            previousMaskedValue.current = null;
+                            onChange(previousMaskedValue);
+                            setPreviousMaskedValue(null);
                             setIsEditing(false);
                         }}
                         className={cn(
