@@ -210,6 +210,8 @@ spec:
           env:
             - name: AUTH_SECRET
               value: "$AUTH_SECRET"
+            - name: WEB_URL
+              value: "https://appdev.ever.works"
             - name: API_URL
               value: "http://ever-works-api-dev:3100"
             - name: NEXT_PUBLIC_WEB_URL
