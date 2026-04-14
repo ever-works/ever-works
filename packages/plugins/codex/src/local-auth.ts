@@ -87,7 +87,7 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 	}
 
 	const existing = getActiveSession(userId);
-	if (existing?.verificationUri && existing?.userCode) {
+	if (existing) {
 		return {
 			installed: true,
 			connected: false,
@@ -95,7 +95,9 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 			authPath,
 			verificationUri: existing.verificationUri,
 			userCode: existing.userCode,
-			message: 'Codex device authentication is already in progress.'
+			message: existing.verificationUri
+				? 'Codex device authentication is already in progress.'
+				: 'Codex device authentication is starting...'
 		};
 	}
 

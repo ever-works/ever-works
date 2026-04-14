@@ -514,6 +514,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		const userId = directory.user?.id ?? 'system';
 
 		let workspaceCreated = false;
+		let workspacePath: string | null = null;
 
 		try {
 			const setupStartedAt = this.startStep('setup-codex', onLogEntry);
@@ -541,7 +542,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			const prepareStartedAt = this.startStep('prepare-context', onLogEntry);
 			reportProgress(onProgress, 1, 15, 'Prepare Context');
 
-			const workspacePath = await createWorkspace(userId, directory.id);
+			workspacePath = await createWorkspace(userId, directory.id);
 			workspaceCreated = true;
 			await seedExistingItems(workspacePath, existing.items);
 			await seedMetadata(workspacePath, {
@@ -681,7 +682,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 			const cleanupStartedAt = this.startStep('cleanup', onLogEntry);
 			reportProgress(onProgress, 5, 95, 'Cleanup');
-			await cleanupWorkspace(userId, directory.id);
+			await cleanupWorkspace(workspacePath);
 			workspaceCreated = false;
 			this.completeStep('cleanup', cleanupStartedAt, onLogEntry);
 
@@ -711,8 +712,8 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			if (runningStepId) {
 				this.failStep(runningStepId, err, onLogEntry);
 			}
-			if (workspaceCreated) {
-				await cleanupWorkspace(userId, directory.id);
+			if (workspaceCreated && workspacePath) {
+				await cleanupWorkspace(workspacePath);
 			}
 			return this.handleError(err, startTime);
 		}

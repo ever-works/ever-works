@@ -26,7 +26,8 @@ describe('workspace-manager', () => {
 		const workspacePath = await createWorkspace(userId, directoryId);
 		cleanupPaths.push(path.join('/tmp/codex-generator', userId));
 
-		expect(workspacePath).toBe(getWorkspacePath(userId, directoryId));
+		expect(workspacePath.startsWith(path.join('/tmp/codex-generator', userId, `${directoryId}-`))).toBe(true);
+		expect(path.dirname(workspacePath)).toBe(path.join('/tmp/codex-generator', userId));
 
 		const metaStats = await fs.stat(path.join(workspacePath, '_meta'));
 		expect(metaStats.isDirectory()).toBe(true);

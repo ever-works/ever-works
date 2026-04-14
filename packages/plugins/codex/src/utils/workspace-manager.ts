@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import type { Brand, Category, ItemData, Tag } from '@ever-works/plugin';
 import {
@@ -130,13 +130,12 @@ async function parallelBatch<T>(tasks: (() => Promise<T>)[], concurrency: number
 	return results;
 }
 
-export function getWorkspacePath(userId: string, directoryId: string): string {
-	return path.join(BASE_TEMP_DIR, userId, directoryId);
+export function getWorkspacePath(userId: string, directoryId: string, runId: string): string {
+	return path.join(BASE_TEMP_DIR, userId, `${directoryId}-${runId}`);
 }
 
 export async function createWorkspace(userId: string, directoryId: string): Promise<string> {
-	const workspacePath = getWorkspacePath(userId, directoryId);
-	await fs.rm(workspacePath, { recursive: true, force: true });
+	const workspacePath = getWorkspacePath(userId, directoryId, randomUUID());
 	await fs.mkdir(path.join(workspacePath, '_meta'), { recursive: true });
 	return workspacePath;
 }
@@ -305,9 +304,9 @@ export async function writeGeneratedItems(workspacePath: string, items: readonly
 
 export async function ensureOnboardingConfig(_configDir: string): Promise<void> {}
 
-export async function cleanupWorkspace(userId: string, directoryId: string): Promise<void> {
+export async function cleanupWorkspace(workspacePath: string): Promise<void> {
 	try {
-		await fs.rm(getWorkspacePath(userId, directoryId), { recursive: true, force: true });
+		await fs.rm(workspacePath, { recursive: true, force: true });
 	} catch {
 		// non-fatal
 	}

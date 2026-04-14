@@ -285,7 +285,7 @@ describe('CodexPlugin', () => {
 			expect(String(result.error)).toContain('Codex failed');
 			expect(result.failedStep).toBe('generate-items');
 			expect(plugin.getState()?.steps.get('generate-items')?.status).toBe('failed');
-			expect(workspaceManager.cleanupWorkspace).toHaveBeenCalledWith('user1', 'dir1');
+			expect(workspaceManager.cleanupWorkspace).toHaveBeenCalledWith('/tmp/codex-generator/user1/dir1');
 		});
 
 		it('fails when Codex finishes without producing any valid item JSON files', async () => {
