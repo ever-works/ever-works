@@ -390,11 +390,7 @@ describe('CodexPlugin', () => {
 					bypassApprovalsAndSandbox: true
 				})
 			);
-			expect(recoverySpy).toHaveBeenCalledWith(
-				expect.objectContaining({
-					preferBypass: true
-				})
-			);
+			expect(recoverySpy).not.toHaveBeenCalled();
 			recoverySpy.mockRestore();
 		});
 

@@ -621,21 +621,23 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 					items = await readGeneratedItems(workspacePath, logger);
 				}
 
-				const recoveredItems = await this.recoverItemsFromStructuredOutput({
-					directory,
-					request,
-					existing,
-					workspacePath,
-					settings,
-					executionAuthEnv: executionAuth.env,
-					preferBypass: shouldRetryWithBypass,
-					onLogEntry,
-					signal
-				});
+				if (items.length === 0) {
+					const recoveredItems = await this.recoverItemsFromStructuredOutput({
+						directory,
+						request,
+						existing,
+						workspacePath,
+						settings,
+						executionAuthEnv: executionAuth.env,
+						preferBypass: shouldRetryWithBypass,
+						onLogEntry,
+						signal
+					});
 
-				if (recoveredItems.length > 0) {
-					await writeGeneratedItems(workspacePath, recoveredItems);
-					items = await readGeneratedItems(workspacePath, logger);
+					if (recoveredItems.length > 0) {
+						await writeGeneratedItems(workspacePath, recoveredItems);
+						items = await readGeneratedItems(workspacePath, logger);
+					}
 				}
 
 				if (items.length === 0) {
