@@ -47,10 +47,8 @@ jobs:
         run: |
           envsubst < $GITHUB_WORKSPACE/.deploy/k8s/k8s-manifest.prod.yaml | kubectl --context do-sfo2-k8s-gauzy apply -f -
         env:
-          # WEB ENV
-          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
-
           # API ENV
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           WEB_URL: https://app.ever.works
           ALLOWED_ORIGINS: https://app.ever.works,https://api.ever.works
           JWT_SECRET: ${{ secrets.JWT_SECRET }}

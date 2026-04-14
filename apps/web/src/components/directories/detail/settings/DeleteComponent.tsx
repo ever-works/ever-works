@@ -23,11 +23,6 @@ import { TriangleAlertIcon } from 'lucide-react';
 
 export function DeleteComponent({ directory }: { directory: Directory }) {
     const permissions = useDirectoryPermissions();
-
-    // Only owners can delete directories
-    if (!permissions.canDelete) {
-        return null;
-    }
     const t = useTranslations('dashboard.directoryDetail.settings');
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
@@ -38,6 +33,11 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
         delete_markdown_repository: false,
         delete_website_repository: false,
     });
+
+    // Only owners can delete directories
+    if (!permissions.canDelete) {
+        return null;
+    }
 
     const handleCloseDialog = () => {
         setShowDeleteDialog(false);

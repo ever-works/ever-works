@@ -9,6 +9,7 @@ import {
     Query,
     HttpCode,
     HttpStatus,
+    Logger,
 } from '@nestjs/common';
 import {
     ApiTags,
@@ -19,22 +20,45 @@ import {
     ApiQuery,
 } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
-import { RegisterDto, LoginDto, RefreshTokenDto, UpdatePasswordDto } from '../dto/auth.dto';
+import { RegisterDto, LoginDto, UpdatePasswordDto } from '../dto/auth.dto';
 import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/email-verification.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
-import { LocalAuthGuard } from '../guards/local-auth.guard';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { AuthSessionGuard } from '../guards/auth-session.guard';
 import { Public } from '../decorators/public.decorator';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
+import { AUTH_PROVIDER } from '../providers/auth-provider.constants';
+import { AuthProvider } from '../providers/auth-provider.abstract';
+import { Inject } from '@nestjs/common';
+import { toHeaders } from '../providers/request-headers';
+import { SocialAuthService } from '../services/social-auth.service';
 
 @ApiTags('Auth')
 @Controller('api/auth')
 export class AuthController {
+    private readonly logger = new Logger(AuthController.name);
+
     constructor(
         private authService: AuthService,
+        private readonly socialAuthService: SocialAuthService,
         private activityLogService: ActivityLogService,
+        @Inject(AUTH_PROVIDER)
+        private readonly authProvider: AuthProvider,
     ) {}
+
+    @Public()
+    @Get('providers')
+    @ApiOperation({
+        summary: 'Get configured auth providers',
+        description: 'Returns the currently configured authentication providers',
+    })
+    @ApiResponse({ status: 200, description: 'Configured auth providers' })
+    getConfiguredProviders() {
+        return {
+            emailPassword: true,
+            socialProviders: this.socialAuthService.getConfiguredProviders(),
+        };
+    }
 
     @Public()
     @Post('register')
@@ -44,28 +68,52 @@ export class AuthController {
     })
     @ApiResponse({ status: 201, description: 'User successfully registered' })
     @ApiResponse({ status: 400, description: 'Invalid input or email already exists' })
-    async register(@Body() registerDto: RegisterDto) {
-        return this.authService.register(registerDto);
+    async register(@Body() registerDto: RegisterDto, @Request() req) {
+        await this.authService.assertCanRegister(registerDto.email);
+        const response = await this.authProvider.signUpEmail(
+            registerDto.username,
+            registerDto.email,
+            registerDto.password,
+            toHeaders(req.headers || {}),
+        );
+
+        try {
+            await this.authService.sendVerificationEmail(
+                response.user.id,
+                registerDto.emailVerificationCallbackUrl,
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Failed to send verification email for user ${response.user.id}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+
+        return response;
     }
 
     @Public()
-    @UseGuards(LocalAuthGuard)
     @Post('login')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'User login', description: 'Authenticate with email and password' })
     @ApiBody({ type: LoginDto })
     @ApiResponse({
         status: 200,
-        description: 'Successfully authenticated, returns access and refresh tokens',
+        description: 'Successfully authenticated, returns a bearer token',
     })
     @ApiResponse({ status: 401, description: 'Invalid credentials' })
-    async login(@Request() req) {
+    async login(@Request() req, @Body() loginDto: LoginDto) {
         const userAgent = req.headers['user-agent'];
         const ipAddress = req.ip || req.headers['x-forwarded-for'];
-        const result = await this.authService.login(req.user, userAgent, ipAddress);
+        const result = await this.authProvider.signInEmail(
+            loginDto.email,
+            loginDto.password,
+            toHeaders(req.headers || {}),
+        );
         this.activityLogService
             .log({
-                userId: req.user.id,
+                userId: result.user.id,
                 actionType: ActivityActionType.USER_LOGIN,
                 action: 'user.login',
                 status: ActivityStatus.COMPLETED,
@@ -77,45 +125,36 @@ export class AuthController {
         return result;
     }
 
-    @Public()
-    @Post('refresh')
-    @HttpCode(HttpStatus.OK)
-    @ApiOperation({
-        summary: 'Refresh access token',
-        description: 'Get a new access token using a refresh token',
-    })
-    @ApiResponse({ status: 200, description: 'New access token generated' })
-    @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
-    async refresh(@Request() req, @Body() refreshTokenDto: RefreshTokenDto) {
-        const userAgent = req.headers['user-agent'];
-        const ipAddress = req.ip || req.headers['x-forwarded-for'];
-        return this.authService.refreshToken(refreshTokenDto.refreshToken, userAgent, ipAddress);
-    }
-
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(AuthSessionGuard)
     @Post('logout')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
-    @ApiOperation({ summary: 'Logout', description: 'Invalidate the current refresh token' })
+    @ApiOperation({
+        summary: 'Logout',
+        description: 'Invalidate the current authenticated session',
+    })
     @ApiResponse({ status: 200, description: 'Successfully logged out' })
-    async logout(@Body() refreshTokenDto: RefreshTokenDto) {
-        return this.authService.logout(refreshTokenDto.refreshToken);
+    async logout(@Request() req) {
+        await this.authProvider.signOut(toHeaders(req.headers || {}));
+
+        return { message: 'Logged out successfully' };
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(AuthSessionGuard)
     @Post('logout-all')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
         summary: 'Logout from all devices',
-        description: 'Invalidate all refresh tokens for the user',
+        description: 'Invalidate all sessions for the user',
     })
     @ApiResponse({ status: 200, description: 'Successfully logged out from all devices' })
     async logoutAll(@Request() req) {
-        return this.authService.logoutAllDevices(req.user.userId);
+        await this.authProvider.signOutAll(req.user.userId);
+        return { message: 'Logged out from all devices successfully' };
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(AuthSessionGuard)
     @Get('profile')
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
@@ -127,7 +166,7 @@ export class AuthController {
         return req.user;
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(AuthSessionGuard)
     @Get('profile/fresh')
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
@@ -140,7 +179,7 @@ export class AuthController {
         return this.authService.getUserProfile(req.user.userId);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(AuthSessionGuard)
     @Post('update-password')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
@@ -148,10 +187,15 @@ export class AuthController {
     @ApiResponse({ status: 200, description: 'Password successfully updated' })
     @ApiResponse({ status: 400, description: 'Current password is incorrect' })
     async updatePassword(@Request() req, @Body() updatePasswordDto: UpdatePasswordDto) {
-        return this.authService.updatePassword(req.user.userId, updatePasswordDto);
+        await this.authProvider.changePassword(
+            updatePasswordDto.currentPassword,
+            updatePasswordDto.newPassword,
+            toHeaders(req.headers || {}),
+        );
+        return { message: 'Password updated successfully' };
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(AuthSessionGuard)
     @Put('profile')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
@@ -164,7 +208,7 @@ export class AuthController {
         return this.authService.updateUserProfile(req.user.userId, updateProfileDto);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(AuthSessionGuard)
     @Post('send-verification')
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
@@ -184,10 +228,11 @@ export class AuthController {
         summary: 'Verify email',
         description: 'Verify email address using the token from the verification email',
     })
-    @ApiResponse({ status: 200, description: 'Email verified successfully' })
+    @ApiResponse({ status: 200, description: 'Email verified successfully and session issued' })
     @ApiResponse({ status: 400, description: 'Invalid or expired token' })
     async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
-        return this.authService.verifyEmail(verifyEmailDto.token);
+        const user = await this.authService.verifyEmail(verifyEmailDto.token);
+        return this.authProvider.issueSession(user.id);
     }
 
     @Public()
@@ -209,7 +254,11 @@ export class AuthController {
     @ApiResponse({ status: 200, description: 'Password reset successfully' })
     @ApiResponse({ status: 400, description: 'Invalid or expired token' })
     async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
-        return this.authService.resetPassword(resetPasswordDto.token, resetPasswordDto.newPassword);
+        const user = await this.authService.getUserByPasswordResetToken(resetPasswordDto.token);
+        await this.authProvider.setPassword(user.id, resetPasswordDto.newPassword);
+        await this.authService.consumePasswordResetToken(resetPasswordDto.token);
+        await this.authProvider.signOutAll(user.id);
+        return { message: 'Password reset successfully' };
     }
 
     @Public()

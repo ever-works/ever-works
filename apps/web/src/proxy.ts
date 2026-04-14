@@ -46,16 +46,13 @@ export default async function proxy(req: NextRequest) {
     // Check authentication
     const auth = await getAuthFromCookie().catch(() => null);
     if (!auth) {
-        // Not authenticated - redirect to login
-        const loginUrl = new URL(ROUTES.AUTH_LOGIN, req.url);
-        loginUrl.searchParams.set(REDIRECT_SEARCH_PARAM, pathname);
+        const response = redirect(maybeLocale, ROUTES.AUTH_LOGIN, req);
 
-        // Remove invalid cookie if it exists
         if (req.cookies.has(AUTH_COOKIE_NAME)) {
-            req.cookies.delete(AUTH_COOKIE_NAME);
+            response.cookies.delete(AUTH_COOKIE_NAME);
         }
 
-        return redirect(maybeLocale, ROUTES.AUTH_LOGIN, req);
+        return response;
     }
 
     return intlResponse;

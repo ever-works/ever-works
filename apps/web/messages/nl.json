@@ -211,7 +211,8 @@
             },
             "oauthConnected": {
                 "title": "Account verbonden met GitHub",
-                "description": "Uw account is succesvol verbonden met GitHub."
+                "description": "Uw account is succesvol verbonden met GitHub.",
+                "defaultProvider": "Git-provider"
             }
         },
         "header": {

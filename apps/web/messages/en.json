@@ -15,6 +15,7 @@
                 "missingCode": "Authorization code is missing. Please try signing in again.",
                 "invalidState": "Invalid authorization state. Please try signing in again.",
                 "unsupportedProvider": "This authentication provider is not supported.",
+                "providerConflict": "This provider account is already linked to another user. Please use a different account or contact support if this is unexpected.",
                 "callbackFailed": "Failed to complete authentication. Please try again."
             },
             "resetPassword": {
@@ -334,6 +335,12 @@
     },
     "dashboard": {
         "title": "Dashboard",
+        "connectGithub": {
+            "title": "Connect your GitHub account",
+            "description": "GitHub is required for creating and managing directory repositories. Connect your account to get started.",
+            "connect": "Connect GitHub",
+            "dismiss": "I'll do this later"
+        },
         "toasts": {
             "newUser": {
                 "title": "Welcome to {companyName}! 🎉",
@@ -349,8 +356,17 @@
                 "description": "Your email address has been verified. You now have full access to all features."
             },
             "oauthConnected": {
-                "title": "Account connected to GitHub",
-                "description": "Your account has been successfully connected to GitHub."
+                "title": "Account connected",
+                "description": "Your account has been successfully connected to {provider}.",
+                "defaultProvider": "Git provider"
+            },
+            "oauthConflict": {
+                "title": "Provider account already linked",
+                "description": "This {provider} account is already linked to another Ever Works user."
+            },
+            "oauthConnectFailed": {
+                "title": "Connection failed",
+                "description": "We could not connect your {provider} account. Please try again."
             }
         },
         "header": {

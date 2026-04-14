@@ -36,9 +36,14 @@ import { usePluginToggle } from '@/lib/hooks/use-plugin-toggle';
 interface PluginSettingsProps {
     plugin: UserPlugin;
     oauthConnection?: OAuthConnectionInfo | null;
+    localAuthStatus?: import('@/lib/api/plugins').CodexLocalAuthStatus | null;
 }
 
-export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps) {
+export function PluginSettings({
+    plugin,
+    oauthConnection,
+    localAuthStatus,
+}: PluginSettingsProps) {
     const t = useTranslations('dashboard.plugins');
     const tOnboarding = useTranslations('onboarding.plugins');
     const byokTrigger = plugin.uiHints?.byok?.triggerField;
@@ -311,6 +316,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                                 <CodexOnboardingWizard
                                     pluginId={plugin.pluginId}
                                     initialSettings={plugin.settings || {}}
+                                    initialLocalAuthStatus={localAuthStatus ?? null}
                                     visibleProperties={visibleProperties}
                                     getFieldValue={getFieldValue}
                                     handleFieldChange={handleFieldChange}

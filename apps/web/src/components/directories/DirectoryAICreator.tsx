@@ -88,7 +88,7 @@ export function DirectoryAICreator({
             }
         }
         loadSchema();
-    }, [providers.pipeline, syncResolvedPipeline, handleProviderChange]);
+    }, [formSchema, providers.pipeline, syncResolvedPipeline, handleProviderChange]);
 
     const handlePluginConfigChange = useCallback((values: Record<string, unknown>) => {
         setPluginConfig(values);
@@ -157,7 +157,7 @@ export function DirectoryAICreator({
             <div
                 className={cn(
                     'p-6 rounded-lg',
-                    'bg-card dark:bg-card-primary-dark',
+                    'bg-card dark:bg-transparent',
                     'border border-card-border dark:border-border-secondary-dark',
                 )}
             >
@@ -345,12 +345,12 @@ function ExamplePrompts({
                         className={cn(
                             'rounded-full py-1 cursor-pointer font-medium',
                             'bg-surface dark:bg-card-secondary-dark/80',
-                            'border hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark',
+                            'border border-border dark:border-border-dark',
                             'text-text-secondary dark:text-text-dark',
-                            'hover:border-primary-500 hover:bg-primary-500 hover:text-white',
-                            'dark:hover:border-primary-800 dark:hover:bg-primary-800 dark:hover:text-white',
+                            'hover:bg-button-primary hover:border-button-primary hover:text-button-primary-foreground',
+                            'dark:hover:bg-button-primary-dark dark:hover:border-button-primary-dark dark:hover:text-button-primary-foreground-dark',
                             selectedName === example.name &&
-                                'dark:border-primary-800 dark:bg-primary-800 dark:text-white border-primary-800 bg-primary-500 text-white',
+                                'bg-button-primary border-button-primary text-button-primary-foreground dark:bg-button-primary-dark dark:border-button-primary-dark dark:text-button-primary-foreground-dark',
                         )}
                     >
                         {example.name}

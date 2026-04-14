@@ -14,7 +14,7 @@ import {
 import superjson from 'superjson';
 import { Public } from '../auth/decorators/public.decorator';
 import { config } from '@ever-works/agent/config';
-import { DirectoryRepository, OAuthTokenRepository } from '@ever-works/agent/database';
+import { DirectoryRepository, AuthAccountRepository } from '@ever-works/agent/database';
 import { Directory, User } from '@ever-works/agent/entities';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
 import { DirectoryOperationsService } from '@ever-works/agent/directory-operations';
@@ -51,12 +51,12 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly pluginRepository: PluginRepository,
         private readonly userPluginRepository: UserPluginRepository,
         private readonly directoryPluginRepository: DirectoryPluginRepository,
-        private readonly oauthTokenRepository: OAuthTokenRepository,
+        private readonly authAccountRepository: AuthAccountRepository,
     ) {}
 
     onModuleInit() {
         this.remoteMap = {
-            OAuthTokenRepository: this.oauthTokenRepository,
+            AuthAccountRepository: this.authAccountRepository,
             PluginRepository: this.pluginRepository,
             UserPluginRepository: this.userPluginRepository,
             DirectoryPluginRepository: this.directoryPluginRepository,

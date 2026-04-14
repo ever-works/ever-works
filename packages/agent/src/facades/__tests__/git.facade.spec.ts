@@ -11,7 +11,7 @@ import {
     type RegisteredPlugin,
 } from '../../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
-import { OAuthTokenRepository } from '../../database/repositories/oauth-token.repository';
+import { AuthAccountRepository } from '../../database/repositories/auth-account.repository';
 import type { ResolvedSettings } from '@ever-works/plugin';
 import type {
     IGitProviderPlugin,
@@ -29,7 +29,7 @@ import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 describe('GitFacadeService', () => {
     let service: GitFacadeService;
     let registry: jest.Mocked<PluginRegistryService>;
-    let oauthTokenRepository: jest.Mocked<OAuthTokenRepository>;
+    let authAccountRepository: jest.Mocked<AuthAccountRepository>;
     let settingsService: jest.Mocked<PluginSettingsService>;
 
     const createMockGitPlugin = (
@@ -214,20 +214,21 @@ describe('GitFacadeService', () => {
         registeredAt: Date.now(),
     });
 
-    const createMockOAuthToken = (overrides: Partial<any> = {}) =>
+    const createMockProviderAccount = (overrides: Partial<any> = {}) =>
         ({
-            id: 'token-1',
+            id: 'account-1',
             userId: 'user-123',
-            provider: 'github',
+            accountId: 'github-user-123',
+            providerId: 'github',
             accessToken: 'access-token-123',
             refreshToken: 'refresh-token-123',
-            expiresAt: new Date(Date.now() + 3600000), // 1 hour from now
+            accessTokenExpiresAt: new Date(Date.now() + 3600000), // 1 hour from now
+            refreshTokenExpiresAt: null,
             username: 'testuser',
             email: 'test@example.com',
             tokenType: 'Bearer',
             scope: 'repo,user',
             metadata: { login: 'testuser' },
-            user: Promise.resolve({} as any),
             createdAt: new Date(),
             updatedAt: new Date(),
             ...overrides,
@@ -263,10 +264,10 @@ describe('GitFacadeService', () => {
                     },
                 },
                 {
-                    provide: OAuthTokenRepository,
+                    provide: AuthAccountRepository,
                     useValue: {
-                        findByUserAndProvider: jest.fn(),
-                        isTokenExpired: jest.fn().mockReturnValue(false),
+                        findProviderAccount: jest.fn(),
+                        isAccessTokenExpired: jest.fn().mockReturnValue(false),
                     },
                 },
                 {
@@ -280,7 +281,7 @@ describe('GitFacadeService', () => {
 
         service = module.get<GitFacadeService>(GitFacadeService);
         registry = module.get(PluginRegistryService);
-        oauthTokenRepository = module.get(OAuthTokenRepository);
+        authAccountRepository = module.get(AuthAccountRepository);
         settingsService = module.get(PluginSettingsService);
     });
 
@@ -387,8 +388,10 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(createMockOAuthToken());
-            oauthTokenRepository.isTokenExpired.mockReturnValue(false);
+            authAccountRepository.findProviderAccount.mockResolvedValue(
+                createMockProviderAccount(),
+            );
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
 
             const result = await service.hasValidCredentials({
                 providerId: 'github',
@@ -406,8 +409,10 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(createMockOAuthToken());
-            oauthTokenRepository.isTokenExpired.mockReturnValue(true);
+            authAccountRepository.findProviderAccount.mockResolvedValue(
+                createMockProviderAccount(),
+            );
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(true);
 
             const result = await service.hasValidCredentials({
                 providerId: 'github',
@@ -425,7 +430,7 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            authAccountRepository.findProviderAccount.mockResolvedValue(null);
 
             const result = await service.hasValidCredentials({
                 providerId: 'github',
@@ -455,7 +460,7 @@ describe('GitFacadeService', () => {
             expect(result).toBeNull();
         });
 
-        it('should return OAuth access token when valid', async () => {
+        it('should return provider access token when valid', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
@@ -463,9 +468,9 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            const mockToken = createMockOAuthToken({ accessToken: 'oauth-access-token' });
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(mockToken);
-            oauthTokenRepository.isTokenExpired.mockReturnValue(false);
+            const mockToken = createMockProviderAccount({ accessToken: 'oauth-access-token' });
+            authAccountRepository.findProviderAccount.mockResolvedValue(mockToken);
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
 
             const result = await service.getAccessToken({
                 providerId: 'github',
@@ -475,7 +480,7 @@ describe('GitFacadeService', () => {
             expect(result).toBe('oauth-access-token');
         });
 
-        it('should return null when OAuth token is expired', async () => {
+        it('should return null when provider account token is expired', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
@@ -483,8 +488,10 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(createMockOAuthToken());
-            oauthTokenRepository.isTokenExpired.mockReturnValue(true);
+            authAccountRepository.findProviderAccount.mockResolvedValue(
+                createMockProviderAccount(),
+            );
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(true);
 
             const result = await service.getAccessToken({
                 providerId: 'github',
@@ -513,12 +520,12 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            const mockToken = createMockOAuthToken({
+            const mockToken = createMockProviderAccount({
                 username: 'testuser',
                 email: 'test@example.com',
                 metadata: { login: 'testuser' },
             });
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(mockToken);
+            authAccountRepository.findProviderAccount.mockResolvedValue(mockToken);
 
             const result = await service.getCommitter({
                 providerId: 'github',
@@ -528,7 +535,7 @@ describe('GitFacadeService', () => {
             expect(result).toEqual({ name: 'testuser', email: 'test@example.com' });
         });
 
-        it('should return null when OAuth token has no username or email', async () => {
+        it('should return null when provider account has no username or email', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
@@ -536,12 +543,12 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            const mockToken = createMockOAuthToken({
+            const mockToken = createMockProviderAccount({
                 username: undefined,
                 email: undefined,
                 metadata: {},
             });
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(mockToken);
+            authAccountRepository.findProviderAccount.mockResolvedValue(mockToken);
 
             const result = await service.getCommitter({
                 providerId: 'github',
@@ -1278,7 +1285,7 @@ describe('GitFacadeService', () => {
             });
 
             expect(gitPlugin.getUser).toHaveBeenCalledWith('provided-token');
-            expect(oauthTokenRepository.findByUserAndProvider).not.toHaveBeenCalled();
+            expect(authAccountRepository.findProviderAccount).not.toHaveBeenCalled();
         });
 
         it('should lookup OAuth token when userId provided', async () => {
@@ -1289,9 +1296,9 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            const mockToken = createMockOAuthToken({ accessToken: 'oauth-token' });
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(mockToken);
-            oauthTokenRepository.isTokenExpired.mockReturnValue(false);
+            const mockToken = createMockProviderAccount({ accessToken: 'oauth-token' });
+            authAccountRepository.findProviderAccount.mockResolvedValue(mockToken);
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
 
             await service.getUser({
                 providerId: 'github',
@@ -1299,7 +1306,7 @@ describe('GitFacadeService', () => {
             });
 
             expect(gitPlugin.getUser).toHaveBeenCalledWith('oauth-token');
-            expect(oauthTokenRepository.findByUserAndProvider).toHaveBeenCalledWith(
+            expect(authAccountRepository.findProviderAccount).toHaveBeenCalledWith(
                 'user-123',
                 'github',
             );
@@ -1313,7 +1320,7 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            authAccountRepository.findProviderAccount.mockResolvedValue(null);
             settingsService.getResolvedSettings.mockResolvedValue(createMockResolvedSettings({}));
 
             await expect(
@@ -1332,8 +1339,10 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(createMockOAuthToken());
-            oauthTokenRepository.isTokenExpired.mockReturnValue(true);
+            authAccountRepository.findProviderAccount.mockResolvedValue(
+                createMockProviderAccount(),
+            );
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(true);
             settingsService.getResolvedSettings.mockResolvedValue(createMockResolvedSettings({}));
 
             await expect(
@@ -1370,7 +1379,7 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            authAccountRepository.findProviderAccount.mockResolvedValue(null);
             settingsService.getResolvedSettings.mockResolvedValue(
                 createMockResolvedSettings({
                     accessToken: createMockResolvedSetting('accessToken', 'pat-token-123', 'user'),
@@ -1393,8 +1402,10 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(createMockOAuthToken());
-            oauthTokenRepository.isTokenExpired.mockReturnValue(true);
+            authAccountRepository.findProviderAccount.mockResolvedValue(
+                createMockProviderAccount(),
+            );
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(true);
             settingsService.getResolvedSettings.mockResolvedValue(
                 createMockResolvedSettings({
                     accessToken: createMockResolvedSetting('accessToken', 'pat-token-456', 'user'),
@@ -1417,9 +1428,9 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            const mockToken = createMockOAuthToken({ accessToken: 'oauth-token' });
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(mockToken);
-            oauthTokenRepository.isTokenExpired.mockReturnValue(false);
+            const mockToken = createMockProviderAccount({ accessToken: 'oauth-token' });
+            authAccountRepository.findProviderAccount.mockResolvedValue(mockToken);
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
             settingsService.getResolvedSettings.mockResolvedValue(
                 createMockResolvedSettings({
                     accessToken: createMockResolvedSetting('accessToken', 'pat-token', 'user'),
@@ -1442,7 +1453,7 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            authAccountRepository.findProviderAccount.mockResolvedValue(null);
             settingsService.getResolvedSettings.mockResolvedValue(createMockResolvedSettings({}));
 
             await expect(
@@ -1461,7 +1472,7 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            authAccountRepository.findProviderAccount.mockResolvedValue(null);
             settingsService.getResolvedSettings.mockResolvedValue(
                 createMockResolvedSettings({
                     accessToken: createMockResolvedSetting('accessToken', 'pat-token', 'user'),
@@ -1484,7 +1495,7 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            authAccountRepository.findProviderAccount.mockResolvedValue(null);
             settingsService.getResolvedSettings.mockResolvedValue(
                 createMockResolvedSettings({
                     accessToken: createMockResolvedSetting('accessToken', 'pat-token-789', 'user'),
@@ -1507,7 +1518,7 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            authAccountRepository.findProviderAccount.mockResolvedValue(null);
             settingsService.getResolvedSettings.mockResolvedValue(
                 createMockResolvedSettings({
                     gitUsername: createMockResolvedSetting('gitUsername', 'gitlab-user', 'user'),
@@ -1532,7 +1543,7 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            authAccountRepository.findProviderAccount.mockResolvedValue(null);
             settingsService.getResolvedSettings.mockResolvedValue(
                 createMockResolvedSettings({
                     accessToken: createMockResolvedSetting('accessToken', 'pat-token', 'user'),
@@ -1556,7 +1567,7 @@ describe('GitFacadeService', () => {
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
 
-            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            authAccountRepository.findProviderAccount.mockResolvedValue(null);
             settingsService.getResolvedSettings.mockResolvedValue(
                 createMockResolvedSettings({
                     accessToken: createMockResolvedSetting(

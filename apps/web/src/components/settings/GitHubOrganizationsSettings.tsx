@@ -28,10 +28,7 @@ export function GitHubOrganizationsSettings({
     const [status, setStatus] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!connected) {
-            setOrganizations([]);
-            return;
-        }
+        if (!connected) return;
 
         startTransition(async () => {
             const result = await getGitProviderOrganizations('github');
@@ -42,9 +39,10 @@ export function GitHubOrganizationsSettings({
     }, [connected]);
 
     const allOrganizations = useMemo(() => {
-        const merged = new Set<string>([...organizations, ...additionalOrganizations]);
+        const visibleOrganizations = connected ? organizations : [];
+        const merged = new Set<string>([...visibleOrganizations, ...additionalOrganizations]);
         return Array.from(merged).sort((a, b) => a.localeCompare(b));
-    }, [additionalOrganizations, organizations]);
+    }, [additionalOrganizations, connected, organizations]);
 
     const addOrganization = () => {
         const next = draftOrganization.trim().replace(/^@/, '');

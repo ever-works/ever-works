@@ -1,10 +1,10 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ClientService } from '../services/client.service';
-import { JwtAuthGuard } from '@src/auth/guards/jwt-auth.guard';
+import { AuthSessionGuard } from '@src/auth/guards/auth-session.guard';
 import { TwentyOrganization } from '../types/twenty-crm.types';
 
 @Controller('api/twenty-crm/companies')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AuthSessionGuard)
 export class CompaniesController {
     constructor(private readonly clientService: ClientService) {}
 

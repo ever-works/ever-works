@@ -18,13 +18,13 @@ import {
     ApiParam,
     ApiQuery,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { AuthSessionGuard } from '../../auth/guards/auth-session.guard';
 import { OAuthService } from './oauth.service';
 
 @ApiTags('OAuth')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/oauth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AuthSessionGuard)
 export class OAuthController {
     constructor(private readonly oauthService: OAuthService) {}
 

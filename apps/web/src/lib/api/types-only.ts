@@ -5,7 +5,6 @@ export type {
     // From auth.ts
     RegisterDto,
     LoginDto,
-    RefreshTokenDto,
     UpdatePasswordDto,
     UpdateProfileDto,
     VerifyEmailDto,

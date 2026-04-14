@@ -211,7 +211,8 @@
             },
             "oauthConnected": {
                 "title": "Аккаунт подключен к GitHub",
-                "description": "Ваш аккаунт успешно подключен к GitHub."
+                "description": "Ваш аккаунт успешно подключен к GitHub.",
+                "defaultProvider": "Git-провайдер"
             }
         },
         "header": {

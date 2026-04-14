@@ -1,14 +1,10 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { usePathname } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 
 interface BackgroundActivityState {
-    /** At least one directory is currently generating */
-    isGeneratingDirectory: boolean;
-    /** User has visited /directories since the last generation started */
-    hasVisitedDirectoriesPage: boolean;
     /** Show the sidebar indicator? */
     showDirectoryIndicator: boolean;
     /** Call when a generation starts (or is detected) */
@@ -22,47 +18,27 @@ const BackgroundActivityContext = createContext<BackgroundActivityState | null>(
 export function BackgroundActivityProvider({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const [isGeneratingDirectory, setIsGeneratingDirectory] = useState(false);
-    const [hasVisitedDirectoriesPage, setHasVisitedDirectoriesPage] = useState(
+    const isOnDirectoriesPage =
         pathname === ROUTES.DASHBOARD_DIRECTORIES ||
-            pathname?.startsWith(ROUTES.DASHBOARD_DIRECTORIES + '/'),
-    );
-
-    // Detect when the user navigates to /directories
-    useEffect(() => {
-        if (
-            pathname === ROUTES.DASHBOARD_DIRECTORIES ||
-            pathname?.startsWith(ROUTES.DASHBOARD_DIRECTORIES + '/')
-        ) {
-            setHasVisitedDirectoriesPage(true);
-        }
-    }, [pathname]);
+        pathname?.startsWith(ROUTES.DASHBOARD_DIRECTORIES + '/');
 
     const markGenerating = useCallback(() => {
         setIsGeneratingDirectory(true);
-        setHasVisitedDirectoriesPage(false);
     }, []);
 
     const clearGenerating = useCallback(() => {
         setIsGeneratingDirectory(false);
     }, []);
 
-    const showDirectoryIndicator = isGeneratingDirectory && !hasVisitedDirectoriesPage;
+    const showDirectoryIndicator = isGeneratingDirectory && !isOnDirectoriesPage;
 
     const value = useMemo(
         () => ({
-            isGeneratingDirectory,
-            hasVisitedDirectoriesPage,
             showDirectoryIndicator,
             markGenerating,
             clearGenerating,
         }),
-        [
-            isGeneratingDirectory,
-            hasVisitedDirectoriesPage,
-            showDirectoryIndicator,
-            markGenerating,
-            clearGenerating,
-        ],
+        [showDirectoryIndicator, markGenerating, clearGenerating],
     );
 
     return (

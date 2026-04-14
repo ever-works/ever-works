@@ -44,6 +44,21 @@ export class UserRepository {
         return await this.findById(id);
     }
 
+    async clearPasswordResetToken(id: string, token: string): Promise<boolean> {
+        const result = await this.repository.update(
+            {
+                id,
+                passwordResetToken: token,
+            },
+            {
+                passwordResetToken: null,
+                passwordResetExpires: null,
+            },
+        );
+
+        return (result.affected || 0) > 0;
+    }
+
     async createOrGetLocalUser(): Promise<User> {
         const username = config.github.getOwner() || config.git.getName();
         const email = config.git.getEmail();

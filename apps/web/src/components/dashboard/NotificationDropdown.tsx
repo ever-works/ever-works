@@ -145,17 +145,30 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
 
     // Initial load and polling
     useEffect(() => {
-        fetchUnreadCount();
+        const updateUnreadCount = async () => {
+            await fetchUnreadCount();
+        };
 
-        const interval = setInterval(fetchUnreadCount, POLL_INTERVAL);
+        void updateUnreadCount();
+        const interval = setInterval(() => {
+            void updateUnreadCount();
+        }, POLL_INTERVAL);
         return () => clearInterval(interval);
     }, [fetchUnreadCount]);
 
     // Fetch notifications when dropdown opens
     useEffect(() => {
         if (isOpen) {
-            setIsLoading(true);
-            fetchNotifications().finally(() => setIsLoading(false));
+            const loadNotifications = async () => {
+                setIsLoading(true);
+                try {
+                    await fetchNotifications();
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            void loadNotifications();
         }
     }, [isOpen, fetchNotifications]);
 

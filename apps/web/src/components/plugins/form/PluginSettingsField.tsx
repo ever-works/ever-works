@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils/cn';
 import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Eye, EyeOff, Pencil, X, KeyRound } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { PluginModelSelect } from './PluginModelSelect';
 import { PluginSettingsObjectField } from './PluginSettingsObjectField';
 import { PluginSettingsArrayField } from './PluginSettingsArrayField';
@@ -33,7 +33,7 @@ export function PluginSettingsField({
     const t = useTranslations('dashboard.plugins.settingsField');
     const [showSecret, setShowSecret] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const previousMaskedValue = useRef<string | null>(null);
+    const [previousMaskedValue, setPreviousMaskedValue] = useState<string | null>(null);
 
     const label = schema.title || name;
     const description = schema.description;
@@ -42,14 +42,7 @@ export function PluginSettingsField({
 
     // Check if the current value is a masked placeholder from the API
     const isMaskedValue = isSecret && typeof value === 'string' && value.includes('••••');
-
-    // Reset editing mode when a new masked value arrives (after save + router refresh)
-    useEffect(() => {
-        if (isMaskedValue) {
-            setIsEditing(false);
-            previousMaskedValue.current = null;
-        }
-    }, [isMaskedValue]);
+    const isEffectivelyEditing = isEditing && !isMaskedValue;
 
     // Determine input type for string/number inputs
     const getInputType = () => {
@@ -187,7 +180,7 @@ export function PluginSettingsField({
         // Secret field with existing masked value: show a placeholder with "Modify" button
         // instead of putting masked characters in the input (which caused ByteString errors
         // when masked values were accidentally saved back).
-        if (isMaskedValue && !isEditing) {
+        if (isMaskedValue && !isEffectivelyEditing) {
             return (
                 <div className="flex items-center gap-2">
                     <div
@@ -203,7 +196,7 @@ export function PluginSettingsField({
                     <button
                         type="button"
                         onClick={() => {
-                            previousMaskedValue.current = String(value);
+                            setPreviousMaskedValue(String(value));
                             setIsEditing(true);
                             onChange('');
                         }}
@@ -233,8 +226,8 @@ export function PluginSettingsField({
                         onChange={(e) => onChange(e.currentTarget.value)}
                         maxLength={schema.maxLength}
                         required={required}
-                        autoFocus={isEditing}
-                        placeholder={isEditing ? t('enterNewValue') : undefined}
+                        autoFocus={isEffectivelyEditing}
+                        placeholder={isEffectivelyEditing ? t('enterNewValue') : undefined}
                         variant="form"
                         className={cn(isSecret && 'pr-10')}
                     />
@@ -252,12 +245,12 @@ export function PluginSettingsField({
                         </button>
                     )}
                 </div>
-                {isEditing && previousMaskedValue.current && (
+                {isEffectivelyEditing && previousMaskedValue && (
                     <button
                         type="button"
                         onClick={() => {
-                            onChange(previousMaskedValue.current);
-                            previousMaskedValue.current = null;
+                            onChange(previousMaskedValue);
+                            setPreviousMaskedValue(null);
                             setIsEditing(false);
                         }}
                         className={cn(

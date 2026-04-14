@@ -1,26 +1,3 @@
-export const jwtConstants = {
-    secret: () => {
-        const secret = process.env.JWT_SECRET;
-        if (!secret) {
-            throw new Error('JWT_SECRET environment variable is required');
-        }
-        return secret;
-    },
-    accessTokenExpiration: (): any => {
-        const expiration = process.env.JWT_ACCESS_TOKEN_EXPIRATION;
-        // Return undefined to disable expiration
-        return expiration === 'never' ? undefined : expiration || '7d';
-    },
-    refreshTokenExpiration: () => {
-        const days = process.env.JWT_REFRESH_TOKEN_EXPIRATION_DAYS;
-        // Return -1 to indicate no expiration
-        return days === 'never' ? -1 : parseInt(days || '14', 10);
-    },
-    isTokenExpirationDisabled: () => {
-        return process.env.JWT_DISABLE_EXPIRATION === 'true';
-    },
-};
-
 export const authConstants = {
     bcryptSaltRounds: 10,
     refreshTokenLength: 32,
@@ -31,12 +8,24 @@ export enum AuthProvider {
     LOCAL = 'local',
     GITHUB = 'github',
     GOOGLE = 'google',
+    FACEBOOK = 'facebook',
+    LINKEDIN = 'linkedin',
 }
 
 export const config = {
     debug: () => process.env.HTTP_DEBUG === 'true',
 
     webAppUrl: () => process.env.WEB_URL || 'http://localhost:3000',
+
+    auth: {
+        secret: () => {
+            const secret = process.env.AUTH_SECRET;
+            if (!secret) {
+                throw new Error('AUTH_SECRET environment variable is required');
+            }
+            return secret;
+        },
+    },
 
     branding: {
         appName: () => process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || 'Ever Works',
@@ -101,6 +90,22 @@ export const config = {
         callbackUrl: () => {
             const webUrl = config.webAppUrl();
             return process.env.GH_CALLBACK_URL || `${webUrl}/api/oauth/github/callback`;
+        },
+    },
+    facebook: {
+        clientId: () => process.env.FACEBOOK_CLIENT_ID,
+        clientSecret: () => process.env.FACEBOOK_CLIENT_SECRET,
+        callbackUrl: () => {
+            const webUrl = config.webAppUrl();
+            return process.env.FACEBOOK_CALLBACK_URL || `${webUrl}/api/oauth/facebook/callback`;
+        },
+    },
+    linkedin: {
+        clientId: () => process.env.LINKEDIN_CLIENT_ID,
+        clientSecret: () => process.env.LINKEDIN_CLIENT_SECRET,
+        callbackUrl: () => {
+            const webUrl = config.webAppUrl();
+            return process.env.LINKEDIN_CALLBACK_URL || `${webUrl}/api/oauth/linkedin/callback`;
         },
     },
 

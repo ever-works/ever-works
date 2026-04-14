@@ -37,26 +37,30 @@ export function PluginOAuthConnection({
     const getReturnPath = () => returnPath || pathname || ROUTES.DASHBOARD_SETTINGS;
 
     const handleConnect = () => {
-        startTransition(async () => {
-            const result = await connectOAuthProvider(pluginId, getReturnPath());
+        startTransition(() => {
+            void (async () => {
+                const result = await connectOAuthProvider(pluginId, getReturnPath());
 
-            if (result.success && result.url) {
-                window.location.href = result.url;
-            } else {
-                toast.error(result.error || t('connectError'));
-            }
+                if (result.success && result.url) {
+                    window.location.href = result.url;
+                } else {
+                    toast.error(result.error || t('connectError'));
+                }
+            })();
         });
     };
 
     const handleReconnect = () => {
-        startTransition(async () => {
-            const result = await connectOAuthProvider(pluginId, getReturnPath(), true);
+        startTransition(() => {
+            void (async () => {
+                const result = await connectOAuthProvider(pluginId, getReturnPath(), true);
 
-            if (result.success && result.url) {
-                window.location.href = result.url;
-            } else {
-                toast.error(result.error || t('reconnectError'));
-            }
+                if (result.success && result.url) {
+                    window.location.href = result.url;
+                } else {
+                    toast.error(result.error || t('reconnectError'));
+                }
+            })();
         });
     };
 
@@ -65,15 +69,17 @@ export function PluginOAuthConnection({
             return;
         }
 
-        startTransition(async () => {
-            const result = await disconnectOAuthProvider(pluginId);
+        startTransition(() => {
+            void (async () => {
+                const result = await disconnectOAuthProvider(pluginId);
 
-            if (result.success) {
-                toast.success(t('disconnected', { plugin: pluginName }));
-                window.location.reload();
-            } else {
-                toast.error(result.error || t('disconnectError'));
-            }
+                if (result.success) {
+                    toast.success(t('disconnected', { plugin: pluginName }));
+                    window.location.reload();
+                } else {
+                    toast.error(result.error || t('disconnectError'));
+                }
+            })();
         });
     };
 

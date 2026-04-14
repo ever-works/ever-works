@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
 import type { CodexLocalAuthStatus, PluginSettingsSchemaProperty } from '@/lib/api/plugins';
@@ -12,6 +12,7 @@ import { getCodexLocalAuthStatus, startCodexLocalAuth } from '@/app/actions/plug
 interface CodexOnboardingWizardProps {
     pluginId: string;
     initialSettings: Record<string, unknown>;
+    initialLocalAuthStatus: CodexLocalAuthStatus | null;
     visibleProperties: Record<string, PluginSettingsSchemaProperty>;
     getFieldValue: (key: string, propSchema: PluginSettingsSchemaProperty) => unknown;
     handleFieldChange: (key: string, value: unknown, isSecret: boolean) => void;
@@ -25,6 +26,7 @@ interface CodexOnboardingWizardProps {
 export function CodexOnboardingWizard({
     pluginId,
     initialSettings,
+    initialLocalAuthStatus,
     visibleProperties,
     getFieldValue,
     handleFieldChange,
@@ -36,57 +38,47 @@ export function CodexOnboardingWizard({
 }: CodexOnboardingWizardProps) {
     const t = useTranslations('onboarding.codexWizard');
     const [step, setStep] = useState(0);
-    const [selectedAuthMode, setSelectedAuthMode] = useState<'api-key' | 'local'>('api-key');
-    const [localAuthStatus, setLocalAuthStatus] = useState<CodexLocalAuthStatus | null>(null);
+    const [selectedAuthMode, setSelectedAuthMode] = useState<'api-key' | 'local'>(() => {
+        const configuredAuthMode =
+            typeof initialSettings.authMode === 'string' ? initialSettings.authMode : undefined;
+        const hasSavedApiKey =
+            typeof initialSettings.apiKey === 'string' && initialSettings.apiKey.length > 0;
+
+        if (configuredAuthMode === 'api-key' || configuredAuthMode === 'local') {
+            return configuredAuthMode;
+        }
+
+        if (hasSavedApiKey) {
+            return 'api-key';
+        }
+
+        return initialLocalAuthStatus?.connected ? 'local' : 'api-key';
+    });
+    const [localAuthStatus, setLocalAuthStatus] = useState<CodexLocalAuthStatus | null>(
+        initialLocalAuthStatus,
+    );
     const [localAuthError, setLocalAuthError] = useState<string | null>(null);
     const [isLoadingLocalAuth, setIsLoadingLocalAuth] = useState(false);
     const [isStartingLocalAuth, setIsStartingLocalAuth] = useState(false);
-    const hasInitializedAuthMode = useRef(false);
-
     const modelSchema = visibleProperties.model;
     const apiKeySchema = visibleProperties.apiKey;
-    const configuredAuthMode =
-        typeof initialSettings.authMode === 'string' ? initialSettings.authMode : undefined;
-    const hasSavedApiKey =
-        typeof initialSettings.apiKey === 'string' && initialSettings.apiKey.length > 0;
 
-    const loadLocalAuthStatus = useCallback(async () => {
+    const refreshLocalAuthStatus = useCallback(async () => {
         setIsLoadingLocalAuth(true);
         setLocalAuthError(null);
-        const result = await getCodexLocalAuthStatus(pluginId);
-        if (!result.success || !result.data) {
-            setLocalAuthError(result.error || t('steps.credentials.local.error'));
+
+        try {
+            const status = await getCodexLocalAuthStatus(pluginId);
+            if (!status.success || !status.data) {
+                setLocalAuthError(status.error || t('steps.credentials.local.error'));
+                return;
+            }
+
+            setLocalAuthStatus(status.data);
+        } finally {
             setIsLoadingLocalAuth(false);
-            return;
         }
-
-        setLocalAuthStatus(result.data);
-        setIsLoadingLocalAuth(false);
-
-        if (hasInitializedAuthMode.current) {
-            return;
-        }
-
-        if (configuredAuthMode === 'api-key' || configuredAuthMode === 'local') {
-            setSelectedAuthMode(configuredAuthMode);
-            handleFieldChange('authMode', configuredAuthMode, false);
-        } else if (hasSavedApiKey) {
-            setSelectedAuthMode('api-key');
-            handleFieldChange('authMode', 'api-key', false);
-        } else if (result.data.connected) {
-            setSelectedAuthMode('local');
-            handleFieldChange('authMode', 'local', false);
-        } else {
-            setSelectedAuthMode('api-key');
-            handleFieldChange('authMode', 'api-key', false);
-        }
-
-        hasInitializedAuthMode.current = true;
-    }, [configuredAuthMode, hasSavedApiKey, pluginId, t, handleFieldChange]);
-
-    useEffect(() => {
-        void loadLocalAuthStatus();
-    }, [loadLocalAuthStatus]);
+    }, [pluginId, t]);
 
     useEffect(() => {
         if (!localAuthStatus?.pending) {
@@ -94,11 +86,11 @@ export function CodexOnboardingWizard({
         }
 
         const timer = window.setInterval(() => {
-            void loadLocalAuthStatus();
+            void refreshLocalAuthStatus();
         }, 2000);
 
         return () => window.clearInterval(timer);
-    }, [localAuthStatus?.pending, loadLocalAuthStatus]);
+    }, [localAuthStatus?.pending, refreshLocalAuthStatus]);
 
     const steps = useMemo(
         () => [
@@ -317,7 +309,7 @@ export function CodexOnboardingWizard({
                                         type="button"
                                         variant="secondary"
                                         className="bg-success/10 text-success hover:bg-success/15"
-                                        onClick={() => void loadLocalAuthStatus()}
+                                        onClick={() => void refreshLocalAuthStatus()}
                                     >
                                         {t('steps.credentials.local.connectedButton')}
                                     </Button>

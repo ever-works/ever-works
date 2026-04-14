@@ -12,6 +12,7 @@ import { HelpDrawer } from '@/components/dashboard/HelpDrawer';
 import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ChatPanel } from '@/components/ai/ChatPanel';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
+import { ConnectGithubModal } from '@/components/auth/connect-github-modal';
 import { BackgroundActivityProvider } from '@/lib/hooks/use-background-activity';
 
 interface DashboardLayoutClientProps {
@@ -19,6 +20,7 @@ interface DashboardLayoutClientProps {
     children: React.ReactNode;
     initialChatOpen?: boolean;
     initialSidebarCollapsed?: boolean;
+    hasGithubConnected?: boolean;
 }
 
 const COOKIE_OPTS = `path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
@@ -28,6 +30,7 @@ export function DashboardLayoutClient({
     children,
     initialChatOpen = false,
     initialSidebarCollapsed = false,
+    hasGithubConnected = false,
 }: DashboardLayoutClientProps) {
     const DEFAULT_CHAT_WIDTH = 380;
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -40,7 +43,7 @@ export function DashboardLayoutClient({
 
     const prevWidthRef = useRef<number | null>(null);
     const [mainStyle, setMainStyle] = useState<React.CSSProperties | undefined>(undefined);
-    const [isMobile, setIsMobile] = useState(false);
+    const [isMobile, setIsMobile] = useState<boolean>(false);
 
     const setChatOpen = useCallback((value: boolean, resetOnOpen = true) => {
         setChatOpenRaw(value);
@@ -65,6 +68,18 @@ export function DashboardLayoutClient({
 
     useEffect(() => {
         try {
+            const v = localStorage.getItem('chat-width');
+            const savedWidth = v ? parseInt(v, 10) : DEFAULT_CHAT_WIDTH;
+            setChatWidth(Number.isFinite(savedWidth) ? savedWidth : DEFAULT_CHAT_WIDTH);
+        } catch (e) {}
+
+        try {
+            setIsMobile(window.innerWidth < 768);
+        } catch (e) {}
+    }, []);
+
+    useEffect(() => {
+        try {
             // Only persist the width when the chat is in resizable (non-expanded) mode.
             // This prevents the expanded width from overwriting the user's preferred
             // resizable width in localStorage.
@@ -72,7 +87,7 @@ export function DashboardLayoutClient({
                 localStorage.setItem('chat-width', String(chatWidth));
             }
         } catch {}
-    }, [chatWidth]);
+    }, [chatWidth, isChatExpanded]);
 
     useEffect(() => {
         try {
@@ -188,7 +203,7 @@ export function DashboardLayoutClient({
         // Open chat without resetting expanded state
         setChatOpen(true, false);
         setIsChatExpanded(true);
-    }, [chatWidth, sidebarCollapsed]);
+    }, [chatWidth, setChatOpen, sidebarCollapsed]);
 
     const startDrag = useCallback((e: React.PointerEvent<Element>) => {
         e.preventDefault();
@@ -222,6 +237,7 @@ export function DashboardLayoutClient({
                 <Suspense fallback={null}>
                     <DashboardToasts />
                 </Suspense>
+                <ConnectGithubModal userId={user.id} hasGithubConnected={hasGithubConnected} />
 
                 <div className="flex h-screen bg-surface dark:bg-surface-dark overflow-hidden">
                     {/* Mobile overlay */}

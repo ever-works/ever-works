@@ -180,7 +180,9 @@ export const CategoriesField = memo(function CategoriesField({
                                     <Plus className="h-4 w-4 text-primary dark:text-primary-dark" />
                                     <span>
                                         {t('createCategory')}{' '}
-                                        <span className="font-medium">"{query.trim()}"</span>
+                                        <span className="font-medium">
+                                            &quot;{query.trim()}&quot;
+                                        </span>
                                     </span>
                                 </span>
                             </ComboboxOption>

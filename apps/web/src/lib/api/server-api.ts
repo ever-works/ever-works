@@ -2,8 +2,18 @@ import 'server-only';
 import { API_URL, WEB_URL } from '../constants';
 import { headers } from 'next/headers';
 import { getAuthAccessCookie } from '../auth/cookies';
-import { refreshAccessToken } from '../auth/refresh';
 import { getTranslations } from 'next-intl/server';
+
+export class ApiResponseError extends Error {
+    constructor(
+        message: string,
+        public readonly statusCode: number,
+        public readonly code?: string,
+    ) {
+        super(message);
+        this.name = 'ApiResponseError';
+    }
+}
 
 export async function handleServerError(error: unknown): Promise<never> {
     console.error('Server API Error:', error);
@@ -65,16 +75,7 @@ export async function serverFetch<T>(
     };
 
     const token = await getAuthAccessCookie();
-    let response = await doFetch(token);
-
-    // On 401, attempt a single token refresh and retry
-    if (response.status === 401 && token) {
-        const refreshed = await refreshAccessToken();
-        if (refreshed) {
-            const newToken = await getAuthAccessCookie();
-            response = await doFetch(newToken);
-        }
-    }
+    const response = await doFetch(token);
 
     // Return raw response for streaming
     if (rawResponse) {
@@ -83,6 +84,7 @@ export async function serverFetch<T>(
 
     if (!response.ok) {
         let errorMessage: string | null = null;
+        let errorCode: string | undefined;
         try {
             const errorData = await response.json();
             const hasStructuredError =
@@ -111,6 +113,12 @@ export async function serverFetch<T>(
             } else if (!hasStructuredError) {
                 errorMessage = `${response.status} ${response.statusText}`.trim();
             }
+
+            if (typeof errorData?.code === 'string') {
+                errorCode = errorData.code;
+            } else if (typeof errorData?.error?.code === 'string') {
+                errorCode = errorData.error.code;
+            }
         } catch (e) {
             errorMessage = await response.text().catch(() => null);
             errorMessage = errorMessage?.trim() || null;
@@ -118,12 +126,16 @@ export async function serverFetch<T>(
 
         // Handle authentication errors
         if (response.status === 401) {
-            throw new Error(errorMessage || t('unauthorizedLogin'));
+            throw new ApiResponseError(
+                errorMessage || t('unauthorizedLogin'),
+                response.status,
+                errorCode,
+            );
         }
 
         // Handle forbidden errors
         if (response.status === 403) {
-            throw new Error(errorMessage || t('forbidden'));
+            throw new ApiResponseError(errorMessage || t('forbidden'), response.status, errorCode);
         }
 
         const apiErro = t('apiError', {
@@ -131,7 +143,7 @@ export async function serverFetch<T>(
             statusText: response.statusText,
         });
 
-        throw new Error(errorMessage || apiErro);
+        throw new ApiResponseError(errorMessage || apiErro, response.status, errorCode);
     }
 
     const text = await response.text();

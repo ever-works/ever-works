@@ -1,14 +1,14 @@
 import { BadRequestException, Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ScreenshotFacadeService } from '@ever-works/agent/facades';
-import { CurrentUser, JwtAuthGuard } from '../../auth';
-import { AuthenticatedUser } from '../../auth/types/jwt.types';
+import { CurrentUser, AuthSessionGuard } from '../../auth';
+import { AuthenticatedUser } from '../../auth/types/auth.types';
 import { CaptureScreenshotDto, GetScreenshotUrlDto } from './dto/screenshot.dto';
 
 @ApiTags('Screenshot')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/screenshot')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AuthSessionGuard)
 export class ScreenshotController {
     constructor(private readonly screenshotFacade: ScreenshotFacadeService) {}
 

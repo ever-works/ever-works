@@ -20,14 +20,16 @@ export default function ForgotPasswordForm() {
         e.preventDefault();
         setError('');
 
-        startTransition(async () => {
-            const response = await forgotPasswordAction(email);
-            if (!response.success) {
-                setError(response.error || t('errors.failed'));
-                return;
-            }
+        startTransition(() => {
+            void (async () => {
+                const response = await forgotPasswordAction(email);
+                if (!response.success) {
+                    setError(response.error || t('errors.failed'));
+                    return;
+                }
 
-            setSuccess(true);
+                setSuccess(true);
+            })();
         });
     };
 

@@ -28,7 +28,6 @@ export function ComparisonGenerationProgress({
 
     useEffect(() => {
         if (!isGenerating) {
-            setStatus({ generating: false });
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
                 intervalRef.current = null;

@@ -57,7 +57,8 @@ export const GET_DIRECTORY_LIST_LIMIT = parseInt(
 export const ONBOARDING_STORAGE_KEY = 'ever-works-onboarding';
 
 // App URL
-export const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+export const WEB_URL =
+    process.env.NEXT_PUBLIC_WEB_URL || process.env.WEB_URL || 'http://localhost:3000';
 
 // AUTH Secret
 export const AUTH_SECRET = process.env.COOKIE_SECRET || process.env.AUTH_SECRET;
@@ -112,6 +113,7 @@ export const ROUTES = {
     // API routes
     API_AUTH_VERIFY_EMAIL: '/api/auth/verify-email',
     API_AUTH_RESET_PASSWORD: '/api/auth/reset-password',
+    API_AUTH_PROVIDER_CALLBACK: '/api/auth/provider/callback/:providerId',
     API_CHAT: '/api/chat',
     API_OAUTH_CALLBACK: '/api/oauth/:providerId/callback',
     API_OAUTH_PLUGINS_CALLBACK: '/api/oauth/:providerId/callback/plugins',

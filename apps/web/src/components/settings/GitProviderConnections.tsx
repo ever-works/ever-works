@@ -56,6 +56,17 @@ function getProviderIcon(providerId: string) {
     }
 }
 
+function renderProviderIcon(providerId: string, className?: string) {
+    switch (providerId.toLowerCase()) {
+        case 'github':
+            return <Github className={className} />;
+        case 'gitlab':
+            return <GitlabIcon className={className} />;
+        default:
+            return <Boxes className={className} />;
+    }
+}
+
 function buildProviderUrl(homepage: string | undefined, path: string): string {
     if (!homepage) return '#';
     return `${homepage.replace(/\/$/, '')}/${path}`;
@@ -209,33 +220,36 @@ function GitProviderCard({
     const username = connectionInfo?.username;
     const avatarUrl = connectionInfo?.avatarUrl || userAvatar;
 
-    const ProviderIcon = getProviderIcon(provider.id);
     const brandColors = getProviderBrandColors(provider.id);
 
     // Use provided returnPath or fall back to current page (locale-free via usePathname)
     const getReturnPath = () => returnPath || pathname || ROUTES.DASHBOARD_SETTINGS;
 
     const handleConnect = () => {
-        startTransition(async () => {
-            const result = await connectOAuthProvider(provider.id, getReturnPath());
+        startTransition(() => {
+            void (async () => {
+                const result = await connectOAuthProvider(provider.id, getReturnPath());
 
-            if (result.success && result.url) {
-                window.location.href = result.url;
-            } else {
-                toast.error(result.error || 'Failed to connect');
-            }
+                if (result.success && result.url) {
+                    window.location.href = result.url;
+                } else {
+                    toast.error(result.error || 'Failed to connect');
+                }
+            })();
         });
     };
 
     const handleReconnect = () => {
-        startTransition(async () => {
-            const result = await connectOAuthProvider(provider.id, getReturnPath(), true);
+        startTransition(() => {
+            void (async () => {
+                const result = await connectOAuthProvider(provider.id, getReturnPath(), true);
 
-            if (result.success && result.url) {
-                window.location.href = result.url;
-            } else {
-                toast.error(result.error || 'Failed to reconnect');
-            }
+                if (result.success && result.url) {
+                    window.location.href = result.url;
+                } else {
+                    toast.error(result.error || 'Failed to reconnect');
+                }
+            })();
         });
     };
 
@@ -244,15 +258,17 @@ function GitProviderCard({
             return;
         }
 
-        startTransition(async () => {
-            const result = await disconnectOAuthProvider(provider.id);
+        startTransition(() => {
+            void (async () => {
+                const result = await disconnectOAuthProvider(provider.id);
 
-            if (result.success) {
-                toast.success(`${provider.name} disconnected`);
-                window.location.reload();
-            } else {
-                toast.error(result.error || 'Failed to disconnect');
-            }
+                if (result.success) {
+                    toast.success(`${provider.name} disconnected`);
+                    window.location.reload();
+                } else {
+                    toast.error(result.error || 'Failed to disconnect');
+                }
+            })();
         });
     };
 
@@ -276,7 +292,7 @@ function GitProviderCard({
                                 'shadow-sm',
                             )}
                         >
-                            <ProviderIcon className={cn('w-6 h-6', brandColors.icon)} />
+                            {renderProviderIcon(provider.id, cn('w-6 h-6', brandColors.icon))}
                         </div>
                         <div>
                             <h3 className="font-semibold text-text dark:text-text-dark">

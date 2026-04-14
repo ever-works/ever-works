@@ -7,7 +7,7 @@ import { DirectoryAdvancedPromptsRepository } from './repositories/directory-adv
 import { DirectoryCustomDomainRepository } from './repositories/directory-custom-domain.repository';
 import { DirectoryMemberRepository } from './repositories/directory-member.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
-import { OAuthTokenRepository } from './repositories/oauth-token.repository';
+import { AuthAccountRepository } from './repositories/auth-account.repository';
 import { databaseConfig, ENTITIES } from './database.config';
 import { UserRepository } from './repositories/user.repository';
 import { DirectoryGenerationHistoryRepository } from './repositories/directory-generation-history.repository';
@@ -42,7 +42,7 @@ import { ConversationRepository } from './repositories/conversation.repository';
         DirectoryMemberRepository,
         RefreshTokenRepository,
         UserRepository,
-        OAuthTokenRepository,
+        AuthAccountRepository,
         DirectoryGenerationHistoryRepository,
         SubscriptionPlanRepository,
         UserSubscriptionRepository,
@@ -61,7 +61,7 @@ import { ConversationRepository } from './repositories/conversation.repository';
         DirectoryMemberRepository,
         UserRepository,
         RefreshTokenRepository,
-        OAuthTokenRepository,
+        AuthAccountRepository,
         DirectoryGenerationHistoryRepository,
         SubscriptionPlanRepository,
         UserSubscriptionRepository,
