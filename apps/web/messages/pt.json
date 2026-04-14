@@ -381,7 +381,8 @@
                 "generated": "Gerado",
                 "error": "Erro",
                 "cancelled": "Cancelado",
-                "idle": "Inativo"
+                "idle": "Inativo",
+                "opening": "Abrindo"
             },
             "role": {
                 "owner": "Proprietário",
@@ -396,7 +397,9 @@
             "items": "{count} itens",
             "views": "{count} visualizações",
             "updated": "Atualizado em {date}",
-            "viewAction": "Ver →"
+            "viewAction": "Ver →",
+            "openingTitle": "Abrindo diretório",
+            "openingMessage": "Estamos preparando seu diretório. Os detalhes serão abertos em instantes. Permaneça nesta página."
         },
         "directoryList": {
             "title": "Seus Diretórios",

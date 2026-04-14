@@ -390,13 +390,16 @@
                 "generated": "تم الإنشاء",
                 "error": "خطأ",
                 "cancelled": "ملغي",
-                "idle": "خامل"
+                "idle": "خامل",
+                "opening": "جارٍ الفتح"
             },
             "noDescription": "لا يوجد وصف",
             "items": "{count} عنصر",
             "views": "{count} مشاهدة",
             "updated": "تم التحديث {date}",
-            "viewAction": "عرض →"
+            "viewAction": "عرض →",
+            "openingTitle": "جارٍ فتح الدليل",
+            "openingMessage": "نحن نجهز دليلك الآن. ستفتح التفاصيل بعد قليل. يرجى البقاء في هذه الصفحة."
         },
         "directoryList": {
             "title": "أدلتك",

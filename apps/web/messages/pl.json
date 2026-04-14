@@ -381,7 +381,8 @@
                 "generated": "Wygenerowany",
                 "error": "Błąd",
                 "cancelled": "Anulowany",
-                "idle": "Bezczynny"
+                "idle": "Bezczynny",
+                "opening": "Otwieranie"
             },
             "role": {
                 "owner": "Właściciel",
@@ -396,7 +397,9 @@
             "items": "{count} pozycji",
             "views": "{count} wyświetleń",
             "updated": "Zaktualizowano {date}",
-            "viewAction": "Zobacz →"
+            "viewAction": "Zobacz →",
+            "openingTitle": "Otwieranie katalogu",
+            "openingMessage": "Przygotowujemy Twój katalog. Szczegóły otworzą się za chwilę. Pozostań na tej stronie."
         },
         "directoryList": {
             "title": "Twoje katalogi",

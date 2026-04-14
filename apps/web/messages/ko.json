@@ -381,7 +381,8 @@
                 "generated": "생성됨",
                 "error": "오류",
                 "cancelled": "취소됨",
-                "idle": "대기 중"
+                "idle": "대기 중",
+                "opening": "여는 중"
             },
             "role": {
                 "owner": "소유자",
@@ -396,7 +397,9 @@
             "items": "{count}개 항목",
             "views": "{count}회 조회",
             "updated": "{date}에 업데이트됨",
-            "viewAction": "보기 →"
+            "viewAction": "보기 →",
+            "openingTitle": "디렉터리를 여는 중",
+            "openingMessage": "디렉터리를 준비하고 있습니다. 잠시 후 세부 정보가 열립니다. 이 페이지에 그대로 머물러 주세요."
         },
         "directoryList": {
             "title": "내 디렉토리",
