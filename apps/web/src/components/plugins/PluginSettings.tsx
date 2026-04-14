@@ -39,11 +39,7 @@ interface PluginSettingsProps {
     localAuthStatus?: import('@/lib/api/plugins').CodexLocalAuthStatus | null;
 }
 
-export function PluginSettings({
-    plugin,
-    oauthConnection,
-    localAuthStatus,
-}: PluginSettingsProps) {
+export function PluginSettings({ plugin, oauthConnection, localAuthStatus }: PluginSettingsProps) {
     const t = useTranslations('dashboard.plugins');
     const tOnboarding = useTranslations('onboarding.plugins');
     const byokTrigger = plugin.uiHints?.byok?.triggerField;

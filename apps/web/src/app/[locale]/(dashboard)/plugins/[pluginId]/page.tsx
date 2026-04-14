@@ -51,8 +51,7 @@ export default async function PluginDetailPage({ params }: PluginDetailPageProps
                 ...plugin,
                 settings: {
                     ...(plugin.settings || {}),
-                    authMode:
-                        !hasSavedApiKey && localAuthStatus?.connected ? 'local' : 'api-key',
+                    authMode: !hasSavedApiKey && localAuthStatus?.connected ? 'local' : 'api-key',
                 },
             };
         }
