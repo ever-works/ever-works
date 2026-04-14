@@ -14,7 +14,7 @@
         "build": "nest build",
         "build:cli": "node build.js",
         "publish:cli": "npm run build:cli && cd dist && npm publish",
-        "test:cli": "cd dist && npm install && node cli.js --help"
+        "test:cli": "npm run build:cli && cd dist && npm install && node cli.js --help"
     },
     "dependencies": {
         "@ever-works/agent": "workspace:*",
