@@ -86,14 +86,19 @@ import { AuthService, CurrentUser, AuthSessionGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { GenerateDirectoryDetailDto } from './dto/generate-detail.dto';
 import { GenerateManualComparisonDto } from './dto/generate-manual-comparison.dto';
-import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
+import { CACHE_MANAGER, Cache, CacheEntryRepository } from '@ever-works/agent/cache';
 import { UpdateDirectoryScheduleDto, UpdateSourceValidationDto } from '@ever-works/agent/dto';
 import { DirectoryScheduleStatus } from '@ever-works/agent/entities';
 import { SubscriptionService } from '@ever-works/agent/subscriptions';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
-
-let CACHE_TTL = 1000 * 60 * 10; // 10 minutes
+import {
+    DIRECTORY_CACHE_TTL_MS,
+    getDirectoryCategoriesTagsCacheKey,
+    getDirectoryConfigCacheKey,
+    getDirectoryCountCacheKey,
+    getDirectoryItemsCacheKey,
+} from './directory-cache.constants';
 
 @ApiTags('Directories')
 @ApiBearerAuth('JWT-auth')
@@ -102,6 +107,7 @@ let CACHE_TTL = 1000 * 60 * 10; // 10 minutes
 export class DirectoriesController {
     constructor(
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
+        private readonly cacheEntryRepository: CacheEntryRepository,
         private readonly directoryQueryService: DirectoryQueryService,
         private readonly directoryLifecycleService: DirectoryLifecycleService,
         private readonly directoryGenerationService: DirectoryGenerationService,
@@ -122,6 +128,10 @@ export class DirectoriesController {
         private readonly subscriptionService: SubscriptionService,
         private readonly activityLogService: ActivityLogService,
     ) {}
+
+    private async invalidateDirectoryCaches(directoryId: string): Promise<void> {
+        await this.cacheEntryRepository.typeormAdapter.deleteUnscopedEntriesLike(directoryId);
+    }
 
     @Get('directories')
     @HttpCode(HttpStatus.OK)
@@ -229,7 +239,7 @@ export class DirectoriesController {
     @ApiParam({ name: 'id', description: 'Directory ID' })
     @ApiResponse({ status: 200, description: 'List of directory items' })
     async getDirectoryItems(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
-        const cacheKey = `directory-items-${id}-${auth.userId}`;
+        const cacheKey = getDirectoryItemsCacheKey(id, auth.userId);
 
         return this.cacheManager.wrap(
             cacheKey,
@@ -237,7 +247,7 @@ export class DirectoriesController {
                 const user = await this.authService.getUser(auth.userId);
                 return this.directoryQueryService.directoryItems(id, user);
             },
-            CACHE_TTL,
+            DIRECTORY_CACHE_TTL_MS,
         );
     }
 
@@ -250,7 +260,7 @@ export class DirectoriesController {
     @ApiParam({ name: 'id', description: 'Directory ID' })
     @ApiResponse({ status: 200, description: 'Directory configuration' })
     async getDirectoryConfig(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
-        const cacheKey = `directory-config-${id}-${auth.userId}`;
+        const cacheKey = getDirectoryConfigCacheKey(id, auth.userId);
 
         return this.cacheManager.wrap(
             cacheKey,
@@ -258,7 +268,7 @@ export class DirectoriesController {
                 const user = await this.authService.getUser(auth.userId);
                 return this.directoryQueryService.directoryConfig(id, user);
             },
-            CACHE_TTL,
+            DIRECTORY_CACHE_TTL_MS,
         );
     }
 
@@ -278,6 +288,7 @@ export class DirectoriesController {
     ) {
         const user = await this.authService.getUser(auth.userId);
         const result = await this.directoryQueryService.updateWebsiteSettings(id, user, dto);
+        await this.invalidateDirectoryCaches(id);
         this.activityLogService
             .log({
                 userId: auth.userId,
@@ -294,7 +305,7 @@ export class DirectoriesController {
     @Get('directories/:id/count')
     @HttpCode(HttpStatus.OK)
     async getDirectoryStatus(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
-        const cacheKey = `directory-count-${id}-${auth.userId}`;
+        const cacheKey = getDirectoryCountCacheKey(id, auth.userId);
 
         return this.cacheManager.wrap(
             cacheKey,
@@ -302,7 +313,7 @@ export class DirectoriesController {
                 const user = await this.authService.getUser(auth.userId);
                 return this.directoryQueryService.directoryCount(id, user);
             },
-            CACHE_TTL,
+            DIRECTORY_CACHE_TTL_MS,
         );
     }
 
@@ -318,7 +329,7 @@ export class DirectoriesController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
     ) {
-        const cacheKey = `directory-categories-tags-${id}-${auth.userId}`;
+        const cacheKey = getDirectoryCategoriesTagsCacheKey(id, auth.userId);
 
         return this.cacheManager.wrap(
             cacheKey,
@@ -326,7 +337,7 @@ export class DirectoriesController {
                 const user = await this.authService.getUser(auth.userId);
                 return this.directoryQueryService.directoryCategoriesTags(id, user);
             },
-            CACHE_TTL,
+            DIRECTORY_CACHE_TTL_MS,
         );
     }
 
@@ -634,6 +645,7 @@ export class DirectoriesController {
     ): Promise<SubmitItemResponseDto> {
         const user = await this.authService.getUser(auth.userId);
         const result = await this.directoryGenerationService.submitItem(id, submitItemDto, user);
+        await this.invalidateDirectoryCaches(id);
         this.activityLogService
             .log({
                 userId: auth.userId,
@@ -659,6 +671,7 @@ export class DirectoriesController {
     ): Promise<RemoveItemResponseDto> {
         const user = await this.authService.getUser(auth.userId);
         const result = await this.directoryGenerationService.removeItem(id, removeItemDto, user);
+        await this.invalidateDirectoryCaches(id);
         this.activityLogService
             .log({
                 userId: auth.userId,
@@ -691,6 +704,7 @@ export class DirectoriesController {
             updateItemDto,
             user,
         );
+        await this.invalidateDirectoryCaches(id);
 
         this.activityLogService
             .log({
@@ -730,7 +744,7 @@ export class DirectoriesController {
             checkItemHealthDto.item_slug,
             user,
         );
-        await this.cacheManager.del(`directory-items-${id}-${auth.userId}`);
+        await this.invalidateDirectoryCaches(id);
 
         this.activityLogService
             .log({
@@ -974,6 +988,7 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         const result = await this.directoryLifecycleService.syncFromDataRepository(id, user);
+        await this.invalidateDirectoryCaches(id);
 
         this.activityLogService
             .log({
@@ -1152,7 +1167,7 @@ export class DirectoriesController {
         @Body() dto: CreateCategoryDto,
     ) {
         const result = await this.directoryTaxonomyService.createCategory(id, dto, auth.userId);
-        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        await this.invalidateDirectoryCaches(id);
 
         this.activityLogService
             .log({
@@ -1182,7 +1197,7 @@ export class DirectoriesController {
             dto,
             auth.userId,
         );
-        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        await this.invalidateDirectoryCaches(id);
 
         this.activityLogService
             .log({
@@ -1211,7 +1226,7 @@ export class DirectoriesController {
             categoryId,
             auth.userId,
         );
-        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        await this.invalidateDirectoryCaches(id);
 
         this.activityLogService
             .log({
@@ -1237,7 +1252,7 @@ export class DirectoriesController {
         @Body() dto: CreateTagDto,
     ) {
         const result = await this.directoryTaxonomyService.createTag(id, dto, auth.userId);
-        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        await this.invalidateDirectoryCaches(id);
 
         this.activityLogService
             .log({
@@ -1262,7 +1277,7 @@ export class DirectoriesController {
         @Body() dto: UpdateTagDto,
     ) {
         const result = await this.directoryTaxonomyService.updateTag(id, tagId, dto, auth.userId);
-        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        await this.invalidateDirectoryCaches(id);
 
         this.activityLogService
             .log({
@@ -1287,7 +1302,7 @@ export class DirectoriesController {
         @Param('tagId') tagId: string,
     ) {
         const result = await this.directoryTaxonomyService.deleteTag(id, tagId, auth.userId);
-        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        await this.invalidateDirectoryCaches(id);
 
         this.activityLogService
             .log({
@@ -1312,7 +1327,7 @@ export class DirectoriesController {
         @Body() dto: CreateCollectionDto,
     ) {
         const result = await this.directoryTaxonomyService.createCollection(id, dto, auth.userId);
-        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        await this.invalidateDirectoryCaches(id);
 
         this.activityLogService
             .log({
@@ -1342,7 +1357,7 @@ export class DirectoriesController {
             dto,
             auth.userId,
         );
-        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        await this.invalidateDirectoryCaches(id);
 
         this.activityLogService
             .log({
@@ -1371,7 +1386,7 @@ export class DirectoriesController {
             collectionId,
             auth.userId,
         );
-        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        await this.invalidateDirectoryCaches(id);
 
         this.activityLogService
             .log({
@@ -1414,6 +1429,7 @@ export class DirectoriesController {
         }
 
         const itemsAdded = await this.communityPrProcessorService.processDirectory(directory);
+        await this.invalidateDirectoryCaches(id);
 
         this.activityLogService
             .log({
@@ -1512,7 +1528,7 @@ export class DirectoriesController {
         await this.directoryOwnershipService.ensureCanEdit(id, user.id);
 
         const result = await this.comparisonGenerationService.generateNextComparison(id, user.id);
-        await this.cacheManager.del(`directory-count-${id}-${auth.userId}`);
+        await this.invalidateDirectoryCaches(id);
         this.activityLogService
             .log({
                 userId: auth.userId,
@@ -1557,7 +1573,7 @@ export class DirectoriesController {
             body.itemASlug,
             body.itemBSlug,
         );
-        await this.cacheManager.del(`directory-count-${id}-${auth.userId}`);
+        await this.invalidateDirectoryCaches(id);
         this.activityLogService
             .log({
                 userId: auth.userId,
@@ -1592,7 +1608,7 @@ export class DirectoriesController {
         await this.directoryOwnershipService.ensureCanEdit(id, user.id);
 
         const result = await this.comparisonGenerationService.deleteComparison(id, user.id, slug);
-        await this.cacheManager.del(`directory-count-${id}-${auth.userId}`);
+        await this.invalidateDirectoryCaches(id);
         this.activityLogService
             .log({
                 userId: auth.userId,
