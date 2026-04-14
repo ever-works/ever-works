@@ -1,5 +1,6 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
+import type { LocalAuthStatus } from '@ever-works/plugin';
 import type {
     PluginResponse,
     UserPluginResponse,
@@ -34,16 +35,7 @@ export type DirectoryPluginListResponse = IDirectoryPluginListResponse;
 export type SettingsMenuResponse = ISettingsMenuResponse;
 export type SettingsMenuCategory = ISettingsMenuCategory;
 export type SettingsMenuPlugin = ISettingsMenuPlugin;
-
-export interface CodexLocalAuthStatus {
-    installed: boolean;
-    connected: boolean;
-    pending: boolean;
-    authPath: string;
-    verificationUri?: string;
-    userCode?: string;
-    message: string;
-}
+export type CodexLocalAuthStatus = LocalAuthStatus;
 
 // ============================================
 // API Client

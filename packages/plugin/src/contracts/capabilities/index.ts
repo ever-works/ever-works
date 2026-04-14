@@ -10,3 +10,4 @@ export * from './pipeline-plugin.interface.js';
 export * from './pipeline-modifier.interface.js';
 export * from './form-schema-provider.interface.js';
 export * from './prompt-provider.interface.js';
+export * from './local-auth-provider.interface.js';

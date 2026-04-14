@@ -252,6 +252,38 @@ export class PluginsController {
         return this.pluginValidationService.validateUserPluginConnection(pluginId, auth.userId);
     }
 
+    @Get('plugins/:pluginId/local-auth-status')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get plugin local auth status',
+        description:
+            'Returns machine-local authentication status for plugins that support a local CLI auth flow.',
+    })
+    @ApiParam({ name: 'pluginId', description: 'Plugin ID' })
+    @ApiResponse({ status: 200, description: 'Local auth status' })
+    async getPluginLocalAuthStatus(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('pluginId') pluginId: string,
+    ) {
+        return this.pluginsService.getPluginLocalAuthStatus(pluginId, auth.userId);
+    }
+
+    @Post('plugins/:pluginId/start-local-auth')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Start plugin local auth',
+        description:
+            'Starts a machine-local CLI authentication flow for plugins that support local auth.',
+    })
+    @ApiParam({ name: 'pluginId', description: 'Plugin ID' })
+    @ApiResponse({ status: 200, description: 'Local auth session started' })
+    async startPluginLocalAuth(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('pluginId') pluginId: string,
+    ) {
+        return this.pluginsService.startPluginLocalAuth(pluginId, auth.userId);
+    }
+
     // ============================================
     // Directory Plugin Management
     // ============================================

@@ -14,8 +14,6 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
 
 import { PluginsController } from './plugins.controller';
 import { PluginValidationService } from './plugin-validation.service';
-import { CodexLocalAuthService } from './codex-local-auth.service';
-import { CodexLocalAuthController } from './codex-local-auth.controller';
 
 /**
  * API module for plugin management endpoints.
@@ -30,18 +28,8 @@ import { CodexLocalAuthController } from './codex-local-auth.controller';
         AuthModule,
         ActivityLogModule,
     ],
-    controllers: [PluginsController, CodexLocalAuthController],
-    providers: [
-        PluginOperationsService,
-        SettingsSchemaValidatorService,
-        PluginValidationService,
-        CodexLocalAuthService,
-    ],
-    exports: [
-        PluginOperationsService,
-        SettingsSchemaValidatorService,
-        PluginValidationService,
-        CodexLocalAuthService,
-    ],
+    controllers: [PluginsController],
+    providers: [PluginOperationsService, SettingsSchemaValidatorService, PluginValidationService],
+    exports: [PluginOperationsService, SettingsSchemaValidatorService, PluginValidationService],
 })
 export class PluginsModule {}

@@ -8,9 +8,11 @@ import type {
 	FormFieldGroup,
 	GenerationRequest,
 	IFormSchemaProvider,
+	ILocalAuthProvider,
 	IPlugin,
 	IPipelinePlugin,
 	JsonSchema,
+	LocalAuthStatus,
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
 	PipelineResult,
@@ -43,6 +45,7 @@ import {
 import { buildSystemPrompt, buildUserPrompt } from './prompt/system-prompt.js';
 import { executeCodex, type ExecuteResult } from './utils/process-runner.js';
 import { ensureBinary } from './utils/binary-manager.js';
+import { getLocalAuthStatus, startLocalAuth } from './local-auth.js';
 import {
 	cleanupWorkspace,
 	collectMetadataFromItems,
@@ -249,7 +252,7 @@ const RECOVERY_OUTPUT_SCHEMA = {
 	}
 } as const;
 
-export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider {
+export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider, ILocalAuthProvider {
 	readonly id = 'codex';
 	readonly name = 'Codex Generator';
 	readonly version = '1.0.0';
@@ -476,6 +479,14 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			success: false,
 			message: 'Configure an OpenAI API key or sign in locally with Codex CLI first'
 		};
+	}
+
+	async getLocalAuthStatus(userId: string): Promise<LocalAuthStatus> {
+		return getLocalAuthStatus(userId, this.context?.logger ?? console);
+	}
+
+	async startLocalAuth(userId: string): Promise<LocalAuthStatus> {
+		return startLocalAuth(userId, this.context?.logger ?? console);
 	}
 
 	async execute(

@@ -11,7 +11,9 @@ import pickBy from 'lodash/pickBy';
 import {
     type IPlugin,
     type JsonSchema,
+    type LocalAuthStatus,
     type PluginManifest,
+    isLocalAuthProvider,
     toPluginSettingsSchemaProperty,
     PLUGIN_CAPABILITIES,
 } from '@ever-works/plugin';
@@ -281,6 +283,19 @@ export class PluginOperationsService {
             .join(' ');
     }
 
+    private getLocalAuthProvider(pluginId: string) {
+        const plugin = this.pluginRegistryService.getPlugin(pluginId);
+        if (!plugin) {
+            throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        }
+
+        if (!isLocalAuthProvider(plugin)) {
+            throw new BadRequestException(`Plugin "${pluginId}" does not support local auth`);
+        }
+
+        return plugin;
+    }
+
     /**
      * Get a single plugin by ID with user-specific status
      */
@@ -295,6 +310,16 @@ export class PluginOperationsService {
         });
 
         return this.toUserPluginResponse(registered, userPlugin);
+    }
+
+    async getPluginLocalAuthStatus(pluginId: string, userId: string): Promise<LocalAuthStatus> {
+        const plugin = this.getLocalAuthProvider(pluginId);
+        return plugin.getLocalAuthStatus(userId);
+    }
+
+    async startPluginLocalAuth(pluginId: string, userId: string): Promise<LocalAuthStatus> {
+        const plugin = this.getLocalAuthProvider(pluginId);
+        return plugin.startLocalAuth(userId);
     }
 
     // ============================================
