@@ -10,7 +10,13 @@ import { PluginRegistryService } from '../services/plugin-registry.service';
 import { SettingsSchemaValidatorService } from '../services/settings-schema-validator.service';
 import { PluginSettingsService } from '../services/plugin-settings.service';
 import type { RegisteredPlugin } from '../services/plugin-registry.service';
-import type { IPlugin, PluginManifest, JsonSchema } from '@ever-works/plugin';
+import type {
+    ILocalAuthProvider,
+    IPlugin,
+    LocalAuthStatus,
+    PluginManifest,
+    JsonSchema,
+} from '@ever-works/plugin';
 
 // Mock the facades module to avoid transitive cross-package @src path resolution issues
 jest.mock('../../facades', () => ({
@@ -133,6 +139,7 @@ describe('PluginOperationsService', () => {
                     provide: PluginRegistryService,
                     useValue: {
                         get: jest.fn().mockReturnValue(createRegisteredPlugin()),
+                        getPlugin: jest.fn().mockReturnValue(createMockPlugin()),
                         getAll: jest.fn().mockReturnValue([createRegisteredPlugin()]),
                         getAvailableCategories: jest.fn().mockReturnValue(['utility']),
                         getAvailableCapabilities: jest.fn().mockReturnValue(['test']),
@@ -1814,6 +1821,57 @@ describe('PluginOperationsService', () => {
                 expect.objectContaining({ enabled: false }),
             );
             expect(directoryPluginRepository.save).toHaveBeenCalled();
+        });
+    });
+
+    describe('plugin local auth capability', () => {
+        const createLocalAuthPlugin = (): IPlugin & ILocalAuthProvider =>
+            ({
+                ...createMockPlugin(),
+                getLocalAuthStatus: jest.fn().mockResolvedValue({
+                    installed: true,
+                    connected: true,
+                    pending: false,
+                    authPath: '/tmp/.codex/auth.json',
+                    message: 'Connected',
+                } satisfies LocalAuthStatus),
+                startLocalAuth: jest.fn().mockResolvedValue({
+                    installed: true,
+                    connected: false,
+                    pending: true,
+                    authPath: '/tmp/.codex/auth.json',
+                    verificationUri: 'https://auth.openai.com/codex/device',
+                    userCode: 'ABCD-EFGH',
+                    message: 'Pending',
+                } satisfies LocalAuthStatus),
+            }) as unknown as IPlugin & ILocalAuthProvider;
+
+        it('should delegate local auth status to plugins that support it', async () => {
+            const plugin = createLocalAuthPlugin();
+            jest.spyOn(pluginRegistryService, 'getPlugin').mockReturnValue(plugin);
+
+            const result = await service.getPluginLocalAuthStatus('test-plugin', 'user-1');
+
+            expect(plugin.getLocalAuthStatus).toHaveBeenCalledWith('user-1');
+            expect(result.connected).toBe(true);
+        });
+
+        it('should delegate start local auth to plugins that support it', async () => {
+            const plugin = createLocalAuthPlugin();
+            jest.spyOn(pluginRegistryService, 'getPlugin').mockReturnValue(plugin);
+
+            const result = await service.startPluginLocalAuth('test-plugin', 'user-1');
+
+            expect(plugin.startLocalAuth).toHaveBeenCalledWith('user-1');
+            expect(result.pending).toBe(true);
+        });
+
+        it('should reject local auth calls for plugins without the capability', async () => {
+            jest.spyOn(pluginRegistryService, 'getPlugin').mockReturnValue(createMockPlugin());
+
+            await expect(service.getPluginLocalAuthStatus('test-plugin', 'user-1')).rejects.toThrow(
+                BadRequestException,
+            );
         });
     });
 

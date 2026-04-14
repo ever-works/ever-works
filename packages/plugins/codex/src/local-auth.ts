@@ -161,6 +161,7 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 			session.status = 'failed';
 			session.error = stderrBuffer.trim() || stdoutBuffer.trim() || `Codex login exited with code ${code}`;
 			logger?.warn(`Codex device auth failed: ${session.error}`);
+			disposeSession(userId);
 		}
 	});
 
@@ -168,10 +169,14 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 		session.status = 'failed';
 		session.error = error.message;
 		logger?.warn(`Failed to start Codex device auth: ${error.message}`);
+		disposeSession(userId);
 	});
 
 	const ready = await waitForDevicePrompt(session, 5000);
 	if (!ready) {
+		session.status = 'failed';
+		session.error = 'Timed out waiting for Codex device authentication prompt.';
+		disposeSession(userId);
 		return {
 			installed: true,
 			connected: false,
@@ -280,6 +285,7 @@ function getActiveSession(userId: string): LocalAuthSession | undefined {
 	}
 
 	if (session.process.killed || session.status === 'failed') {
+		sessionByUser.delete(userId);
 		return undefined;
 	}
 

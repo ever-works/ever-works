@@ -2,8 +2,8 @@
  * Codex Generator Plugin
  *
  * Full pipeline plugin that will delegate the entire directory generation
- * to Codex CLI. The initial scaffold registers the plugin and form schema
- * before the external runner is implemented.
+ * to Codex CLI, including managed binary resolution, authentication handling,
+ * workspace generation, result collection, and screenshot follow-up support.
  *
  * @packageDocumentation
  */
