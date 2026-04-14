@@ -110,7 +110,7 @@ export async function resolveSettings(
 		]);
 
 		for (const key in directorySettings) {
-			if (directorySettings[key]) {
+			if (directorySettings[key] !== undefined && directorySettings[key] !== null) {
 				userSettings[key] = directorySettings[key];
 			}
 		}

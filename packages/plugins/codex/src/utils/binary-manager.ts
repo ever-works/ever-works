@@ -1,4 +1,6 @@
 import * as fs from 'fs/promises';
+import * as http from 'http';
+import * as https from 'https';
 import * as path from 'path';
 import { spawn } from 'child_process';
 
@@ -42,9 +44,9 @@ function fetchBuffer(url: string, maxRedirects = 5): Promise<Buffer> {
 			return;
 		}
 
-		const proto = url.startsWith('https') ? require('https') : require('http');
+		const proto = url.startsWith('https') ? https : http;
 		proto
-			.get(url, (res: import('http').IncomingMessage) => {
+			.get(url, (res: http.IncomingMessage) => {
 				if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
 					fetchBuffer(res.headers.location, maxRedirects - 1).then(resolve, reject);
 					return;

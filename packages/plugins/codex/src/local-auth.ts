@@ -157,9 +157,12 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 			return;
 		}
 
-		if (code !== 0 && session.status !== 'connected') {
+		if (session.status !== 'connected') {
 			session.status = 'failed';
-			session.error = stderrBuffer.trim() || stdoutBuffer.trim() || `Codex login exited with code ${code}`;
+			session.error =
+				code !== 0
+					? stderrBuffer.trim() || stdoutBuffer.trim() || `Codex login exited with code ${code}`
+					: 'Codex login exited successfully but auth file was not found.';
 			logger?.warn(`Codex device auth failed: ${session.error}`);
 			disposeSession(userId);
 		}

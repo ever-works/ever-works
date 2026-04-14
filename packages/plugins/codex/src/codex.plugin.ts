@@ -959,12 +959,6 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			combined.includes('sandboxed file-write blockage') ||
 			combined.includes('file writes were blocked') ||
 			combined.includes('local file writes were blocked') ||
-			combined.includes('local file tools are working') ||
-			combined.includes('write the json files directly') ||
-			combined.includes('write the full json files immediately') ||
-			combined.includes('ready-to-save json') ||
-			combined.includes('paste the full') ||
-			combined.includes('next reply') ||
 			combined.includes('re-run this task in a session where local file tools are working') ||
 			combined.includes('insufficient to finish the task because local file writes were blocked') ||
 			(mentionsSandbox && mentionsWriteBlock)
@@ -1167,7 +1161,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			return false;
 		}
 
-		const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-validate-'));
+		const workspacePath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'codex-validate-'));
 		const abortController = new AbortController();
 		const timeout = setTimeout(() => abortController.abort(), 12_000);
 
@@ -1192,7 +1186,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			return false;
 		} finally {
 			clearTimeout(timeout);
-			fs.rmSync(workspacePath, { recursive: true, force: true });
+			await fs.promises.rm(workspacePath, { recursive: true, force: true });
 		}
 	}
 
