@@ -10,7 +10,7 @@ import {
 import {
     GenerationMethod,
     type DirectoryScheduleAllowedCadence,
-    type DirectoryScheduleDto,
+    type DirectoryScheduleDto as ContractDirectoryScheduleDto,
     type UpdateDirectorySchedulePayload,
     type GenerationMetrics,
     type DirectoryGenerationHistoryEntry,
@@ -25,7 +25,6 @@ import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generat
 // Re-export directory types from contracts for convenience
 export type {
     DirectoryScheduleAllowedCadence,
-    DirectoryScheduleDto,
     UpdateDirectorySchedulePayload,
     GenerationMetrics,
     GenerationStepLog,
@@ -34,6 +33,13 @@ export type {
     SourceValidationSettingsDto,
     UpdateSourceValidationPayload,
 } from '@ever-works/contracts/api';
+
+export type DirectoryScheduleDto = Omit<ContractDirectoryScheduleDto, 'blockingCode'> & {
+    blockingCode?:
+        | 'SCHEDULED_UPDATES_DISABLED'
+        | 'INITIAL_DIRECTORY_SETUP_REQUIRED'
+        | 'CONFIG_UNAVAILABLE';
+};
 
 export interface MarkdownReadmeConfig {
     header?: string;

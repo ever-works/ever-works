@@ -22,6 +22,14 @@ export interface DirectoryScheduleAllowedCadence {
 export interface DirectoryScheduleDto {
 	/** Current schedule status */
 	status: DirectoryScheduleStatus;
+	/** Whether the scheduled updates feature is currently available */
+	featureEnabled: boolean;
+	/** Whether this directory is currently eligible to enable scheduled updates */
+	canEnable: boolean;
+	/** Machine-readable reason the schedule cannot currently be enabled */
+	blockingCode?: 'SCHEDULED_UPDATES_DISABLED' | 'INITIAL_DIRECTORY_SETUP_REQUIRED' | 'CONFIG_UNAVAILABLE';
+	/** Human-readable reason the schedule cannot currently be enabled */
+	blockingReason?: string;
 	/** Selected cadence (null if disabled) */
 	cadence: DirectoryScheduleCadence | null;
 	/** Billing mode */
