@@ -9,11 +9,8 @@ import {
 } from './enums';
 import {
     GenerationMethod,
-    type DirectoryScheduleAllowedCadence,
     type DirectoryScheduleDto as ContractDirectoryScheduleDto,
-    type UpdateDirectorySchedulePayload,
-    type GenerationMetrics,
-    type DirectoryGenerationHistoryEntry,
+    type UpdateDirectorySchedulePayload as ContractUpdateDirectorySchedulePayload,
     type DirectoryGenerationHistoryResponse,
     type SourceValidationSettingsDto,
     type UpdateSourceValidationPayload,
@@ -25,7 +22,6 @@ import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generat
 // Re-export directory types from contracts for convenience
 export type {
     DirectoryScheduleAllowedCadence,
-    UpdateDirectorySchedulePayload,
     GenerationMetrics,
     GenerationStepLog,
     DirectoryGenerationHistoryEntry,
@@ -39,6 +35,10 @@ export type DirectoryScheduleDto = Omit<ContractDirectoryScheduleDto, 'blockingC
         | 'SCHEDULED_UPDATES_DISABLED'
         | 'INITIAL_DIRECTORY_SETUP_REQUIRED'
         | 'CONFIG_UNAVAILABLE';
+};
+
+export type UpdateDirectorySchedulePayload = ContractUpdateDirectorySchedulePayload & {
+    runImmediately?: boolean;
 };
 
 export interface MarkdownReadmeConfig {

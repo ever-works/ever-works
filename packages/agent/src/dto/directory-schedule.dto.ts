@@ -25,6 +25,13 @@ export class UpdateDirectoryScheduleDto implements IUpdateDirectorySchedulePaylo
     enable?: boolean;
 
     @ApiPropertyOptional({
+        description: 'Whether to trigger an immediate run after saving the active schedule',
+    })
+    @IsOptional()
+    @IsBoolean()
+    runImmediately?: boolean;
+
+    @ApiPropertyOptional({
         description: 'Schedule cadence',
         enum: DirectoryScheduleCadence,
     })

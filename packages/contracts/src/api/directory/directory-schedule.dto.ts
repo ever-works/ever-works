@@ -62,6 +62,8 @@ export interface DirectoryScheduleDto {
 export interface UpdateDirectorySchedulePayload {
 	/** Enable or disable schedule */
 	enable?: boolean;
+	/** Trigger an immediate run after saving the active schedule */
+	runImmediately?: boolean;
 	/** Schedule cadence */
 	cadence?: DirectoryScheduleCadence;
 	/** Billing mode */

@@ -274,6 +274,7 @@ function ScheduleFormContent({
 
             const result = await updateDirectorySchedule(directoryId, {
                 enable: !form.enable,
+                runImmediately: !form.enable,
                 cadence: form.cadence,
                 billingMode: form.billingMode,
                 maxFailureBeforePause: form.maxFailureBeforePause,

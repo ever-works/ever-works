@@ -552,6 +552,11 @@ export class DirectoriesController {
             user,
         );
 
+        if (updateScheduleDto.runImmediately && schedule.status === DirectoryScheduleStatus.ACTIVE) {
+            const scheduleEntity = await this.directoryScheduleService.getScheduleEntity(id, user);
+            await this.directoryGenerationService.runScheduledUpdate(scheduleEntity);
+        }
+
         this.activityLogService
             .log({
                 userId: auth.userId,
