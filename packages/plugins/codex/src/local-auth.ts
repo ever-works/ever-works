@@ -6,6 +6,7 @@ import * as path from 'node:path';
 import type { LocalAuthStatus } from '@ever-works/plugin';
 
 import { ensureBinary } from './utils/binary-manager.js';
+import { buildSubprocessEnv } from './utils/subprocess-env.js';
 
 type LoggerLike = {
 	log(message: string, ...args: unknown[]): void;
@@ -101,7 +102,7 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 	const codexCommand = await ensureBinary(undefined, getBinaryLogger(logger));
 	const child = spawn(codexCommand, ['login', '--device-auth'], {
 		cwd: process.cwd(),
-		env: process.env,
+		env: buildSubprocessEnv(),
 		stdio: ['ignore', 'pipe', 'pipe']
 	});
 
@@ -223,7 +224,7 @@ async function isCodexInstalled(logger?: LoggerLike): Promise<boolean> {
 		return await new Promise((resolve) => {
 			const child = spawn(codexCommand, ['--version'], {
 				cwd: process.cwd(),
-				env: process.env,
+				env: buildSubprocessEnv(),
 				stdio: ['ignore', 'ignore', 'ignore']
 			});
 
@@ -245,7 +246,7 @@ async function isConnected(logger?: LoggerLike): Promise<boolean> {
 		return await new Promise((resolve) => {
 			const child = spawn(codexCommand, ['login', 'status'], {
 				cwd: process.cwd(),
-				env: process.env,
+				env: buildSubprocessEnv(),
 				stdio: ['ignore', 'pipe', 'pipe']
 			});
 

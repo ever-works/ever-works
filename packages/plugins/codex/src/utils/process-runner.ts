@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'child_process';
+import { buildSubprocessEnv } from './subprocess-env.js';
 
 const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
 const KILL_TIMEOUT_MS = 5000;
@@ -71,10 +72,7 @@ export function executeCodex(options: ExecuteOptions): {
 		}
 		args.push(options.prompt);
 
-		const env: Record<string, string> = {
-			...(process.env as Record<string, string>),
-			...options.env
-		};
+		const env = buildSubprocessEnv(options.env);
 
 		childProcess = spawn(options.command ?? 'codex', args, {
 			cwd: options.cwd,
