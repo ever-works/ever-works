@@ -4,6 +4,22 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const AUTHOR = 'Ever Co. LTD <evereq@gmail.com>';
+const FRAMEWORK_EXTERNALS = [
+    '@nestjs/cache-manager',
+    '@nestjs/common',
+    '@nestjs/config',
+    '@nestjs/core',
+    '@nestjs/event-emitter',
+    '@nestjs/microservices',
+    '@nestjs/platform-express',
+    '@nestjs/typeorm',
+    '@nestjs/websockets',
+    'cache-manager',
+    'class-transformer',
+    'class-validator',
+    'rxjs',
+    'typeorm',
+];
 
 async function buildCLI() {
     const buildDir = path.join(__dirname, 'dist');
@@ -63,6 +79,10 @@ async function buildCLI() {
             'better-sqlite3',
             'libsodium-wrappers',
 
+            // Runtime framework packages are kept external to avoid
+            // bundling Nest/TypeORM internals into the single-file CLI.
+            ...FRAMEWORK_EXTERNALS,
+
             // Required for TypeORM decorators
             'reflect-metadata',
 
@@ -93,7 +113,8 @@ async function buildCLI() {
             'readline',
         ],
         format: 'cjs',
-        minify: true, // Keep readable for debugging
+        // Preserve NestJS metadata and make runtime failures easier to inspect.
+        minify: false,
         sourcemap: false,
         metafile: true,
         // Preserve decorator metadata for TypeORM
@@ -110,6 +131,22 @@ async function buildCLI() {
 
     // Read the current package.json
     const currentPackageJson = await fs.readJson(packageJsonPath);
+    const agentPackageJson = await fs.readJson(path.join(__dirname, '../../packages/agent/package.json'));
+
+    const publishableDependencies = {
+        'better-sqlite3': '^11.10.0',
+        'libsodium-wrappers': '^0.7.15',
+        'reflect-metadata': '^0.2.2',
+    };
+
+    const dependencySources = [currentPackageJson.dependencies ?? {}, agentPackageJson.dependencies ?? {}];
+
+    for (const dependency of FRAMEWORK_EXTERNALS) {
+        const version = dependencySources.find((source) => source[dependency])?.[dependency];
+        if (version) {
+            publishableDependencies[dependency] = version;
+        }
+    }
 
     // Create publishable package.json
     const publishablePackageJson = {
@@ -145,12 +182,8 @@ async function buildCLI() {
         engines: {
             node: '>=20.0.0',
         },
-        // Only include runtime dependencies that are external
-        dependencies: {
-            'better-sqlite3': '^11.10.0',
-            'libsodium-wrappers': '^0.7.15',
-            'reflect-metadata': '^0.2.2',
-        },
+        // Only include runtime dependencies that remain external to the bundle.
+        dependencies: publishableDependencies,
         // Remove dev dependencies and workspace dependencies
         scripts: {
             postinstall:
