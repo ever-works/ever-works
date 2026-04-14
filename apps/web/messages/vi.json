@@ -381,7 +381,8 @@
                 "generated": "Đã Tạo",
                 "error": "Lỗi",
                 "cancelled": "Đã Hủy",
-                "idle": "Không hoạt động"
+                "idle": "Không hoạt động",
+                "opening": "Đang mở"
             },
             "role": {
                 "owner": "Chủ sở hữu",
@@ -396,7 +397,9 @@
             "items": "{count} mục",
             "views": "{count} lượt xem",
             "updated": "Đã cập nhật {date}",
-            "viewAction": "Xem →"
+            "viewAction": "Xem →",
+            "openingTitle": "Đang mở thư mục",
+            "openingMessage": "Chúng tôi đang chuẩn bị thư mục của bạn. Chi tiết sẽ mở trong giây lát. Vui lòng ở lại trang này."
         },
         "directoryList": {
             "title": "Thư mục của Bạn",

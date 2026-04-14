@@ -390,13 +390,16 @@
                 "generated": "Generiert",
                 "error": "Fehler",
                 "cancelled": "Abgebrochen",
-                "idle": "Inaktiv"
+                "idle": "Inaktiv",
+                "opening": "Wird geöffnet"
             },
             "noDescription": "Keine Beschreibung vorhanden",
             "items": "{count} Einträge",
             "views": "{count} Aufrufe",
             "updated": "Aktualisiert {date}",
-            "viewAction": "Anzeigen →"
+            "viewAction": "Anzeigen →",
+            "openingTitle": "Verzeichnis wird geöffnet",
+            "openingMessage": "Ihr Verzeichnis wird vorbereitet. Die Details öffnen sich in Kürze. Bitte bleiben Sie auf dieser Seite."
         },
         "directoryList": {
             "title": "Ihre Verzeichnisse",

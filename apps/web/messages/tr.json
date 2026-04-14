@@ -381,7 +381,8 @@
                 "generated": "Oluşturuldu",
                 "error": "Hata",
                 "cancelled": "İptal Edildi",
-                "idle": "Boşta"
+                "idle": "Boşta",
+                "opening": "Açılıyor"
             },
             "role": {
                 "owner": "Sahip",
@@ -396,7 +397,9 @@
             "items": "{count} öğe",
             "views": "{count} görüntülenme",
             "updated": "{date} güncellendi",
-            "viewAction": "Görüntüle →"
+            "viewAction": "Görüntüle →",
+            "openingTitle": "Dizin açılıyor",
+            "openingMessage": "Dizininiz hazırlanıyor. Ayrıntılar kısa süre içinde açılacak. Lütfen bu sayfada kalın."
         },
         "directoryList": {
             "title": "Dizinleriniz",

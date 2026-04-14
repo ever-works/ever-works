@@ -381,7 +381,8 @@
                 "generated": "Dibuat",
                 "error": "Kesalahan",
                 "cancelled": "Dibatalkan",
-                "idle": "Diam"
+                "idle": "Diam",
+                "opening": "Membuka"
             },
             "role": {
                 "owner": "Pemilik",
@@ -396,7 +397,9 @@
             "items": "{count} item",
             "views": "{count} tampilan",
             "updated": "Diperbarui {date}",
-            "viewAction": "Lihat →"
+            "viewAction": "Lihat →",
+            "openingTitle": "Membuka direktori",
+            "openingMessage": "Kami sedang menyiapkan direktori Anda. Detail akan segera terbuka. Tetap di halaman ini."
         },
         "directoryList": {
             "title": "Direktori Anda",

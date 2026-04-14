@@ -390,13 +390,16 @@
                 "generated": "Generado",
                 "error": "Error",
                 "cancelled": "Cancelado",
-                "idle": "Inactivo"
+                "idle": "Inactivo",
+                "opening": "Abriendo"
             },
             "noDescription": "No se proporcionó descripción",
             "items": "{count} elementos",
             "views": "{count} visualizaciones",
             "updated": "Actualizado {date}",
-            "viewAction": "Ver →"
+            "viewAction": "Ver →",
+            "openingTitle": "Abriendo directorio",
+            "openingMessage": "Estamos preparando tu directorio. Los detalles se abrirán en breve. Permanece en esta página."
         },
         "directoryList": {
             "title": "Tus Directorios",

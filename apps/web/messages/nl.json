@@ -381,7 +381,8 @@
                 "generated": "Gegenereerd",
                 "error": "Fout",
                 "cancelled": "Geannuleerd",
-                "idle": "Inactief"
+                "idle": "Inactief",
+                "opening": "Openen"
             },
             "role": {
                 "owner": "Eigenaar",
@@ -396,7 +397,9 @@
             "items": "{count} items",
             "views": "{count} weergaven",
             "updated": "Bijgewerkt op {date}",
-            "viewAction": "Bekijken →"
+            "viewAction": "Bekijken →",
+            "openingTitle": "Map wordt geopend",
+            "openingMessage": "Je map wordt voorbereid. De details worden zo geopend. Blijf op deze pagina."
         },
         "directoryList": {
             "title": "Uw Directory's",

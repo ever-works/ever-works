@@ -390,13 +390,16 @@
                 "generated": "已生成",
                 "error": "错误",
                 "cancelled": "已取消",
-                "idle": "空闲"
+                "idle": "空闲",
+                "opening": "正在打开"
             },
             "noDescription": "未提供描述",
             "items": "{count} 个项目",
             "views": "{count} 次查看",
             "updated": "更新于 {date}",
-            "viewAction": "查看 →"
+            "viewAction": "查看 →",
+            "openingTitle": "正在打开目录",
+            "openingMessage": "我们正在准备您的目录，详情即将打开。请停留在此页面。"
         },
         "directoryList": {
             "title": "您的目录",

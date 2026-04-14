@@ -390,13 +390,16 @@
                 "generated": "נוצר",
                 "error": "שגיאה",
                 "cancelled": "בוטל",
-                "idle": "לא פעיל"
+                "idle": "לא פעיל",
+                "opening": "בפתיחה"
             },
             "noDescription": "לא סופק תיאור",
             "items": "{count} פריטים",
             "views": "{count} צפיות",
             "updated": "עודכן בתאריך {date}",
-            "viewAction": "הצג →"
+            "viewAction": "הצג →",
+            "openingTitle": "פותחים את הספרייה",
+            "openingMessage": "אנחנו מכינים את הספרייה שלך. הפרטים ייפתחו בעוד רגע. נא להישאר בעמוד הזה."
         },
         "directoryList": {
             "title": "המדריכים שלך",

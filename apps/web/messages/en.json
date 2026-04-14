@@ -730,7 +730,8 @@
                 "generated": "Generated",
                 "error": "Error",
                 "cancelled": "Cancelled",
-                "idle": "Idle"
+                "idle": "Idle",
+                "opening": "Opening"
             },
             "role": {
                 "owner": "Owner",
@@ -745,7 +746,9 @@
             "items": "{count} items",
             "views": "{count} views",
             "updated": "Updated {date}",
-            "viewAction": "View →"
+            "viewAction": "View →",
+            "openingTitle": "Opening directory",
+            "openingMessage": "Preparing your directory. Details will open shortly. Stay on this page."
         },
         "directoryList": {
             "title": "Your Directories",

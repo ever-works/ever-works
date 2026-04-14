@@ -381,7 +381,8 @@
                 "generated": "Generato",
                 "error": "Errore",
                 "cancelled": "Annullato",
-                "idle": "Inattivo"
+                "idle": "Inattivo",
+                "opening": "Apertura"
             },
             "role": {
                 "owner": "Proprietario",
@@ -396,7 +397,9 @@
             "items": "{count} elementi",
             "views": "{count} visualizzazioni",
             "updated": "Aggiornato {date}",
-            "viewAction": "Vedi →"
+            "viewAction": "Vedi →",
+            "openingTitle": "Apertura della directory",
+            "openingMessage": "Stiamo preparando la directory. I dettagli si apriranno a breve. Rimani su questa pagina."
         },
         "directoryList": {
             "title": "Le tue Directory",

@@ -390,13 +390,16 @@
                 "generated": "Généré",
                 "error": "Erreur",
                 "cancelled": "Annulé",
-                "idle": "Inactif"
+                "idle": "Inactif",
+                "opening": "Ouverture"
             },
             "noDescription": "Aucune description fournie",
             "items": "{count} éléments",
             "views": "{count} vues",
             "updated": "Mis à jour le {date}",
-            "viewAction": "Voir →"
+            "viewAction": "Voir →",
+            "openingTitle": "Ouverture du répertoire",
+            "openingMessage": "Nous préparons votre répertoire. Les détails vont s'ouvrir sous peu. Restez sur cette page."
         },
         "directoryList": {
             "title": "Vos répertoires",
