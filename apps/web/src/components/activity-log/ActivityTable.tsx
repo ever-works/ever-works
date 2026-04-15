@@ -7,6 +7,7 @@ import type { ActivityLogEntry } from '@/lib/api/activity-log';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
 import { ActivityTypeBadge } from './ActivityTypeBadge';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { Tooltip } from '@/components/ui/tooltip';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { TerminalLogViewer } from '@/components/directories/detail/shared/TerminalLogViewer';
@@ -268,17 +269,26 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                         aria-expanded={isExpanded}
                                     >
                                         <td className="px-3 py-3 text-center">
-                                            {isExpanded ? (
-                                                <ChevronDown
-                                                    className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
-                                                    aria-hidden="true"
-                                                />
-                                            ) : (
-                                                <ChevronRight
-                                                    className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
-                                                    aria-hidden="true"
-                                                />
-                                            )}
+                                            <Tooltip
+                                                content={
+                                                    isExpanded
+                                                        ? t('detail.collapse')
+                                                        : t('detail.expand')
+                                                }
+                                                position="right"
+                                            >
+                                                {isExpanded ? (
+                                                    <ChevronDown
+                                                        className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
+                                                        aria-hidden="true"
+                                                    />
+                                                ) : (
+                                                    <ChevronRight
+                                                        className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
+                                                        aria-hidden="true"
+                                                    />
+                                                )}
+                                            </Tooltip>
                                         </td>
                                         <td className="px-4 py-3">
                                             <ActivityStatusBadge status={activity.status} />
@@ -315,22 +325,8 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                             <ActivityTypeBadge actionType={activity.actionType} />
                                         </td>
                                         <td className="px-4 py-3 text-xs text-text dark:text-text-dark max-w-md">
-                                            <div className="space-y-1">
-                                                <div className="line-clamp-3 break-words">
-                                                    {activity.summary}
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        toggleExpanded(activity.id);
-                                                    }}
-                                                >
-                                                    {isExpanded
-                                                        ? t('detail.collapse')
-                                                        : t('detail.expand')}
-                                                </button>
+                                            <div className="line-clamp-3 break-words">
+                                                {activity.summary}
                                             </div>
                                         </td>
                                     </tr>
