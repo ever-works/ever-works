@@ -451,7 +451,17 @@ describe('OpenCodePlugin', () => {
 				getScreenshotUrl: vi.fn()
 			};
 
-			const result = await plugin.execute(directory, request, existing, {
+			const result = await plugin.execute(
+				directory,
+				{
+					...request,
+					config: {
+						...(request.config || {}),
+						capture_screenshots: true
+					}
+				},
+				existing,
+				{
 				execContext: {
 					aiFacade: {} as never,
 					searchFacade: {} as never,
@@ -461,7 +471,8 @@ describe('OpenCodePlugin', () => {
 					directory,
 					user: { id: 'user1' }
 				}
-			});
+				}
+			);
 
 			expect(result.success).toBe(true);
 			expect(mockScreenshotFacade.getSmartImage).toHaveBeenCalled();
