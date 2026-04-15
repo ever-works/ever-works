@@ -13,7 +13,7 @@ export function Tooltip({ content, children, position = 'top' }: TooltipProps) {
     const [visible, setVisible] = useState(false);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-     const handleMouseEnter = () => {
+    const handleMouseEnter = () => {
         if (timerRef.current) clearTimeout(timerRef.current);
         setVisible(true);
     };
