@@ -26,6 +26,7 @@ import { PluginEnablePanel } from './PluginEnablePanel';
 import { PluginDisableWarning } from './PluginDisableWarning';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { ClaudeCodeOnboardingWizard } from '@/components/settings/ClaudeCodeOnboardingWizard';
+import { OpenCodeOnboardingWizard } from '@/components/settings/OpenCodeOnboardingWizard';
 import { SimAiOnboardingWizard } from '@/components/settings/SimAiOnboardingWizard';
 import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
@@ -116,6 +117,13 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
     const showSetupButton =
         setupLink &&
         (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !plugin.settings?.[f]));
+    const usesClaudeWizard =
+        plugin.pluginId === 'claude-code' && Boolean(plugin.uiHints?.onboardingWizard);
+    const usesOpenCodeWizard =
+        plugin.pluginId === 'opencode' && Boolean(plugin.uiHints?.onboardingWizard);
+    const usesSimAiWizard =
+        plugin.pluginId === 'sim-ai' && Boolean(plugin.uiHints?.onboardingWizard);
+    const usesCustomWizard = usesClaudeWizard || usesOpenCodeWizard || usesSimAiWizard;
 
     return (
         <div className="space-y-6">
@@ -289,9 +297,21 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                     </div>
 
                     <div className="p-6">
-                        {plugin.uiHints?.onboardingWizard ? (
-                            plugin.pluginId === 'sim-ai' ? (
+                        {usesCustomWizard ? (
+                            usesSimAiWizard ? (
                                 <SimAiOnboardingWizard
+                                    pluginId={plugin.pluginId}
+                                    visibleProperties={visibleProperties}
+                                    getFieldValue={getFieldValue}
+                                    handleFieldChange={handleFieldChange}
+                                    handleSave={handleSave}
+                                    isSaving={isSaving}
+                                    saveSuccess={saveSuccess}
+                                    validationError={validationError}
+                                    saveMessage={saveMessage}
+                                />
+                            ) : usesOpenCodeWizard ? (
+                                <OpenCodeOnboardingWizard
                                     pluginId={plugin.pluginId}
                                     visibleProperties={visibleProperties}
                                     getFieldValue={getFieldValue}
@@ -376,7 +396,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                         )}
                     </div>
 
-                    {!plugin.uiHints?.onboardingWizard && (
+                    {!usesCustomWizard && (
                         <div className="flex items-center gap-3 px-6 py-4 border-t border-border dark:border-border-dark">
                             <Button
                                 variant="primary"

@@ -176,7 +176,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				type: 'string',
 				title: 'Authentication Mode',
 				description:
-					'Use `machine-local` to rely on this machine\'s existing OpenCode login, or `api-key` to store an isolated API key for the plugin.',
+					"Use `machine-local` to rely on this machine's existing OpenCode login, or `api-key` to store an isolated API key for the plugin.",
 				default: 'machine-local',
 				enum: ['machine-local', 'api-key'],
 				'x-scope': 'user'
@@ -192,8 +192,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			apiKey: {
 				type: 'string',
 				title: 'API Key',
-				description:
-					'OpenCode API key for the selected provider when using API key authentication.',
+				description: 'OpenCode API key for the selected provider when using API key authentication.',
 				'x-secret': true,
 				'x-scope': 'user',
 				'x-envVar': 'PLUGIN_OPENCODE_API_KEY'
@@ -210,8 +209,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				title: 'Model',
 				'x-scope': 'user',
 				default: 'go/kimi-k2.5',
-				description:
-					'Model to use in the form provider/model, for example `go/kimi-k2.5`.'
+				description: 'Model to use in the form provider/model, for example `go/kimi-k2.5`.'
 			}
 		},
 		required: ['authMode']
@@ -314,7 +312,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			visibility: 'public',
 			selectableProviderCategories: ['screenshot'],
 			uiHints: {
-				onboardingWizard: false,
+				onboardingWizard: true,
 				includeInOnboarding: true,
 				onboardingPriority: 1,
 				completionFields: ['authMode', 'provider', 'apiKey', 'model'],
@@ -1067,11 +1065,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		});
 	}
 
-	private failStep(
-		stepId: OpenCodeStepId,
-		error: Error,
-		onLogEntry?: PipelineExecutionOptions['onLogEntry']
-	): void {
+	private failStep(stepId: OpenCodeStepId, error: Error, onLogEntry?: PipelineExecutionOptions['onLogEntry']): void {
 		this.setState(stepId, 'failed', error.message);
 		this.emitOpenCodeLog({
 			onLogEntry,
