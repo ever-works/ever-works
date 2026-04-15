@@ -171,7 +171,12 @@ export function PluginOAuthConnection({
                                 size="sm"
                                 className="gap-1.5 text-sm"
                             >
-                                <RefreshCw className={cn('w-4 h-4 stroke-[1.5]', isPending && 'animate-spin')} />
+                                <RefreshCw
+                                    className={cn(
+                                        'w-4 h-4 stroke-[1.5]',
+                                        isPending && 'animate-spin',
+                                    )}
+                                />
                                 {isPending ? t('reconnecting') : t('reconnect')}
                             </Button>
                             <Button
