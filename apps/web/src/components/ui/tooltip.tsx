@@ -16,7 +16,7 @@ export function Tooltip({ content, children, position = 'top' }: TooltipProps) {
     const handleMouseEnter = () => {
         if (timerRef.current) clearTimeout(timerRef.current);
         setVisible(true);
-        timerRef.current = setTimeout(() => setVisible(false), 2000);
+        timerRef.current = setTimeout(() => setVisible(false), 1200);
     };
 
     const handleMouseLeave = () => {
