@@ -462,15 +462,15 @@ describe('OpenCodePlugin', () => {
 				},
 				existing,
 				{
-				execContext: {
-					aiFacade: {} as never,
-					searchFacade: {} as never,
-					screenshotFacade: mockScreenshotFacade as never,
-					contentExtractorFacade: {} as never,
-					logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-					directory,
-					user: { id: 'user1' }
-				}
+					execContext: {
+						aiFacade: {} as never,
+						searchFacade: {} as never,
+						screenshotFacade: mockScreenshotFacade as never,
+						contentExtractorFacade: {} as never,
+						logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+						directory,
+						user: { id: 'user1' }
+					}
 				}
 			);
 
