@@ -165,7 +165,7 @@ export function ImportFlow({ onClose, initialPreview, isPullMode }: ImportFlowPr
                         }`}
                     >
                         <FileJson
-                            className={`w-7 h-7 transition-colors duration-200 ${
+                            className={`w-7 h-7 stroke-1 transition-colors duration-200 ${
                                 dragOver
                                     ? 'text-primary'
                                     : 'text-text-muted dark:text-text-muted-dark'
