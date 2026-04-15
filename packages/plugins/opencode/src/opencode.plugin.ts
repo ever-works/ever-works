@@ -314,7 +314,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			visibility: 'public',
 			selectableProviderCategories: ['screenshot'],
 			uiHints: {
-				onboardingWizard: true,
+				onboardingWizard: false,
 				includeInOnboarding: true,
 				onboardingPriority: 1,
 				completionFields: ['authMode', 'provider', 'apiKey', 'model'],
