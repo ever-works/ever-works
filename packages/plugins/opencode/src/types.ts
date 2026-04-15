@@ -1,3 +1,6 @@
+import * as os from 'os';
+import * as path from 'path';
+
 /**
  * Step IDs for the OpenCode pipeline.
  * All steps run sequentially (non-parallelizable).
@@ -32,7 +35,7 @@ export function isOpenCodeStepId(value: string): value is OpenCodeStepId {
 /**
  * Base temporary directory for all OpenCode operations
  */
-export const BASE_TEMP_DIR = '/tmp/opencode-generator';
+export const BASE_TEMP_DIR = path.join(os.tmpdir(), 'opencode-generator');
 
 /**
  * GitHub repository for OpenCode CLI distribution

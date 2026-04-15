@@ -15,13 +15,12 @@ export interface PlatformInfo {
  */
 async function isMuslLinux(): Promise<boolean> {
 	try {
-		const lddOutput = await fs.readFile('/usr/bin/ldd', 'utf-8').catch(() => '');
-		if (lddOutput.includes('musl')) {
+		const libFiles = await fs.readdir('/lib').catch(() => [] as string[]);
+		if (libFiles.some((f) => f.startsWith('ld-musl'))) {
 			return true;
 		}
-		// Check if /lib/ld-musl* exists
-		const libFiles = await fs.readdir('/lib').catch(() => []);
-		return libFiles.some((f) => f.startsWith('ld-musl'));
+		const lddOutput = await fs.readFile('/usr/bin/ldd', 'utf-8').catch(() => '');
+		return lddOutput.includes('musl');
 	} catch {
 		return false;
 	}

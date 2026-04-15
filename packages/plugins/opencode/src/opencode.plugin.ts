@@ -741,7 +741,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		logger: { log(...args: unknown[]): void; warn(...args: unknown[]): void },
 		onLogEntry?: PipelineExecutionOptions['onLogEntry']
 	): Promise<string[]> {
-		const shouldCapture = (request.config || {}).capture_screenshots !== false;
+		const shouldCapture = Boolean((request.config || {}).capture_screenshots);
 		const screenshotFacade = execContext?.screenshotFacade;
 
 		if (!shouldCapture || items.length === 0 || signal.aborted || !screenshotFacade) {
