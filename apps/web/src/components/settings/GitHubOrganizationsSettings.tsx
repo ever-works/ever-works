@@ -72,9 +72,7 @@ export function GitHubOrganizationsSettings({
                 },
             });
 
-            setStatus(
-                result.success ? t('savedSuccess') : result.error || t('saveFailed'),
-            );
+            setStatus(result.success ? t('savedSuccess') : result.error || t('saveFailed'));
         });
     };
 
