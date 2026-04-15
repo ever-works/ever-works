@@ -145,12 +145,12 @@ export function DirectorySwitcher() {
                 <div className="relative">
                     <div
                         className={cn(
-                            'flex min-h-10 items-center gap-2 rounded-lg border px-3 py-2',
+                            'flex cursort-center min-h-10 items-center gap-2 rounded-xl border px-3 py-2',
                             'border-border dark:border-border-dark',
                             'bg-surface dark:bg-surface-dark',
                             'transition-colors',
-                            'focus-within:border-primary dark:focus-within:border-primary-dark',
-                            'focus-within:ring-2 focus-within:ring-primary/15',
+                            'focus-within:border-primary dark:focus-within:border-white/12',
+                            'focus-within:ring-2 focus-within:ring-white/12',
                             (isLoading || isNavigating) && 'opacity-80',
                         )}
                     >
@@ -188,61 +188,72 @@ export function DirectorySwitcher() {
 
                     <ComboboxOptions
                         className={cn(
-                            'absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-xl border shadow-xl',
+                            'absolute left-0 top-full z-50 mt-1.5 w-full overflow-hidden rounded-xl border shadow-2xl',
                             'border-border dark:border-border-dark',
-                            'bg-white dark:bg-surface-dark',
-                            'max-h-80 p-1',
+                            'bg-white dark:bg-[#0a0a0a]',
                             'empty:invisible',
                         )}
                     >
-                        <div className="max-h-78 overflow-y-auto">
-                            {isLoading ? (
-                                <div className="flex items-center gap-2 px-3 py-3 text-sm text-text-muted dark:text-text-muted-dark">
-                                    <LoaderCircle className="h-4 w-4 animate-spin" />
-                                    <span>{t('search')}</span>
-                                </div>
-                            ) : filteredDirectories.length === 0 ? (
-                                <div className="px-3 py-3 text-sm text-text-muted dark:text-text-muted-dark">
-                                    {t('empty.notFound.withSearch')}
-                                </div>
-                            ) : (
-                                filteredDirectories.map((directory) => {
-                                    const isCurrentDirectory = directory.id === currentDirectoryId;
+                        <div className="relative">
+                            <div className="max-h-72 overflow-y-auto px-1.5 py-2">
+                                {isLoading ? (
+                                    <div className="flex items-center gap-2 px-3 py-3 text-sm text-text-muted dark:text-text-muted-dark">
+                                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                                        <span>{t('search')}</span>
+                                    </div>
+                                ) : filteredDirectories.length === 0 ? (
+                                    <div className="px-3 py-3 text-sm text-text-muted dark:text-text-muted-dark">
+                                        {t('empty.notFound.withSearch')}
+                                    </div>
+                                ) : (
+                                    filteredDirectories.map((directory) => {
+                                        const isCurrentDirectory =
+                                            directory.id === currentDirectoryId;
 
-                                    return (
-                                        <ComboboxOption
-                                            key={directory.id}
-                                            value={directory}
-                                            disabled={isCurrentDirectory || isNavigating}
-                                            className={({ active, disabled }) =>
-                                                cn(
-                                                    'flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm',
-                                                    'text-text dark:text-text-dark',
-                                                    active &&
-                                                        'bg-surface-hover dark:bg-surface-hover-dark',
-                                                    disabled && 'cursor-default opacity-60',
-                                                )
-                                            }
-                                        >
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <FolderOpen className="h-4 w-4 shrink-0 text-text-muted dark:text-text-muted-dark" />
-                                                    <span className="truncate font-medium">
-                                                        {directory.name}
-                                                    </span>
+                                        return (
+                                            <ComboboxOption
+                                                key={directory.id}
+                                                value={directory}
+                                                disabled={isCurrentDirectory || isNavigating}
+                                                className={({ active, disabled }) =>
+                                                    cn(
+                                                        'flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm',
+                                                        'text-text dark:text-text-dark transition-colors duration-100',
+                                                        active &&
+                                                            'bg-surface-secondary dark:bg-white/4',
+                                                        isCurrentDirectory &&
+                                                            'bg-primary/5 dark:bg-white/4',
+                                                        disabled && 'cursor-default opacity-60',
+                                                    )
+                                                }
+                                            >
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <FolderOpen
+                                                            className={cn(
+                                                                'h-3.5 w-3.5 shrink-0',
+                                                                isCurrentDirectory
+                                                                    ? 'text-primary dark:text-text-muted-dark'
+                                                                    : 'text-text-muted dark:text-text-muted-dark',
+                                                            )}
+                                                        />
+                                                        <span className="truncate text-xs font-medium">
+                                                            {directory.name}
+                                                        </span>
+                                                    </div>
+                                                    <div className="truncate pl-5 text-[11px] text-text-muted dark:text-text-muted-dark">
+                                                        {directory.slug}
+                                                    </div>
                                                 </div>
-                                                <div className="truncate pl-6 text-xs text-text-muted dark:text-text-muted-dark">
-                                                    {directory.slug}
-                                                </div>
-                                            </div>
 
-                                            {isCurrentDirectory && (
-                                                <Check className="h-4 w-4 shrink-0 text-primary dark:text-primary-dark" />
-                                            )}
-                                        </ComboboxOption>
-                                    );
-                                })
-                            )}
+                                                {isCurrentDirectory && (
+                                                    <Check className="h-3.5 w-3.5 shrink-0 text-primary dark:text-text-muted-dark" />
+                                                )}
+                                            </ComboboxOption>
+                                        );
+                                    })
+                                )}
+                            </div>
                         </div>
                     </ComboboxOptions>
                 </div>
