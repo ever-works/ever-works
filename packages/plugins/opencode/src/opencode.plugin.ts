@@ -172,6 +172,15 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {
+			authMode: {
+				type: 'string',
+				title: 'Authentication Mode',
+				description:
+					'Use `machine-local` to rely on this machine\'s existing OpenCode login, or `api-key` to store an isolated API key for the plugin.',
+				default: 'machine-local',
+				enum: ['machine-local', 'api-key'],
+				'x-scope': 'user'
+			},
 			provider: {
 				type: 'string',
 				title: 'Provider',
@@ -183,7 +192,8 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			apiKey: {
 				type: 'string',
 				title: 'API Key',
-				description: 'OpenCode API key for the selected provider (for example OpenCode Go or OpenCode Zen)',
+				description:
+					'OpenCode API key for the selected provider when using API key authentication.',
 				'x-secret': true,
 				'x-scope': 'user',
 				'x-envVar': 'PLUGIN_OPENCODE_API_KEY'
@@ -204,7 +214,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 					'Model to use in the form provider/model, for example `go/kimi-k2.5`.'
 			}
 		},
-		required: ['apiKey']
+		required: ['authMode']
 	};
 
 	private context: PluginContext | null = null;
@@ -241,8 +251,17 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		return value;
 	}
 
+	private resolveAuthMode(settings: Record<string, unknown>): 'machine-local' | 'api-key' {
+		return settings.authMode === 'api-key' ? 'api-key' : 'machine-local';
+	}
+
 	async isAvailable(settings?: Record<string, unknown>): Promise<boolean> {
 		const resolved = settings || {};
+		if (this.resolveAuthMode(resolved) === 'machine-local') {
+			const result = await this.validateMachineLocalCliAuth(resolved);
+			return result.valid;
+		}
+
 		const apiKey = this.getRealSecret(resolved.apiKey);
 		if (!apiKey) {
 			return false;
@@ -252,10 +271,26 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 	}
 
 	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		if (this.resolveAuthMode(settings) === 'machine-local') {
+			const result = await this.validateMachineLocalCliAuth(settings);
+			return result.valid
+				? { success: true, message: `Machine-local OpenCode auth verified from ${result.authPath}.` }
+				: {
+						success: false,
+						message:
+							result.detail ||
+							'Machine-local OpenCode auth is not available. Run `opencode auth login` on this machine first.'
+					};
+		}
+
 		const apiKey = this.getRealSecret(settings.apiKey);
 
 		if (!apiKey) {
-			return { success: false, message: 'No API key configured. Add an OpenCode provider API key first.' };
+			return {
+				success: false,
+				message:
+					'No API key configured. Add an OpenCode provider API key or switch to machine-local authentication.'
+			};
 		}
 
 		const valid = await this.validateConnectionWithCli(settings, apiKey);
@@ -282,7 +317,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				onboardingWizard: true,
 				includeInOnboarding: true,
 				onboardingPriority: 1,
-				completionFields: ['provider', 'apiKey', 'model'],
+				completionFields: ['authMode', 'provider', 'apiKey', 'model'],
 				onboardingDescription: 'Connect your AI assistant to power content generation across your directories.'
 			},
 			readme: [
@@ -303,16 +338,21 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				'',
 				'## Settings',
 				'',
-				'| Setting        | Description                       |',
-				'| -------------- | --------------------------------- |',
-				'| `provider`     | OpenCode provider (`go` or `zen`) |',
-				'| `apiKey`       | OpenCode provider API key         |',
-				'| `model`        | OpenCode model in `provider/model` form |',
+				'| Setting        | Description                              |',
+				'| -------------- | ---------------------------------------- |',
+				'| `authMode`     | `machine-local` or `api-key` authentication |',
+				'| `provider`     | OpenCode provider (`go` or `zen`)        |',
+				'| `apiKey`       | OpenCode provider API key                |',
+				'| `model`        | OpenCode model in `provider/model` form  |',
 				'',
 				'### Authentication',
 				'',
+				'**Machine-local auth**:',
+				'Run `opencode auth login` on the machine running Ever Works.',
 				'OpenCode stores provider credentials in `~/.local/share/opencode/auth.json`.',
-				'This plugin writes an isolated auth file for the configured user and runs the CLI against it.',
+				'',
+				'**API key auth**:',
+				'The plugin can also write an isolated auth file for the configured user and run the CLI against it.',
 				'',
 				'For OpenCode Go, subscribe and copy your API key from [OpenCode Go](https://opencode.ai/docs/go/).',
 				'## Usage',
@@ -357,6 +397,76 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				`OpenCode CLI validation failed: ${err instanceof Error ? err.message : 'unknown error'}`
 			);
 			return false;
+		} finally {
+			if (tempDir) {
+				await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+			}
+		}
+	}
+
+	private getMachineAuthPath(): string {
+		const xdgDataHome = process.env.XDG_DATA_HOME;
+		if (xdgDataHome) {
+			return path.join(xdgDataHome, 'opencode', 'auth.json');
+		}
+
+		return path.join(os.homedir(), '.local', 'share', 'opencode', 'auth.json');
+	}
+
+	private async hasMachineAuthForProvider(provider: 'go' | 'zen'): Promise<boolean> {
+		try {
+			const content = await fs.readFile(this.getMachineAuthPath(), 'utf-8');
+			const parsed = JSON.parse(content) as Record<string, unknown>;
+			const providerEntry = parsed[provider];
+			return typeof providerEntry === 'object' && providerEntry !== null;
+		} catch {
+			return false;
+		}
+	}
+
+	private async validateMachineLocalCliAuth(
+		settings: Record<string, unknown>
+	): Promise<{ valid: boolean; detail?: string; authPath: string }> {
+		const version = (settings.version as string) || DEFAULT_CLI_VERSION;
+		const provider = resolveProviderKey(settings);
+		const model = (settings.model as string | undefined) || 'go/kimi-k2.5';
+		const authPath = this.getMachineAuthPath();
+		let tempDir: string | null = null;
+
+		if (!(await this.hasMachineAuthForProvider(provider))) {
+			return {
+				valid: false,
+				authPath,
+				detail: `Machine-local OpenCode auth for provider "${provider}" was not found at ${authPath}. Run \`opencode auth login\` first.`
+			};
+		}
+
+		try {
+			const binaryPath = await ensureBinary(version, this.context?.logger || console);
+			tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ever-works-opencode-machine-validate-'));
+
+			const { promise } = executeOpenCode({
+				binaryPath,
+				prompt: 'Reply with exactly OK. Do not ask follow-up questions and do not modify any files.',
+				cwd: tempDir,
+				env: this.buildMachineLocalEnv(model),
+				model
+			});
+
+			const result = await Promise.race([
+				promise,
+				new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Validation timed out')), 30_000))
+			]);
+
+			return result.exitCode === 0
+				? { valid: true, authPath }
+				: { valid: false, authPath, detail: this.extractErrorDetail(result) };
+		} catch (err) {
+			return {
+				valid: false,
+				authPath,
+				detail: err instanceof Error ? err.message : 'Machine-local OpenCode validation failed.'
+			};
 		} finally {
 			if (tempDir) {
 				await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
@@ -419,9 +529,23 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			const model = (settings.model as string | undefined) || 'go/kimi-k2.5';
 			const provider = resolveProviderKey(settings);
 			const apiKey = this.getRealSecret(settings.apiKey);
+			const authMode = this.resolveAuthMode(settings);
 
-			if (!apiKey) {
-				return this.handleError(new Error('OpenCode API key is required'), startTime);
+			if (authMode === 'api-key' && !apiKey) {
+				return this.handleError(
+					new Error('OpenCode API key is required when API key authentication is selected'),
+					startTime
+				);
+			}
+
+			if (authMode === 'machine-local') {
+				const machineAuth = await this.validateMachineLocalCliAuth(settings);
+				if (!machineAuth.valid) {
+					return this.handleError(
+						new Error(machineAuth.detail || 'Machine-local OpenCode auth is not available'),
+						startTime
+					);
+				}
 			}
 
 			// ── Step 1: Setup OpenCode ──────────────────────────────
@@ -438,7 +562,9 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			reportProgress(onProgress, 1, 20, 'Prepare Context');
 
 			const workspacePath = await createWorkspace(userId, directory.id);
-			await this.prepareOpenCodeConfig(workspacePath, provider, apiKey, model);
+			if (authMode === 'api-key' && apiKey) {
+				await this.prepareOpenCodeConfig(workspacePath, provider, apiKey, model);
+			}
 			await seedExistingItems(workspacePath, existing.items);
 			await seedMetadata(workspacePath, {
 				directory: { name: directory.name, description: directory.description },
@@ -492,7 +618,10 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 					binaryPath,
 					prompt: this.buildCombinedPrompt(systemPrompt, userPrompt),
 					cwd: workspacePath,
-					env: this.buildOpenCodeEnv(workspacePath, model),
+					env:
+						authMode === 'api-key'
+							? this.buildOpenCodeEnv(workspacePath, model)
+							: this.buildMachineLocalEnv(model),
 					model,
 					signal,
 					onStdoutLine,
@@ -743,6 +872,24 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			}),
 			OPENCODE_DISABLE_AUTOUPDATE: '1'
 		};
+	}
+
+	private buildMachineLocalEnv(model: string): Record<string, string> {
+		const env: Record<string, string> = {
+			HOME: process.env.HOME ?? os.homedir(),
+			OPENCODE_CONFIG_CONTENT: JSON.stringify({
+				$schema: 'https://opencode.ai/config.json',
+				model,
+				small_model: model
+			}),
+			OPENCODE_DISABLE_AUTOUPDATE: '1'
+		};
+
+		if (process.env.XDG_DATA_HOME) {
+			env.XDG_DATA_HOME = process.env.XDG_DATA_HOME;
+		}
+
+		return env;
 	}
 
 	private buildCombinedPrompt(systemPrompt: string, userPrompt: string): string {

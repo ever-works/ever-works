@@ -98,6 +98,7 @@ function createMockContext(settingsOverride?: PluginSettings): PluginContext {
 		services: {},
 		getSettings: vi.fn().mockResolvedValue(
 			settingsOverride ?? {
+				authMode: 'api-key',
 				provider: 'go',
 				apiKey: 'test-api-key',
 				version: 'v1.0.223',
@@ -135,13 +136,15 @@ describe('OpenCodePlugin', () => {
 		expect(plugin.configurationMode).toBe('user-required');
 	});
 
-	it('should define OpenCode auth settings as user-scoped and require an API key', () => {
+	it('should define OpenCode auth settings with explicit auth mode', () => {
 		const props = plugin.settingsSchema.properties!;
+		expect(props.authMode.default).toBe('machine-local');
+		expect(props.authMode['x-scope']).toBe('user');
 		expect(props.provider.default).toBe('go');
 		expect(props.provider['x-scope']).toBe('user');
 		expect(props.apiKey['x-secret']).toBe(true);
 		expect(props.apiKey['x-scope']).toBe('user');
-		expect(plugin.settingsSchema.required).toEqual(['apiKey']);
+		expect(plugin.settingsSchema.required).toEqual(['authMode']);
 	});
 
 	it('should return 6 step definitions in correct order', () => {
