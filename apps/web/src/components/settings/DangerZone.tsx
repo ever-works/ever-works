@@ -46,7 +46,10 @@ export function DangerZone({ user }: DangerZoneProps) {
 
     return (
         <div className="space-y-3">
-            {/* Export Data */}
+            <div>
+                <h2 className="text-xl font-semibold text-danger mb-4">{t('title')}</h2>
+                <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
+            </div>
             <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark overflow-hidden">
                 <div className="p-5">
                     <div className="flex items-start justify-between gap-4">

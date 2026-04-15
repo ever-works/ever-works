@@ -98,7 +98,7 @@ export function ActivityFilters({
             {hasActiveFilters && (
                 <button
                     onClick={onClearFilters}
-                    className="inline-flex cursor-pointer items-center border gap-1 px-3 py-2 text-sm rounded-lg text-text-muted dark:text-text-muted-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+                    className="inline-flex cursor-pointer items-center border border-border dark:border-border-dark gap-1 px-3 py-2 text-sm rounded-lg text-text-muted dark:text-text-muted-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
                 >
                     <X className="w-3.5 h-3.5" />
                     {t('actions.clearFilters')}
