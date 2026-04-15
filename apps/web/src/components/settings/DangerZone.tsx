@@ -45,118 +45,135 @@ export function DangerZone({ user }: DangerZoneProps) {
     };
 
     return (
-        <div className="space-y-6">
-            <div>
-                <h2 className="text-xl font-semibold text-danger mb-4">{t('title')}</h2>
-                <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
-            </div>
-
+        <div className="space-y-3">
             {/* Export Data */}
-            <div className="p-4 rounded-lg border border-danger/20 bg-danger/5">
-                <h3 className="text-lg font-medium text-text dark:text-text-dark mb-2">
-                    {t('export.title')}
-                </h3>
-                <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
-                    {t('export.subtitle')}
-                </p>
-                <button
-                    disabled
-                    className={cn(
-                        'px-4 py-2 rounded-lg text-sm font-medium',
-                        'bg-surface-secondary dark:bg-surface-secondary-dark',
-                        'text-text-muted dark:text-text-muted-dark',
-                        'cursor-not-allowed opacity-50',
-                    )}
-                >
-                    {t('export.action')}
-                </button>
+            <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark overflow-hidden">
+                <div className="p-5">
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-sm font-semibold text-text dark:text-text-dark">
+                                {t('export.title')}
+                            </h3>
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5 leading-relaxed">
+                                {t('export.subtitle')}
+                            </p>
+                        </div>
+                        <button
+                            disabled
+                            className={cn(
+                                'shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium',
+                                'bg-surface-secondary dark:bg-surface-secondary-dark',
+                                'text-text-muted dark:text-text-muted-dark',
+                                'cursor-not-allowed opacity-50',
+                            )}
+                        >
+                            {t('export.action')}
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {/* Delete Account */}
-            <div className="p-4 rounded-lg border border-danger/20 bg-danger/5">
-                <h3 className="text-lg font-medium text-danger mb-2">{t('delete.title')}</h3>
-                <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
-                    {t('delete.subtitle')}
-                </p>
-
-                {!showDeleteConfirm ? (
-                    <button
-                        onClick={() => setShowDeleteConfirm(true)}
+            <div className="rounded-xl border border-danger/25 dark:border-danger/20 bg-card dark:bg-card-primary-dark overflow-hidden">
+                <div className="p-5">
+                    <div
                         className={cn(
-                            'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                            'bg-danger text-white hover:bg-danger/90',
+                            'flex items-start gap-4',
+                            showDeleteConfirm ? 'flex-col' : 'justify-between',
                         )}
                     >
-                        {t('delete.button')}
-                    </button>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="p-3 rounded bg-danger/10 border border-danger/30">
-                            <p className="text-sm text-danger font-medium mb-2">
-                                {t('delete.confirmTitle')}
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-sm font-semibold text-danger">
+                                {t('delete.title')}
+                            </h3>
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5 leading-relaxed">
+                                {t('delete.subtitle')}
                             </p>
-                            <ul className="text-sm text-text-muted dark:text-text-muted-dark space-y-1 ml-5 pl-4 list-disc">
-                                <li>{t('delete.confirmItems.0')}</li>
-                                <li>{t('delete.confirmItems.1')}</li>
-                                <li>{t('delete.confirmItems.2')}</li>
-                                <li>{t('delete.confirmItems.3')}</li>
-                                <li>{t('delete.confirmItems.4')}</li>
-                            </ul>
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                                {t('delete.confirmLabel', { email: user.email })}
-                            </label>
-                            <input
-                                type="email"
-                                value={confirmEmail}
-                                onChange={(e) => setConfirmEmail(e.target.value)}
+                        {!showDeleteConfirm ? (
+                            <button
+                                onClick={() => setShowDeleteConfirm(true)}
                                 className={cn(
-                                    'w-full px-4 py-1 rounded-lg',
-                                    'bg-surface dark:bg-surface-dark',
-                                    'border border-danger',
-                                    'text-text dark:text-text-dark',
-                                    'focus:outline-none focus:ring-2 focus:ring-danger',
-                                    'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
+                                    'shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                                    'bg-danger/10 dark:bg-danger/15 text-danger border border-danger/20',
+                                    'hover:bg-danger hover:text-white hover:border-danger',
                                 )}
-                                placeholder={t('delete.confirmPlaceholder')}
-                            />
-                        </div>
+                            >
+                                {t('delete.button')}
+                            </button>
+                        ) : (
+                            <div className="w-full space-y-4 pt-1">
+                                <div className="p-3.5 rounded-lg bg-danger/5 dark:bg-danger/8 border border-danger/15">
+                                    <p className="text-xs font-semibold text-danger mb-2">
+                                        {t('delete.confirmTitle')}
+                                    </p>
+                                    <ul className="text-xs text-text-muted dark:text-text-muted-dark space-y-1 pl-4 list-disc">
+                                        <li>{t('delete.confirmItems.0')}</li>
+                                        <li>{t('delete.confirmItems.1')}</li>
+                                        <li>{t('delete.confirmItems.2')}</li>
+                                        <li>{t('delete.confirmItems.3')}</li>
+                                        <li>{t('delete.confirmItems.4')}</li>
+                                    </ul>
+                                </div>
 
-                        <div className="flex gap-3">
-                            <button
-                                onClick={handleDeleteAccount}
-                                disabled={isPending || confirmEmail !== user.email}
-                                className={cn(
-                                    'px-6 py-2 rounded-lg font-medium transition-colors text-sm',
-                                    'bg-danger text-white',
-                                    confirmEmail === user.email
-                                        ? 'hover:bg-danger/90'
-                                        : 'opacity-50 cursor-not-allowed',
-                                )}
-                            >
-                                {isPending ? t('delete.deleting') : t('delete.confirmButton')}
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setShowDeleteConfirm(false);
-                                    setConfirmEmail('');
-                                }}
-                                disabled={isPending}
-                                className={cn(
-                                    'px-6 py-2 rounded-lg font-medium transition-colors text-sm',
-                                    'bg-surface-secondary dark:bg-surface-secondary-dark',
-                                    'text-text dark:text-text-dark',
-                                    'hover:bg-surface dark:hover:bg-surface-dark',
-                                    'disabled:opacity-50 disabled:cursor-not-allowed',
-                                )}
-                            >
-                                {t('delete.cancel')}
-                            </button>
-                        </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-text dark:text-text-dark mb-1.5">
+                                        {t('delete.confirmLabel', { email: user.email })}
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={confirmEmail}
+                                        onChange={(e) => setConfirmEmail(e.target.value)}
+                                        className={cn(
+                                            'w-full px-3 py-2 rounded-lg text-xs',
+                                            'bg-surface dark:bg-surface-dark',
+                                            'border border-danger/40 dark:border-danger/30',
+                                            'text-text dark:text-text-dark',
+                                            'focus:outline-none focus:ring-2 focus:ring-danger/20',
+                                            'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
+                                        )}
+                                        placeholder={t('delete.confirmPlaceholder')}
+                                    />
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleDeleteAccount}
+                                        disabled={isPending || confirmEmail !== user.email}
+                                        className={cn(
+                                            'px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                                            'bg-danger text-white',
+                                            confirmEmail === user.email
+                                                ? 'hover:bg-danger/90'
+                                                : 'opacity-40 cursor-not-allowed',
+                                        )}
+                                    >
+                                        {isPending
+                                            ? t('delete.deleting')
+                                            : t('delete.confirmButton')}
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowDeleteConfirm(false);
+                                            setConfirmEmail('');
+                                        }}
+                                        disabled={isPending}
+                                        className={cn(
+                                            'px-3.5 cursor-pointer py-1.5 rounded-lg text-xs font-medium transition-colors',
+                                            'border border-border/60 dark:border-border-dark/60',
+                                            'text-text-secondary dark:text-text-secondary-dark',
+                                            'hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark',
+                                            'disabled:opacity-50 disabled:cursor-not-allowed',
+                                        )}
+                                    >
+                                        {t('delete.cancel')}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                )}
+                </div>
             </div>
         </div>
     );
