@@ -1813,6 +1813,20 @@
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure"
+        },
+        "plugins": {
+            "githubOrganizations": {
+                "title": "GitHub संगठन",
+                "description": "अपने GitHub कनेक्शन से उपलब्ध संगठनों की समीक्षा करें और कोई भी अतिरिक्त संगठन जोड़ें जिन्हें आप Ever Works से लक्षित करना चाहते हैं।",
+                "noOrganizations": "अभी तक कोई संगठन नहीं मिला।",
+                "connectToLoad": "अपने संगठन लोड करने के लिए GitHub से जुड़ें।",
+                "placeholder": "लॉगिन द्वारा संगठन जोड़ें",
+                "addButton": "संगठन जोड़ें",
+                "saveButton": "संगठन सहेजें",
+                "savedSuccess": "संगठन की पहुँच सहेजी गई।",
+                "saveFailed": "सहेजना विफल रहा।",
+                "removeLabel": "{login} हटाएं"
+            }
         }
     },
     "layout": {

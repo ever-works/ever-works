@@ -1810,6 +1810,20 @@
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure"
+        },
+        "plugins": {
+            "githubOrganizations": {
+                "title": "ארגוני GitHub",
+                "description": "בדוק את הארגונים הזמינים מחיבור ה-GitHub שלך והוסף ארגונים נוספים שתרצה ש-Ever Works ישתמש בהם.",
+                "noOrganizations": "לא נמצאו ארגונים עדיין.",
+                "connectToLoad": "התחבר ל-GitHub כדי לטעון את הארגונים שלך.",
+                "placeholder": "הוסף ארגון לפי שם משתמש",
+                "addButton": "הוסף ארגון",
+                "saveButton": "שמור ארגונים",
+                "savedSuccess": "גישת הארגון נשמרה.",
+                "saveFailed": "השמירה נכשלה.",
+                "removeLabel": "הסר {login}"
+            }
         }
     },
     "layout": {

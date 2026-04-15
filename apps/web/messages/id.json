@@ -1813,6 +1813,20 @@
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure"
+        },
+        "plugins": {
+            "githubOrganizations": {
+                "title": "Organisasi GitHub",
+                "description": "Tinjau organisasi yang tersedia dari koneksi GitHub Anda dan tambahkan organisasi tambahan yang ingin Ever Works targetkan.",
+                "noOrganizations": "Belum ada organisasi ditemukan.",
+                "connectToLoad": "Hubungkan GitHub untuk memuat organisasi Anda.",
+                "placeholder": "Tambah organisasi berdasarkan login",
+                "addButton": "Tambah organisasi",
+                "saveButton": "Simpan organisasi",
+                "savedSuccess": "Akses organisasi tersimpan.",
+                "saveFailed": "Gagal menyimpan.",
+                "removeLabel": "Hapus {login}"
+            }
         }
     },
     "layout": {

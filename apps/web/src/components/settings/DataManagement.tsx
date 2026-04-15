@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
-import { Download, Upload } from 'lucide-react';
+import { Download, Upload, Github, AlertTriangle } from 'lucide-react';
 import { ImportFlow } from './ImportFlow';
 import { GitHubSync } from './GitHubSync';
 import { exportAccountData } from '@/app/actions/account-transfer';
@@ -42,54 +42,77 @@ export function DataManagement() {
     };
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-10">
             {/* Export Section */}
-            <div>
-                <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                    {t('exportTitle')}
-                </h2>
-                <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
-                    {t('exportDescription')}
-                </p>
-
-                <div className="flex items-center gap-3 mb-4">
-                    <label className="flex items-center gap-2 text-sm text-text dark:text-text-dark cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={includeSecrets}
-                            onChange={(e) => setIncludeSecrets(e.target.checked)}
-                            className="rounded border-border dark:border-border-dark"
-                        />
-                        {t('includeSecrets')}
-                    </label>
+            <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-surface-secondary dark:bg-surface-secondary-dark border border-border/60 dark:border-border-dark/60 flex items-center justify-center shrink-0 mt-0.5">
+                        <Download className="w-3.5 h-3.5 text-text-muted dark:text-text-muted-dark" />
+                    </div>
+                    <div>
+                        <h2 className="text-base font-semibold leading-tight tracking-tight text-text dark:text-text-dark mb-1">
+                            {t('exportTitle')}
+                        </h2>
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark leading-relaxed">
+                            {t('exportDescription')}
+                        </p>
+                    </div>
                 </div>
 
+                <label className="inline-flex items-center gap-2.5 text-sm text-text dark:text-text-dark cursor-pointer select-none px-3.5 py-2.5 rounded-xl border border-border/60 dark:border-border-dark/60 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors duration-150">
+                    <input
+                        type="checkbox"
+                        checked={includeSecrets}
+                        onChange={(e) => setIncludeSecrets(e.target.checked)}
+                        className="rounded border-border dark:border-border-dark"
+                    />
+                    {t('includeSecrets')}
+                </label>
+
                 {includeSecrets && (
-                    <div className="mb-4 p-3 rounded-lg bg-warning/10 border border-warning/20 text-sm text-warning-foreground">
-                        {t('secretsWarning')}
+                    <div className="p-3.5 rounded-xl bg-warning/10 border border-warning/20 text-sm text-warning-foreground leading-relaxed flex items-start gap-2.5">
+                        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-warning" />
+                        <span>{t('secretsWarning')}</span>
                     </div>
                 )}
 
-                <Button onClick={handleExport} disabled={isExporting} size="sm">
-                    <Download className="w-4 h-4" />
+                <Button
+                    onClick={handleExport}
+                    disabled={isExporting}
+                    size="sm"
+                    className="h-8 px-3.5 text-xs font-medium gap-1.5 shadow-sm hover:shadow active:scale-[0.97] transition-all duration-150"
+                >
+                    <Download className="w-3.5 h-3.5" />
                     {isExporting ? t('exporting') : t('exportButton')}
                 </Button>
             </div>
 
-            <hr className="border-border dark:border-border-dark" />
+            <div className="border-t border-dashed border-border/40 dark:border-border-dark/40" />
 
             {/* Import Section */}
-            <div>
-                <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                    {t('importTitle')}
-                </h2>
-                <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
-                    {t('importDescription')}
-                </p>
+            <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-surface-secondary dark:bg-surface-secondary-dark border border-border/60 dark:border-border-dark/60 flex items-center justify-center shrink-0 mt-0.5">
+                        <Upload className="w-3.5 h-3.5 text-text-muted dark:text-text-muted-dark" />
+                    </div>
+                    <div>
+                        <h2 className="text-base font-semibold leading-tight tracking-tight text-text dark:text-text-dark mb-1">
+                            {t('importTitle')}
+                        </h2>
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark leading-relaxed">
+                            {t('importDescription')}
+                        </p>
+                    </div>
+                </div>
 
                 {!showImport ? (
-                    <Button variant="secondary" onClick={() => setShowImport(true)} size="sm">
-                        <Upload className="w-4 h-4" />
+                    <Button
+                        variant="secondary"
+                        onClick={() => setShowImport(true)}
+                        size="sm"
+                        className="h-8 px-3.5 text-xs font-medium gap-1.5 hover:shadow-sm active:scale-[0.97] transition-all duration-150"
+                    >
+                        <Upload className="w-3.5 h-3.5" />
                         {t('importButton')}
                     </Button>
                 ) : (
@@ -97,16 +120,23 @@ export function DataManagement() {
                 )}
             </div>
 
-            <hr className="border-border dark:border-border-dark" />
+            <div className="border-t border-dashed border-border/40 dark:border-border-dark/40" />
 
             {/* GitHub Sync Section */}
-            <div>
-                <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                    {t('syncTitle')}
-                </h2>
-                <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
-                    {t('syncDescription')}
-                </p>
+            <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-surface-secondary dark:bg-surface-secondary-dark border border-border/60 dark:border-border-dark/60 flex items-center justify-center shrink-0 mt-0.5">
+                        <Github className="w-3.5 h-3.5 text-text-muted dark:text-text-muted-dark" />
+                    </div>
+                    <div>
+                        <h2 className="text-base font-semibold leading-tight tracking-tight text-text dark:text-text-dark mb-1">
+                            {t('syncTitle')}
+                        </h2>
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark leading-relaxed">
+                            {t('syncDescription')}
+                        </p>
+                    </div>
+                </div>
 
                 <GitHubSync />
             </div>

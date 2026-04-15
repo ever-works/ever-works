@@ -1813,6 +1813,20 @@
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure"
+        },
+        "plugins": {
+            "githubOrganizations": {
+                "title": "GitHub Organizasyonları",
+                "description": "GitHub bağlantınızdan mevcut organizasyonları inceleyin ve Ever Works'ün hedeflemesini istediğiniz ek organizasyonları ekleyin.",
+                "noOrganizations": "Henüz organizasyon bulunamadı.",
+                "connectToLoad": "Organizasyonlarınızı yüklemek için GitHub'a bağlanın.",
+                "placeholder": "Login ile organizasyon ekle",
+                "addButton": "Organizasyon ekle",
+                "saveButton": "Organizasyonları kaydet",
+                "savedSuccess": "Organizasyon erişimi kaydedildi.",
+                "saveFailed": "Kaydetme başarısız oldu.",
+                "removeLabel": "{login} kaldır"
+            }
         }
     },
     "layout": {

@@ -95,7 +95,7 @@ export function DangerZone({ user }: DangerZoneProps) {
                             <p className="text-sm text-danger font-medium mb-2">
                                 {t('delete.confirmTitle')}
                             </p>
-                            <ul className="text-sm text-text-muted dark:text-text-muted-dark space-y-1 ml-5 list-disc">
+                            <ul className="text-sm text-text-muted dark:text-text-muted-dark space-y-1 ml-5 pl-4 list-disc">
                                 <li>{t('delete.confirmItems.0')}</li>
                                 <li>{t('delete.confirmItems.1')}</li>
                                 <li>{t('delete.confirmItems.2')}</li>
@@ -113,7 +113,7 @@ export function DangerZone({ user }: DangerZoneProps) {
                                 value={confirmEmail}
                                 onChange={(e) => setConfirmEmail(e.target.value)}
                                 className={cn(
-                                    'w-full px-4 py-2 rounded-lg',
+                                    'w-full px-4 py-1 rounded-lg',
                                     'bg-surface dark:bg-surface-dark',
                                     'border border-danger',
                                     'text-text dark:text-text-dark',
