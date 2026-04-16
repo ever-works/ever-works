@@ -180,7 +180,7 @@ export function PluginSettingsInline({
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     aria-label={setupLink!.label}
-                                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+                                    className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-button-primary-foreground dark:text-button-primary-foreground-dark rounded-sm"
                                 >
                                     {setupLink!.buttonLabel ?? setupLink!.label}
                                 </a>

@@ -1816,6 +1816,20 @@
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure"
+        },
+        "plugins": {
+            "githubOrganizations": {
+                "title": "GitHub-organisaties",
+                "description": "Bekijk de organisaties die beschikbaar zijn via uw GitHub-verbinding en voeg extra organisaties toe die u wilt dat Ever Works gebruikt.",
+                "noOrganizations": "Nog geen organisaties gevonden.",
+                "connectToLoad": "Verbind GitHub om uw organisaties te laden.",
+                "placeholder": "Organisatie toevoegen via login",
+                "addButton": "Organisatie toevoegen",
+                "saveButton": "Organisaties opslaan",
+                "savedSuccess": "Toegang tot organisatie opgeslagen.",
+                "saveFailed": "Opslaan mislukt.",
+                "removeLabel": "{login} verwijderen"
+            }
         }
     },
     "layout": {

@@ -140,7 +140,7 @@ export function PluginOAuthConnection({
                             )}
                         </div>
                         {isConnected && username && (
-                            <div className="flex items-center gap-2 text-sm text-text-secondary dark:text-text-secondary-dark">
+                            <div className="flex items-center gap-2 text-xs text-text-secondary dark:text-text-secondary-dark">
                                 <span className="truncate">@{username}</span>
                                 {email && (
                                     <>
@@ -169,9 +169,14 @@ export function PluginOAuthConnection({
                                 disabled={isPending}
                                 variant="ghost"
                                 size="sm"
-                                className="gap-1.5"
+                                className="gap-1.5 text-sm"
                             >
-                                <RefreshCw className={cn('w-4 h-4', isPending && 'animate-spin')} />
+                                <RefreshCw
+                                    className={cn(
+                                        'w-4 h-4 stroke-[1.5]',
+                                        isPending && 'animate-spin',
+                                    )}
+                                />
                                 {isPending ? t('reconnecting') : t('reconnect')}
                             </Button>
                             <Button
@@ -179,9 +184,9 @@ export function PluginOAuthConnection({
                                 disabled={isPending}
                                 variant="ghost"
                                 size="sm"
-                                className="gap-1.5 text-danger hover:text-danger hover:bg-danger/10"
+                                className="gap-1.5 text-sm text-danger hover:text-danger hover:bg-danger/10"
                             >
-                                <Unlink className="w-4 h-4" />
+                                <Unlink className="w-4 h-4 stroke-[1.5]" />
                                 {t('disconnect')}
                             </Button>
                         </>
@@ -190,9 +195,9 @@ export function PluginOAuthConnection({
                             onClick={handleConnect}
                             disabled={isPending}
                             size="sm"
-                            className="gap-1.5"
+                            className="gap-1.5 text-sm"
                         >
-                            <LinkIcon className="w-4 h-4" />
+                            <LinkIcon className="w-4 h-4 stroke-[1.5]" />
                             {isPending ? t('connecting') : t('connect')}
                         </Button>
                     )}
