@@ -26,6 +26,7 @@ import { PluginEnablePanel } from './PluginEnablePanel';
 import { PluginDisableWarning } from './PluginDisableWarning';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { ClaudeCodeOnboardingWizard } from '@/components/settings/ClaudeCodeOnboardingWizard';
+import { GeminiOnboardingWizard } from '@/components/settings/GeminiOnboardingWizard';
 import { SimAiOnboardingWizard } from '@/components/settings/SimAiOnboardingWizard';
 import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
@@ -292,6 +293,18 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                         {plugin.uiHints?.onboardingWizard ? (
                             plugin.pluginId === 'sim-ai' ? (
                                 <SimAiOnboardingWizard
+                                    pluginId={plugin.pluginId}
+                                    visibleProperties={visibleProperties}
+                                    getFieldValue={getFieldValue}
+                                    handleFieldChange={handleFieldChange}
+                                    handleSave={handleSave}
+                                    isSaving={isSaving}
+                                    saveSuccess={saveSuccess}
+                                    validationError={validationError}
+                                    saveMessage={saveMessage}
+                                />
+                            ) : plugin.pluginId === 'gemini' ? (
+                                <GeminiOnboardingWizard
                                     pluginId={plugin.pluginId}
                                     visibleProperties={visibleProperties}
                                     getFieldValue={getFieldValue}
