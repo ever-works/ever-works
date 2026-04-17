@@ -69,11 +69,13 @@ import {
 	buildMetrics,
 	hasLocalCodexAuth,
 	initializeState,
+	reportItemProgress,
 	reportProgress,
 	resolveExecutionAuth,
 	resolveSettings,
 	updateStepState
 } from './utils/pipeline-helpers.js';
+import { startTaxonomyWatcher } from './utils/taxonomy-watcher.js';
 
 const CODEX_SUPPORTED_MODELS: readonly AiModel[] = [
 	{
@@ -350,10 +352,15 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		return CODEX_SUPPORTED_MODELS;
 	}
 
+	private getRealSecret(value: unknown): string | undefined {
+		if (typeof value !== 'string' || !value || value.includes('••••')) return undefined;
+		return value;
+	}
+
 	async isAvailable(settings?: Record<string, unknown>): Promise<boolean> {
 		const resolved = settings || {};
 		const authMode = typeof resolved.authMode === 'string' ? resolved.authMode : undefined;
-		const apiKey = typeof resolved.apiKey === 'string' ? resolved.apiKey.trim() : '';
+		const apiKey = this.getRealSecret(resolved.apiKey)?.trim() ?? '';
 		const model = typeof resolved.model === 'string' ? resolved.model : DEFAULT_MODEL;
 
 		if (authMode === 'api-key') {
@@ -421,7 +428,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
 		const authMode = typeof settings.authMode === 'string' ? settings.authMode : undefined;
-		const apiKey = typeof settings.apiKey === 'string' ? settings.apiKey.trim() : '';
+		const apiKey = this.getRealSecret(settings.apiKey)?.trim() ?? '';
 		const model = typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL;
 		if (authMode === 'api-key') {
 			if (!apiKey) {
@@ -575,23 +582,48 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				promptFacade,
 				facadeOptions
 			);
-			let executionResult = await this.runCodexPrompt({
+
+			const targetItems = ((request.config || {}).target_items as number) || DEFAULT_TARGET_ITEMS;
+			const taxonomyWatcher = startTaxonomyWatcher({
 				workspacePath,
-				executionAuthEnv: executionAuth.env,
-				model: typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL,
-				bypassApprovalsAndSandbox: settings.unsafeBypassSandbox === true,
-				prompt,
-				signal,
-				onLogEntry,
-				stepId: 'generate-items'
+				logger,
+				onNewItem: (newItemCount) => {
+					reportItemProgress(onProgress, newItemCount, targetItems, 2);
+				}
 			});
+
+			let executionResult: ExecuteResult;
+			try {
+				executionResult = await this.runCodexPrompt({
+					workspacePath,
+					executionAuthEnv: executionAuth.env,
+					model: typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL,
+					bypassApprovalsAndSandbox: settings.unsafeBypassSandbox === true,
+					prompt,
+					signal,
+					onLogEntry,
+					stepId: 'generate-items'
+				});
+			} finally {
+				taxonomyWatcher.stop();
+			}
 
 			if (signal.aborted || executionResult.killed) {
 				return this.handleCancel(startTime);
 			}
 
+			let generationWarning: string | undefined;
 			if (executionResult.exitCode !== 0) {
-				throw new Error(this.extractErrorDetail(executionResult));
+				const detail = this.extractErrorDetail(executionResult);
+				logger.warn(`Codex exited with code ${executionResult.exitCode}: ${detail}`);
+				generationWarning = `Codex finished with an error (${detail}).`;
+				this.emitCodexLog({
+					onLogEntry,
+					stepId: 'generate-items',
+					event: 'message',
+					level: 'warn',
+					message: generationWarning
+				});
 			}
 
 			reportProgress(onProgress, 2, 80, 'Generate Items', 'Codex execution finished');
@@ -632,7 +664,9 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 					}
 
 					if (executionResult.exitCode !== 0) {
-						throw new Error(this.extractErrorDetail(executionResult));
+						const retryDetail = this.extractErrorDetail(executionResult);
+						logger.warn(`Codex bypass retry exited with code ${executionResult.exitCode}: ${retryDetail}`);
+						generationWarning = `Codex finished with an error (${retryDetail}).`;
 					}
 
 					items = await readGeneratedItems(workspacePath, logger);
@@ -707,6 +741,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 			reportProgress(onProgress, 6, 100, 'Complete');
 			const duration = Date.now() - startTime;
+			const warnings = [...(generationWarning ? [generationWarning] : []), ...screenshotWarnings];
 
 			return buildSuccessPipelineResult(
 				{
@@ -722,7 +757,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 					stepsCompleted: this.state?.completedSteps.length ?? 0,
 					totalSteps: STEP_DEFINITIONS.length,
 					state: this.state ?? undefined,
-					warnings: screenshotWarnings.length > 0 ? screenshotWarnings : undefined
+					warnings: warnings.length > 0 ? warnings : undefined
 				}
 			);
 		} catch (error) {

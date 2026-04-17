@@ -94,6 +94,25 @@ export function reportProgress(
 	});
 }
 
+export function reportItemProgress(
+	onProgress: PipelineProgressCallback | undefined,
+	newItemCount: number,
+	targetItems: number,
+	stepIndex: number
+): void {
+	const ratio = newItemCount / Math.max(targetItems, 1);
+	const percent = Math.min(30 + Math.round(ratio * 53), 83);
+
+	onProgress?.({
+		percent,
+		currentStepIndex: stepIndex,
+		totalSteps: CODEX_STEP_IDS.length,
+		currentStepName: 'Generate Items',
+		message: `${newItemCount} items generated`,
+		itemsProcessed: newItemCount
+	});
+}
+
 export async function resolveSettings(
 	context: PluginContext | null,
 	userId: string,

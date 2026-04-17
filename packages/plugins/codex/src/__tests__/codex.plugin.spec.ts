@@ -11,6 +11,7 @@ import * as processRunner from '../utils/process-runner.js';
 import * as workspaceManager from '../utils/workspace-manager.js';
 import * as screenshotCapture from '../utils/screenshot-capture.js';
 import * as binaryManager from '../utils/binary-manager.js';
+import * as taxonomyWatcher from '../utils/taxonomy-watcher.js';
 
 vi.mock('../utils/pipeline-helpers.js', async () => {
 	const actual = await vi.importActual<typeof import('../utils/pipeline-helpers.js')>('../utils/pipeline-helpers.js');
@@ -50,6 +51,10 @@ vi.mock('../utils/screenshot-capture.js', () => ({
 
 vi.mock('../utils/binary-manager.js', () => ({
 	ensureBinary: vi.fn()
+}));
+
+vi.mock('../utils/taxonomy-watcher.js', () => ({
+	startTaxonomyWatcher: vi.fn(() => ({ stop: vi.fn() }))
 }));
 
 function createMockContext(settingsOverride?: PluginSettings): PluginContext {
@@ -265,7 +270,33 @@ describe('CodexPlugin', () => {
 			expect(plugin.getState()?.steps.get('capture-screenshots')?.status).toBe('skipped');
 		});
 
-		it('returns a failed result when Codex exits with non-zero code', async () => {
+		it('returns a failed result when Codex exits with non-zero code and produces no items', async () => {
+			const recoverySpy = vi
+				.spyOn(plugin as never, 'recoverItemsFromStructuredOutput')
+				.mockResolvedValue([] as never);
+			vi.mocked(processRunner.executeCodex).mockReturnValueOnce({
+				promise: Promise.resolve({
+					stdout: '',
+					stderr: 'Error: Codex failed',
+					exitCode: 1,
+					killed: false,
+					duration: 1000
+				}),
+				kill: vi.fn()
+			});
+			vi.mocked(workspaceManager.readGeneratedItems).mockResolvedValue([]);
+
+			await plugin.onLoad(createMockContext());
+
+			const result = await plugin.execute(directory, request, existing);
+
+			expect(result.success).toBe(false);
+			expect(String(result.error)).toContain('Codex completed without producing any valid item JSON files');
+			expect(workspaceManager.cleanupWorkspace).toHaveBeenCalledWith('/tmp/codex-generator/user1/dir1');
+			recoverySpy.mockRestore();
+		});
+
+		it('succeeds with warning when Codex exits with non-zero code but produces items', async () => {
 			vi.mocked(processRunner.executeCodex).mockReturnValueOnce({
 				promise: Promise.resolve({
 					stdout: '',
@@ -281,11 +312,9 @@ describe('CodexPlugin', () => {
 
 			const result = await plugin.execute(directory, request, existing);
 
-			expect(result.success).toBe(false);
-			expect(String(result.error)).toContain('Codex failed');
-			expect(result.failedStep).toBe('generate-items');
-			expect(plugin.getState()?.steps.get('generate-items')?.status).toBe('failed');
-			expect(workspaceManager.cleanupWorkspace).toHaveBeenCalledWith('/tmp/codex-generator/user1/dir1');
+			expect(result.success).toBe(true);
+			expect(result.warnings).toBeDefined();
+			expect(result.warnings!.some((w) => w.includes('Codex finished with an error'))).toBe(true);
 		});
 
 		it('fails when Codex finishes without producing any valid item JSON files', async () => {
@@ -395,6 +424,9 @@ describe('CodexPlugin', () => {
 		});
 
 		it('translates stdin-interactive Codex failures into a clearer auth message', async () => {
+			const recoverySpy = vi
+				.spyOn(plugin as never, 'recoverItemsFromStructuredOutput')
+				.mockResolvedValue([] as never);
 			vi.mocked(processRunner.executeCodex).mockReturnValueOnce({
 				promise: Promise.resolve({
 					stdout: '',
@@ -405,14 +437,15 @@ describe('CodexPlugin', () => {
 				}),
 				kill: vi.fn()
 			});
+			vi.mocked(workspaceManager.readGeneratedItems).mockResolvedValue([]);
 
 			await plugin.onLoad(createMockContext());
 
 			const result = await plugin.execute(directory, request, existing);
 
 			expect(result.success).toBe(false);
-			expect(String(result.error)).toContain('interactive input');
-			expect(String(result.error)).toContain('codex login');
+			expect(String(result.error)).toContain('Codex completed without producing any valid item JSON files');
+			recoverySpy.mockRestore();
 		});
 
 		it('executes using local auth mode when resolved settings use CODEX_HOME', async () => {
