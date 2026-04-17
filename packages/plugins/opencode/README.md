@@ -6,8 +6,8 @@ Full pipeline plugin that delegates directory generation to the [OpenCode CLI](h
 
 The plugin runs 6 sequential steps:
 
-| #   | Step                    | Description                                                       | Optional |
-| --- | ----------------------- | ----------------------------------------------------------------- | -------- |
+| #   | Step                    | Description                                                        | Optional |
+| --- | ----------------------- | ------------------------------------------------------------------ | -------- |
 | 1   | **Setup OpenCode**      | Downloads/caches the OpenCode CLI binary from GitHub               | No       |
 | 2   | **Prepare Context**     | Creates a temp workspace, seeds existing items and metadata        | No       |
 | 3   | **Generate Items**      | Executes OpenCode CLI to research and generate items as JSON files | No       |
@@ -37,13 +37,13 @@ The onboarding wizard provides a multi-step flow: choose auth mode, configure cr
 
 ## Settings
 
-| Setting    | Type   | Scope  | Description                                                          |
-| ---------- | ------ | ------ | -------------------------------------------------------------------- |
-| `authMode` | string | user   | `machine-local` or `api-key`                                        |
-| `provider` | string | user   | OpenCode provider (`go` or `zen`)                                   |
+| Setting    | Type   | Scope  | Description                                                           |
+| ---------- | ------ | ------ | --------------------------------------------------------------------- |
+| `authMode` | string | user   | `machine-local` or `api-key`                                          |
+| `provider` | string | user   | OpenCode provider (`go` or `zen`)                                     |
 | `apiKey`   | string | user   | Provider API key (secret, supports env var `PLUGIN_OPENCODE_API_KEY`) |
-| `model`    | string | global | Model in `provider/model` form (default: `go/kimi-k2.5`)           |
-| `version`  | string | hidden | OpenCode CLI version to install (default: `v1.0.223`)               |
+| `model`    | string | global | Model in `provider/model` form (default: `go/kimi-k2.5`)              |
+| `version`  | string | hidden | OpenCode CLI version to install (default: `v1.0.223`)                 |
 
 ### Supported Models
 

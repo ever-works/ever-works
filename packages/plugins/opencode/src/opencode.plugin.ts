@@ -314,11 +314,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				errors: [{ path: 'apiKey', message: 'API key must be a string when provided' }]
 			};
 		}
-		if (
-			settings.provider !== undefined &&
-			settings.provider !== 'go' &&
-			settings.provider !== 'zen'
-		) {
+		if (settings.provider !== undefined && settings.provider !== 'go' && settings.provider !== 'zen') {
 			return {
 				valid: false,
 				errors: [{ path: 'provider', message: 'Provider must be "go" or "zen"' }]
@@ -702,9 +698,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				const stderrExcerpt = execResult.stderr?.trim().split('\n').slice(0, 5).join('\n') || '';
 				const stdoutExcerpt = execResult.stdout?.trim().split('\n').slice(-5).join('\n') || '';
 				const detail = stderrExcerpt || stdoutExcerpt || `exit code ${execResult.exitCode}`;
-				throw new Error(
-					`OpenCode completed but produced no valid item files. CLI output:\n${detail}`
-				);
+				throw new Error(`OpenCode completed but produced no valid item files. CLI output:\n${detail}`);
 			}
 
 			const metadata = collectMetadataFromItems(items);
