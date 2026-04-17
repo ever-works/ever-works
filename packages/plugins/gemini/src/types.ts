@@ -48,11 +48,6 @@ export const GEMINI_NPM_PACKAGE = '@google/gemini-cli';
 export const DEFAULT_CLI_VERSION = 'latest';
 
 /**
- * Default maximum number of agentic turns for Gemini
- */
-export const DEFAULT_MAX_TURNS = 500;
-
-/**
  * Default Gemini model
  */
 export const DEFAULT_MODEL = 'gemini-2.5-pro';

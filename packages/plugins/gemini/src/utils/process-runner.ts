@@ -105,6 +105,13 @@ export function executeGemini(options: ExecuteOptions): {
 
 		childProcess.on('error', reject);
 		childProcess.on('exit', (code) => {
+			if (stdoutRemainder?.trim() && options.onStdoutLine) {
+				options.onStdoutLine(stdoutRemainder);
+			}
+			if (stderrRemainder?.trim() && options.onStderrLine) {
+				options.onStderrLine(stderrRemainder);
+			}
+
 			resolve({
 				stdout,
 				stderr,

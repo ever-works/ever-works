@@ -434,13 +434,14 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 
 		const version = (settings.version as string) || DEFAULT_CLI_VERSION;
 		let tempDir: string | null = null;
+		let killProcess: (() => void) | null = null;
 
 		try {
 			const binaryPath = await ensureBinary(version, this.context?.logger || console);
 			const workspacePath = await fs.mkdtemp(path.join(os.tmpdir(), 'ever-works-gemini-validate-'));
 			tempDir = workspacePath;
 
-			const { promise } = executeGemini({
+			const execution = executeGemini({
 				binaryPath,
 				prompt: 'Reply with OK.',
 				systemPrompt: 'Reply with the single word OK. Nothing else.',
@@ -448,9 +449,10 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				env: authEnv,
 				model: settings.model as string | undefined
 			});
+			killProcess = execution.kill;
 
 			const result = await Promise.race([
-				promise,
+				execution.promise,
 				new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Validation timed out')), 30_000))
 			]);
 
@@ -463,6 +465,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		} catch (err) {
 			return { valid: false, detail: err instanceof Error ? err.message : 'CLI validation failed.' };
 		} finally {
+			killProcess?.();
 			if (tempDir) {
 				await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
 			}

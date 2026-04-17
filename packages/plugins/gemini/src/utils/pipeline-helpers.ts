@@ -114,13 +114,14 @@ export async function resolveSettings(
 			context.getSettings('directory', directoryId)
 		]);
 
+		const merged = { ...userSettings };
 		for (const key in directorySettings) {
 			if (directorySettings[key] !== undefined && directorySettings[key] !== null) {
-				userSettings[key] = directorySettings[key];
+				merged[key] = directorySettings[key];
 			}
 		}
 
-		return userSettings;
+		return merged;
 	} catch {
 		return {};
 	}
