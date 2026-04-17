@@ -25,7 +25,13 @@ import type {
 	StepStatus,
 	ValidationResult
 } from '@ever-works/plugin';
-import { buildSuccessPipelineResult, lucideIcon, normalizeItemTags, substituteVariables, type ItemData } from '@ever-works/plugin';
+import {
+	buildSuccessPipelineResult,
+	lucideIcon,
+	normalizeItemTags,
+	substituteVariables,
+	type ItemData
+} from '@ever-works/plugin';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';

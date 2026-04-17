@@ -6,14 +6,14 @@ Full pipeline plugin that delegates directory generation to the [Codex CLI](http
 
 The plugin runs 6 sequential steps:
 
-| # | Step                  | Description                                                        | Optional |
-|---|-----------------------|--------------------------------------------------------------------|----------|
-| 1 | **Setup Codex**       | Downloads/caches the Codex CLI binary and resolves authentication  | No       |
-| 2 | **Prepare Context**   | Creates a temp workspace, seeds existing items and metadata        | No       |
-| 3 | **Generate Items**    | Executes Codex CLI to research and generate items as JSON files    | No       |
-| 4 | **Collect Results**   | Reads generated JSON files back into the pipeline result           | No       |
-| 5 | **Capture Screenshots** | Takes screenshots for generated items (via screenshot provider)  | Yes      |
-| 6 | **Cleanup**           | Removes the temporary workspace                                   | Yes      |
+| #   | Step                    | Description                                                       | Optional |
+| --- | ----------------------- | ----------------------------------------------------------------- | -------- |
+| 1   | **Setup Codex**         | Downloads/caches the Codex CLI binary and resolves authentication | No       |
+| 2   | **Prepare Context**     | Creates a temp workspace, seeds existing items and metadata       | No       |
+| 3   | **Generate Items**      | Executes Codex CLI to research and generate items as JSON files   | No       |
+| 4   | **Collect Results**     | Reads generated JSON files back into the pipeline result          | No       |
+| 5   | **Capture Screenshots** | Takes screenshots for generated items (via screenshot provider)   | Yes      |
+| 6   | **Cleanup**             | Removes the temporary workspace                                   | Yes      |
 
 During step 3, a **taxonomy watcher** monitors the workspace for new item files and keeps `_meta/` taxonomy files (categories, tags, brands) in sync in real time. Progress is reported per item as files appear.
 
@@ -39,12 +39,12 @@ The onboarding wizard (`CodexOnboardingWizard`) provides a 3-step flow: choose a
 
 ## Settings
 
-| Setting               | Type    | Scope  | Description                                                    |
-|-----------------------|---------|--------|----------------------------------------------------------------|
-| `authMode`            | string  | user   | `api-key` or `local` (hidden, set by onboarding wizard)        |
-| `apiKey`              | string  | user   | OpenAI API key (secret, supports env var `OPENAI_API_KEY`)     |
-| `model`               | string  | global | Model for generation (default: `gpt-5.4`)                     |
-| `unsafeBypassSandbox` | boolean | hidden | Bypass Codex sandboxing on incompatible hosts                  |
+| Setting               | Type    | Scope  | Description                                                |
+| --------------------- | ------- | ------ | ---------------------------------------------------------- |
+| `authMode`            | string  | user   | `api-key` or `local` (hidden, set by onboarding wizard)    |
+| `apiKey`              | string  | user   | OpenAI API key (secret, supports env var `OPENAI_API_KEY`) |
+| `model`               | string  | global | Model for generation (default: `gpt-5.4`)                  |
+| `unsafeBypassSandbox` | boolean | hidden | Bypass Codex sandboxing on incompatible hosts              |
 
 ### Supported Models
 
@@ -56,16 +56,17 @@ The onboarding wizard (`CodexOnboardingWizard`) provides a 3-step flow: choose a
 
 The plugin provides a user-facing form with two configurable fields:
 
-| Field                | Type    | Default | Validation   | Description                            |
-|----------------------|---------|---------|--------------|----------------------------------------|
-| `target_items`       | number  | 50      | 1-500        | Target number of new items to generate |
-| `capture_screenshots`| boolean | false   | -            | Take screenshots for generated items   |
+| Field                 | Type    | Default | Validation | Description                            |
+| --------------------- | ------- | ------- | ---------- | -------------------------------------- |
+| `target_items`        | number  | 50      | 1-500      | Target number of new items to generate |
+| `capture_screenshots` | boolean | false   | -          | Take screenshots for generated items   |
 
 ## Prompt System
 
 Prompts are managed through a prompt facade (e.g., Langfuse). When no external prompt is found, hardcoded defaults are used as fallback.
 
 Prompt keys:
+
 - `codex.system` - System prompt template
 - `codex.user` - User prompt template
 
