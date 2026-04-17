@@ -8,7 +8,6 @@ export interface ExecuteOptions {
 	readonly systemPrompt: string;
 	readonly cwd: string;
 	readonly env: Record<string, string>;
-	readonly maxTurns: number;
 	readonly model?: string;
 	readonly signal?: AbortSignal;
 	readonly onStdoutLine?: (line: string) => void;
@@ -45,16 +44,7 @@ export function executeGemini(options: ExecuteOptions): {
 	const promise = new Promise<ExecuteResult>((resolve, reject) => {
 		const startTime = Date.now();
 		const mergedPrompt = `${options.systemPrompt.trim()}\n\n${options.prompt.trim()}`.trim();
-		const args = [
-			'-p',
-			mergedPrompt,
-			'--output-format',
-			'json',
-			'--approval-mode',
-			'yolo',
-			'--max-turns',
-			String(options.maxTurns)
-		];
+		const args = ['-p', mergedPrompt, '--output-format', 'json', '--approval-mode', 'yolo'];
 
 		if (options.model) {
 			args.push('--model', options.model);

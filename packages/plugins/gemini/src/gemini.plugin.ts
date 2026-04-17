@@ -30,7 +30,7 @@ import * as path from 'path';
 import * as https from 'https';
 
 import type { GeminiStepId } from './types.js';
-import { GEMINI_STEP_IDS, DEFAULT_CLI_VERSION, DEFAULT_MAX_TURNS, BASE_TEMP_DIR, DEFAULT_MODEL } from './types.js';
+import { GEMINI_STEP_IDS, DEFAULT_CLI_VERSION, BASE_TEMP_DIR, DEFAULT_MODEL } from './types.js';
 import { STEP_DEFINITIONS } from './steps.js';
 import { ensureBinary } from './utils/binary-manager.js';
 import {
@@ -183,15 +183,6 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				title: 'CLI Version',
 				description: 'Gemini CLI version to use',
 				default: DEFAULT_CLI_VERSION,
-				'x-hidden': true
-			},
-			maxTurns: {
-				type: 'integer',
-				title: 'Max Turns',
-				description: 'Maximum number of agentic turns',
-				default: DEFAULT_MAX_TURNS,
-				minimum: 1,
-				maximum: 100,
 				'x-hidden': true
 			},
 			model: {
@@ -455,7 +446,6 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				systemPrompt: 'Reply with the single word OK. Nothing else.',
 				cwd: workspacePath,
 				env: authEnv,
-				maxTurns: 1,
 				model: settings.model as string | undefined
 			});
 
@@ -531,7 +521,6 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			}
 
 			const version = (settings.version as string) || DEFAULT_CLI_VERSION;
-			const maxTurns = (settings.maxTurns as number) || DEFAULT_MAX_TURNS;
 			const model = settings.model as string | undefined;
 			const authMode = this.resolveAuthMode(settings);
 
@@ -613,7 +602,6 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 					systemPrompt,
 					cwd: workspacePath,
 					env: executionEnv,
-					maxTurns,
 					model,
 					signal,
 					onStdoutLine,
