@@ -231,6 +231,29 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         { key: 'failed', count: summary.failed, label: t('filters.statuses.failed') },
     ] as const;
 
+    const statusConfig = {
+        in_progress: {
+            dot: 'bg-info',
+            activeBg: 'bg-info/5 dark:bg-info/10',
+            activeBorder: 'border-info/40 dark:border-info/30',
+        },
+        completed: {
+            dot: 'bg-success',
+            activeBg: 'bg-success/5 dark:bg-success/10',
+            activeBorder: 'border-success/40 dark:border-success/30',
+        },
+        pending: {
+            dot: 'bg-warning',
+            activeBg: 'bg-warning/5 dark:bg-warning/10',
+            activeBorder: 'border-warning/40 dark:border-warning/30',
+        },
+        failed: {
+            dot: 'bg-danger',
+            activeBg: 'bg-danger/5 dark:bg-danger/10',
+            activeBorder: 'border-danger/40 dark:border-danger/30',
+        },
+    } as const;
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -244,32 +267,38 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                 </div>
                 <button
                     onClick={handleExport}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
                 >
-                    <Download className="w-4 h-4" />
+                    <Download className="w-3.5 h-3.5" />
                     {t('actions.export')}
                 </button>
             </div>
 
-            <div className="grid gap-3 @sm/main:grid-cols-2 @xl/main:grid-cols-4">
+            <div className="grid gap-2 @sm/main:grid-cols-2 @xl/main:grid-cols-4">
                 {summaryCards.map((card) => {
                     const isActive = status === card.key;
+                    const config = statusConfig[card.key];
 
                     return (
                         <button
                             key={card.key}
                             type="button"
                             onClick={() => setStatus(isActive ? '' : card.key)}
-                            className={`rounded-xl border px-4 py-3 text-left transition-colors ${
+                            className={`rounded-lg cursor-pointer border px-4 py-3.5 text-left transition-all duration-150 ${
                                 isActive
-                                    ? 'border-primary bg-primary/5 dark:bg-primary/10'
-                                    : 'border-border dark:border-border-dark bg-card dark:bg-card-primary-dark/10 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark'
+                                    ? `${config.activeBorder} ${config.activeBg}`
+                                    : 'border-border dark:border-border-dark bg-card dark:bg-card-primary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark'
                             }`}
                         >
-                            <p className="text-xs uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-                                {card.label}
-                            </p>
-                            <p className="mt-1 text-2xl font-semibold text-text dark:text-text-dark">
+                            <div className="flex items-center gap-1.5 mb-2">
+                                <span
+                                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dot}`}
+                                />
+                                <p className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                                    {card.label}
+                                </p>
+                            </div>
+                            <p className="text-xl font-normal tabular-nums text-text dark:text-text-dark">
                                 {card.count.toLocaleString()}
                             </p>
                         </button>
@@ -310,18 +339,18 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                                 <span className="text-sm text-text-muted dark:text-text-muted-dark">
                                     {t('pagination.pageOf', { page, total: totalPages })}
                                 </span>
-                                <div className="flex gap-2">
+                                <div className="flex gap-1.5">
                                     <button
                                         onClick={() => handlePageChange(page - 1)}
                                         disabled={page <= 1}
-                                        className="px-3 py-1.5 text-sm rounded-md border border-border dark:border-border-dark disabled:opacity-50 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+                                        className="px-2.5 py-1 text-xs rounded-md border border-border dark:border-border-dark disabled:opacity-40 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
                                     >
                                         {t('pagination.previous')}
                                     </button>
                                     <button
                                         onClick={() => handlePageChange(page + 1)}
                                         disabled={page >= totalPages}
-                                        className="px-3 py-1.5 text-sm rounded-md border border-border dark:border-border-dark disabled:opacity-50 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+                                        className="px-2.5 py-1 text-xs rounded-md border border-border dark:border-border-dark disabled:opacity-40 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
                                     >
                                         {t('pagination.next')}
                                     </button>

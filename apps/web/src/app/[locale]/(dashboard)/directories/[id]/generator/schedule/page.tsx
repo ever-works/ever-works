@@ -52,26 +52,30 @@ export default async function DirectorySchedulePage({ params }: Params) {
     const { id } = await params;
 
     let directory;
-    let scheduleRes;
     let formSchema;
     let configRes;
+    let scheduleRes = null;
+    let scheduleErrorMessage: string | null = null;
 
     try {
-        const [directoryResult, scheduleResult, formSchemaResult, configResult] = await Promise.all(
-            [
-                directoryAPI.get(id),
-                directoryAPI.getSchedule(id).catch(() => null),
-                itemsGeneratorAPI.getFormSchema(id).catch(() => null),
-                directoryAPI.getConfig(id).catch(() => null),
-            ],
-        );
+        const [directoryResult, formSchemaResult, configResult] = await Promise.all([
+            directoryAPI.get(id),
+            itemsGeneratorAPI.getFormSchema(id).catch(() => null),
+            directoryAPI.getConfig(id).catch(() => null),
+        ]);
 
         directory = directoryResult.directory;
-        scheduleRes = scheduleResult;
         formSchema = formSchemaResult;
         configRes = configResult;
     } catch {
         notFound();
+    }
+
+    try {
+        scheduleRes = await directoryAPI.getSchedule(id);
+    } catch (error) {
+        scheduleErrorMessage =
+            error instanceof Error ? error.message : 'Failed to load schedule settings.';
     }
 
     if (!canManageSchedule(directory.userRole)) {
@@ -94,6 +98,7 @@ export default async function DirectorySchedulePage({ params }: Params) {
 
             <DirectoryScheduleCard
                 schedule={schedule}
+                errorMessage={scheduleErrorMessage}
                 pipelineProviders={pipelineProviders}
                 activeProviders={activeProviders}
             />

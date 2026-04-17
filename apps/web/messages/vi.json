@@ -381,7 +381,8 @@
                 "generated": "Đã Tạo",
                 "error": "Lỗi",
                 "cancelled": "Đã Hủy",
-                "idle": "Không hoạt động"
+                "idle": "Không hoạt động",
+                "opening": "Đang mở"
             },
             "role": {
                 "owner": "Chủ sở hữu",
@@ -396,7 +397,9 @@
             "items": "{count} mục",
             "views": "{count} lượt xem",
             "updated": "Đã cập nhật {date}",
-            "viewAction": "Xem →"
+            "viewAction": "Xem →",
+            "openingTitle": "Đang mở thư mục",
+            "openingMessage": "Chúng tôi đang chuẩn bị thư mục của bạn. Chi tiết sẽ mở trong giây lát. Vui lòng ở lại trang này."
         },
         "directoryList": {
             "title": "Thư mục của Bạn",
@@ -1813,6 +1816,20 @@
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure"
+        },
+        "plugins": {
+            "githubOrganizations": {
+                "title": "Tổ chức GitHub",
+                "description": "Xem các tổ chức có sẵn từ kết nối GitHub của bạn và thêm bất kỳ tổ chức bổ sung nào bạn muốn Ever Works nhắm đến.",
+                "noOrganizations": "Chưa tìm thấy tổ chức nào.",
+                "connectToLoad": "Kết nối GitHub để tải tổ chức của bạn.",
+                "placeholder": "Thêm tổ chức theo login",
+                "addButton": "Thêm tổ chức",
+                "saveButton": "Lưu tổ chức",
+                "savedSuccess": "Đã lưu quyền truy cập tổ chức.",
+                "saveFailed": "Lưu thất bại.",
+                "removeLabel": "Xóa {login}"
+            }
         }
     },
     "layout": {

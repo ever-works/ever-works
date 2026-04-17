@@ -381,7 +381,8 @@
                 "generated": "Згенеровано",
                 "error": "Помилка",
                 "cancelled": "Скасовано",
-                "idle": "Неактивний"
+                "idle": "Неактивний",
+                "opening": "Відкриття"
             },
             "role": {
                 "owner": "Власник",
@@ -396,7 +397,9 @@
             "items": "{count} елементів",
             "views": "{count} переглядів",
             "updated": "Оновлено {date}",
-            "viewAction": "Переглянути →"
+            "viewAction": "Переглянути →",
+            "openingTitle": "Відкриваємо каталог",
+            "openingMessage": "Ми готуємо ваш каталог. Деталі відкриються за мить. Залишайтеся на цій сторінці."
         },
         "directoryList": {
             "title": "Ваші довідники",
@@ -1813,6 +1816,20 @@
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure"
+        },
+        "plugins": {
+            "githubOrganizations": {
+                "title": "Організації GitHub",
+                "description": "Перегляньте організації, доступні через ваше підключення до GitHub, і додайте будь-які додаткові організації, на які має орієнтуватися Ever Works.",
+                "noOrganizations": "Ще не знайдено жодної організації.",
+                "connectToLoad": "Підключіть GitHub для завантаження ваших організацій.",
+                "placeholder": "Додати організацію за логіном",
+                "addButton": "Додати організацію",
+                "saveButton": "Зберегти організації",
+                "savedSuccess": "Доступ до організації збережено.",
+                "saveFailed": "Не вдалося зберегти.",
+                "removeLabel": "Видалити {login}"
+            }
         }
     },
     "layout": {

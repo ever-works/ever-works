@@ -1,26 +1,35 @@
 import { IsBoolean, IsEnum, IsInt, IsOptional, Max, Min, ValidateNested } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import {
-    DirectoryScheduleBillingMode,
-    DirectoryScheduleCadence,
-    DirectoryScheduleStatus,
-    GenerateStatusType,
-} from '@src/entities/types';
-import type { UpdateDirectorySchedulePayload as IUpdateDirectorySchedulePayload } from '@ever-works/contracts/api';
+import { DirectoryScheduleBillingMode, DirectoryScheduleCadence } from '@src/entities/types';
+import type {
+    DirectoryScheduleAllowedCadence as ContractDirectoryScheduleAllowedCadence,
+    DirectoryScheduleDto as ContractDirectoryScheduleDto,
+    UpdateDirectorySchedulePayload as IUpdateDirectorySchedulePayload,
+} from '@ever-works/contracts/api';
 import { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dto';
 
-// Re-export types from contracts for convenience
-export type {
-    DirectoryScheduleAllowedCadence,
-    DirectoryScheduleDto,
-} from '@ever-works/contracts/api';
+export type DirectoryScheduleAllowedCadence = ContractDirectoryScheduleAllowedCadence;
+
+export type DirectoryScheduleDto = Omit<ContractDirectoryScheduleDto, 'blockingCode'> & {
+    blockingCode?:
+        | 'SCHEDULED_UPDATES_DISABLED'
+        | 'INITIAL_DIRECTORY_SETUP_REQUIRED'
+        | 'CONFIG_UNAVAILABLE';
+};
 
 export class UpdateDirectoryScheduleDto implements IUpdateDirectorySchedulePayload {
     @ApiPropertyOptional({ description: 'Whether the schedule is enabled' })
     @IsOptional()
     @IsBoolean()
     enable?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Whether to trigger an immediate run after saving the active schedule',
+    })
+    @IsOptional()
+    @IsBoolean()
+    runImmediately?: boolean;
 
     @ApiPropertyOptional({
         description: 'Schedule cadence',

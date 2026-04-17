@@ -30,6 +30,7 @@ export type { ResolvedProvider };
 
 type DirectoryScheduleCardProps = {
     schedule: DirectoryScheduleDto | null;
+    errorMessage?: string | null;
     pipelineProviders?: ProviderOption[];
     activeProviders?: ResolvedProvider[];
 };
@@ -51,6 +52,7 @@ const defaultAllowances = cadenceOrder.map((cadence) => ({
 
 export function DirectoryScheduleCard({
     schedule,
+    errorMessage,
     pipelineProviders = [],
     activeProviders = [],
 }: DirectoryScheduleCardProps) {
@@ -58,11 +60,51 @@ export function DirectoryScheduleCard({
     const t = useTranslations('dashboard.directoryDetail.schedule.card');
     const router = useRouter();
 
+    if (errorMessage) {
+        return (
+            <ScheduleStateCard
+                title={t('title')}
+                description={errorMessage}
+                actionLabel={t('empty.refresh')}
+                onAction={() => router.refresh()}
+            />
+        );
+    }
+
     if (!schedule) {
         return (
-            <ScheduleEmptyState
-                title={t('empty.title')}
+            <ScheduleStateCard
+                title={t('title')}
                 description={t('empty.description')}
+                actionLabel={t('empty.refresh')}
+                onAction={() => router.refresh()}
+            />
+        );
+    }
+
+    const hasPersistedSchedule =
+        schedule.cadence !== null || schedule.status !== DirectoryScheduleStatus.DISABLED;
+
+    if (!schedule.featureEnabled && !hasPersistedSchedule) {
+        return (
+            <ScheduleStateCard
+                title={t('summary.statusMap.disabled')}
+                description={schedule.blockingReason ?? t('empty.description')}
+                actionLabel={t('empty.refresh')}
+                onAction={() => router.refresh()}
+            />
+        );
+    }
+
+    if (!hasPersistedSchedule && !schedule.canEnable) {
+        return (
+            <ScheduleStateCard
+                title={
+                    schedule.blockingCode === 'INITIAL_DIRECTORY_SETUP_REQUIRED'
+                        ? t('empty.title')
+                        : t('title')
+                }
+                description={schedule.blockingReason ?? t('empty.description')}
                 actionLabel={t('empty.refresh')}
                 onAction={() => router.refresh()}
             />
@@ -73,6 +115,7 @@ export function DirectoryScheduleCard({
         <ScheduleForm
             directoryId={directory.id}
             schedule={schedule}
+            readOnly={!schedule.featureEnabled}
             pipelineProviders={pipelineProviders}
             activeProviders={activeProviders}
         />
@@ -82,11 +125,13 @@ export function DirectoryScheduleCard({
 function ScheduleForm({
     directoryId,
     schedule,
+    readOnly,
     pipelineProviders,
     activeProviders,
 }: {
     directoryId: string;
     schedule: DirectoryScheduleDto;
+    readOnly: boolean;
     pipelineProviders: ProviderOption[];
     activeProviders: ResolvedProvider[];
 }) {
@@ -147,6 +192,7 @@ function ScheduleForm({
             directoryId={directoryId}
             directory={directory}
             schedule={schedule}
+            readOnly={readOnly}
             allowances={allowances}
             pipelineProviders={pipelineProviders}
             activeProviders={activeProviders}
@@ -163,6 +209,7 @@ function ScheduleFormContent({
     directoryId,
     directory,
     schedule,
+    readOnly,
     allowances,
     pipelineProviders,
     activeProviders,
@@ -175,6 +222,7 @@ function ScheduleFormContent({
     directoryId: string;
     directory: ReturnType<typeof useDirectoryDetail>['directory'];
     schedule: DirectoryScheduleDto;
+    readOnly: boolean;
     allowances: { cadence: DirectoryScheduleCadence; allowed: boolean }[];
     pipelineProviders: ProviderOption[];
     activeProviders: ResolvedProvider[];
@@ -198,6 +246,7 @@ function ScheduleFormContent({
     const [isRunning, startRunning] = useTransition();
 
     const subscriptionsEnabled = schedule.subscriptionsEnabled;
+    const readOnlyReason = readOnly ? schedule.blockingReason : null;
     const cadenceInfo = allowances.find((item) => item.cadence === form.cadence);
     const requiresUsage = subscriptionsEnabled && cadenceInfo ? !cadenceInfo.allowed : false;
 
@@ -212,6 +261,7 @@ function ScheduleFormContent({
     const isActive = schedule.status === DirectoryScheduleStatus.ACTIVE;
     const isGenerationRunning = directory.generateStatus?.status === 'generating';
     const anyBusy = isSaving || isRunning;
+    const controlsDisabled = anyBusy || readOnly;
 
     const toggleAutomation = () => {
         updateForm({ enable: !form.enable });
@@ -224,6 +274,7 @@ function ScheduleFormContent({
 
             const result = await updateDirectorySchedule(directoryId, {
                 enable: !form.enable,
+                runImmediately: !form.enable,
                 cadence: form.cadence,
                 billingMode: form.billingMode,
                 maxFailureBeforePause: form.maxFailureBeforePause,
@@ -320,6 +371,7 @@ function ScheduleFormContent({
         <FieldCard label={t('fields.createPullRequest')} helper={t('fields.createPullRequestHelp')}>
             <Switch
                 checked={form.alwaysCreatePullRequest}
+                disabled={readOnly}
                 onChange={(checked) => updateForm({ alwaysCreatePullRequest: checked })}
             />
         </FieldCard>
@@ -337,11 +389,16 @@ function ScheduleFormContent({
                             ? t('subtitle.enabled')
                             : t('subtitle.disabled')}
                     </p>
+                    {readOnlyReason ? (
+                        <HelperPill tone="alert" icon={AlertCircle}>
+                            {readOnlyReason}
+                        </HelperPill>
+                    ) : null}
                 </div>
                 <button
                     type="button"
                     onClick={toggleAutomation}
-                    disabled={anyBusy}
+                    disabled={controlsDisabled}
                     title={isActive ? t('actions.stopAutomation') : t('actions.startAutomation')}
                     className={cn(
                         'p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0',
@@ -396,6 +453,7 @@ function ScheduleFormContent({
                 >
                     <Select
                         value={form.cadence}
+                        disabled={readOnly}
                         onValueChange={(val) =>
                             updateForm({
                                 cadence: val as DirectoryScheduleCadence,
@@ -454,6 +512,7 @@ function ScheduleFormContent({
                         type="number"
                         min={1}
                         max={10}
+                        disabled={readOnly}
                         value={form.maxFailureBeforePause}
                         onChange={(event) => {
                             const nextValue = Number(event.target.value);
@@ -469,6 +528,7 @@ function ScheduleFormContent({
                     <PipelineOverrideField
                         providers={pipelineProviders}
                         value={form.pipelineOverride}
+                        disabled={readOnly}
                         onChange={(value) => updateForm({ pipelineOverride: value })}
                     />
                 )}
@@ -477,6 +537,7 @@ function ScheduleFormContent({
                     <FieldCard label={t('fields.billing')} helper={t('fields.billingHelp')}>
                         <Select
                             value={form.billingMode}
+                            disabled={readOnly}
                             onValueChange={(val) =>
                                 updateForm({
                                     billingMode: val as DirectoryScheduleBillingMode,
@@ -497,7 +558,7 @@ function ScheduleFormContent({
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-                <Button onClick={saveSchedule} disabled={anyBusy}>
+                <Button onClick={saveSchedule} disabled={controlsDisabled}>
                     {isSaving ? t('actions.saving') : t('actions.save')}
                 </Button>
 
@@ -506,7 +567,7 @@ function ScheduleFormContent({
                 <Button
                     variant={isActive ? 'danger' : 'secondary'}
                     onClick={toggleAutomation}
-                    disabled={anyBusy}
+                    disabled={controlsDisabled}
                     className="gap-2"
                 >
                     {isActive ? (
@@ -525,13 +586,15 @@ function ScheduleFormContent({
                 <Button
                     variant="secondary"
                     onClick={runNow}
-                    disabled={anyBusy || !isActive || isGenerationRunning}
+                    disabled={controlsDisabled || !isActive || isGenerationRunning}
                     title={
-                        isGenerationRunning
-                            ? 'Generation is running, please wait it to finish'
-                            : !isActive
-                              ? 'Schedule must be active to run now'
-                              : undefined
+                        readOnlyReason
+                            ? readOnlyReason
+                            : isGenerationRunning
+                              ? 'Generation is running, please wait it to finish'
+                              : !isActive
+                                ? 'Schedule must be active to run now'
+                                : undefined
                     }
                     className="gap-2"
                 >
@@ -546,10 +609,12 @@ function ScheduleFormContent({
 function PipelineOverrideField({
     providers,
     value,
+    disabled,
     onChange,
 }: {
     providers: ProviderOption[];
     value: string | undefined;
+    disabled?: boolean;
     onChange: (value: string | undefined) => void;
 }) {
     const t = useTranslations('dashboard.directoryDetail.schedule.card');
@@ -558,6 +623,7 @@ function PipelineOverrideField({
         <FieldCard label={t('fields.pipeline')} helper={t('fields.pipelineHelp')}>
             <Select
                 value={value ?? '__inherit__'}
+                disabled={disabled}
                 onValueChange={(val) => onChange(val === '__inherit__' ? undefined : val)}
             >
                 <option value="__inherit__">{t('pipeline.inherit')}</option>
@@ -583,7 +649,7 @@ function SummaryChip({ label, value }: { label: string; value: ReactNode | strin
     );
 }
 
-function ScheduleEmptyState({
+function ScheduleStateCard({
     title,
     description,
     actionLabel,

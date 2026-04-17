@@ -13,6 +13,16 @@ import {
 describe('DirectoryScheduleService', () => {
     const user = { id: 'user-1' } as any;
     const directory = { id: 'dir-1', sourceRepository: null } as any;
+    const originalScheduledUpdatesEnabled = process.env.SCHEDULED_UPDATES_ENABLED;
+
+    const restoreScheduledUpdatesEnabled = () => {
+        if (originalScheduledUpdatesEnabled === undefined) {
+            delete process.env.SCHEDULED_UPDATES_ENABLED;
+            return;
+        }
+
+        process.env.SCHEDULED_UPDATES_ENABLED = originalScheduledUpdatesEnabled;
+    };
 
     let scheduleRepository: any;
     let directoryRepository: any;
@@ -25,6 +35,8 @@ describe('DirectoryScheduleService', () => {
     let service: DirectoryScheduleService;
 
     beforeEach(() => {
+        restoreScheduledUpdatesEnabled();
+
         scheduleRepository = {
             findByDirectoryId: jest.fn(),
             upsert: jest.fn(),
@@ -79,6 +91,65 @@ describe('DirectoryScheduleService', () => {
             dataGeneratorService,
             pluginRegistry,
             notificationService,
+        );
+    });
+
+    afterAll(() => {
+        restoreScheduledUpdatesEnabled();
+    });
+
+    it('returns readiness metadata instead of throwing when initial setup is incomplete', async () => {
+        scheduleRepository.findByDirectoryId.mockResolvedValue(null);
+        dataGeneratorService.getConfig.mockResolvedValue({
+            metadata: {},
+        });
+
+        const result = await service.getSchedule(directory.id, user);
+
+        expect(result.schedule).toEqual(
+            expect.objectContaining({
+                status: DirectoryScheduleStatus.DISABLED,
+                featureEnabled: true,
+                canEnable: false,
+                blockingCode: 'INITIAL_DIRECTORY_SETUP_REQUIRED',
+                blockingReason:
+                    'Complete an initial directory setup before enabling scheduled updates.',
+            }),
+        );
+    });
+
+    it('returns feature-disabled metadata when scheduled updates are turned off globally', async () => {
+        process.env.SCHEDULED_UPDATES_ENABLED = 'false';
+        scheduleRepository.findByDirectoryId.mockResolvedValue(null);
+
+        const result = await service.getSchedule(directory.id, user);
+
+        expect(result.schedule).toEqual(
+            expect.objectContaining({
+                status: DirectoryScheduleStatus.DISABLED,
+                featureEnabled: false,
+                canEnable: false,
+                blockingCode: 'SCHEDULED_UPDATES_DISABLED',
+                blockingReason: 'Scheduled updates are currently disabled.',
+            }),
+        );
+    });
+
+    it('returns config-unavailable metadata when readiness inspection fails', async () => {
+        scheduleRepository.findByDirectoryId.mockResolvedValue(null);
+        dataGeneratorService.getConfig.mockRejectedValue(new Error('repository unavailable'));
+
+        const result = await service.getSchedule(directory.id, user);
+
+        expect(result.schedule).toEqual(
+            expect.objectContaining({
+                status: DirectoryScheduleStatus.DISABLED,
+                featureEnabled: true,
+                canEnable: false,
+                blockingCode: 'CONFIG_UNAVAILABLE',
+                blockingReason:
+                    'Schedule readiness could not be checked right now. Try again in a moment.',
+            }),
         );
     });
 

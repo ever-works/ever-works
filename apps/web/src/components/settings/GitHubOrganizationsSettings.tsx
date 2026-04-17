@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { Building2, Plus, Save, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getGitProviderOrganizations } from '@/app/actions/dashboard/oauth';
@@ -17,6 +18,7 @@ export function GitHubOrganizationsSettings({
     plugin,
     connected,
 }: GitHubOrganizationsSettingsProps) {
+    const t = useTranslations('dashboard.plugins.githubOrganizations');
     const [isPending, startTransition] = useTransition();
     const [organizations, setOrganizations] = useState<string[]>([]);
     const [additionalOrganizations, setAdditionalOrganizations] = useState<string[]>(
@@ -70,9 +72,7 @@ export function GitHubOrganizationsSettings({
                 },
             });
 
-            setStatus(
-                result.success ? 'Saved organization access.' : result.error || 'Save failed.',
-            );
+            setStatus(result.success ? t('savedSuccess') : result.error || t('saveFailed'));
         });
     };
 
@@ -84,11 +84,10 @@ export function GitHubOrganizationsSettings({
                 </div>
                 <div>
                     <h3 className="text-sm font-semibold text-text dark:text-text-dark">
-                        GitHub organizations
+                        {t('title')}
                     </h3>
                     <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                        Review the organizations available from your GitHub connection and add any
-                        extra organizations you want Ever Works to target.
+                        {t('description')}
                     </p>
                 </div>
             </div>
@@ -109,7 +108,7 @@ export function GitHubOrganizationsSettings({
                                         type="button"
                                         onClick={() => removeAdditionalOrganization(login)}
                                         className="text-text-muted hover:text-danger"
-                                        aria-label={`Remove ${login}`}
+                                        aria-label={t('removeLabel', { login })}
                                     >
                                         <X className="w-3.5 h-3.5" />
                                     </button>
@@ -119,9 +118,7 @@ export function GitHubOrganizationsSettings({
                     })
                 ) : (
                     <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                        {connected
-                            ? 'No organizations found yet.'
-                            : 'Connect GitHub to load your organizations.'}
+                        {connected ? t('noOrganizations') : t('connectToLoad')}
                     </p>
                 )}
             </div>
@@ -130,16 +127,16 @@ export function GitHubOrganizationsSettings({
                 <Input
                     value={draftOrganization}
                     onChange={(event) => setDraftOrganization(event.target.value)}
-                    placeholder="Add organization by login"
+                    placeholder={t('placeholder')}
                 />
                 <div className="flex gap-3 items-center">
                     <Button variant="secondary" onClick={addOrganization} className="text-sm">
                         <Plus className="w-4 h-4" />
-                        Add organization
+                        {t('addButton')}
                     </Button>
                     <Button onClick={saveOrganizations} loading={isPending} size="sm">
                         <Save className="w-4 h-4" />
-                        Save organizations
+                        {t('saveButton')}
                     </Button>
                 </div>
             </div>

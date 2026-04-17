@@ -65,7 +65,7 @@ export function ActivityFilters({
                     onChange={(e) => onSearchChange(e.target.value)}
                     placeholder={t('filters.search')}
                     aria-label={t('filters.search')}
-                    className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border dark:border-border-dark bg-card dark:bg-transparent text-text dark:text-text-dark placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark text-text dark:text-text-dark placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
             </div>
 
@@ -98,7 +98,7 @@ export function ActivityFilters({
             {hasActiveFilters && (
                 <button
                     onClick={onClearFilters}
-                    className="inline-flex items-center gap-1 px-3 py-2 text-sm rounded-lg text-text-muted dark:text-text-muted-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+                    className="inline-flex cursor-pointer items-center border border-border dark:border-border-dark gap-1 px-3 py-2 text-sm rounded-lg text-text-muted dark:text-text-muted-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
                 >
                     <X className="w-3.5 h-3.5" />
                     {t('actions.clearFilters')}

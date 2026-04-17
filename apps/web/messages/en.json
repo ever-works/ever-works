@@ -774,7 +774,8 @@
                 "generated": "Generated",
                 "error": "Error",
                 "cancelled": "Cancelled",
-                "idle": "Idle"
+                "idle": "Idle",
+                "opening": "Opening"
             },
             "role": {
                 "owner": "Owner",
@@ -789,7 +790,9 @@
             "items": "{count} items",
             "views": "{count} views",
             "updated": "Updated {date}",
-            "viewAction": "View →"
+            "viewAction": "View →",
+            "openingTitle": "Opening directory",
+            "openingMessage": "Preparing your directory. Details will open shortly. Stay on this page."
         },
         "directoryList": {
             "title": "Your Directories",
@@ -2635,6 +2638,18 @@
                 "connectError": "Failed to connect. Please try again.",
                 "reconnectError": "Failed to reconnect. Please try again.",
                 "disconnectError": "Failed to disconnect. Please try again."
+            },
+            "githubOrganizations": {
+                "title": "GitHub Organizations",
+                "description": "Review the organizations available from your GitHub connection and add any extra organizations you want Ever Works to target.",
+                "noOrganizations": "No organizations found yet.",
+                "connectToLoad": "Connect GitHub to load your organizations.",
+                "placeholder": "Add organization by login",
+                "addButton": "Add organization",
+                "saveButton": "Save organizations",
+                "savedSuccess": "Saved organization access.",
+                "saveFailed": "Save failed.",
+                "removeLabel": "Remove {login}"
             }
         },
         "directoryPlugins": {
