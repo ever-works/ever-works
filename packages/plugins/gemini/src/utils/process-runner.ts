@@ -45,7 +45,16 @@ export function executeGemini(options: ExecuteOptions): {
 	const promise = new Promise<ExecuteResult>((resolve, reject) => {
 		const startTime = Date.now();
 		const mergedPrompt = `${options.systemPrompt.trim()}\n\n${options.prompt.trim()}`.trim();
-		const args = ['-p', mergedPrompt, '--output-format', 'json', '--approval-mode', 'yolo'];
+		const args = [
+			'-p',
+			mergedPrompt,
+			'--output-format',
+			'json',
+			'--approval-mode',
+			'yolo',
+			'--max-turns',
+			String(options.maxTurns)
+		];
 
 		if (options.model) {
 			args.push('--model', options.model);

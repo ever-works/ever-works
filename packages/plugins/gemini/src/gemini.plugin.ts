@@ -309,6 +309,34 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			: { success: false, message: 'No cached Gemini login was found on this machine.' };
 	}
 
+	validateSettings(settings: Record<string, unknown>): ValidationResult {
+		if (
+			settings.authMode !== undefined &&
+			settings.authMode !== 'machine-local' &&
+			settings.authMode !== 'api-key' &&
+			settings.authMode !== 'vertex'
+		) {
+			return {
+				valid: false,
+				errors: [{ path: 'authMode', message: 'Authentication mode must be "machine-local", "api-key", or "vertex"' }]
+			};
+		}
+		if (settings.apiKey !== undefined && typeof settings.apiKey !== 'string') {
+			return {
+				valid: false,
+				errors: [{ path: 'apiKey', message: 'API key must be a string when provided' }]
+			};
+		}
+		if (settings.googleCloudProject !== undefined && typeof settings.googleCloudProject !== 'string') {
+			return {
+				valid: false,
+				errors: [{ path: 'googleCloudProject', message: 'Google Cloud project must be a string when provided' }]
+			};
+		}
+
+		return { valid: true };
+	}
+
 	getManifest(): PluginManifest {
 		return {
 			id: this.id,
@@ -624,6 +652,30 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			reportProgress(onProgress, 3, 85, 'Collect Results');
 
 			const items = await readGeneratedItems(workspacePath, logger);
+
+			if (items.length === 0) {
+				const stderrExcerpt = execResult.stderr
+					?.trim()
+					.split('\n')
+					.filter(Boolean)
+					.slice(-2)
+					.join(' | ');
+				const stdoutExcerpt = execResult.stdout
+					?.trim()
+					.split('\n')
+					.filter(Boolean)
+					.slice(-2)
+					.join(' | ');
+				const cliParts = [
+					stderrExcerpt ? `stderr: ${stderrExcerpt}` : '',
+					stdoutExcerpt ? `stdout: ${stdoutExcerpt}` : ''
+				].filter(Boolean);
+				const cliSummary = cliParts.length > 0 ? ` Gemini output excerpt: ${cliParts.join(' ; ')}.` : '';
+				throw new Error(
+					`Gemini CLI completed without producing any valid item JSON files in the workspace.${cliSummary}`
+				);
+			}
+
 			const metadata = collectMetadataFromItems(items);
 			this.completeStep('collect-results', collectResultsStepStartedAt, onLogEntry);
 
