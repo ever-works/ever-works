@@ -111,6 +111,13 @@ export function executeOpenCode(options: ExecuteOptions): {
 
 		childProcess.on('error', reject);
 		childProcess.on('exit', (code) => {
+			if (stdoutRemainder?.trim()) {
+				options.onStdoutLine?.(stdoutRemainder);
+			}
+			if (stderrRemainder?.trim()) {
+				options.onStderrLine?.(stderrRemainder);
+			}
+
 			resolve({
 				stdout,
 				stderr,

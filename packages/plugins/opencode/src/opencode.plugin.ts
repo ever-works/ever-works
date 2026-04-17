@@ -207,7 +207,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			model: {
 				type: 'string',
 				title: 'Model',
-				'x-scope': 'user',
+				'x-scope': 'global',
 				default: 'go/kimi-k2.5',
 				description: 'Model to use in the form provider/model, for example `go/kimi-k2.5`.'
 			}
@@ -297,6 +297,36 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			: { success: false, message: 'OpenCode CLI validation failed. Check the API key, provider, and model.' };
 	}
 
+	validateSettings(settings: Record<string, unknown>): ValidationResult {
+		if (
+			settings.authMode !== undefined &&
+			settings.authMode !== 'machine-local' &&
+			settings.authMode !== 'api-key'
+		) {
+			return {
+				valid: false,
+				errors: [{ path: 'authMode', message: 'Authentication mode must be "machine-local" or "api-key"' }]
+			};
+		}
+		if (settings.apiKey !== undefined && typeof settings.apiKey !== 'string') {
+			return {
+				valid: false,
+				errors: [{ path: 'apiKey', message: 'API key must be a string when provided' }]
+			};
+		}
+		if (
+			settings.provider !== undefined &&
+			settings.provider !== 'go' &&
+			settings.provider !== 'zen'
+		) {
+			return {
+				valid: false,
+				errors: [{ path: 'provider', message: 'Provider must be "go" or "zen"' }]
+			};
+		}
+		return { valid: true };
+	}
+
 	getManifest(): PluginManifest {
 		return {
 			id: this.id,
@@ -370,22 +400,24 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		const provider = settings.provider === 'zen' ? 'zen' : 'go';
 		const model = (settings.model as string | undefined) || 'go/kimi-k2.5';
 		let tempDir: string | null = null;
+		let killProcess: (() => void) | null = null;
 
 		try {
 			const binaryPath = await ensureBinary(version, this.context?.logger || console);
 			tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ever-works-opencode-validate-'));
 			await this.prepareOpenCodeConfig(tempDir, provider, apiKey, model);
 
-			const { promise } = executeOpenCode({
+			const execution = executeOpenCode({
 				binaryPath,
 				prompt: 'Reply with exactly OK. Do not ask follow-up questions and do not modify any files.',
 				cwd: tempDir,
 				env: this.buildOpenCodeEnv(tempDir, model),
 				model
 			});
+			killProcess = execution.kill;
 
 			const result = await Promise.race([
-				promise,
+				execution.promise,
 				new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Validation timed out')), 30_000))
 			]);
 
@@ -396,6 +428,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			);
 			return false;
 		} finally {
+			killProcess?.();
 			if (tempDir) {
 				await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
 			}
@@ -439,20 +472,23 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			};
 		}
 
+		let killValidation: (() => void) | null = null;
+
 		try {
 			const binaryPath = await ensureBinary(version, this.context?.logger || console);
 			tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ever-works-opencode-machine-validate-'));
 
-			const { promise } = executeOpenCode({
+			const execution = executeOpenCode({
 				binaryPath,
 				prompt: 'Reply with exactly OK. Do not ask follow-up questions and do not modify any files.',
 				cwd: tempDir,
 				env: this.buildMachineLocalEnv(model),
 				model
 			});
+			killValidation = execution.kill;
 
 			const result = await Promise.race([
-				promise,
+				execution.promise,
 				new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Validation timed out')), 30_000))
 			]);
 
@@ -466,6 +502,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				detail: err instanceof Error ? err.message : 'Machine-local OpenCode validation failed.'
 			};
 		} finally {
+			killValidation?.();
 			if (tempDir) {
 				await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
 			}
@@ -660,6 +697,16 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			reportProgress(onProgress, 3, 85, 'Collect Results');
 
 			const items = await readGeneratedItems(workspacePath, logger);
+
+			if (items.length === 0) {
+				const stderrExcerpt = execResult.stderr?.trim().split('\n').slice(0, 5).join('\n') || '';
+				const stdoutExcerpt = execResult.stdout?.trim().split('\n').slice(-5).join('\n') || '';
+				const detail = stderrExcerpt || stdoutExcerpt || `exit code ${execResult.exitCode}`;
+				throw new Error(
+					`OpenCode completed but produced no valid item files. CLI output:\n${detail}`
+				);
+			}
+
 			const metadata = collectMetadataFromItems(items);
 			this.completeStep('collect-results', collectResultsStepStartedAt, onLogEntry);
 

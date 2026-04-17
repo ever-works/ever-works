@@ -48,11 +48,6 @@ export const OPENCODE_GITHUB_REPO = 'sst/opencode';
 export const DEFAULT_CLI_VERSION = 'v1.0.223';
 
 /**
- * Default maximum number of agentic turns for OpenCode
- */
-export const DEFAULT_MAX_TURNS = 500;
-
-/**
  * Maximum stdout/stderr buffer size (10MB) to prevent OOM
  */
 export const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
