@@ -25,7 +25,7 @@ import type {
 	StepStatus,
 	ValidationResult
 } from '@ever-works/plugin';
-import { buildSuccessPipelineResult, lucideIcon, normalizeItemTags, type ItemData } from '@ever-works/plugin';
+import { buildSuccessPipelineResult, lucideIcon, normalizeItemTags, substituteVariables, type ItemData } from '@ever-works/plugin';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -42,7 +42,13 @@ import {
 	getFormGroups as formGroups,
 	validateFormInput as formValidate
 } from './form-schema.js';
-import { buildSystemPrompt, buildUserPrompt } from './prompt/system-prompt.js';
+import {
+	buildSystemPromptVariables,
+	buildUserPromptVariables,
+	DEFAULT_SYSTEM_PROMPT,
+	DEFAULT_USER_PROMPT
+} from './prompt/system-prompt.js';
+import { PROMPT_KEYS } from './prompt-keys.js';
 import { executeCodex, type ExecuteResult } from './utils/process-runner.js';
 import { ensureBinary } from './utils/binary-manager.js';
 import { getLocalAuthStatus, startLocalAuth } from './local-auth.js';
@@ -557,7 +563,18 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			const generateStartedAt = this.startStep('generate-items', onLogEntry);
 			reportProgress(onProgress, 2, 30, 'Generate Items');
 
-			const prompt = this.buildExecutionPrompt(directory, request, existing, workspacePath);
+			const execContext = options?.execContext;
+			const promptFacade = execContext?.promptFacade;
+			const facadeOptions = { userId, directoryId: directory.id };
+
+			const prompt = await this.buildExecutionPrompt(
+				directory,
+				request,
+				existing,
+				workspacePath,
+				promptFacade,
+				facadeOptions
+			);
 			let executionResult = await this.runCodexPrompt({
 				workspacePath,
 				executionAuthEnv: executionAuth.env,
@@ -731,12 +748,14 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		return this.state;
 	}
 
-	private buildExecutionPrompt(
+	private async buildExecutionPrompt(
 		directory: DirectoryReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
-		workspacePath: string
-	): string {
+		workspacePath: string,
+		promptFacade?: { getPrompt(key: string, defaultPrompt: string, options: FacadeOptions): Promise<string> },
+		facadeOptions?: FacadeOptions
+	): Promise<string> {
 		const promptOptions = {
 			directory,
 			request: {
@@ -750,7 +769,21 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			workspacePath
 		};
 
-		return [buildSystemPrompt(promptOptions), '', buildUserPrompt(promptOptions)].join('\n');
+		const sysTemplate = (
+			promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.SYSTEM, DEFAULT_SYSTEM_PROMPT, facadeOptions!)
+				: DEFAULT_SYSTEM_PROMPT
+		) as typeof DEFAULT_SYSTEM_PROMPT;
+		const systemPrompt = substituteVariables(sysTemplate, buildSystemPromptVariables(promptOptions));
+
+		const userTemplate = (
+			promptFacade
+				? await promptFacade.getPrompt(PROMPT_KEYS.USER, DEFAULT_USER_PROMPT, facadeOptions!)
+				: DEFAULT_USER_PROMPT
+		) as typeof DEFAULT_USER_PROMPT;
+		const userPrompt = substituteVariables(userTemplate, buildUserPromptVariables(promptOptions));
+
+		return [systemPrompt, '', userPrompt].join('\n');
 	}
 
 	private async runCodexPrompt({
