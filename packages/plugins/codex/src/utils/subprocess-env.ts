@@ -7,6 +7,10 @@ export function buildSubprocessEnv(overrides: Record<string, string> = {}): Reco
 		TMPDIR: process.env.TMPDIR ?? os.tmpdir()
 	};
 
+	if (process.env.CODEX_HOME) {
+		env.CODEX_HOME = process.env.CODEX_HOME;
+	}
+
 	for (const [key, value] of Object.entries(overrides)) {
 		env[key] = value;
 	}
