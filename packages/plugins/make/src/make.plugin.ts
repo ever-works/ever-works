@@ -365,13 +365,7 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 			let execResult: MakeExecutionResult;
 
 			if (mode === 'scenario' && scenarioId) {
-				reportProgress(
-					onProgress,
-					2,
-					15,
-					'Execute Make.com Scenario',
-					`Starting scenario "${scenarioId}"...`
-				);
+				reportProgress(onProgress, 2, 15, 'Execute Make.com Scenario', `Starting scenario "${scenarioId}"...`);
 
 				const runStart = Date.now();
 				const run = await client.runScenario(scenarioId, payload, signal);

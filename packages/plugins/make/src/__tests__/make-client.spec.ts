@@ -197,9 +197,7 @@ describe('MakeClient', () => {
 
 	describe('runScenario', () => {
 		it('should POST to /scenarios/{id}/run with the input', async () => {
-			fetchMock.mockResolvedValueOnce(
-				mockResponse({ body: { executionId: 'exec-1', status: 'running' } })
-			);
+			fetchMock.mockResolvedValueOnce(mockResponse({ body: { executionId: 'exec-1', status: 'running' } }));
 			const client = createClient();
 
 			const response = await client.runScenario(42, createInput());
@@ -271,9 +269,7 @@ describe('MakeClient', () => {
 
 	describe('hooks', () => {
 		it('should list hooks and include teamId when set', async () => {
-			fetchMock.mockResolvedValueOnce(
-				mockResponse({ body: { hooks: [{ id: 1, name: 'My Hook' }] } })
-			);
+			fetchMock.mockResolvedValueOnce(mockResponse({ body: { hooks: [{ id: 1, name: 'My Hook' }] } }));
 			const client = createClient({ teamId: '7' });
 
 			const hooks = await client.listHooks();
@@ -284,9 +280,7 @@ describe('MakeClient', () => {
 		});
 
 		it('should get a single hook', async () => {
-			fetchMock.mockResolvedValueOnce(
-				mockResponse({ body: { hook: { id: 11, name: 'A Hook' } } })
-			);
+			fetchMock.mockResolvedValueOnce(mockResponse({ body: { hook: { id: 11, name: 'A Hook' } } }));
 			const client = createClient();
 
 			const hook = await client.getHook(11);
@@ -312,15 +306,12 @@ describe('MakeClient', () => {
 
 	describe('invokeWebhook', () => {
 		it('should POST JSON to the webhook URL and parse the response', async () => {
-			fetchMock.mockResolvedValueOnce(
-				mockResponse({ body: { items: [{ name: 'Hook Item' }] } })
-			);
+			fetchMock.mockResolvedValueOnce(mockResponse({ body: { items: [{ name: 'Hook Item' }] } }));
 			const client = createClient();
 
-			const result = (await client.invokeWebhook(
-				'https://hook.us2.make.com/xyz',
-				createInput()
-			)) as { items: Array<{ name: string }> };
+			const result = (await client.invokeWebhook('https://hook.us2.make.com/xyz', createInput())) as {
+				items: Array<{ name: string }>;
+			};
 
 			expect(result.items[0].name).toBe('Hook Item');
 			const [url, init] = fetchMock.mock.calls[0];
@@ -338,14 +329,10 @@ describe('MakeClient', () => {
 		});
 
 		it('should throw when webhook returns an error status', async () => {
-			fetchMock.mockResolvedValueOnce(
-				mockResponse({ status: 500, statusText: 'Internal Error', body: 'boom' })
-			);
+			fetchMock.mockResolvedValueOnce(mockResponse({ status: 500, statusText: 'Internal Error', body: 'boom' }));
 			const client = createClient();
 
-			await expect(
-				client.invokeWebhook('https://hook.us2.make.com/xyz', createInput())
-			).rejects.toThrow('500');
+			await expect(client.invokeWebhook('https://hook.us2.make.com/xyz', createInput())).rejects.toThrow('500');
 		});
 	});
 });
