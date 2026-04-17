@@ -188,7 +188,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			model: {
 				type: 'string',
 				title: 'Model',
-				'x-scope': 'user',
+				'x-scope': 'global',
 				'x-widget': 'model-select',
 				default: DEFAULT_MODEL,
 				description: 'Gemini model to use for generation.'
