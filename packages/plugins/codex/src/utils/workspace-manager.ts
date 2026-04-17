@@ -302,8 +302,6 @@ export async function writeGeneratedItems(workspacePath: string, items: readonly
 	await parallelBatch(writes, WRITE_CONCURRENCY);
 }
 
-export async function ensureOnboardingConfig(_configDir: string): Promise<void> {}
-
 export async function cleanupWorkspace(workspacePath: string): Promise<void> {
 	try {
 		await fs.rm(workspacePath, { recursive: true, force: true });

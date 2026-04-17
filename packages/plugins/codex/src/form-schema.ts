@@ -43,7 +43,17 @@ export function getFormGroups(): FormFieldGroup[] {
 	];
 }
 
-export function validateFormInput(_values: Record<string, unknown>): ValidationResult {
+export function validateFormInput(values: Record<string, unknown>): ValidationResult {
+	if (values.target_items !== undefined) {
+		const target = Number(values.target_items);
+		if (!Number.isFinite(target) || target < 1 || target > 500) {
+			return {
+				valid: false,
+				errors: [{ path: 'target_items', message: 'Target items must be between 1 and 500' }]
+			};
+		}
+	}
+
 	return { valid: true };
 }
 

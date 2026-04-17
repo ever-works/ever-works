@@ -1216,7 +1216,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		logger: { warn(...args: unknown[]): void },
 		onLogEntry?: PipelineExecutionOptions['onLogEntry']
 	): Promise<string[]> {
-		const shouldCapture = (request.config || {}).capture_screenshots !== false;
+		const shouldCapture = (request.config || {}).capture_screenshots === true;
 		const screenshotFacade = execContext?.screenshotFacade;
 
 		if (!shouldCapture || items.length === 0 || signal.aborted || !screenshotFacade) {
