@@ -318,7 +318,9 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		) {
 			return {
 				valid: false,
-				errors: [{ path: 'authMode', message: 'Authentication mode must be "machine-local", "api-key", or "vertex"' }]
+				errors: [
+					{ path: 'authMode', message: 'Authentication mode must be "machine-local", "api-key", or "vertex"' }
+				]
 			};
 		}
 		if (settings.apiKey !== undefined && typeof settings.apiKey !== 'string') {
@@ -654,18 +656,8 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			const items = await readGeneratedItems(workspacePath, logger);
 
 			if (items.length === 0) {
-				const stderrExcerpt = execResult.stderr
-					?.trim()
-					.split('\n')
-					.filter(Boolean)
-					.slice(-2)
-					.join(' | ');
-				const stdoutExcerpt = execResult.stdout
-					?.trim()
-					.split('\n')
-					.filter(Boolean)
-					.slice(-2)
-					.join(' | ');
+				const stderrExcerpt = execResult.stderr?.trim().split('\n').filter(Boolean).slice(-2).join(' | ');
+				const stdoutExcerpt = execResult.stdout?.trim().split('\n').filter(Boolean).slice(-2).join(' | ');
 				const cliParts = [
 					stderrExcerpt ? `stderr: ${stderrExcerpt}` : '',
 					stdoutExcerpt ? `stdout: ${stdoutExcerpt}` : ''

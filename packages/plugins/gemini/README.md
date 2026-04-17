@@ -6,13 +6,13 @@ Full pipeline plugin that delegates directory generation to the [Gemini CLI](htt
 
 The plugin runs 6 sequential steps:
 
-| #   | Step                    | Description                                                       | Optional |
-| --- | ----------------------- | ----------------------------------------------------------------- | -------- |
-| 1   | **Setup Gemini CLI**    | Installs/caches the Gemini CLI via npm and resolves auth          | No       |
-| 2   | **Prepare Context**     | Creates a temp workspace, seeds existing items and metadata       | No       |
-| 3   | **Generate Items**      | Executes Gemini CLI to research and generate items as JSON files  | No       |
-| 4   | **Collect Results**     | Reads generated JSON files back into the pipeline result          | No       |
-| 5   | **Capture Screenshots** | Takes screenshots for generated items (via screenshot provider)   | Yes      |
+| #   | Step                    | Description                                                      | Optional |
+| --- | ----------------------- | ---------------------------------------------------------------- | -------- |
+| 1   | **Setup Gemini CLI**    | Installs/caches the Gemini CLI via npm and resolves auth         | No       |
+| 2   | **Prepare Context**     | Creates a temp workspace, seeds existing items and metadata      | No       |
+| 3   | **Generate Items**      | Executes Gemini CLI to research and generate items as JSON files | No       |
+| 4   | **Collect Results**     | Reads generated JSON files back into the pipeline result         | No       |
+| 5   | **Capture Screenshots** | Takes screenshots for generated items (via screenshot provider)  | Yes      |
 | 6   | **Cleanup**             | Removes the temporary workspace                                  | Yes      |
 
 During step 3, a **taxonomy watcher** monitors the workspace for new item files and keeps `_meta/` taxonomy files (categories, tags, brands) in sync in real time. Progress is reported per item as files appear.
@@ -45,16 +45,16 @@ The onboarding wizard (`GeminiOnboardingWizard`) provides a 3-step flow: choose 
 
 ## Settings
 
-| Setting               | Type    | Scope  | Description                                                    |
-| --------------------- | ------- | ------ | -------------------------------------------------------------- |
-| `authMode`            | string  | user   | `machine-local`, `api-key`, or `vertex`                        |
+| Setting               | Type    | Scope  | Description                                                       |
+| --------------------- | ------- | ------ | ----------------------------------------------------------------- |
+| `authMode`            | string  | user   | `machine-local`, `api-key`, or `vertex`                           |
 | `apiKey`              | string  | user   | Gemini API key (secret, supports env var `PLUGIN_GEMINI_API_KEY`) |
-| `googleApiKey`        | string  | user   | Google Cloud API key for Vertex AI (secret, optional)          |
-| `googleCloudProject`  | string  | user   | Google Cloud project ID for Vertex AI                          |
-| `googleCloudLocation` | string  | user   | Google Cloud region for Vertex AI (default: `us-central1`)     |
-| `model`               | string  | user   | Model for generation (default: `gemini-2.5-pro`)               |
-| `version`             | string  | hidden | Gemini CLI version to install (default: `latest`)              |
-| `maxTurns`            | integer | hidden | Maximum agentic turns (default: 500)                           |
+| `googleApiKey`        | string  | user   | Google Cloud API key for Vertex AI (secret, optional)             |
+| `googleCloudProject`  | string  | user   | Google Cloud project ID for Vertex AI                             |
+| `googleCloudLocation` | string  | user   | Google Cloud region for Vertex AI (default: `us-central1`)        |
+| `model`               | string  | user   | Model for generation (default: `gemini-2.5-pro`)                  |
+| `version`             | string  | hidden | Gemini CLI version to install (default: `latest`)                 |
+| `maxTurns`            | integer | hidden | Maximum agentic turns (default: 500)                              |
 
 ### Supported Models
 
