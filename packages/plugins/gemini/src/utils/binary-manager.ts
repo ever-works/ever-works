@@ -61,8 +61,7 @@ export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger
 		'utf-8'
 	);
 
-	const packageSpec =
-		version === 'latest' ? GEMINI_NPM_PACKAGE : `${GEMINI_NPM_PACKAGE}@${version}`;
+	const packageSpec = version === 'latest' ? GEMINI_NPM_PACKAGE : `${GEMINI_NPM_PACKAGE}@${version}`;
 
 	logger?.log(`Installing Gemini CLI (${packageSpec})...`);
 	await runCommand('npm', ['install', '--no-package-lock', '--silent', packageSpec], installDir);
