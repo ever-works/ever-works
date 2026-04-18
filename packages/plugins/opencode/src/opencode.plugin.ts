@@ -155,14 +155,16 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			provider: {
 				type: 'string',
 				title: 'Provider',
-				description: 'OpenCode provider to authenticate against (e.g. anthropic, openai, google, go, zen, groq, xai).',
+				description:
+					'OpenCode provider to authenticate against (e.g. anthropic, openai, google, go, zen, groq, xai).',
 				default: DEFAULT_PROVIDER,
 				'x-scope': 'user'
 			},
 			apiKey: {
 				type: 'string',
 				title: 'API Key',
-				description: 'API key for the selected provider (e.g. Anthropic, OpenAI, Google, or OpenCode Go/Zen key).',
+				description:
+					'API key for the selected provider (e.g. Anthropic, OpenAI, Google, or OpenCode Go/Zen key).',
 				'x-secret': true,
 				'x-scope': 'user',
 				'x-envVar': 'PLUGIN_OPENCODE_API_KEY'
@@ -179,7 +181,8 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				title: 'Model',
 				'x-scope': 'global',
 				default: DEFAULT_MODEL,
-				description: 'Model in provider/model format (e.g. anthropic/claude-sonnet-4-20250514, openai/gpt-4.1, go/kimi-k2.5).'
+				description:
+					'Model in provider/model format (e.g. anthropic/claude-sonnet-4-20250514, openai/gpt-4.1, go/kimi-k2.5).'
 			}
 		},
 		required: ['authMode']
@@ -287,13 +290,24 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		if (settings.provider !== undefined && (typeof settings.provider !== 'string' || !settings.provider.trim())) {
 			return {
 				valid: false,
-				errors: [{ path: 'provider', message: 'Provider must be a non-empty string (e.g. anthropic, openai, google, go, zen).' }]
+				errors: [
+					{
+						path: 'provider',
+						message: 'Provider must be a non-empty string (e.g. anthropic, openai, google, go, zen).'
+					}
+				]
 			};
 		}
 		if (settings.model !== undefined && (typeof settings.model !== 'string' || !settings.model.trim())) {
 			return {
 				valid: false,
-				errors: [{ path: 'model', message: 'Model must be a non-empty string in provider/model form (e.g. anthropic/claude-sonnet-4-20250514).' }]
+				errors: [
+					{
+						path: 'model',
+						message:
+							'Model must be a non-empty string in provider/model form (e.g. anthropic/claude-sonnet-4-20250514).'
+					}
+				]
 			};
 		}
 		return { valid: true };
