@@ -76,8 +76,11 @@ function getArchiveName(platformString: string): string {
 		case 'darwin-x64':
 			return 'opencode-darwin-x64.zip';
 		case 'linux-arm64':
+		case 'linux-arm64-musl':
+			// OpenCode ships glibc Linux archives; fall back to the glibc archive on musl (Alpine).
 			return 'opencode-linux-arm64.zip';
 		case 'linux-x64':
+		case 'linux-x64-musl':
 			return 'opencode-linux-x64.zip';
 		default:
 			throw new Error(`Unsupported OpenCode binary platform: ${platformString}`);
