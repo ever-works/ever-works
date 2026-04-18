@@ -586,7 +586,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			const setupStepStartedAt = this.startStep('setup-opencode', onLogEntry);
 			reportProgress(onProgress, 0, 0, 'Setup OpenCode');
 
-			const binaryPath = await ensureBinary(version, logger);
+			const binaryPath = await ensureBinary(version, logger, signal);
 			this.completeStep('setup-opencode', setupStepStartedAt, onLogEntry);
 
 			if (signal.aborted) return this.handleCancel(startTime);

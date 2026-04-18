@@ -25,47 +25,65 @@ interface ReleaseResponse {
 	readonly assets: readonly ReleaseAsset[];
 }
 
-function fetchBuffer(url: string, maxRedirects = 5): Promise<Buffer> {
+/** Socket idle timeout (ms). Resets on activity, so it's safe for large downloads on slow links. */
+const FETCH_SOCKET_IDLE_TIMEOUT_MS = 60_000;
+
+function fetchBuffer(url: string, maxRedirects = 5, signal?: AbortSignal): Promise<Buffer> {
 	return new Promise((resolve, reject) => {
 		if (maxRedirects <= 0) {
 			reject(new Error('Too many redirects'));
 			return;
 		}
+		if (signal?.aborted) {
+			reject(new Error('Aborted'));
+			return;
+		}
 
 		const client = url.startsWith('https://') ? https : http;
-		client
-			.get(
-				url,
-				{
-					headers: {
-						'user-agent': 'ever-works-opencode-plugin'
-					}
-				},
-				(res) => {
-					if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-						fetchBuffer(res.headers.location, maxRedirects - 1).then(resolve, reject);
-						return;
-					}
-
-					if ((res.statusCode || 500) >= 400) {
-						reject(new Error(`HTTP ${res.statusCode} fetching ${url}`));
-						return;
-					}
-
-					const chunks: Buffer[] = [];
-					res.on('data', (chunk: Buffer) => chunks.push(chunk));
-					res.on('end', () => resolve(Buffer.concat(chunks)));
-					res.on('error', reject);
+		const req = client.get(
+			url,
+			{
+				headers: {
+					'user-agent': 'ever-works-opencode-plugin'
 				}
-			)
-			.on('error', reject);
+			},
+			(res) => {
+				if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+					res.resume(); // drain so the socket is released before following the redirect
+					fetchBuffer(res.headers.location, maxRedirects - 1, signal).then(resolve, reject);
+					return;
+				}
+
+				if ((res.statusCode || 500) >= 400) {
+					res.resume();
+					reject(new Error(`HTTP ${res.statusCode} fetching ${url}`));
+					return;
+				}
+
+				const chunks: Buffer[] = [];
+				res.on('data', (chunk: Buffer) => chunks.push(chunk));
+				res.on('end', () => resolve(Buffer.concat(chunks)));
+				res.on('error', reject);
+			}
+		);
+
+		req.setTimeout(FETCH_SOCKET_IDLE_TIMEOUT_MS, () => {
+			req.destroy(new Error(`Request timed out after ${FETCH_SOCKET_IDLE_TIMEOUT_MS}ms of inactivity: ${url}`));
+		});
+		req.on('error', reject);
+
+		if (signal) {
+			const onAbort = () => req.destroy(new Error('Aborted'));
+			signal.addEventListener('abort', onAbort, { once: true });
+			req.on('close', () => signal.removeEventListener('abort', onAbort));
+		}
 	});
 }
 
-async function fetchRelease(version: string): Promise<ReleaseResponse> {
+async function fetchRelease(version: string, signal?: AbortSignal): Promise<ReleaseResponse> {
 	const normalizedVersion = version.startsWith('v') ? version : `v${version}`;
 	const url = `https://api.github.com/repos/${OPENCODE_GITHUB_REPO}/releases/tags/${normalizedVersion}`;
-	const buffer = await fetchBuffer(url);
+	const buffer = await fetchBuffer(url, 5, signal);
 	return JSON.parse(buffer.toString('utf-8')) as ReleaseResponse;
 }
 
@@ -114,17 +132,25 @@ async function unzipArchive(archivePath: string, outputDir: string): Promise<voi
 	});
 }
 
-async function resolveChecksum(assets: readonly ReleaseAsset[], archiveName: string): Promise<string | null> {
+async function resolveChecksum(
+	assets: readonly ReleaseAsset[],
+	archiveName: string,
+	signal?: AbortSignal
+): Promise<string | null> {
 	const checksumAsset = assets.find((asset) => asset.name === `${archiveName}.sha256`);
 	if (!checksumAsset) {
 		return null;
 	}
 
-	const checksumText = (await fetchBuffer(checksumAsset.browser_download_url)).toString('utf-8').trim();
+	const checksumText = (await fetchBuffer(checksumAsset.browser_download_url, 5, signal)).toString('utf-8').trim();
 	return checksumText.split(/\s+/u)[0] || null;
 }
 
-export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger?: Logger): Promise<string> {
+export async function ensureBinary(
+	version: string = DEFAULT_CLI_VERSION,
+	logger?: Logger,
+	signal?: AbortSignal
+): Promise<string> {
 	const platform = await detectPlatform();
 	const binaryPath = getBinaryPath(version, platform.platformString);
 
@@ -140,7 +166,7 @@ export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger
 	await fs.mkdir(binDir, { recursive: true });
 
 	logger?.log(`Resolving OpenCode release ${version} from GitHub...`);
-	const release = await fetchRelease(version);
+	const release = await fetchRelease(version, signal);
 	const archiveName = getArchiveName(platform.platformString);
 	const archiveAsset = release.assets.find((asset) => asset.name === archiveName);
 
@@ -156,10 +182,10 @@ export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger
 
 	try {
 		logger?.log(`Downloading OpenCode CLI from ${archiveAsset.browser_download_url}...`);
-		const archiveBuffer = await fetchBuffer(archiveAsset.browser_download_url);
+		const archiveBuffer = await fetchBuffer(archiveAsset.browser_download_url, 5, signal);
 		await fs.writeFile(archivePath, archiveBuffer);
 
-		const checksum = await resolveChecksum(release.assets, archiveName);
+		const checksum = await resolveChecksum(release.assets, archiveName, signal);
 		if (checksum) {
 			const valid = await verifySha256(archivePath, checksum);
 			if (!valid) {
