@@ -2,7 +2,15 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { mockVerifyLocalAuthConnection } = vi.hoisted(() => ({
+	mockVerifyLocalAuthConnection: vi.fn()
+}));
+
+vi.mock('../local-auth.js', () => ({
+	verifyLocalAuthConnection: mockVerifyLocalAuthConnection
+}));
 
 import {
 	hasLocalCodexAuth,
@@ -24,6 +32,11 @@ afterEach(async () => {
 	await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
 });
 
+beforeEach(() => {
+	mockVerifyLocalAuthConnection.mockReset();
+	mockVerifyLocalAuthConnection.mockResolvedValue(false);
+});
+
 describe('pipeline-helpers', () => {
 	it('prefers api key auth when provided', async () => {
 		const auth = await resolveExecutionAuth({ apiKey: 'sk-test' });
@@ -36,7 +49,6 @@ describe('pipeline-helpers', () => {
 
 	it('honors explicit local auth mode even when an api key exists', async () => {
 		const codexHome = await makeTempDir();
-		await fs.writeFile(path.join(codexHome, 'auth.json'), '{"ok":true}', 'utf-8');
 
 		const auth = await resolveExecutionAuth({
 			authMode: 'local',
@@ -49,10 +61,24 @@ describe('pipeline-helpers', () => {
 			codexHome,
 			env: { CODEX_HOME: codexHome }
 		});
+		expect(mockVerifyLocalAuthConnection).not.toHaveBeenCalled();
 	});
 
-	it('requires an api key when api-key mode is selected explicitly', async () => {
-		expect(await resolveExecutionAuth({ authMode: 'api-key' })).toBeNull();
+	it('falls back to local auth when api-key mode has no key but auth.json exists', async () => {
+		const codexHome = await makeTempDir();
+		await fs.writeFile(path.join(codexHome, 'auth.json'), '{"ok":true}', 'utf-8');
+
+		const auth = await resolveExecutionAuth({ authMode: 'api-key', codexHome });
+		expect(auth).toEqual({
+			mode: 'local',
+			codexHome,
+			env: { CODEX_HOME: codexHome }
+		});
+	});
+
+	it('returns null when api-key mode has no key and no local auth exists', async () => {
+		const codexHome = await makeTempDir();
+		expect(await resolveExecutionAuth({ authMode: 'api-key', codexHome })).toBeNull();
 	});
 
 	it('detects local Codex auth from auth.json', async () => {
@@ -74,6 +100,7 @@ describe('pipeline-helpers', () => {
 		const codexHome = await makeTempDir();
 
 		expect(await hasLocalCodexAuth({ codexHome })).toBe(false);
+		expect(mockVerifyLocalAuthConnection).toHaveBeenCalledWith(codexHome);
 		expect(await resolveExecutionAuth({ codexHome })).toBeNull();
 	});
 

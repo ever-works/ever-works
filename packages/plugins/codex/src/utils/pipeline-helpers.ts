@@ -17,6 +17,7 @@ import { buildCancelledPipelineResult, buildErrorPipelineResult, createEmptyPipe
 import type { CodexStepId } from '../types.js';
 import { CODEX_STEP_IDS } from '../types.js';
 import { STEP_DEFINITIONS } from '../steps.js';
+import { verifyLocalAuthConnection } from '../local-auth.js';
 
 export interface ResolvedExecutionAuth {
 	readonly env: Record<string, string>;
@@ -146,24 +147,25 @@ export function resolveCodexHome(settings: PluginSettings): string {
 }
 
 export async function hasLocalCodexAuth(settings: PluginSettings): Promise<boolean> {
-	const authPath = path.join(resolveCodexHome(settings), 'auth.json');
+	const codexHome = resolveCodexHome(settings);
+	const authPath = path.join(codexHome, 'auth.json');
 	try {
 		const stats = await fs.stat(authPath);
-		return stats.isFile();
+		if (stats.isFile()) {
+			return true;
+		}
 	} catch {
-		return false;
+		// Fall back to Codex CLI status below.
 	}
+
+	return verifyLocalAuthConnection(codexHome);
 }
 
 export async function resolveExecutionAuth(settings: PluginSettings): Promise<ResolvedExecutionAuth | null> {
 	const authMode = typeof settings.authMode === 'string' ? settings.authMode : undefined;
 	const apiKey = typeof settings.apiKey === 'string' ? settings.apiKey.trim() : '';
 
-	if (authMode === 'api-key') {
-		if (!apiKey) {
-			return null;
-		}
-
+	if (authMode === 'api-key' && apiKey) {
 		return {
 			mode: 'api-key',
 			env: { OPENAI_API_KEY: apiKey }
@@ -171,10 +173,6 @@ export async function resolveExecutionAuth(settings: PluginSettings): Promise<Re
 	}
 
 	if (authMode === 'local') {
-		if (!(await hasLocalCodexAuth(settings))) {
-			return null;
-		}
-
 		const codexHome = resolveCodexHome(settings);
 		return {
 			mode: 'local',
