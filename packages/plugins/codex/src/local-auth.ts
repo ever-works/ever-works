@@ -203,10 +203,7 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 	};
 }
 
-export async function verifyLocalAuthConnection(
-	codexHome?: string,
-	logger?: LoggerLike
-): Promise<boolean> {
+export async function verifyLocalAuthConnection(codexHome?: string, logger?: LoggerLike): Promise<boolean> {
 	return isConnected(codexHome, logger);
 }
 
