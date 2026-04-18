@@ -156,8 +156,9 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				type: 'string',
 				title: 'Provider',
 				description:
-					'OpenCode provider to authenticate against (e.g. anthropic, openai, google, go, zen, groq, xai).',
+					'OpenCode provider to authenticate against. Anthropic is the recommended default; switch to any provider you have an API key for.',
 				default: DEFAULT_PROVIDER,
+				enum: ['anthropic', 'openai', 'google', 'groq', 'xai', 'go', 'zen'],
 				'x-scope': 'user'
 			},
 			apiKey: {
@@ -180,9 +181,10 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				type: 'string',
 				title: 'Model',
 				'x-scope': 'global',
+				'x-widget': 'model-select',
 				default: DEFAULT_MODEL,
 				description:
-					'Model in provider/model format (e.g. anthropic/claude-sonnet-4-20250514, openai/gpt-4.1, go/kimi-k2.5).'
+					'Model in provider/model format (e.g. anthropic/claude-sonnet-4-20250514, openai/gpt-4.1, go/kimi-k2.5). Claude Sonnet 4 is the recommended default.'
 			}
 		},
 		required: ['authMode']
