@@ -140,7 +140,7 @@ describe('OpenCodePlugin', () => {
 		const props = plugin.settingsSchema.properties!;
 		expect(props.authMode.default).toBe('machine-local');
 		expect(props.authMode['x-scope']).toBe('user');
-		expect(props.provider.default).toBe('go');
+		expect(props.provider.default).toBe('anthropic');
 		expect(props.provider['x-scope']).toBe('user');
 		expect(props.apiKey['x-secret']).toBe(true);
 		expect(props.apiKey['x-scope']).toBe('user');

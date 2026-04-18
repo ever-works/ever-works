@@ -69,74 +69,45 @@ import {
 	DEFAULT_TARGET_ITEMS
 } from './form-schema.js';
 
+function model(id: string, name: string, vision: boolean, context: number): AiModel {
+	return {
+		id,
+		name,
+		capabilities: {
+			supportsStructuredOutput: true,
+			supportsStreaming: true,
+			supportsToolCalling: true,
+			supportsVision: vision,
+			maxContextLength: context
+		}
+	};
+}
+
 const OPENCODE_SUPPORTED_MODELS: readonly AiModel[] = [
-	{
-		id: 'go/glm-5.1',
-		name: 'OpenCode Go GLM-5.1',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: false,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'go/glm-5',
-		name: 'OpenCode Go GLM-5',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: false,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'go/kimi-k2.5',
-		name: 'OpenCode Go Kimi K2.5',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: false,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'go/mimo-v2-pro',
-		name: 'OpenCode Go MiMo-V2-Pro',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: false,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'go/minimax-m2.7',
-		name: 'OpenCode Go MiniMax M2.7',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: false,
-			maxContextLength: 200000
-		}
-	},
-	{
-		id: 'go/qwen3.5-plus',
-		name: 'OpenCode Go Qwen3.5 Plus',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: false,
-			maxContextLength: 200000
-		}
-	}
+	// ── Anthropic ──
+	model('anthropic/claude-sonnet-4-20250514', 'Claude Sonnet 4', true, 200000),
+	model('anthropic/claude-haiku-4-5-20251001', 'Claude Haiku 4.5', true, 200000),
+	// ── OpenAI ──
+	model('openai/gpt-4.1', 'GPT-4.1', true, 1047576),
+	model('openai/gpt-4.1-mini', 'GPT-4.1 Mini', true, 1047576),
+	model('openai/o3', 'o3', true, 200000),
+	model('openai/o4-mini', 'o4-mini', true, 200000),
+	// ── Google ──
+	model('google/gemini-2.5-pro', 'Gemini 2.5 Pro', true, 1048576),
+	model('google/gemini-2.5-flash', 'Gemini 2.5 Flash', true, 1048576),
+	// ── Groq ──
+	model('groq/llama-3.3-70b-versatile', 'Llama 3.3 70B (Groq)', false, 128000),
+	// ── OpenCode Go ──
+	model('go/kimi-k2.5', 'OpenCode Go Kimi K2.5', false, 200000),
+	model('go/glm-5.1', 'OpenCode Go GLM-5.1', false, 200000),
+	model('go/glm-5', 'OpenCode Go GLM-5', false, 200000),
+	model('go/mimo-v2-pro', 'OpenCode Go MiMo-V2-Pro', false, 200000),
+	model('go/minimax-m2.7', 'OpenCode Go MiniMax M2.7', false, 200000),
+	model('go/qwen3.5-plus', 'OpenCode Go Qwen3.5 Plus', false, 200000)
 ] as const;
+
+const DEFAULT_PROVIDER = 'anthropic';
+const DEFAULT_MODEL = 'anthropic/claude-sonnet-4-20250514';
 
 const LOG_MESSAGE_MAX_LENGTH = 500;
 const STEP_CONTEXT_BY_ID = new Map(
@@ -184,15 +155,14 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			provider: {
 				type: 'string',
 				title: 'Provider',
-				description: 'OpenCode provider to authenticate and run against',
-				default: 'go',
-				enum: ['go', 'zen'],
+				description: 'OpenCode provider to authenticate against (e.g. anthropic, openai, google, go, zen, groq, xai).',
+				default: DEFAULT_PROVIDER,
 				'x-scope': 'user'
 			},
 			apiKey: {
 				type: 'string',
 				title: 'API Key',
-				description: 'OpenCode API key for the selected provider when using API key authentication.',
+				description: 'API key for the selected provider (e.g. Anthropic, OpenAI, Google, or OpenCode Go/Zen key).',
 				'x-secret': true,
 				'x-scope': 'user',
 				'x-envVar': 'PLUGIN_OPENCODE_API_KEY'
@@ -208,8 +178,8 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				type: 'string',
 				title: 'Model',
 				'x-scope': 'global',
-				default: 'go/kimi-k2.5',
-				description: 'Model to use in the form provider/model, for example `go/kimi-k2.5`.'
+				default: DEFAULT_MODEL,
+				description: 'Model in provider/model format (e.g. anthropic/claude-sonnet-4-20250514, openai/gpt-4.1, go/kimi-k2.5).'
 			}
 		},
 		required: ['authMode']
@@ -314,10 +284,16 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				errors: [{ path: 'apiKey', message: 'API key must be a string when provided' }]
 			};
 		}
-		if (settings.provider !== undefined && settings.provider !== 'go' && settings.provider !== 'zen') {
+		if (settings.provider !== undefined && (typeof settings.provider !== 'string' || !settings.provider.trim())) {
 			return {
 				valid: false,
-				errors: [{ path: 'provider', message: 'Provider must be "go" or "zen"' }]
+				errors: [{ path: 'provider', message: 'Provider must be a non-empty string (e.g. anthropic, openai, google, go, zen).' }]
+			};
+		}
+		if (settings.model !== undefined && (typeof settings.model !== 'string' || !settings.model.trim())) {
+			return {
+				valid: false,
+				errors: [{ path: 'model', message: 'Model must be a non-empty string in provider/model form (e.g. anthropic/claude-sonnet-4-20250514).' }]
 			};
 		}
 		return { valid: true };
@@ -362,12 +338,24 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				'',
 				'## Settings',
 				'',
-				'| Setting        | Description                              |',
-				'| -------------- | ---------------------------------------- |',
-				'| `authMode`     | `machine-local` or `api-key` authentication |',
-				'| `provider`     | OpenCode provider (`go` or `zen`)        |',
-				'| `apiKey`       | OpenCode provider API key                |',
-				'| `model`        | OpenCode model in `provider/model` form  |',
+				'| Setting    | Description                                                                     |',
+				'| ---------- | ------------------------------------------------------------------------------- |',
+				'| `authMode` | `machine-local` or `api-key` authentication                                     |',
+				'| `provider` | OpenCode provider key (e.g. `anthropic`, `openai`, `google`, `groq`, `go`, `zen`) |',
+				'| `apiKey`   | API key for the selected provider                                               |',
+				'| `model`    | Model in `provider/model` form (e.g. `anthropic/claude-sonnet-4-20250514`)      |',
+				'',
+				'### Providers',
+				'',
+				'OpenCode is provider-agnostic and supports many upstream providers. Typical choices:',
+				'',
+				'- `anthropic` — Claude Sonnet / Haiku',
+				'- `openai` — GPT-4.1, o3, o4-mini',
+				'- `google` — Gemini 2.5 Pro / Flash',
+				'- `groq` — Llama and other Groq-hosted models',
+				'- `go` / `zen` — OpenCode’s own hosted providers',
+				'',
+				'Any provider string OpenCode CLI recognises is accepted; the plugin writes an auth entry keyed by `provider` and lets the CLI select the model.',
 				'',
 				'### Authentication',
 				'',
@@ -376,9 +364,8 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				'OpenCode stores provider credentials in `~/.local/share/opencode/auth.json`.',
 				'',
 				'**API key auth**:',
-				'The plugin can also write an isolated auth file for the configured user and run the CLI against it.',
+				'The plugin writes an isolated auth file for the configured user and runs the CLI against it. Provide an API key for the provider you selected (Anthropic, OpenAI, Google, Groq, OpenCode Go/Zen, etc.).',
 				'',
-				'For OpenCode Go, subscribe and copy your API key from [OpenCode Go](https://opencode.ai/docs/go/).',
 				'## Usage',
 				'',
 				"Enable the plugin for a directory and trigger generation with `providers.pipeline: 'opencode'`."
@@ -393,8 +380,8 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 
 	private async validateConnectionWithCli(settings: Record<string, unknown>, apiKey: string): Promise<boolean> {
 		const version = (settings.version as string) || DEFAULT_CLI_VERSION;
-		const provider = settings.provider === 'zen' ? 'zen' : 'go';
-		const model = (settings.model as string | undefined) || 'go/kimi-k2.5';
+		const provider = resolveProviderKey(settings);
+		const model = (settings.model as string | undefined) || DEFAULT_MODEL;
 		let tempDir: string | null = null;
 		let killProcess: (() => void) | null = null;
 
@@ -440,7 +427,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		return path.join(os.homedir(), '.local', 'share', 'opencode', 'auth.json');
 	}
 
-	private async hasMachineAuthForProvider(provider: 'go' | 'zen'): Promise<boolean> {
+	private async hasMachineAuthForProvider(provider: string): Promise<boolean> {
 		try {
 			const content = await fs.readFile(this.getMachineAuthPath(), 'utf-8');
 			const parsed = JSON.parse(content) as Record<string, unknown>;
@@ -456,7 +443,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 	): Promise<{ valid: boolean; detail?: string; authPath: string }> {
 		const version = (settings.version as string) || DEFAULT_CLI_VERSION;
 		const provider = resolveProviderKey(settings);
-		const model = (settings.model as string | undefined) || 'go/kimi-k2.5';
+		const model = (settings.model as string | undefined) || DEFAULT_MODEL;
 		const authPath = this.getMachineAuthPath();
 		let tempDir: string | null = null;
 
@@ -557,7 +544,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			}
 
 			const version = (settings.version as string) || DEFAULT_CLI_VERSION;
-			const model = (settings.model as string | undefined) || 'go/kimi-k2.5';
+			const model = (settings.model as string | undefined) || DEFAULT_MODEL;
 			const provider = resolveProviderKey(settings);
 			const apiKey = this.getRealSecret(settings.apiKey);
 			const authMode = this.resolveAuthMode(settings);
@@ -856,7 +843,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 
 	private async prepareOpenCodeConfig(
 		baseDir: string,
-		provider: 'go' | 'zen',
+		provider: string,
 		apiKey: string,
 		model: string
 	): Promise<void> {

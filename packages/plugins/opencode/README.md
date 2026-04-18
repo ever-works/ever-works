@@ -37,22 +37,28 @@ The onboarding wizard provides a multi-step flow: choose auth mode, configure cr
 
 ## Settings
 
-| Setting    | Type   | Scope  | Description                                                           |
-| ---------- | ------ | ------ | --------------------------------------------------------------------- |
-| `authMode` | string | user   | `machine-local` or `api-key`                                          |
-| `provider` | string | user   | OpenCode provider (`go` or `zen`)                                     |
-| `apiKey`   | string | user   | Provider API key (secret, supports env var `PLUGIN_OPENCODE_API_KEY`) |
-| `model`    | string | global | Model in `provider/model` form (default: `go/kimi-k2.5`)              |
-| `version`  | string | hidden | OpenCode CLI version to install (default: `v1.0.223`)                 |
+| Setting    | Type   | Scope  | Description                                                                       |
+| ---------- | ------ | ------ | --------------------------------------------------------------------------------- |
+| `authMode` | string | user   | `machine-local` or `api-key`                                                      |
+| `provider` | string | user   | OpenCode provider key (e.g. `anthropic`, `openai`, `google`, `groq`, `go`, `zen`) |
+| `apiKey`   | string | user   | Provider API key (secret, supports env var `PLUGIN_OPENCODE_API_KEY`)             |
+| `model`    | string | global | Model in `provider/model` form (default: `anthropic/claude-sonnet-4-20250514`)    |
+| `version`  | string | hidden | OpenCode CLI version to install (default: `v1.0.223`)                             |
 
-### Supported Models
+### Providers & Models
 
-- **Go GLM-5.1** — 200k context
-- **Go GLM-5** — 200k context
-- **Go Kimi K2.5** (default) — 200k context
-- **Go MiMo-V2-Pro** — 200k context
-- **Go MiniMax M2.7** — 200k context
-- **Go Qwen3.5 Plus** — 200k context
+OpenCode is a provider-agnostic coding agent. The plugin forwards the `provider/model` string directly to the CLI, so any combination the CLI supports works. Typical options:
+
+| Provider    | Example models                                           |
+| ----------- | -------------------------------------------------------- |
+| `anthropic` | `anthropic/claude-sonnet-4-20250514`, `claude-haiku-4-5` |
+| `openai`    | `openai/gpt-4.1`, `openai/gpt-4.1-mini`, `openai/o3`     |
+| `google`    | `google/gemini-2.5-pro`, `google/gemini-2.5-flash`       |
+| `groq`      | `groq/llama-3.3-70b-versatile`                           |
+| `go`        | `go/kimi-k2.5`, `go/glm-5.1`, `go/mimo-v2-pro`, etc.     |
+| `zen`       | OpenCode Zen models                                      |
+
+Set `provider` to the provider key and `apiKey` to a matching key, or rely on `machine-local` auth if the OpenCode CLI is already logged in on the host.
 
 ## Form Schema
 
