@@ -305,14 +305,9 @@ export function CodexOnboardingWizard({
                                         {t('steps.credentials.local.notInstalled')}
                                     </p>
                                 ) : localAuthStatus.connected ? (
-                                    <Button
-                                        type="button"
-                                        variant="secondary"
-                                        className="bg-success/10 text-success hover:bg-success/15"
-                                        onClick={() => void refreshLocalAuthStatus()}
-                                    >
+                                    <span className="inline-flex items-center rounded-lg bg-success/10 px-3 py-2 text-sm font-medium text-success">
                                         {t('steps.credentials.local.connectedButton')}
-                                    </Button>
+                                    </span>
                                 ) : (
                                     <Button
                                         type="button"
