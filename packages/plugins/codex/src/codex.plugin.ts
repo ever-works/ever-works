@@ -57,7 +57,7 @@ import {
 import { PROMPT_KEYS } from './prompt-keys.js';
 import { executeCodex, type ExecuteResult } from './utils/process-runner.js';
 import { ensureBinary } from './utils/binary-manager.js';
-import { getLocalAuthStatus, startLocalAuth } from './local-auth.js';
+import { getLocalAuthStatus, startLocalAuth, verifyLocalAuthConnection } from './local-auth.js';
 import {
 	cleanupWorkspace,
 	collectMetadataFromItems,
@@ -1238,33 +1238,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			return false;
 		}
 
-		const workspacePath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'codex-validate-'));
-		const abortController = new AbortController();
-		const timeout = setTimeout(() => abortController.abort(), 12_000);
-
-		try {
-			this.codexCommandPath = await ensureBinary(DEFAULT_CLI_VERSION, this.context?.logger);
-			const { promise, kill } = executeCodex({
-				command: this.codexCommandPath ?? 'codex',
-				cwd: workspacePath,
-				env: executionAuth.env,
-				model: typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL,
-				bypassApprovalsAndSandbox: settings.unsafeBypassSandbox === true,
-				prompt: 'Reply with exactly OK and do not read from stdin, ask follow-up questions, or modify files.',
-				signal: abortController.signal
-			});
-
-			abortController.signal.addEventListener('abort', kill, { once: true });
-
-			const result = await promise;
-			const detail = this.extractErrorDetail(result);
-			return result.exitCode === 0 && !detail.includes('interactive input');
-		} catch {
-			return false;
-		} finally {
-			clearTimeout(timeout);
-			await fs.promises.rm(workspacePath, { recursive: true, force: true });
-		}
+		return verifyLocalAuthConnection(executionAuth.codexHome, this.context?.logger ?? console);
 	}
 
 	private handleError(error: Error, startTime: number): PipelineResult {

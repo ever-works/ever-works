@@ -40,7 +40,7 @@ function getBinaryLogger(logger?: LoggerLike) {
 export async function getLocalAuthStatus(userId: string, logger?: LoggerLike): Promise<LocalAuthStatus> {
 	const installed = await isCodexInstalled(logger);
 	const authPath = getAuthPath();
-	const connected = installed ? await isConnected(logger) : false;
+	const connected = installed ? await verifyLocalAuthConnection(undefined, logger) : false;
 	const session = getActiveSession(userId);
 
 	if (connected && session) {
@@ -75,7 +75,7 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 		};
 	}
 
-	if (await isConnected(logger)) {
+	if (await isConnected(undefined, logger)) {
 		disposeSession(userId);
 		return {
 			installed: true,
@@ -203,6 +203,13 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 	};
 }
 
+export async function verifyLocalAuthConnection(
+	codexHome?: string,
+	logger?: LoggerLike
+): Promise<boolean> {
+	return isConnected(codexHome, logger);
+}
+
 async function waitForDevicePrompt(session: LocalAuthSession, timeoutMs: number): Promise<boolean> {
 	const startedAt = Date.now();
 	while (Date.now() - startedAt < timeoutMs) {
@@ -238,8 +245,8 @@ async function isCodexInstalled(logger?: LoggerLike): Promise<boolean> {
 	}
 }
 
-async function isConnected(logger?: LoggerLike): Promise<boolean> {
-	if (await hasAuthFile()) {
+async function isConnected(codexHome?: string, logger?: LoggerLike): Promise<boolean> {
+	if (await hasAuthFile(codexHome)) {
 		return true;
 	}
 
@@ -248,7 +255,7 @@ async function isConnected(logger?: LoggerLike): Promise<boolean> {
 		return await new Promise((resolve) => {
 			const child = spawn(codexCommand, ['login', 'status'], {
 				cwd: process.cwd(),
-				env: buildSubprocessEnv(),
+				env: buildSubprocessEnv(codexHome ? { CODEX_HOME: codexHome } : {}),
 				stdio: ['ignore', 'pipe', 'pipe']
 			});
 
@@ -270,18 +277,18 @@ async function isConnected(logger?: LoggerLike): Promise<boolean> {
 	}
 }
 
-async function hasAuthFile(): Promise<boolean> {
+async function hasAuthFile(codexHome?: string): Promise<boolean> {
 	try {
-		const stats = await fs.stat(getAuthPath());
+		const stats = await fs.stat(getAuthPath(codexHome));
 		return stats.isFile();
 	} catch {
 		return false;
 	}
 }
 
-function getAuthPath(): string {
-	const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
-	return path.join(codexHome, 'auth.json');
+function getAuthPath(codexHome?: string): string {
+	const resolvedCodexHome = codexHome || process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
+	return path.join(resolvedCodexHome, 'auth.json');
 }
 
 function getActiveSession(userId: string): LocalAuthSession | undefined {
