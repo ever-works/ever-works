@@ -85,6 +85,8 @@ function model(id: string, name: string, vision: boolean, context: number): AiMo
 
 const OPENCODE_SUPPORTED_MODELS: readonly AiModel[] = [
 	// ── Anthropic ──
+	model('anthropic/claude-opus-4-7', 'Claude Opus 4.7', true, 200000),
+	model('anthropic/claude-sonnet-4-6', 'Claude Sonnet 4.6', true, 200000),
 	model('anthropic/claude-sonnet-4-20250514', 'Claude Sonnet 4', true, 200000),
 	model('anthropic/claude-haiku-4-5-20251001', 'Claude Haiku 4.5', true, 200000),
 	// ── OpenAI ──
@@ -93,8 +95,12 @@ const OPENCODE_SUPPORTED_MODELS: readonly AiModel[] = [
 	model('openai/o3', 'o3', true, 200000),
 	model('openai/o4-mini', 'o4-mini', true, 200000),
 	// ── Google ──
+	model('google/gemini-3.1-pro-preview', 'Gemini 3.1 Pro (Preview)', true, 1048576),
+	model('google/gemini-3.1-flash-lite-preview', 'Gemini 3.1 Flash-Lite (Preview)', true, 1048576),
+	model('google/gemini-3-flash-preview', 'Gemini 3 Flash (Preview)', true, 1048576),
 	model('google/gemini-2.5-pro', 'Gemini 2.5 Pro', true, 1048576),
 	model('google/gemini-2.5-flash', 'Gemini 2.5 Flash', true, 1048576),
+	model('google/gemini-2.5-flash-lite', 'Gemini 2.5 Flash-Lite', true, 1048576),
 	// ── Groq ──
 	model('groq/llama-3.3-70b-versatile', 'Llama 3.3 70B (Groq)', false, 128000),
 	// ── OpenCode Go ──
@@ -107,7 +113,7 @@ const OPENCODE_SUPPORTED_MODELS: readonly AiModel[] = [
 ] as const;
 
 const DEFAULT_PROVIDER = 'anthropic';
-const DEFAULT_MODEL = 'anthropic/claude-sonnet-4-20250514';
+const DEFAULT_MODEL = 'anthropic/claude-sonnet-4-6';
 
 const LOG_MESSAGE_MAX_LENGTH = 500;
 const STEP_CONTEXT_BY_ID = new Map(
