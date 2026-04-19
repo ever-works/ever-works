@@ -233,7 +233,7 @@ describe('OAuthFacadeService', () => {
             expect(oauthPlugin.revokeToken).toHaveBeenCalledWith('token-123');
             expect(authAccountRepository.deleteProviderAccount).toHaveBeenCalledWith(
                 'user-1',
-                'github',
+                'plugin:github',
             );
         });
 
@@ -250,7 +250,7 @@ describe('OAuthFacadeService', () => {
 
             expect(authAccountRepository.deleteProviderAccount).toHaveBeenCalledWith(
                 'user-1',
-                'github',
+                'plugin:github',
             );
         });
     });

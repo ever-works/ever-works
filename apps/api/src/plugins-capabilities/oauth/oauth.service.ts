@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { OAuthFacadeService } from '@ever-works/agent/facades';
-import { AuthAccountRepository } from '@ever-works/agent/database';
+import { AuthAccountRepository, buildPluginProviderId } from '@ever-works/agent/database';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
 import type { OAuthConfig, OAuthProviderInfo } from '@ever-works/plugin';
 
@@ -128,7 +128,7 @@ export class OAuthService {
 
         await this.authAccountRepository.upsertProviderAccount({
             userId,
-            providerId,
+            providerId: buildPluginProviderId(providerId),
             accountId: user.id,
             accessToken: token.accessToken,
             refreshToken: token.refreshToken,
