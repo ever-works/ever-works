@@ -69,6 +69,16 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_CALLBACK_URL: https://appstage.ever.works/api/oauth/google/callback
 
+          # Facebook Auth
+          FACEBOOK_CLIENT_ID: ${{ secrets.FACEBOOK_CLIENT_ID }}
+          FACEBOOK_CLIENT_SECRET: ${{ secrets.FACEBOOK_CLIENT_SECRET }}
+          FACEBOOK_CALLBACK_URL: https://appstage.ever.works/api/oauth/facebook/callback
+
+          # LinkedIn Auth
+          LINKEDIN_CLIENT_ID: ${{ secrets.LINKEDIN_CLIENT_ID }}
+          LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}
+          LINKEDIN_CALLBACK_URL: https://appstage.ever.works/api/oauth/linkedin/callback
+
           # Plugins
           PLUGIN_OPENROUTER_API_KEY: ${{ secrets.PLUGIN_OPENROUTER_API_KEY }}
           PLUGIN_OPENROUTER_DEFAULT_MODEL: ${{ secrets.PLUGIN_OPENROUTER_DEFAULT_MODEL }}
