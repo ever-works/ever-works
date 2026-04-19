@@ -26,10 +26,6 @@ export function GitHubSync() {
     const [showPullImport, setShowPullImport] = useState(false);
     const [includeSecrets, setIncludeSecrets] = useState(false);
 
-    useEffect(() => {
-        loadStatus();
-    }, []);
-
     const loadStatus = () => {
         startTransition(() => {
             void (async () => {
@@ -40,6 +36,10 @@ export function GitHubSync() {
             })();
         });
     };
+
+    useEffect(() => {
+        loadStatus();
+    }, []);
 
     const handleCreateNew = () => {
         startTransition(() => {
@@ -121,20 +121,29 @@ export function GitHubSync() {
 
     if (!status) {
         return (
-            <div className="text-sm text-text-muted dark:text-text-muted-dark">{t('loading')}</div>
+            <div className="flex items-center gap-2 text-sm text-text-muted dark:text-text-muted-dark">
+                <span className="flex gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40 animate-bounce [animation-delay:0ms]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40 animate-bounce [animation-delay:150ms]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40 animate-bounce [animation-delay:300ms]" />
+                </span>
+                {t('loading')}
+            </div>
         );
     }
 
     if (!status.hasOAuth) {
         return (
-            <div className="p-4 rounded-lg border border-border dark:border-border-dark">
-                <div className="flex items-center gap-0.5 mb-2">
-                    <Github className="w-5 h-5" />
-                    <span className="font-medium text-text dark:text-text-dark">
+            <div className="p-5 rounded-xl border border-border dark:border-border-dark">
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-surface-secondary dark:bg-surface-secondary-dark border border-border/60 dark:border-border-dark/60 flex items-center justify-center shrink-0">
+                        <Github className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
+                    </div>
+                    <span className="font-medium text-sm text-text dark:text-text-dark">
                         {t('connectGitHub')}
                     </span>
                 </div>
-                <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                <p className="text-sm text-text-muted dark:text-text-muted-dark leading-relaxed pl-11">
                     {t('connectGitHubDescription')}
                 </p>
             </div>
@@ -160,31 +169,34 @@ export function GitHubSync() {
         return (
             <div className="space-y-4">
                 {!showConfigure ? (
-                    <Button variant="secondary" onClick={() => setShowConfigure(true)} size="sm">
-                        <Github className="w-4 h-4" />
+                    <Button
+                        variant="secondary"
+                        onClick={() => setShowConfigure(true)}
+                        size="sm"
+                        className="h-8 px-3.5 text-xs font-medium gap-1.5 hover:shadow-sm active:scale-[0.97] transition-all duration-150"
+                    >
+                        <Github className="w-3.5 h-3.5" />
                         {t('setupSync')}
                     </Button>
                 ) : (
-                    <div className="p-4 rounded-lg border border-border dark:border-border-dark space-y-4">
-                        <div>
-                            <Button
-                                onClick={handleCreateNew}
-                                disabled={isPending}
-                                variant="secondary"
-                                size="sm"
-                                className="w-full justify-start"
-                            >
-                                <Plus className="w-4 h-4 mr-2" />
-                                {t('createNewRepo')}
-                            </Button>
-                        </div>
+                    <div className="p-5 rounded-xl border border-border dark:border-border-dark space-y-4">
+                        <Button
+                            onClick={handleCreateNew}
+                            disabled={isPending}
+                            variant="secondary"
+                            size="sm"
+                            className="w-full justify-center h-9 text-xs font-medium gap-2 hover:shadow-sm active:scale-[0.98] transition-all duration-150"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            {t('createNewRepo')}
+                        </Button>
 
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center">
                                 <div className="w-full border-t border-border dark:border-border-dark" />
                             </div>
                             <div className="relative flex justify-center text-xs">
-                                <span className="bg-white dark:bg-gray-900 px-2 text-text-muted dark:text-text-muted-dark">
+                                <span className="bg-surface dark:bg-surface-dark px-2.5 text-text-muted dark:text-text-muted-dark">
                                     {t('or')}
                                 </span>
                             </div>
@@ -202,12 +214,18 @@ export function GitHubSync() {
                                 disabled={isPending || !repoName.trim()}
                                 variant="secondary"
                                 size="sm"
+                                className="h-9 px-3.5 font-medium hover:shadow-sm active:scale-[0.97] transition-all duration-150"
                             >
                                 {t('connect')}
                             </Button>
                         </div>
 
-                        <Button variant="ghost" size="sm" onClick={() => setShowConfigure(false)}>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowConfigure(false)}
+                            className="h-8 px-3 text-xs text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark active:scale-[0.97] transition-all duration-150"
+                        >
                             {t('cancel')}
                         </Button>
                     </div>
@@ -218,84 +236,107 @@ export function GitHubSync() {
 
     // Connected state
     return (
-        <div className="space-y-4">
-            <div className="p-4 rounded-lg border border-border dark:border-border-dark">
-                <div className="flex items-center gap-2 mb-3">
-                    <Github className="w-5 h-5" />
-                    <span className="font-medium text-text dark:text-text-dark">
-                        {status.repoOwner}/{status.repoName}
-                    </span>
-                    <Check className="w-4 h-4 text-green-600" />
+        <div className="rounded-xl border border-border dark:border-border-dark overflow-hidden">
+            {/* Header */}
+            <div className="px-5 py-4 flex items-center gap-3 border-b border-border/50 dark:border-border-dark/50">
+                <div className="w-7 h-7 rounded-lg bg-surface-secondary dark:bg-surface-secondary-dark border border-border/50 dark:border-border-dark/50 flex items-center justify-center shrink-0">
+                    <Github className="w-3.5 h-3.5 text-text dark:text-text-dark" />
                 </div>
+                <code className="flex-1 text-sm font-mono text-text dark:text-text-dark truncate">
+                    {status.repoOwner}/{status.repoName}
+                </code>
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/30 shrink-0">
+                    <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
+                </span>
+            </div>
 
-                <div className="grid grid-cols-2 gap-2 text-sm mb-4">
+            {/* Timestamps */}
+            {(status.lastPushAt || status.lastPullAt) && (
+                <div className="px-5 py-3 border-b border-border/50 dark:border-border-dark/50 divide-y divide-border/30 dark:divide-border-dark/30">
                     {status.lastPushAt && (
-                        <>
+                        <div className="flex items-center justify-between py-1.5 first:pt-0 last:pb-0 text-xs">
                             <span className="text-text-muted dark:text-text-muted-dark">
-                                {t('lastPush')}:
+                                {t('lastPush')}
                             </span>
-                            <span className="text-text dark:text-text-dark">
+                            <span className="text-text dark:text-text-dark font-medium tabular-nums">
                                 {new Date(status.lastPushAt).toLocaleString()}
                             </span>
-                        </>
+                        </div>
                     )}
                     {status.lastPullAt && (
-                        <>
+                        <div className="flex items-center justify-between py-1.5 first:pt-0 last:pb-0 text-xs">
                             <span className="text-text-muted dark:text-text-muted-dark">
-                                {t('lastPull')}:
+                                {t('lastPull')}
                             </span>
-                            <span className="text-text dark:text-text-dark">
+                            <span className="text-text dark:text-text-dark font-medium tabular-nums">
                                 {new Date(status.lastPullAt).toLocaleString()}
                             </span>
-                        </>
+                        </div>
                     )}
                 </div>
+            )}
 
-                {status.lastSyncError && (
-                    <div className="p-2 rounded bg-destructive/10 text-sm text-destructive mb-4 flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                        <span>{status.lastSyncError}</span>
+            {/* Error */}
+            {status.lastSyncError && (
+                <div className="px-5 py-3.5 border-b border-border/50 dark:border-border-dark/50">
+                    <div className="flex items-start gap-2.5 text-sm text-destructive">
+                        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                        <span className="leading-relaxed">{status.lastSyncError}</span>
                     </div>
-                )}
-
-                <div className="flex items-center gap-2 mb-3">
-                    <label className="flex items-center gap-2 text-sm text-text dark:text-text-dark cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={includeSecrets}
-                            onChange={(e) => setIncludeSecrets(e.target.checked)}
-                            className="rounded border-border dark:border-border-dark"
-                        />
-                        {t('includeSecrets')}
-                    </label>
                 </div>
+            )}
+
+            {/* Options */}
+            <div className="px-5 py-4 border-b border-border/50 dark:border-border-dark/50">
+                <label className="inline-flex items-center gap-2.5 text-sm text-text dark:text-text-dark cursor-pointer select-none">
+                    <input
+                        type="checkbox"
+                        checked={includeSecrets}
+                        onChange={(e) => setIncludeSecrets(e.target.checked)}
+                        className="rounded border-border dark:border-border-dark"
+                    />
+                    {t('includeSecrets')}
+                </label>
 
                 {includeSecrets && (
-                    <div className="mb-3 p-3 rounded-lg bg-warning/10 border border-warning/20 text-sm text-warning-foreground">
-                        {t('secretsWarning')}
+                    <div className="mt-3 p-3.5 rounded-xl bg-warning/10 border border-warning/20 text-sm text-warning-foreground leading-relaxed flex items-start gap-2.5">
+                        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-warning" />
+                        <span>{t('secretsWarning')}</span>
                     </div>
                 )}
+            </div>
 
-                <div className="flex gap-2 flex-wrap">
-                    <Button onClick={handlePush} disabled={isPending} size="sm">
-                        <Upload className="w-4 h-4 mr-2" />
-                        {t('push')}
-                    </Button>
-                    <Button onClick={handlePull} disabled={isPending} variant="secondary" size="sm">
-                        <Download className="w-4 h-4 mr-2" />
-                        {t('pull')}
-                    </Button>
-                    <Button
-                        onClick={handleDisconnect}
-                        disabled={isPending}
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                    >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        {t('disconnect')}
-                    </Button>
-                </div>
+            {/* Actions */}
+            <div className="px-5 py-4 flex items-center gap-2 flex-wrap">
+                <Button
+                    onClick={handlePush}
+                    disabled={isPending}
+                    size="sm"
+                    className="h-8 px-3.5 font-medium gap-1.5 shadow-sm hover:shadow active:scale-[0.97] transition-all duration-150"
+                >
+                    <Upload className="w-3.5 h-3.5" />
+                    {t('push')}
+                </Button>
+                <Button
+                    onClick={handlePull}
+                    disabled={isPending}
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 px-3.5 font-medium gap-1.5 hover:shadow-sm active:scale-[0.97] transition-all duration-150"
+                >
+                    <Download className="w-3.5 h-3.5" />
+                    {t('pull')}
+                </Button>
+                <Button
+                    onClick={handleDisconnect}
+                    disabled={isPending}
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-3 text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5 active:scale-[0.97] transition-all duration-150 ml-auto"
+                >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {t('disconnect')}
+                </Button>
             </div>
         </div>
     );

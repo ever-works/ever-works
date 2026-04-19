@@ -381,7 +381,8 @@
                 "generated": "Gegenereerd",
                 "error": "Fout",
                 "cancelled": "Geannuleerd",
-                "idle": "Inactief"
+                "idle": "Inactief",
+                "opening": "Openen"
             },
             "role": {
                 "owner": "Eigenaar",
@@ -396,7 +397,9 @@
             "items": "{count} items",
             "views": "{count} weergaven",
             "updated": "Bijgewerkt op {date}",
-            "viewAction": "Bekijken →"
+            "viewAction": "Bekijken →",
+            "openingTitle": "Map wordt geopend",
+            "openingMessage": "Je map wordt voorbereid. De details worden zo geopend. Blijf op deze pagina."
         },
         "directoryList": {
             "title": "Uw Directory's",
@@ -1813,6 +1816,20 @@
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure"
+        },
+        "plugins": {
+            "githubOrganizations": {
+                "title": "GitHub-organisaties",
+                "description": "Bekijk de organisaties die beschikbaar zijn via uw GitHub-verbinding en voeg extra organisaties toe die u wilt dat Ever Works gebruikt.",
+                "noOrganizations": "Nog geen organisaties gevonden.",
+                "connectToLoad": "Verbind GitHub om uw organisaties te laden.",
+                "placeholder": "Organisatie toevoegen via login",
+                "addButton": "Organisatie toevoegen",
+                "saveButton": "Organisaties opslaan",
+                "savedSuccess": "Toegang tot organisatie opgeslagen.",
+                "saveFailed": "Opslaan mislukt.",
+                "removeLabel": "{login} verwijderen"
+            }
         }
     },
     "layout": {

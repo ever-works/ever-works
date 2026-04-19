@@ -70,7 +70,7 @@ export function PipelineDefaultSelector({ plugins }: PipelineDefaultSelectorProp
                 <label
                     className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer border transition-colors ${
                         selectedId === null
-                            ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                            ? 'border-primary/60 dark:border-white/15 bg-primary/5 dark:bg-white/4'
                             : 'border-transparent hover:bg-surface dark:hover:bg-surface-dark'
                     }`}
                 >
@@ -103,7 +103,7 @@ export function PipelineDefaultSelector({ plugins }: PipelineDefaultSelectorProp
                         key={plugin.pluginId}
                         className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer border transition-colors ${
                             selectedId === plugin.pluginId
-                                ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                                ? 'border-primary/60 dark:border-white/15 bg-primary/5 dark:bg-white/4'
                                 : 'border-transparent hover:bg-surface dark:hover:bg-surface-dark'
                         }`}
                     >
@@ -149,7 +149,7 @@ export function PipelineDefaultSelector({ plugins }: PipelineDefaultSelectorProp
                                 disabled={isPending}
                                 className="peer sr-only"
                             />
-                            <div className="w-9 h-5 bg-border dark:bg-border-dark rounded-full peer-checked:bg-primary transition-colors" />
+                            <div className="w-9 h-5 bg-border dark:bg-border-dark rounded-full peer-checked:bg-primary dark:peer-checked:bg-primary/70 transition-colors" />
                             <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4" />
                         </div>
                         <div>

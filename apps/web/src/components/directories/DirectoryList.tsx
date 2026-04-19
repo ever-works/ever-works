@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Directory } from '@/lib/api/directory';
 import { cn } from '@/lib/utils/cn';
 import { getDirectories } from '@/app/actions/dashboard/directories';
@@ -26,14 +26,7 @@ export function DirectoryList({
     const [loading, setLoading] = useState(false);
     const t = useTranslations('dashboard.directoryList');
 
-    useEffect(() => {
-        // If no initial directories provided, fetch them
-        if (initialDirectories.length === 0 && !loading) {
-            fetchDirectories();
-        }
-    }, []);
-
-    const fetchDirectories = async () => {
+    const fetchDirectories = useCallback(async () => {
         setLoading(true);
         try {
             const response = await getDirectories({ limit: showLimit || 10 });
@@ -46,7 +39,14 @@ export function DirectoryList({
         } finally {
             setLoading(false);
         }
-    };
+    }, [onUpdate, showLimit]);
+
+    useEffect(() => {
+        // If no initial directories provided, fetch them
+        if (initialDirectories.length === 0) {
+            void fetchDirectories();
+        }
+    }, [fetchDirectories, initialDirectories.length]);
 
     if (loading && directories.length === 0) {
         return <DirectoryListSkeleton />;

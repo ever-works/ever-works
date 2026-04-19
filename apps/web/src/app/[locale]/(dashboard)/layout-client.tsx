@@ -87,7 +87,7 @@ export function DashboardLayoutClient({
                 localStorage.setItem('chat-width', String(chatWidth));
             }
         } catch {}
-    }, [chatWidth]);
+    }, [chatWidth, isChatExpanded]);
 
     useEffect(() => {
         try {
@@ -203,7 +203,7 @@ export function DashboardLayoutClient({
         // Open chat without resetting expanded state
         setChatOpen(true, false);
         setIsChatExpanded(true);
-    }, [chatWidth, sidebarCollapsed]);
+    }, [chatWidth, setChatOpen, sidebarCollapsed]);
 
     const startDrag = useCallback((e: React.PointerEvent<Element>) => {
         e.preventDefault();

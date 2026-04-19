@@ -33,7 +33,7 @@ export function PluginModelSelect({
 }: PluginModelSelectProps) {
     const t = useTranslations('dashboard.plugins.modelSelect');
     const [models, setModels] = useState<AiModel[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [loadedPluginId, setLoadedPluginId] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -59,23 +59,24 @@ export function PluginModelSelect({
     useEffect(() => {
         if (!pluginId) return;
 
-        setLoading(true);
-        setError(null);
         fetchModels(pluginId)
             .then((response) => {
                 if (response.success && Array.isArray(response.data)) {
                     setModels(response.data as any);
+                    setError(null);
                 } else {
                     setError(response.error || t('loadError'));
                 }
+                setLoadedPluginId(pluginId);
             })
             .catch(() => {
                 setError(t('loadError'));
-            })
-            .finally(() => {
-                setLoading(false);
+                setLoadedPluginId(pluginId);
             });
     }, [pluginId, t]);
+
+    const loading = Boolean(pluginId) && loadedPluginId !== pluginId;
+    const activeError = loadedPluginId === pluginId ? error : null;
 
     const filteredModels = useMemo(() => {
         if (!search) return models;
@@ -163,9 +164,11 @@ export function PluginModelSelect({
 
                     {/* Model list */}
                     <div className="overflow-y-auto max-h-56">
-                        {error && <div className="px-3 py-2 text-sm text-danger">{error}</div>}
+                        {activeError && (
+                            <div className="px-3 py-2 text-sm text-danger">{activeError}</div>
+                        )}
 
-                        {!error && filteredModels.length === 0 && !loading && (
+                        {!activeError && filteredModels.length === 0 && !loading && (
                             <div className="px-3 py-2 text-sm text-text-muted dark:text-text-muted-dark">
                                 {t('noModels')}
                             </div>

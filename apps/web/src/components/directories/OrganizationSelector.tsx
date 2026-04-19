@@ -31,8 +31,6 @@ export function OrganizationSelector({
         LOADED_ORGS.get(cacheKey) || [],
     );
     const [isPending, startTransition] = useTransition();
-    const onChangeRef = useRef(onChange);
-    onChangeRef.current = onChange;
     const reconciledRef = useRef<string | undefined>(undefined);
 
     useEffect(() => {
@@ -48,7 +46,7 @@ export function OrganizationSelector({
                 console.error('Failed to fetch organizations:', result.error);
             }
         });
-    }, [providerId]);
+    }, [cacheKey, providerId]);
 
     // Reconcile suggestedOwner against the loaded organizations list
     useEffect(() => {
@@ -62,12 +60,12 @@ export function OrganizationSelector({
         );
 
         if (match) {
-            onChangeRef.current(match.login, true);
+            onChange(match.login, true);
         } else if (value === suggestedOwner) {
             // User doesn't belong to this org — reset to personal
-            onChangeRef.current('', false);
+            onChange('', false);
         }
-    }, [suggestedOwner, organizations, value]);
+    }, [suggestedOwner, organizations, onChange, value]);
 
     const handleChange = (selected: string) => {
         const selectedValue = selected === '__personal__' ? '' : selected;

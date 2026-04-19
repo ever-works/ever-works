@@ -390,13 +390,16 @@
                 "generated": "已生成",
                 "error": "错误",
                 "cancelled": "已取消",
-                "idle": "空闲"
+                "idle": "空闲",
+                "opening": "正在打开"
             },
             "noDescription": "未提供描述",
             "items": "{count} 个项目",
             "views": "{count} 次查看",
             "updated": "更新于 {date}",
-            "viewAction": "查看 →"
+            "viewAction": "查看 →",
+            "openingTitle": "正在打开目录",
+            "openingMessage": "我们正在准备您的目录，详情即将打开。请停留在此页面。"
         },
         "directoryList": {
             "title": "您的目录",
@@ -1813,6 +1816,20 @@
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure"
+        },
+        "plugins": {
+            "githubOrganizations": {
+                "title": "GitHub 组织",
+                "description": "查看您的 GitHub 连接中可用的组织，并添加您希望 Ever Works 使用的其他组织。",
+                "noOrganizations": "尚未找到任何组织。",
+                "connectToLoad": "连接 GitHub 以加载您的组织。",
+                "placeholder": "通过登录名添加组织",
+                "addButton": "添加组织",
+                "saveButton": "保存组织",
+                "savedSuccess": "组织访问权限已保存。",
+                "saveFailed": "保存失败。",
+                "removeLabel": "删除 {login}"
+            }
         }
     },
     "layout": {

@@ -142,7 +142,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         return () => {
             cancelled = true;
         };
-    }, [t]);
+    }, [setSelectedProvider, t]);
 
     const updateConversationId = useCallback(
         (id: string | null) => {
@@ -197,7 +197,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 },
             );
         },
-        [t],
+        [t, updateConversationId],
     );
 
     const resetChat = useCallback(() => {

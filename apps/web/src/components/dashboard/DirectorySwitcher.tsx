@@ -17,11 +17,13 @@ import { getDirectories } from '@/app/actions/dashboard/directories';
 import { Directory } from '@/lib/api/directory';
 import { getPathname, usePathname } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
+import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
 import {
     getDirectoryIdFromPath,
     isDirectoryDetailPath,
     replaceDirectoryIdInPath,
 } from '@/lib/utils/directory-route';
+import { ShinyText } from '@/components/ui/ShinyText';
 
 const DIRECTORY_SWITCHER_LIMIT = 1000;
 
@@ -43,6 +45,7 @@ export function DirectorySwitcher() {
     const searchParams = useSearchParams();
     const locale = useLocale();
     const t = useTranslations('dashboard.directories');
+    const tStatus = useTranslations('dashboard.directoryDetail.status');
     const [isNavigating, startNavigation] = useTransition();
     const [directories, setDirectories] = useState<Directory[]>([]);
     const [query, setQuery] = useState('');
@@ -208,6 +211,14 @@ export function DirectorySwitcher() {
                             ) : (
                                 filteredDirectories.map((directory) => {
                                     const isCurrentDirectory = directory.id === currentDirectoryId;
+                                    const hasWarnings =
+                                        !!directory.generateStatus?.warnings?.length;
+                                    const statusStyle = getGenerationStatusConfig(
+                                        directory.generateStatus?.status,
+                                        { hasWarnings },
+                                    );
+                                    const statusLabel = tStatus(statusStyle.labelKey);
+                                    const StatusIcon = statusStyle.icon;
 
                                     return (
                                         <ComboboxOption
@@ -224,21 +235,45 @@ export function DirectorySwitcher() {
                                                 )
                                             }
                                         >
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <FolderOpen className="h-4 w-4 shrink-0 text-text-muted dark:text-text-muted-dark" />
-                                                    <span className="truncate font-medium">
-                                                        {directory.name}
-                                                    </span>
+                                            <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex min-w-0 items-center gap-2">
+                                                        <FolderOpen className="h-4 w-4 shrink-0 text-text-muted dark:text-text-muted-dark" />
+                                                        <span className="truncate font-medium">
+                                                            {directory.name}
+                                                        </span>
+                                                    </div>
+                                                    <div className="truncate pl-6 text-xs text-text-muted dark:text-text-muted-dark">
+                                                        {directory.slug}
+                                                    </div>
                                                 </div>
-                                                <div className="truncate pl-6 text-xs text-text-muted dark:text-text-muted-dark">
-                                                    {directory.slug}
+
+                                                <div className="flex shrink-0 items-center gap-2 self-center">
+                                                    <span
+                                                        className={cn(
+                                                            'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
+                                                            statusStyle.badge,
+                                                        )}
+                                                    >
+                                                        <StatusIcon
+                                                            className={cn(
+                                                                'h-3 w-3',
+                                                                statusStyle.animate &&
+                                                                    'animate-spin',
+                                                            )}
+                                                        />
+                                                        {statusStyle.animate ? (
+                                                            <ShinyText text={statusLabel} />
+                                                        ) : (
+                                                            statusLabel
+                                                        )}
+                                                    </span>
+
+                                                    {isCurrentDirectory && (
+                                                        <Check className="h-4 w-4 shrink-0 text-primary dark:text-primary-dark" />
+                                                    )}
                                                 </div>
                                             </div>
-
-                                            {isCurrentDirectory && (
-                                                <Check className="h-4 w-4 shrink-0 text-primary dark:text-primary-dark" />
-                                            )}
                                         </ComboboxOption>
                                     );
                                 })

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { UserPlugin, PluginCategory } from '@/lib/api/plugins';
 import { getCategoryLabel } from '@/lib/utils/plugin-category-icons';
 import { PluginSearchBar } from './PluginSearchBar';
@@ -38,14 +38,13 @@ export function PluginsList({ plugins, categories = [] }: PluginsListProps) {
 
     // Capture initial sort order once — prevents cards jumping when toggling a plugin.
     // Order refreshes on full page navigation.
-    const initialOrderRef = useRef<Map<string, number> | null>(null);
-    if (initialOrderRef.current === null) {
+    const [initialOrder] = useState(() => {
         const sorted = [...plugins].sort(sortPlugins);
-        initialOrderRef.current = new Map(sorted.map((p, i) => [p.pluginId, i]));
-    }
+        return new Map(sorted.map((p, i) => [p.pluginId, i]));
+    });
 
     const pluginMap = new Map(plugins.map((p) => [p.pluginId, p]));
-    const stablePlugins = [...initialOrderRef.current.entries()]
+    const stablePlugins = [...initialOrder.entries()]
         .sort(([, a], [, b]) => a - b)
         .map(([id]) => pluginMap.get(id))
         .filter((p): p is UserPlugin => p != null);

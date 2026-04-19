@@ -50,7 +50,7 @@ const Input = ({
             id={inputId}
             className={cn(
                 'w-full text-sm rounded-lg transition-colors outline-none',
-                'bg-white dark:bg-card-primary-dark',
+                'bg-card dark:bg-card-primary-dark',
                 'border border-card-border dark:border-white/9',
                 'text-text dark:text-text-dark placeholder-text-muted dark:placeholder-text-muted-dark',
                 'focus:border-primary dark:focus:border-white/9',

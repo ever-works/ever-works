@@ -83,7 +83,7 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 key={tab.id}
                 href={tab.href}
                 className={cn(
-                    'w-full flex items-center gap-3 px-4 py-2 rounded-lg text-left transition-colors',
+                    'w-full flex items-center gap-3 px-4 text-sm py-2 rounded-lg text-left transition-colors',
                     isActive(tab.href)
                         ? 'bg-surface-secondary dark:bg-surface-secondary-dark text-text dark:text-text-dark font-medium'
                         : 'text-text-muted dark:text-text-muted-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-text dark:hover:text-text-dark',
@@ -105,13 +105,13 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 key={category.category}
                 href={categoryHref}
                 className={cn(
-                    'w-full flex items-center gap-3 px-4 py-2 rounded-lg text-left transition-colors',
+                    'w-full flex items-center gap-3 px-4 text-sm py-2 rounded-lg text-left transition-colors',
                     isCategoryActive(category)
                         ? 'bg-surface-secondary dark:bg-surface-secondary-dark text-text dark:text-text-dark font-medium'
                         : 'text-text-muted dark:text-text-muted-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-text dark:hover:text-text-dark',
                 )}
             >
-                <Icon className="w-5 h-5" />
+                <Icon className="w-4 h-4" />
                 <span className="flex-1">{category.label}</span>
                 {hasUnconfigured && (
                     <span
