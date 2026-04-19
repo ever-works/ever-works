@@ -23,7 +23,7 @@
         "@nestjs/common": "^11.1.18",
         "@nestjs/core": "^11.1.18",
         "@nestjs/event-emitter": "^3.0.1",
-        "@nestjs/microservices": "^11.1.18",
+        "@nestjs/microservices": "^11.1.19",
         "@nestjs/platform-express": "^11.1.18",
         "@nestjs/websockets": "^11.1.18",
         "@trigger.dev/sdk": "^4.4.3",

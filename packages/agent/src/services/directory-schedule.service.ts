@@ -33,6 +33,16 @@ import { Directory } from '@src/entities/directory.entity';
 import { NotificationService } from '@src/notifications/notification.service';
 import type { ScheduleRunOutcome } from './types/trigger-context.types';
 
+type DirectoryScheduleReadiness = {
+    featureEnabled: boolean;
+    canEnable: boolean;
+    blockingCode?:
+        | 'SCHEDULED_UPDATES_DISABLED'
+        | 'INITIAL_DIRECTORY_SETUP_REQUIRED'
+        | 'CONFIG_UNAVAILABLE';
+    blockingReason?: string;
+};
+
 @Injectable()
 export class DirectoryScheduleService {
     private readonly logger = new Logger(DirectoryScheduleService.name);
@@ -55,23 +65,20 @@ export class DirectoryScheduleService {
         directoryId: string,
         user: User,
     ): Promise<{ schedule: DirectoryScheduleDto; directoryId: string }> {
-        this.ensureSchedulingEnabled();
-
         // Any access level can view schedule
         const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);
         const subscriptionsEnabled = this.subscriptionService.isEnabled();
 
-        await this.ensureDirectoryConfigReady(directory, user);
-
-        const [schedule, allowances, plan] = await Promise.all([
+        const [schedule, allowances, plan, readiness] = await Promise.all([
             this.scheduleRepository.findByDirectoryId(directory.id),
             this.subscriptionService.getCadenceAllowances(user),
             this.subscriptionService.resolvePlanForUser(user),
+            this.getScheduleReadiness(directory, user),
         ]);
 
         return {
             directoryId: directory.id,
-            schedule: this.toDto(schedule, allowances, plan.code, subscriptionsEnabled),
+            schedule: this.toDto(schedule, allowances, plan.code, subscriptionsEnabled, readiness),
         };
     }
 
@@ -189,7 +196,8 @@ export class DirectoryScheduleService {
 
         await this.syncDirectory(directory.id, schedule);
 
-        return this.toDto(schedule, allowances, plan.code, subscriptionsEnabled);
+        const readiness = await this.getScheduleReadiness(directory, user);
+        return this.toDto(schedule, allowances, plan.code, subscriptionsEnabled, readiness);
     }
 
     async cancelSchedule(directoryId: string, user: User) {
@@ -219,7 +227,8 @@ export class DirectoryScheduleService {
             this.subscriptionService.resolvePlanForUser(user),
         ]);
 
-        return this.toDto(updated, allowances, plan.code, subscriptionsEnabled);
+        const readiness = await this.getScheduleReadiness(directory, user);
+        return this.toDto(updated, allowances, plan.code, subscriptionsEnabled, readiness);
     }
 
     async pauseSchedule(scheduleId: string) {
@@ -612,9 +621,14 @@ export class DirectoryScheduleService {
         allowances: DirectoryScheduleAllowedCadence[],
         planCode: string,
         subscriptionsEnabled: boolean,
+        readiness: DirectoryScheduleReadiness,
     ): DirectoryScheduleDto {
         return {
             status: schedule?.status ?? DirectoryScheduleStatus.DISABLED,
+            featureEnabled: readiness.featureEnabled,
+            canEnable: readiness.canEnable,
+            blockingCode: readiness.blockingCode,
+            blockingReason: readiness.blockingReason,
             cadence: schedule?.cadence ?? null,
             billingMode: schedule?.billingMode ?? DirectoryScheduleBillingMode.SUBSCRIPTION,
             nextRunAt: schedule?.nextRunAt ? schedule.nextRunAt.toISOString() : null,
@@ -641,35 +655,77 @@ export class DirectoryScheduleService {
         });
     }
 
-    private async ensureDirectoryConfigReady(directory: Directory, user: User) {
-        // Skip validation for sync directories (they don't need AI config)
-        // Sync directories have a sourceRepository and sync from external source
+    private async getScheduleReadiness(
+        directory: Directory,
+        user: User,
+    ): Promise<DirectoryScheduleReadiness> {
+        if (!config.subscriptions.scheduledUpdatesEnabled()) {
+            return {
+                featureEnabled: false,
+                canEnable: false,
+                blockingCode: 'SCHEDULED_UPDATES_DISABLED',
+                blockingReason: 'Scheduled updates are currently disabled.',
+            };
+        }
+
+        // Sync directories do not rely on saved generation request data.
         if (directory.sourceRepository) {
+            return {
+                featureEnabled: true,
+                canEnable: true,
+            };
+        }
+
+        const blockingReason =
+            'Complete an initial directory setup before enabling scheduled updates.';
+        const unavailableReason =
+            'Schedule readiness could not be checked right now. Try again in a moment.';
+
+        try {
+            const generatorConfig = await this.dataGeneratorService.getConfig(directory, user);
+
+            if (!generatorConfig?.metadata?.last_request_data) {
+                return {
+                    featureEnabled: true,
+                    canEnable: false,
+                    blockingCode: 'INITIAL_DIRECTORY_SETUP_REQUIRED',
+                    blockingReason,
+                };
+            }
+
+            return {
+                featureEnabled: true,
+                canEnable: true,
+            };
+        } catch (error) {
+            this.logger.warn(
+                `Failed to inspect schedule readiness for directory ${directory.id}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return {
+                featureEnabled: true,
+                canEnable: false,
+                blockingCode: 'CONFIG_UNAVAILABLE',
+                blockingReason: unavailableReason,
+            };
+        }
+    }
+
+    private async ensureDirectoryConfigReady(directory: Directory, user: User) {
+        const readiness = await this.getScheduleReadiness(directory, user);
+
+        if (readiness.canEnable) {
             return;
         }
 
-        try {
-            const config = await this.dataGeneratorService
-                .getConfig(directory, user)
-                .catch(() => null);
-
-            if (!config?.metadata?.last_request_data) {
-                throw new BadRequestException({
-                    status: 'error',
-                    message:
-                        'Complete an initial directory setup before enabling scheduled updates.',
-                });
-            }
-        } catch (error) {
-            if (error instanceof BadRequestException) {
-                throw error;
-            }
-
-            throw new BadRequestException({
-                status: 'error',
-                message: 'Complete an initial directory setup before enabling scheduled updates.',
-            });
-        }
+        throw new BadRequestException({
+            status: 'error',
+            code: readiness.blockingCode ?? 'SCHEDULE_NOT_READY',
+            message:
+                readiness.blockingReason ??
+                'Complete an initial directory setup before enabling scheduled updates.',
+        });
     }
 
     private validateProviderOverrides(overrides: ProvidersDto): void {

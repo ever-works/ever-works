@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Tag } from '@/lib/api/types-only';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,24 +16,26 @@ interface TagModalProps {
 }
 
 export function TagModal({ isOpen, onClose, onSave, tag, existingNames }: TagModalProps) {
+    if (!isOpen) return null;
+
+    return (
+        <TagModalContent
+            key={tag?.id ?? 'new'}
+            onClose={onClose}
+            onSave={onSave}
+            tag={tag}
+            existingNames={existingNames}
+        />
+    );
+}
+
+function TagModalContent({ onClose, onSave, tag, existingNames }: Omit<TagModalProps, 'isOpen'>) {
     const t = useTranslations('dashboard.directoryDetail.items.taxonomy.tags.modal');
-    const [name, setName] = useState('');
+    const [name, setName] = useState(() => tag?.name ?? '');
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const isEditing = !!tag;
-
-    // Reset form when modal opens/closes or tag changes
-    useEffect(() => {
-        if (isOpen) {
-            if (tag) {
-                setName(tag.name);
-            } else {
-                setName('');
-            }
-            setError(null);
-        }
-    }, [isOpen, tag]);
 
     const validateName = (value: string): string | null => {
         if (!value.trim()) {
@@ -68,8 +70,6 @@ export function TagModal({ isOpen, onClose, onSave, tag, existingNames }: TagMod
             onClose();
         }
     };
-
-    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">

@@ -1,6 +1,7 @@
 'use client';
 
 import {
+    useCallback,
     forwardRef,
     TextareaHTMLAttributes,
     useImperativeHandle,
@@ -25,7 +26,7 @@ export const AutoResizeTextarea = forwardRef<HTMLTextAreaElement, AutoResizeText
 
         useImperativeHandle(forwardedRef, () => innerRef.current as HTMLTextAreaElement);
 
-        const resize = () => {
+        const resize = useCallback(() => {
             if (!autoResize) return;
             const el = innerRef.current;
             if (!el) return;
@@ -34,11 +35,11 @@ export const AutoResizeTextarea = forwardRef<HTMLTextAreaElement, AutoResizeText
             const nextHeight = Math.min(el.scrollHeight, maxHeight);
             el.style.height = `${nextHeight}px`;
             el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
-        };
+        }, [autoResize, maxHeight]);
 
         useLayoutEffect(() => {
             resize();
-        }, [value, autoResize, maxHeight]);
+        }, [value, resize]);
 
         const handleChange: React.ChangeEventHandler<HTMLTextAreaElement> = (event) => {
             if (autoResize) {

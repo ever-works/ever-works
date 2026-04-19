@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
     Dialog,
     DialogClose,
@@ -42,24 +42,18 @@ export function TeamSelectionDialog({
     const [selectedTeamScope, setSelectedTeamScope] = useState<string>('');
 
     const options = useMemo(() => teams ?? [], [teams]);
-
-    useEffect(() => {
-        if (open) {
-            setSelectedTeamScope(options[0]?.slug ?? '');
-        } else {
-            setSelectedTeamScope('');
-        }
-    }, [open, options]);
+    const effectiveSelectedTeamScope = selectedTeamScope || options[0]?.slug || '';
 
     const handleConfirm = () => {
-        if (!selectedTeamScope) {
+        if (!effectiveSelectedTeamScope) {
             return;
         }
-        onConfirm(selectedTeamScope);
+        onConfirm(effectiveSelectedTeamScope);
     };
 
     const handleOpenChange = (nextOpen: boolean) => {
         if (!nextOpen) {
+            setSelectedTeamScope('');
             onCancel();
         }
     };
@@ -80,7 +74,10 @@ export function TeamSelectionDialog({
                         <label className="block text-xs font-medium text-text-muted dark:text-text-muted-dark">
                             {t('form.deployment.teamSelection.label')}
                         </label>
-                        <Select value={selectedTeamScope} onValueChange={setSelectedTeamScope}>
+                        <Select
+                            value={effectiveSelectedTeamScope}
+                            onValueChange={setSelectedTeamScope}
+                        >
                             <option value="" disabled>
                                 {t('form.deployment.teamSelection.placeholder')}
                             </option>
@@ -100,7 +97,7 @@ export function TeamSelectionDialog({
                     <Button
                         type="button"
                         onClick={handleConfirm}
-                        disabled={!selectedTeamScope || isSubmitting}
+                        disabled={!effectiveSelectedTeamScope || isSubmitting}
                     >
                         {isSubmitting ? (
                             <span className="flex items-center gap-2">

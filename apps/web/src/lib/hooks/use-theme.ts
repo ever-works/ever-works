@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useMounted } from './use-mounted';
 
 export type Theme = 'light' | 'dark';
 
@@ -31,17 +32,44 @@ function applyTheme(newTheme: Theme): void {
  * Respects system preference if no stored theme is found
  */
 export function useTheme(): UseThemeReturn {
-    const [theme, setTheme] = useState<Theme>('light');
-    const [mounted, setMounted] = useState(false);
+    const mounted = useMounted();
+    const [theme, setTheme] = useState<Theme>(() => {
+        if (typeof window === 'undefined') {
+            return 'light';
+        }
 
-    useEffect(() => {
-        setMounted(true);
         const storedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const initialTheme = storedTheme || (prefersDark ? 'dark' : 'light');
+        return storedTheme || (prefersDark ? 'dark' : 'light');
+    });
 
-        setTheme(initialTheme);
-        applyTheme(initialTheme);
+    useEffect(() => {
+        applyTheme(theme);
+    }, [theme]);
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleSystemThemeChange = (event: MediaQueryListEvent) => {
+            const storedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
+            if (!storedTheme) {
+                setTheme(event.matches ? 'dark' : 'light');
+            }
+        };
+
+        const handleStorageChange = (event: StorageEvent) => {
+            if (event.key !== THEME_STORAGE_KEY || event.newValue == null) return;
+            if (event.newValue === 'light' || event.newValue === 'dark') {
+                setTheme(event.newValue);
+            }
+        };
+
+        mediaQuery.addEventListener('change', handleSystemThemeChange);
+        window.addEventListener('storage', handleStorageChange);
+
+        return () => {
+            mediaQuery.removeEventListener('change', handleSystemThemeChange);
+            window.removeEventListener('storage', handleStorageChange);
+        };
     }, []);
 
     const toggleTheme = (newTheme?: Theme) => {

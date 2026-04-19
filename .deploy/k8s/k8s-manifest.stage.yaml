@@ -85,6 +85,22 @@ spec:
             - name: GOOGLE_CALLBACK_URL
               value: https://appstage.ever.works/api/oauth/google/callback
 
+            # Facebook Auth
+            - name: FACEBOOK_CLIENT_ID
+              value: "$FACEBOOK_CLIENT_ID"
+            - name: FACEBOOK_CLIENT_SECRET
+              value: "$FACEBOOK_CLIENT_SECRET"
+            - name: FACEBOOK_CALLBACK_URL
+              value: https://appstage.ever.works/api/oauth/facebook/callback
+
+            # LinkedIn Auth
+            - name: LINKEDIN_CLIENT_ID
+              value: "$LINKEDIN_CLIENT_ID"
+            - name: LINKEDIN_CLIENT_SECRET
+              value: "$LINKEDIN_CLIENT_SECRET"
+            - name: LINKEDIN_CALLBACK_URL
+              value: https://appstage.ever.works/api/oauth/linkedin/callback
+
             # Plugins
             - name: PLUGIN_OPENROUTER_API_KEY
               value: "$PLUGIN_OPENROUTER_API_KEY"

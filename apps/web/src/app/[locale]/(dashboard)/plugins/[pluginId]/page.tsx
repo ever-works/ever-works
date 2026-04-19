@@ -16,25 +16,26 @@ interface PluginDetailPageProps {
 
 export default async function PluginDetailPage({ params }: PluginDetailPageProps) {
     const { pluginId } = await params;
+    let plugin;
 
     try {
-        const plugin = await pluginsAPI.get(pluginId);
-
-        let oauthConnection: OAuthConnectionInfo | null | undefined;
-        if (plugin.capabilities.includes('oauth')) {
-            try {
-                oauthConnection = await oauthAPI.checkConnection(plugin.pluginId);
-            } catch {
-                oauthConnection = null;
-            }
-        }
-
-        return (
-            <div className="w-full">
-                <PluginSettings plugin={plugin} oauthConnection={oauthConnection} />
-            </div>
-        );
-    } catch (error) {
+        plugin = await pluginsAPI.get(pluginId);
+    } catch {
         notFound();
     }
+
+    let oauthConnection: OAuthConnectionInfo | null | undefined;
+    if (plugin.capabilities.includes('oauth')) {
+        try {
+            oauthConnection = await oauthAPI.checkConnection(plugin.pluginId);
+        } catch {
+            oauthConnection = null;
+        }
+    }
+
+    return (
+        <div className="w-full">
+            <PluginSettings plugin={plugin} oauthConnection={oauthConnection} />
+        </div>
+    );
 }

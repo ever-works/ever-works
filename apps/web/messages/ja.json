@@ -381,7 +381,8 @@
                 "generated": "生成完了",
                 "error": "エラー",
                 "cancelled": "キャンセル済",
-                "idle": "待機中"
+                "idle": "待機中",
+                "opening": "開いています"
             },
             "role": {
                 "owner": "所有者",
@@ -396,7 +397,9 @@
             "items": "{count} 件のアイテム",
             "views": "{count} 回表示",
             "updated": "更新日 {date}",
-            "viewAction": "表示 →"
+            "viewAction": "表示 →",
+            "openingTitle": "ディレクトリを開いています",
+            "openingMessage": "ディレクトリを準備しています。詳細はまもなく開きます。このページでお待ちください。"
         },
         "directoryList": {
             "title": "あなたのディレクトリ",
@@ -1813,6 +1816,20 @@
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure"
+        },
+        "plugins": {
+            "githubOrganizations": {
+                "title": "GitHub組織",
+                "description": "GitHubの接続から利用可能な組織を確認し、Ever Worksがターゲットにする追加の組織を追加してください。",
+                "noOrganizations": "まだ組織が見つかりません。",
+                "connectToLoad": "GitHubを接続して組織を読み込んでください。",
+                "placeholder": "ログインで組織を追加",
+                "addButton": "組織を追加",
+                "saveButton": "組織を保存",
+                "savedSuccess": "組織のアクセスを保存しました。",
+                "saveFailed": "保存に失敗しました。",
+                "removeLabel": "{login}を削除"
+            }
         }
     },
     "layout": {

@@ -390,13 +390,16 @@
                 "generated": "Generiert",
                 "error": "Fehler",
                 "cancelled": "Abgebrochen",
-                "idle": "Inaktiv"
+                "idle": "Inaktiv",
+                "opening": "Wird geöffnet"
             },
             "noDescription": "Keine Beschreibung vorhanden",
             "items": "{count} Einträge",
             "views": "{count} Aufrufe",
             "updated": "Aktualisiert {date}",
-            "viewAction": "Anzeigen →"
+            "viewAction": "Anzeigen →",
+            "openingTitle": "Verzeichnis wird geöffnet",
+            "openingMessage": "Ihr Verzeichnis wird vorbereitet. Die Details öffnen sich in Kürze. Bitte bleiben Sie auf dieser Seite."
         },
         "directoryList": {
             "title": "Ihre Verzeichnisse",
@@ -1813,6 +1816,20 @@
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure"
+        },
+        "plugins": {
+            "githubOrganizations": {
+                "title": "GitHub-Organisationen",
+                "description": "Überprüfen Sie die verfügbaren Organisationen aus Ihrer GitHub-Verbindung und fügen Sie weitere Organisationen hinzu, die Ever Works ansprechen soll.",
+                "noOrganizations": "Noch keine Organisationen gefunden.",
+                "connectToLoad": "GitHub verbinden, um Ihre Organisationen zu laden.",
+                "placeholder": "Organisation per Login hinzufügen",
+                "addButton": "Organisation hinzufügen",
+                "saveButton": "Organisationen speichern",
+                "savedSuccess": "Organisationszugriff gespeichert.",
+                "saveFailed": "Speichern fehlgeschlagen.",
+                "removeLabel": "{login} entfernen"
+            }
         }
     },
     "layout": {

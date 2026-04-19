@@ -381,7 +381,8 @@
                 "generated": "สร้างแล้ว",
                 "error": "ข้อผิดพลาด",
                 "cancelled": "ยกเลิกแล้ว",
-                "idle": "ไม่มีการใช้งาน"
+                "idle": "ไม่มีการใช้งาน",
+                "opening": "กำลังเปิด"
             },
             "role": {
                 "owner": "เจ้าของ",
@@ -396,7 +397,9 @@
             "items": "{count} รายการ",
             "views": "{count} มุมมอง",
             "updated": "อัปเดต {date}",
-            "viewAction": "ดู →"
+            "viewAction": "ดู →",
+            "openingTitle": "กำลังเปิดไดเรกทอรี",
+            "openingMessage": "เรากำลังเตรียมไดเรกทอรีของคุณ รายละเอียดจะเปิดในอีกสักครู่ โปรดอยู่ในหน้านี้ต่อไป"
         },
         "directoryList": {
             "title": "ไดเรกทอรีของคุณ",
@@ -1813,6 +1816,20 @@
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure"
+        },
+        "plugins": {
+            "githubOrganizations": {
+                "title": "องค์กร GitHub",
+                "description": "ตรวจสอบองค์กรที่มีอยู่จากการเชื่อมต่อ GitHub ของคุณ และเพิ่มองค์กรเพิ่มเติมที่คุณต้องการให้ Ever Works ใช้",
+                "noOrganizations": "ยังไม่พบองค์กร",
+                "connectToLoad": "เชื่อมต่อ GitHub เพื่อโหลดองค์กรของคุณ",
+                "placeholder": "เพิ่มองค์กรด้วย login",
+                "addButton": "เพิ่มองค์กร",
+                "saveButton": "บันทึกองค์กร",
+                "savedSuccess": "บันทึกการเข้าถึงองค์กรแล้ว",
+                "saveFailed": "การบันทึกล้มเหลว",
+                "removeLabel": "ลบ {login}"
+            }
         }
     },
     "layout": {

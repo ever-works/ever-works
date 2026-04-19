@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Category } from '@/lib/api/types-only';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,33 +23,34 @@ export function CategoryModal({
     category,
     existingNames,
 }: CategoryModalProps) {
+    if (!isOpen) return null;
+
+    return (
+        <CategoryModalContent
+            key={category?.id ?? 'new'}
+            onClose={onClose}
+            onSave={onSave}
+            category={category}
+            existingNames={existingNames}
+        />
+    );
+}
+
+function CategoryModalContent({
+    onClose,
+    onSave,
+    category,
+    existingNames,
+}: Omit<CategoryModalProps, 'isOpen'>) {
     const t = useTranslations('dashboard.directoryDetail.items.taxonomy.categories.modal');
-    const [name, setName] = useState('');
-    const [description, setDescription] = useState('');
-    const [iconUrl, setIconUrl] = useState('');
-    const [priority, setPriority] = useState<string>('');
+    const [name, setName] = useState(() => category?.name ?? '');
+    const [description, setDescription] = useState(() => category?.description ?? '');
+    const [iconUrl, setIconUrl] = useState(() => category?.icon_url ?? '');
+    const [priority, setPriority] = useState(() => category?.priority?.toString() ?? '');
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const isEditing = !!category;
-
-    // Reset form when modal opens/closes or category changes
-    useEffect(() => {
-        if (isOpen) {
-            if (category) {
-                setName(category.name);
-                setDescription(category.description || '');
-                setIconUrl(category.icon_url || '');
-                setPriority(category.priority?.toString() || '');
-            } else {
-                setName('');
-                setDescription('');
-                setIconUrl('');
-                setPriority('');
-            }
-            setError(null);
-        }
-    }, [isOpen, category]);
 
     const validateName = (value: string): string | null => {
         if (!value.trim()) {
@@ -87,8 +88,6 @@ export function CategoryModal({
             onClose();
         }
     };
-
-    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">

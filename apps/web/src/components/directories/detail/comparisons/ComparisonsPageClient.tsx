@@ -143,7 +143,7 @@ export function ComparisonsPageClient({
         .filter((item) => item.slug !== selectedItemA)
         .filter((item) => queryB === '' || item.name.toLowerCase().includes(queryB.toLowerCase()));
 
-    const refreshComparisons = async () => {
+    const refreshComparisons = useCallback(async () => {
         try {
             const updated = await listComparisons(directoryId);
             setComparisons(updated);
@@ -151,7 +151,7 @@ export function ComparisonsPageClient({
             // Fallback: reload if fetch fails
             window.location.reload();
         }
-    };
+    }, [directoryId]);
 
     const handleGenerateNext = () => {
         startTransition(async () => {
@@ -270,7 +270,7 @@ export function ComparisonsPageClient({
         }
 
         await refreshComparisons();
-    }, [directoryId, remainingCount]);
+    }, [directoryId, refreshComparisons, remainingCount, t]);
 
     const handleStopGenerateAll = () => {
         cancelRef.current = true;

@@ -463,6 +463,29 @@ export class DirectoryRepository {
         });
     }
 
+    async countForDetailCacheWarmup(): Promise<number> {
+        return this.repository
+            .createQueryBuilder('directory')
+            .where('COALESCE(directory.itemsCount, 0) > 0')
+            .getCount();
+    }
+
+    /**
+     * Return a bounded page of directories whose detail pages are likely to benefit
+     * from prewarmed config/count cache entries.
+     */
+    async findForDetailCacheWarmup(limit: number, offset = 0): Promise<Directory[]> {
+        return this.repository
+            .createQueryBuilder('directory')
+            .leftJoinAndSelect('directory.user', 'user')
+            .where('COALESCE(directory.itemsCount, 0) > 0')
+            .orderBy('directory.updatedAt', 'DESC')
+            .addOrderBy('directory.id', 'ASC')
+            .skip(offset)
+            .take(limit)
+            .getMany();
+    }
+
     async findDueSourceValidation(limit: number): Promise<Directory[]> {
         return this.repository.find({
             where: {
