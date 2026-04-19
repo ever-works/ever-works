@@ -19,13 +19,13 @@ function mockResponse(init: MockResponseInit = {}): Response {
 	} as unknown as Response;
 }
 
-function createClient(overrides?: Partial<Parameters<typeof MakeClient.prototype.constructor>[0]>): MakeClient {
+function createClient(overrides?: Record<string, unknown>): MakeClient {
 	return new MakeClient({
 		apiKey: 'test-api-key',
 		baseUrl: 'https://us2.make.com/api/v2',
 		logger: { log: vi.fn(), warn: vi.fn() },
 		...(overrides as Record<string, unknown>)
-	});
+	} as ConstructorParameters<typeof MakeClient>[0]);
 }
 
 function createSettings(overrides?: Partial<MakeSettings>): MakeSettings {
@@ -213,7 +213,7 @@ describe('MakeClient', () => {
 	});
 
 	describe('pollExecution', () => {
-		it('should resolve when status becomes success', async () => {
+		it('should resolve when status becomes success and return attempt count', async () => {
 			fetchMock
 				.mockResolvedValueOnce(mockResponse({ body: { execution: { status: 'running' } } }))
 				.mockResolvedValueOnce(
@@ -223,11 +223,24 @@ describe('MakeClient', () => {
 			const client = createClient();
 			const onProgress = vi.fn();
 
-			const status = await client.pollExecution(1, 'exec-1', createSettings(), onProgress);
+			const result = await client.pollExecution(1, 'exec-1', createSettings(), onProgress);
 
-			expect(status.status).toBe('success');
+			expect(result.status.status).toBe('success');
+			expect(result.attempts).toBe(2);
 			expect(onProgress).toHaveBeenCalledTimes(2);
 			expect(onProgress).toHaveBeenLastCalledWith(2, 'success');
+		});
+
+		it('should return attempts=1 when scenario succeeds on the first poll', async () => {
+			fetchMock.mockResolvedValueOnce(
+				mockResponse({ body: { execution: { status: 'success', output: { items: [] } } } })
+			);
+
+			const client = createClient();
+			const result = await client.pollExecution(1, 'exec-1', createSettings());
+
+			expect(result.status.status).toBe('success');
+			expect(result.attempts).toBe(1);
 		});
 
 		it('should throw on error status with provided error message', async () => {
@@ -333,6 +346,15 @@ describe('MakeClient', () => {
 			const client = createClient();
 
 			await expect(client.invokeWebhook('https://hook.us2.make.com/xyz', createInput())).rejects.toThrow('500');
+		});
+
+		it('should explain 401 with actionable guidance', async () => {
+			fetchMock.mockResolvedValueOnce(mockResponse({ status: 401, statusText: 'Unauthorized', body: 'nope' }));
+			const client = createClient();
+
+			await expect(client.invokeWebhook('https://hook.us2.make.com/xyz', createInput())).rejects.toThrow(
+				/scenario tied to this webhook is active/
+			);
 		});
 	});
 });

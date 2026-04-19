@@ -104,15 +104,29 @@ function parseItems(rawItems: MakeOutputItem[]): ItemData[] {
 
 	for (const raw of rawItems) {
 		if (!raw || typeof raw !== 'object') continue;
-		if (!raw.name || typeof raw.name !== 'string') continue;
+
+		const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+		if (!name) continue;
+
+		const description = typeof raw.description === 'string' ? raw.description.trim() : '';
+		const sourceUrl =
+			typeof raw.url === 'string' && raw.url.trim()
+				? raw.url.trim()
+				: typeof raw.source_url === 'string' && raw.source_url.trim()
+					? raw.source_url.trim()
+					: '';
+		const category = typeof raw.category === 'string' ? raw.category.trim() : '';
+
+		// ItemData requires description, source_url, and category. Skip items
+		// missing any of them rather than propagating placeholders downstream.
+		if (!description || !sourceUrl || !category) continue;
 
 		const item: ItemData = {
-			name: raw.name.trim(),
-			description: typeof raw.description === 'string' ? raw.description.trim() : '',
-			source_url:
-				typeof raw.url === 'string' ? raw.url : typeof raw.source_url === 'string' ? raw.source_url : '',
+			name,
+			description,
+			source_url: sourceUrl,
 			markdown: typeof raw.content === 'string' ? raw.content : undefined,
-			category: typeof raw.category === 'string' ? raw.category.trim() : '',
+			category,
 			tags: Array.isArray(raw.tags) ? raw.tags.filter((t): t is string => typeof t === 'string') : [],
 			brand: typeof raw.brand === 'string' ? raw.brand.trim() : undefined,
 			images: Array.isArray(raw.images) ? raw.images.filter((i): i is string => typeof i === 'string') : undefined

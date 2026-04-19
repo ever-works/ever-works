@@ -123,6 +123,7 @@ function mockSuccessfulScenarioRun(fetchMock: ReturnType<typeof vi.fn>): void {
 									name: 'Test Item 2',
 									description: 'Another test item',
 									url: 'https://example.com/2',
+									category: 'Tools',
 									tags: ['tag1']
 								}
 							],
@@ -377,7 +378,14 @@ describe('MakePlugin', () => {
 			fetchMock.mockResolvedValueOnce(
 				mockResponse({
 					body: {
-						items: [{ name: 'Webhook Item', description: 'Via webhook', url: 'https://example.com' }]
+						items: [
+							{
+								name: 'Webhook Item',
+								description: 'Via webhook',
+								url: 'https://example.com',
+								category: 'Tools'
+							}
+						]
 					}
 				})
 			);
@@ -429,7 +437,8 @@ describe('MakePlugin', () => {
 			const result = await plugin.execute(createDirectory(), createRequest(), createExisting());
 
 			expect(result.success).toBe(false);
-			expect(result.error?.message || String(result.error)).toMatch(/not active/);
+			const errorMessage = result.error instanceof Error ? result.error.message : String(result.error);
+			expect(errorMessage).toMatch(/not active/);
 		});
 	});
 

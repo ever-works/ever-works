@@ -119,6 +119,9 @@ export class MakeClient {
 	/**
 	 * Polls the execution status of a scenario run until it succeeds, errors,
 	 * the caller aborts, or we exceed the maximum number of attempts.
+	 *
+	 * Returns the final execution status alongside the number of poll attempts
+	 * made, so callers can surface polling telemetry.
 	 */
 	async pollExecution(
 		scenarioId: string | number,
@@ -126,7 +129,7 @@ export class MakeClient {
 		settings: Pick<MakeSettings, 'pollIntervalMs' | 'maxPollAttempts' | 'timeoutMs'>,
 		onProgress?: (attempt: number, status: string) => void,
 		signal?: AbortSignal
-	): Promise<MakeExecutionStatus> {
+	): Promise<{ status: MakeExecutionStatus; attempts: number }> {
 		const intervalMs = settings.pollIntervalMs || DEFAULT_POLL_INTERVAL_MS;
 		const maxAttempts = settings.maxPollAttempts || DEFAULT_MAX_POLL_ATTEMPTS;
 		const deadline = Date.now() + (settings.timeoutMs || maxAttempts * intervalMs);
@@ -150,7 +153,9 @@ export class MakeClient {
 
 			onProgress?.(attempt, normalizedStatus);
 
-			if (normalizedStatus === 'success' || normalizedStatus === 'completed') return exec;
+			if (normalizedStatus === 'success' || normalizedStatus === 'completed') {
+				return { status: exec, attempts: attempt };
+			}
 			if (normalizedStatus === 'error' || normalizedStatus === 'stopped' || normalizedStatus === 'failed') {
 				throw new Error(exec?.error || `Make.com scenario execution ${normalizedStatus}`);
 			}
@@ -198,7 +203,7 @@ export class MakeClient {
 
 		const text = await response.text();
 		if (!response.ok) {
-			throw new Error(`Make.com webhook returned ${response.status} ${response.statusText}: ${truncate(text)}`);
+			throw new Error(this.describeWebhookError(response.status, response.statusText, text));
 		}
 
 		try {
@@ -206,6 +211,28 @@ export class MakeClient {
 		} catch {
 			return text;
 		}
+	}
+
+	private describeWebhookError(status: number, statusText: string, rawBody: string): string {
+		const body = truncate(rawBody);
+		const base = `Make.com webhook returned ${status} ${statusText}`;
+
+		if (status === 401 || status === 403) {
+			return (
+				`${base}. The webhook rejected the request. Verify in the Make.com dashboard that ` +
+				`(1) the scenario tied to this webhook is active, ` +
+				`(2) the webhook URL zone matches your workspace (e.g. us2 vs eu1), and ` +
+				`(3) the webhook module does not require an API key / mandatory headers. ` +
+				`Response: ${body}`
+			);
+		}
+		if (status === 404) {
+			return `${base}. The webhook URL was not found. It may have been deleted or regenerated in Make.com. Response: ${body}`;
+		}
+		if (status === 410) {
+			return `${base}. The webhook has been disabled in Make.com. Re-enable it or recreate the scenario. Response: ${body}`;
+		}
+		return `${base}: ${body}`;
 	}
 
 	// ── Internal HTTP helpers ────────────────────────────────────────────

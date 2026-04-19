@@ -40,11 +40,12 @@ export function updateStepState(
 
 	const now = Date.now();
 	const steps = new Map(state.steps);
+	const isTerminal = status === 'completed' || status === 'failed' || status === 'skipped';
 	steps.set(stepId, {
 		...existing,
 		status,
 		startedAt: status === 'running' ? now : existing.startedAt,
-		completedAt: status === 'completed' || status === 'failed' ? now : undefined,
+		completedAt: isTerminal ? now : existing.completedAt,
 		error: error ?? existing.error
 	});
 
@@ -52,7 +53,8 @@ export function updateStepState(
 		...state,
 		steps,
 		currentStep: status === 'running' ? stepId : state.currentStep,
-		completedSteps: status === 'completed' ? [...state.completedSteps, stepId] : state.completedSteps,
+		completedSteps:
+			status === 'completed' || status === 'skipped' ? [...state.completedSteps, stepId] : state.completedSteps,
 		failedSteps: status === 'failed' ? [...state.failedSteps, stepId] : state.failedSteps
 	};
 }
@@ -73,7 +75,14 @@ export function reportProgress(
 	});
 }
 
-/** Merges user and directory-level settings (directory overrides user). */
+/**
+ * Merges user and directory-level settings (directory overrides user).
+ *
+ * Returns a fresh object rather than mutating either input, so the plugin
+ * context is free to cache the original settings objects without risk of
+ * cross-directory contamination on subsequent calls. Only own, non-nullish
+ * directory properties override user values.
+ */
 export async function resolveSettings(
 	context: PluginContext | null,
 	userId: string,
@@ -87,13 +96,15 @@ export async function resolveSettings(
 			context.getSettings('directory', directoryId)
 		]);
 
-		for (const key in directorySettings) {
-			if (directorySettings[key] !== undefined && directorySettings[key] !== null) {
-				userSettings[key] = directorySettings[key];
+		const merged: PluginSettings = { ...userSettings };
+		for (const key of Object.keys(directorySettings)) {
+			const value = directorySettings[key];
+			if (value !== undefined && value !== null) {
+				merged[key] = value;
 			}
 		}
 
-		return userSettings;
+		return merged;
 	} catch {
 		return {};
 	}

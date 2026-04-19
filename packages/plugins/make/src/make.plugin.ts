@@ -372,28 +372,11 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 				const executionId = run.executionId ?? this.extractExecutionId(run as Record<string, unknown>);
 
 				if (executionId) {
-					const status = await client.pollExecution(
+					const { status, attempts } = await client.pollExecution(
 						scenarioId,
 						executionId,
 						makeSettings,
 						(attempt, statusName) => {
-							const percent = Math.min(15 + Math.round((attempt / 60) * 55), 70);
-							reportProgress(
-								onProgress,
-								2,
-								percent,
-								'Execute Make.com Scenario',
-								`Execution ${statusName} (poll #${attempt})...`
-							);
-						},
-				if (executionId) {
-					let pollingAttempts = 0;
-					const status = await client.pollExecution(
-						scenarioId,
-						executionId,
-						makeSettings,
-						(attempt, statusName) => {
-							pollingAttempts = attempt;
 							const percent = Math.min(15 + Math.round((attempt / 60) * 55), 70);
 							reportProgress(
 								onProgress,
@@ -407,7 +390,7 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 					);
 					execResult = {
 						output: status.output ?? status.result ?? status.data ?? status,
-						pollingAttempts,
+						pollingAttempts: attempts,
 						makeDuration: Date.now() - runStart,
 						executionId
 					};
@@ -440,9 +423,7 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 			setState('collect-results', 'running');
 			reportProgress(onProgress, 3, 75, 'Collect & Validate Results');
 
-			logger.log(
-				`Raw Make.com output type: ${typeof execResult.output}, value: ${JSON.stringify(execResult.output).substring(0, 500)}`
-			);
+			logger.log(`Received Make.com output (${describeOutputShape(execResult.output)})`);
 
 			const parsed = parseMakeOutput(execResult.output);
 
@@ -594,12 +575,12 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 		const screenshotFacade = execContext?.screenshotFacade;
 
 		if (!shouldCapture || items.length === 0 || signal.aborted || !screenshotFacade) {
-			setState('capture-screenshots', 'skipped' as StepStatus);
+			setState('capture-screenshots', 'skipped');
 			return [];
 		}
 
 		if (!screenshotFacade.isAvailable()) {
-			setState('capture-screenshots', 'skipped' as StepStatus);
+			setState('capture-screenshots', 'skipped');
 			return ['Screenshot provider is not configured. Enable a screenshot plugin to capture item images.'];
 		}
 
@@ -658,6 +639,24 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 		}
 		return flat;
 	}
+}
+
+/**
+ * Describes the shape of a Make.com response without serializing its values.
+ * We avoid JSON.stringify because the output may contain circular references
+ * (which would throw and fail the pipeline after a successful run) or echo
+ * sensitive inputs like repo access tokens into logs.
+ */
+function describeOutputShape(output: unknown): string {
+	if (output === null) return 'type=null';
+	if (output === undefined) return 'type=undefined';
+	if (Array.isArray(output)) return `type=array, length=${output.length}`;
+	if (typeof output === 'string') return `type=string, length=${output.length}`;
+	if (typeof output === 'object') {
+		const keys = Object.keys(output as Record<string, unknown>);
+		return `type=object, keys=[${keys.slice(0, 10).join(', ')}${keys.length > 10 ? ', …' : ''}]`;
+	}
+	return `type=${typeof output}`;
 }
 
 export default MakePlugin;

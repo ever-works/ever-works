@@ -2,11 +2,25 @@ import { describe, it, expect } from 'vitest';
 import { parseMakeOutput, deduplicateItems } from '../utils/result-parser.js';
 
 describe('parseMakeOutput', () => {
+	const fullItem = (overrides: Record<string, unknown> = {}) => ({
+		name: 'Item',
+		description: 'A description',
+		url: 'https://example.com',
+		category: 'Tools',
+		...overrides
+	});
+
 	it('should parse valid output with items array', () => {
 		const result = parseMakeOutput({
 			items: [
-				{ name: 'Item 1', description: 'Desc 1', url: 'https://example.com/1', category: 'Tools' },
-				{ name: 'Item 2', description: 'Desc 2', tags: ['tag1', 'tag2'] }
+				fullItem({ name: 'Item 1', description: 'Desc 1', url: 'https://example.com/1', category: 'Tools' }),
+				fullItem({
+					name: 'Item 2',
+					description: 'Desc 2',
+					url: 'https://example.com/2',
+					category: 'Tools',
+					tags: ['tag1', 'tag2']
+				})
 			],
 			categories: [{ name: 'Tools', description: 'Dev tools' }],
 			tags: [{ name: 'tag1' }, { name: 'tag2' }]
@@ -23,15 +37,15 @@ describe('parseMakeOutput', () => {
 
 	it('should parse a direct array of items', () => {
 		const result = parseMakeOutput([
-			{ name: 'Item 1', description: 'Desc 1' },
-			{ name: 'Item 2', description: 'Desc 2' }
+			fullItem({ name: 'Item 1', description: 'Desc 1' }),
+			fullItem({ name: 'Item 2', description: 'Desc 2' })
 		]);
 
 		expect(result.items).toHaveLength(2);
 	});
 
 	it('should parse a JSON string containing items', () => {
-		const result = parseMakeOutput(JSON.stringify({ items: [{ name: 'Stringified Item' }] }));
+		const result = parseMakeOutput(JSON.stringify({ items: [fullItem({ name: 'Stringified Item' })] }));
 		expect(result.items).toHaveLength(1);
 		expect(result.items[0].name).toBe('Stringified Item');
 	});
@@ -39,7 +53,7 @@ describe('parseMakeOutput', () => {
 	it('should handle nested output field (async result)', () => {
 		const result = parseMakeOutput({
 			output: {
-				items: [{ name: 'Async Item' }]
+				items: [fullItem({ name: 'Async Item' })]
 			}
 		});
 
@@ -50,7 +64,7 @@ describe('parseMakeOutput', () => {
 	it('should handle nested data field', () => {
 		const result = parseMakeOutput({
 			data: {
-				items: [{ name: 'Data Item' }]
+				items: [fullItem({ name: 'Data Item' })]
 			}
 		});
 
@@ -60,7 +74,7 @@ describe('parseMakeOutput', () => {
 	it('should handle nested body field (webhook response)', () => {
 		const result = parseMakeOutput({
 			body: {
-				items: [{ name: 'Webhook Item' }]
+				items: [fullItem({ name: 'Webhook Item' })]
 			}
 		});
 
@@ -71,9 +85,9 @@ describe('parseMakeOutput', () => {
 	it('should extract categories from item references', () => {
 		const result = parseMakeOutput({
 			items: [
-				{ name: 'Item 1', category: 'Cat A' },
-				{ name: 'Item 2', category: 'Cat B' },
-				{ name: 'Item 3', category: 'Cat A' }
+				fullItem({ name: 'Item 1', category: 'Cat A' }),
+				fullItem({ name: 'Item 2', category: 'Cat B' }),
+				fullItem({ name: 'Item 3', category: 'Cat A' })
 			]
 		});
 
@@ -85,8 +99,8 @@ describe('parseMakeOutput', () => {
 	it('should extract tags from items', () => {
 		const result = parseMakeOutput({
 			items: [
-				{ name: 'Item 1', tags: ['tag1', 'tag2'] },
-				{ name: 'Item 2', tags: ['tag2', 'tag3'] }
+				fullItem({ name: 'Item 1', tags: ['tag1', 'tag2'] }),
+				fullItem({ name: 'Item 2', tags: ['tag2', 'tag3'] })
 			]
 		});
 
@@ -95,10 +109,7 @@ describe('parseMakeOutput', () => {
 
 	it('should extract brands from items', () => {
 		const result = parseMakeOutput({
-			items: [
-				{ name: 'Item 1', brand: 'Brand A' },
-				{ name: 'Item 2', brand: 'Brand B' }
-			],
+			items: [fullItem({ name: 'Item 1', brand: 'Brand A' }), fullItem({ name: 'Item 2', brand: 'Brand B' })],
 			brands: [{ name: 'Brand A', url: 'https://branda.com' }]
 		});
 
@@ -109,9 +120,33 @@ describe('parseMakeOutput', () => {
 	it('should skip items without a name', () => {
 		const result = parseMakeOutput({
 			items: [
-				{ name: 'Valid', description: 'Has name' },
-				{ description: 'No name' },
-				{ name: '', description: 'Empty name' }
+				fullItem({ name: 'Valid' }),
+				fullItem({ name: undefined, description: 'No name' }),
+				fullItem({ name: '', description: 'Empty name' })
+			]
+		});
+
+		expect(result.items).toHaveLength(1);
+		expect(result.items[0].name).toBe('Valid');
+	});
+
+	it('should skip items missing description, source_url, or category', () => {
+		expect(() =>
+			parseMakeOutput({
+				items: [
+					{ name: 'No description', url: 'https://example.com', category: 'Tools' },
+					{ name: 'No url', description: 'Has desc', category: 'Tools' },
+					{ name: 'No category', description: 'Has desc', url: 'https://example.com' }
+				]
+			})
+		).toThrow('no usable items');
+	});
+
+	it('should keep items that have all required fields and skip invalid siblings', () => {
+		const result = parseMakeOutput({
+			items: [
+				{ name: 'Valid', description: 'Ok', url: 'https://example.com', category: 'Tools' },
+				{ name: 'Missing category', description: 'Ok', url: 'https://example.com' }
 			]
 		});
 
@@ -121,7 +156,7 @@ describe('parseMakeOutput', () => {
 
 	it('should handle source_url field', () => {
 		const result = parseMakeOutput({
-			items: [{ name: 'Item', source_url: 'https://example.com' }]
+			items: [fullItem({ name: 'Item', url: undefined, source_url: 'https://example.com' })]
 		});
 
 		expect(result.items[0].source_url).toBe('https://example.com');
@@ -129,7 +164,7 @@ describe('parseMakeOutput', () => {
 
 	it('should prefer url over source_url', () => {
 		const result = parseMakeOutput({
-			items: [{ name: 'Item', url: 'https://a.com', source_url: 'https://b.com' }]
+			items: [fullItem({ name: 'Item', url: 'https://a.com', source_url: 'https://b.com' })]
 		});
 
 		expect(result.items[0].source_url).toBe('https://a.com');
@@ -150,7 +185,7 @@ describe('parseMakeOutput', () => {
 
 	it('should handle items with image arrays', () => {
 		const result = parseMakeOutput({
-			items: [{ name: 'Item', images: ['https://img.com/1.png', 'https://img.com/2.png'] }]
+			items: [fullItem({ name: 'Item', images: ['https://img.com/1.png', 'https://img.com/2.png'] })]
 		});
 
 		expect(result.items[0].images).toEqual(['https://img.com/1.png', 'https://img.com/2.png']);
@@ -158,7 +193,7 @@ describe('parseMakeOutput', () => {
 
 	it('should trim whitespace from names', () => {
 		const result = parseMakeOutput({
-			items: [{ name: '  Padded Name  ', category: '  Cat  ' }]
+			items: [fullItem({ name: '  Padded Name  ', category: '  Cat  ' })]
 		});
 
 		expect(result.items[0].name).toBe('Padded Name');
@@ -167,7 +202,7 @@ describe('parseMakeOutput', () => {
 
 	it('should filter non-string tags', () => {
 		const result = parseMakeOutput({
-			items: [{ name: 'Item', tags: ['valid', 123, null, 'also-valid'] }]
+			items: [fullItem({ name: 'Item', tags: ['valid', 123, null, 'also-valid'] })]
 		});
 
 		expect(result.items[0].tags).toEqual(['valid', 'also-valid']);
