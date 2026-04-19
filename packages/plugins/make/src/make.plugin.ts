@@ -386,11 +386,28 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 								`Execution ${statusName} (poll #${attempt})...`
 							);
 						},
+				if (executionId) {
+					let pollingAttempts = 0;
+					const status = await client.pollExecution(
+						scenarioId,
+						executionId,
+						makeSettings,
+						(attempt, statusName) => {
+							pollingAttempts = attempt;
+							const percent = Math.min(15 + Math.round((attempt / 60) * 55), 70);
+							reportProgress(
+								onProgress,
+								2,
+								percent,
+								'Execute Make.com Scenario',
+								`Execution ${statusName} (poll #${attempt})...`
+							);
+						},
 						signal
 					);
 					execResult = {
 						output: status.output ?? status.result ?? status.data ?? status,
-						pollingAttempts: 0,
+						pollingAttempts,
 						makeDuration: Date.now() - runStart,
 						executionId
 					};
