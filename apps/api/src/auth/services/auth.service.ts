@@ -359,29 +359,7 @@ export class AuthService {
             return true;
         }
 
-        return this.hasRequiredScopes(account.scope, ['repo']);
-    }
-
-    private hasRequiredScopes(
-        scope: string | null | undefined,
-        requiredScopes: readonly string[],
-    ): boolean {
-        if (requiredScopes.length === 0) {
-            return true;
-        }
-
-        const availableScopes = new Set(
-            (scope || '')
-                .split(/[,\s]+/)
-                .map((value) => value.trim())
-                .filter(Boolean),
-        );
-
-        if (availableScopes.size === 0) {
-            return false;
-        }
-
-        return requiredScopes.every((requiredScope) => availableScopes.has(requiredScope));
+        return this.authAccountRepository.hasRequiredScopes(account, ['repo']);
     }
 
     private async randomHashedPassword() {
