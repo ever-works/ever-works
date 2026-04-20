@@ -11,12 +11,7 @@ import { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dt
 
 export type DirectoryScheduleAllowedCadence = ContractDirectoryScheduleAllowedCadence;
 
-export type DirectoryScheduleDto = Omit<ContractDirectoryScheduleDto, 'blockingCode'> & {
-    blockingCode?:
-        | 'SCHEDULED_UPDATES_DISABLED'
-        | 'INITIAL_DIRECTORY_SETUP_REQUIRED'
-        | 'CONFIG_UNAVAILABLE';
-};
+export type DirectoryScheduleDto = ContractDirectoryScheduleDto;
 
 export class UpdateDirectoryScheduleDto implements IUpdateDirectorySchedulePayload {
     @ApiPropertyOptional({ description: 'Whether the schedule is enabled' })

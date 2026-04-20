@@ -100,10 +100,16 @@ export class PluginOperationsService {
         }
 
         // Map to response
-        const plugins: UserPluginResponse[] = filteredPlugins.map((registered) => {
-            const userPlugin = userPluginMap.get(registered.plugin.id);
-            return this.toUserPluginResponse(registered, userPlugin);
-        });
+        const plugins = await Promise.all(
+            filteredPlugins.map((registered) => {
+                const userPlugin = userPluginMap.get(registered.plugin.id);
+                return this.toUserPluginResponseWithResolvedSettings(
+                    registered,
+                    userPlugin,
+                    userId,
+                );
+            }),
+        );
 
         return {
             plugins,
@@ -294,7 +300,7 @@ export class PluginOperationsService {
             where: { userId, pluginId },
         });
 
-        return this.toUserPluginResponse(registered, userPlugin);
+        return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId);
     }
 
     // ============================================
@@ -377,7 +383,7 @@ export class PluginOperationsService {
         await this.userPluginRepository.save(userPlugin);
         this.logger.log(`Plugin "${pluginId}" enabled for user "${userId}"`);
 
-        return this.toUserPluginResponse(registered, userPlugin);
+        return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId);
     }
 
     /**
@@ -433,7 +439,7 @@ export class PluginOperationsService {
 
         this.logger.log(`Plugin "${pluginId}" disabled for user "${userId}"`);
 
-        return this.toUserPluginResponse(registered, userPlugin);
+        return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId);
     }
 
     /**
@@ -519,7 +525,7 @@ export class PluginOperationsService {
         await this.userPluginRepository.save(userPlugin);
         this.logger.log(`Plugin "${pluginId}" settings updated for user "${userId}"`);
 
-        return this.toUserPluginResponse(registered, userPlugin);
+        return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId);
     }
 
     /**
@@ -1140,6 +1146,59 @@ export class PluginOperationsService {
             userPluginId: userPlugin?.id,
             autoEnableForDirectories: userPlugin?.autoEnableForDirectories ?? false,
         };
+    }
+
+    private async toUserPluginResponseWithResolvedSettings(
+        registered: RegisteredPlugin,
+        userPlugin: UserPluginEntity | null | undefined,
+        userId: string,
+    ): Promise<UserPluginResponse> {
+        const response = this.toUserPluginResponse(registered, userPlugin);
+        const resolvedSettings = await this.getResolvedDisplaySettings(registered, userId);
+
+        if (!resolvedSettings) {
+            return response;
+        }
+
+        return {
+            ...response,
+            resolvedSettings,
+        };
+    }
+
+    private async getResolvedDisplaySettings(
+        registered: RegisteredPlugin,
+        userId: string,
+    ): Promise<Record<string, unknown> | undefined> {
+        const schema = registered.plugin.settingsSchema;
+        if (!schema?.properties) {
+            return undefined;
+        }
+
+        const resolved = await this.settingsService.getResolvedSettings(registered.plugin.id, {
+            userId,
+        });
+
+        const displaySettings: Record<string, unknown> = {};
+
+        for (const [key, propSchema] of Object.entries(schema.properties)) {
+            if (propSchema['x-hidden'] || propSchema['x-adminOnly']) continue;
+
+            const resolvedSetting = resolved[key];
+            if (!resolvedSetting) continue;
+
+            const value = resolvedSetting.value;
+            if (value === undefined || value === null || value === '') continue;
+
+            if (propSchema['x-secret']) {
+                displaySettings[key] = '••••••••';
+                continue;
+            }
+
+            displaySettings[key] = value;
+        }
+
+        return Object.keys(displaySettings).length > 0 ? displaySettings : undefined;
     }
 
     /**
