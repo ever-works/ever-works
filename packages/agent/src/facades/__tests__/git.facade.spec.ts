@@ -1407,7 +1407,10 @@ describe('GitFacadeService', () => {
             registry.getByCapability.mockReturnValue([registered]);
 
             authAccountRepository.findProviderAccount.mockResolvedValue(
-                createMockProviderAccount({ accessToken: 'social-login-token', scope: 'read:user,user:email' }),
+                createMockProviderAccount({
+                    accessToken: 'social-login-token',
+                    scope: 'read:user,user:email',
+                }),
             );
             authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
             authAccountRepository.hasRequiredScopes.mockReturnValue(false);

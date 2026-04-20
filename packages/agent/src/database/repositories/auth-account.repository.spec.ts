@@ -220,10 +220,9 @@ describe('AuthAccountRepository', () => {
         ).toBe(true);
 
         expect(
-            authAccountRepository.hasRequiredScopes(
-                { scope: 'user:email read:user' } as any,
-                ['repo'],
-            ),
+            authAccountRepository.hasRequiredScopes({ scope: 'user:email read:user' } as any, [
+                'repo',
+            ]),
         ).toBe(false);
     });
 });

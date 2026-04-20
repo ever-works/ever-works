@@ -190,7 +190,12 @@ describe('OAuthFacadeService', () => {
         });
 
         it('should return false when provider account is missing required scopes', async () => {
-            const token = { accessToken: 'token', userId: 'user-1', providerId: 'github', scope: 'read:user' };
+            const token = {
+                accessToken: 'token',
+                userId: 'user-1',
+                providerId: 'github',
+                scope: 'read:user',
+            };
             authAccountRepository.findProviderAccount.mockResolvedValue(token as any);
             authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
             authAccountRepository.hasRequiredScopes.mockReturnValue(false);
@@ -231,7 +236,12 @@ describe('OAuthFacadeService', () => {
         });
 
         it('should return null when provider account is missing required scopes', async () => {
-            const token = { accessToken: 'token-123', userId: 'user-1', providerId: 'github', scope: 'read:user' };
+            const token = {
+                accessToken: 'token-123',
+                userId: 'user-1',
+                providerId: 'github',
+                scope: 'read:user',
+            };
             authAccountRepository.findProviderAccount.mockResolvedValue(token as any);
             authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
             authAccountRepository.hasRequiredScopes.mockReturnValue(false);

@@ -1,4 +1,1 @@
-export {
-    GITHUB_SCOPES,
-    type GitHubScope,
-} from '@ever-works/plugin';
+export { GITHUB_SCOPES, type GitHubScope } from '@ever-works/plugin';

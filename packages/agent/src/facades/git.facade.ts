@@ -119,7 +119,11 @@ export class GitFacadeService implements IGitFacade {
 
     private canUseOAuthAccountForGit(
         providerId: string,
-        account: { accessToken?: string | null; scope?: string | null; accessTokenExpiresAt?: Date | null },
+        account: {
+            accessToken?: string | null;
+            scope?: string | null;
+            accessTokenExpiresAt?: Date | null;
+        },
     ): boolean {
         return (
             !!account.accessToken &&
