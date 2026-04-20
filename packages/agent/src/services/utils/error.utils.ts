@@ -78,7 +78,8 @@ export function normalizeGeneratorError(error: any): string {
 
     if (
         lowerMessage.includes('could not read username') ||
-        lowerMessage.includes('could not read password')
+        lowerMessage.includes('could not read password') ||
+        lowerMessage.includes('no connected account found')
     ) {
         return 'Please reconnect your Git account to continue.';
     }
