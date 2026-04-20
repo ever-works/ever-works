@@ -108,6 +108,29 @@ export class GitFacadeService implements IGitFacade {
         private readonly settingsService: PluginSettingsService,
     ) {}
 
+    private getRequiredOAuthScopes(providerId: string): readonly string[] {
+        switch (providerId) {
+            case 'github':
+                return ['repo'];
+            default:
+                return [];
+        }
+    }
+
+    private canUseOAuthAccountForGit(
+        providerId: string,
+        account: { accessToken?: string | null; scope?: string | null; accessTokenExpiresAt?: Date | null },
+    ): boolean {
+        return (
+            !!account.accessToken &&
+            !this.authAccountRepository.isAccessTokenExpired(account) &&
+            this.authAccountRepository.hasRequiredScopes(
+                account,
+                this.getRequiredOAuthScopes(providerId),
+            )
+        );
+    }
+
     isConfigured(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.length > 0 && plugins.some((p) => p.state === 'loaded');
@@ -141,7 +164,7 @@ export class GitFacadeService implements IGitFacade {
                 options.userId,
                 plugin.id,
             );
-            if (account && !this.authAccountRepository.isAccessTokenExpired(account)) {
+            if (account && this.canUseOAuthAccountForGit(plugin.id, account)) {
                 return true;
             }
 
@@ -173,7 +196,7 @@ export class GitFacadeService implements IGitFacade {
                 options.userId,
                 plugin.id,
             );
-            if (account && !this.authAccountRepository.isAccessTokenExpired(account)) {
+            if (account && this.canUseOAuthAccountForGit(plugin.id, account)) {
                 return account.accessToken || null;
             }
 
@@ -753,11 +776,7 @@ export class GitFacadeService implements IGitFacade {
             options.userId,
             plugin.id,
         );
-        if (
-            account &&
-            !this.authAccountRepository.isAccessTokenExpired(account) &&
-            account.accessToken
-        ) {
+        if (account && this.canUseOAuthAccountForGit(plugin.id, account)) {
             return { plugin, token: account.accessToken };
         }
 

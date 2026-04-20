@@ -264,10 +264,12 @@ export class AuthService {
         // Get connected providers from account records
         const providerAccounts =
             await this.authAccountRepository.findProviderAccountsByUserId(userId);
-        const connectedProviders = providerAccounts.map((account) => ({
-            provider: account.providerId,
-            createdAt: account.createdAt,
-        }));
+        const connectedProviders = providerAccounts
+            .filter((account) => this.isConnectedProviderAccount(account))
+            .map((account) => ({
+                provider: account.providerId,
+                createdAt: account.createdAt,
+            }));
 
         return {
             ...userProfile,
@@ -341,6 +343,45 @@ export class AuthService {
             email: user.email,
             expiresAt: user.passwordResetExpires,
         };
+    }
+
+    private isConnectedProviderAccount(account: {
+        providerId: string;
+        accessToken?: string | null;
+        accessTokenExpiresAt?: Date | null;
+        scope?: string | null;
+    }): boolean {
+        if (!account.accessToken || this.authAccountRepository.isAccessTokenExpired(account)) {
+            return false;
+        }
+
+        if (account.providerId !== AuthProvider.GITHUB) {
+            return true;
+        }
+
+        return this.hasRequiredScopes(account.scope, ['repo']);
+    }
+
+    private hasRequiredScopes(
+        scope: string | null | undefined,
+        requiredScopes: readonly string[],
+    ): boolean {
+        if (requiredScopes.length === 0) {
+            return true;
+        }
+
+        const availableScopes = new Set(
+            (scope || '')
+                .split(/[,\s]+/)
+                .map((value) => value.trim())
+                .filter(Boolean),
+        );
+
+        if (availableScopes.size === 0) {
+            return false;
+        }
+
+        return requiredScopes.every((requiredScope) => availableScopes.has(requiredScope));
     }
 
     private async randomHashedPassword() {

@@ -32,21 +32,11 @@ import type {
 	OAuthToken,
 	OAuthUser
 } from '@ever-works/plugin';
+import { GITHUB_SCOPES } from '@ever-works/plugin';
 import { GitOperations } from '@ever-works/plugin/git';
 import { GitHubApiService } from './github-api.service.js';
 import { GitHubActionsService } from './github-actions.service.js';
 import type { GitHubSettings, GitHubPublicKey } from './types.js';
-
-const DEFAULT_SCOPES = [
-	'user:email',
-	'read:user',
-	'repo',
-	'delete_repo',
-	'workflow',
-	'write:repo_hook',
-	'read:org',
-	'project'
-] as const;
 
 export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 	readonly id = 'github';
@@ -452,7 +442,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 	getAuthorizationUrl(state: string, config?: Partial<OAuthConfig>): string {
 		const clientId = config?.clientId;
 		const redirectUri = config?.redirectUri;
-		const scopes = config?.scopes || DEFAULT_SCOPES;
+		const scopes = config?.scopes || GITHUB_SCOPES;
 		const forceConsent = config?.forceConsent || false;
 
 		if (!clientId) {

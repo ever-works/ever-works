@@ -118,4 +118,112 @@ describe('AuthAccountRepository', () => {
             }),
         });
     });
+
+    it('preserves a stronger existing token when a narrower token is upserted later', async () => {
+        const existingProviderAccount = {
+            id: 'account-1',
+            userId: 'user-1',
+            providerId: 'github',
+            accountId: '35149259',
+            accessToken: 'repo-token',
+            refreshToken: 'repo-refresh',
+            tokenType: 'Bearer',
+            accessTokenExpiresAt: new Date(Date.now() + 60_000),
+            refreshTokenExpiresAt: null,
+            scope: 'user:email read:user repo workflow read:org',
+            idToken: null,
+            metadata: { login: 'repo-user' },
+            username: 'repo-user',
+            email: 'repo@example.com',
+        };
+
+        repository.findOne
+            .mockResolvedValueOnce(existingProviderAccount)
+            .mockResolvedValueOnce(null);
+        repository.findOneOrFail.mockResolvedValue(existingProviderAccount);
+
+        await authAccountRepository.upsertProviderAccount({
+            userId: 'user-1',
+            providerId: 'github',
+            accountId: '35149259',
+            accessToken: 'login-token',
+            refreshToken: 'login-refresh',
+            tokenType: 'Bearer',
+            accessTokenExpiresAt: new Date(Date.now() + 120_000),
+            scope: 'user:email read:user',
+            username: 'login-user',
+        });
+
+        expect(repository.update).toHaveBeenCalledWith(
+            'account-1',
+            expect.objectContaining({
+                accessToken: 'repo-token',
+                refreshToken: 'repo-refresh',
+                scope: 'user:email read:user repo workflow read:org',
+                username: 'login-user',
+            }),
+        );
+    });
+
+    it('replaces an expired stronger token with a newer narrower token', async () => {
+        const existingProviderAccount = {
+            id: 'account-1',
+            userId: 'user-1',
+            providerId: 'github',
+            accountId: '35149259',
+            accessToken: 'expired-repo-token',
+            refreshToken: 'expired-repo-refresh',
+            tokenType: 'Bearer',
+            accessTokenExpiresAt: new Date(Date.now() - 60_000),
+            refreshTokenExpiresAt: null,
+            scope: 'user:email read:user repo workflow read:org',
+            idToken: null,
+            metadata: { login: 'repo-user' },
+        };
+
+        repository.findOne
+            .mockResolvedValueOnce(existingProviderAccount)
+            .mockResolvedValueOnce(null);
+        repository.findOneOrFail.mockResolvedValue({
+            ...existingProviderAccount,
+            accessToken: 'login-token',
+            scope: 'user:email read:user',
+        });
+
+        await authAccountRepository.upsertProviderAccount({
+            userId: 'user-1',
+            providerId: 'github',
+            accountId: '35149259',
+            accessToken: 'login-token',
+            refreshToken: 'login-refresh',
+            tokenType: 'Bearer',
+            accessTokenExpiresAt: new Date(Date.now() + 120_000),
+            scope: 'user:email read:user',
+        });
+
+        expect(repository.update).toHaveBeenCalledWith(
+            'account-1',
+            expect.objectContaining({
+                accessToken: 'login-token',
+                refreshToken: 'login-refresh',
+                scope: 'user:email read:user',
+            }),
+        );
+    });
+
+    it('matches required scopes across comma and space separated values', () => {
+        expect(
+            authAccountRepository.hasRequiredScopes(
+                { scope: 'user:email, read:user repo' } as any,
+                ['repo', 'read:user'],
+            ),
+        ).toBe(true);
+
+        expect(
+            authAccountRepository.hasRequiredScopes(
+                { scope: 'user:email read:user' } as any,
+                ['repo'],
+            ),
+        ).toBe(false);
+    });
 });
