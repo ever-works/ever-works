@@ -371,7 +371,21 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 				const run = await client.runScenario(scenarioId, payload, signal);
 				const executionId = run.executionId ?? this.extractExecutionId(run as Record<string, unknown>);
 
-				if (executionId) {
+				// `POST /scenarios/{id}/run` is invoked with `responsive: true`, so when the
+				// scenario finishes synchronously its final module payload (e.g. a Webhook
+				// Response body) is included inline in the run response. Prefer that output
+				// over the polling endpoint, which only returns execution metadata (status,
+				// operations, transfer) — never the scenario's output bundles.
+				const inlineOutput = extractInlineOutput(run as Record<string, unknown>);
+
+				if (inlineOutput !== undefined) {
+					execResult = {
+						output: inlineOutput,
+						pollingAttempts: 0,
+						makeDuration: Date.now() - runStart,
+						executionId
+					};
+				} else if (executionId) {
 					const { status, attempts } = await client.pollExecution(
 						scenarioId,
 						executionId,
@@ -647,6 +661,44 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
  * (which would throw and fail the pipeline after a successful run) or echo
  * sensitive inputs like repo access tokens into logs.
  */
+/**
+ * Pulls the scenario's output bundle out of a `POST /scenarios/{id}/run` response.
+ *
+ * With `responsive: true`, Make runs the scenario synchronously and embeds the
+ * final module's payload (e.g. a "Webhook response" body) in the run response.
+ * The exact wrapper varies by zone and account — Make has used `outputs`,
+ * `output`, `result`, `data`, and `response.body` interchangeably — so we walk
+ * the known shapes and unwrap string-encoded JSON when present.
+ *
+ * Returns `undefined` when the response has no inline output and the caller
+ * should fall back to polling `/executions/{id}` for truly async runs.
+ */
+function extractInlineOutput(run: Record<string, unknown>): unknown {
+	const candidateKeys = ['outputs', 'output', 'result', 'data', 'body', 'payload', 'response'];
+	for (const key of candidateKeys) {
+		const value = run[key];
+		if (value === undefined || value === null) continue;
+		if (key === 'response' && typeof value === 'object') {
+			const body = (value as Record<string, unknown>).body;
+			if (body !== undefined && body !== null) return unwrapJsonString(body);
+			continue;
+		}
+		return unwrapJsonString(value);
+	}
+	return undefined;
+}
+
+function unwrapJsonString(value: unknown): unknown {
+	if (typeof value !== 'string') return value;
+	const trimmed = value.trim();
+	if (!trimmed) return value;
+	try {
+		return JSON.parse(trimmed);
+	} catch {
+		return value;
+	}
+}
+
 function describeOutputShape(output: unknown): string {
 	if (output === null) return 'type=null';
 	if (output === undefined) return 'type=undefined';

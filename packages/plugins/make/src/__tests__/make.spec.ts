@@ -406,6 +406,68 @@ describe('MakePlugin', () => {
 			expect(result.outputs.items[0].name).toBe('Webhook Item');
 		});
 
+		it('should use inline outputs from a responsive scenario run without polling', async () => {
+			// validate-make: scenario detail
+			fetchMock.mockResolvedValueOnce(
+				mockResponse({ body: { scenario: { id: 42, name: 'My Scenario', isActive: true } } })
+			);
+			// runScenario: responsive run returns the final module's body inline
+			fetchMock.mockResolvedValueOnce(
+				mockResponse({
+					body: {
+						executionId: 'exec-inline-1',
+						outputs: {
+							items: [
+								{
+									name: 'Inline Item',
+									description: 'Returned inline from responsive run',
+									url: 'https://example.com/inline',
+									category: 'Tools'
+								}
+							]
+						}
+					}
+				})
+			);
+
+			const result = await plugin.execute(createDirectory(), createRequest(), createExisting());
+
+			expect(result.success).toBe(true);
+			expect(result.outputs.items[0].name).toBe('Inline Item');
+			// No third fetch for /executions/{id} — polling was skipped.
+			expect(fetchMock).toHaveBeenCalledTimes(2);
+		});
+
+		it('should parse a string-encoded JSON body inside the inline run response', async () => {
+			fetchMock.mockResolvedValueOnce(
+				mockResponse({ body: { scenario: { id: 42, name: 'My Scenario', isActive: true } } })
+			);
+			// Some Make zones wrap the final body as a stringified JSON in `body`.
+			fetchMock.mockResolvedValueOnce(
+				mockResponse({
+					body: {
+						executionId: 'exec-inline-2',
+						body: JSON.stringify({
+							items: [
+								{
+									name: 'Stringified Inline Item',
+									description: 'Inline string JSON',
+									url: 'https://example.com/sj',
+									category: 'Tools'
+								}
+							]
+						})
+					}
+				})
+			);
+
+			const result = await plugin.execute(createDirectory(), createRequest(), createExisting());
+
+			expect(result.success).toBe(true);
+			expect(result.outputs.items[0].name).toBe('Stringified Inline Item');
+			expect(fetchMock).toHaveBeenCalledTimes(2);
+		});
+
 		it('should handle cancellation', async () => {
 			const abortController = new AbortController();
 			abortController.abort();
