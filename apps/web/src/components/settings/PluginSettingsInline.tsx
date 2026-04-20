@@ -10,8 +10,8 @@ import { Save, Check, AlertCircle } from 'lucide-react';
 import { updatePluginSettings } from '@/app/actions/plugins';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { PluginSettingsField } from '@/components/plugins/form/PluginSettingsField';
-import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
+import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 
@@ -29,8 +29,9 @@ export function PluginSettingsInline({
     const t = useTranslations('dashboard.plugins');
     const tOnboarding = useTranslations('onboarding.plugins');
     const byokTrigger = plugin.uiHints?.byok?.triggerField;
+    const displaySettings = plugin.resolvedSettings || plugin.settings || {};
     const [byokRevealed, setByokRevealed] = useState(
-        !plugin.uiHints?.byok || Boolean(byokTrigger && plugin.settings?.[byokTrigger]),
+        !plugin.uiHints?.byok || Boolean(byokTrigger && displaySettings[byokTrigger]),
     );
 
     const hasOAuth = plugin.capabilities.includes('oauth') && oauthConnection !== undefined;
@@ -76,6 +77,7 @@ export function PluginSettingsInline({
         initialSettings: plugin.settings || {},
         scopes: ['global', 'user'],
         onSave,
+        fallbackSettings: plugin.resolvedSettings,
         scope: 'user',
     });
 
@@ -89,7 +91,7 @@ export function PluginSettingsInline({
     const setupLink = plugin.uiHints?.setupLink;
     const showSetupButton =
         setupLink &&
-        (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !plugin.settings?.[f]));
+        (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !displaySettings[f]));
 
     const headerContent = (
         <div className="flex items-center gap-3 min-w-0">

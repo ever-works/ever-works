@@ -29,3 +29,6 @@ export { DomainType } from '@ever-works/contracts';
 
 // Form types commonly used in form-schema providers
 export type { FormFieldDefinition, FormFieldGroup, FormSchema, FormFieldType } from '@ever-works/contracts';
+
+// Shared provider constants
+export { GITHUB_SCOPES, type GitHubScope } from './github.scopes.js';

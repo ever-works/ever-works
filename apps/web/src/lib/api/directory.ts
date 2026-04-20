@@ -30,12 +30,7 @@ export type {
     UpdateSourceValidationPayload,
 } from '@ever-works/contracts/api';
 
-export type DirectoryScheduleDto = Omit<ContractDirectoryScheduleDto, 'blockingCode'> & {
-    blockingCode?:
-        | 'SCHEDULED_UPDATES_DISABLED'
-        | 'INITIAL_DIRECTORY_SETUP_REQUIRED'
-        | 'CONFIG_UNAVAILABLE';
-};
+export type DirectoryScheduleDto = ContractDirectoryScheduleDto;
 
 export type UpdateDirectorySchedulePayload = ContractUpdateDirectorySchedulePayload & {
     runImmediately?: boolean;
