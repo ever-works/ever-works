@@ -130,8 +130,6 @@ export interface PluginUiHints {
 		/** Only show the button when ALL listed fields are empty. */
 		showWhenEmpty?: string[];
 	};
-	/** Show an org/team management panel inside the plugin settings page. */
-	organizationSettings?: boolean;
 	/** Include this plugin as a step in the first-time onboarding wizard. */
 	includeInOnboarding?: boolean;
 	/** Step position in the onboarding wizard (lower = earlier). */

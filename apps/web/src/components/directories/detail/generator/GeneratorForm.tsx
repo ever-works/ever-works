@@ -47,8 +47,8 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
 
     // Check if directory has been generated before
     const isGenerated = !!config?.metadata;
-    const initialPrompt = config?.metadata?.initial_prompt || '';
     const lastRequestData = config?.metadata?.last_request_data;
+    const initialPrompt = lastRequestData?.prompt || config?.metadata?.initial_prompt || '';
 
     // Core form data (always present)
     const [coreData, setCoreData] = useState<{
@@ -176,16 +176,26 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const submitGeneration = async () => {
         startTransition(async () => {
             let result;
+            const selectedProviders = buildSelectedProviders(formSchema);
+            const promptChanged = coreData.prompt.trim() !== initialPrompt.trim();
+            const requiresFullGeneration =
+                !isGenerated ||
+                showAdvancedOptions ||
+                coreData.generation_method === GenerationMethod.RECREATE ||
+                promptChanged;
 
-            if (
-                isGenerated &&
-                !showAdvancedOptions &&
-                coreData.generation_method !== GenerationMethod.RECREATE
-            ) {
+            const unconfigured = getUnconfiguredProviders(formSchema);
+            if (unconfigured.length > 0) {
+                toast.error(t('unconfiguredProviders', { providers: unconfigured.join(', ') }));
+                return;
+            }
+
+            if (isGenerated && !requiresFullGeneration) {
                 // Simple update - only send update-specific fields
                 const updateData: UpdateItemsGeneratorDto = {
                     generation_method: coreData.generation_method,
                     update_with_pull_request: coreData.update_with_pull_request,
+                    providers: selectedProviders,
                 };
                 result = await updateItems(directoryId, updateData);
             } else {
@@ -195,19 +205,13 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                     return;
                 }
 
-                const unconfigured = getUnconfiguredProviders(formSchema);
-                if (unconfigured.length > 0) {
-                    toast.error(t('unconfiguredProviders', { providers: unconfigured.join(', ') }));
-                    return;
-                }
-
                 const generateData: CreateItemsGeneratorDto = {
                     name: coreData.name,
                     prompt: coreData.prompt,
                     generation_method: coreData.generation_method,
                     update_with_pull_request: coreData.update_with_pull_request,
                     website_repository_creation_method: coreData.website_repository_creation_method,
-                    providers: buildSelectedProviders(formSchema),
+                    providers: selectedProviders,
                     pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
                 };
 
@@ -236,15 +240,15 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl">
-            {/* Show update fields for existing directories, full fields for new/expanded */}
-            {isGenerated && !showAdvancedOptions ? (
+            <RequiredFields formData={coreData} onChange={handleCoreDataChange} />
+
+            {/* Update-specific controls for existing directories */}
+            {isGenerated && (
                 <UpdateItemsFields
                     generationMethod={coreData.generation_method}
                     updateWithPullRequest={coreData.update_with_pull_request}
                     onChange={handleCoreDataChange}
                 />
-            ) : (
-                <RequiredFields formData={coreData} onChange={handleCoreDataChange} />
             )}
 
             {/* Pipeline & Provider Selection — always visible */}

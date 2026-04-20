@@ -204,6 +204,9 @@ export interface UserPluginResponse extends PluginResponse {
 	enabled: boolean;
 	/** User-specific settings (masked) */
 	settings?: Record<string, unknown>;
+	/** Resolved display settings for the current user.
+	 * Non-secret values are returned as-is; secrets are masked for display only. */
+	resolvedSettings?: Record<string, unknown>;
 	/** User-specific metadata (read-only state) */
 	metadata?: Record<string, unknown>;
 	/** User plugin entity ID */

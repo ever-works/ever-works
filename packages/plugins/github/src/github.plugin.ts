@@ -557,7 +557,6 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 			autoEnable: true,
 			visibility: 'user-only',
 			uiHints: {
-				organizationSettings: true,
 				includeInOnboarding: true,
 				onboardingPriority: 2,
 				onboardingDescription: 'Link your GitHub account to store projects and enable automatic deployments.'
