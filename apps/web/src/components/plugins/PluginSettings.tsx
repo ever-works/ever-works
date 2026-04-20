@@ -26,6 +26,7 @@ import { PluginEnablePanel } from './PluginEnablePanel';
 import { PluginDisableWarning } from './PluginDisableWarning';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { ClaudeCodeOnboardingWizard } from '@/components/settings/ClaudeCodeOnboardingWizard';
+import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
 import { SimAiOnboardingWizard } from '@/components/settings/SimAiOnboardingWizard';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
@@ -269,6 +270,13 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                     pluginId={plugin.pluginId}
                     pluginName={plugin.name}
                     connection={oauthConnection}
+                />
+            )}
+
+            {plugin.uiHints?.organizationSettings && (
+                <GitHubOrganizationsSettings
+                    plugin={plugin}
+                    connected={Boolean(oauthConnection?.connected)}
                 />
             )}
 

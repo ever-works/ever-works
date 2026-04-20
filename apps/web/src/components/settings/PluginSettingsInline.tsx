@@ -10,6 +10,7 @@ import { Save, Check, AlertCircle } from 'lucide-react';
 import { updatePluginSettings } from '@/app/actions/plugins';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { PluginSettingsField } from '@/components/plugins/form/PluginSettingsField';
+import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
@@ -147,6 +148,13 @@ export function PluginSettingsInline({
                         pluginId={plugin.pluginId}
                         pluginName={plugin.name}
                         connection={oauthConnection!}
+                    />
+                )}
+
+                {plugin.uiHints?.organizationSettings && (
+                    <GitHubOrganizationsSettings
+                        plugin={plugin}
+                        connected={Boolean(oauthConnection?.connected)}
                     />
                 )}
 

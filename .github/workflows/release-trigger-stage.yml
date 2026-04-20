@@ -41,4 +41,4 @@ jobs:
         working-directory: packages/tasks
         env:
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
-        run: npx trigger.dev@4.4.3 deploy --env staging
+        run: npx trigger.dev@4.4.4 deploy --env staging

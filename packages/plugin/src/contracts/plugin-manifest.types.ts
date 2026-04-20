@@ -114,6 +114,8 @@ export interface PluginRepository {
 export interface PluginUiHints {
 	/** Plugin has a multi-step setup wizard shown inside its settings page. */
 	onboardingWizard?: boolean;
+	/** Show a read-only list of organizations available from the connected provider account. */
+	organizationSettings?: boolean;
 	/** Hide all settings fields behind a reveal button until the user opts in. */
 	byok?: {
 		/** Reveal button label. Defaults to "Bring your own key". */
