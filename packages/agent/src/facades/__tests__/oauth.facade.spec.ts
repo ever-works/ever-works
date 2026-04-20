@@ -67,6 +67,7 @@ describe('OAuthFacadeService', () => {
             findProviderAccount: jest.fn(),
             deleteProviderAccount: jest.fn(),
             isAccessTokenExpired: jest.fn().mockReturnValue(false),
+            hasRequiredScopes: jest.fn().mockReturnValue(true),
         } as any;
 
         const module: TestingModule = await Test.createTestingModule({
@@ -188,6 +189,22 @@ describe('OAuthFacadeService', () => {
             expect(result).toBe(false);
         });
 
+        it('should return false when provider account is missing required scopes', async () => {
+            const token = {
+                accessToken: 'token',
+                userId: 'user-1',
+                providerId: 'github',
+                scope: 'read:user',
+            };
+            authAccountRepository.findProviderAccount.mockResolvedValue(token as any);
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
+            authAccountRepository.hasRequiredScopes.mockReturnValue(false);
+
+            const result = await service.hasValidCredentials('user-1', 'github');
+
+            expect(result).toBe(false);
+        });
+
         it('should return false when no token exists', async () => {
             authAccountRepository.findProviderAccount.mockResolvedValue(null);
 
@@ -212,6 +229,22 @@ describe('OAuthFacadeService', () => {
             const token = { accessToken: 'token-123', userId: 'user-1', provider: 'github' };
             authAccountRepository.findProviderAccount.mockResolvedValue(token as any);
             authAccountRepository.isAccessTokenExpired.mockReturnValue(true);
+
+            const result = await service.getAccessToken('user-1', 'github');
+
+            expect(result).toBeNull();
+        });
+
+        it('should return null when provider account is missing required scopes', async () => {
+            const token = {
+                accessToken: 'token-123',
+                userId: 'user-1',
+                providerId: 'github',
+                scope: 'read:user',
+            };
+            authAccountRepository.findProviderAccount.mockResolvedValue(token as any);
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
+            authAccountRepository.hasRequiredScopes.mockReturnValue(false);
 
             const result = await service.getAccessToken('user-1', 'github');
 

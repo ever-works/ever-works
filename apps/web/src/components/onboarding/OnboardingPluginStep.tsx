@@ -60,13 +60,15 @@ function FieldBasedPluginStep({ plugin }: { plugin: UserPlugin }) {
         initialSettings: plugin.settings || {},
         scopes: ['global', 'user'],
         onSave,
+        fallbackSettings: plugin.resolvedSettings,
         scope: 'user',
     });
 
+    const displaySettings = plugin.resolvedSettings || plugin.settings || {};
     const setupLink = plugin.uiHints?.setupLink;
     const showSetupButton =
         setupLink &&
-        (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !plugin.settings?.[f]));
+        (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !displaySettings[f]));
 
     if (!hasSettings) {
         return (

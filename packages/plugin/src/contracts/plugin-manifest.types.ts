@@ -114,6 +114,8 @@ export interface PluginRepository {
 export interface PluginUiHints {
 	/** Plugin has a multi-step setup wizard shown inside its settings page. */
 	onboardingWizard?: boolean;
+	/** Show a read-only list of organizations available from the connected provider account. */
+	organizationSettings?: boolean;
 	/** Hide all settings fields behind a reveal button until the user opts in. */
 	byok?: {
 		/** Reveal button label. Defaults to "Bring your own key". */
@@ -130,8 +132,6 @@ export interface PluginUiHints {
 		/** Only show the button when ALL listed fields are empty. */
 		showWhenEmpty?: string[];
 	};
-	/** Show an org/team management panel inside the plugin settings page. */
-	organizationSettings?: boolean;
 	/** Include this plugin as a step in the first-time onboarding wizard. */
 	includeInOnboarding?: boolean;
 	/** Step position in the onboarding wizard (lower = earlier). */
