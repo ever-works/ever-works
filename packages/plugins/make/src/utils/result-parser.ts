@@ -43,14 +43,42 @@ export function parseMakeOutput(raw: unknown): ParsedResults {
  */
 function normalizeOutput(raw: unknown): MakeWorkflowOutput {
 	if (typeof raw === 'string') {
-		const parsed = tryParse(raw);
+		const trimmed = raw.trim();
+
+		// Make.com's default response when no "Webhook Response" module runs.
+		// See https://apps.make.com/gateway — gateways return "Accepted" until
+		// the scenario explicitly emits a response.
+		if (/^accepted\.?$/i.test(trimmed)) {
+			throw new Error(
+				'Make.com returned the default "Accepted" response, which means the scenario did not run a ' +
+					'"Webhook Response" module. In the Make dashboard: (1) add a Webhooks → Webhook response module ' +
+					'at the end of the scenario, (2) set Status=200 and Body to JSON like { "items": [...] }, ' +
+					'(3) set a Content-Type: application/json custom header, (4) make sure the response module is ' +
+					'connected on the same branch as the Webhook trigger and is reached on every run.'
+			);
+		}
+
+		// Strip ```json ... ``` fences in case the scenario wraps output in markdown.
+		const unfenced = stripCodeFence(trimmed);
+		const parsed = tryParse(unfenced);
 		if (parsed !== null && typeof parsed === 'object') {
 			return normalizeOutput(parsed);
 		}
-		const preview = raw.length > 200 ? raw.slice(0, 200) + '...' : raw;
+
+		// HTML error page (e.g. reverse proxy, auth portal, login redirect).
+		if (trimmed.startsWith('<')) {
+			throw new Error(
+				'Make.com webhook returned HTML instead of JSON. This typically means the scenario or webhook URL ' +
+					'is proxied by an auth/CDN layer, or the URL is wrong. Verify the Webhook Response module returns ' +
+					'Content-Type: application/json and that the URL points directly at hook.<zone>.make.com.'
+			);
+		}
+
+		const preview = trimmed.length > 200 ? trimmed.slice(0, 200) + '…' : trimmed;
 		throw new Error(
 			'Make.com scenario returned a string that is not valid JSON. ' +
-				'Ensure the final module returns a JSON object with { items: [...] }. ' +
+				'Ensure the Webhook Response module returns a JSON object with { items: [...] } and ' +
+				'Content-Type: application/json. ' +
 				`Received: ${preview}`
 		);
 	}
@@ -97,6 +125,12 @@ function tryParse(str: string): unknown {
 	} catch {
 		return null;
 	}
+}
+
+function stripCodeFence(str: string): string {
+	const fence = /^```(?:json)?\s*([\s\S]*?)\s*```$/i;
+	const match = str.match(fence);
+	return match ? match[1].trim() : str;
 }
 
 function parseItems(rawItems: MakeOutputItem[]): ItemData[] {

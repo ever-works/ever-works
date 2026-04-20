@@ -211,6 +211,24 @@ describe('parseMakeOutput', () => {
 	it('should throw when items array is empty', () => {
 		expect(() => parseMakeOutput({ items: [] })).toThrow('no usable items');
 	});
+
+	it('should throw an actionable error when Make returns the default "Accepted" response', () => {
+		expect(() => parseMakeOutput('Accepted')).toThrow(/Webhook Response/i);
+		expect(() => parseMakeOutput('accepted.')).toThrow(/Webhook Response/i);
+	});
+
+	it('should parse markdown-fenced JSON', () => {
+		const fenced = '```json\n' + JSON.stringify({ items: [fullItem({ name: 'Fenced' })] }) + '\n```';
+		const result = parseMakeOutput(fenced);
+		expect(result.items).toHaveLength(1);
+		expect(result.items[0].name).toBe('Fenced');
+	});
+
+	it('should throw a clear error when webhook returns HTML', () => {
+		expect(() => parseMakeOutput('<!doctype html><html><body>Login</body></html>')).toThrow(
+			/HTML instead of JSON/i
+		);
+	});
 });
 
 describe('deduplicateItems', () => {
