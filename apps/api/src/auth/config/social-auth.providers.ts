@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { AuthProvider, config } from '../../config/constants';
+import { GITHUB_SCOPES } from './github-scopes.config';
 import type { SocialAuthProviderId } from '../types/social-auth.types';
 
 export interface SocialAuthProviderConfig {
@@ -20,7 +21,7 @@ export const SOCIAL_AUTH_PROVIDERS: Record<SocialAuthProviderId, SocialAuthProvi
         displayName: 'GitHub',
         authorizationUrl: 'https://github.com/login/oauth/authorize',
         tokenUrl: 'https://github.com/login/oauth/access_token',
-        scopes: ['user:email', 'read:user'],
+        scopes: [...GITHUB_SCOPES],
         callbackUrl: config.github.callbackUrl,
         clientId: config.github.clientId,
         clientSecret: config.github.clientSecret,

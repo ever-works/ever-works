@@ -1816,6 +1816,20 @@
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure"
+        },
+        "plugins": {
+            "githubOrganizations": {
+                "title": "GitHub организации",
+                "description": "Прегледайте организациите, достъпни от вашата GitHub връзка, и добавете допълнителни организации, които Ever Works да таргетира.",
+                "noOrganizations": "Все още не са намерени организации.",
+                "connectToLoad": "Свържете GitHub, за да заредите организациите си.",
+                "placeholder": "Добавете организация по потребителско име",
+                "addButton": "Добавяне на организация",
+                "saveButton": "Запазване на организациите",
+                "savedSuccess": "Достъпът до организацията е запазен.",
+                "saveFailed": "Неуспешно запазване.",
+                "removeLabel": "Премахване на {login}"
+            }
         }
     },
     "layout": {

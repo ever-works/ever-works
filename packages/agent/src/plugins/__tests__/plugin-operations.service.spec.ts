@@ -148,6 +148,7 @@ describe('PluginOperationsService', () => {
                     provide: PluginSettingsService,
                     useValue: {
                         resolveSettings: jest.fn().mockResolvedValue({}),
+                        getResolvedSettings: jest.fn().mockResolvedValue({}),
                     },
                 },
                 {
@@ -1870,6 +1871,7 @@ describe('PluginOperationsService', () => {
                         provide: PluginSettingsService,
                         useValue: {
                             resolveSettings: jest.fn().mockResolvedValue({}),
+                            getResolvedSettings: jest.fn().mockResolvedValue({}),
                         },
                     },
                     {

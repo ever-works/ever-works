@@ -135,7 +135,7 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                         'bg-surface-secondary dark:bg-surface-secondary-dark',
                         'border border-border dark:border-border-dark',
                         'text-text dark:text-text-dark',
-                        'hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
+                        'hover:bg-surface-tertiary dark:hover:bg-white/10',
                         'hover:border-border-secondary dark:hover:border-border-secondary-dark',
                         'focus:outline-none focus:ring-1 focus:ring-primary/20',
                         'active:scale-[0.98] ',
@@ -162,9 +162,9 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                             key={loc}
                             onClick={() => handleLocaleChange(loc)}
                             className={cn(
-                                'flex items-center gap-2 mb-px py-1 hover:bg-surface-tertiary/50 hover:dark:bg-surface-tertiary-dark/70',
+                                'flex items-center gap-2 mb-px py-1 hover:bg-surface-tertiary/50 hover:dark:bg-white/10',
                                 isActive &&
-                                    'bg-surface-tertiary dark:bg-surface-tertiary-dark/80 cursor-pointer font-medium',
+                                    'bg-surface-tertiary dark:bg-white/10 cursor-pointer font-medium',
                                 !isActive && 'cursor-pointer',
                             )}
                         >
