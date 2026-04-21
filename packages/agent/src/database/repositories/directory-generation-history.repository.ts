@@ -44,6 +44,8 @@ type HistoryUpdateParams = {
     logs?: GenerationStepLog[] | null;
 };
 
+const LATEST_POSITIVE_ITEM_COUNTS_BATCH_MULTIPLIER = 10;
+
 @Injectable()
 export class DirectoryGenerationHistoryRepository {
     constructor(
@@ -127,24 +129,44 @@ export class DirectoryGenerationHistoryRepository {
     }
 
     async findLatestPositiveItemCounts(directoryIds: string[]): Promise<Map<string, number>> {
-        if (directoryIds.length === 0) {
+        const uniqueDirectoryIds = Array.from(new Set(directoryIds));
+        if (uniqueDirectoryIds.length === 0) {
             return new Map();
         }
 
-        const records = await this.repository.find({
-            where: {
-                directoryId: In(directoryIds),
-                totalItemsCount: MoreThan(0),
-            },
-            order: { startedAt: 'DESC', createdAt: 'DESC' },
-        });
-
         const counts = new Map<string, number>();
+        const batchSize = Math.max(
+            uniqueDirectoryIds.length * LATEST_POSITIVE_ITEM_COUNTS_BATCH_MULTIPLIER,
+            uniqueDirectoryIds.length,
+        );
+        let skip = 0;
 
-        for (const record of records) {
-            if (!counts.has(record.directoryId)) {
-                counts.set(record.directoryId, record.totalItemsCount);
+        while (counts.size < uniqueDirectoryIds.length) {
+            const records = await this.repository.find({
+                where: {
+                    directoryId: In(uniqueDirectoryIds),
+                    totalItemsCount: MoreThan(0),
+                },
+                order: { startedAt: 'DESC', createdAt: 'DESC' },
+                take: batchSize,
+                skip,
+            });
+
+            if (records.length === 0) {
+                break;
             }
+
+            for (const record of records) {
+                if (!counts.has(record.directoryId)) {
+                    counts.set(record.directoryId, record.totalItemsCount);
+                }
+            }
+
+            if (records.length < batchSize) {
+                break;
+            }
+
+            skip += records.length;
         }
 
         return counts;
