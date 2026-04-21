@@ -112,6 +112,33 @@ export class GitFacadeService implements IGitFacade {
         private readonly settingsService: PluginSettingsService,
     ) {}
 
+    private getRequiredOAuthScopes(providerId: string): readonly string[] {
+        switch (providerId) {
+            case 'github':
+                return ['repo'];
+            default:
+                return [];
+        }
+    }
+
+    private canUseOAuthAccountForGit(
+        providerId: string,
+        account: {
+            accessToken?: string | null;
+            scope?: string | null;
+            accessTokenExpiresAt?: Date | null;
+        },
+    ): boolean {
+        return (
+            !!account.accessToken &&
+            !this.authAccountRepository.isAccessTokenExpired(account) &&
+            this.authAccountRepository.hasRequiredScopes(
+                account,
+                this.getRequiredOAuthScopes(providerId),
+            )
+        );
+    }
+
     isConfigured(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.length > 0 && plugins.some((p) => p.state === 'loaded');
@@ -135,6 +162,31 @@ export class GitFacadeService implements IGitFacade {
         );
         if (pluginAccount) return pluginAccount;
         return this.authAccountRepository.findProviderAccount(userId, pluginId);
+    }
+
+    private async findUsableGitProviderAccount(
+        userId: string,
+        pluginId: string,
+    ): Promise<AuthAccount | null> {
+        const pluginAccount = await this.authAccountRepository.findProviderAccount(
+            userId,
+            buildPluginProviderId(pluginId),
+        );
+
+        if (pluginAccount && this.canUseOAuthAccountForGit(pluginId, pluginAccount)) {
+            return pluginAccount;
+        }
+
+        const providerAccount = await this.authAccountRepository.findProviderAccount(
+            userId,
+            pluginId,
+        );
+
+        if (providerAccount && this.canUseOAuthAccountForGit(pluginId, providerAccount)) {
+            return providerAccount;
+        }
+
+        return null;
     }
 
     getAvailableProviders(): GitProviderInfo[] {
@@ -161,8 +213,8 @@ export class GitFacadeService implements IGitFacade {
             );
 
             // Check connected provider account first
-            const account = await this.findGitProviderAccount(options.userId, plugin.id);
-            if (account && !this.authAccountRepository.isAccessTokenExpired(account)) {
+            const account = await this.findUsableGitProviderAccount(options.userId, plugin.id);
+            if (account) {
                 return true;
             }
 
@@ -190,8 +242,8 @@ export class GitFacadeService implements IGitFacade {
             );
 
             // Try connected provider account first
-            const account = await this.findGitProviderAccount(options.userId, plugin.id);
-            if (account && !this.authAccountRepository.isAccessTokenExpired(account)) {
+            const account = await this.findUsableGitProviderAccount(options.userId, plugin.id);
+            if (account) {
                 return account.accessToken || null;
             }
 
@@ -764,12 +816,8 @@ export class GitFacadeService implements IGitFacade {
         }
 
         // 1. Try the connected provider account first (for OAuth-based plugins like GitHub)
-        const account = await this.findGitProviderAccount(options.userId, plugin.id);
-        if (
-            account &&
-            !this.authAccountRepository.isAccessTokenExpired(account) &&
-            account.accessToken
-        ) {
+        const account = await this.findUsableGitProviderAccount(options.userId, plugin.id);
+        if (account?.accessToken) {
             return { plugin, token: account.accessToken };
         }
 

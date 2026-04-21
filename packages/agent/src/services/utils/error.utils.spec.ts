@@ -22,4 +22,14 @@ describe('normalizeGeneratorError', () => {
             'Repository not found. Please verify the repository exists and try again.',
         );
     });
+
+    it('maps missing connected git accounts to a reconnect message', () => {
+        const error = new Error(
+            'No connected account found for user user-123 with provider github',
+        );
+
+        expect(normalizeGeneratorError(error)).toBe(
+            'Please reconnect your Git account to continue.',
+        );
+    });
 });

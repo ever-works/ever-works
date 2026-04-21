@@ -268,6 +268,7 @@ describe('GitFacadeService', () => {
                     useValue: {
                         findProviderAccount: jest.fn(),
                         isAccessTokenExpired: jest.fn().mockReturnValue(false),
+                        hasRequiredScopes: jest.fn().mockReturnValue(true),
                     },
                 },
                 {
@@ -422,6 +423,28 @@ describe('GitFacadeService', () => {
             expect(result).toBe(false);
         });
 
+        it('should return false when provider account is missing required git scopes', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            authAccountRepository.findProviderAccount.mockResolvedValue(
+                createMockProviderAccount({ scope: 'read:user,user:email' }),
+            );
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
+            authAccountRepository.hasRequiredScopes.mockReturnValue(false);
+
+            const result = await service.hasValidCredentials({
+                providerId: 'github',
+                userId: 'user-123',
+            });
+
+            expect(result).toBe(false);
+        });
+
         it('should return false when no OAuth token exists', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
@@ -512,9 +535,15 @@ describe('GitFacadeService', () => {
             authAccountRepository.findProviderAccount.mockImplementation(
                 async (_userId: string, providerId: string) => {
                     if (providerId === 'plugin:github') {
-                        return createMockProviderAccount({ accessToken: 'plugin-token' });
+                        return createMockProviderAccount({
+                            accessToken: 'plugin-token',
+                            scope: 'repo,user',
+                        });
                     }
-                    return createMockProviderAccount({ accessToken: 'signin-token' });
+                    return createMockProviderAccount({
+                        accessToken: 'signin-token',
+                        scope: 'repo,user',
+                    });
                 },
             );
             authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
@@ -538,7 +567,10 @@ describe('GitFacadeService', () => {
             authAccountRepository.findProviderAccount.mockImplementation(
                 async (_userId: string, providerId: string) => {
                     if (providerId === 'plugin:github') return null;
-                    return createMockProviderAccount({ accessToken: 'signin-token' });
+                    return createMockProviderAccount({
+                        accessToken: 'signin-token',
+                        scope: 'repo,user',
+                    });
                 },
             );
             authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
@@ -549,6 +581,28 @@ describe('GitFacadeService', () => {
             });
 
             expect(result).toBe('signin-token');
+        });
+
+        it('should return null when provider account is missing required git scopes', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            authAccountRepository.findProviderAccount.mockResolvedValue(
+                createMockProviderAccount({ scope: 'read:user,user:email' }),
+            );
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
+            authAccountRepository.hasRequiredScopes.mockReturnValue(false);
+
+            const result = await service.getAccessToken({
+                providerId: 'github',
+                userId: 'user-123',
+            });
+
+            expect(result).toBeNull();
         });
     });
 
@@ -1395,6 +1449,32 @@ describe('GitFacadeService', () => {
                 createMockProviderAccount(),
             );
             authAccountRepository.isAccessTokenExpired.mockReturnValue(true);
+            settingsService.getResolvedSettings.mockResolvedValue(createMockResolvedSettings({}));
+
+            await expect(
+                service.getUser({
+                    providerId: 'github',
+                    userId: 'user-123',
+                }),
+            ).rejects.toThrow(NoGitCredentialsError);
+        });
+
+        it('should throw NoGitCredentialsError when provider account is missing required git scopes and no PAT', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            authAccountRepository.findProviderAccount.mockResolvedValue(
+                createMockProviderAccount({
+                    accessToken: 'social-login-token',
+                    scope: 'read:user,user:email',
+                }),
+            );
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
+            authAccountRepository.hasRequiredScopes.mockReturnValue(false);
             settingsService.getResolvedSettings.mockResolvedValue(createMockResolvedSettings({}));
 
             await expect(

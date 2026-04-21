@@ -171,7 +171,7 @@ export class DirectoryQueryService {
             this.logger.error('Failed to get directory items:', error);
 
             const errMessage = normalizeGeneratorError(error);
-            if (errMessage.includes('Repository not found')) {
+            if (this.isReadOnlyRepoUnavailable(errMessage)) {
                 return {
                     status: 'success',
                     items: [],
@@ -201,7 +201,7 @@ export class DirectoryQueryService {
             }
 
             const errMessage = normalizeGeneratorError(error);
-            if (errMessage.includes('Repository not found')) {
+            if (this.isReadOnlyRepoUnavailable(errMessage)) {
                 return {
                     status: 'success',
                     config: null,
@@ -236,7 +236,7 @@ export class DirectoryQueryService {
             }
 
             const errMessage = normalizeGeneratorError(error);
-            if (errMessage.includes('Repository not found')) {
+            if (this.isReadOnlyRepoUnavailable(errMessage)) {
                 return {
                     status: 'success',
                     company_name: 'Acme',
@@ -341,7 +341,7 @@ export class DirectoryQueryService {
             }
 
             const errMessage = normalizeGeneratorError(error);
-            if (errMessage.includes('Repository not found')) {
+            if (this.isReadOnlyRepoUnavailable(errMessage)) {
                 return {
                     status: 'success',
                     items: 0,
@@ -381,7 +381,7 @@ export class DirectoryQueryService {
 
             const errMessage = normalizeGeneratorError(error);
 
-            if (errMessage.includes('Repository not found')) {
+            if (this.isReadOnlyRepoUnavailable(errMessage)) {
                 return {
                     status: 'success',
                     categories: [],
@@ -483,5 +483,12 @@ export class DirectoryQueryService {
             default:
                 return undefined;
         }
+    }
+
+    private isReadOnlyRepoUnavailable(message: string): boolean {
+        return (
+            message.includes('Repository not found') ||
+            message.includes('Please reconnect your Git account to continue.')
+        );
     }
 }

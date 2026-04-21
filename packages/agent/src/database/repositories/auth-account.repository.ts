@@ -80,22 +80,38 @@ export class AuthAccountRepository {
         }
 
         const targetAccount = existingAccount ?? existingProviderAccount;
+        const preserveExistingCredentials =
+            !!targetAccount && this.shouldPreserveExistingCredentials(targetAccount, accountData);
 
         const nextAccountData: Partial<AuthAccount> = {
             userId: accountData.userId,
             providerId: accountData.providerId,
             accountId: resolvedAccountId,
-            accessToken: accountData.accessToken ?? targetAccount?.accessToken ?? null,
-            refreshToken: accountData.refreshToken ?? targetAccount?.refreshToken ?? null,
+            accessToken: preserveExistingCredentials
+                ? (targetAccount.accessToken ?? null)
+                : (accountData.accessToken ?? targetAccount?.accessToken ?? null),
+            refreshToken: preserveExistingCredentials
+                ? (targetAccount.refreshToken ?? null)
+                : (accountData.refreshToken ?? targetAccount?.refreshToken ?? null),
             username: accountData.username ?? targetAccount?.username ?? null,
             email: accountData.email ?? targetAccount?.email ?? null,
-            tokenType: accountData.tokenType ?? targetAccount?.tokenType ?? 'Bearer',
-            accessTokenExpiresAt:
-                accountData.accessTokenExpiresAt ?? targetAccount?.accessTokenExpiresAt ?? null,
-            refreshTokenExpiresAt:
-                accountData.refreshTokenExpiresAt ?? targetAccount?.refreshTokenExpiresAt ?? null,
-            scope: accountData.scope ?? targetAccount?.scope ?? null,
-            idToken: accountData.idToken ?? targetAccount?.idToken ?? null,
+            tokenType: preserveExistingCredentials
+                ? (targetAccount.tokenType ?? 'Bearer')
+                : (accountData.tokenType ?? targetAccount?.tokenType ?? 'Bearer'),
+            accessTokenExpiresAt: preserveExistingCredentials
+                ? (targetAccount.accessTokenExpiresAt ?? null)
+                : (accountData.accessTokenExpiresAt ?? targetAccount?.accessTokenExpiresAt ?? null),
+            refreshTokenExpiresAt: preserveExistingCredentials
+                ? (targetAccount.refreshTokenExpiresAt ?? null)
+                : (accountData.refreshTokenExpiresAt ??
+                  targetAccount?.refreshTokenExpiresAt ??
+                  null),
+            scope: preserveExistingCredentials
+                ? (targetAccount.scope ?? null)
+                : (accountData.scope ?? targetAccount?.scope ?? null),
+            idToken: preserveExistingCredentials
+                ? (targetAccount.idToken ?? null)
+                : (accountData.idToken ?? targetAccount?.idToken ?? null),
             password: targetAccount?.password ?? null,
             metadata: accountData.metadata ?? targetAccount?.metadata ?? null,
         };
@@ -160,6 +176,22 @@ export class AuthAccountRepository {
         return new Date() > account.accessTokenExpiresAt;
     }
 
+    hasRequiredScopes(
+        account: Pick<AuthAccount, 'scope'> | null | undefined,
+        requiredScopes: readonly string[],
+    ): boolean {
+        if (!account || requiredScopes.length === 0) {
+            return true;
+        }
+
+        const availableScopes = this.parseScopes(account.scope);
+        if (availableScopes.size === 0) {
+            return false;
+        }
+
+        return requiredScopes.every((scope) => availableScopes.has(scope));
+    }
+
     private resolveAccountId(
         accountData: Pick<
             ProviderAccountUpsertData,
@@ -193,6 +225,60 @@ export class AuthAccountRepository {
         }
 
         return accountData.email || accountData.username || null;
+    }
+
+    private shouldPreserveExistingCredentials(
+        existingAccount: Pick<
+            AuthAccount,
+            | 'accessToken'
+            | 'refreshToken'
+            | 'tokenType'
+            | 'accessTokenExpiresAt'
+            | 'refreshTokenExpiresAt'
+            | 'scope'
+            | 'idToken'
+        >,
+        incomingAccountData: Pick<
+            ProviderAccountUpsertData,
+            | 'accessToken'
+            | 'refreshToken'
+            | 'tokenType'
+            | 'accessTokenExpiresAt'
+            | 'refreshTokenExpiresAt'
+            | 'scope'
+            | 'idToken'
+        >,
+    ): boolean {
+        if (!existingAccount.accessToken || this.isAccessTokenExpired(existingAccount)) {
+            return false;
+        }
+
+        if (!incomingAccountData.accessToken || !incomingAccountData.scope) {
+            return false;
+        }
+
+        const existingScopes = this.parseScopes(existingAccount.scope);
+        const incomingScopes = this.parseScopes(incomingAccountData.scope);
+
+        if (existingScopes.size === 0 || incomingScopes.size === 0) {
+            return false;
+        }
+
+        const existingIsSuperset = [...incomingScopes].every((scope) => existingScopes.has(scope));
+        return existingIsSuperset && existingScopes.size > incomingScopes.size;
+    }
+
+    private parseScopes(scope: string | null | undefined): Set<string> {
+        if (!scope) {
+            return new Set();
+        }
+
+        return new Set(
+            scope
+                .split(/[,\s]+/)
+                .map((value) => value.trim())
+                .filter(Boolean),
+        );
     }
 
     private async translateUniqueConstraint(

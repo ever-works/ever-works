@@ -28,6 +28,7 @@ export type {
 export type Plugin = PluginResponse;
 export type UserPlugin = UserPluginResponse & {
     metadata?: Record<string, unknown>;
+    resolvedSettings?: Record<string, unknown>;
 };
 export type DirectoryPlugin = DirectoryPluginResponse;
 export type PluginListResponse = IPluginListResponse;

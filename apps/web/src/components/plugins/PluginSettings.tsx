@@ -43,8 +43,9 @@ export function PluginSettings({ plugin, oauthConnection, localAuthStatus }: Plu
     const t = useTranslations('dashboard.plugins');
     const tOnboarding = useTranslations('onboarding.plugins');
     const byokTrigger = plugin.uiHints?.byok?.triggerField;
+    const displaySettings = plugin.resolvedSettings || plugin.settings || {};
     const [byokRevealed, setByokRevealed] = useState(
-        !plugin.uiHints?.byok || Boolean(byokTrigger && plugin.settings?.[byokTrigger]),
+        !plugin.uiHints?.byok || Boolean(byokTrigger && displaySettings[byokTrigger]),
     );
 
     const onSave = useCallback(
@@ -92,6 +93,7 @@ export function PluginSettings({ plugin, oauthConnection, localAuthStatus }: Plu
         initialSettings: plugin.settings || {},
         scopes: ['global', 'user'],
         onSave,
+        fallbackSettings: plugin.resolvedSettings,
         scope: 'user',
     });
 
@@ -121,7 +123,7 @@ export function PluginSettings({ plugin, oauthConnection, localAuthStatus }: Plu
     const setupLink = plugin.uiHints?.setupLink;
     const showSetupButton =
         setupLink &&
-        (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !plugin.settings?.[f]));
+        (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !displaySettings[f]));
 
     return (
         <div className="space-y-6">
