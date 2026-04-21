@@ -41,8 +41,9 @@ export class ActivityLogController {
             return;
         }
 
-        const reconcilePromise = this.activityLogService
+        const reconcilePromise: Promise<void> = this.activityLogService
             .reconcileStaleGenerationActivities(userId)
+            .then(() => undefined)
             .catch(() => {
                 // Activity listing should remain available even if stale-state cleanup fails.
             })
