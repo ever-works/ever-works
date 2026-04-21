@@ -74,6 +74,15 @@ export class ActivityLogService {
                 return 0;
             }
 
+            const directories = await this.directoryRepository.findByIds(
+                activities
+                    .map((activity) => activity.directoryId)
+                    .filter((directoryId): directoryId is string => !!directoryId),
+            );
+            const directoriesById = new Map(
+                directories.map((directory) => [directory.id, directory]),
+            );
+
             let reconciledCount = 0;
 
             for (const activity of activities) {
@@ -85,7 +94,7 @@ export class ActivityLogService {
                         continue;
                     }
 
-                    const directory = await this.directoryRepository.findById(activity.directoryId);
+                    const directory = directoriesById.get(activity.directoryId);
 
                     if (directory?.generateStatus?.status === GenerateStatusType.GENERATING) {
                         continue;
