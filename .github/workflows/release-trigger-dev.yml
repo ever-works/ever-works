@@ -41,4 +41,4 @@ jobs:
         # because it requires a paid account and also because we want to use built-in scheduling in NestJs in the dev!
         # That's why we just run the login operation below.
         run: |
-          npx trigger.dev@4.4.3 login
+          npx trigger.dev@4.4.4 login

@@ -27,8 +27,8 @@ import { PluginDisableWarning } from './PluginDisableWarning';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { ClaudeCodeOnboardingWizard } from '@/components/settings/ClaudeCodeOnboardingWizard';
 import { GeminiOnboardingWizard } from '@/components/settings/GeminiOnboardingWizard';
-import { SimAiOnboardingWizard } from '@/components/settings/SimAiOnboardingWizard';
 import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
+import { SimAiOnboardingWizard } from '@/components/settings/SimAiOnboardingWizard';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 import { usePluginToggle } from '@/lib/hooks/use-plugin-toggle';
@@ -42,8 +42,9 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
     const t = useTranslations('dashboard.plugins');
     const tOnboarding = useTranslations('onboarding.plugins');
     const byokTrigger = plugin.uiHints?.byok?.triggerField;
+    const displaySettings = plugin.resolvedSettings || plugin.settings || {};
     const [byokRevealed, setByokRevealed] = useState(
-        !plugin.uiHints?.byok || Boolean(byokTrigger && plugin.settings?.[byokTrigger]),
+        !plugin.uiHints?.byok || Boolean(byokTrigger && displaySettings[byokTrigger]),
     );
 
     const onSave = useCallback(
@@ -87,6 +88,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
         initialSettings: plugin.settings || {},
         scopes: ['global', 'user'],
         onSave,
+        fallbackSettings: plugin.resolvedSettings,
         scope: 'user',
     });
 
@@ -116,7 +118,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
     const setupLink = plugin.uiHints?.setupLink;
     const showSetupButton =
         setupLink &&
-        (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !plugin.settings?.[f]));
+        (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !displaySettings[f]));
 
     return (
         <div className="space-y-6">

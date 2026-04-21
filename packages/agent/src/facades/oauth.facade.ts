@@ -49,6 +49,33 @@ export class OAuthFacadeService implements IOAuthFacade {
         private readonly authAccountRepository: AuthAccountRepository,
     ) {}
 
+    private getRequiredScopes(providerId: string): readonly string[] {
+        switch (providerId) {
+            case 'github':
+                return ['repo'];
+            default:
+                return [];
+        }
+    }
+
+    private isUsableProviderAccount(
+        providerId: string,
+        account: {
+            accessToken?: string | null;
+            scope?: string | null;
+            accessTokenExpiresAt?: Date | null;
+        },
+    ): boolean {
+        return (
+            !!account.accessToken &&
+            !this.authAccountRepository.isAccessTokenExpired(account) &&
+            this.authAccountRepository.hasRequiredScopes(
+                account,
+                this.getRequiredScopes(providerId),
+            )
+        );
+    }
+
     isConfigured(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.length > 0 && plugins.some((p) => p.state === 'loaded');
@@ -95,7 +122,7 @@ export class OAuthFacadeService implements IOAuthFacade {
                 userId,
                 providerId,
             );
-            return account !== null && !this.authAccountRepository.isAccessTokenExpired(account);
+            return account !== null && this.isUsableProviderAccount(providerId, account);
         } catch {
             return false;
         }
@@ -114,7 +141,7 @@ export class OAuthFacadeService implements IOAuthFacade {
                 userId,
                 providerId,
             );
-            if (!account || this.authAccountRepository.isAccessTokenExpired(account)) {
+            if (!account || !this.isUsableProviderAccount(providerId, account)) {
                 return null;
             }
             return account.accessToken || null;

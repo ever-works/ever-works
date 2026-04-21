@@ -1816,6 +1816,20 @@
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure"
+        },
+        "plugins": {
+            "githubOrganizations": {
+                "title": "GitHub 조직",
+                "description": "GitHub 연결에서 사용 가능한 조직을 검토하고 Ever Works가 대상으로 할 추가 조직을 추가하세요.",
+                "noOrganizations": "아직 조직을 찾을 수 없습니다.",
+                "connectToLoad": "조직을 로드하려면 GitHub를 연결하세요.",
+                "placeholder": "로그인으로 조직 추가",
+                "addButton": "조직 추가",
+                "saveButton": "조직 저장",
+                "savedSuccess": "조직 접근 권한이 저장되었습니다.",
+                "saveFailed": "저장에 실패했습니다.",
+                "removeLabel": "{login} 제거"
+            }
         }
     },
     "layout": {

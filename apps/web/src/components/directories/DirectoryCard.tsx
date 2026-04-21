@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
-import { Link } from '@/i18n/navigation';
+import { Link, usePathname } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import type { Directory } from '@/lib/api/directory';
@@ -19,6 +19,8 @@ interface DirectoryCardProps {
     directory: Directory;
 }
 
+const OPENING_RESET_MS = 8000;
+
 const formatDate = (date: string, locale: string) => {
     return new Date(date).toLocaleDateString(locale, {
         month: 'short',
@@ -30,6 +32,7 @@ const formatDate = (date: string, locale: string) => {
 export function DirectoryCard({ directory }: DirectoryCardProps) {
     const t = useTranslations('dashboard.directoryCard');
     const tStatus = useTranslations('dashboard.directoryDetail.status');
+    const pathname = usePathname();
     const [isOpening, setIsOpening] = useState(false);
 
     const status = directory.generateStatus?.status;
@@ -44,6 +47,24 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
           ? `${tStatus(statusConfig.labelKey)} - Scheduled`
           : tStatus(statusConfig.labelKey);
     const isGenerating = statusConfig.labelKey === 'generating' || isOpening;
+
+    useEffect(() => {
+        if (!isOpening) {
+            return;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            setIsOpening(false);
+        }, OPENING_RESET_MS);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
+    }, [isOpening]);
+
+    useEffect(() => {
+        setIsOpening(false);
+    }, [pathname]);
 
     const handleOpen = (event: React.MouseEvent<HTMLAnchorElement>) => {
         if (isOpening) {
