@@ -26,6 +26,7 @@ import { PluginEnablePanel } from './PluginEnablePanel';
 import { PluginDisableWarning } from './PluginDisableWarning';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { ClaudeCodeOnboardingWizard } from '@/components/settings/ClaudeCodeOnboardingWizard';
+import { GeminiOnboardingWizard } from '@/components/settings/GeminiOnboardingWizard';
 import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
 import { SimAiOnboardingWizard } from '@/components/settings/SimAiOnboardingWizard';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
@@ -118,6 +119,14 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
     const showSetupButton =
         setupLink &&
         (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !displaySettings[f]));
+    const usesClaudeWizard =
+        plugin.pluginId === 'claude-code' && Boolean(plugin.uiHints?.onboardingWizard);
+
+    const usesGeminiWizard =
+        plugin.pluginId === 'gemini' && Boolean(plugin.uiHints?.onboardingWizard);
+    const usesSimAiWizard =
+        plugin.pluginId === 'sim-ai' && Boolean(plugin.uiHints?.onboardingWizard);
+    const usesCustomWizard = usesClaudeWizard || usesGeminiWizard || usesSimAiWizard;
 
     return (
         <div className="space-y-6">
@@ -291,9 +300,21 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                     </div>
 
                     <div className="p-6">
-                        {plugin.uiHints?.onboardingWizard ? (
-                            plugin.pluginId === 'sim-ai' ? (
+                        {usesCustomWizard ? (
+                            usesSimAiWizard ? (
                                 <SimAiOnboardingWizard
+                                    pluginId={plugin.pluginId}
+                                    visibleProperties={visibleProperties}
+                                    getFieldValue={getFieldValue}
+                                    handleFieldChange={handleFieldChange}
+                                    handleSave={handleSave}
+                                    isSaving={isSaving}
+                                    saveSuccess={saveSuccess}
+                                    validationError={validationError}
+                                    saveMessage={saveMessage}
+                                />
+                            ) : usesGeminiWizard ? (
+                                <GeminiOnboardingWizard
                                     pluginId={plugin.pluginId}
                                     visibleProperties={visibleProperties}
                                     getFieldValue={getFieldValue}
@@ -378,7 +399,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                         )}
                     </div>
 
-                    {!plugin.uiHints?.onboardingWizard && (
+                    {!usesCustomWizard && (
                         <div className="flex items-center gap-3 px-6 py-4 border-t border-border dark:border-border-dark">
                             <Button
                                 variant="primary"

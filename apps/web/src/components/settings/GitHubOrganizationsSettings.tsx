@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
-import { Building2, Plus } from 'lucide-react';
+import { Building2, RefreshCw } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { connectOAuthProvider, getGitProviderOrganizations } from '@/app/actions/dashboard/oauth';
@@ -24,7 +24,6 @@ export function GitHubOrganizationsSettings(props: GitHubOrganizationsSettingsPr
 
     useEffect(() => {
         if (!props.connected) {
-            setOrganizations([]);
             return;
         }
 
@@ -45,10 +44,14 @@ export function GitHubOrganizationsSettings(props: GitHubOrganizationsSettingsPr
     }, [props.connected, props.plugin.pluginId]);
 
     const visibleOrganizations = useMemo(() => {
-        return Array.from(new Set(organizations)).sort((a, b) => a.localeCompare(b));
-    }, [organizations]);
+        if (!props.connected) {
+            return [];
+        }
 
-    const handleAddOrganization = () => {
+        return Array.from(new Set(organizations)).sort((a, b) => a.localeCompare(b));
+    }, [organizations, props.connected]);
+
+    const handleReconnect = () => {
         startTransition(() => {
             void (async () => {
                 const result = await connectOAuthProvider(
@@ -85,12 +88,12 @@ export function GitHubOrganizationsSettings(props: GitHubOrganizationsSettingsPr
                     type="button"
                     variant="secondary"
                     size="sm"
-                    onClick={handleAddOrganization}
+                    onClick={handleReconnect}
                     disabled={isPending}
                     className="gap-1.5 text-sm"
                 >
-                    <Plus className="w-4 h-4" />
-                    {isPending ? tOAuth('reconnecting') : t('addButton')}
+                    <RefreshCw className="w-4 h-4" />
+                    {isPending ? tOAuth('reconnecting') : tOAuth('reconnect')}
                 </Button>
             </div>
 
