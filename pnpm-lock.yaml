@@ -1371,6 +1371,24 @@ importers:
         specifier: ^3.2.1
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.11)(jiti@2.6.1)(lightningcss@1.32.0)(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(terser@5.46.1)(yaml@2.8.3)
 
+  packages/plugins/opencode:
+    devDependencies:
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(jiti@2.6.1)(postcss@8.5.9)(typescript@5.9.3)(yaml@2.8.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.1
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.11)(jiti@2.6.1)(lightningcss@1.32.0)(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(terser@5.46.1)(yaml@2.8.3)
+
   packages/plugins/openrouter:
     dependencies:
       '@ever-works/plugin':

@@ -123,6 +123,14 @@ export function PluginSettings({ plugin, oauthConnection, localAuthStatus }: Plu
         setupLink &&
         (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !displaySettings[f]));
 
+    const usesClaudeWizard =
+        plugin.pluginId === 'claude-code' && Boolean(plugin.uiHints?.onboardingWizard);
+    const usesGeminiWizard =
+        plugin.pluginId === 'gemini' && Boolean(plugin.uiHints?.onboardingWizard);
+    const usesSimAiWizard =
+        plugin.pluginId === 'sim-ai' && Boolean(plugin.uiHints?.onboardingWizard);
+    const usesCustomWizard = usesClaudeWizard || usesGeminiWizard || usesSimAiWizard;
+
     return (
         <div className="space-y-6">
             {/* Back link */}
@@ -370,7 +378,7 @@ export function PluginSettings({ plugin, oauthConnection, localAuthStatus }: Plu
                         )}
                     </div>
 
-                    {!plugin.uiHints?.onboardingWizard && (
+                    {!usesCustomWizard && (
                         <div className="flex items-center gap-3 px-6 py-4 border-t border-border dark:border-border-dark">
                             <Button
                                 variant="primary"
