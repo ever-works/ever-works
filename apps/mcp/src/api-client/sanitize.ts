@@ -19,13 +19,13 @@ const SENSITIVE_FIELDS = new Set([
 	'token'
 ]);
 
-export function sanitizeResponse<T>(data: T): T {
+function sanitizeValue(data: unknown): unknown {
 	if (data === null || data === undefined || typeof data !== 'object') {
 		return data;
 	}
 
 	if (Array.isArray(data)) {
-		return data.map((item) => sanitizeResponse(item)) as T;
+		return data.map((item) => sanitizeValue(item));
 	}
 
 	const result: Record<string, unknown> = {};
@@ -33,7 +33,11 @@ export function sanitizeResponse<T>(data: T): T {
 		if (SENSITIVE_FIELDS.has(key)) {
 			continue;
 		}
-		result[key] = sanitizeResponse(value);
+		result[key] = sanitizeValue(value);
 	}
-	return result as T;
+	return result;
+}
+
+export function sanitizeResponse<T>(data: T): T {
+	return sanitizeValue(data) as T;
 }

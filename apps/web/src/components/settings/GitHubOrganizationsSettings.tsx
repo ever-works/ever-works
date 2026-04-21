@@ -24,7 +24,6 @@ export function GitHubOrganizationsSettings(props: GitHubOrganizationsSettingsPr
 
     useEffect(() => {
         if (!props.connected) {
-            setOrganizations([]);
             return;
         }
 
@@ -45,8 +44,12 @@ export function GitHubOrganizationsSettings(props: GitHubOrganizationsSettingsPr
     }, [props.connected, props.plugin.pluginId]);
 
     const visibleOrganizations = useMemo(() => {
+        if (!props.connected) {
+            return [];
+        }
+
         return Array.from(new Set(organizations)).sort((a, b) => a.localeCompare(b));
-    }, [organizations]);
+    }, [organizations, props.connected]);
 
     const handleAddOrganization = () => {
         startTransition(() => {
