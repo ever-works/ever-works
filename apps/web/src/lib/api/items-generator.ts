@@ -79,7 +79,7 @@ export interface RegenerateMarkdownResponse {
 export interface CancelGenerationResponse {
     status: 'success';
     message: string;
-    mode: 'trigger' | 'in_process' | 'stale';
+    mode: 'trigger' | 'in_process' | 'stale' | 'already_finished';
 }
 
 export const itemsGeneratorAPI = {

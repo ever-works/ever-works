@@ -333,7 +333,7 @@ export class DirectoryGenerationService {
     ): Promise<{
         status: 'success';
         message: string;
-        mode: 'trigger' | 'in_process' | 'stale';
+        mode: 'trigger' | 'in_process' | 'stale' | 'already_finished';
     }> {
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
 
@@ -361,6 +361,19 @@ export class DirectoryGenerationService {
                     status: 'success',
                     message: 'Cancellation requested. The generation will stop shortly.',
                     mode: 'trigger',
+                };
+            }
+
+            const refreshedDirectory = await this.directoryRepository.findById(directoryId);
+
+            if (
+                refreshedDirectory?.generateStatus?.status &&
+                refreshedDirectory.generateStatus.status !== GenerateStatusType.GENERATING
+            ) {
+                return {
+                    status: 'success',
+                    message: `Directory "${refreshedDirectory.name}" is no longer generating.`,
+                    mode: 'already_finished',
                 };
             }
 
@@ -1530,11 +1543,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
 
         if (error instanceof Error) {
             const message = error.message.toLowerCase();
-            return (
-                error.name === 'AbortError' ||
-                message === GENERATION_CANCELLED.toLowerCase() ||
-                message.includes('cancelled')
-            );
+            return error.name === 'AbortError' || message === GENERATION_CANCELLED.toLowerCase();
         }
 
         return false;
