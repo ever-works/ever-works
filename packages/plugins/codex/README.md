@@ -29,11 +29,13 @@ Get one from [platform.openai.com/account/api-keys](https://platform.openai.com/
 
 ### Local Codex Auth
 
-If no API key is configured, the plugin can use local Codex CLI auth stored in `CODEX_HOME` or `~/.codex/auth.json`. Authenticate via the onboarding wizard or manually:
+If no API key is configured, the plugin can use local Codex CLI auth stored in a managed per-user `CODEX_HOME`. Authenticate via the onboarding wizard or manually:
 
 ```bash
 codex login
 ```
+
+The plugin materializes an isolated `CODEX_HOME` for each Ever Works user under its managed temp directory, so local Codex auth does not rely on a shared `~/.codex/auth.json`.
 
 The onboarding wizard (`CodexOnboardingWizard`) provides a 3-step flow: choose auth mode, configure credentials, and verify the connection.
 

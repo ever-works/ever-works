@@ -1,5 +1,4 @@
 import * as fs from 'fs/promises';
-import * as os from 'os';
 import * as path from 'path';
 
 import type {
@@ -18,11 +17,33 @@ import type { CodexStepId } from '../types.js';
 import { CODEX_STEP_IDS } from '../types.js';
 import { STEP_DEFINITIONS } from '../steps.js';
 import { verifyLocalAuthConnection } from '../local-auth.js';
+import { resolveCodexHome } from './codex-home.js';
+export { getManagedCodexHome, resolveCodexHome } from './codex-home.js';
 
 export interface ResolvedExecutionAuth {
 	readonly env: Record<string, string>;
 	readonly mode: 'api-key' | 'local';
 	readonly codexHome?: string;
+}
+
+export interface LocalAuthResolutionOptions {
+	readonly allowHostFallback?: boolean;
+}
+
+function hasConfiguredCodexHome(settings: PluginSettings): boolean {
+	return typeof settings.codexHome === 'string' && settings.codexHome.trim().length > 0;
+}
+
+function shouldUseHostFallback(
+	settings: PluginSettings,
+	userId: string | undefined,
+	options?: LocalAuthResolutionOptions
+): boolean {
+	if (userId || hasConfiguredCodexHome(settings)) {
+		return true;
+	}
+
+	return options?.allowHostFallback !== false;
 }
 
 export function initializeState(): PipelineState<CodexStepId> {
@@ -141,13 +162,16 @@ export async function resolveSettings(
 	}
 }
 
-export function resolveCodexHome(settings: PluginSettings): string {
-	const configured = typeof settings.codexHome === 'string' ? settings.codexHome.trim() : '';
-	return configured || process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
-}
+export async function hasLocalCodexAuth(
+	settings: PluginSettings,
+	userId?: string,
+	options?: LocalAuthResolutionOptions
+): Promise<boolean> {
+	if (!shouldUseHostFallback(settings, userId, options)) {
+		return false;
+	}
 
-export async function hasLocalCodexAuth(settings: PluginSettings): Promise<boolean> {
-	const codexHome = resolveCodexHome(settings);
+	const codexHome = resolveCodexHome(settings, userId);
 	const authPath = path.join(codexHome, 'auth.json');
 	try {
 		const stats = await fs.stat(authPath);
@@ -161,7 +185,11 @@ export async function hasLocalCodexAuth(settings: PluginSettings): Promise<boole
 	return verifyLocalAuthConnection(codexHome);
 }
 
-export async function resolveExecutionAuth(settings: PluginSettings): Promise<ResolvedExecutionAuth | null> {
+export async function resolveExecutionAuth(
+	settings: PluginSettings,
+	userId?: string,
+	options?: LocalAuthResolutionOptions
+): Promise<ResolvedExecutionAuth | null> {
 	const authMode = typeof settings.authMode === 'string' ? settings.authMode : undefined;
 	const apiKey = typeof settings.apiKey === 'string' ? settings.apiKey.trim() : '';
 
@@ -173,7 +201,11 @@ export async function resolveExecutionAuth(settings: PluginSettings): Promise<Re
 	}
 
 	if (authMode === 'local') {
-		const codexHome = resolveCodexHome(settings);
+		if (!shouldUseHostFallback(settings, userId, options)) {
+			return null;
+		}
+
+		const codexHome = resolveCodexHome(settings, userId);
 		return {
 			mode: 'local',
 			codexHome,
@@ -190,8 +222,8 @@ export async function resolveExecutionAuth(settings: PluginSettings): Promise<Re
 		};
 	}
 
-	if (await hasLocalCodexAuth(settings)) {
-		const codexHome = resolveCodexHome(settings);
+	if (await hasLocalCodexAuth(settings, userId, options)) {
+		const codexHome = resolveCodexHome(settings, userId);
 		return {
 			mode: 'local',
 			codexHome,

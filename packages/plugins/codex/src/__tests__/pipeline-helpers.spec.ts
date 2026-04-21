@@ -13,6 +13,7 @@ vi.mock('../local-auth.js', () => ({
 }));
 
 import {
+	getManagedCodexHome,
 	hasLocalCodexAuth,
 	resolveCodexHome,
 	resolveExecutionAuth,
@@ -64,6 +65,19 @@ describe('pipeline-helpers', () => {
 		expect(mockVerifyLocalAuthConnection).not.toHaveBeenCalled();
 	});
 
+	it('derives a managed per-user codex home when userId is provided', async () => {
+		const userId = 'user/1';
+
+		expect(resolveCodexHome({}, userId)).toBe(getManagedCodexHome(userId));
+
+		const auth = await resolveExecutionAuth({ authMode: 'local' }, userId);
+		expect(auth).toEqual({
+			mode: 'local',
+			codexHome: getManagedCodexHome(userId),
+			env: { CODEX_HOME: getManagedCodexHome(userId) }
+		});
+	});
+
 	it('falls back to local auth when api-key mode has no key but auth.json exists', async () => {
 		const codexHome = await makeTempDir();
 		await fs.writeFile(path.join(codexHome, 'auth.json'), '{"ok":true}', 'utf-8');
@@ -94,6 +108,42 @@ describe('pipeline-helpers', () => {
 			codexHome,
 			env: { CODEX_HOME: codexHome }
 		});
+	});
+
+	it('checks the managed per-user auth path when userId is provided', async () => {
+		const userId = 'user-2';
+		const codexHome = getManagedCodexHome(userId);
+		await fs.mkdir(codexHome, { recursive: true });
+		await fs.writeFile(path.join(codexHome, 'auth.json'), '{"ok":true}', 'utf-8');
+		tempDirs.push(path.dirname(codexHome));
+
+		expect(await hasLocalCodexAuth({}, userId)).toBe(true);
+		expect(await resolveExecutionAuth({}, userId)).toEqual({
+			mode: 'local',
+			codexHome,
+			env: { CODEX_HOME: codexHome }
+		});
+	});
+
+	it('does not fall back to host-global local auth when unscoped fallback is disabled', async () => {
+		const codexHome = await makeTempDir();
+		await fs.writeFile(path.join(codexHome, 'auth.json'), '{"ok":true}', 'utf-8');
+		const previousCodexHome = process.env.CODEX_HOME;
+		process.env.CODEX_HOME = codexHome;
+
+		try {
+			expect(await hasLocalCodexAuth({}, undefined, { allowHostFallback: false })).toBe(false);
+			expect(
+				await resolveExecutionAuth({ authMode: 'local' }, undefined, { allowHostFallback: false })
+			).toBeNull();
+			expect(await resolveExecutionAuth({}, undefined, { allowHostFallback: false })).toBeNull();
+		} finally {
+			if (previousCodexHome === undefined) {
+				delete process.env.CODEX_HOME;
+			} else {
+				process.env.CODEX_HOME = previousCodexHome;
+			}
+		}
 	});
 
 	it('returns null when no api key or local auth is available', async () => {

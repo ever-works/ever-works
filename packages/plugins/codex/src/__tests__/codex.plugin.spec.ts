@@ -1,8 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import type { PluginContext, PluginSettings } from '@ever-works/plugin';
 
 import { CodexPlugin } from '../codex.plugin.js';
@@ -199,27 +196,8 @@ describe('CodexPlugin', () => {
 		expect(plugin.getStepDefinitions()[0]?.id).toBe('setup-codex');
 	});
 
-	it('keeps apiKey as the onboarding completion field when local Codex auth is absent', () => {
-		const previousCodexHome = process.env.CODEX_HOME;
-		const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-manifest-empty-'));
-		process.env.CODEX_HOME = codexHome;
-
+	it('keeps apiKey as the onboarding completion field in the manifest', () => {
 		expect(plugin.getManifest().uiHints?.completionFields).toEqual(['apiKey']);
-
-		process.env.CODEX_HOME = previousCodexHome;
-		fs.rmSync(codexHome, { recursive: true, force: true });
-	});
-
-	it('drops completionFields when local Codex auth is available', () => {
-		const previousCodexHome = process.env.CODEX_HOME;
-		const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-manifest-auth-'));
-		fs.writeFileSync(path.join(codexHome, 'auth.json'), JSON.stringify({ token: 'test' }));
-		process.env.CODEX_HOME = codexHome;
-
-		expect(plugin.getManifest().uiHints?.completionFields).toBeUndefined();
-
-		process.env.CODEX_HOME = previousCodexHome;
-		fs.rmSync(codexHome, { recursive: true, force: true });
 	});
 
 	it('fails API key validation when the key cannot be verified', async () => {
@@ -248,6 +226,20 @@ describe('CodexPlugin', () => {
 		expect(result.message).toContain('Local Codex CLI auth verified');
 
 		validateCliAuthSpy.mockRestore();
+	});
+
+	it('does not use host-global local auth fallback during unscoped connection validation', async () => {
+		vi.mocked(pipelineHelpers.hasLocalCodexAuth).mockResolvedValue(false);
+
+		const result = await plugin.validateConnection({
+			authMode: 'local'
+		});
+
+		expect(pipelineHelpers.hasLocalCodexAuth).toHaveBeenCalledWith({ authMode: 'local' }, undefined, {
+			allowHostFallback: false
+		});
+		expect(result.success).toBe(false);
+		expect(result.message).toContain('cannot be verified from unscoped settings alone');
 	});
 
 	describe('execute', () => {

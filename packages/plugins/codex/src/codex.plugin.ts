@@ -33,7 +33,6 @@ import {
 	type ItemData
 } from '@ever-works/plugin';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import * as https from 'https';
 
@@ -180,7 +179,7 @@ const MANIFEST: PluginManifest = {
 		'Codex supports two authentication modes:',
 		'',
 		'1. **API Key** - Provide `apiKey` in plugin settings.',
-		'2. **Local Codex Auth** - If no `apiKey` is configured, the plugin can reuse local Codex CLI auth from `CODEX_HOME` or `~/.codex/auth.json`.',
+		'2. **Local Codex Auth** - If no `apiKey` is configured, the plugin can reuse local Codex CLI auth from a managed per-user `CODEX_HOME`.',
 		'',
 		'**API Key**:',
 		'',
@@ -192,7 +191,7 @@ const MANIFEST: PluginManifest = {
 		'codex login',
 		'```',
 		'',
-		'This signs the local Codex CLI into your OpenAI account and stores reusable local auth for subsequent runs.',
+		'This signs the local Codex CLI into your OpenAI account and stores reusable local auth inside a per-user managed Codex home for subsequent runs.',
 		'',
 		'### Sandbox Compatibility',
 		'',
@@ -221,14 +220,10 @@ const MANIFEST: PluginManifest = {
 	homepage: 'https://github.com/openai/codex'
 };
 
-function hasLocalCodexAuthSync(): boolean {
-	const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
-	return fs.existsSync(path.join(codexHome, 'auth.json'));
-}
-
 const LOG_MESSAGE_MAX_LENGTH = 500;
 const RECOVERY_ITEMS_SCHEMA_FILE = 'recovered-items.schema.json';
 const RECOVERY_ITEMS_OUTPUT_FILE = 'recovered-items.json';
+const UNSCOPED_LOCAL_AUTH_OPTIONS = { allowHostFallback: false } as const;
 const STEP_CONTEXT_BY_ID = new Map(
 	STEP_DEFINITIONS.map((step, stepIndex) => [step.id, { stepIndex, stepName: step.name }])
 );
@@ -341,16 +336,6 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	getManifest(): PluginManifest {
-		if (hasLocalCodexAuthSync()) {
-			return {
-				...MANIFEST,
-				uiHints: {
-					...MANIFEST.uiHints,
-					completionFields: undefined
-				}
-			};
-		}
-
 		return MANIFEST;
 	}
 
@@ -455,10 +440,11 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		}
 
 		if (authMode === 'local') {
-			if (!(await hasLocalCodexAuth(settings))) {
+			if (!(await hasLocalCodexAuth(settings, undefined, UNSCOPED_LOCAL_AUTH_OPTIONS))) {
 				return {
 					success: false,
-					message: 'Local Codex CLI auth is not connected on this machine yet.'
+					message:
+						'Local Codex CLI auth cannot be verified from unscoped settings alone. Start local auth for this user first or configure an OpenAI API key.'
 				};
 			}
 
@@ -483,7 +469,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 					};
 		}
 
-		if (await hasLocalCodexAuth(settings)) {
+		if (await hasLocalCodexAuth(settings, undefined, UNSCOPED_LOCAL_AUTH_OPTIONS)) {
 			const valid = await this.validateCliAuth(settings);
 			return valid
 				? { success: true, message: 'Local Codex CLI auth verified.' }
@@ -540,7 +526,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			reportProgress(onProgress, 0, 5, 'Setup Codex');
 
 			const settings = await resolveSettings(this.context, userId, directory.id);
-			const executionAuth = await resolveExecutionAuth(settings);
+			const executionAuth = await resolveExecutionAuth(settings, userId);
 			if (!executionAuth) {
 				throw new Error(
 					'No Codex authentication available. Configure an OpenAI API key or sign in locally with Codex CLI.'
@@ -1233,7 +1219,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	private async validateCliAuth(settings: Record<string, unknown>): Promise<boolean> {
-		const executionAuth = await resolveExecutionAuth(settings);
+		const executionAuth = await resolveExecutionAuth(settings, undefined, UNSCOPED_LOCAL_AUTH_OPTIONS);
 		if (!executionAuth || executionAuth.mode !== 'local') {
 			return false;
 		}

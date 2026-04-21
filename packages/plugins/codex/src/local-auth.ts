@@ -7,6 +7,7 @@ import type { LocalAuthStatus } from '@ever-works/plugin';
 
 import { ensureBinary } from './utils/binary-manager.js';
 import { buildSubprocessEnv } from './utils/subprocess-env.js';
+import { getManagedCodexHome } from './utils/codex-home.js';
 
 type LoggerLike = {
 	log(message: string, ...args: unknown[]): void;
@@ -38,9 +39,10 @@ function getBinaryLogger(logger?: LoggerLike) {
 }
 
 export async function getLocalAuthStatus(userId: string, logger?: LoggerLike): Promise<LocalAuthStatus> {
+	const codexHome = getManagedCodexHome(userId);
 	const installed = await isCodexInstalled(logger);
-	const authPath = getAuthPath();
-	const connected = installed ? await verifyLocalAuthConnection(undefined, logger) : false;
+	const authPath = getAuthPath(codexHome);
+	const connected = installed ? await verifyLocalAuthConnection(codexHome, logger) : false;
 	const session = getActiveSession(userId);
 
 	if (connected && session) {
@@ -63,8 +65,9 @@ export async function getLocalAuthStatus(userId: string, logger?: LoggerLike): P
 }
 
 export async function startLocalAuth(userId: string, logger?: LoggerLike): Promise<LocalAuthStatus> {
+	const codexHome = getManagedCodexHome(userId);
 	const installed = await isCodexInstalled(logger);
-	const authPath = getAuthPath();
+	const authPath = getAuthPath(codexHome);
 	if (!installed) {
 		return {
 			installed: false,
@@ -75,7 +78,7 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 		};
 	}
 
-	if (await isConnected(undefined, logger)) {
+	if (await isConnected(codexHome, logger)) {
 		disposeSession(userId);
 		return {
 			installed: true,
@@ -102,9 +105,10 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 	}
 
 	const codexCommand = await ensureBinary(undefined, getBinaryLogger(logger));
+	await fs.mkdir(codexHome, { recursive: true });
 	const child = spawn(codexCommand, ['login', '--device-auth'], {
 		cwd: process.cwd(),
-		env: buildSubprocessEnv(),
+		env: buildSubprocessEnv({ CODEX_HOME: codexHome }),
 		stdio: ['ignore', 'pipe', 'pipe']
 	});
 
@@ -153,7 +157,7 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 	});
 
 	child.on('exit', async (code) => {
-		const connected = await hasAuthFile();
+		const connected = await hasAuthFile(codexHome);
 		if (connected) {
 			session.status = 'connected';
 			disposeSession(userId);
