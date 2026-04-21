@@ -6,7 +6,7 @@ import { formatDistanceToNow } from 'date-fns';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
 import { ActivityTypeBadge } from './ActivityTypeBadge';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -190,7 +190,13 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
     };
 
     return (
-        <div className="overflow-hidden rounded-lg border border-border dark:border-border-dark">
+        <div className="relative overflow-hidden rounded-lg border border-border dark:border-border-dark">
+            {loading && activities.length > 0 && (
+                <div className="pointer-events-none absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-full border border-border dark:border-border-dark bg-card/95 dark:bg-card-primary-dark/95 px-2.5 py-1 text-xs text-text-muted dark:text-text-muted-dark shadow-sm backdrop-blur-sm">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {t('loading')}
+                </div>
+            )}
             <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-border dark:divide-border-dark">
                     <thead className="bg-muted/50 dark:bg-muted/20">
@@ -200,7 +206,7 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                             </th>
                             <th
                                 scope="col"
-                                className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-secondary dark:text-text-secondary-dark"
+                                className="w-[9rem] whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-secondary dark:text-text-secondary-dark"
                             >
                                 {t('columns.status')}
                             </th>
@@ -290,7 +296,7 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                                 )}
                                             </Tooltip>
                                         </td>
-                                        <td className="px-4 py-3">
+                                        <td className="w-[9rem] whitespace-nowrap px-4 py-3 align-top">
                                             <ActivityStatusBadge status={activity.status} />
                                         </td>
                                         <td className="px-4 py-3 text-xs text-text-muted dark:text-text-muted-dark whitespace-nowrap">

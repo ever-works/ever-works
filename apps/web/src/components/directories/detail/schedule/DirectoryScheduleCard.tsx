@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState, useTransition, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { AlertCircle, CheckCircle2, CircleStop, PlayCircle, Repeat, Square } from 'lucide-react';
 import { toast } from 'sonner';
@@ -25,6 +24,8 @@ import {
 import { ShowDateTime } from '@/components/ui/show-datetime';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
 import { ActiveProvidersBar, FieldCard, HelperPill, type ResolvedProvider } from '../shared';
+import { ROUTES } from '@/lib/constants';
+import { useRouter } from '@/i18n/navigation';
 
 export type { ResolvedProvider };
 
@@ -363,7 +364,7 @@ function ScheduleFormContent({
             }
 
             toast.success(result.message || t('success.runStarted'));
-            router.refresh();
+            router.push(ROUTES.DASHBOARD_DIRECTORY_GENERATOR(directoryId));
         });
     };
 

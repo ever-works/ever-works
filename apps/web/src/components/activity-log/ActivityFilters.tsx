@@ -37,6 +37,7 @@ interface ActivityFiltersProps {
     onStatusChange: (value: string) => void;
     search: string;
     onSearchChange: (value: string) => void;
+    loading?: boolean;
     hasActiveFilters: boolean;
     onClearFilters: () => void;
 }
@@ -48,6 +49,7 @@ export function ActivityFilters({
     onStatusChange,
     search,
     onSearchChange,
+    loading = false,
     hasActiveFilters,
     onClearFilters,
 }: ActivityFiltersProps) {
@@ -65,6 +67,7 @@ export function ActivityFilters({
                     onChange={(e) => onSearchChange(e.target.value)}
                     placeholder={t('filters.search')}
                     aria-label={t('filters.search')}
+                    disabled={loading}
                     className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark text-text dark:text-text-dark placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
             </div>
@@ -74,6 +77,7 @@ export function ActivityFilters({
                 onValueChange={onActionTypeChange}
                 aria-label={t('columns.type')}
                 className={selectClass}
+                disabled={loading}
             >
                 {ACTION_TYPES.map((type) => (
                     <option key={type.value} value={type.value}>
@@ -87,6 +91,7 @@ export function ActivityFilters({
                 onValueChange={onStatusChange}
                 aria-label={t('columns.status')}
                 className={selectClass}
+                disabled={loading}
             >
                 {STATUS_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -98,11 +103,18 @@ export function ActivityFilters({
             {hasActiveFilters && (
                 <button
                     onClick={onClearFilters}
+                    disabled={loading}
                     className="inline-flex cursor-pointer items-center border border-border dark:border-border-dark gap-1 px-3 py-2 text-sm rounded-lg text-text-muted dark:text-text-muted-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
                 >
                     <X className="w-3.5 h-3.5" />
                     {t('actions.clearFilters')}
                 </button>
+            )}
+
+            {loading && (
+                <span className="text-sm text-text-muted dark:text-text-muted-dark">
+                    {t('loading')}
+                </span>
             )}
         </div>
     );

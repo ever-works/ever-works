@@ -267,6 +267,46 @@
                 }
             }
         },
+        "geminiWizard": {
+            "label": "Gemini setup",
+            "title": "Set up Gemini in three steps",
+            "subtitle": "Choose how Gemini should authenticate on this machine, then verify the connection before you finish.",
+            "stepIndex": "Step {index}",
+            "continueButton": "Continue",
+            "steps": {
+                "mode": {
+                    "title": "Choose auth mode",
+                    "description": "Pick the Gemini authentication flow you want this plugin to use, and confirm the model at the same time."
+                },
+                "credentials": {
+                    "title": "Configure access",
+                    "description": "Add the credentials required for the selected Gemini authentication flow."
+                },
+                "verify": {
+                    "title": "Verify connection",
+                    "description": "Save settings and run a live Gemini validation before finishing.",
+                    "checkTitle": "Run a live Gemini validation",
+                    "button": "Verify and finish setup",
+                    "successDefault": "Gemini connection verified."
+                }
+            },
+            "modes": {
+                "machine-local": {
+                    "title": "Use the machine-local Gemini login",
+                    "description": "Reuse the Gemini CLI login already cached on this machine. This is best when Gemini has already been authenticated locally.",
+                    "hint": "No secret is required here. Gemini will reuse the cached login from this machine, typically under ~/.gemini.",
+                    "verifyHint": "Saving here checks whether a cached machine-local Gemini login is present and usable."
+                },
+                "api-key": {
+                    "description": "Paste a Gemini API key from Google AI Studio.",
+                    "verifyHint": "Saving here verifies your Gemini API key against the selected model."
+                },
+                "vertex": {
+                    "description": "Provide the Google Cloud project details Gemini should use for Vertex AI.",
+                    "verifyHint": "Saving here runs a live Gemini CLI validation using your Vertex AI configuration."
+                }
+            }
+        },
         "simWizard": {
             "label": "SIM AI setup",
             "title": "Set up SIM AI in two steps",
@@ -1483,7 +1523,7 @@
                 "repositoryPlaceholder": "Brief description of the repository (optional)",
                 "startGeneration": "Start Generation",
                 "regenerateItems": "Regenerate Items",
-                "updateItems": "Update Items",
+                "updateItems": "Run Generation",
                 "recreateDirectory": "Recreate Directory",
                 "showAdvancedOptions": "Show Advanced Options",
                 "hideAdvancedOptions": "Hide Advanced Options",
@@ -2597,7 +2637,7 @@
             "githubOrganizations": {
                 "title": "GitHub Organizations",
                 "description": "Review the organizations available from your GitHub connection and add any extra organizations you want Ever Works to target.",
-                "noOrganizations": "No organizations found yet.",
+                "noOrganizations": "No organizations are available from the current GitHub connection.",
                 "connectToLoad": "Connect GitHub to load your organizations.",
                 "placeholder": "Add organization by login",
                 "addButton": "Add organization",
