@@ -67,68 +67,92 @@ export class ActivityLogService {
     }
 
     async reconcileStaleGenerationActivities(userId: string): Promise<number> {
-        const activities = await this.repository.findInProgressGenerationsByUserId(userId);
+        try {
+            const activities = await this.repository.findInProgressGenerationsByUserId(userId);
 
-        if (activities.length === 0) {
+            if (activities.length === 0) {
+                return 0;
+            }
+
+            let reconciledCount = 0;
+
+            for (const activity of activities) {
+                try {
+                    if (
+                        !activity.directoryId ||
+                        activity.actionType !== ActivityActionType.GENERATION
+                    ) {
+                        continue;
+                    }
+
+                    const directory = await this.directoryRepository.findById(activity.directoryId);
+
+                    if (directory?.generateStatus?.status === GenerateStatusType.GENERATING) {
+                        continue;
+                    }
+
+                    const itemCount = directory?.itemsCount || 0;
+                    const resolvedStatus =
+                        !directory ||
+                        directory.generateStatus?.status === GenerateStatusType.ERROR ||
+                        directory.generateStatus?.status === GenerateStatusType.CANCELLED
+                            ? ActivityStatus.FAILED
+                            : ActivityStatus.COMPLETED;
+                    const summary = !directory
+                        ? 'Generation state is no longer available for this directory'
+                        : directory.generateStatus?.status === GenerateStatusType.CANCELLED
+                          ? `Generation cancelled for ${directory.name}`
+                          : directory.generateStatus?.status === GenerateStatusType.ERROR
+                            ? `Generation failed for ${directory.name}`
+                            : `Generated ${itemCount} items for ${directory.name}`;
+                    const existingDetails =
+                        activity.details &&
+                        typeof activity.details === 'object' &&
+                        !Array.isArray(activity.details)
+                            ? activity.details
+                            : {};
+
+                    const updated = await this.updateStatus(
+                        activity.id,
+                        resolvedStatus,
+                        {
+                            ...existingDetails,
+                            itemsCount: itemCount,
+                            generateStatus: directory?.generateStatus ?? null,
+                        },
+                        {
+                            action: 'generation.completed',
+                            summary,
+                        },
+                    );
+
+                    if (updated) {
+                        reconciledCount += 1;
+                    }
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error);
+                    this.logger.warn(
+                        `Failed to reconcile stale generation activity ${activity.id}: ${message}`,
+                    );
+                }
+            }
+
+            if (reconciledCount > 0) {
+                this.logger.debug(
+                    `Reconciled ${reconciledCount} stale in-progress generation activit${
+                        reconciledCount === 1 ? 'y' : 'ies'
+                    } for user ${userId}`,
+                );
+            }
+
+            return reconciledCount;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+                `Failed to reconcile stale generation activities for user ${userId}: ${message}`,
+            );
             return 0;
         }
-
-        let reconciledCount = 0;
-
-        for (const activity of activities) {
-            if (!activity.directoryId || activity.actionType !== ActivityActionType.GENERATION) {
-                continue;
-            }
-
-            const directory = await this.directoryRepository.findById(activity.directoryId);
-
-            if (directory?.generateStatus?.status === GenerateStatusType.GENERATING) {
-                continue;
-            }
-
-            const itemCount = directory?.itemsCount || 0;
-            const resolvedStatus =
-                !directory ||
-                directory.generateStatus?.status === GenerateStatusType.ERROR ||
-                directory.generateStatus?.status === GenerateStatusType.CANCELLED
-                    ? ActivityStatus.FAILED
-                    : ActivityStatus.COMPLETED;
-            const summary = !directory
-                ? 'Generation state is no longer available for this directory'
-                : directory.generateStatus?.status === GenerateStatusType.CANCELLED
-                  ? `Generation cancelled for ${directory.name}`
-                  : directory.generateStatus?.status === GenerateStatusType.ERROR
-                    ? `Generation failed for ${directory.name}`
-                    : `Generated ${itemCount} items for ${directory.name}`;
-
-            const updated = await this.updateStatus(
-                activity.id,
-                resolvedStatus,
-                {
-                    ...(activity.details ?? {}),
-                    itemsCount: itemCount,
-                    generateStatus: directory?.generateStatus ?? null,
-                },
-                {
-                    action: 'generation.completed',
-                    summary,
-                },
-            );
-
-            if (updated) {
-                reconciledCount += 1;
-            }
-        }
-
-        if (reconciledCount > 0) {
-            this.logger.debug(
-                `Reconciled ${reconciledCount} stale in-progress generation activit${
-                    reconciledCount === 1 ? 'y' : 'ies'
-                } for user ${userId}`,
-            );
-        }
-
-        return reconciledCount;
     }
 
     async findAll(
