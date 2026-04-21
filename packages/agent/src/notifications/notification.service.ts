@@ -216,7 +216,7 @@ export class NotificationService {
             category: NotificationCategory.GENERATION,
             title: 'Schedule Paused',
             message: `Scheduled updates for "${directoryName}" paused: ${reason}`,
-            actionUrl: `/directories/${directoryId}/schedule`,
+            actionUrl: `/directories/${directoryId}/generator/schedule`,
             actionLabel: 'View Schedule',
             metadata: { directoryId, directoryName },
             deduplicationKey: `schedule_paused_${directoryId}`,
