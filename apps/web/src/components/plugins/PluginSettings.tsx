@@ -25,11 +25,8 @@ import { PluginReadme } from './PluginReadme';
 import { PluginEnablePanel } from './PluginEnablePanel';
 import { PluginDisableWarning } from './PluginDisableWarning';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
-import { ClaudeCodeOnboardingWizard } from '@/components/settings/ClaudeCodeOnboardingWizard';
-import { CodexOnboardingWizard } from '@/components/settings/CodexOnboardingWizard';
-import { GeminiOnboardingWizard } from '@/components/settings/GeminiOnboardingWizard';
 import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
-import { SimAiOnboardingWizard } from '@/components/settings/SimAiOnboardingWizard';
+import { PluginOnboardingWizard } from '@/components/settings/PluginOnboardingWizard';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 import { usePluginToggle } from '@/lib/hooks/use-plugin-toggle';
@@ -37,7 +34,7 @@ import { usePluginToggle } from '@/lib/hooks/use-plugin-toggle';
 interface PluginSettingsProps {
     plugin: UserPlugin;
     oauthConnection?: OAuthConnectionInfo | null;
-    localAuthStatus?: import('@/lib/api/plugins').CodexLocalAuthStatus | null;
+    localAuthStatus?: import('@/lib/api/plugins').PluginLocalAuthStatus | null;
 }
 
 export function PluginSettings({ plugin, oauthConnection, localAuthStatus }: PluginSettingsProps) {
@@ -299,57 +296,19 @@ export function PluginSettings({ plugin, oauthConnection, localAuthStatus }: Plu
 
                     <div className="p-6">
                         {plugin.uiHints?.onboardingWizard ? (
-                            plugin.pluginId === 'sim-ai' ? (
-                                <SimAiOnboardingWizard
-                                    pluginId={plugin.pluginId}
-                                    visibleProperties={visibleProperties}
-                                    getFieldValue={getFieldValue}
-                                    handleFieldChange={handleFieldChange}
-                                    handleSave={handleSave}
-                                    isSaving={isSaving}
-                                    saveSuccess={saveSuccess}
-                                    validationError={validationError}
-                                    saveMessage={saveMessage}
-                                />
-                            ) : plugin.pluginId === 'codex' ? (
-                                <CodexOnboardingWizard
-                                    pluginId={plugin.pluginId}
-                                    initialSettings={plugin.settings || {}}
-                                    initialLocalAuthStatus={localAuthStatus ?? null}
-                                    visibleProperties={visibleProperties}
-                                    getFieldValue={getFieldValue}
-                                    handleFieldChange={handleFieldChange}
-                                    handleSave={handleSave}
-                                    isSaving={isSaving}
-                                    saveSuccess={saveSuccess}
-                                    validationError={validationError}
-                                    saveMessage={saveMessage}
-                                />
-                            ) : plugin.pluginId === 'gemini' ? (
-                                <GeminiOnboardingWizard
-                                    pluginId={plugin.pluginId}
-                                    visibleProperties={visibleProperties}
-                                    getFieldValue={getFieldValue}
-                                    handleFieldChange={handleFieldChange}
-                                    handleSave={handleSave}
-                                    isSaving={isSaving}
-                                    saveSuccess={saveSuccess}
-                                    validationError={validationError}
-                                    saveMessage={saveMessage}
-                                />
-                            ) : (
-                                <ClaudeCodeOnboardingWizard
-                                    pluginId={plugin.pluginId}
-                                    visibleProperties={visibleProperties}
-                                    getFieldValue={getFieldValue}
-                                    handleFieldChange={handleFieldChange}
-                                    handleSave={handleSave}
-                                    isSaving={isSaving}
-                                    saveSuccess={saveSuccess}
-                                    validationError={validationError}
-                                    saveMessage={saveMessage}
-                                />
-                            )
+                            <PluginOnboardingWizard
+                                plugin={plugin}
+                                initialSettings={plugin.settings || {}}
+                                initialLocalAuthStatus={localAuthStatus ?? null}
+                                visibleProperties={visibleProperties}
+                                getFieldValue={getFieldValue}
+                                handleFieldChange={handleFieldChange}
+                                handleSave={handleSave}
+                                isSaving={isSaving}
+                                saveSuccess={saveSuccess}
+                                validationError={validationError}
+                                saveMessage={saveMessage}
+                            />
                         ) : (
                             <div className="space-y-5">
                                 {plugin.uiHints?.byok && !byokRevealed && (

@@ -29,6 +29,7 @@ import {
 	buildSuccessPipelineResult,
 	lucideIcon,
 	normalizeItemTags,
+	PLUGIN_CAPABILITIES,
 	substituteVariables,
 	type ItemData
 } from '@ever-works/plugin';
@@ -123,7 +124,7 @@ const MANIFEST: PluginManifest = {
 	name: 'Codex Generator',
 	version: '1.0.0',
 	category: 'pipeline',
-	capabilities: ['pipeline', 'form-schema-provider'],
+	capabilities: ['pipeline', 'form-schema-provider', 'local-auth'],
 	description: 'Full pipeline plugin that delegates the entire generation to Codex',
 	author: { name: 'Ever Works Team' },
 	license: 'MIT',
@@ -143,6 +144,9 @@ const MANIFEST: PluginManifest = {
 		completionFields: ['apiKey'],
 		onboardingDescription:
 			'Connect Codex with an OpenAI API key or local Codex CLI auth for end-to-end directory generation.',
+		localAuth: {
+			authModeField: 'authMode'
+		},
 		setupLink: {
 			url: 'https://platform.openai.com/account/api-keys',
 			label: 'OpenAI API keys',
@@ -266,7 +270,11 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	readonly name = 'Codex Generator';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'pipeline';
-	readonly capabilities = ['pipeline', 'form-schema-provider'] as const;
+	readonly capabilities = [
+		PLUGIN_CAPABILITIES.PIPELINE,
+		PLUGIN_CAPABILITIES.FORM_SCHEMA_PROVIDER,
+		PLUGIN_CAPABILITIES.LOCAL_AUTH
+	] as const;
 	readonly configurationMode = 'user-required' as const;
 	readonly handledConfigFields = ['*'] as const;
 

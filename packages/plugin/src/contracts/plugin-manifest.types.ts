@@ -143,6 +143,11 @@ export interface PluginUiHints {
 	completionFields?: string[];
 	/** User-friendly step description shown in the onboarding wizard (separate from the plugin description). */
 	onboardingDescription?: string;
+	/** Exposes a plugin-managed local auth flow, such as a machine-local CLI/device auth session. */
+	localAuth?: {
+		/** Settings field that selects the auth mode when local auth is available. */
+		authModeField?: string;
+	};
 }
 
 /**

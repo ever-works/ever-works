@@ -37,7 +37,7 @@ codex login
 
 The plugin materializes an isolated `CODEX_HOME` for each Ever Works user under its managed temp directory, so local Codex auth does not rely on a shared `~/.codex/auth.json`.
 
-The onboarding wizard (`CodexOnboardingWizard`) provides a 3-step flow: choose auth mode, configure credentials, and verify the connection.
+The onboarding UI provides a 3-step flow: choose auth mode, configure credentials, and verify the connection.
 
 ## Settings
 

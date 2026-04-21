@@ -45,7 +45,8 @@
 			"category": "pipeline",
 			"capabilities": [
 				"pipeline",
-				"form-schema-provider"
+				"form-schema-provider",
+				"local-auth"
 			],
 			"description": "Full pipeline plugin that delegates the entire generation to Codex",
 			"author": {

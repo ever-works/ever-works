@@ -2,7 +2,7 @@
 
 import { pluginsAPI } from '@/lib/api/plugins';
 import { revalidatePath } from 'next/cache';
-import type { CodexLocalAuthStatus } from '@/lib/api/plugins';
+import type { PluginLocalAuthStatus } from '@/lib/api/plugins';
 
 export interface ActionResult<T = unknown> {
     success: boolean;
@@ -208,9 +208,9 @@ export async function setGlobalPipelineDefault(
     }
 }
 
-export async function getCodexLocalAuthStatus(
+export async function getPluginLocalAuthStatus(
     pluginId: string,
-): Promise<ActionResult<CodexLocalAuthStatus>> {
+): Promise<ActionResult<PluginLocalAuthStatus>> {
     try {
         const result = await pluginsAPI.getLocalAuthStatus(pluginId);
         return { success: true, data: result };
@@ -223,9 +223,9 @@ export async function getCodexLocalAuthStatus(
     }
 }
 
-export async function startCodexLocalAuth(
+export async function startPluginLocalAuth(
     pluginId: string,
-): Promise<ActionResult<CodexLocalAuthStatus>> {
+): Promise<ActionResult<PluginLocalAuthStatus>> {
     try {
         const result = await pluginsAPI.startLocalAuth(pluginId);
         revalidatePath('/plugins');

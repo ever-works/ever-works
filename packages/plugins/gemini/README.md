@@ -43,7 +43,7 @@ Use Google Cloud / Vertex AI environment-based authentication. Requires:
 - `googleCloudLocation` - Region (default: `us-central1`)
 - `googleApiKey` (optional) - Google Cloud API key
 
-The onboarding wizard (`GeminiOnboardingWizard`) provides a 3-step flow: choose auth mode, configure credentials, and verify the connection.
+The onboarding UI provides a 3-step flow: choose auth mode, configure credentials, and verify the connection.
 
 ## Settings
 

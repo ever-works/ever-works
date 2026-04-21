@@ -75,7 +75,7 @@ describe('local-auth', () => {
 		const result = await getLocalAuthStatus(userId);
 
 		expect(result.connected).toBe(true);
-		expect(result.authPath).toBe(path.join(codexHome, 'auth.json'));
+		expect(result.scope).toBe('machine-local');
 	});
 
 	it('starts device auth with a managed per-user CODEX_HOME', async () => {
@@ -86,7 +86,7 @@ describe('local-auth', () => {
 		const result = await startLocalAuth(userId);
 
 		expect(result.pending).toBe(true);
-		expect(result.authPath).toBe(path.join(codexHome, 'auth.json'));
+		expect(result.scope).toBe('machine-local');
 		expect(result.verificationUri).toBe('https://auth.openai.com/codex/device');
 		expect(result.userCode).toBe('ABCD-EFGH');
 

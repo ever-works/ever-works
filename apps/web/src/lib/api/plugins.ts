@@ -36,7 +36,7 @@ export type DirectoryPluginListResponse = IDirectoryPluginListResponse;
 export type SettingsMenuResponse = ISettingsMenuResponse;
 export type SettingsMenuCategory = ISettingsMenuCategory;
 export type SettingsMenuPlugin = ISettingsMenuPlugin;
-export type CodexLocalAuthStatus = LocalAuthStatus;
+export type PluginLocalAuthStatus = LocalAuthStatus;
 
 // ============================================
 // API Client
@@ -161,12 +161,12 @@ export const pluginsAPI = {
         });
     },
 
-    getLocalAuthStatus: async (pluginId: string): Promise<CodexLocalAuthStatus> => {
-        return serverFetch<CodexLocalAuthStatus>(`/plugins/${pluginId}/local-auth-status`);
+    getLocalAuthStatus: async (pluginId: string): Promise<PluginLocalAuthStatus> => {
+        return serverFetch<PluginLocalAuthStatus>(`/plugins/${pluginId}/local-auth-status`);
     },
 
-    startLocalAuth: async (pluginId: string): Promise<CodexLocalAuthStatus> => {
-        return serverMutation<CodexLocalAuthStatus>({
+    startLocalAuth: async (pluginId: string): Promise<PluginLocalAuthStatus> => {
+        return serverMutation<PluginLocalAuthStatus>({
             endpoint: `/plugins/${pluginId}/start-local-auth`,
             data: {},
             method: 'POST',

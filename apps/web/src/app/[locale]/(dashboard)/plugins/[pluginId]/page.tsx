@@ -34,26 +34,11 @@ export default async function PluginDetailPage({ params }: PluginDetailPageProps
     }
 
     let localAuthStatus = null;
-    if (plugin.pluginId === 'codex') {
+    if (plugin.capabilities.includes('local-auth') || plugin.uiHints?.localAuth) {
         try {
             localAuthStatus = await pluginsAPI.getLocalAuthStatus(plugin.pluginId);
         } catch {
             localAuthStatus = null;
-        }
-
-        const configuredAuthMode =
-            typeof plugin.settings?.authMode === 'string' ? plugin.settings.authMode : undefined;
-        const hasSavedApiKey =
-            typeof plugin.settings?.apiKey === 'string' && plugin.settings.apiKey.length > 0;
-
-        if (!configuredAuthMode) {
-            plugin = {
-                ...plugin,
-                settings: {
-                    ...(plugin.settings || {}),
-                    authMode: !hasSavedApiKey && localAuthStatus?.connected ? 'local' : 'api-key',
-                },
-            };
         }
     }
 

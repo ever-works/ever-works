@@ -2,7 +2,7 @@ export interface LocalAuthStatus {
 	installed: boolean;
 	connected: boolean;
 	pending: boolean;
-	authPath: string;
+	scope: 'machine-local';
 	verificationUri?: string;
 	userCode?: string;
 	message: string;

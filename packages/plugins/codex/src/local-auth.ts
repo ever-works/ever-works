@@ -41,7 +41,6 @@ function getBinaryLogger(logger?: LoggerLike) {
 export async function getLocalAuthStatus(userId: string, logger?: LoggerLike): Promise<LocalAuthStatus> {
 	const codexHome = getManagedCodexHome(userId);
 	const installed = await isCodexInstalled(logger);
-	const authPath = getAuthPath(codexHome);
 	const connected = installed ? await verifyLocalAuthConnection(codexHome, logger) : false;
 	const session = getActiveSession(userId);
 
@@ -53,7 +52,7 @@ export async function getLocalAuthStatus(userId: string, logger?: LoggerLike): P
 		installed,
 		connected,
 		pending: Boolean(session && !connected),
-		authPath,
+		scope: 'machine-local',
 		verificationUri: session?.verificationUri,
 		userCode: session?.userCode,
 		message: buildStatusMessage({
@@ -67,13 +66,12 @@ export async function getLocalAuthStatus(userId: string, logger?: LoggerLike): P
 export async function startLocalAuth(userId: string, logger?: LoggerLike): Promise<LocalAuthStatus> {
 	const codexHome = getManagedCodexHome(userId);
 	const installed = await isCodexInstalled(logger);
-	const authPath = getAuthPath(codexHome);
 	if (!installed) {
 		return {
 			installed: false,
 			connected: false,
 			pending: false,
-			authPath,
+			scope: 'machine-local',
 			message: 'Codex CLI is not installed on this machine.'
 		};
 	}
@@ -84,7 +82,7 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 			installed: true,
 			connected: true,
 			pending: false,
-			authPath,
+			scope: 'machine-local',
 			message: 'Local Codex CLI auth is already connected.'
 		};
 	}
@@ -95,7 +93,7 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 			installed: true,
 			connected: false,
 			pending: true,
-			authPath,
+			scope: 'machine-local',
 			verificationUri: existing.verificationUri,
 			userCode: existing.userCode,
 			message: existing.verificationUri
@@ -191,7 +189,7 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 			installed: true,
 			connected: false,
 			pending: false,
-			authPath,
+			scope: 'machine-local',
 			message: 'Failed to start Codex device authentication.'
 		};
 	}
@@ -200,7 +198,7 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 		installed: true,
 		connected: false,
 		pending: true,
-		authPath,
+		scope: 'machine-local',
 		verificationUri: session.verificationUri,
 		userCode: session.userCode,
 		message: 'Open the device-auth page and enter the code shown below.'
