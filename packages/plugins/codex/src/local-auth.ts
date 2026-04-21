@@ -25,6 +25,7 @@ type LocalAuthSession = {
 };
 
 const sessionByUser = new Map<string, LocalAuthSession>();
+const lastFailureByUser = new Map<string, string>();
 
 function getBinaryLogger(logger?: LoggerLike) {
 	if (!logger) {
@@ -48,6 +49,10 @@ export async function getLocalAuthStatus(userId: string, logger?: LoggerLike): P
 		disposeSession(userId);
 	}
 
+	if (connected) {
+		lastFailureByUser.delete(userId);
+	}
+
 	return {
 		installed,
 		connected,
@@ -58,7 +63,8 @@ export async function getLocalAuthStatus(userId: string, logger?: LoggerLike): P
 		message: buildStatusMessage({
 			installed,
 			connected,
-			pending: Boolean(session && !connected)
+			pending: Boolean(session && !connected),
+			lastFailure: lastFailureByUser.get(userId)
 		})
 	};
 }
@@ -78,6 +84,7 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 
 	if (await isConnected(codexHome, logger)) {
 		disposeSession(userId);
+		lastFailureByUser.delete(userId);
 		return {
 			installed: true,
 			connected: true,
@@ -104,6 +111,7 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 
 	const codexCommand = await ensureBinary(undefined, getBinaryLogger(logger));
 	await fs.mkdir(codexHome, { recursive: true });
+	lastFailureByUser.delete(userId);
 	const child = spawn(codexCommand, ['login', '--device-auth'], {
 		cwd: process.cwd(),
 		env: buildSubprocessEnv({ CODEX_HOME: codexHome }),
@@ -168,6 +176,7 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 				code !== 0
 					? stderrBuffer.trim() || stdoutBuffer.trim() || `Codex login exited with code ${code}`
 					: 'Codex login exited successfully but auth file was not found.';
+			lastFailureByUser.set(userId, session.error);
 			logger?.warn(`Codex device auth failed: ${session.error}`);
 			disposeSession(userId);
 		}
@@ -176,21 +185,31 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 	child.on('error', (error) => {
 		session.status = 'failed';
 		session.error = error.message;
+		lastFailureByUser.set(userId, error.message);
 		logger?.warn(`Failed to start Codex device auth: ${error.message}`);
 		disposeSession(userId);
 	});
 
 	const ready = await waitForDevicePrompt(session, 5000);
 	if (!ready) {
-		session.status = 'failed';
-		session.error = 'Timed out waiting for Codex device authentication prompt.';
-		disposeSession(userId);
+		if (session.status === 'failed') {
+			return {
+				installed: true,
+				connected: false,
+				pending: false,
+				scope: 'machine-local',
+				message: session.error || 'Failed to start Codex device authentication.'
+			};
+		}
+
 		return {
 			installed: true,
 			connected: false,
-			pending: false,
+			pending: true,
 			scope: 'machine-local',
-			message: 'Failed to start Codex device authentication.'
+			verificationUri: session.verificationUri,
+			userCode: session.userCode,
+			message: 'Codex device authentication is starting on the backend machine.'
 		};
 	}
 
@@ -314,7 +333,12 @@ function disposeSession(userId: string): void {
 	}
 }
 
-function buildStatusMessage(params: { installed: boolean; connected: boolean; pending: boolean }): string {
+function buildStatusMessage(params: {
+	installed: boolean;
+	connected: boolean;
+	pending: boolean;
+	lastFailure?: string;
+}): string {
 	if (!params.installed) {
 		return 'Codex CLI is not installed on this machine.';
 	}
@@ -325,6 +349,10 @@ function buildStatusMessage(params: { installed: boolean; connected: boolean; pe
 
 	if (params.pending) {
 		return 'Codex device authentication is in progress.';
+	}
+
+	if (params.lastFailure) {
+		return `Last local auth attempt failed: ${params.lastFailure}`;
 	}
 
 	return 'Local Codex CLI auth is not connected yet.';

@@ -240,7 +240,66 @@
         "plugins": {
             "byokDescription": "Connect your own key to unlock the full configuration.",
             "byokDefaultButton": "Bring your own key",
-            "setupTokenDescription": "Create a token first, then paste it below and save to verify the connection."
+            "setupTokenDescription": "Create a token first, then paste it below and save to verify the connection.",
+            "wizard": {
+                "setupLabel": "Setup",
+                "back": "Back",
+                "continue": "Continue",
+                "errors": {
+                    "loadStatus": "Failed to load local authentication status.",
+                    "start": "Failed to start local authentication."
+                },
+                "steps": {
+                    "configure": {
+                        "title": "Configuration",
+                        "description": "Configure {pluginName} settings."
+                    },
+                    "credentials": {
+                        "title": "Credentials",
+                        "description": "Configure credentials for {pluginName}."
+                    },
+                    "verify": {
+                        "title": "Verify",
+                        "description": "Save settings and verify the connection.",
+                        "cardTitle": "Verify Connection",
+                        "cardDescription": "Save the current settings and run the plugin connection validation.",
+                        "action": "Save and Verify",
+                        "successDefault": "Connection verified successfully."
+                    }
+                },
+                "authModes": {
+                    "apiKey": {
+                        "eyebrow": "User-scoped",
+                        "title": "API Key",
+                        "description": "Use a user-scoped API key for this plugin."
+                    },
+                    "local": {
+                        "eyebrow": "Backend-scoped",
+                        "title": "Local Authentication",
+                        "description": "Authenticate on the backend machine for this plugin."
+                    }
+                },
+                "localAuth": {
+                    "badges": {
+                        "connected": "Connected",
+                        "pending": "Pending"
+                    },
+                    "status": {
+                        "title": "Backend Machine Status",
+                        "fallback": "Start or refresh local authentication for this backend instance.",
+                        "machineScoped": "Local auth is machine-scoped and only works on the backend instance where it was created.",
+                        "deviceCode": "Device Code",
+                        "openLink": "Open verification page"
+                    },
+                    "actions": {
+                        "notInstalled": "The required CLI is not installed on this machine.",
+                        "connected": "Local authentication connected",
+                        "start": "Start Local Auth",
+                        "restart": "Restart Local Auth",
+                        "refresh": "Refresh Status"
+                    }
+                }
+            }
         },
         "claudeWizard": {
             "label": "Claude Code setup",
