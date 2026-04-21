@@ -1357,7 +1357,6 @@ Only include image URLs that are absolute URLs (starting with http).`;
         } catch (error) {
             generationError = error;
         } finally {
-            this.generationAbortControllers.delete(directory.id);
             try {
                 await logCollector?.dispose();
                 await this.finalizeGeneration({
@@ -1371,6 +1370,8 @@ Only include image URLs that are absolute URLs (starting with http).`;
                 });
             } catch (finalizeError) {
                 this.logger.error('Failed to finalize generation status:', finalizeError);
+            } finally {
+                this.generationAbortControllers.delete(directory.id);
             }
         }
 
