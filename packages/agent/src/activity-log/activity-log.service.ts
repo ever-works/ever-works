@@ -1,12 +1,14 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ActivityLogRepository } from '@src/database/repositories/activity-log.repository';
-import type {
-    CreateActivityLogDto,
-    ActivityLogQueryOptions,
+import { DirectoryRepository } from '@src/database/repositories/directory.repository';
+import {
     ActivityActionType,
     ActivityStatus,
+    type CreateActivityLogDto,
+    type ActivityLogQueryOptions,
 } from '../entities/activity-log.types';
 import type { ActivityLog } from '../entities/activity-log.entity';
+import { GenerateStatusType } from '@src/entities/types';
 import {
     ACTIVITY_LOG_ANALYTICS_DISPATCHER,
     type ActivityLogAnalyticsDispatcher,
@@ -18,6 +20,7 @@ export class ActivityLogService {
 
     constructor(
         private readonly repository: ActivityLogRepository,
+        private readonly directoryRepository: DirectoryRepository,
         @Optional()
         @Inject(ACTIVITY_LOG_ANALYTICS_DISPATCHER)
         private readonly analyticsDispatcher?: ActivityLogAnalyticsDispatcher,
@@ -61,6 +64,71 @@ export class ActivityLogService {
             this.dispatchAnalytics(activity);
         }
         return activity;
+    }
+
+    async reconcileStaleGenerationActivities(userId: string): Promise<number> {
+        const activities = await this.repository.findInProgressGenerationsByUserId(userId);
+
+        if (activities.length === 0) {
+            return 0;
+        }
+
+        let reconciledCount = 0;
+
+        for (const activity of activities) {
+            if (!activity.directoryId || activity.actionType !== ActivityActionType.GENERATION) {
+                continue;
+            }
+
+            const directory = await this.directoryRepository.findById(activity.directoryId);
+
+            if (directory?.generateStatus?.status === GenerateStatusType.GENERATING) {
+                continue;
+            }
+
+            const itemCount = directory?.itemsCount || 0;
+            const resolvedStatus =
+                !directory ||
+                directory.generateStatus?.status === GenerateStatusType.ERROR ||
+                directory.generateStatus?.status === GenerateStatusType.CANCELLED
+                    ? ActivityStatus.FAILED
+                    : ActivityStatus.COMPLETED;
+            const summary = !directory
+                ? 'Generation state is no longer available for this directory'
+                : directory.generateStatus?.status === GenerateStatusType.CANCELLED
+                  ? `Generation cancelled for ${directory.name}`
+                  : directory.generateStatus?.status === GenerateStatusType.ERROR
+                    ? `Generation failed for ${directory.name}`
+                    : `Generated ${itemCount} items for ${directory.name}`;
+
+            const updated = await this.updateStatus(
+                activity.id,
+                resolvedStatus,
+                {
+                    ...(activity.details ?? {}),
+                    itemsCount: itemCount,
+                    generateStatus: directory?.generateStatus ?? null,
+                },
+                {
+                    action: 'generation.completed',
+                    summary,
+                },
+            );
+
+            if (updated) {
+                reconciledCount += 1;
+            }
+        }
+
+        if (reconciledCount > 0) {
+            this.logger.debug(
+                `Reconciled ${reconciledCount} stale in-progress generation activit${
+                    reconciledCount === 1 ? 'y' : 'ies'
+                } for user ${userId}`,
+            );
+        }
+
+        return reconciledCount;
     }
 
     async findAll(

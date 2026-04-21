@@ -57,6 +57,8 @@ export class ActivityLogController {
         @Query('limit', new DefaultValuePipe(25), ParseIntPipe) limit?: number,
         @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset?: number,
     ) {
+        await this.activityLogService.reconcileStaleGenerationActivities(auth.userId);
+
         const result = await this.activityLogService.findAll({
             userId: auth.userId,
             actionType: actionType as ActivityActionType,
@@ -82,6 +84,8 @@ export class ActivityLogController {
     })
     @ApiResponse({ status: 200, description: 'Running operations count' })
     async getRunningCount(@CurrentUser() auth: AuthenticatedUser) {
+        await this.activityLogService.reconcileStaleGenerationActivities(auth.userId);
+
         const count = await this.activityLogService.countRunning(auth.userId);
         return { count };
     }
@@ -93,6 +97,8 @@ export class ActivityLogController {
     })
     @ApiResponse({ status: 200, description: 'Activity summary counts' })
     async getSummary(@CurrentUser() auth: AuthenticatedUser) {
+        await this.activityLogService.reconcileStaleGenerationActivities(auth.userId);
+
         const counts = await this.activityLogService.summarizeStatuses(auth.userId);
         return { counts };
     }
@@ -140,6 +146,8 @@ export class ActivityLogController {
     @ApiResponse({ status: 200, description: 'Activity log entry details' })
     @ApiResponse({ status: 404, description: 'Activity not found' })
     async getActivity(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        await this.activityLogService.reconcileStaleGenerationActivities(auth.userId);
+
         const activity = await this.activityLogService.findByIdAndUserId(id, auth.userId);
         if (!activity) {
             throw new NotFoundException('Activity not found');

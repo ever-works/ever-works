@@ -58,6 +58,18 @@ export class ActivityLogRepository {
         });
     }
 
+    async findInProgressGenerationsByUserId(userId: string): Promise<ActivityLog[]> {
+        return this.repository.find({
+            where: {
+                userId,
+                actionType: 'generation' as ActivityActionType,
+                status: 'in_progress' as ActivityStatus,
+            },
+            order: { createdAt: 'DESC' },
+            relations: ['directory'],
+        });
+    }
+
     async findByUserId(
         options: ActivityLogQueryOptions,
     ): Promise<{ activities: ActivityLog[]; total: number }> {

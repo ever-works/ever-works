@@ -131,6 +131,12 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                                         const result = await cancelGeneration(directory.id);
 
                                         if (!result.success) {
+                                            if (result.error?.includes('is not generating')) {
+                                                toast.error(result.error);
+                                                router.refresh();
+                                                return;
+                                            }
+
                                             toast.error(result.error || t('generating.stopFailed'));
                                             return;
                                         }

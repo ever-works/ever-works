@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useState, useTransition } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { formatDistanceToNow } from 'date-fns';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
@@ -15,11 +15,59 @@ import type { GenerationStepLog } from '@/lib/api/types-only';
 import { Button } from '@/components/ui/button';
 import { cancelGeneration } from '@/app/actions/dashboard/generator';
 import { toast } from 'sonner';
+import { useMounted } from '@/lib/hooks/use-mounted';
 
 interface ActivityTableProps {
     activities: ActivityLogEntry[];
     loading: boolean;
     onStopRequested?: () => void;
+}
+
+const dateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+function formatActivityDateTime(value: string, locale: string) {
+    if (!dateTimeFormatterCache.has(locale)) {
+        dateTimeFormatterCache.set(
+            locale,
+            new Intl.DateTimeFormat(locale, {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+            }),
+        );
+    }
+
+    return dateTimeFormatterCache.get(locale)!.format(new Date(value));
+}
+
+function ActivityTimestamp({
+    value,
+    variant = 'absolute',
+    className,
+}: {
+    value: string;
+    variant?: 'absolute' | 'relative';
+    className?: string;
+}) {
+    const locale = useLocale();
+    const mounted = useMounted();
+
+    if (!mounted) {
+        return <time dateTime={value} className={className} />;
+    }
+
+    const absoluteValue = formatActivityDateTime(value, locale);
+
+    return (
+        <time
+            dateTime={value}
+            title={variant === 'relative' ? absoluteValue : undefined}
+            className={className}
+        >
+            {variant === 'relative'
+                ? formatDistanceToNow(new Date(value), { addSuffix: true })
+                : absoluteValue}
+        </time>
+    );
 }
 
 function hasStructuredData(value?: Record<string, unknown>) {
@@ -201,6 +249,13 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
             const result = await cancelGeneration(directoryId);
 
             if (!result.success) {
+                if (result.error?.includes('is not generating')) {
+                    toast.error(result.error);
+                    onStopRequested?.();
+                    setStoppingDirectoryId(null);
+                    return;
+                }
+
                 toast.error(result.error || t('actions.stopFailed'));
                 setStoppingDirectoryId(null);
                 return;
@@ -323,15 +378,10 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                             <ActivityStatusBadge status={activity.status} />
                                         </td>
                                         <td className="px-4 py-3 text-xs text-text-muted dark:text-text-muted-dark whitespace-nowrap">
-                                            <span
-                                                title={new Date(
-                                                    activity.createdAt,
-                                                ).toLocaleString()}
-                                            >
-                                                {formatDistanceToNow(new Date(activity.createdAt), {
-                                                    addSuffix: true,
-                                                })}
-                                            </span>
+                                            <ActivityTimestamp
+                                                value={activity.createdAt}
+                                                variant="relative"
+                                            />
                                         </td>
                                         <td className="px-4 py-3 text-xs">
                                             {activity.directory ? (
@@ -426,11 +476,12 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                                                     <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
                                                                         {t('detail.created')}:
                                                                     </span>{' '}
-                                                                    <span className="text-[11px] text-text-muted dark:text-text-muted-dark">
-                                                                        {new Date(
-                                                                            hydratedActivity.createdAt,
-                                                                        ).toLocaleString()}
-                                                                    </span>
+                                                                    <ActivityTimestamp
+                                                                        value={
+                                                                            hydratedActivity.createdAt
+                                                                        }
+                                                                        className="text-[11px] text-text-muted dark:text-text-muted-dark"
+                                                                    />
                                                                 </p>
                                                             </div>
                                                         </div>
