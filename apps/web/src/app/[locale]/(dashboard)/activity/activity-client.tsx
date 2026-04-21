@@ -9,7 +9,7 @@ import { ActivityTable } from '@/components/activity-log/ActivityTable';
 import { ActivityFilters } from '@/components/activity-log/ActivityFilters';
 import { ActivityEmptyState } from '@/components/activity-log/ActivityEmptyState';
 import { toast } from 'sonner';
-import { Download } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 
 const POLL_INTERVAL = 5000;
 const ITEMS_PER_PAGE = 25;
@@ -47,6 +47,7 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
 
     const requestIdRef = useRef(0);
     const hasMountedRef = useRef(false);
+    const [pendingStatusKey, setPendingStatusKey] = useState<string | null>(null);
     const hasActiveFilters = actionType !== '' || status !== '' || debouncedSearch !== '';
 
     // Sync filters → URL query params
@@ -99,6 +100,7 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
             } finally {
                 if (currentRequestId === requestIdRef.current && !silent) {
                     setLoading(false);
+                    setPendingStatusKey(null);
                 }
             }
         },
@@ -191,6 +193,7 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         setStatus('');
         setSearch('');
         setDebouncedSearch('');
+        setPendingStatusKey(null);
     };
 
     const handleExport = async () => {
@@ -283,12 +286,17 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                         <button
                             key={card.key}
                             type="button"
-                            onClick={() => setStatus(isActive ? '' : card.key)}
+                            onClick={() => {
+                                setPendingStatusKey(card.key);
+                                setStatus(isActive ? '' : card.key);
+                            }}
+                            disabled={loading}
+                            aria-busy={loading && pendingStatusKey === card.key}
                             className={`rounded-lg cursor-pointer border px-4 py-3.5 text-left transition-all duration-150 ${
                                 isActive
                                     ? `${config.activeBorder} ${config.activeBg}`
                                     : 'border-border dark:border-border-dark bg-card dark:bg-card-primary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark'
-                            }`}
+                            } ${loading ? 'opacity-70 cursor-wait' : ''}`}
                         >
                             <div className="flex items-center gap-1.5 mb-2">
                                 <span
@@ -297,6 +305,9 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                                 <p className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
                                     {card.label}
                                 </p>
+                                {loading && pendingStatusKey === card.key && (
+                                    <Loader2 className="w-3 h-3 animate-spin text-text-muted dark:text-text-muted-dark" />
+                                )}
                             </div>
                             <p className="text-xl font-normal tabular-nums text-text dark:text-text-dark">
                                 {card.count.toLocaleString()}
@@ -313,6 +324,7 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                 onStatusChange={setStatus}
                 search={search}
                 onSearchChange={setSearch}
+                loading={loading}
                 hasActiveFilters={hasActiveFilters}
                 onClearFilters={handleClearFilters}
             />

@@ -1483,7 +1483,7 @@
                 "repositoryPlaceholder": "Brief description of the repository (optional)",
                 "startGeneration": "Start Generation",
                 "regenerateItems": "Regenerate Items",
-                "updateItems": "Update Items",
+                "updateItems": "Run Generation",
                 "recreateDirectory": "Recreate Directory",
                 "showAdvancedOptions": "Show Advanced Options",
                 "hideAdvancedOptions": "Hide Advanced Options",
@@ -2597,7 +2597,7 @@
             "githubOrganizations": {
                 "title": "GitHub Organizations",
                 "description": "Review the organizations available from your GitHub connection and add any extra organizations you want Ever Works to target.",
-                "noOrganizations": "No organizations found yet.",
+                "noOrganizations": "No organizations are available from the current GitHub connection.",
                 "connectToLoad": "Connect GitHub to load your organizations.",
                 "placeholder": "Add organization by login",
                 "addButton": "Add organization",
