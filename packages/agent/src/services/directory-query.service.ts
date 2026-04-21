@@ -5,7 +5,7 @@ import { DirectoryGenerationHistoryRepository } from '@src/database/repositories
 import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
 import { User } from '@src/entities/user.entity';
 import { Directory } from '@src/entities/directory.entity';
-import { DirectoryMemberRole } from '@src/entities/types';
+import { DirectoryMemberRole, GenerateStatusType } from '@src/entities/types';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { normalizeGeneratorError, rethrowAsNormalized } from './utils/error.utils';
 import {
@@ -69,6 +69,15 @@ export class DirectoryQueryService {
                 search: sanitizedSearch,
             });
 
+            const directoryIdsNeedingRecoveredCounts = directories
+                .filter((dir) => this.shouldRecoverItemsCount(dir))
+                .map((dir) => dir.id);
+
+            const recoveredItemCounts =
+                await this.generationHistoryRepository.findLatestPositiveItemCounts(
+                    directoryIdsNeedingRecoveredCounts,
+                );
+
             // Separate directories into owned vs member-accessed for role computation
             const nonOwnedDirectoryIds = directories
                 .filter((dir) => dir.userId !== user.id)
@@ -84,6 +93,12 @@ export class DirectoryQueryService {
             const directoriesWithRoles: DirectoryWithRole[] = directories.map((dir) => {
                 dir.owner = dir.getRepoOwner();
 
+                const recoveredItemsCount = recoveredItemCounts.get(dir.id);
+                const itemsCount =
+                    (dir.itemsCount ?? 0) > 0
+                        ? dir.itemsCount
+                        : (recoveredItemsCount ?? dir.itemsCount);
+
                 // Creator is always OWNER, otherwise look up member role
                 const userRole =
                     dir.userId === user.id
@@ -92,6 +107,7 @@ export class DirectoryQueryService {
 
                 return {
                     ...dir,
+                    itemsCount,
                     userRole,
                 } as DirectoryWithRole;
             });
@@ -112,6 +128,19 @@ export class DirectoryQueryService {
         } catch (error) {
             rethrowAsNormalized(error, this.logger, 'getting directories');
         }
+    }
+
+    private shouldRecoverItemsCount(directory: Directory): boolean {
+        if ((directory.itemsCount ?? 0) > 0) {
+            return false;
+        }
+
+        const status = directory.generateStatus?.status;
+        return (
+            status === GenerateStatusType.GENERATING ||
+            status === GenerateStatusType.ERROR ||
+            status === GenerateStatusType.CANCELLED
+        );
     }
 
     async getStats(user: User) {
