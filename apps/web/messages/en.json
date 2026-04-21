@@ -1653,7 +1653,8 @@
                 "progress": "Progress",
                 "closeNote": "This may take a few minutes. You can close this page and come back later.",
                 "showLogs": "Show step logs",
-                "hideLogs": "Hide step logs"
+                "hideLogs": "Hide step logs",
+                "waitingForLogs": "Waiting for live logs to arrive..."
             },
             "settings": {
                 "sourceSettings": "Source Repository",
