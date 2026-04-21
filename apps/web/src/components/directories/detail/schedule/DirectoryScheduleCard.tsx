@@ -365,7 +365,6 @@ function ScheduleFormContent({
 
             toast.success(result.message || t('success.runStarted'));
             router.push(ROUTES.DASHBOARD_DIRECTORY_GENERATOR(directoryId));
-            router.refresh();
         });
     };
 

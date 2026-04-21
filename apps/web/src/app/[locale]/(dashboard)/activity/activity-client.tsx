@@ -287,7 +287,9 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                             key={card.key}
                             type="button"
                             onClick={() => {
-                                setPendingStatusKey(card.key);
+                                if (!isActive) {
+                                    setPendingStatusKey(card.key);
+                                }
                                 setStatus(isActive ? '' : card.key);
                             }}
                             disabled={loading}
