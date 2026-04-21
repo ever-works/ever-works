@@ -44,7 +44,24 @@ export function getFormGroups(): FormFieldGroup[] {
 }
 
 export function validateFormInput(_values: Record<string, unknown>): ValidationResult {
-	return { valid: true };
+	const errors: Array<{ path: string; message: string }> = [];
+	const targetItems = _values.target_items;
+
+	if (targetItems !== undefined && targetItems !== null) {
+		const num = Number(targetItems);
+		if (Number.isNaN(num)) {
+			errors.push({ path: 'target_items', message: 'target_items must be a number' });
+		} else if (num < 1 || num > 500) {
+			errors.push({ path: 'target_items', message: 'target_items must be between 1 and 500' });
+		}
+	}
+
+	const captureScreenshots = _values.capture_screenshots;
+	if (captureScreenshots !== undefined && typeof captureScreenshots !== 'boolean') {
+		errors.push({ path: 'capture_screenshots', message: 'capture_screenshots must be a boolean' });
+	}
+
+	return errors.length > 0 ? { valid: false, errors } : { valid: true };
 }
 
 export function getDefaultValues(fields: FormFieldDefinition[]): Record<string, unknown> {

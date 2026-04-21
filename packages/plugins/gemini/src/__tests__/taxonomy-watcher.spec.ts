@@ -92,6 +92,42 @@ describe('taxonomy-watcher', () => {
 		}
 	});
 
+	it('should serialize taxonomy sync for rapid successive writes', async () => {
+		const watcher = startTaxonomyWatcher({ workspacePath, logger });
+
+		try {
+			await Promise.all([
+				writeFile(
+					join(workspacePath, 'first.json'),
+					JSON.stringify({ name: 'First', category: 'Category One', tags: ['alpha'] }),
+					'utf-8'
+				),
+				writeFile(
+					join(workspacePath, 'second.json'),
+					JSON.stringify({ name: 'Second', category: 'Category Two', tags: ['beta'] }),
+					'utf-8'
+				)
+			]);
+
+			await sleep(400);
+
+			const { readFile: rf } = await import('node:fs/promises');
+			const categories = JSON.parse(await rf(join(workspacePath, '_meta', 'categories.json'), 'utf-8'));
+			const tags = JSON.parse(await rf(join(workspacePath, '_meta', 'tags.json'), 'utf-8'));
+
+			expect(categories).toEqual([
+				{ id: 'category-one', name: 'Category One' },
+				{ id: 'category-two', name: 'Category Two' }
+			]);
+			expect(tags).toEqual([
+				{ id: 'alpha', name: 'Alpha' },
+				{ id: 'beta', name: 'Beta' }
+			]);
+		} finally {
+			watcher.stop();
+		}
+	});
+
 	describe('onNewItem callback', () => {
 		it('should fire for new (non-seeded) files with incrementing count', async () => {
 			const onNewItem = vi.fn();

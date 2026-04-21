@@ -44,7 +44,8 @@ export function executeGemini(options: ExecuteOptions): {
 	const promise = new Promise<ExecuteResult>((resolve, reject) => {
 		const startTime = Date.now();
 		const mergedPrompt = `${options.systemPrompt.trim()}\n\n${options.prompt.trim()}`.trim();
-		const args = ['-p', mergedPrompt, '--output-format', 'json', '--approval-mode', 'yolo'];
+		// Keep automation non-interactive while forcing Gemini's own sandbox boundary on every run.
+		const args = ['-p', mergedPrompt, '--output-format', 'json', '--sandbox', '--approval-mode', 'yolo'];
 
 		if (options.model) {
 			args.push('--model', options.model);

@@ -245,7 +245,7 @@ export async function ensureOnboardingConfig(configDir: string): Promise<void> {
 			...(typeof existingConfig.tools === 'object' && existingConfig.tools !== null
 				? (existingConfig.tools as Record<string, unknown>)
 				: {}),
-			sandbox: false
+			sandbox: true
 		}
 	};
 

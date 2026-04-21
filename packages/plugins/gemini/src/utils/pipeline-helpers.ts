@@ -13,6 +13,19 @@ import type { GeminiStepId } from '../types.js';
 import { GEMINI_STEP_IDS } from '../types.js';
 import { STEP_DEFINITIONS } from '../steps.js';
 
+function getUsableSecret(value: unknown): string | undefined {
+	if (typeof value !== 'string') {
+		return undefined;
+	}
+
+	const trimmed = value.trim();
+	if (!trimmed || trimmed.includes('••••')) {
+		return undefined;
+	}
+
+	return trimmed;
+}
+
 export function initializeState(): PipelineState<GeminiStepId> {
 	const steps = new Map<GeminiStepId, StepState<GeminiStepId>>();
 	for (const def of STEP_DEFINITIONS) {
@@ -129,8 +142,8 @@ export async function resolveSettings(
 
 export function resolveAuthEnv(settings: PluginSettings): Record<string, string> {
 	const authMode = settings.authMode as string | undefined;
-	const apiKey = settings.apiKey as string | undefined;
-	const googleApiKey = settings.googleApiKey as string | undefined;
+	const apiKey = getUsableSecret(settings.apiKey);
+	const googleApiKey = getUsableSecret(settings.googleApiKey);
 	const project = settings.googleCloudProject as string | undefined;
 	const location = settings.googleCloudLocation as string | undefined;
 

@@ -147,6 +147,43 @@ describe('GeminiPlugin', () => {
 		expect(props.googleCloudLocation.default).toBe('us-central1');
 	});
 
+	it('should validate auth settings based on auth mode', () => {
+		expect(plugin.validateSettings({ authMode: 'api-key' })).toEqual({
+			valid: false,
+			errors: [{ path: 'apiKey', message: 'API key is required when authMode is "api-key"' }]
+		});
+
+		expect(plugin.validateSettings({ authMode: 'vertex', googleCloudLocation: 'us-central1' })).toEqual({
+			valid: false,
+			errors: [
+				{
+					path: 'googleCloudProject',
+					message: 'Google Cloud project is required when authMode is "vertex"'
+				}
+			]
+		});
+
+		expect(
+			plugin.validateSettings({
+				authMode: 'vertex',
+				googleCloudProject: 'ever-works',
+				googleCloudLocation: 'us-central1'
+			})
+		).toEqual({ valid: true });
+	});
+
+	it('should validate form input bounds and types', () => {
+		expect(plugin.validateFormInput({ target_items: 50, capture_screenshots: false })).toEqual({ valid: true });
+		expect(plugin.validateFormInput({ target_items: 0 })).toEqual({
+			valid: false,
+			errors: [{ path: 'target_items', message: 'target_items must be between 1 and 500' }]
+		});
+		expect(plugin.validateFormInput({ capture_screenshots: 'yes' })).toEqual({
+			valid: false,
+			errors: [{ path: 'capture_screenshots', message: 'capture_screenshots must be a boolean' }]
+		});
+	});
+
 	it('should return 6 step definitions in correct order', () => {
 		const steps = plugin.getStepDefinitions();
 		expect(steps.map((s) => s.id)).toEqual([

@@ -334,33 +334,73 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 	}
 
 	validateSettings(settings: Record<string, unknown>): ValidationResult {
+		const errors: Array<{ path: string; message: string }> = [];
+		const authMode = settings.authMode;
+
 		if (
-			settings.authMode !== undefined &&
-			settings.authMode !== 'machine-local' &&
-			settings.authMode !== 'api-key' &&
-			settings.authMode !== 'vertex'
+			authMode !== undefined &&
+			authMode !== 'machine-local' &&
+			authMode !== 'api-key' &&
+			authMode !== 'vertex'
 		) {
-			return {
-				valid: false,
-				errors: [
-					{ path: 'authMode', message: 'Authentication mode must be "machine-local", "api-key", or "vertex"' }
-				]
-			};
-		}
-		if (settings.apiKey !== undefined && typeof settings.apiKey !== 'string') {
-			return {
-				valid: false,
-				errors: [{ path: 'apiKey', message: 'API key must be a string when provided' }]
-			};
-		}
-		if (settings.googleCloudProject !== undefined && typeof settings.googleCloudProject !== 'string') {
-			return {
-				valid: false,
-				errors: [{ path: 'googleCloudProject', message: 'Google Cloud project must be a string when provided' }]
-			};
+			errors.push({
+				path: 'authMode',
+				message: 'Authentication mode must be "machine-local", "api-key", or "vertex"'
+			});
 		}
 
-		return { valid: true };
+		if (settings.apiKey !== undefined && typeof settings.apiKey !== 'string') {
+			errors.push({ path: 'apiKey', message: 'API key must be a string when provided' });
+		}
+		if (settings.googleApiKey !== undefined && typeof settings.googleApiKey !== 'string') {
+			errors.push({ path: 'googleApiKey', message: 'Google Cloud API key must be a string when provided' });
+		}
+		if (settings.googleCloudProject !== undefined && typeof settings.googleCloudProject !== 'string') {
+			errors.push({ path: 'googleCloudProject', message: 'Google Cloud project must be a string when provided' });
+		}
+		if (settings.googleCloudLocation !== undefined && typeof settings.googleCloudLocation !== 'string') {
+			errors.push({
+				path: 'googleCloudLocation',
+				message: 'Google Cloud location must be a string when provided'
+			});
+		}
+		if (settings.model !== undefined && typeof settings.model !== 'string') {
+			errors.push({ path: 'model', message: 'Model must be a string when provided' });
+		}
+		if (settings.version !== undefined && typeof settings.version !== 'string') {
+			errors.push({ path: 'version', message: 'CLI version must be a string when provided' });
+		}
+
+		if (authMode === 'api-key') {
+			const apiKey = settings.apiKey;
+			if (typeof apiKey !== 'string' || apiKey.trim() === '') {
+				errors.push({ path: 'apiKey', message: 'API key is required when authMode is "api-key"' });
+			}
+		}
+
+		if (authMode === 'vertex') {
+			if (
+				typeof settings.googleCloudProject !== 'string' ||
+				settings.googleCloudProject.trim() === ''
+			) {
+				errors.push({
+					path: 'googleCloudProject',
+					message: 'Google Cloud project is required when authMode is "vertex"'
+				});
+			}
+
+			if (
+				typeof settings.googleCloudLocation !== 'string' ||
+				settings.googleCloudLocation.trim() === ''
+			) {
+				errors.push({
+					path: 'googleCloudLocation',
+					message: 'Google Cloud location is required when authMode is "vertex"'
+				});
+			}
+		}
+
+		return errors.length > 0 ? { valid: false, errors } : { valid: true };
 	}
 
 	getManifest(): PluginManifest {

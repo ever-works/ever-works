@@ -257,7 +257,7 @@ describe('workspace-manager', () => {
 			expect(written.general.disableAutoUpdate).toBe(true);
 			expect(written.general.disableUpdateNag).toBe(true);
 			expect(written.general.checkpointing.enabled).toBe(false);
-			expect(written.tools.sandbox).toBe(false);
+			expect(written.tools.sandbox).toBe(true);
 		});
 
 		it('should not overwrite when all flags are already set', async () => {
@@ -269,7 +269,7 @@ describe('workspace-manager', () => {
 						checkpointing: { enabled: false }
 					},
 					tools: {
-						sandbox: false
+						sandbox: true
 					}
 				})
 			);

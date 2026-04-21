@@ -29,6 +29,7 @@ export function startTaxonomyWatcher(options: TaxonomyWatcherOptions): { stop: (
 	let watcher: FSWatcher | null = null;
 
 	const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+	let syncQueue = Promise.resolve();
 
 	const readFn = (p: string) => readFile(p, 'utf-8');
 	const writeFn = (p: string, c: string) => writeFile(p, c, 'utf-8');
@@ -64,7 +65,9 @@ export function startTaxonomyWatcher(options: TaxonomyWatcherOptions): { stop: (
 						onNewItem(countedNewFiles.size, filename);
 					}
 
-					handleFileChange(workspacePath, filename, readFn, writeFn, logger);
+					syncQueue = syncQueue
+						.catch(() => undefined)
+						.then(() => handleFileChange(workspacePath, filename, readFn, writeFn, logger));
 				}, 50)
 			);
 		});
