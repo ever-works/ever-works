@@ -523,9 +523,7 @@ describe('MakePlugin', () => {
 				mockResponse({ body: { scenario: { id: 42, name: 'My Scenario', isActive: true } } })
 			);
 			fetchMock.mockResolvedValueOnce(mockResponse({ body: {} }));
-			fetchMock.mockResolvedValueOnce(
-				mockResponse({ body: { hook: { id: 99, name: 'Broken Hook' } } })
-			);
+			fetchMock.mockResolvedValueOnce(mockResponse({ body: { hook: { id: 99, name: 'Broken Hook' } } }));
 
 			const result = await plugin.execute(
 				createDirectory(),
