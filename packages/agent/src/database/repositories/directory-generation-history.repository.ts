@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, MoreThan, Repository } from 'typeorm';
 import { DirectoryGenerationHistory, GenerationMetrics } from '@src/entities';
 import { GenerateStatusType } from '@src/entities/types';
 import {
@@ -124,6 +124,30 @@ export class DirectoryGenerationHistoryRepository {
 
     async findById(id: string): Promise<DirectoryGenerationHistory | null> {
         return this.repository.findOne({ where: { id } });
+    }
+
+    async findLatestPositiveItemCounts(directoryIds: string[]): Promise<Map<string, number>> {
+        if (directoryIds.length === 0) {
+            return new Map();
+        }
+
+        const records = await this.repository.find({
+            where: {
+                directoryId: In(directoryIds),
+                totalItemsCount: MoreThan(0),
+            },
+            order: { startedAt: 'DESC', createdAt: 'DESC' },
+        });
+
+        const counts = new Map<string, number>();
+
+        for (const record of records) {
+            if (!counts.has(record.directoryId)) {
+                counts.set(record.directoryId, record.totalItemsCount);
+            }
+        }
+
+        return counts;
     }
 
     async appendLogs(id: string, newLogs: GenerationStepLog[]): Promise<void> {
