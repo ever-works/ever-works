@@ -27,8 +27,9 @@ import { PluginDisableWarning } from './PluginDisableWarning';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { ClaudeCodeOnboardingWizard } from '@/components/settings/ClaudeCodeOnboardingWizard';
 import { OpenCodeOnboardingWizard } from '@/components/settings/OpenCodeOnboardingWizard';
-import { SimAiOnboardingWizard } from '@/components/settings/SimAiOnboardingWizard';
+import { GeminiOnboardingWizard } from '@/components/settings/GeminiOnboardingWizard';
 import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
+import { SimAiOnboardingWizard } from '@/components/settings/SimAiOnboardingWizard';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 import { usePluginToggle } from '@/lib/hooks/use-plugin-toggle';
@@ -123,9 +124,12 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
         plugin.pluginId === 'claude-code' && Boolean(plugin.uiHints?.onboardingWizard);
     const usesOpenCodeWizard =
         plugin.pluginId === 'opencode' && Boolean(plugin.uiHints?.onboardingWizard);
+    const usesGeminiWizard =
+        plugin.pluginId === 'gemini' && Boolean(plugin.uiHints?.onboardingWizard);
     const usesSimAiWizard =
         plugin.pluginId === 'sim-ai' && Boolean(plugin.uiHints?.onboardingWizard);
-    const usesCustomWizard = usesClaudeWizard || usesOpenCodeWizard || usesSimAiWizard;
+    const usesCustomWizard =
+        usesClaudeWizard || usesOpenCodeWizard || usesGeminiWizard || usesSimAiWizard;
 
     return (
         <div className="space-y-6">
@@ -314,6 +318,18 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                                 />
                             ) : usesOpenCodeWizard ? (
                                 <OpenCodeOnboardingWizard
+                                    pluginId={plugin.pluginId}
+                                    visibleProperties={visibleProperties}
+                                    getFieldValue={getFieldValue}
+                                    handleFieldChange={handleFieldChange}
+                                    handleSave={handleSave}
+                                    isSaving={isSaving}
+                                    saveSuccess={saveSuccess}
+                                    validationError={validationError}
+                                    saveMessage={saveMessage}
+                                />
+                            ) : usesGeminiWizard ? (
+                                <GeminiOnboardingWizard
                                     pluginId={plugin.pluginId}
                                     visibleProperties={visibleProperties}
                                     getFieldValue={getFieldValue}
