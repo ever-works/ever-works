@@ -97,9 +97,9 @@ export function buildSystemPromptVariables(
 			`These are **research seeds** — treat them as starting-point input, NOT as final content.\n\n` +
 			'A lightweight index is available at `_meta/existing-items.jsonl` ' +
 			'(one JSON per line with slug, name, source_url).\n\n' +
-			'To check for duplicates, **use `grep`** on the index — do NOT read the entire file:\n' +
-			'- Search for URLs: `grep "example.com" _meta/existing-items.jsonl`\n' +
-			'- Search for names: `grep -i "keyword" _meta/existing-items.jsonl`\n\n' +
+			'To check for duplicates, use the built-in search tools on the index instead of reading the entire file.\n' +
+			'- Search for URLs by domain or exact URL fragments in `_meta/existing-items.jsonl`\n' +
+			'- Search for names with case-insensitive matching in `_meta/existing-items.jsonl`\n\n' +
 			'### Enrichment Rules (IMPORTANT)\n' +
 			'1. **Never copy seed content verbatim.** Descriptions, categories, and tags from seeds are input for research only.\n' +
 			'2. **Expand significantly.** Discover NEW items via web search so that seed items represent at most ~30-40% of the final collection. ' +

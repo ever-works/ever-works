@@ -127,25 +127,6 @@ export async function resolveSettings(
 	}
 }
 
-export const DEFAULT_OPENCODE_PROVIDER = 'anthropic';
-
-/**
- * Resolve the provider key used for auth/config.
- * Priority: explicit `provider` setting → provider segment of `model` (`provider/model`) → default.
- */
-export function resolveProviderKey(settings: PluginSettings): string {
-	const explicit = typeof settings.provider === 'string' ? settings.provider.trim() : '';
-	if (explicit) return explicit;
-
-	const model = typeof settings.model === 'string' ? settings.model : '';
-	const slashIndex = model.indexOf('/');
-	if (slashIndex > 0) {
-		return model.slice(0, slashIndex);
-	}
-
-	return DEFAULT_OPENCODE_PROVIDER;
-}
-
 export function buildMetrics(startTime: number, duration: number, itemCount: number): PipelineMetrics {
 	return {
 		startTime,

@@ -45,6 +45,23 @@ vi.mock('../utils/process-runner', () => ({
 	})
 }));
 
+vi.mock('../utils/opencode-config', () => ({
+	prepareOpenCodeSessionConfig: vi.fn().mockResolvedValue({
+		sessionDir: '/tmp/opencode-generator/user1/opencode/dir1',
+		configDir: '/tmp/opencode-generator/user1/opencode/dir1/config',
+		env: {
+			HOME: '/tmp/opencode-generator/user1/opencode/dir1',
+			XDG_DATA_HOME: '/tmp/opencode-generator/user1/opencode/dir1/data',
+			OPENCODE_CONFIG_DIR: '/tmp/opencode-generator/user1/opencode/dir1/config',
+			OPENCODE_CONFIG_CONTENT: '{}',
+			OPENCODE_PROVIDER_API_KEY: 'provider-key',
+			OPENCODE_ENABLE_EXA: '1',
+			OPENCODE_DISABLE_AUTOUPDATE: '1'
+		}
+	}),
+	cleanupOpenCodeSessionConfig: vi.fn().mockResolvedValue(undefined)
+}));
+
 vi.mock('../prompt/system-prompt', () => ({
 	buildSystemPrompt: vi.fn().mockReturnValue('system prompt'),
 	buildUserPrompt: vi.fn().mockReturnValue('user prompt'),
@@ -98,11 +115,7 @@ function createMockContext(settingsOverride?: PluginSettings): PluginContext {
 		services: {},
 		getSettings: vi.fn().mockResolvedValue(
 			settingsOverride ?? {
-				authMode: 'api-key',
-				provider: 'go',
-				apiKey: 'test-api-key',
-				version: 'v1.0.223',
-				model: 'go/kimi-k2.5'
+				version: 'v1.0.223'
 			}
 		),
 		getResolvedSettings: vi.fn(),
@@ -113,6 +126,33 @@ function createMockContext(settingsOverride?: PluginSettings): PluginContext {
 		hasCustomCapability: vi.fn(),
 		listCustomCapabilities: vi.fn()
 	} as unknown as PluginContext;
+}
+
+function createExecContext(overrides?: Record<string, unknown>) {
+	return {
+		aiFacade: {
+			getProviderConfig: vi.fn().mockResolvedValue({
+				providerId: 'test-ai-provider',
+				providerName: 'Test AI Provider',
+				baseUrl: 'https://ai.example.com/v1',
+				apiKey: 'provider-key',
+				defaultModel: 'test-default-model',
+				routing: {
+					complexModel: 'test-complex-model'
+				}
+			})
+		},
+		searchFacade: {} as never,
+		screenshotFacade: undefined,
+		contentExtractorFacade: {} as never,
+		promptFacade: undefined,
+		logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+		directory: {
+			id: 'dir1'
+		},
+		user: { id: 'user1' },
+		...overrides
+	} as never;
 }
 
 describe('OpenCodePlugin', () => {
@@ -136,15 +176,13 @@ describe('OpenCodePlugin', () => {
 		expect(plugin.configurationMode).toBe('user-required');
 	});
 
-	it('should define OpenCode auth settings with explicit auth mode', () => {
+	it('should define only hidden CLI version settings and use selectable ai-provider category', () => {
 		const props = plugin.settingsSchema.properties!;
-		expect(props.authMode.default).toBe('machine-local');
-		expect(props.authMode['x-scope']).toBe('user');
-		expect(props.provider.default).toBe('anthropic');
-		expect(props.provider['x-scope']).toBe('user');
-		expect(props.apiKey['x-secret']).toBe(true);
-		expect(props.apiKey['x-scope']).toBe('user');
-		expect(plugin.settingsSchema.required).toEqual(['authMode']);
+		expect(Object.keys(props)).toEqual(['version']);
+		expect(props.version.default).toBe('v1.0.223');
+		const manifest = plugin.getManifest();
+		expect(manifest.selectableProviderCategories).toContain('ai-provider');
+		expect(manifest.selectableProviderCategories).toContain('screenshot');
 	});
 
 	it('should return 6 step definitions in correct order', () => {
@@ -192,7 +230,9 @@ describe('OpenCodePlugin', () => {
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);
 
-			const result = await plugin.execute(directory, request, existing);
+			const result = await plugin.execute(directory, request, existing, {
+				execContext: createExecContext()
+			});
 
 			expect(result.success).toBe(true);
 			expect(result.outputs.items).toHaveLength(1);
@@ -208,7 +248,15 @@ describe('OpenCodePlugin', () => {
 			await plugin.onLoad(ctx);
 
 			const progressUpdates: Array<{ percent: number }> = [];
-			await plugin.execute(directory, request, existing, undefined, (p) => progressUpdates.push(p));
+			await plugin.execute(
+				directory,
+				request,
+				existing,
+				{
+					execContext: createExecContext()
+				},
+				(p) => progressUpdates.push(p)
+			);
 
 			expect(progressUpdates.length).toBeGreaterThan(0);
 			expect(progressUpdates[progressUpdates.length - 1].percent).toBe(100);
@@ -234,8 +282,14 @@ describe('OpenCodePlugin', () => {
 			await plugin.onLoad(ctx);
 
 			const progressUpdates: Array<{ percent: number; message?: string; itemsProcessed?: number }> = [];
-			await plugin.execute(directory, { ...request, config: { target_items: 10 } }, existing, undefined, (p) =>
-				progressUpdates.push(p)
+			await plugin.execute(
+				directory,
+				{ ...request, config: { target_items: 10 } },
+				existing,
+				{
+					execContext: createExecContext()
+				},
+				(p) => progressUpdates.push(p)
 			);
 
 			// Find item-level progress updates (those with itemsProcessed)
@@ -301,6 +355,7 @@ describe('OpenCodePlugin', () => {
 			}> = [];
 
 			await plugin.execute(directory, request, existing, {
+				execContext: createExecContext(),
 				onLogEntry: (log) => logs.push(log)
 			});
 
@@ -371,7 +426,9 @@ describe('OpenCodePlugin', () => {
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);
 
-			const result = await plugin.execute(directory, request, existing);
+			const result = await plugin.execute(directory, request, existing, {
+				execContext: createExecContext()
+			});
 
 			expect(result.success).toBe(true);
 			expect(result.warnings).toHaveLength(1);
@@ -394,20 +451,21 @@ describe('OpenCodePlugin', () => {
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);
 
-			const result = await plugin.execute(directory, request, existing);
+			const result = await plugin.execute(directory, request, existing, {
+				execContext: createExecContext()
+			});
 
 			expect(result.warnings).toHaveLength(1);
 			expect(result.warnings![0]).toContain('Max turns reached');
 		});
 
-		it('should skip screenshots when no execContext and succeed when facade throws', async () => {
+		it('should require execContext and still succeed when screenshot facade throws', async () => {
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);
 
-			// No execContext → screenshots skipped
+			// No execContext → hard failure because AI provider resolution needs facade context
 			const result1 = await plugin.execute(directory, request, existing);
-			expect(result1.success).toBe(true);
-			expect(plugin.getState()?.steps.get('capture-screenshots')?.status).toBe('skipped');
+			expect(result1.success).toBe(false);
 
 			// Reset
 			vi.clearAllMocks();
@@ -417,7 +475,7 @@ describe('OpenCodePlugin', () => {
 			// Facade throws → pipeline still succeeds
 			const result2 = await plugin2.execute(directory, request, existing, {
 				execContext: {
-					aiFacade: {} as never,
+					...createExecContext(),
 					searchFacade: {} as never,
 					screenshotFacade: {
 						isAvailable: () => true,
@@ -463,7 +521,7 @@ describe('OpenCodePlugin', () => {
 				existing,
 				{
 					execContext: {
-						aiFacade: {} as never,
+						...createExecContext(),
 						searchFacade: {} as never,
 						screenshotFacade: mockScreenshotFacade as never,
 						contentExtractorFacade: {} as never,

@@ -26,7 +26,6 @@ import { PluginEnablePanel } from './PluginEnablePanel';
 import { PluginDisableWarning } from './PluginDisableWarning';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { ClaudeCodeOnboardingWizard } from '@/components/settings/ClaudeCodeOnboardingWizard';
-import { OpenCodeOnboardingWizard } from '@/components/settings/OpenCodeOnboardingWizard';
 import { GeminiOnboardingWizard } from '@/components/settings/GeminiOnboardingWizard';
 import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
 import { SimAiOnboardingWizard } from '@/components/settings/SimAiOnboardingWizard';
@@ -122,14 +121,12 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
         (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !displaySettings[f]));
     const usesClaudeWizard =
         plugin.pluginId === 'claude-code' && Boolean(plugin.uiHints?.onboardingWizard);
-    const usesOpenCodeWizard =
-        plugin.pluginId === 'opencode' && Boolean(plugin.uiHints?.onboardingWizard);
+
     const usesGeminiWizard =
         plugin.pluginId === 'gemini' && Boolean(plugin.uiHints?.onboardingWizard);
     const usesSimAiWizard =
         plugin.pluginId === 'sim-ai' && Boolean(plugin.uiHints?.onboardingWizard);
-    const usesCustomWizard =
-        usesClaudeWizard || usesOpenCodeWizard || usesGeminiWizard || usesSimAiWizard;
+    const usesCustomWizard = usesClaudeWizard || usesGeminiWizard || usesSimAiWizard;
 
     return (
         <div className="space-y-6">
@@ -306,18 +303,6 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                         {usesCustomWizard ? (
                             usesSimAiWizard ? (
                                 <SimAiOnboardingWizard
-                                    pluginId={plugin.pluginId}
-                                    visibleProperties={visibleProperties}
-                                    getFieldValue={getFieldValue}
-                                    handleFieldChange={handleFieldChange}
-                                    handleSave={handleSave}
-                                    isSaving={isSaving}
-                                    saveSuccess={saveSuccess}
-                                    validationError={validationError}
-                                    saveMessage={saveMessage}
-                                />
-                            ) : usesOpenCodeWizard ? (
-                                <OpenCodeOnboardingWizard
                                     pluginId={plugin.pluginId}
                                     visibleProperties={visibleProperties}
                                     getFieldValue={getFieldValue}

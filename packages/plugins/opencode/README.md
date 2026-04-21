@@ -1,6 +1,6 @@
 # @ever-works/opencode-plugin
 
-Full pipeline plugin that delegates directory generation to the [OpenCode CLI](https://github.com/sst/opencode). A single OpenCode CLI session autonomously handles web search, content creation, and file generation inside a temporary workspace.
+Full pipeline plugin that delegates directory generation to the [OpenCode CLI](https://github.com/sst/opencode). A single OpenCode CLI session autonomously handles web search, content creation, and file generation inside a temporary workspace while using the active Ever Works AI provider for model access.
 
 ## Pipeline Steps
 
@@ -17,48 +17,22 @@ The plugin runs 6 sequential steps:
 
 During step 3, a **taxonomy watcher** monitors the workspace for new item files and keeps `_meta/` taxonomy files (categories, tags, brands) in sync in real time. Progress is reported per item as files appear.
 
-## Authentication
+## AI Provider Integration
 
-OpenCode CLI supports two authentication modes:
+OpenCode does not ask the user to configure a separate provider, auth mode, or model inside this plugin.
 
-### Machine-Local (default)
+Instead, it resolves the active Ever Works `ai-provider` for the current `{ userId, directoryId }` context and generates an isolated OpenCode config for the run:
 
-Uses an existing local OpenCode login stored at `~/.local/share/opencode/auth.json` (or `$XDG_DATA_HOME/opencode/auth.json`). Authenticate manually:
-
-```bash
-opencode auth login
-```
-
-### API Key
-
-Provide an OpenCode provider API key in plugin settings (`apiKey` field). The plugin writes an isolated auth file per session so machine-local credentials are unaffected.
-
-The onboarding wizard provides a multi-step flow: choose auth mode, configure credentials, and verify the connection.
+- Provider base URL and API key come from `execContext.aiFacade.getProviderConfig(...)`
+- Model selection comes from the AI provider routing config (`complexModel` first, then `defaultModel`)
+- OpenCode runs with a user-scoped, isolated config directory rather than machine-global auth state
+- Web tools are explicitly enabled, including `websearch`
 
 ## Settings
 
-| Setting    | Type   | Scope  | Description                                                                       |
-| ---------- | ------ | ------ | --------------------------------------------------------------------------------- |
-| `authMode` | string | user   | `machine-local` or `api-key`                                                      |
-| `provider` | string | user   | OpenCode provider key (e.g. `anthropic`, `openai`, `google`, `groq`, `go`, `zen`) |
-| `apiKey`   | string | user   | Provider API key (secret, supports env var `PLUGIN_OPENCODE_API_KEY`)             |
-| `model`    | string | global | Model in `provider/model` form (default: `anthropic/claude-sonnet-4-20250514`)    |
-| `version`  | string | hidden | OpenCode CLI version to install (default: `v1.0.223`)                             |
-
-### Providers & Models
-
-OpenCode is a provider-agnostic coding agent. The plugin forwards the `provider/model` string directly to the CLI, so any combination the CLI supports works. Typical options:
-
-| Provider    | Example models                                           |
-| ----------- | -------------------------------------------------------- |
-| `anthropic` | `anthropic/claude-sonnet-4-20250514`, `claude-haiku-4-5` |
-| `openai`    | `openai/gpt-4.1`, `openai/gpt-4.1-mini`, `openai/o3`     |
-| `google`    | `google/gemini-2.5-pro`, `google/gemini-2.5-flash`       |
-| `groq`      | `groq/llama-3.3-70b-versatile`                           |
-| `go`        | `go/kimi-k2.5`, `go/glm-5.1`, `go/mimo-v2-pro`, etc.     |
-| `zen`       | OpenCode Zen models                                      |
-
-Set `provider` to the provider key and `apiKey` to a matching key, or rely on `machine-local` auth if the OpenCode CLI is already logged in on the host.
+| Setting   | Type   | Scope  | Description                                           |
+| --------- | ------ | ------ | ----------------------------------------------------- |
+| `version` | string | hidden | OpenCode CLI version to install (default: `v1.0.223`) |
 
 ## Form Schema
 
@@ -93,7 +67,7 @@ The plugin downloads the OpenCode CLI binary from GitHub releases:
 
 - **Non-zero exit codes**: Treated as soft warnings. If items were still produced, the result succeeds with warnings attached.
 - **Empty results**: If OpenCode completes without producing any valid item JSON files, an error is thrown with CLI output excerpts for debugging.
-- **Masked secrets**: The `getRealSecret` helper filters out UI placeholder values before using credentials.
+- **Missing AI provider config**: The pipeline fails early if the resolved Ever Works AI provider does not expose a base URL, API key, or runnable model.
 
 ## Project Structure
 
@@ -109,6 +83,7 @@ src/
     system-prompt.ts       # Default prompts and variable builders
   utils/
     binary-manager.ts      # CLI download from GitHub releases
+    opencode-config.ts     # User-scoped OpenCode config generation and cleanup
     pipeline-helpers.ts    # State management, settings resolution, progress reporting
     process-runner.ts      # OpenCode CLI subprocess execution
     workspace-manager.ts   # Workspace I/O (create, seed, read, cleanup)
