@@ -139,7 +139,7 @@ describe('GeminiPlugin', () => {
 
 	it('should define Gemini auth fields as user-scoped settings', () => {
 		const props = plugin.settingsSchema.properties!;
-		expect(props.authMode.default).toBe('machine-local');
+		expect(props.authMode.default).toBe('api-key');
 		expect(props.apiKey['x-secret']).toBe(true);
 		expect(props.apiKey['x-scope']).toBe('user');
 		expect(props.googleApiKey['x-secret']).toBe(true);

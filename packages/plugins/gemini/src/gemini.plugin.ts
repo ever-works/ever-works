@@ -179,7 +179,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				title: 'Authentication Mode',
 				description:
 					"Use `machine-local` to rely on this machine's existing Gemini login, `api-key` for Google AI Studio keys, or `vertex` for Google Cloud / Vertex AI authentication.",
-				default: 'machine-local',
+				default: 'api-key',
 				enum: ['machine-local', 'api-key', 'vertex'],
 				'x-scope': 'user'
 			},
@@ -265,7 +265,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 
 	private resolveAuthMode(settings: Record<string, unknown>): 'machine-local' | 'api-key' | 'vertex' {
 		const value = settings.authMode;
-		return value === 'api-key' || value === 'vertex' ? value : 'machine-local';
+		return value === 'machine-local' || value === 'vertex' ? value : 'api-key';
 	}
 
 	private async hasCachedMachineAuth(): Promise<boolean> {

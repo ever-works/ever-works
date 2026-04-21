@@ -21,7 +21,11 @@ During step 3, a **taxonomy watcher** monitors the workspace for new item files 
 
 Gemini CLI supports three authentication modes:
 
-### Machine-Local (default)
+### API Key (default)
+
+Provide a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) in plugin settings (`apiKey` field).
+
+### Machine-Local
 
 Uses an existing local Google login cached by Gemini CLI at `~/.gemini/`. Authenticate manually:
 
@@ -30,8 +34,6 @@ gemini login
 ```
 
 ### API Key
-
-Provide a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) in plugin settings (`apiKey` field).
 
 ### Vertex AI
 
