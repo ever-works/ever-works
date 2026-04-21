@@ -337,12 +337,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		const errors: Array<{ path: string; message: string }> = [];
 		const authMode = settings.authMode;
 
-		if (
-			authMode !== undefined &&
-			authMode !== 'machine-local' &&
-			authMode !== 'api-key' &&
-			authMode !== 'vertex'
-		) {
+		if (authMode !== undefined && authMode !== 'machine-local' && authMode !== 'api-key' && authMode !== 'vertex') {
 			errors.push({
 				path: 'authMode',
 				message: 'Authentication mode must be "machine-local", "api-key", or "vertex"'
@@ -379,20 +374,14 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		}
 
 		if (authMode === 'vertex') {
-			if (
-				typeof settings.googleCloudProject !== 'string' ||
-				settings.googleCloudProject.trim() === ''
-			) {
+			if (typeof settings.googleCloudProject !== 'string' || settings.googleCloudProject.trim() === '') {
 				errors.push({
 					path: 'googleCloudProject',
 					message: 'Google Cloud project is required when authMode is "vertex"'
 				});
 			}
 
-			if (
-				typeof settings.googleCloudLocation !== 'string' ||
-				settings.googleCloudLocation.trim() === ''
-			) {
+			if (typeof settings.googleCloudLocation !== 'string' || settings.googleCloudLocation.trim() === '') {
 				errors.push({
 					path: 'googleCloudLocation',
 					message: 'Google Cloud location is required when authMode is "vertex"'
