@@ -66,7 +66,6 @@ export class ActivityLogRepository {
                 status: 'in_progress' as ActivityStatus,
             },
             order: { createdAt: 'DESC' },
-            relations: ['directory'],
         });
     }
 

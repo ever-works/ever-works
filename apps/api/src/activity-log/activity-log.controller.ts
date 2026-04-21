@@ -27,17 +27,33 @@ import type { Response } from 'express';
 @ApiBearerAuth('JWT-auth')
 @Controller('api/activity-log')
 export class ActivityLogController {
+    private readonly reconcileInFlight = new Map<string, Promise<void>>();
+
     constructor(
         private readonly activityLogService: ActivityLogService,
         private readonly directoryRepository: DirectoryRepository,
     ) {}
 
     private async reconcileActivities(userId: string) {
-        try {
-            await this.activityLogService.reconcileStaleGenerationActivities(userId);
-        } catch {
-            // Activity listing should remain available even if stale-state cleanup fails.
+        const existing = this.reconcileInFlight.get(userId);
+        if (existing) {
+            await existing;
+            return;
         }
+
+        const reconcilePromise = this.activityLogService
+            .reconcileStaleGenerationActivities(userId)
+            .catch(() => {
+                // Activity listing should remain available even if stale-state cleanup fails.
+            })
+            .finally(() => {
+                if (this.reconcileInFlight.get(userId) === reconcilePromise) {
+                    this.reconcileInFlight.delete(userId);
+                }
+            });
+
+        this.reconcileInFlight.set(userId, reconcilePromise);
+        await reconcilePromise;
     }
 
     @Get()

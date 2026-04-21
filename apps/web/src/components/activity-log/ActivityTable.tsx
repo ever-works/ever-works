@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useState, useTransition } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { formatDistanceToNow } from 'date-fns';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
@@ -176,8 +176,7 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
     const [hydratedActivities, setHydratedActivities] = useState<Record<string, ActivityLogEntry>>(
         {},
     );
-    const [stoppingDirectoryId, setStoppingDirectoryId] = useState<string | null>(null);
-    const [isStopping, startStopping] = useTransition();
+    const [stoppingDirectoryIds, setStoppingDirectoryIds] = useState<string[]>([]);
 
     const toggleExpanded = (id: string) => {
         setExpandedIds((current) =>
@@ -243,28 +242,30 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
         }
     };
 
-    const stopGeneration = (directoryId: string) => {
-        setStoppingDirectoryId(directoryId);
-        startStopping(async () => {
+    const stopGeneration = async (directoryId: string) => {
+        setStoppingDirectoryIds((current) =>
+            current.includes(directoryId) ? current : [...current, directoryId],
+        );
+
+        try {
             const result = await cancelGeneration(directoryId);
 
             if (!result.success) {
                 if (result.error?.includes('is not generating')) {
                     toast.error(result.error);
                     onStopRequested?.();
-                    setStoppingDirectoryId(null);
                     return;
                 }
 
                 toast.error(result.error || t('actions.stopFailed'));
-                setStoppingDirectoryId(null);
                 return;
             }
 
             toast.success(result.message || t('actions.stopRequested'));
             onStopRequested?.();
-            setStoppingDirectoryId(null);
-        });
+        } finally {
+            setStoppingDirectoryIds((current) => current.filter((id) => id !== directoryId));
+        }
     };
 
     return (
@@ -341,6 +342,9 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                             const hasDetails = hasStructuredData(detailsWithoutLiveLogs);
                             const hasMetadata = hasStructuredData(hydratedActivity.metadata);
                             const hasStructuredContent = hasDetails || hasMetadata;
+                            const isStopping = activity.directoryId
+                                ? stoppingDirectoryIds.includes(activity.directoryId)
+                                : false;
 
                             return (
                                 <Fragment key={activity.id}>
@@ -414,18 +418,13 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                                     <Button
                                                         variant="danger"
                                                         size="sm"
-                                                        loading={
-                                                            isStopping &&
-                                                            stoppingDirectoryId ===
-                                                                activity.directoryId
-                                                        }
+                                                        loading={isStopping}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             stopGeneration(activity.directoryId!);
                                                         }}
                                                     >
-                                                        {isStopping &&
-                                                        stoppingDirectoryId === activity.directoryId
+                                                        {isStopping
                                                             ? t('actions.stopping')
                                                             : t('actions.stop')}
                                                     </Button>
