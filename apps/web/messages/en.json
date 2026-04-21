@@ -446,7 +446,11 @@
             },
             "actions": {
                 "export": "Export CSV",
-                "clearFilters": "Clear filters"
+                "clearFilters": "Clear filters",
+                "stop": "Stop",
+                "stopping": "Stopping...",
+                "stopRequested": "Generation cancellation requested",
+                "stopFailed": "Failed to stop generation"
             },
             "empty": {
                 "title": "No activities yet",
@@ -990,7 +994,11 @@
                 "generating": {
                     "title": "Generation in Progress",
                     "description": "Processing your request...",
-                    "processing": "Processing..."
+                    "processing": "Processing...",
+                    "stop": "Stop",
+                    "stopping": "Stopping...",
+                    "stopRequested": "Generation cancellation requested",
+                    "stopFailed": "Failed to stop generation"
                 },
                 "generated": {
                     "title": "Generation Complete",
@@ -2845,8 +2853,10 @@
             "promptRequired": "Prompt is required",
             "nameRequired": "Name is required",
             "generationStartedSuccessfully": "Generation started successfully",
+            "generationCancellationRequested": "Generation cancellation requested",
             "updateStartedSuccessfully": "Update started successfully",
             "failedToGenerateItems": "Failed to generate items",
+            "failedToCancelGeneration": "Failed to cancel generation",
             "failedToUpdateItems": "Failed to update items",
             "markdownRegeneratedSuccessfully": "Markdown regenerated successfully",
             "failedToRegenerateMarkdown": "Failed to regenerate markdown",

@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { formatDistanceToNow } from 'date-fns';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
@@ -12,10 +12,14 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { TerminalLogViewer } from '@/components/directories/detail/shared/TerminalLogViewer';
 import type { GenerationStepLog } from '@/lib/api/types-only';
+import { Button } from '@/components/ui/button';
+import { cancelGeneration } from '@/app/actions/dashboard/generator';
+import { toast } from 'sonner';
 
 interface ActivityTableProps {
     activities: ActivityLogEntry[];
     loading: boolean;
+    onStopRequested?: () => void;
 }
 
 function hasStructuredData(value?: Record<string, unknown>) {
@@ -118,12 +122,14 @@ function RawJsonPanel({
     );
 }
 
-export function ActivityTable({ activities, loading }: ActivityTableProps) {
+export function ActivityTable({ activities, loading, onStopRequested }: ActivityTableProps) {
     const t = useTranslations('dashboard.activity');
     const [expandedIds, setExpandedIds] = useState<string[]>([]);
     const [hydratedActivities, setHydratedActivities] = useState<Record<string, ActivityLogEntry>>(
         {},
     );
+    const [stoppingDirectoryId, setStoppingDirectoryId] = useState<string | null>(null);
+    const [isStopping, startStopping] = useTransition();
 
     const toggleExpanded = (id: string) => {
         setExpandedIds((current) =>
@@ -187,6 +193,23 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
             e.preventDefault();
             toggleExpanded(id);
         }
+    };
+
+    const stopGeneration = (directoryId: string) => {
+        setStoppingDirectoryId(directoryId);
+        startStopping(async () => {
+            const result = await cancelGeneration(directoryId);
+
+            if (!result.success) {
+                toast.error(result.error || t('actions.stopFailed'));
+                setStoppingDirectoryId(null);
+                return;
+            }
+
+            toast.success(result.message || t('actions.stopRequested'));
+            onStopRequested?.();
+            setStoppingDirectoryId(null);
+        });
     };
 
     return (
@@ -331,8 +354,32 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                             <ActivityTypeBadge actionType={activity.actionType} />
                                         </td>
                                         <td className="px-4 py-3 text-xs text-text dark:text-text-dark max-w-md">
-                                            <div className="line-clamp-3 break-words">
-                                                {activity.summary}
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0 flex-1 line-clamp-3 break-words">
+                                                    {activity.summary}
+                                                </div>
+                                                {activity.actionType === 'generation' &&
+                                                activity.status === 'in_progress' &&
+                                                activity.directoryId ? (
+                                                    <Button
+                                                        variant="danger"
+                                                        size="sm"
+                                                        loading={
+                                                            isStopping &&
+                                                            stoppingDirectoryId ===
+                                                                activity.directoryId
+                                                        }
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            stopGeneration(activity.directoryId!);
+                                                        }}
+                                                    >
+                                                        {isStopping &&
+                                                        stoppingDirectoryId === activity.directoryId
+                                                            ? t('actions.stopping')
+                                                            : t('actions.stop')}
+                                                    </Button>
+                                                ) : null}
                                             </div>
                                         </td>
                                     </tr>
