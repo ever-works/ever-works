@@ -368,52 +368,73 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 				reportProgress(onProgress, 2, 15, 'Execute Make.com Scenario', `Starting scenario "${scenarioId}"...`);
 
 				const runStart = Date.now();
-				const run = await client.runScenario(scenarioId, payload, signal);
-				const executionId = run.executionId ?? this.extractExecutionId(run as Record<string, unknown>);
 
-				// `POST /scenarios/{id}/run` is invoked with `responsive: true`, so when the
-				// scenario finishes synchronously its final module payload (e.g. a Webhook
-				// Response body) is included inline in the run response. Prefer that output
-				// over the polling endpoint, which only returns execution metadata (status,
-				// operations, transfer) — never the scenario's output bundles.
-				const inlineOutput = extractInlineOutput(run as Record<string, unknown>);
-
-				if (inlineOutput !== undefined) {
+				if (hookId) {
+					// Webhook-triggered scenarios: invoke via the hook URL. It's the only
+					// channel that returns the Webhook Response body inline.
+					reportProgress(onProgress, 2, 30, 'Execute Make.com Scenario', 'Resolving webhook URL...');
+					const hook = await client.getHook(hookId, signal);
+					if (!hook.url) {
+						throw new Error(
+							`Make.com hook "${hookId}" does not expose a URL. Switch to webhook execution ` +
+								`mode and set the webhook URL directly, or remove the hook ID to rely on REST /run.`
+						);
+					}
+					reportProgress(onProgress, 2, 45, 'Execute Make.com Scenario', 'Invoking scenario...');
+					const output = await client.invokeWebhook(hook.url, payload, signal);
 					execResult = {
-						output: inlineOutput,
-						pollingAttempts: 0,
-						makeDuration: Date.now() - runStart,
-						executionId
-					};
-				} else if (executionId) {
-					const { status, attempts } = await client.pollExecution(
-						scenarioId,
-						executionId,
-						makeSettings,
-						(attempt, statusName) => {
-							const percent = Math.min(15 + Math.round((attempt / 60) * 55), 70);
-							reportProgress(
-								onProgress,
-								2,
-								percent,
-								'Execute Make.com Scenario',
-								`Execution ${statusName} (poll #${attempt})...`
-							);
-						},
-						signal
-					);
-					execResult = {
-						output: status.output ?? status.result ?? status.data ?? status,
-						pollingAttempts: attempts,
-						makeDuration: Date.now() - runStart,
-						executionId
-					};
-				} else {
-					execResult = {
-						output: run.output ?? run.result ?? run.data ?? run,
+						output,
 						pollingAttempts: 0,
 						makeDuration: Date.now() - runStart
 					};
+				} else {
+					const run = await client.runScenario(scenarioId, payload, signal);
+					const executionId = run.executionId ?? this.extractExecutionId(run as Record<string, unknown>);
+
+					// `POST /scenarios/{id}/run` is invoked with `responsive: true`, so when the
+					// scenario finishes synchronously its final module payload (e.g. a Webhook
+					// Response body) is included inline in the run response. Prefer that output
+					// over the polling endpoint, which only returns execution metadata (status,
+					// operations, transfer) — never the scenario's output bundles.
+					const inlineOutput = extractInlineOutput(run as Record<string, unknown>);
+
+					if (inlineOutput !== undefined) {
+						execResult = {
+							output: inlineOutput,
+							pollingAttempts: 0,
+							makeDuration: Date.now() - runStart,
+							executionId
+						};
+					} else if (executionId) {
+						const { status, attempts } = await client.pollExecution(
+							scenarioId,
+							executionId,
+							makeSettings,
+							(attempt, statusName) => {
+								const percent = Math.min(15 + Math.round((attempt / 60) * 55), 70);
+								reportProgress(
+									onProgress,
+									2,
+									percent,
+									'Execute Make.com Scenario',
+									`Execution ${statusName} (poll #${attempt})...`
+								);
+							},
+							signal
+						);
+						execResult = {
+							output: status.output ?? status.result ?? status.data ?? status,
+							pollingAttempts: attempts,
+							makeDuration: Date.now() - runStart,
+							executionId
+						};
+					} else {
+						execResult = {
+							output: run.output ?? run.result ?? run.data ?? run,
+							pollingAttempts: 0,
+							makeDuration: Date.now() - runStart
+						};
+					}
 				}
 			} else {
 				reportProgress(onProgress, 2, 15, 'Execute Make.com Scenario', 'Invoking webhook...');

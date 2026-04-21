@@ -468,6 +468,82 @@ describe('MakePlugin', () => {
 			expect(fetchMock).toHaveBeenCalledTimes(2);
 		});
 
+		it('should invoke the hook URL in scenario mode when a hook ID is configured', async () => {
+			// validate-make: scenario detail
+			fetchMock.mockResolvedValueOnce(
+				mockResponse({ body: { scenario: { id: 42, name: 'My Scenario', isActive: true } } })
+			);
+			// validate-make: pingHook (fire-and-forget, wrapped in try/catch)
+			fetchMock.mockResolvedValueOnce(mockResponse({ body: {} }));
+			// execute-scenario: getHook returns the webhook URL
+			fetchMock.mockResolvedValueOnce(
+				mockResponse({
+					body: { hook: { id: 99, name: 'My Hook', url: 'https://hook.us2.make.com/abc' } }
+				})
+			);
+			// execute-scenario: invokeWebhook returns the output
+			fetchMock.mockResolvedValueOnce(
+				mockResponse({
+					body: {
+						items: [
+							{
+								name: 'Hook-Routed Item',
+								description: 'Fetched via the hook URL fallback',
+								url: 'https://example.com/hook',
+								category: 'Tools'
+							}
+						]
+					}
+				})
+			);
+
+			const result = await plugin.execute(
+				createDirectory(),
+				createRequest({
+					config: {
+						execution_mode: 'scenario',
+						scenario_id: '42',
+						hook_id: '99'
+					}
+				}),
+				createExisting()
+			);
+
+			expect(result.success).toBe(true);
+			expect(result.outputs.items[0].name).toBe('Hook-Routed Item');
+			// REST /run and /executions/{id} must NOT be called on this path.
+			const calledUrls = fetchMock.mock.calls.map((c) => String(c[0]));
+			expect(calledUrls.some((u) => u.includes('/scenarios/42/run'))).toBe(false);
+			expect(calledUrls.some((u) => u.includes('/executions/'))).toBe(false);
+			expect(calledUrls.some((u) => u === 'https://hook.us2.make.com/abc')).toBe(true);
+		});
+
+		it('should fail scenario mode when the configured hook has no URL', async () => {
+			fetchMock.mockResolvedValueOnce(
+				mockResponse({ body: { scenario: { id: 42, name: 'My Scenario', isActive: true } } })
+			);
+			fetchMock.mockResolvedValueOnce(mockResponse({ body: {} }));
+			fetchMock.mockResolvedValueOnce(
+				mockResponse({ body: { hook: { id: 99, name: 'Broken Hook' } } })
+			);
+
+			const result = await plugin.execute(
+				createDirectory(),
+				createRequest({
+					config: {
+						execution_mode: 'scenario',
+						scenario_id: '42',
+						hook_id: '99'
+					}
+				}),
+				createExisting()
+			);
+
+			expect(result.success).toBe(false);
+			const errorMessage = result.error instanceof Error ? result.error.message : String(result.error);
+			expect(errorMessage).toMatch(/does not expose a URL/i);
+		});
+
 		it('should handle cancellation', async () => {
 			const abortController = new AbortController();
 			abortController.abort();
