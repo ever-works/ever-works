@@ -54,12 +54,13 @@ export class ActivityLogController {
 
         const reconcilePromise: Promise<void> = this.activityLogService
             .reconcileStaleGenerationActivities(userId)
-            .then(() => undefined)
+            .then(() => {
+                this.reconcileCompletedAt.set(userId, Date.now());
+            })
             .catch(() => {
                 // Activity listing should remain available even if stale-state cleanup fails.
             })
             .finally(() => {
-                this.reconcileCompletedAt.set(userId, Date.now());
                 if (this.reconcileInFlight.get(userId) === reconcilePromise) {
                     this.reconcileInFlight.delete(userId);
                 }
