@@ -413,7 +413,7 @@ export class DirectoryRepository {
                 'activeWebsites',
             )
             .addSelect(
-                'COALESCE(SUM(CASE WHEN directory.generationStartedAt IS NOT NULL AND directory.generationFinishedAt IS NULL THEN 1 ELSE 0 END), 0)',
+                `COALESCE(SUM(CASE WHEN directory.generateStatus LIKE '%"status":"generating"%' THEN 1 ELSE 0 END), 0)`,
                 'generatingCount',
             )
             .getRawOne();

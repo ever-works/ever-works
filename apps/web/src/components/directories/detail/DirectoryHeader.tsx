@@ -31,7 +31,9 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
     });
     const isScheduled = directory.scheduledStatus === DirectoryScheduleStatus.ACTIVE;
     const StatusIcon = statusStyle.icon;
-    const statusLabel = isScheduled
+    const shouldShowScheduledSuffix =
+        isScheduled && directory.generateStatus?.status !== 'generating';
+    const statusLabel = shouldShowScheduledSuffix
         ? `${t(`status.${statusStyle.labelKey}`)} - Scheduled`
         : t(`status.${statusStyle.labelKey}`);
     const pathSegments = pathname.split('/').filter(Boolean);
