@@ -152,7 +152,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		return {
 			success: false,
 			message:
-				'OpenCode depends on a configured directory AI provider and cannot be verified from plugin user settings alone.'
+				'OpenCode uses the active directory AI provider for credentials and model routing. Verify the directory AI provider configuration to confirm this pipeline is runnable.'
 		};
 	}
 
@@ -187,11 +187,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			selectableProviderCategories: ['ai-provider', 'screenshot'],
 			uiHints: {
 				onboardingWizard: false,
-				includeInOnboarding: false,
-				onboardingPriority: 1,
-				completionFields: [],
-				onboardingDescription:
-					'Use your configured AI provider to power OpenCode-based content generation across your directories.'
+				includeInOnboarding: false
 			},
 			readme: [
 				'# OpenCode Generator Plugin',

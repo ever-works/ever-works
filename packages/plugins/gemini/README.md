@@ -30,13 +30,13 @@ The runtime also uses an isolated per-user Gemini home/config directory instead 
 | Setting   | Type   | Scope  | Description                                                       |
 | --------- | ------ | ------ | ----------------------------------------------------------------- |
 | `apiKey`  | string | user   | Gemini API key (secret, supports env var `PLUGIN_GEMINI_API_KEY`) |
-| `model`   | string | user   | Model for generation (default: `gemini-2.5-pro`)                  |
+| `model`   | string | user   | Model for generation (default: `gemini-2.5-flash`)                |
 | `version` | string | hidden | Gemini CLI version to install (default: `latest`)                 |
 
 ### Supported Models
 
-- **Gemini 2.5 Pro** (default) - 200k context
-- **Gemini 2.5 Flash** - 200k context
+- **Gemini 2.5 Flash** (default) - 200k context
+- **Gemini 2.5 Pro** - 200k context
 - **Gemini 2.0 Flash** - 200k context
 
 ## Form Schema

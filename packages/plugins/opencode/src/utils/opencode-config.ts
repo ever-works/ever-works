@@ -17,10 +17,12 @@ function getSessionRoot(userId: string, directoryId: string): string {
 }
 
 function buildConfig(providerConfig: AiProviderConfig, model: string) {
+	const qualifiedModel = `${OPENCODE_PROVIDER_ID}/${model}`;
+
 	return {
 		$schema: 'https://opencode.ai/config.json',
-		model,
-		small_model: model,
+		model: qualifiedModel,
+		small_model: qualifiedModel,
 		enabled_providers: [OPENCODE_PROVIDER_ID],
 		provider: {
 			[OPENCODE_PROVIDER_ID]: {

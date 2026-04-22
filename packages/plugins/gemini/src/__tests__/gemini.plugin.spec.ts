@@ -102,7 +102,7 @@ function createMockContext(settingsOverride?: PluginSettings): PluginContext {
 				apiKey: 'test-key',
 				version: 'latest',
 				maxTurns: 20,
-				model: 'gemini-2.5-pro'
+				model: 'gemini-2.5-flash'
 			}
 		),
 		getResolvedSettings: vi.fn(),
