@@ -30,6 +30,9 @@
 	"peerDependencies": {
 		"@ever-works/plugin": "workspace:*"
 	},
+	"dependencies": {
+		"tar": "^7.4.3"
+	},
 	"devDependencies": {
 		"@ever-works/plugin": "workspace:*",
 		"@types/node": "^22.0.0",

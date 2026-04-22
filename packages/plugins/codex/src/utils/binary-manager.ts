@@ -3,6 +3,7 @@ import * as http from 'http';
 import * as https from 'https';
 import * as path from 'path';
 import { spawn } from 'child_process';
+import * as tar from 'tar';
 
 import { CODEX_RELEASES_URL, DEFAULT_CLI_VERSION } from '../types.js';
 import { detectPlatform, getBinaryPath } from './platform.js';
@@ -67,25 +68,9 @@ function fetchBuffer(url: string, maxRedirects = 5): Promise<Buffer> {
 }
 
 async function extractTarGz(archivePath: string, outputDir: string): Promise<void> {
-	await new Promise<void>((resolve, reject) => {
-		const child = spawn('tar', ['-xzf', archivePath, '-C', outputDir], {
-			stdio: ['ignore', 'ignore', 'pipe']
-		});
-
-		let stderr = '';
-		child.stderr?.on('data', (chunk: Buffer) => {
-			stderr += chunk.toString('utf-8');
-		});
-
-		child.on('error', reject);
-		child.on('exit', (code) => {
-			if (code === 0) {
-				resolve();
-				return;
-			}
-
-			reject(new Error(stderr.trim() || `tar exited with code ${code}`));
-		});
+	await tar.x({
+		file: archivePath,
+		cwd: outputDir
 	});
 }
 
@@ -113,7 +98,7 @@ async function findBinary(rootDir: string, binaryName: string): Promise<string |
 }
 
 export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger?: Logger): Promise<string> {
-	const platform = detectPlatform();
+	const platform = await detectPlatform();
 	const binaryPath = getBinaryPath(version, platform.platformString);
 
 	try {
