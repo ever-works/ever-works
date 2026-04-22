@@ -36,7 +36,6 @@ export const delay = runtime.delay;
 export function resolveAuthEnv(settings: PluginSettings): Record<string, string> {
 	const authMode = settings.authMode as string | undefined;
 	const apiKey = getUsableSecret(settings.apiKey);
-	const googleApiKey = getUsableSecret(settings.googleApiKey);
 	const project = settings.googleCloudProject as string | undefined;
 	const location = settings.googleCloudLocation as string | undefined;
 
@@ -49,7 +48,6 @@ export function resolveAuthEnv(settings: PluginSettings): Record<string, string>
 			GOOGLE_GENAI_USE_VERTEXAI: 'true'
 		};
 
-		if (googleApiKey) env.GOOGLE_API_KEY = googleApiKey;
 		if (project) env.GOOGLE_CLOUD_PROJECT = project;
 		if (location) env.GOOGLE_CLOUD_LOCATION = location;
 		return env;

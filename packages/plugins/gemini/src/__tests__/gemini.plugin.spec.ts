@@ -143,9 +143,11 @@ describe('GeminiPlugin', () => {
 		expect(props.authMode.enum).toEqual(['api-key', 'vertex']);
 		expect(props.apiKey['x-secret']).toBe(true);
 		expect(props.apiKey['x-scope']).toBe('user');
-		expect(props.googleApiKey['x-secret']).toBe(true);
+		expect(props.apiKey['x-showIf']).toEqual({ field: 'authMode', value: 'api-key' });
 		expect(props.googleCloudProject['x-scope']).toBe('user');
+		expect(props.googleCloudProject['x-showIf']).toEqual({ field: 'authMode', value: 'vertex' });
 		expect(props.googleCloudLocation.default).toBe('us-central1');
+		expect(props.googleCloudLocation['x-showIf']).toEqual({ field: 'authMode', value: 'vertex' });
 	});
 
 	it('should validate auth settings based on auth mode', () => {

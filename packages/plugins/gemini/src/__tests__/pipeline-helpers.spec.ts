@@ -14,7 +14,6 @@ describe('pipeline-helpers', () => {
 			expect(
 				resolveAuthEnv({
 					authMode: 'vertex',
-					googleApiKey: '••••hidden••••',
 					googleCloudProject: 'ever-works',
 					googleCloudLocation: 'us-central1'
 				})

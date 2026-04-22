@@ -34,6 +34,32 @@ type FieldEntry = [string, PluginSettingsSchemaProperty];
 
 const CREDENTIAL_FIELD_NAMES = new Set(['apiKey', 'oauthToken']);
 
+function fieldMatchesCondition(
+    schema: PluginSettingsSchemaProperty,
+    visibleProperties: Record<string, PluginSettingsSchemaProperty>,
+    getFieldValue: PluginOnboardingWizardProps['getFieldValue'],
+) {
+    if (!schema.showIf) {
+        return true;
+    }
+
+    const dependencySchema = visibleProperties[schema.showIf.field];
+    if (!dependencySchema) {
+        return false;
+    }
+
+    const dependencyValue = getFieldValue(schema.showIf.field, dependencySchema);
+    return dependencyValue === schema.showIf.value;
+}
+
+function isAuthModeDependentField(key: string, schema: PluginSettingsSchemaProperty, authModeField: string) {
+    if (key === authModeField) {
+        return true;
+    }
+
+    return schema.showIf?.field === authModeField;
+}
+
 function StepNavigation({
     steps,
     step,
@@ -365,19 +391,32 @@ export function PluginOnboardingWizard({
     ]);
 
     const orderedFields = useMemo(() => Object.entries(visibleProperties), [visibleProperties]);
-    const configurationFields = orderedFields.filter(([key, schema]) => {
-        if (key === authModeField) {
+    const activeFields = orderedFields.filter(([, schema]) =>
+        fieldMatchesCondition(schema, visibleProperties, getFieldValue),
+    );
+
+    const authModeSchema =
+        !supportsDeviceAuth && authModeField in visibleProperties
+            ? visibleProperties[authModeField]
+            : undefined;
+
+    const configurationFields = activeFields.filter(([key, schema]) => {
+        if (isAuthModeDependentField(key, schema, authModeField)) {
             return false;
         }
 
         return !CREDENTIAL_FIELD_NAMES.has(key) && schema.secret !== true;
     });
-    const credentialFields = orderedFields.filter(([key, schema]) => {
+    const credentialFields = activeFields.filter(([key, schema]) => {
         if (key === authModeField) {
             return false;
         }
 
-        return CREDENTIAL_FIELD_NAMES.has(key) || schema.secret === true;
+        return (
+            CREDENTIAL_FIELD_NAMES.has(key) ||
+            schema.secret === true ||
+            isAuthModeDependentField(key, schema, authModeField)
+        );
     });
 
     const apiKeyField = credentialFields.find(([key]) => key === 'apiKey');
@@ -396,7 +435,7 @@ export function PluginOnboardingWizard({
             });
         }
 
-        if (supportsDeviceAuth || credentialFields.length > 0) {
+        if (supportsDeviceAuth || authModeSchema || credentialFields.length > 0) {
             result.push({
                 key: 'credentials',
                 title: tWizard('steps.credentials.title'),
@@ -413,6 +452,7 @@ export function PluginOnboardingWizard({
         return result;
     }, [
         configurationFields.length,
+        authModeSchema,
         credentialFields.length,
         plugin.name,
         plugin.uiHints?.onboardingDescription,
@@ -427,13 +467,21 @@ export function PluginOnboardingWizard({
         handleFieldChange(authModeField, mode, false);
     };
 
-    const setupStatusLabel = deviceAuthStatus?.connected
-        ? tWizard('deviceAuth.badges.connected')
-        : deviceAuthStatus?.pending
-          ? tWizard('deviceAuth.badges.pending')
-          : selectedAuthMode === 'device-auth'
-            ? tWizard('authModes.deviceAuth.title')
-            : tWizard('authModes.apiKey.title');
+    const currentAuthModeValue =
+        authModeSchema && typeof getFieldValue(authModeField, authModeSchema) === 'string'
+            ? (getFieldValue(authModeField, authModeSchema) as string)
+            : configuredAuthMode;
+    const setupStatusLabel = supportsDeviceAuth
+        ? deviceAuthStatus?.connected
+            ? tWizard('deviceAuth.badges.connected')
+            : deviceAuthStatus?.pending
+              ? tWizard('deviceAuth.badges.pending')
+              : selectedAuthMode === 'device-auth'
+                ? tWizard('authModes.deviceAuth.title')
+                : tWizard('authModes.apiKey.title')
+        : typeof currentAuthModeValue === 'string' && currentAuthModeValue.length > 0
+          ? currentAuthModeValue
+          : tWizard('steps.credentials.title');
 
     return (
         <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-6 space-y-6">
@@ -558,6 +606,22 @@ export function PluginOnboardingWizard({
                                     />
                                 )}
                             </div>
+                        )}
+
+                        {!supportsDeviceAuth && authModeSchema && (
+                            <PluginSettingsField
+                                name={authModeField}
+                                schema={authModeSchema}
+                                value={getFieldValue(authModeField, authModeSchema)}
+                                onChange={(value) =>
+                                    handleFieldChange(
+                                        authModeField,
+                                        value,
+                                        authModeSchema.secret || false,
+                                    )
+                                }
+                                pluginId={plugin.pluginId}
+                            />
                         )}
 
                         {!supportsDeviceAuth &&

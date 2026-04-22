@@ -31,7 +31,6 @@ Use Google Cloud / Vertex AI environment-based authentication. Requires:
 
 - `googleCloudProject` - Google Cloud project ID
 - `googleCloudLocation` - Region (default: `us-central1`)
-- `googleApiKey` (optional) - Google Cloud API key
 
 The onboarding UI provides a 3-step flow: choose auth mode, configure credentials, and verify the connection.
 
@@ -45,7 +44,6 @@ The runtime also uses an isolated per-user Gemini home/config directory instead 
 | --------------------- | ------- | ------ | ----------------------------------------------------------------- |
 | `authMode`            | string  | user   | `api-key` or `vertex`                                             |
 | `apiKey`              | string  | user   | Gemini API key (secret, supports env var `PLUGIN_GEMINI_API_KEY`) |
-| `googleApiKey`        | string  | user   | Google Cloud API key for Vertex AI (secret, optional)             |
 | `googleCloudProject`  | string  | user   | Google Cloud project ID for Vertex AI                             |
 | `googleCloudLocation` | string  | user   | Google Cloud region for Vertex AI (default: `us-central1`)        |
 | `model`               | string  | user   | Model for generation (default: `gemini-2.5-pro`)                  |

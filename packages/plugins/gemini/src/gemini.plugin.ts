@@ -201,27 +201,23 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				description: 'Gemini API key from Google AI Studio.',
 				'x-secret': true,
 				'x-scope': 'user',
-				'x-envVar': 'PLUGIN_GEMINI_API_KEY'
-			},
-			googleApiKey: {
-				type: 'string',
-				title: 'Google Cloud API Key',
-				description: 'Optional Google Cloud API key for Vertex AI mode.',
-				'x-secret': true,
-				'x-scope': 'user'
+				'x-envVar': 'PLUGIN_GEMINI_API_KEY',
+				'x-showIf': { field: 'authMode', value: 'api-key' }
 			},
 			googleCloudProject: {
 				type: 'string',
 				title: 'Google Cloud Project',
 				description: 'Required for Vertex AI mode.',
-				'x-scope': 'user'
+				'x-scope': 'user',
+				'x-showIf': { field: 'authMode', value: 'vertex' }
 			},
 			googleCloudLocation: {
 				type: 'string',
 				title: 'Google Cloud Location',
 				description: 'Required for Vertex AI mode, for example `us-central1`.',
 				default: 'us-central1',
-				'x-scope': 'user'
+				'x-scope': 'user',
+				'x-showIf': { field: 'authMode', value: 'vertex' }
 			},
 			version: {
 				type: 'string',
@@ -335,9 +331,6 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 
 		if (settings.apiKey !== undefined && typeof settings.apiKey !== 'string') {
 			errors.push({ path: 'apiKey', message: 'API key must be a string when provided' });
-		}
-		if (settings.googleApiKey !== undefined && typeof settings.googleApiKey !== 'string') {
-			errors.push({ path: 'googleApiKey', message: 'Google Cloud API key must be a string when provided' });
 		}
 		if (settings.googleCloudProject !== undefined && typeof settings.googleCloudProject !== 'string') {
 			errors.push({ path: 'googleCloudProject', message: 'Google Cloud project must be a string when provided' });
