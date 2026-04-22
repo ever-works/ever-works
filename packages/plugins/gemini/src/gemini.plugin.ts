@@ -24,8 +24,6 @@ import type {
 	ConnectionValidationResult
 } from '@ever-works/plugin';
 import { buildSuccessPipelineResult, substituteVariables } from '@ever-works/plugin';
-import * as fs from 'fs/promises';
-import * as os from 'os';
 import * as path from 'path';
 import * as https from 'https';
 
@@ -186,38 +184,13 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {
-			authMode: {
-				type: 'string',
-				title: 'Authentication Mode',
-				description:
-					'Use `api-key` for Google AI Studio keys or `vertex` for Google Cloud / Vertex AI authentication.',
-				default: 'api-key',
-				enum: ['api-key', 'vertex'],
-				'x-scope': 'user'
-			},
 			apiKey: {
 				type: 'string',
 				title: 'API Key',
 				description: 'Gemini API key from Google AI Studio.',
 				'x-secret': true,
 				'x-scope': 'user',
-				'x-envVar': 'PLUGIN_GEMINI_API_KEY',
-				'x-showIf': { field: 'authMode', value: 'api-key' }
-			},
-			googleCloudProject: {
-				type: 'string',
-				title: 'Google Cloud Project',
-				description: 'Required for Vertex AI mode.',
-				'x-scope': 'user',
-				'x-showIf': { field: 'authMode', value: 'vertex' }
-			},
-			googleCloudLocation: {
-				type: 'string',
-				title: 'Google Cloud Location',
-				description: 'Required for Vertex AI mode, for example `us-central1`.',
-				default: 'us-central1',
-				'x-scope': 'user',
-				'x-showIf': { field: 'authMode', value: 'vertex' }
+				'x-envVar': 'PLUGIN_GEMINI_API_KEY'
 			},
 			version: {
 				type: 'string',
@@ -271,75 +244,30 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		return value;
 	}
 
-	private resolveAuthMode(settings: Record<string, unknown>): 'api-key' | 'vertex' {
-		const value = settings.authMode;
-		return value === 'vertex' ? 'vertex' : 'api-key';
-	}
-
 	async isAvailable(settings?: Record<string, unknown>): Promise<boolean> {
 		const resolved = settings || {};
-		const authMode = this.resolveAuthMode(resolved);
-		if (authMode === 'api-key') {
-			const apiKey = this.getRealSecret(resolved.apiKey);
-			return apiKey
-				? this.validateApiKey(apiKey, (resolved.model as string | undefined) || DEFAULT_MODEL)
-				: false;
-		}
-
-		if (authMode === 'vertex') {
-			const result = await this.validateCliAuth(resolved);
-			return result.valid;
-		}
-
-		return false;
+		const apiKey = this.getRealSecret(resolved.apiKey);
+		return apiKey ? this.validateApiKey(apiKey, (resolved.model as string | undefined) || DEFAULT_MODEL) : false;
 	}
 
 	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
-		const authMode = this.resolveAuthMode(settings);
-		if (authMode === 'api-key') {
-			const apiKey = this.getRealSecret(settings.apiKey);
-			if (!apiKey) {
-				return { success: false, message: 'No Gemini API key configured.' };
-			}
-			const model = (settings.model as string | undefined) || DEFAULT_MODEL;
-			const valid = await this.validateApiKey(apiKey, model);
-			return valid
-				? { success: true, message: 'Gemini API key verified.' }
-				: { success: false, message: 'Gemini API key is invalid or the API is unreachable.' };
+		const apiKey = this.getRealSecret(settings.apiKey);
+		if (!apiKey) {
+			return { success: false, message: 'No Gemini API key configured.' };
 		}
 
-		if (authMode === 'vertex') {
-			const result = await this.validateCliAuth(settings);
-			return result.valid
-				? { success: true, message: 'Vertex AI authentication verified.' }
-				: { success: false, message: result.detail || 'Vertex AI authentication is not configured correctly.' };
-		}
-
-		return { success: false, message: 'Gemini authentication is not configured correctly.' };
+		const model = (settings.model as string | undefined) || DEFAULT_MODEL;
+		const valid = await this.validateApiKey(apiKey, model);
+		return valid
+			? { success: true, message: 'Gemini API key verified.' }
+			: { success: false, message: 'Gemini API key is invalid or the API is unreachable.' };
 	}
 
 	validateSettings(settings: Record<string, unknown>): ValidationResult {
 		const errors: Array<{ path: string; message: string }> = [];
-		const authMode = settings.authMode;
-
-		if (authMode !== undefined && authMode !== 'api-key' && authMode !== 'vertex') {
-			errors.push({
-				path: 'authMode',
-				message: 'Authentication mode must be "api-key" or "vertex"'
-			});
-		}
 
 		if (settings.apiKey !== undefined && typeof settings.apiKey !== 'string') {
 			errors.push({ path: 'apiKey', message: 'API key must be a string when provided' });
-		}
-		if (settings.googleCloudProject !== undefined && typeof settings.googleCloudProject !== 'string') {
-			errors.push({ path: 'googleCloudProject', message: 'Google Cloud project must be a string when provided' });
-		}
-		if (settings.googleCloudLocation !== undefined && typeof settings.googleCloudLocation !== 'string') {
-			errors.push({
-				path: 'googleCloudLocation',
-				message: 'Google Cloud location must be a string when provided'
-			});
 		}
 		if (settings.model !== undefined && typeof settings.model !== 'string') {
 			errors.push({ path: 'model', message: 'Model must be a string when provided' });
@@ -348,27 +276,9 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			errors.push({ path: 'version', message: 'CLI version must be a string when provided' });
 		}
 
-		if (authMode === 'api-key') {
-			const apiKey = settings.apiKey;
-			if (typeof apiKey !== 'string' || apiKey.trim() === '') {
-				errors.push({ path: 'apiKey', message: 'API key is required when authMode is "api-key"' });
-			}
-		}
-
-		if (authMode === 'vertex') {
-			if (typeof settings.googleCloudProject !== 'string' || settings.googleCloudProject.trim() === '') {
-				errors.push({
-					path: 'googleCloudProject',
-					message: 'Google Cloud project is required when authMode is "vertex"'
-				});
-			}
-
-			if (typeof settings.googleCloudLocation !== 'string' || settings.googleCloudLocation.trim() === '') {
-				errors.push({
-					path: 'googleCloudLocation',
-					message: 'Google Cloud location is required when authMode is "vertex"'
-				});
-			}
+		const apiKey = settings.apiKey;
+		if (typeof apiKey !== 'string' || apiKey.trim() === '') {
+			errors.push({ path: 'apiKey', message: 'API key is required.' });
 		}
 
 		return errors.length > 0 ? { valid: false, errors } : { valid: true };
@@ -388,12 +298,6 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			autoEnable: false,
 			visibility: 'public',
 			selectableProviderCategories: ['screenshot'],
-			uiHints: {
-				onboardingWizard: true,
-				includeInOnboarding: true,
-				onboardingPriority: 1,
-				onboardingDescription: 'Connect your AI assistant to power content generation across your directories.'
-			},
 			readme: [
 				'# Gemini Generator Plugin',
 				'',
@@ -412,17 +316,15 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				'',
 				'## Authentication',
 				'',
-				'- **API Key**: connect with a Google AI Studio Gemini API key.',
-				'- **Vertex AI**: connect with Google Cloud project settings for Vertex AI.',
+				'- Connect with a Google AI Studio Gemini API key.',
 				'',
 				'Authentication is configured from Ever Works user settings rather than shared host login state.',
 				'The runtime uses an isolated per-user Gemini home/config directory instead of the machine user home.',
 				'## Usage',
 				'',
-				'1. Choose API Key or Vertex AI authentication.',
-				'2. Save the required Gemini settings.',
-				'3. Enable the plugin for a directory.',
-				'4. Select `gemini` as the pipeline provider for generation.'
+				'1. Save your Gemini API key in plugin settings.',
+				'2. Enable the plugin for a directory.',
+				'3. Select `gemini` as the pipeline provider for generation.'
 			].join('\n'),
 			homepage: 'https://github.com/google-gemini/gemini-cli',
 			icon: {
@@ -461,53 +363,6 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			request.write(payload);
 			request.end();
 		});
-	}
-
-	private async validateCliAuth(settings: Record<string, unknown>): Promise<{ valid: boolean; detail?: string }> {
-		const authEnv = resolveAuthEnv(settings);
-
-		const version = (settings.version as string) || DEFAULT_CLI_VERSION;
-		let tempDir: string | null = null;
-		let killProcess: (() => void) | null = null;
-
-		try {
-			const cliCommand = ensureBinary(version, this.context?.logger || console);
-			tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ever-works-gemini-validate-'));
-			const configDir = path.join(tempDir, 'config-home');
-			const workspacePath = path.join(tempDir, 'workspace');
-			await fs.mkdir(workspacePath, { recursive: true });
-			await ensureOnboardingConfig(configDir);
-
-			const execution = executeGemini({
-				command: cliCommand.command,
-				commandArgs: cliCommand.args,
-				prompt: 'Reply with OK.',
-				systemPrompt: 'Reply with the single word OK. Nothing else.',
-				cwd: workspacePath,
-				env: buildIsolatedGeminiEnv(configDir, authEnv),
-				model: settings.model as string | undefined
-			});
-			killProcess = execution.kill;
-
-			const result = await Promise.race([
-				execution.promise,
-				new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Validation timed out')), 30_000))
-			]);
-
-			if (result.exitCode === 0) {
-				return { valid: true };
-			}
-
-			const detail = this.extractErrorDetail(result);
-			return { valid: false, detail };
-		} catch (err) {
-			return { valid: false, detail: err instanceof Error ? err.message : 'CLI validation failed.' };
-		} finally {
-			killProcess?.();
-			if (tempDir) {
-				await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
-			}
-		}
 	}
 
 	// ── IFormSchemaProvider ─────────────────────────────────────────────

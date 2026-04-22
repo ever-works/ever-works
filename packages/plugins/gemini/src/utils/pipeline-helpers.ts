@@ -34,24 +34,6 @@ export const buildCancelledResult = runtime.buildCancelledResult;
 export const delay = runtime.delay;
 
 export function resolveAuthEnv(settings: PluginSettings): Record<string, string> {
-	const authMode = settings.authMode as string | undefined;
 	const apiKey = getUsableSecret(settings.apiKey);
-	const project = settings.googleCloudProject as string | undefined;
-	const location = settings.googleCloudLocation as string | undefined;
-
-	if (authMode === 'api-key' && apiKey) {
-		return { GEMINI_API_KEY: apiKey };
-	}
-
-	if (authMode === 'vertex') {
-		const env: Record<string, string> = {
-			GOOGLE_GENAI_USE_VERTEXAI: 'true'
-		};
-
-		if (project) env.GOOGLE_CLOUD_PROJECT = project;
-		if (location) env.GOOGLE_CLOUD_LOCATION = location;
-		return env;
-	}
-
-	return {};
+	return apiKey ? { GEMINI_API_KEY: apiKey } : {};
 }

@@ -52,7 +52,11 @@ function fieldMatchesCondition(
     return dependencyValue === schema.showIf.value;
 }
 
-function isAuthModeDependentField(key: string, schema: PluginSettingsSchemaProperty, authModeField: string) {
+function isAuthModeDependentField(
+    key: string,
+    schema: PluginSettingsSchemaProperty,
+    authModeField: string,
+) {
     if (key === authModeField) {
         return true;
     }
