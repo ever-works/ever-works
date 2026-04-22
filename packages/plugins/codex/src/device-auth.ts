@@ -29,6 +29,7 @@ const lastFailureByUser = new Map<string, string>();
 const DEVICE_AUTH_PROMPT_DISCOVERY_TIMEOUT_MS = 30_000;
 const DEVICE_AUTH_SESSION_TIMEOUT_MS = 10 * 60 * 1000;
 const DEVICE_AUTH_PROMPT_POLL_INTERVAL_MS = 100;
+const DEFAULT_DEVICE_AUTH_VERIFICATION_URI = 'https://auth.openai.com/codex/device';
 const DEVICE_AUTH_EXPIRED_MESSAGE =
 	'Codex device authentication expired before it was completed. Restart the device-auth flow.';
 
@@ -150,13 +151,13 @@ export async function startDeviceAuth(userId: string, logger?: LoggerLike): Prom
 	const applyOutput = (text: string) => {
 		const lines = text.split(/\r?\n/u);
 		for (const line of lines) {
-			const trimmed = line.trim();
+			const trimmed = stripAnsi(line).trim();
 			if (!trimmed) {
 				continue;
 			}
 
 			if (!session.verificationUri) {
-				const urlMatch = trimmed.match(/https:\/\/auth\.openai\.com\/codex\/device/iu);
+				const urlMatch = trimmed.match(/https:\/\/auth\.openai\.com\/[^\s)>"']+/iu);
 				if (urlMatch?.[0]) {
 					session.verificationUri = urlMatch[0];
 				}
@@ -166,6 +167,9 @@ export async function startDeviceAuth(userId: string, logger?: LoggerLike): Prom
 				const codeMatch = trimmed.match(/\b[A-Z0-9]{4}-[A-Z0-9]{4,6}\b/u);
 				if (codeMatch?.[0]) {
 					session.userCode = codeMatch[0];
+					if (!session.verificationUri) {
+						session.verificationUri = DEFAULT_DEVICE_AUTH_VERIFICATION_URI;
+					}
 				}
 			}
 		}
@@ -275,6 +279,10 @@ async function waitForDevicePrompt(session: DeviceAuthSession, timeoutMs: number
 	}
 
 	return false;
+}
+
+function stripAnsi(value: string): string {
+	return value.replace(/\u001B\[[0-9;]*[A-Za-z]/gu, '');
 }
 
 async function isCodexInstalled(logger?: LoggerLike): Promise<boolean> {

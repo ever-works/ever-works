@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPluginDeviceAuthStatus, startPluginDeviceAuth } from '@/app/actions/plugins';
 import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';
 
@@ -23,6 +23,24 @@ export function usePluginDeviceAuth({
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isStarting, setIsStarting] = useState(false);
+    const handledVerificationUriRef = useRef<string | null>(
+        initialStatus?.prompt?.verificationUri ?? null,
+    );
+
+    const openVerificationUri = useCallback((verificationUri?: string | null) => {
+        if (!verificationUri || typeof window === 'undefined') {
+            return;
+        }
+
+        if (handledVerificationUriRef.current === verificationUri) {
+            return;
+        }
+
+        // Browsers can return null for noopener/noreferrer popups even when the tab opens.
+        // Treat the URL as handled once we attempt to open it so polling does not reopen it.
+        handledVerificationUriRef.current = verificationUri;
+        window.open(verificationUri, '_blank', 'noopener,noreferrer');
+    }, []);
 
     const refresh = useCallback(async () => {
         setIsLoading(true);
@@ -40,11 +58,12 @@ export function usePluginDeviceAuth({
         } finally {
             setIsLoading(false);
         }
-    }, [loadErrorMessage, pluginId]);
+    }, [loadErrorMessage, openVerificationUri, pluginId]);
 
     const start = useCallback(async () => {
         setIsStarting(true);
         setError(null);
+        handledVerificationUriRef.current = null;
 
         try {
             const result = await startPluginDeviceAuth(pluginId);
@@ -56,16 +75,13 @@ export function usePluginDeviceAuth({
             onActivate?.();
             setStatus(result.data);
 
-            const verificationUri = result.data.prompt?.verificationUri;
-            if (verificationUri) {
-                window.open(verificationUri, '_blank', 'noopener,noreferrer');
-            }
+            openVerificationUri(result.data.prompt?.verificationUri);
 
             return result.data;
         } finally {
             setIsStarting(false);
         }
-    }, [onActivate, pluginId, startErrorMessage]);
+    }, [onActivate, openVerificationUri, pluginId, startErrorMessage]);
 
     useEffect(() => {
         if (!status?.pending) {
@@ -78,6 +94,14 @@ export function usePluginDeviceAuth({
 
         return () => window.clearInterval(timer);
     }, [refresh, status?.pending]);
+
+    useEffect(() => {
+        if (!status?.pending) {
+            return;
+        }
+
+        openVerificationUri(status.prompt?.verificationUri);
+    }, [openVerificationUri, status?.pending, status?.prompt?.verificationUri]);
 
     return {
         status,

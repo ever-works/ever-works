@@ -112,6 +112,39 @@ describe('device-auth', () => {
 		);
 	});
 
+	it('falls back to the canonical OpenAI device-auth page when only a user code is printed', async () => {
+		spawnMock.mockImplementation((command: string, args: string[]) => {
+			const child = new MockChildProcess();
+
+			queueMicrotask(() => {
+				if (args[0] === '--version') {
+					child.emit('exit', 0);
+					return;
+				}
+
+				if (args[0] === 'login' && args[1] === 'status') {
+					child.stderr.emitData('not logged in');
+					child.emit('exit', 1);
+					return;
+				}
+
+				if (args[0] === 'login' && args[1] === '--device-auth') {
+					child.stdout.emitData('Code: ZXCV-1234\n');
+				}
+			});
+
+			return child;
+		});
+
+		const userId = 'user-device-auth-fallback';
+		const { startDeviceAuth } = await import('../device-auth.js');
+		const result = await startDeviceAuth(userId);
+
+		expect(result.pending).toBe(true);
+		expect(result.prompt?.userCode).toBe('ZXCV-1234');
+		expect(result.prompt?.verificationUri).toBe('https://auth.openai.com/codex/device');
+	});
+
 	it('expires pending device-auth sessions that are never completed', async () => {
 		const userId = 'user-device-auth-expired';
 		const { startDeviceAuth, getDeviceAuthStatus } = await import('../device-auth.js');
