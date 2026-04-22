@@ -133,13 +133,17 @@ export class ZapierClient {
 			return new Error('Zapier action timed out. Try increasing the timeout setting.');
 		}
 		if (error instanceof ZapierValidationError) {
-			return new Error('Zapier rejected the action inputs. Check that required input fields are present and valid.');
+			return new Error(
+				'Zapier rejected the action inputs. Check that required input fields are present and valid.'
+			);
 		}
 		if (error instanceof ZapierActionError) {
 			return new Error(`Zapier action failed: ${error.message}`);
 		}
 		if (error instanceof ZapierNotFoundError) {
-			return new Error('Zapier action or authentication not found. Verify the app key, action key, and authentication ID.');
+			return new Error(
+				'Zapier action or authentication not found. Verify the app key, action key, and authentication ID.'
+			);
 		}
 		if (error instanceof ZapierError) {
 			return new Error(`Zapier error during ${context}: ${error.message}`);

@@ -1,10 +1,5 @@
 import type { ItemData, Category, Tag, Brand } from '@ever-works/plugin';
-import type {
-	ZapierWorkflowOutput,
-	ZapierOutputItem,
-	ZapierResultShape,
-	ZapierFieldMapping
-} from '../types.js';
+import type { ZapierWorkflowOutput, ZapierOutputItem, ZapierResultShape, ZapierFieldMapping } from '../types.js';
 
 export interface ParsedResults {
 	items: ItemData[];
@@ -23,11 +18,7 @@ export interface ParsedResults {
  *    e.g. a `search` action returning an array of domain objects. The caller
  *    provides a field mapping to project each record onto ItemData.
  */
-export function parseZapierOutput(
-	raw: unknown,
-	shape: ZapierResultShape,
-	mapping: ZapierFieldMapping
-): ParsedResults {
+export function parseZapierOutput(raw: unknown, shape: ZapierResultShape, mapping: ZapierFieldMapping): ParsedResults {
 	if (raw === null || raw === undefined) {
 		throw new Error('Zapier action returned no data.');
 	}
@@ -208,7 +199,10 @@ function isNonEmptyItem(item: ItemData): boolean {
 /** Reads a field by a dot-separated path (e.g. `profile.name` or `fields[0].title`). */
 function readField(record: Record<string, unknown>, path: string): unknown {
 	if (!path) return undefined;
-	const parts = path.split('.').map((p) => p.trim()).filter(Boolean);
+	const parts = path
+		.split('.')
+		.map((p) => p.trim())
+		.filter(Boolean);
 	let current: unknown = record;
 	for (const part of parts) {
 		if (current == null) return undefined;

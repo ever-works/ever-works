@@ -209,7 +209,12 @@ describe('ZapierClient', () => {
 		});
 
 		it('should reject when the signal aborts during execution', async () => {
-			mockRunAction.mockImplementation(() => new Promise(() => { /* never resolves */ }));
+			mockRunAction.mockImplementation(
+				() =>
+					new Promise(() => {
+						/* never resolves */
+					})
+			);
 			const client = createClient();
 			const controller = new AbortController();
 

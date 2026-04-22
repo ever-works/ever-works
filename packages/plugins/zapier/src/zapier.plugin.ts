@@ -410,11 +410,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			setState('collect-results', 'running');
 			reportProgress(onProgress, 3, 75, 'Collect & Validate Results');
 
-			const parsed = parseZapierOutput(
-				execResult.data,
-				zapierSettings.resultShape,
-				zapierSettings.fieldMapping
-			);
+			const parsed = parseZapierOutput(execResult.data, zapierSettings.resultShape, zapierSettings.fieldMapping);
 
 			const existingNames = existing.items.map((i) => i.name);
 			const items = deduplicateItems(parsed.items, existingNames);
@@ -536,8 +532,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 
 	private resolveActionRef(config: Record<string, unknown>, settings: ZapierSettings): ZapierActionRef {
 		const appKey = (trimOrUndefined(config.app_key) || settings.defaultAppKey || '').trim();
-		const actionType = ((config.action_type as ZapierActionType) ||
-			settings.defaultActionType) as ZapierActionType;
+		const actionType = ((config.action_type as ZapierActionType) || settings.defaultActionType) as ZapierActionType;
 		const actionKey = (trimOrUndefined(config.action_key) || settings.defaultActionKey || '').trim();
 		const authenticationId =
 			normalizeAuthId(config.authentication_id) ?? settings.defaultAuthenticationId ?? Number.NaN;

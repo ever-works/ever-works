@@ -8,11 +8,7 @@ import type {
 	PipelineMetrics,
 	StepStatus
 } from '@ever-works/plugin';
-import {
-	buildCancelledPipelineResult,
-	buildErrorPipelineResult,
-	createEmptyPipelineOutputs
-} from '@ever-works/plugin';
+import { buildCancelledPipelineResult, buildErrorPipelineResult, createEmptyPipelineOutputs } from '@ever-works/plugin';
 import type { ZapierStepId, ZapierPipelineMetrics } from '../types.js';
 import { ZAPIER_STEP_IDS } from '../types.js';
 import { STEP_DEFINITIONS } from '../steps.js';

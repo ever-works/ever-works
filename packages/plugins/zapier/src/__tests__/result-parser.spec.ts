@@ -42,11 +42,7 @@ describe('parseZapierOutput — structured shape', () => {
 	});
 
 	it('should unwrap nested `output` field', () => {
-		const result = parseZapierOutput(
-			{ output: { items: [{ name: 'Async Item' }] } },
-			'structured',
-			EMPTY_MAPPING
-		);
+		const result = parseZapierOutput({ output: { items: [{ name: 'Async Item' }] } }, 'structured', EMPTY_MAPPING);
 
 		expect(result.items).toHaveLength(1);
 		expect(result.items[0].name).toBe('Async Item');
@@ -196,22 +192,14 @@ describe('parseZapierOutput — native shape', () => {
 	it('should read array paths with numeric indices', () => {
 		const mapping: ZapierFieldMapping = { nameField: 'fields.0.value' };
 
-		const result = parseZapierOutput(
-			[{ fields: [{ value: 'First' }, { value: 'Second' }] }],
-			'native',
-			mapping
-		);
+		const result = parseZapierOutput([{ fields: [{ value: 'First' }, { value: 'Second' }] }], 'native', mapping);
 
 		expect(result.items[0].name).toBe('First');
 	});
 
 	it('should unwrap `results` wrapper objects', () => {
 		const mapping: ZapierFieldMapping = { nameField: 'title' };
-		const result = parseZapierOutput(
-			{ results: [{ title: 'A' }, { title: 'B' }] },
-			'native',
-			mapping
-		);
+		const result = parseZapierOutput({ results: [{ title: 'A' }, { title: 'B' }] }, 'native', mapping);
 		expect(result.items).toHaveLength(2);
 	});
 
@@ -231,11 +219,7 @@ describe('parseZapierOutput — native shape', () => {
 
 	it('should accept a single image URL string', () => {
 		const mapping: ZapierFieldMapping = { nameField: 'title', imageField: 'img' };
-		const result = parseZapierOutput(
-			[{ title: 'Item', img: 'https://example.com/a.png' }],
-			'native',
-			mapping
-		);
+		const result = parseZapierOutput([{ title: 'Item', img: 'https://example.com/a.png' }], 'native', mapping);
 		expect(result.items[0].images).toEqual(['https://example.com/a.png']);
 	});
 

@@ -1,11 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ZapierPlugin } from '../zapier.plugin.js';
-import type {
-	DirectoryReference,
-	GenerationRequest,
-	ExistingItems,
-	PluginContext
-} from '@ever-works/plugin';
+import type { DirectoryReference, GenerationRequest, ExistingItems, PluginContext } from '@ever-works/plugin';
 
 const { mockGetAction, mockRunAction } = vi.hoisted(() => ({
 	mockGetAction: vi.fn(),
@@ -188,9 +183,7 @@ describe('ZapierPlugin', () => {
 			const anyOf = plugin.settingsSchema.anyOf as Array<{ required: string[] }>;
 			expect(anyOf).toBeDefined();
 			const requirements = anyOf.map((entry) => entry.required);
-			expect(requirements).toEqual(
-				expect.arrayContaining([['accessToken'], ['clientId', 'clientSecret']])
-			);
+			expect(requirements).toEqual(expect.arrayContaining([['accessToken'], ['clientId', 'clientSecret']]));
 		});
 
 		it('should mark accessToken and clientSecret as secret', () => {

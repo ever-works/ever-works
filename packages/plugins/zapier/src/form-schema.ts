@@ -205,8 +205,7 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'action_params',
 			type: 'json',
 			label: 'Custom Action Parameters',
-			description:
-				'Additional key-value parameters forwarded to the Zapier action under `inputs.actionParams`.',
+			description: 'Additional key-value parameters forwarded to the Zapier action under `inputs.actionParams`.',
 			defaultValue: {},
 			group: 'advanced'
 		}
