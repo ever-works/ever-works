@@ -149,8 +149,9 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		}
 
 		return {
-			success: true,
-			message: 'OpenCode uses the configured Ever Works AI provider for authentication and model selection.'
+			success: false,
+			message:
+				'OpenCode depends on a configured directory AI provider and cannot be verified from plugin user settings alone.'
 		};
 	}
 
@@ -185,7 +186,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			selectableProviderCategories: ['ai-provider', 'screenshot'],
 			uiHints: {
 				onboardingWizard: false,
-				includeInOnboarding: true,
+				includeInOnboarding: false,
 				onboardingPriority: 1,
 				completionFields: [],
 				onboardingDescription:
@@ -258,8 +259,18 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		onProgress?: PipelineProgressCallback
 	): Promise<PipelineResult> {
 		const startTime = Date.now();
-		this.abortController = new AbortController();
-		const signal = options?.signal ?? this.abortController.signal;
+		if (this.abortController) {
+			return this.handleError(
+				new Error(
+					'OpenCode Generator is already executing another generation. Wait for it to finish or cancel it first.'
+				),
+				startTime
+			);
+		}
+
+		const abortController = new AbortController();
+		this.abortController = abortController;
+		const signal = options?.signal ?? abortController.signal;
 		const onLogEntry = options?.onLogEntry;
 		const execContext = options?.execContext;
 
@@ -484,6 +495,11 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			await cleanupWorkspace(userId, directory.id);
 			await cleanupOpenCodeSessionConfig(userId, directory.id);
 			return this.handleError(err, startTime);
+		} finally {
+			if (this.abortController === abortController) {
+				this.abortController = null;
+				this.killProcess = null;
+			}
 		}
 	}
 

@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, ArrowUpRight, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PluginSettingsField } from '@/components/plugins/form/PluginSettingsField';
-import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { cn } from '@/lib/utils/cn';
 import type {
     PluginLocalAuthStatus,
@@ -50,43 +49,24 @@ function StepNavigation({
     getStepLabel: (index: number) => string;
 }) {
     return (
-        <div className="space-y-3">
+        <div className={cn('grid gap-3', steps.length >= 3 ? 'md:grid-cols-3' : 'md:grid-cols-2')}>
             {steps.map((item, index) => (
                 <button
                     key={item.key}
                     type="button"
                     onClick={() => onSelect(index)}
                     className={cn(
-                        'w-full rounded-2xl border px-4 py-4 text-left transition-all',
+                        'rounded-xl border px-4 py-3 text-left transition-colors',
                         index === step
-                            ? 'border-primary bg-primary/[0.08] shadow-[0_12px_30px_-22px_rgba(36,99,235,0.55)]'
-                            : 'border-border/80 dark:border-border-dark bg-surface-secondary/45 dark:bg-surface-secondary-dark/35 hover:border-primary/30 hover:bg-surface dark:hover:bg-surface-dark',
+                            ? 'border-primary bg-primary/8'
+                            : 'border-border dark:border-border-dark hover:border-primary/40',
                     )}
                 >
-                    <div className="flex items-start gap-3">
-                        <div
-                            className={cn(
-                                'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold',
-                                index < step
-                                    ? 'border-success/30 bg-success/10 text-success'
-                                    : index === step
-                                      ? 'border-primary/30 bg-primary/10 text-primary'
-                                      : 'border-border dark:border-border-dark text-text-muted dark:text-text-muted-dark',
-                            )}
-                        >
-                            {index < step ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
-                        </div>
-                        <div className="min-w-0">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-text-muted dark:text-text-muted-dark">
-                                {getStepLabel(index + 1)}
-                            </div>
-                            <div className="mt-1 text-sm font-semibold text-text dark:text-text-dark">
-                                {item.title}
-                            </div>
-                            <p className="mt-1 text-sm leading-6 text-text-muted dark:text-text-muted-dark">
-                                {item.description}
-                            </p>
-                        </div>
+                    <div className="text-xs font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                        {getStepLabel(index + 1)}
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-text dark:text-text-dark">
+                        {item.title}
                     </div>
                 </button>
             ))}
@@ -126,14 +106,12 @@ function AuthModeOption({
     title,
     description,
     badge,
-    eyebrow,
     onClick,
 }: {
     selected: boolean;
     title: string;
     description: string;
     badge?: { label: string; tone: 'success' | 'primary' };
-    eyebrow?: string;
     onClick: () => void;
 }) {
     return (
@@ -145,16 +123,10 @@ function AuthModeOption({
                 selected
                     ? 'border-primary bg-primary/8'
                     : 'border-border dark:border-border-dark bg-surface dark:bg-surface-dark',
-                badge?.tone === 'success' && 'ring-1 ring-primary/20',
             )}
         >
             <div className="flex items-center justify-between gap-3">
                 <div>
-                    {eyebrow && (
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-text-muted dark:text-text-muted-dark">
-                            {eyebrow}
-                        </p>
-                    )}
                     <p className="text-sm font-semibold text-text dark:text-text-dark">{title}</p>
                     <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark">
                         {description}
@@ -199,7 +171,7 @@ function LocalAuthStatusPanel({
         fallbackMessage: string;
         machineScoped: string;
         deviceCode: string;
-        openLink: string;
+        verificationUrl: string;
         notInstalled: string;
         connected: string;
         start: string;
@@ -241,19 +213,13 @@ function LocalAuthStatusPanel({
             )}
 
             {localAuthStatus?.verificationUri && (
-                <div className="rounded-xl border border-border/80 dark:border-border-dark bg-surface-secondary/50 dark:bg-surface-secondary-dark/45 p-3">
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark break-all">
+                <div className="rounded-lg bg-surface-secondary/70 dark:bg-surface-secondary-dark/60 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted dark:text-text-muted-dark">
+                        {copy.verificationUrl}
+                    </p>
+                    <p className="mt-2 text-sm text-text dark:text-text-dark break-all">
                         {localAuthStatus.verificationUri}
                     </p>
-                    <a
-                        href={localAuthStatus.verificationUri}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-hover"
-                    >
-                        {copy.openLink}
-                        <ArrowUpRight className="h-4 w-4" />
-                    </a>
                 </div>
             )}
 
@@ -507,248 +473,186 @@ export function PluginOnboardingWizard({
             : tWizard('authModes.apiKey.title');
 
     return (
-        <div className="overflow-hidden rounded-[28px] border border-border/80 dark:border-border-dark bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.12),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.1),transparent_30%)] p-1">
-            <div className="rounded-[26px] bg-surface dark:bg-surface-dark p-6">
-                <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-                    <aside className="space-y-4">
-                        <div className="rounded-[24px] border border-border/80 dark:border-border-dark bg-surface-secondary/60 dark:bg-surface-secondary-dark/45 p-5">
-                            <div className="flex items-start justify-between gap-4">
-                                <div>
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-text-muted dark:text-text-muted-dark">
-                                        {tWizard('setupLabel')}
-                                    </p>
-                                    <div className="mt-4 flex items-center gap-3">
-                                        <PluginIcon
-                                            icon={plugin.icon}
-                                            name={plugin.name}
-                                            size={48}
-                                            className="shrink-0 rounded-2xl"
-                                        />
-                                        <div>
-                                            <h2 className="text-lg font-semibold text-text dark:text-text-dark">
-                                                {plugin.name}
-                                            </h2>
-                                            <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                                v{plugin.version}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                                    {setupStatusLabel}
-                                </span>
-                            </div>
+        <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-6 space-y-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <p className="text-sm font-medium text-text-muted dark:text-text-muted-dark">
+                        {tWizard('setupLabel')}
+                    </p>
+                    <h2 className="mt-1 text-lg font-semibold text-text dark:text-text-dark">
+                        {plugin.name}
+                    </h2>
+                    <p className="mt-2 text-sm text-text-muted dark:text-text-muted-dark">
+                        {plugin.uiHints?.onboardingDescription || plugin.description}
+                    </p>
+                </div>
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                    {setupStatusLabel}
+                </span>
+            </div>
 
-                            <p className="mt-4 text-sm leading-6 text-text-muted dark:text-text-muted-dark">
-                                {plugin.uiHints?.onboardingDescription || plugin.description}
-                            </p>
-                        </div>
+            <StepNavigation
+                steps={steps}
+                step={step}
+                onSelect={setStep}
+                getStepLabel={(index) => tOnboarding('stepIndex', { index })}
+            />
 
-                        <StepNavigation
-                            steps={steps}
-                            step={step}
-                            onSelect={setStep}
-                            getStepLabel={(index) => tOnboarding('stepIndex', { index })}
-                        />
-                    </aside>
+            <div className="rounded-xl border border-border dark:border-border-dark p-5 space-y-4">
+                <div>
+                    <p className="text-sm font-medium text-text dark:text-text-dark">
+                        {currentStep.title}
+                    </p>
+                    <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark">
+                        {currentStep.description}
+                    </p>
+                </div>
 
-                    <div className="rounded-[24px] border border-border/80 dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-5 sm:p-6 space-y-6">
-                        <div className="flex items-start gap-4 border-b border-border/70 dark:border-border-dark pb-5">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-sm font-semibold text-primary">
-                                {step + 1}
-                            </div>
-                            <div className="min-w-0">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-text-muted dark:text-text-muted-dark">
-                                    {tOnboarding('stepIndex', { index: step + 1 })}
-                                </p>
-                                <h3 className="mt-1 text-xl font-semibold text-text dark:text-text-dark">
-                                    {currentStep.title}
-                                </h3>
-                                <p className="mt-2 max-w-2xl text-sm leading-6 text-text-muted dark:text-text-muted-dark">
-                                    {currentStep.description}
-                                </p>
-                            </div>
-                        </div>
+                {currentStep.key === 'configure' && (
+                    <SettingsFieldList
+                        fields={configurationFields}
+                        getFieldValue={getFieldValue}
+                        handleFieldChange={handleFieldChange}
+                        pluginId={plugin.pluginId}
+                    />
+                )}
 
-                        {currentStep.key === 'configure' && (
-                            <SettingsFieldList
-                                fields={configurationFields}
-                                getFieldValue={getFieldValue}
-                                handleFieldChange={handleFieldChange}
-                                pluginId={plugin.pluginId}
-                            />
-                        )}
-
-                        {currentStep.key === 'credentials' && (
+                {currentStep.key === 'credentials' && (
+                    <div className="space-y-4">
+                        {supportsLocalAuth && (
                             <div className="space-y-4">
-                                {supportsLocalAuth && (
-                                    <div className="space-y-4">
-                                        <div className="grid gap-4 @lg/main:grid-cols-2">
-                                            {apiKeyField && (
-                                                <AuthModeOption
-                                                    selected={selectedAuthMode === 'api-key'}
-                                                    eyebrow={tWizard('authModes.apiKey.eyebrow')}
-                                                    title={tWizard('authModes.apiKey.title')}
-                                                    description={tWizard(
-                                                        'authModes.apiKey.description',
-                                                    )}
-                                                    onClick={() => setAuthMode('api-key')}
-                                                />
-                                            )}
-
-                                            <AuthModeOption
-                                                selected={selectedAuthMode === 'local'}
-                                                eyebrow={tWizard('authModes.local.eyebrow')}
-                                                title={tWizard('authModes.local.title')}
-                                                description={tWizard('authModes.local.description')}
-                                                badge={
-                                                    localAuthStatus?.connected
-                                                        ? {
-                                                              label: tWizard(
-                                                                  'localAuth.badges.connected',
-                                                              ),
-                                                              tone: 'success',
-                                                          }
-                                                        : localAuthStatus?.pending
-                                                          ? {
-                                                                label: tWizard(
-                                                                    'localAuth.badges.pending',
-                                                                ),
-                                                                tone: 'primary',
-                                                            }
-                                                          : undefined
-                                                }
-                                                onClick={() => setAuthMode('local')}
-                                            />
-                                        </div>
-
-                                        {selectedAuthMode === 'api-key' && apiKeyField && (
-                                            <PluginSettingsField
-                                                name={apiKeyField[0]}
-                                                schema={apiKeyField[1]}
-                                                value={getFieldValue(
-                                                    apiKeyField[0],
-                                                    apiKeyField[1],
-                                                )}
-                                                onChange={(value) =>
-                                                    handleFieldChange(
-                                                        apiKeyField[0],
-                                                        value,
-                                                        apiKeyField[1].secret || true,
-                                                    )
-                                                }
-                                                pluginId={plugin.pluginId}
-                                            />
-                                        )}
-
-                                        {selectedAuthMode === 'local' && (
-                                            <LocalAuthStatusPanel
-                                                localAuthStatus={localAuthStatus}
-                                                localAuthError={localAuthError}
-                                                isLoadingLocalAuth={isLoadingLocalAuth}
-                                                isStartingLocalAuth={isStartingLocalAuth}
-                                                onStart={() => void handleStartLocalAuth()}
-                                                onRefresh={() => void refreshLocalAuthStatus()}
-                                                copy={{
-                                                    title: tWizard('localAuth.status.title'),
-                                                    fallbackMessage: tWizard(
-                                                        'localAuth.status.fallback',
-                                                    ),
-                                                    machineScoped: tWizard(
-                                                        'localAuth.status.machineScoped',
-                                                    ),
-                                                    deviceCode: tWizard(
-                                                        'localAuth.status.deviceCode',
-                                                    ),
-                                                    openLink: tWizard('localAuth.status.openLink'),
-                                                    notInstalled: tWizard(
-                                                        'localAuth.actions.notInstalled',
-                                                    ),
-                                                    connected: tWizard(
-                                                        'localAuth.actions.connected',
-                                                    ),
-                                                    start: tWizard('localAuth.actions.start'),
-                                                    restart: tWizard('localAuth.actions.restart'),
-                                                    refresh: tWizard('localAuth.actions.refresh'),
-                                                }}
-                                            />
-                                        )}
-                                    </div>
-                                )}
-
-                                {!supportsLocalAuth &&
-                                    credentialFields.map(([key, schema]) => (
-                                        <PluginSettingsField
-                                            key={key}
-                                            name={key}
-                                            schema={schema}
-                                            value={getFieldValue(key, schema)}
-                                            onChange={(value) =>
-                                                handleFieldChange(key, value, schema.secret || true)
-                                            }
-                                            pluginId={plugin.pluginId}
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    {apiKeyField && (
+                                        <AuthModeOption
+                                            selected={selectedAuthMode === 'api-key'}
+                                            title={tWizard('authModes.apiKey.title')}
+                                            description={tWizard('authModes.apiKey.description')}
+                                            onClick={() => setAuthMode('api-key')}
                                         />
-                                    ))}
+                                    )}
 
-                                {additionalCredentialFields.map(([key, schema]) => (
+                                    <AuthModeOption
+                                        selected={selectedAuthMode === 'local'}
+                                        title={tWizard('authModes.local.title')}
+                                        description={tWizard('authModes.local.description')}
+                                        badge={
+                                            localAuthStatus?.connected
+                                                ? {
+                                                      label: tWizard('localAuth.badges.connected'),
+                                                      tone: 'success',
+                                                  }
+                                                : localAuthStatus?.pending
+                                                  ? {
+                                                        label: tWizard('localAuth.badges.pending'),
+                                                        tone: 'primary',
+                                                    }
+                                                  : undefined
+                                        }
+                                        onClick={() => setAuthMode('local')}
+                                    />
+                                </div>
+
+                                {selectedAuthMode === 'api-key' && apiKeyField && (
                                     <PluginSettingsField
-                                        key={key}
-                                        name={key}
-                                        schema={schema}
-                                        value={getFieldValue(key, schema)}
+                                        name={apiKeyField[0]}
+                                        schema={apiKeyField[1]}
+                                        value={getFieldValue(apiKeyField[0], apiKeyField[1])}
                                         onChange={(value) =>
-                                            handleFieldChange(key, value, schema.secret || true)
+                                            handleFieldChange(
+                                                apiKeyField[0],
+                                                value,
+                                                apiKeyField[1].secret || true,
+                                            )
                                         }
                                         pluginId={plugin.pluginId}
                                     />
-                                ))}
+                                )}
+
+                                {selectedAuthMode === 'local' && (
+                                    <LocalAuthStatusPanel
+                                        localAuthStatus={localAuthStatus}
+                                        localAuthError={localAuthError}
+                                        isLoadingLocalAuth={isLoadingLocalAuth}
+                                        isStartingLocalAuth={isStartingLocalAuth}
+                                        onStart={() => void handleStartLocalAuth()}
+                                        onRefresh={() => void refreshLocalAuthStatus()}
+                                        copy={{
+                                            title: tWizard('localAuth.status.title'),
+                                            fallbackMessage: tWizard('localAuth.status.fallback'),
+                                            machineScoped: tWizard(
+                                                'localAuth.status.machineScoped',
+                                            ),
+                                            deviceCode: tWizard('localAuth.status.deviceCode'),
+                                            verificationUrl: tWizard(
+                                                'localAuth.status.verificationUrl',
+                                            ),
+                                            notInstalled: tWizard('localAuth.actions.notInstalled'),
+                                            connected: tWizard('localAuth.actions.connected'),
+                                            start: tWizard('localAuth.actions.start'),
+                                            restart: tWizard('localAuth.actions.restart'),
+                                            refresh: tWizard('localAuth.actions.refresh'),
+                                        }}
+                                    />
+                                )}
                             </div>
                         )}
 
-                        {currentStep.key === 'verify' && (
-                            <VerifyStepPanel
-                                onSave={handleSave}
-                                isSaving={isSaving}
-                                saveSuccess={saveSuccess}
-                                saveMessage={saveMessage}
-                                validationError={validationError}
-                                copy={{
-                                    title: tWizard('steps.verify.cardTitle'),
-                                    description: tWizard('steps.verify.cardDescription'),
-                                    action: tWizard('steps.verify.action'),
-                                    success: tWizard('steps.verify.successDefault'),
-                                }}
+                        {!supportsLocalAuth &&
+                            credentialFields.map(([key, schema]) => (
+                                <PluginSettingsField
+                                    key={key}
+                                    name={key}
+                                    schema={schema}
+                                    value={getFieldValue(key, schema)}
+                                    onChange={(value) =>
+                                        handleFieldChange(key, value, schema.secret || true)
+                                    }
+                                    pluginId={plugin.pluginId}
+                                />
+                            ))}
+
+                        {additionalCredentialFields.map(([key, schema]) => (
+                            <PluginSettingsField
+                                key={key}
+                                name={key}
+                                schema={schema}
+                                value={getFieldValue(key, schema)}
+                                onChange={(value) =>
+                                    handleFieldChange(key, value, schema.secret || true)
+                                }
+                                pluginId={plugin.pluginId}
                             />
-                        )}
-
-                        {(step > 0 || step < steps.length - 1) && (
-                            <div className="flex items-center justify-between gap-3 border-t border-border/70 dark:border-border-dark pt-2">
-                                {step > 0 ? (
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        onClick={() => setStep((current) => current - 1)}
-                                    >
-                                        {tWizard('back')}
-                                    </Button>
-                                ) : (
-                                    <span />
-                                )}
-                                {step < steps.length - 1 ? (
-                                    <Button
-                                        variant="secondary"
-                                        onClick={() => setStep((current) => current + 1)}
-                                    >
-                                        {tWizard('continue')}
-                                        <ArrowRight className="w-4 h-4" />
-                                    </Button>
-                                ) : (
-                                    <span />
-                                )}
-                            </div>
-                        )}
+                        ))}
                     </div>
-                </div>
+                )}
+
+                {currentStep.key === 'verify' && (
+                    <VerifyStepPanel
+                        onSave={handleSave}
+                        isSaving={isSaving}
+                        saveSuccess={saveSuccess}
+                        saveMessage={saveMessage}
+                        validationError={validationError}
+                        copy={{
+                            title: tWizard('steps.verify.cardTitle'),
+                            description: tWizard('steps.verify.cardDescription'),
+                            action: tWizard('steps.verify.action'),
+                            success: tWizard('steps.verify.successDefault'),
+                        }}
+                    />
+                )}
+
+                {step < steps.length - 1 && (
+                    <div className="flex justify-end">
+                        <Button
+                            variant="secondary"
+                            onClick={() => setStep((current) => current + 1)}
+                        >
+                            {tWizard('continue')}
+                            <ArrowRight className="w-4 h-4" />
+                        </Button>
+                    </div>
+                )}
             </div>
         </div>
     );

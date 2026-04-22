@@ -410,7 +410,6 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				onboardingWizard: true,
 				includeInOnboarding: true,
 				onboardingPriority: 1,
-				completionFields: ['authMode', 'apiKey', 'googleApiKey', 'googleCloudProject', 'googleCloudLocation'],
 				onboardingDescription: 'Connect your AI assistant to power content generation across your directories.'
 			},
 			readme: [
@@ -566,8 +565,18 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		onProgress?: PipelineProgressCallback
 	): Promise<PipelineResult> {
 		const startTime = Date.now();
-		this.abortController = new AbortController();
-		const signal = options?.signal ?? this.abortController.signal;
+		if (this.abortController) {
+			return this.handleError(
+				new Error(
+					'Gemini Generator is already executing another generation. Wait for it to finish or cancel it first.'
+				),
+				startTime
+			);
+		}
+
+		const abortController = new AbortController();
+		this.abortController = abortController;
+		const signal = options?.signal ?? abortController.signal;
 		const onLogEntry = options?.onLogEntry;
 
 		this.state = initializeState();
@@ -776,6 +785,11 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			logger.error(`Gemini CLI pipeline failed: ${err.message}`);
 			await cleanupWorkspace(userId, directory.id);
 			return this.handleError(err, startTime);
+		} finally {
+			if (this.abortController === abortController) {
+				this.abortController = null;
+				this.killProcess = null;
+			}
 		}
 	}
 

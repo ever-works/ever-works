@@ -143,7 +143,6 @@ const MANIFEST: PluginManifest = {
 		onboardingWizard: true,
 		includeInOnboarding: true,
 		onboardingPriority: 2,
-		completionFields: ['apiKey'],
 		onboardingDescription:
 			'Connect Codex with an OpenAI API key or local Codex CLI auth for end-to-end directory generation.',
 		localAuth: {
@@ -512,18 +511,28 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		onProgress?: PipelineProgressCallback
 	): Promise<PipelineResult> {
 		const startTime = Date.now();
+		if (this.abortController) {
+			return this.handleError(
+				new Error(
+					'Codex Generator is already executing another generation. Wait for it to finish or cancel it first.'
+				),
+				startTime
+			);
+		}
+
 		this.state = initializeState();
-		this.abortController = new AbortController();
+		const abortController = new AbortController();
+		this.abortController = abortController;
 
 		if (options?.signal) {
 			if (options.signal.aborted) {
-				this.abortController.abort();
+				abortController.abort();
 			} else {
-				options.signal.addEventListener('abort', () => this.abortController?.abort(), { once: true });
+				options.signal.addEventListener('abort', () => abortController.abort(), { once: true });
 			}
 		}
 
-		const signal = this.abortController.signal;
+		const signal = abortController.signal;
 		const onLogEntry = options?.onLogEntry;
 		const logger = this.context?.logger ?? console;
 		const userId = directory.user?.id ?? 'system';
@@ -772,6 +781,11 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				await cleanupWorkspace(workspacePath);
 			}
 			return this.handleError(err, startTime);
+		} finally {
+			if (this.abortController === abortController) {
+				this.abortController = null;
+				this.killProcess = null;
+			}
 		}
 	}
 

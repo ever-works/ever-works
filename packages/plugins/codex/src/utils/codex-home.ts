@@ -7,9 +7,16 @@ function sanitizeUserId(userId: string): string {
 	return userId.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
+function isWithinTempDir(targetPath: string): boolean {
+	const resolvedTarget = path.resolve(targetPath);
+	const resolvedTempDir = path.resolve(os.tmpdir());
+
+	return resolvedTarget === resolvedTempDir || resolvedTarget.startsWith(`${resolvedTempDir}${path.sep}`);
+}
+
 function getManagedCodexBaseDir(): string {
 	const configuredDataDir = process.env.EVER_WORKS_DATA_DIR?.trim();
-	if (configuredDataDir) {
+	if (configuredDataDir && !isWithinTempDir(configuredDataDir)) {
 		return path.join(configuredDataDir, 'codex');
 	}
 

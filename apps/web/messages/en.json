@@ -289,6 +289,7 @@
                         "fallback": "Start or refresh local authentication for this backend instance.",
                         "machineScoped": "Local auth is machine-scoped and only works on the backend instance where it was created.",
                         "deviceCode": "Device Code",
+                        "verificationUrl": "Verification URL",
                         "openLink": "Open verification page"
                     },
                     "actions": {

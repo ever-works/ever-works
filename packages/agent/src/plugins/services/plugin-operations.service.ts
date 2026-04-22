@@ -19,6 +19,7 @@ import {
 } from '@ever-works/plugin';
 import type {
     PluginResponse,
+    PluginConnectionStatus,
     UserPluginResponse,
     DirectoryPluginResponse,
     PluginListResponse,
@@ -1179,16 +1180,119 @@ export class PluginOperationsService {
         userId: string,
     ): Promise<UserPluginResponse> {
         const response = this.toUserPluginResponse(registered, userPlugin);
-        const resolvedSettings = await this.getResolvedDisplaySettings(registered, userId);
+        const [resolvedSettings, connectionStatus] = await Promise.all([
+            this.getResolvedDisplaySettings(registered, userId),
+            this.getConnectionStatus(registered, userId),
+        ]);
 
-        if (!resolvedSettings) {
+        if (!resolvedSettings && !connectionStatus) {
             return response;
         }
 
         return {
             ...response,
             resolvedSettings,
+            connectionStatus,
         };
+    }
+
+    private async getConnectionStatus(
+        registered: RegisteredPlugin,
+        userId: string,
+    ): Promise<PluginConnectionStatus | undefined> {
+        if (!registered.manifest?.uiHints?.includeInOnboarding) {
+            return undefined;
+        }
+
+        if (registered.plugin.capabilities.includes('oauth')) {
+            return undefined;
+        }
+
+        const settings = await this.settingsService.getSettings(registered.plugin.id, {
+            userId,
+            includeSecrets: true,
+        });
+
+        if (isLocalAuthProvider(registered.plugin)) {
+            const authModeField =
+                registered.manifest.uiHints?.localAuth?.authModeField ?? 'authMode';
+            const authMode =
+                typeof settings[authModeField] === 'string' ? settings[authModeField] : undefined;
+            const prefersLocalAuth =
+                authMode === undefined || authMode === 'local' || authMode === 'machine-local';
+
+            if (prefersLocalAuth) {
+                try {
+                    const localAuthStatus = await registered.plugin.getLocalAuthStatus(userId);
+
+                    if (
+                        localAuthStatus.connected ||
+                        localAuthStatus.pending ||
+                        authMode === 'local' ||
+                        authMode === 'machine-local'
+                    ) {
+                        return {
+                            connected: localAuthStatus.connected,
+                            pending: localAuthStatus.pending,
+                            scope: localAuthStatus.scope,
+                            message: localAuthStatus.message,
+                        };
+                    }
+                } catch (error) {
+                    this.logger.warn(
+                        `Failed to read local auth status for plugin "${registered.plugin.id}": ${error}`,
+                    );
+                }
+            }
+        }
+
+        const plugin = registered.plugin as unknown as Record<string, unknown>;
+        const validateConnection = plugin.validateConnection as
+            | ((s: Record<string, unknown>) => Promise<{ success: boolean; message: string }>)
+            | undefined;
+
+        if (typeof validateConnection === 'function') {
+            try {
+                const result = await validateConnection.call(registered.plugin, settings);
+                return {
+                    connected: result.success,
+                    scope: 'user',
+                    message: result.message,
+                };
+            } catch (error) {
+                this.logger.warn(
+                    `Failed to validate onboarding connection for plugin "${registered.plugin.id}": ${error}`,
+                );
+                return {
+                    connected: false,
+                    scope: 'user',
+                    message: `${registered.plugin.name} is not configured yet.`,
+                };
+            }
+        }
+
+        const isAvailable = plugin.isAvailable as
+            | ((s?: Record<string, unknown>) => Promise<boolean>)
+            | undefined;
+
+        if (typeof isAvailable === 'function') {
+            try {
+                const available = await isAvailable.call(registered.plugin, settings);
+                return {
+                    connected: available,
+                    scope: 'user',
+                    message: available
+                        ? `${registered.plugin.name} is configured.`
+                        : `${registered.plugin.name} is not configured yet.`,
+                };
+            } catch (error) {
+                this.logger.warn(
+                    `Failed to resolve availability for plugin "${registered.plugin.id}": ${error}`,
+                );
+            }
+        }
+
+        return undefined;
     }
 
     private async getResolvedDisplaySettings(

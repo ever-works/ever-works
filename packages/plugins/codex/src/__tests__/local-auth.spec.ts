@@ -36,7 +36,7 @@ class MockChildProcess extends EventEmitter {
 
 describe('local-auth', () => {
 	beforeEach(() => {
-		process.env.EVER_WORKS_DATA_DIR = '/tmp/ever-works-local-auth-test';
+		process.env.EVER_WORKS_DATA_DIR = path.join(process.cwd(), '.tmp', 'ever-works-local-auth-test');
 		spawnMock.mockReset();
 		spawnMock.mockImplementation((command: string, args: string[]) => {
 			const child = new MockChildProcess();
@@ -64,7 +64,12 @@ describe('local-auth', () => {
 
 	afterEach(async () => {
 		delete process.env.EVER_WORKS_DATA_DIR;
-		await fs.rm('/tmp/ever-works-local-auth-test', { recursive: true, force: true }).catch(() => undefined);
+		await fs
+			.rm(path.join(process.cwd(), '.tmp', 'ever-works-local-auth-test'), {
+				recursive: true,
+				force: true
+			})
+			.catch(() => undefined);
 	});
 
 	it('returns a managed per-user auth path for local auth status', async () => {

@@ -196,8 +196,8 @@ describe('CodexPlugin', () => {
 		expect(plugin.getStepDefinitions()[0]?.id).toBe('setup-codex');
 	});
 
-	it('keeps apiKey as the onboarding completion field in the manifest', () => {
-		expect(plugin.getManifest().uiHints?.completionFields).toEqual(['apiKey']);
+	it('does not rely on legacy completion fields in the manifest', () => {
+		expect(plugin.getManifest().uiHints?.completionFields).toBeUndefined();
 	});
 
 	it('fails API key validation when the key cannot be verified', async () => {
