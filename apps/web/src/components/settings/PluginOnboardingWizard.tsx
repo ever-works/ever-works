@@ -574,18 +574,19 @@ export function PluginOnboardingWizard({
                                 />
                             ))}
 
-                        {additionalCredentialFields.map(([key, schema]) => (
-                            <PluginSettingsField
-                                key={key}
-                                name={key}
-                                schema={schema}
-                                value={getFieldValue(key, schema)}
-                                onChange={(value) =>
-                                    handleFieldChange(key, value, schema.secret || true)
-                                }
-                                pluginId={plugin.pluginId}
-                            />
-                        ))}
+                        {supportsDeviceAuth &&
+                            additionalCredentialFields.map(([key, schema]) => (
+                                <PluginSettingsField
+                                    key={key}
+                                    name={key}
+                                    schema={schema}
+                                    value={getFieldValue(key, schema)}
+                                    onChange={(value) =>
+                                        handleFieldChange(key, value, schema.secret || true)
+                                    }
+                                    pluginId={plugin.pluginId}
+                                />
+                            ))}
                     </div>
                 )}
 

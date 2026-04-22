@@ -126,6 +126,8 @@ export function PluginSettings({ plugin, oauthConnection, deviceAuthStatus }: Pl
         (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !displaySettings[f]));
     const hasDeviceAuth =
         plugin.capabilities.includes('device-auth') && deviceAuthStatus !== undefined;
+
+    const showsOnboardingWizard = Boolean(plugin.uiHints?.onboardingWizard);
     const deviceAuthModeField = plugin.uiHints?.deviceAuth?.authModeField ?? 'authMode';
 
     return (
@@ -282,7 +284,7 @@ export function PluginSettings({ plugin, oauthConnection, deviceAuthStatus }: Pl
                 />
             )}
 
-            {hasDeviceAuth && (
+            {hasDeviceAuth && !showsOnboardingWizard && (
                 <PluginDeviceAuthConnection
                     pluginId={plugin.pluginId}
                     pluginName={plugin.name}
@@ -309,7 +311,7 @@ export function PluginSettings({ plugin, oauthConnection, deviceAuthStatus }: Pl
                     </div>
 
                     <div className="p-6">
-                        {plugin.uiHints?.onboardingWizard ? (
+                        {showsOnboardingWizard ? (
                             <PluginOnboardingWizard
                                 plugin={plugin}
                                 initialSettings={plugin.settings || {}}
