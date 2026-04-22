@@ -484,6 +484,8 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 				logger
 			);
 
+			if (signal.aborted) return handleCancel();
+
 			// ── Step 6: Cleanup ───────────────────────────────────────
 			setState('cleanup', 'running');
 			reportProgress(onProgress, 5, 95, 'Cleanup');
@@ -644,6 +646,11 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 				logger.warn(`Failed to capture image for ${item.name}: ${reason}`);
 				errors.push(reason);
 			}
+		}
+
+		if (signal.aborted) {
+			setState('capture-screenshots', 'failed', 'Cancelled');
+			return [];
 		}
 
 		setState(

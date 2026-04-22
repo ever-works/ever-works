@@ -1,5 +1,6 @@
 'use client';
 
+import type { ComponentType } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { UserPlugin } from '@/lib/api/plugins';
@@ -32,6 +33,28 @@ import { SimAiOnboardingWizard } from '@/components/settings/SimAiOnboardingWiza
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 import { usePluginToggle } from '@/lib/hooks/use-plugin-toggle';
+import type { PluginSettingsSchemaProperty } from '@/lib/api/plugins';
+
+type OnboardingWizardProps = {
+    pluginId: string;
+    visibleProperties: Record<string, PluginSettingsSchemaProperty>;
+    getFieldValue: (key: string, propSchema: PluginSettingsSchemaProperty) => unknown;
+    handleFieldChange: (key: string, value: unknown, isSecret: boolean) => void;
+    handleSave: () => Promise<void>;
+    isSaving: boolean;
+    saveSuccess: boolean;
+    validationError: string | null;
+    saveMessage: string | null;
+};
+
+const WIZARD_COMPONENT_BY_PLUGIN_ID: Record<
+    string,
+    ComponentType<OnboardingWizardProps> | undefined
+> = {
+    'claude-code': ClaudeCodeOnboardingWizard,
+    gemini: GeminiOnboardingWizard,
+    'sim-ai': SimAiOnboardingWizard,
+};
 
 interface PluginSettingsProps {
     plugin: UserPlugin;
@@ -119,14 +142,10 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
     const showSetupButton =
         setupLink &&
         (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !displaySettings[f]));
-    const usesClaudeWizard =
-        plugin.pluginId === 'claude-code' && Boolean(plugin.uiHints?.onboardingWizard);
-
-    const usesGeminiWizard =
-        plugin.pluginId === 'gemini' && Boolean(plugin.uiHints?.onboardingWizard);
-    const usesSimAiWizard =
-        plugin.pluginId === 'sim-ai' && Boolean(plugin.uiHints?.onboardingWizard);
-    const usesCustomWizard = usesClaudeWizard || usesGeminiWizard || usesSimAiWizard;
+    const OnboardingWizard = plugin.uiHints?.onboardingWizard
+        ? WIZARD_COMPONENT_BY_PLUGIN_ID[plugin.pluginId]
+        : undefined;
+    const usesCustomWizard = Boolean(OnboardingWizard);
 
     return (
         <div className="space-y-6">
@@ -301,8 +320,8 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
 
                     <div className="p-6">
                         {usesCustomWizard ? (
-                            usesSimAiWizard ? (
-                                <SimAiOnboardingWizard
+                            OnboardingWizard ? (
+                                <OnboardingWizard
                                     pluginId={plugin.pluginId}
                                     visibleProperties={visibleProperties}
                                     getFieldValue={getFieldValue}
@@ -313,31 +332,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                                     validationError={validationError}
                                     saveMessage={saveMessage}
                                 />
-                            ) : usesGeminiWizard ? (
-                                <GeminiOnboardingWizard
-                                    pluginId={plugin.pluginId}
-                                    visibleProperties={visibleProperties}
-                                    getFieldValue={getFieldValue}
-                                    handleFieldChange={handleFieldChange}
-                                    handleSave={handleSave}
-                                    isSaving={isSaving}
-                                    saveSuccess={saveSuccess}
-                                    validationError={validationError}
-                                    saveMessage={saveMessage}
-                                />
-                            ) : (
-                                <ClaudeCodeOnboardingWizard
-                                    pluginId={plugin.pluginId}
-                                    visibleProperties={visibleProperties}
-                                    getFieldValue={getFieldValue}
-                                    handleFieldChange={handleFieldChange}
-                                    handleSave={handleSave}
-                                    isSaving={isSaving}
-                                    saveSuccess={saveSuccess}
-                                    validationError={validationError}
-                                    saveMessage={saveMessage}
-                                />
-                            )
+                            ) : null
                         ) : (
                             <div className="space-y-5">
                                 {plugin.uiHints?.byok && !byokRevealed && (

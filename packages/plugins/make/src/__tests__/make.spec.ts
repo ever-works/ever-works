@@ -264,8 +264,16 @@ describe('MakePlugin', () => {
 			expect(result.valid).toBe(true);
 		});
 
-		it('should fail when webhook mode is selected without URL', () => {
+		it('should allow webhook mode without a per-run URL so plugin defaults can be used', () => {
 			const result = plugin.validateFormInput({ execution_mode: 'webhook' });
+			expect(result.valid).toBe(true);
+		});
+
+		it('should fail when webhook mode receives an empty URL override', () => {
+			const result = plugin.validateFormInput({
+				execution_mode: 'webhook',
+				webhook_url: '   '
+			});
 			expect(result.valid).toBe(false);
 		});
 
@@ -551,6 +559,39 @@ describe('MakePlugin', () => {
 			});
 
 			expect(result.success).toBe(false);
+		});
+
+		it('should return cancelled when aborted during screenshot capture', async () => {
+			mockSuccessfulScenarioRun(fetchMock);
+			const abortController = new AbortController();
+			const screenshotFacade = {
+				isAvailable: () => true,
+				getSmartImage: vi.fn(async () => {
+					abortController.abort();
+					return { source: 'screenshot' };
+				})
+			};
+
+			const result = await plugin.execute(
+				createDirectory(),
+				createRequest({
+					config: {
+						execution_mode: 'scenario',
+						scenario_id: '42',
+						target_items: 50,
+						capture_screenshots: true
+					}
+				}),
+				createExisting(),
+				{
+					signal: abortController.signal,
+					execContext: { screenshotFacade } as never
+				}
+			);
+
+			expect(result.success).toBe(false);
+			expect(result.state?.isCancelled).toBe(true);
+			expect(screenshotFacade.getSmartImage).toHaveBeenCalled();
 		});
 
 		it('should track state during execution', async () => {

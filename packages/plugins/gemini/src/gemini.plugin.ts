@@ -509,6 +509,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				systemPrompt: 'Reply with the single word OK. Nothing else.',
 				cwd: workspacePath,
 				env: authEnv,
+				logger: this.context?.logger ?? console,
 				model: settings.model as string | undefined
 			});
 			killProcess = execution.kill;
@@ -667,6 +668,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 					systemPrompt,
 					cwd: workspacePath,
 					env: executionEnv,
+					logger,
 					model,
 					signal,
 					onStdoutLine,

@@ -166,12 +166,18 @@ export function getFormGroups(): FormFieldGroup[] {
 
 export function validateFormInput(values: Record<string, unknown>): ValidationResult {
 	const mode = (values.execution_mode as string | undefined) ?? 'scenario';
+	const webhookUrl = (values.webhook_url as string | undefined)?.trim();
 
 	if (mode === 'webhook') {
-		if (!values.webhook_url || typeof values.webhook_url !== 'string' || values.webhook_url.trim() === '') {
+		if (values.webhook_url !== undefined && (!webhookUrl || typeof values.webhook_url !== 'string')) {
 			return {
 				valid: false,
-				errors: [{ path: 'webhook_url', message: 'Webhook URL is required in webhook mode' }]
+				errors: [
+					{
+						path: 'webhook_url',
+						message: 'Webhook URL must be a non-empty string when provided'
+					}
+				]
 			};
 		}
 	}

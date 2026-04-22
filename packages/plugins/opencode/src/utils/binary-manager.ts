@@ -132,6 +132,43 @@ async function unzipArchive(archivePath: string, outputDir: string): Promise<voi
 	});
 }
 
+async function ensureUnzipAvailable(): Promise<void> {
+	await new Promise<void>((resolve, reject) => {
+		const child = spawn('unzip', ['-v'], {
+			stdio: ['ignore', 'ignore', 'ignore']
+		});
+
+		child.on('error', (error) => {
+			const message =
+				error instanceof Error && 'code' in error && error.code === 'ENOENT'
+					? 'OpenCode CLI extraction requires the system `unzip` binary, but it is not installed or not on PATH.'
+					: error instanceof Error
+						? error.message
+						: 'Unknown unzip availability error';
+
+			reject(
+				new Error(
+					`${message} Install \`unzip\` on the host before using the OpenCode plugin runtime installer.`
+				)
+			);
+		});
+
+		child.on('exit', (code) => {
+			if (code === 0) {
+				resolve();
+				return;
+			}
+
+			reject(
+				new Error(
+					`OpenCode CLI extraction requires a working system \`unzip\` binary. ` +
+						`\`unzip -v\` exited with code ${code}.`
+				)
+			);
+		});
+	});
+}
+
 async function resolveChecksum(
 	assets: readonly ReleaseAsset[],
 	archiveName: string,
@@ -195,6 +232,7 @@ export async function ensureBinary(
 			logger?.warn(`No checksum asset found for ${archiveName}; proceeding without checksum verification.`);
 		}
 
+		await ensureUnzipAvailable();
 		await unzipArchive(archivePath, tempDir);
 
 		const extractedBinaryPath = path.join(tempDir, 'opencode');

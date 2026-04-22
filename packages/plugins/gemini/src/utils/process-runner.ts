@@ -8,6 +8,7 @@ export interface ExecuteOptions {
 	readonly systemPrompt: string;
 	readonly cwd: string;
 	readonly env: Record<string, string>;
+	readonly logger?: Pick<Console, 'warn'>;
 	readonly model?: string;
 	readonly signal?: AbortSignal;
 	readonly onStdoutLine?: (line: string) => void;
@@ -21,6 +22,8 @@ export interface ExecuteResult {
 	readonly killed: boolean;
 	readonly duration: number;
 }
+
+let hasWarnedAboutYoloSandbox = false;
 
 export function executeGemini(options: ExecuteOptions): {
 	promise: Promise<ExecuteResult>;
@@ -46,6 +49,14 @@ export function executeGemini(options: ExecuteOptions): {
 		const mergedPrompt = `${options.systemPrompt.trim()}\n\n${options.prompt.trim()}`.trim();
 		// Keep automation non-interactive while forcing Gemini's own sandbox boundary on every run.
 		const args = ['-p', mergedPrompt, '--output-format', 'json', '--sandbox', '--approval-mode', 'yolo'];
+
+		if (!hasWarnedAboutYoloSandbox) {
+			hasWarnedAboutYoloSandbox = true;
+			options.logger?.warn(
+				'Gemini CLI is running with --sandbox and --approval-mode yolo. ' +
+					'Ensure the host sandbox boundary is available and enforced before using this automation path.'
+			);
+		}
 
 		if (options.model) {
 			args.push('--model', options.model);

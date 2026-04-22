@@ -10,6 +10,8 @@ interface Logger {
 	debug(message: string, ...args: unknown[]): void;
 }
 
+const installPromises = new Map<string, Promise<string>>();
+
 function runCommand(command: string, args: string[], cwd: string): Promise<void> {
 	return new Promise((resolve, reject) => {
 		const child = spawn(command, args, {
@@ -54,19 +56,34 @@ export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger
 		// continue with install
 	}
 
-	await fs.mkdir(installDir, { recursive: true });
-	await fs.writeFile(
-		path.join(installDir, 'package.json'),
-		JSON.stringify({ private: true, name: 'ever-works-gemini-runtime' }, null, 2),
-		'utf-8'
-	);
+	const existingInstall = installPromises.get(version);
+	if (existingInstall) {
+		return existingInstall;
+	}
 
-	const packageSpec = version === 'latest' ? GEMINI_NPM_PACKAGE : `${GEMINI_NPM_PACKAGE}@${version}`;
+	const installPromise = (async () => {
+		await fs.mkdir(installDir, { recursive: true });
+		await fs.writeFile(
+			path.join(installDir, 'package.json'),
+			JSON.stringify({ private: true, name: 'ever-works-gemini-runtime' }, null, 2),
+			'utf-8'
+		);
 
-	logger?.log(`Installing Gemini CLI (${packageSpec})...`);
-	await runCommand('npm', ['install', '--no-package-lock', '--silent', packageSpec], installDir);
+		const packageSpec = version === 'latest' ? GEMINI_NPM_PACKAGE : `${GEMINI_NPM_PACKAGE}@${version}`;
 
-	await fs.access(binaryPath, fs.constants.X_OK);
-	logger?.log(`Gemini CLI ready at ${binaryPath}`);
-	return binaryPath;
+		logger?.log(`Installing Gemini CLI (${packageSpec})...`);
+		await runCommand('npm', ['install', '--no-package-lock', '--silent', packageSpec], installDir);
+
+		await fs.access(binaryPath, fs.constants.X_OK);
+		logger?.log(`Gemini CLI ready at ${binaryPath}`);
+		return binaryPath;
+	})();
+
+	installPromises.set(version, installPromise);
+
+	try {
+		return await installPromise;
+	} finally {
+		installPromises.delete(version);
+	}
 }

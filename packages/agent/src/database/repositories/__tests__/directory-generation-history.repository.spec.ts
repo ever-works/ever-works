@@ -3,12 +3,33 @@ import { DirectoryGenerationHistoryRepository } from '../directory-generation-hi
 import { DirectoryGenerationHistory } from '@src/entities/directory-generation-history.entity';
 
 describe('DirectoryGenerationHistoryRepository', () => {
-    let repository: jest.Mocked<Pick<Repository<DirectoryGenerationHistory>, 'find'>>;
+    let queryBuilder: {
+        select: jest.Mock;
+        addSelect: jest.Mock;
+        where: jest.Mock;
+        andWhere: jest.Mock;
+        subQuery: jest.Mock;
+        from: jest.Mock;
+        getQuery: jest.Mock;
+        getRawMany: jest.Mock;
+    };
+    let repository: jest.Mocked<Pick<Repository<DirectoryGenerationHistory>, 'createQueryBuilder'>>;
     let service: DirectoryGenerationHistoryRepository;
 
     beforeEach(() => {
+        queryBuilder = {
+            select: jest.fn().mockReturnThis(),
+            addSelect: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            andWhere: jest.fn().mockReturnThis(),
+            subQuery: jest.fn().mockReturnThis(),
+            from: jest.fn().mockReturnThis(),
+            getQuery: jest.fn().mockReturnValue('SELECT 1'),
+            getRawMany: jest.fn(),
+        };
+
         repository = {
-            find: jest.fn(),
+            createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
         };
 
         service = new DirectoryGenerationHistoryRepository(
@@ -18,38 +39,25 @@ describe('DirectoryGenerationHistoryRepository', () => {
 
     it('returns early for an empty directory list', async () => {
         await expect(service.findLatestPositiveItemCounts([])).resolves.toEqual(new Map());
-        expect(repository.find).not.toHaveBeenCalled();
+        expect(repository.createQueryBuilder).not.toHaveBeenCalled();
     });
 
-    it('fetches history in bounded pages until every directory has a count', async () => {
-        repository.find
-            .mockResolvedValueOnce(
-                Array.from({ length: 20 }, (_, index) => ({
-                    directoryId: 'dir-a',
-                    totalItemsCount: 100 - index,
-                })) as DirectoryGenerationHistory[],
-            )
-            .mockResolvedValueOnce([
-                {
-                    directoryId: 'dir-b',
-                    totalItemsCount: 42,
-                },
-            ] as DirectoryGenerationHistory[]);
+    it('returns the latest positive item count for each requested directory in one query', async () => {
+        queryBuilder.getRawMany.mockResolvedValueOnce([
+            { directoryId: 'dir-a', totalItemsCount: 100 },
+            { directoryId: 'dir-b', totalItemsCount: '42' },
+        ]);
 
         const result = await service.findLatestPositiveItemCounts(['dir-a', 'dir-b']);
 
-        expect(repository.find).toHaveBeenNthCalledWith(1, {
-            where: expect.any(Object),
-            order: { startedAt: 'DESC', createdAt: 'DESC' },
-            take: 20,
-            skip: 0,
-        });
-        expect(repository.find).toHaveBeenNthCalledWith(2, {
-            where: expect.any(Object),
-            order: { startedAt: 'DESC', createdAt: 'DESC' },
-            take: 20,
-            skip: 20,
-        });
+        expect(repository.createQueryBuilder).toHaveBeenCalledWith('history');
+        expect(queryBuilder.where).toHaveBeenCalledWith(
+            'history.directoryId IN (:...directoryIds)',
+            {
+                directoryIds: ['dir-a', 'dir-b'],
+            },
+        );
+        expect(queryBuilder.getRawMany).toHaveBeenCalledTimes(1);
         expect(result).toEqual(
             new Map([
                 ['dir-a', 100],
@@ -59,22 +67,17 @@ describe('DirectoryGenerationHistoryRepository', () => {
     });
 
     it('deduplicates requested directory ids before querying', async () => {
-        repository.find.mockResolvedValueOnce([
-            {
-                directoryId: 'dir-a',
-                totalItemsCount: 7,
-            },
-        ] as DirectoryGenerationHistory[]);
+        queryBuilder.getRawMany.mockResolvedValueOnce([
+            { directoryId: 'dir-a', totalItemsCount: 7 },
+        ]);
 
         await service.findLatestPositiveItemCounts(['dir-a', 'dir-a']);
 
-        expect(repository.find).toHaveBeenCalledWith({
-            where: expect.objectContaining({
-                directoryId: expect.anything(),
-            }),
-            order: { startedAt: 'DESC', createdAt: 'DESC' },
-            take: 10,
-            skip: 0,
-        });
+        expect(queryBuilder.where).toHaveBeenCalledWith(
+            'history.directoryId IN (:...directoryIds)',
+            {
+                directoryIds: ['dir-a'],
+            },
+        );
     });
 });
