@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { pluginsAPI } from '@/lib/api/plugins';
+import { deviceAuthAPI } from '@/lib/api/plugins-capabilities/device-auth';
 import { oauthAPI, OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import { PluginSettings } from '@/components/plugins/PluginSettings';
 import { notFound } from 'next/navigation';
@@ -33,9 +34,22 @@ export default async function PluginDetailPage({ params }: PluginDetailPageProps
         }
     }
 
+    let deviceAuthStatus = null;
+    if (plugin.capabilities.includes('device-auth')) {
+        try {
+            deviceAuthStatus = await deviceAuthAPI.getStatus(plugin.pluginId);
+        } catch {
+            deviceAuthStatus = null;
+        }
+    }
+
     return (
         <div className="w-full">
-            <PluginSettings plugin={plugin} oauthConnection={oauthConnection} />
+            <PluginSettings
+                plugin={plugin}
+                oauthConnection={oauthConnection}
+                deviceAuthStatus={deviceAuthStatus}
+            />
         </div>
     );
 }

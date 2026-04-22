@@ -3,7 +3,8 @@ import { spawn, type ChildProcess } from 'child_process';
 import { MAX_BUFFER_SIZE, KILL_TIMEOUT_MS } from '../types.js';
 
 export interface ExecuteOptions {
-	readonly binaryPath: string;
+	readonly command: string;
+	readonly commandArgs: string[];
 	readonly prompt: string;
 	readonly systemPrompt: string;
 	readonly cwd: string;
@@ -51,15 +52,33 @@ export function executeGemini(options: ExecuteOptions): {
 			args.push('--model', options.model);
 		}
 
+		const passthroughEnvKeys = [
+			'HTTP_PROXY',
+			'HTTPS_PROXY',
+			'ALL_PROXY',
+			'NO_PROXY',
+			'SSL_CERT_FILE',
+			'SSL_CERT_DIR',
+			'NODE_EXTRA_CA_CERTS',
+			'GOOGLE_APPLICATION_CREDENTIALS',
+			'GOOGLE_API_USE_CLIENT_CERTIFICATE'
+		] as const;
+
 		const env: Record<string, string> = {
 			PATH: process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin',
 			HOME: process.env.HOME ?? os.homedir(),
 			TMPDIR: process.env.TMPDIR ?? os.tmpdir(),
-			NO_COLOR: '1',
-			...options.env
+			NO_COLOR: '1'
 		};
+		for (const key of passthroughEnvKeys) {
+			const value = process.env[key];
+			if (value) {
+				env[key] = value;
+			}
+		}
+		Object.assign(env, options.env);
 
-		childProcess = spawn(options.binaryPath, args, {
+		childProcess = spawn(options.command, [...options.commandArgs, ...args], {
 			cwd: options.cwd,
 			env,
 			stdio: ['ignore', 'pipe', 'pipe']

@@ -50,7 +50,7 @@ export const DEFAULT_CLI_VERSION = 'latest';
 /**
  * Default Gemini model
  */
-export const DEFAULT_MODEL = 'gemini-2.5-pro';
+export const DEFAULT_MODEL = 'gemini-2.5-flash';
 
 /**
  * Maximum stdout/stderr buffer size (10MB) to prevent OOM

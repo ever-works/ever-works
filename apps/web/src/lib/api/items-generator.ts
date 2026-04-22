@@ -44,7 +44,7 @@ export type {
 export interface ItemsGeneratorResponse {
     id: string;
     slug: string;
-    status: string;
+    status: 'success' | 'error' | 'pending' | 'skipped';
     message?: string;
 }
 

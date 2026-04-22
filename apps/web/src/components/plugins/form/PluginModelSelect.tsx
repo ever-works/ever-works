@@ -25,6 +25,53 @@ interface PluginModelSelectProps {
     disabled?: boolean;
 }
 
+type ModelLoadResult = {
+    models: AiModel[];
+    error: string | null;
+};
+
+const modelCache = new Map<string, AiModel[]>();
+const inFlightModelRequests = new Map<string, Promise<ModelLoadResult>>();
+
+async function loadPluginModels(
+    pluginId: string,
+    loadErrorMessage: string,
+): Promise<ModelLoadResult> {
+    const cached = modelCache.get(pluginId);
+    if (cached) {
+        return { models: cached, error: null };
+    }
+
+    const existingRequest = inFlightModelRequests.get(pluginId);
+    if (existingRequest) {
+        return existingRequest;
+    }
+
+    const request = fetchModels(pluginId)
+        .then((response) => {
+            if (response.success && Array.isArray(response.data)) {
+                const models = response.data as AiModel[];
+                modelCache.set(pluginId, models);
+                return { models, error: null };
+            }
+
+            return {
+                models: [],
+                error: response.error || loadErrorMessage,
+            };
+        })
+        .catch(() => ({
+            models: [],
+            error: loadErrorMessage,
+        }))
+        .finally(() => {
+            inFlightModelRequests.delete(pluginId);
+        });
+
+    inFlightModelRequests.set(pluginId, request);
+    return request;
+}
+
 export function PluginModelSelect({
     pluginId,
     value,
@@ -59,20 +106,29 @@ export function PluginModelSelect({
     useEffect(() => {
         if (!pluginId) return;
 
-        fetchModels(pluginId)
-            .then((response) => {
-                if (response.success && Array.isArray(response.data)) {
-                    setModels(response.data as any);
-                    setError(null);
-                } else {
-                    setError(response.error || t('loadError'));
-                }
-                setLoadedPluginId(pluginId);
-            })
-            .catch(() => {
-                setError(t('loadError'));
-                setLoadedPluginId(pluginId);
-            });
+        const cached = modelCache.get(pluginId);
+        if (cached) {
+            setModels(cached);
+            setError(null);
+            setLoadedPluginId(pluginId);
+            return;
+        }
+
+        let cancelled = false;
+
+        void loadPluginModels(pluginId, t('loadError')).then((result) => {
+            if (cancelled) {
+                return;
+            }
+
+            setModels(result.models);
+            setError(result.error);
+            setLoadedPluginId(pluginId);
+        });
+
+        return () => {
+            cancelled = true;
+        };
     }, [pluginId, t]);
 
     const loading = Boolean(pluginId) && loadedPluginId !== pluginId;

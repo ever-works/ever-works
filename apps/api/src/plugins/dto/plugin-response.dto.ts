@@ -217,6 +217,11 @@ export class UserPluginResponseDto extends PluginResponseDto implements UserPlug
 
     @ApiPropertyOptional({ description: 'User plugin entity ID' })
     userPluginId?: string;
+
+    @ApiPropertyOptional({
+        description: 'Generic connection/readiness status used by onboarding and settings UI',
+    })
+    connectionStatus?: UserPluginResponse['connectionStatus'];
 }
 
 /**

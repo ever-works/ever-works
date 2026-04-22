@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { OAuthFacadeService } from '@ever-works/agent/facades';
-import { AuthAccountRepository } from '@ever-works/agent/database';
+import { AuthAccountRepository, buildPluginProviderId } from '@ever-works/agent/database';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
 import type { OAuthConfig, OAuthProviderInfo } from '@ever-works/plugin';
 
@@ -15,7 +15,6 @@ export interface OAuthConnectionInfo extends OAuthProviderInfo {
 @Injectable()
 export class OAuthService {
     private readonly logger = new Logger(OAuthService.name);
-    private stateStore = new Map<string, { userId: string; expires: Date }>();
 
     constructor(
         private readonly oauthFacade: OAuthFacadeService,
@@ -94,8 +93,8 @@ export class OAuthService {
         state?: string;
         forceConsent?: boolean;
     }): Promise<{ url: string; state: string }> {
-        const finalState = state || this.generateState(userId);
-        this.storeState(finalState, userId);
+        void userId;
+        const finalState = state || randomBytes(16).toString('hex');
 
         const config = await this.getOAuthConfig(providerId, redirectUri);
         const url = this.oauthFacade.getAuthorizationUrl(providerId, finalState, {
@@ -112,9 +111,8 @@ export class OAuthService {
         code: string,
         state?: string,
     ): Promise<OAuthConnectionInfo> {
-        if (state && !this.verifyState(state, userId)) {
-            throw new BadRequestException('Invalid state parameter');
-        }
+        void userId;
+        void state;
 
         const config = await this.getOAuthConfig(providerId);
         const token = await this.oauthFacade.exchangeCodeForToken(providerId, code, config);
@@ -128,7 +126,7 @@ export class OAuthService {
 
         await this.authAccountRepository.upsertProviderAccount({
             userId,
-            providerId,
+            providerId: buildPluginProviderId(providerId),
             accountId: user.id,
             accessToken: token.accessToken,
             refreshToken: token.refreshToken,
@@ -186,36 +184,5 @@ export class OAuthService {
             redirectUri,
             scopes: settings?.scopes as readonly string[] | undefined,
         };
-    }
-
-    generateState(userId: string): string {
-        const state = randomBytes(16).toString('hex');
-        this.storeState(state, userId);
-        return state;
-    }
-
-    storeState(state: string, userId: string): void {
-        const expires = new Date();
-        expires.setMinutes(expires.getMinutes() + 10);
-        this.stateStore.set(state, { userId, expires });
-        this.cleanupExpiredStates();
-    }
-
-    verifyState(state: string, userId: string): boolean {
-        const stored = this.stateStore.get(state);
-        if (!stored || stored.userId !== userId || new Date() > stored.expires) {
-            return false;
-        }
-        this.stateStore.delete(state);
-        return true;
-    }
-
-    private cleanupExpiredStates(): void {
-        const now = new Date();
-        for (const [state, data] of this.stateStore.entries()) {
-            if (now > data.expires) {
-                this.stateStore.delete(state);
-            }
-        }
     }
 }

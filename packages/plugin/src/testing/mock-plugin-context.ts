@@ -11,7 +11,13 @@ import type {
 	UserInfo
 } from '../contracts/plugin-context.interface.js';
 import type { EnvironmentVariables } from '../contracts/plugin-environment.interface.js';
-import type { PluginSettings, ResolvedSettings, SettingScope, ResolvedSetting } from '../settings/settings.types.js';
+import type {
+	PluginSettings,
+	PluginSettingsWrite,
+	ResolvedSettings,
+	SettingScope,
+	ResolvedSetting
+} from '../settings/settings.types.js';
 import type { PluginEventName, PluginEventPayloads, EventHandler, EventSubscription } from '../events/event-types.js';
 import {
 	createMockPluginEnvironment,
@@ -236,6 +242,14 @@ export function createMockPluginContext(options: MockPluginContextOptions = {}):
 				};
 			}
 			return resolved;
+		},
+
+		async updateSettings(
+			_scope: 'user' | 'directory',
+			_scopeId: string | undefined,
+			data: PluginSettingsWrite
+		): Promise<void> {
+			Object.assign(settings, data.settings ?? {}, data.secretSettings ?? {});
 		},
 
 		onEvent<T extends PluginEventName>(event: T, handler: EventHandler<T>): EventSubscription {

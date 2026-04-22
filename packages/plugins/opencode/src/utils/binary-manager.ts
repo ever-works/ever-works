@@ -3,8 +3,9 @@ import * as path from 'path';
 import * as os from 'os';
 import * as http from 'http';
 import * as https from 'https';
-import { spawn } from 'child_process';
 import { createHash } from 'node:crypto';
+import extractZip from 'extract-zip';
+import * as tar from 'tar';
 import { detectPlatform, getBinaryPath } from './platform.js';
 import { DEFAULT_CLI_VERSION, OPENCODE_GITHUB_REPO } from '../types.js';
 
@@ -18,6 +19,7 @@ interface Logger {
 interface ReleaseAsset {
 	readonly name: string;
 	readonly browser_download_url: string;
+	readonly digest?: string;
 }
 
 interface ReleaseResponse {
@@ -94,12 +96,15 @@ function getArchiveName(platformString: string): string {
 		case 'darwin-x64':
 			return 'opencode-darwin-x64.zip';
 		case 'linux-arm64':
+			return 'opencode-linux-arm64.tar.gz';
 		case 'linux-arm64-musl':
-			// OpenCode ships glibc Linux archives; fall back to the glibc archive on musl (Alpine).
-			return 'opencode-linux-arm64.zip';
+			return 'opencode-linux-arm64-musl.tar.gz';
 		case 'linux-x64':
+			return 'opencode-linux-x64.tar.gz';
 		case 'linux-x64-musl':
-			return 'opencode-linux-x64.zip';
+			return 'opencode-linux-x64-musl.tar.gz';
+		case 'windows-x64':
+			return 'opencode-windows-x64.zip';
 		default:
 			throw new Error(`Unsupported OpenCode binary platform: ${platformString}`);
 	}
@@ -111,25 +116,28 @@ async function verifySha256(filePath: string, checksum: string): Promise<boolean
 }
 
 async function unzipArchive(archivePath: string, outputDir: string): Promise<void> {
-	await new Promise<void>((resolve, reject) => {
-		const child = spawn('unzip', ['-o', archivePath, '-d', outputDir], {
-			stdio: ['ignore', 'ignore', 'pipe']
-		});
+	await extractZip(archivePath, { dir: outputDir });
+}
 
-		let stderr = '';
-		child.stderr?.on('data', (chunk: Buffer) => {
-			stderr += chunk.toString('utf-8');
-		});
-
-		child.on('error', reject);
-		child.on('exit', (code) => {
-			if (code === 0) {
-				resolve();
-				return;
-			}
-			reject(new Error(stderr.trim() || `unzip failed with exit code ${code}`));
-		});
+async function extractTarGzArchive(archivePath: string, outputDir: string): Promise<void> {
+	await tar.x({
+		file: archivePath,
+		cwd: outputDir
 	});
+}
+
+async function extractArchive(archivePath: string, outputDir: string): Promise<void> {
+	if (archivePath.endsWith('.zip')) {
+		await unzipArchive(archivePath, outputDir);
+		return;
+	}
+
+	if (archivePath.endsWith('.tar.gz')) {
+		await extractTarGzArchive(archivePath, outputDir);
+		return;
+	}
+
+	throw new Error(`Unsupported OpenCode archive format: ${path.basename(archivePath)}`);
 }
 
 async function resolveChecksum(
@@ -137,6 +145,12 @@ async function resolveChecksum(
 	archiveName: string,
 	signal?: AbortSignal
 ): Promise<string | null> {
+	const archiveAsset = assets.find((asset) => asset.name === archiveName);
+	const digest = archiveAsset?.digest?.trim();
+	if (digest?.startsWith('sha256:')) {
+		return digest.slice('sha256:'.length);
+	}
+
 	const checksumAsset = assets.find((asset) => asset.name === `${archiveName}.sha256`);
 	if (!checksumAsset) {
 		return null;
@@ -195,7 +209,7 @@ export async function ensureBinary(
 			logger?.warn(`No checksum asset found for ${archiveName}; proceeding without checksum verification.`);
 		}
 
-		await unzipArchive(archivePath, tempDir);
+		await extractArchive(archivePath, tempDir);
 
 		const extractedBinaryPath = path.join(tempDir, 'opencode');
 		await fs.access(extractedBinaryPath, fs.constants.X_OK);

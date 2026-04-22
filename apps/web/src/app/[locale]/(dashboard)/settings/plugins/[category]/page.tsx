@@ -1,5 +1,9 @@
 import type { Metadata } from 'next';
 import { pluginsAPI } from '@/lib/api/plugins';
+import {
+    deviceAuthAPI,
+    type PluginDeviceAuthStatus,
+} from '@/lib/api/plugins-capabilities/device-auth';
 import { oauthAPI, OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
@@ -41,9 +45,10 @@ export default async function PluginCategoryPage({ params }: PageProps) {
     }
 
     // Fetch OAuth connections for plugins with oauth capability
-    const pluginsWithOAuth = await Promise.all(
+    const pluginsWithConnections = await Promise.all(
         plugins.map(async (plugin) => {
             let oauthConnection: OAuthConnectionInfo | null = null;
+            let deviceAuthStatus: PluginDeviceAuthStatus | null = null;
             if (plugin.capabilities.includes('oauth')) {
                 try {
                     oauthConnection = await oauthAPI.checkConnection(plugin.pluginId);
@@ -52,13 +57,22 @@ export default async function PluginCategoryPage({ params }: PageProps) {
                     oauthConnection = null;
                 }
             }
-            return { plugin, oauthConnection };
+
+            if (plugin.capabilities.includes('device-auth')) {
+                try {
+                    deviceAuthStatus = await deviceAuthAPI.getStatus(plugin.pluginId);
+                } catch {
+                    deviceAuthStatus = null;
+                }
+            }
+
+            return { plugin, oauthConnection, deviceAuthStatus };
         }),
     );
 
     const categoryLabel = getCategoryLabel(category);
 
-    const isSinglePlugin = pluginsWithOAuth.length === 1;
+    const isSinglePlugin = pluginsWithConnections.length === 1;
 
     return (
         <div className="space-y-6">
@@ -75,11 +89,12 @@ export default async function PluginCategoryPage({ params }: PageProps) {
             {category === 'pipeline' && <PipelineDefaultSelector plugins={plugins} />}
 
             <div className="space-y-3">
-                {pluginsWithOAuth.map(({ plugin, oauthConnection }) => (
+                {pluginsWithConnections.map(({ plugin, oauthConnection, deviceAuthStatus }) => (
                     <PluginSettingsInline
                         key={plugin.pluginId}
                         plugin={plugin}
                         oauthConnection={oauthConnection}
+                        deviceAuthStatus={deviceAuthStatus}
                         defaultExpanded={isSinglePlugin}
                     />
                 ))}
