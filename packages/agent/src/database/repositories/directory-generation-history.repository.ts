@@ -126,6 +126,68 @@ export class DirectoryGenerationHistoryRepository {
         return this.repository.findOne({ where: { id } });
     }
 
+    async findLatestInProgressByDirectory(
+        directoryId: string,
+    ): Promise<DirectoryGenerationHistory | null> {
+        return this.repository.findOne({
+            where: {
+                directoryId,
+                status: GenerateStatusType.GENERATING,
+            },
+            order: { startedAt: 'DESC', createdAt: 'DESC' },
+        });
+    }
+
+    async findLatestPositiveItemCounts(directoryIds: string[]): Promise<Map<string, number>> {
+        const uniqueDirectoryIds = Array.from(new Set(directoryIds));
+        if (uniqueDirectoryIds.length === 0) {
+            return new Map();
+        }
+
+        const rows = await this.repository
+            .createQueryBuilder('history')
+            .select('history.directoryId', 'directoryId')
+            .addSelect('history.totalItemsCount', 'totalItemsCount')
+            .where('history.directoryId IN (:...directoryIds)', {
+                directoryIds: uniqueDirectoryIds,
+            })
+            .andWhere('history.totalItemsCount > 0')
+            .andWhere((queryBuilder) => {
+                const subQuery = queryBuilder
+                    .subQuery()
+                    .select('1')
+                    .from(DirectoryGenerationHistory, 'newer')
+                    .where('newer.directoryId = history.directoryId')
+                    .andWhere('newer.totalItemsCount > 0')
+                    .andWhere(
+                        `(
+                            newer.startedAt > history.startedAt
+                            OR (
+                                newer.startedAt = history.startedAt
+                                AND newer.createdAt > history.createdAt
+                            )
+                        )`,
+                    )
+                    .getQuery();
+
+                return `NOT EXISTS ${subQuery}`;
+            })
+            .getRawMany<{ directoryId: string; totalItemsCount: string | number }>();
+
+        const counts = new Map<string, number>();
+        for (const row of rows) {
+            const current = counts.get(row.directoryId);
+            const totalItemsCount = Number(row.totalItemsCount);
+
+            // If multiple rows tie on timestamps, keep the largest positive count deterministically.
+            if (current === undefined || totalItemsCount > current) {
+                counts.set(row.directoryId, totalItemsCount);
+            }
+        }
+
+        return counts;
+    }
+
     async appendLogs(id: string, newLogs: GenerationStepLog[]): Promise<void> {
         if (!newLogs.length) return;
 

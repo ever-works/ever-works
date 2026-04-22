@@ -26,6 +26,11 @@ type DeviceAuthSession = {
 
 const sessionByUser = new Map<string, DeviceAuthSession>();
 const lastFailureByUser = new Map<string, string>();
+const DEVICE_AUTH_PROMPT_DISCOVERY_TIMEOUT_MS = 30_000;
+const DEVICE_AUTH_SESSION_TIMEOUT_MS = 10 * 60 * 1000;
+const DEVICE_AUTH_PROMPT_POLL_INTERVAL_MS = 100;
+const DEVICE_AUTH_EXPIRED_MESSAGE =
+	'Codex device authentication expired before it was completed. Restart the device-auth flow.';
 
 function getBinaryLogger(logger?: LoggerLike) {
 	if (!logger) {
@@ -204,7 +209,7 @@ export async function startDeviceAuth(userId: string, logger?: LoggerLike): Prom
 		disposeSession(userId);
 	});
 
-	const ready = await waitForDevicePrompt(session, 5000);
+	const ready = await waitForDevicePrompt(session, DEVICE_AUTH_PROMPT_DISCOVERY_TIMEOUT_MS);
 	if (!ready) {
 		if (session.status === 'failed') {
 			return {
@@ -266,7 +271,7 @@ async function waitForDevicePrompt(session: DeviceAuthSession, timeoutMs: number
 			return false;
 		}
 
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await new Promise((resolve) => setTimeout(resolve, DEVICE_AUTH_PROMPT_POLL_INTERVAL_MS));
 	}
 
 	return false;
@@ -342,12 +347,34 @@ function getActiveSession(userId: string): DeviceAuthSession | undefined {
 		return undefined;
 	}
 
+	if (isExpiredSession(session)) {
+		expireSession(userId, DEVICE_AUTH_EXPIRED_MESSAGE);
+		return undefined;
+	}
+
 	if (session.process.killed || session.status === 'failed') {
 		sessionByUser.delete(userId);
 		return undefined;
 	}
 
 	return session;
+}
+
+function isExpiredSession(session: DeviceAuthSession): boolean {
+	return session.status === 'pending' && Date.now() - session.startedAt > DEVICE_AUTH_SESSION_TIMEOUT_MS;
+}
+
+function expireSession(userId: string, message: string): void {
+	const session = sessionByUser.get(userId);
+	if (!session) {
+		lastFailureByUser.set(userId, message);
+		return;
+	}
+
+	session.status = 'failed';
+	session.error = message;
+	lastFailureByUser.set(userId, message);
+	disposeSession(userId);
 }
 
 function disposeSession(userId: string): void {

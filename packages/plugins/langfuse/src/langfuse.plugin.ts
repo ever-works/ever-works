@@ -55,8 +55,29 @@ Each prompt uses \`{variable}\` placeholders that are substituted at runtime.
 
 | Key | Description | Variables |
 |-----|-------------|-----------|
-| \`claude-code.system\` | Claude Code system prompt | \`{workspacePath}\`, \`{date}\`, \`{itemSchemaText}\`, \`{existingCount}\`, \`{existingItemsSection}\`, \`{modificationSection}\`, \`{targetItems}\`, \`{directorySection}\` |
+| \`claude-code.system\` | Claude Code system prompt | \`{workspacePath}\`, \`{date}\`, \`{itemSchemaText}\`, \`{existingItemsSection}\`, \`{modificationSection}\`, \`{targetItems}\`, \`{directorySection}\` |
 | \`claude-code.user\` | Claude Code user prompt | \`{userInstruction}\`, \`{directoryDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
+
+### Gemini
+
+| Key | Description | Variables |
+|-----|-------------|-----------|
+| \`gemini.system\` | Gemini CLI system prompt | \`{workspacePath}\`, \`{date}\`, \`{itemSchemaText}\`, \`{existingItemsSection}\`, \`{modificationSection}\`, \`{targetItems}\`, \`{directorySection}\` |
+| \`gemini.user\` | Gemini CLI user prompt | \`{userInstruction}\`, \`{directoryDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
+
+### OpenCode
+
+| Key | Description | Variables |
+|-----|-------------|-----------|
+| \`opencode.system\` | OpenCode system prompt | \`{workspacePath}\`, \`{date}\`, \`{itemSchemaText}\`, \`{existingItemsSection}\`, \`{modificationSection}\`, \`{targetItems}\`, \`{directorySection}\` |
+| \`opencode.user\` | OpenCode user prompt | \`{userInstruction}\`, \`{directoryDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
+
+### Codex
+
+| Key | Description | Variables |
+|-----|-------------|-----------|
+| \`codex.system\` | Codex system prompt | \`{workspacePath}\`, \`{date}\`, \`{itemSchemaText}\`, \`{existingItemsSection}\`, \`{directorySection}\`, \`{targetItems}\` |
+| \`codex.user\` | Codex user prompt | \`{userInstruction}\`, \`{directoryDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
 
 ### Comparison Generator
 

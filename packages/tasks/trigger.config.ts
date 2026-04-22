@@ -7,7 +7,7 @@ const canRetry = process.env.TRIGGER_DEV_ENABLE_RETRIES === 'true';
 
 export default defineConfig({
     project: 'proj_uevrbfmpvojzzazvhffy',
-    runtime: 'node',
+    runtime: 'node-22',
     logLevel: 'log',
     // The max compute seconds a task is allowed to run. If the task run exceeds this duration, it will be stopped.
     // You can override this on an individual task.

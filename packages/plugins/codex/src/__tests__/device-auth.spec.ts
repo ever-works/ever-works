@@ -36,6 +36,7 @@ class MockChildProcess extends EventEmitter {
 
 describe('device-auth', () => {
 	beforeEach(() => {
+		vi.useRealTimers();
 		process.env.EVER_WORKS_DATA_DIR = path.join(process.cwd(), '.tmp', 'ever-works-device-auth-test');
 		spawnMock.mockReset();
 		spawnMock.mockImplementation((command: string, args: string[]) => {
@@ -63,6 +64,7 @@ describe('device-auth', () => {
 	});
 
 	afterEach(async () => {
+		vi.useRealTimers();
 		delete process.env.EVER_WORKS_DATA_DIR;
 		await fs
 			.rm(path.join(process.cwd(), '.tmp', 'ever-works-device-auth-test'), {
@@ -108,5 +110,29 @@ describe('device-auth', () => {
 				})
 			})
 		);
+	});
+
+	it('expires pending device-auth sessions that are never completed', async () => {
+		const userId = 'user-device-auth-expired';
+		const { startDeviceAuth, getDeviceAuthStatus } = await import('../device-auth.js');
+		const startedAt = Date.now();
+		const startResult = await startDeviceAuth(userId);
+
+		expect(startResult.pending).toBe(true);
+		expect(startResult.prompt?.userCode).toBe('ABCD-EFGH');
+
+		const loginCallIndex = spawnMock.mock.calls.findIndex(
+			(call) => call[1]?.[0] === 'login' && call[1]?.[1] === '--device-auth'
+		);
+		const loginChild = spawnMock.mock.results[loginCallIndex]?.value as MockChildProcess | undefined;
+
+		const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(startedAt + 11 * 60 * 1000);
+		const expiredStatus = await getDeviceAuthStatus(userId);
+		nowSpy.mockRestore();
+
+		expect(expiredStatus.pending).toBe(false);
+		expect(expiredStatus.connected).toBe(false);
+		expect(expiredStatus.message).toContain('expired');
+		expect(loginChild?.kill).toHaveBeenCalled();
 	});
 });
