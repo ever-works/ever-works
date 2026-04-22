@@ -393,7 +393,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 					prompt: this.buildCombinedPrompt(systemPrompt, userPrompt),
 					cwd: workspacePath,
 					env: sessionConfig.env,
-					model: modelName,
+					model: sessionConfig.model,
 					signal,
 					onStdoutLine,
 					onStderrLine

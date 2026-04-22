@@ -10,6 +10,7 @@ export interface OpenCodeSessionConfig {
 	readonly sessionDir: string;
 	readonly configDir: string;
 	readonly env: Record<string, string>;
+	readonly model: string;
 }
 
 function getSessionRoot(userId: string, directoryId: string): string {
@@ -55,6 +56,10 @@ function buildConfig(providerConfig: AiProviderConfig, model: string) {
 	};
 }
 
+function buildQualifiedModel(model: string): string {
+	return `${OPENCODE_PROVIDER_ID}/${model}`;
+}
+
 export async function prepareOpenCodeSessionConfig(options: {
 	userId: string;
 	directoryId: string;
@@ -67,6 +72,7 @@ export async function prepareOpenCodeSessionConfig(options: {
 	const sessionDir = path.join(sessionRoot, `run-${randomUUID()}`);
 	const configDir = path.join(sessionDir, 'config');
 	const dataHome = path.join(sessionDir, 'data');
+	const qualifiedModel = buildQualifiedModel(model);
 
 	await fs.mkdir(configDir, { recursive: true });
 	await fs.mkdir(path.join(dataHome, 'opencode'), { recursive: true });
@@ -77,6 +83,7 @@ export async function prepareOpenCodeSessionConfig(options: {
 	return {
 		sessionDir,
 		configDir,
+		model: qualifiedModel,
 		env: {
 			HOME: sessionDir,
 			XDG_DATA_HOME: dataHome,

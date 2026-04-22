@@ -19,6 +19,7 @@ interface Logger {
 interface ReleaseAsset {
 	readonly name: string;
 	readonly browser_download_url: string;
+	readonly digest?: string;
 }
 
 interface ReleaseResponse {
@@ -144,6 +145,12 @@ async function resolveChecksum(
 	archiveName: string,
 	signal?: AbortSignal
 ): Promise<string | null> {
+	const archiveAsset = assets.find((asset) => asset.name === archiveName);
+	const digest = archiveAsset?.digest?.trim();
+	if (digest?.startsWith('sha256:')) {
+		return digest.slice('sha256:'.length);
+	}
+
 	const checksumAsset = assets.find((asset) => asset.name === `${archiveName}.sha256`);
 	if (!checksumAsset) {
 		return null;

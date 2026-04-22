@@ -35,6 +35,7 @@ describe('opencode-config', () => {
 			provider: Record<string, { options: { apiKey: string } }>;
 		};
 
+		expect(session.model).toBe('everworks/gemini-2.5-flash');
 		expect(config.model).toBe('everworks/gemini-2.5-flash');
 		expect(config.small_model).toBe('everworks/gemini-2.5-flash');
 		expect(config.provider.everworks.options.apiKey).toBe('{env:OPENCODE_PROVIDER_API_KEY}');
