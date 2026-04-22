@@ -166,9 +166,11 @@ export function getFormGroups(): FormFieldGroup[] {
 
 export function validateFormInput(values: Record<string, unknown>): ValidationResult {
 	const mode = (values.execution_mode as string | undefined) ?? 'scenario';
-	const webhookUrl = (values.webhook_url as string | undefined)?.trim();
 
 	if (mode === 'webhook') {
+		const rawWebhookUrl = values.webhook_url;
+		const webhookUrl = typeof rawWebhookUrl === 'string' ? rawWebhookUrl.trim() : undefined;
+
 		if (values.webhook_url !== undefined && (!webhookUrl || typeof values.webhook_url !== 'string')) {
 			return {
 				valid: false,

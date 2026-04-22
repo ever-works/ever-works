@@ -50,12 +50,12 @@ export function executeGemini(options: ExecuteOptions): {
 		// Keep automation non-interactive while forcing Gemini's own sandbox boundary on every run.
 		const args = ['-p', mergedPrompt, '--output-format', 'json', '--sandbox', '--approval-mode', 'yolo'];
 
-		if (!hasWarnedAboutYoloSandbox) {
-			hasWarnedAboutYoloSandbox = true;
-			options.logger?.warn(
+		if (!hasWarnedAboutYoloSandbox && options.logger) {
+			options.logger.warn(
 				'Gemini CLI is running with --sandbox and --approval-mode yolo. ' +
 					'Ensure the host sandbox boundary is available and enforced before using this automation path.'
 			);
+			hasWarnedAboutYoloSandbox = true;
 		}
 
 		if (options.model) {

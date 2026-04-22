@@ -277,6 +277,14 @@ describe('MakePlugin', () => {
 			expect(result.valid).toBe(false);
 		});
 
+		it('should fail gracefully when webhook mode receives a non-string URL override', () => {
+			const result = plugin.validateFormInput({
+				execution_mode: 'webhook',
+				webhook_url: 123
+			});
+			expect(result.valid).toBe(false);
+		});
+
 		it('should pass when webhook mode has a URL', () => {
 			const result = plugin.validateFormInput({
 				execution_mode: 'webhook',

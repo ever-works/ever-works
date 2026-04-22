@@ -166,11 +166,6 @@ export class DirectoryGenerationHistoryRepository {
                                 newer.startedAt = history.startedAt
                                 AND newer.createdAt > history.createdAt
                             )
-                            OR (
-                                newer.startedAt = history.startedAt
-                                AND newer.createdAt = history.createdAt
-                                AND newer.id > history.id
-                            )
                         )`,
                     )
                     .getQuery();
@@ -179,11 +174,18 @@ export class DirectoryGenerationHistoryRepository {
             })
             .getRawMany<{ directoryId: string; totalItemsCount: string | number }>();
 
-        return new Map(
-            rows.map(
-                (row) => [row.directoryId, Number(row.totalItemsCount)] satisfies [string, number],
-            ),
-        );
+        const counts = new Map<string, number>();
+        for (const row of rows) {
+            const current = counts.get(row.directoryId);
+            const totalItemsCount = Number(row.totalItemsCount);
+
+            // If multiple rows tie on timestamps, keep the largest positive count deterministically.
+            if (current === undefined || totalItemsCount > current) {
+                counts.set(row.directoryId, totalItemsCount);
+            }
+        }
+
+        return counts;
     }
 
     async appendLogs(id: string, newLogs: GenerationStepLog[]): Promise<void> {

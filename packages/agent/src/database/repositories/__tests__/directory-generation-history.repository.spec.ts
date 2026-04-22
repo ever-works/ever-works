@@ -80,4 +80,15 @@ describe('DirectoryGenerationHistoryRepository', () => {
             },
         );
     });
+
+    it('uses the largest positive count when multiple latest rows tie on timestamps', async () => {
+        queryBuilder.getRawMany.mockResolvedValueOnce([
+            { directoryId: 'dir-a', totalItemsCount: 7 },
+            { directoryId: 'dir-a', totalItemsCount: 11 },
+        ]);
+
+        const result = await service.findLatestPositiveItemCounts(['dir-a']);
+
+        expect(result).toEqual(new Map([['dir-a', 11]]));
+    });
 });
