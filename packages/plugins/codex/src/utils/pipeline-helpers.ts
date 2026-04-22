@@ -16,17 +16,17 @@ import { buildCancelledPipelineResult, buildErrorPipelineResult, createEmptyPipe
 import type { CodexStepId } from '../types.js';
 import { CODEX_STEP_IDS } from '../types.js';
 import { STEP_DEFINITIONS } from '../steps.js';
-import { verifyLocalAuthConnection } from '../local-auth.js';
+import { verifyDeviceAuthConnection } from '../device-auth.js';
 import { resolveCodexHome } from './codex-home.js';
 export { getManagedCodexHome, resolveCodexHome } from './codex-home.js';
 
 export interface ResolvedExecutionAuth {
 	readonly env: Record<string, string>;
-	readonly mode: 'api-key' | 'local';
+	readonly mode: 'api-key' | 'device-auth';
 	readonly codexHome?: string;
 }
 
-export interface LocalAuthResolutionOptions {
+export interface DeviceAuthResolutionOptions {
 	readonly allowHostFallback?: boolean;
 }
 
@@ -37,7 +37,7 @@ function hasConfiguredCodexHome(settings: PluginSettings): boolean {
 function shouldUseHostFallback(
 	settings: PluginSettings,
 	userId: string | undefined,
-	options?: LocalAuthResolutionOptions
+	options?: DeviceAuthResolutionOptions
 ): boolean {
 	if (userId || hasConfiguredCodexHome(settings)) {
 		return true;
@@ -162,10 +162,10 @@ export async function resolveSettings(
 	}
 }
 
-export async function hasLocalCodexAuth(
+export async function hasDeviceCodexAuth(
 	settings: PluginSettings,
 	userId?: string,
-	options?: LocalAuthResolutionOptions
+	options?: DeviceAuthResolutionOptions
 ): Promise<boolean> {
 	if (!shouldUseHostFallback(settings, userId, options)) {
 		return false;
@@ -182,13 +182,13 @@ export async function hasLocalCodexAuth(
 		// Fall back to Codex CLI status below.
 	}
 
-	return verifyLocalAuthConnection(codexHome);
+	return verifyDeviceAuthConnection(codexHome);
 }
 
 export async function resolveExecutionAuth(
 	settings: PluginSettings,
 	userId?: string,
-	options?: LocalAuthResolutionOptions
+	options?: DeviceAuthResolutionOptions
 ): Promise<ResolvedExecutionAuth | null> {
 	const authMode = typeof settings.authMode === 'string' ? settings.authMode : undefined;
 	const apiKey = typeof settings.apiKey === 'string' ? settings.apiKey.trim() : '';
@@ -200,14 +200,17 @@ export async function resolveExecutionAuth(
 		};
 	}
 
-	if (authMode === 'local') {
+	if (authMode === 'device-auth') {
 		if (!shouldUseHostFallback(settings, userId, options)) {
 			return null;
 		}
 
 		const codexHome = resolveCodexHome(settings, userId);
+		if (!(await verifyDeviceAuthConnection(codexHome))) {
+			return null;
+		}
 		return {
-			mode: 'local',
+			mode: 'device-auth',
 			codexHome,
 			env: {
 				CODEX_HOME: codexHome
@@ -222,10 +225,10 @@ export async function resolveExecutionAuth(
 		};
 	}
 
-	if (await hasLocalCodexAuth(settings, userId, options)) {
+	if (await hasDeviceCodexAuth(settings, userId, options)) {
 		const codexHome = resolveCodexHome(settings, userId);
 		return {
-			mode: 'local',
+			mode: 'device-auth',
 			codexHome,
 			env: {
 				CODEX_HOME: codexHome

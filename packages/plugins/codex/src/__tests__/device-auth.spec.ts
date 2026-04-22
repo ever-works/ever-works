@@ -34,9 +34,9 @@ class MockChildProcess extends EventEmitter {
 	});
 }
 
-describe('local-auth', () => {
+describe('device-auth', () => {
 	beforeEach(() => {
-		process.env.EVER_WORKS_DATA_DIR = path.join(process.cwd(), '.tmp', 'ever-works-local-auth-test');
+		process.env.EVER_WORKS_DATA_DIR = path.join(process.cwd(), '.tmp', 'ever-works-device-auth-test');
 		spawnMock.mockReset();
 		spawnMock.mockImplementation((command: string, args: string[]) => {
 			const child = new MockChildProcess();
@@ -65,37 +65,39 @@ describe('local-auth', () => {
 	afterEach(async () => {
 		delete process.env.EVER_WORKS_DATA_DIR;
 		await fs
-			.rm(path.join(process.cwd(), '.tmp', 'ever-works-local-auth-test'), {
+			.rm(path.join(process.cwd(), '.tmp', 'ever-works-device-auth-test'), {
 				recursive: true,
 				force: true
 			})
 			.catch(() => undefined);
 	});
 
-	it('returns a managed per-user auth path for local auth status', async () => {
+	it('returns a user-scoped status for managed device auth', async () => {
 		const userId = 'user-status';
 		const codexHome = getManagedCodexHome(userId);
 		await fs.mkdir(codexHome, { recursive: true });
 		await fs.writeFile(path.join(codexHome, 'auth.json'), '{"ok":true}', 'utf-8');
 
-		const { getLocalAuthStatus } = await import('../local-auth.js');
-		const result = await getLocalAuthStatus(userId);
+		const { getDeviceAuthStatus } = await import('../device-auth.js');
+		const result = await getDeviceAuthStatus(userId);
 
 		expect(result.connected).toBe(true);
-		expect(result.scope).toBe('machine-local');
+		expect(result.scope).toBe('user');
+		expect(result.flowType).toBe('device-code');
 	});
 
 	it('starts device auth with a managed per-user CODEX_HOME', async () => {
 		const userId = 'user-device-auth';
 		const codexHome = getManagedCodexHome(userId);
 
-		const { startLocalAuth } = await import('../local-auth.js');
-		const result = await startLocalAuth(userId);
+		const { startDeviceAuth } = await import('../device-auth.js');
+		const result = await startDeviceAuth(userId);
 
 		expect(result.pending).toBe(true);
-		expect(result.scope).toBe('machine-local');
-		expect(result.verificationUri).toBe('https://auth.openai.com/codex/device');
-		expect(result.userCode).toBe('ABCD-EFGH');
+		expect(result.scope).toBe('user');
+		expect(result.flowType).toBe('device-code');
+		expect(result.prompt?.verificationUri).toBe('https://auth.openai.com/codex/device');
+		expect(result.prompt?.userCode).toBe('ABCD-EFGH');
 
 		expect(spawnMock).toHaveBeenCalledWith(
 			'/tmp/codex-generator/bin/codex',

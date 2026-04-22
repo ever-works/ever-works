@@ -17,7 +17,7 @@ vi.mock('../utils/pipeline-helpers.js', async () => {
 		...actual,
 		resolveSettings: vi.fn(),
 		resolveExecutionAuth: vi.fn(),
-		hasLocalCodexAuth: vi.fn()
+		hasDeviceCodexAuth: vi.fn()
 	};
 });
 
@@ -139,7 +139,7 @@ describe('CodexPlugin', () => {
 			mode: 'api-key',
 			env: { OPENAI_API_KEY: 'sk-test' }
 		});
-		vi.mocked(pipelineHelpers.hasLocalCodexAuth).mockResolvedValue(false);
+		vi.mocked(pipelineHelpers.hasDeviceCodexAuth).mockResolvedValue(false);
 		vi.mocked(binaryManager.ensureBinary).mockResolvedValue('/tmp/codex-generator/bin/codex');
 
 		vi.mocked(workspaceManager.createWorkspace).mockResolvedValue('/tmp/codex-generator/user1/dir1');
@@ -214,8 +214,8 @@ describe('CodexPlugin', () => {
 		validateApiKeySpy.mockRestore();
 	});
 
-	it('verifies local Codex auth through the CLI validation path', async () => {
-		vi.mocked(pipelineHelpers.hasLocalCodexAuth).mockResolvedValue(true);
+	it('verifies Codex device auth through the CLI validation path', async () => {
+		vi.mocked(pipelineHelpers.hasDeviceCodexAuth).mockResolvedValue(true);
 		const validateCliAuthSpy = vi.spyOn(plugin as never, 'validateCliAuth').mockResolvedValue(true as never);
 
 		const result = await plugin.validateConnection({
@@ -223,19 +223,19 @@ describe('CodexPlugin', () => {
 		});
 
 		expect(result.success).toBe(true);
-		expect(result.message).toContain('Local Codex CLI auth verified');
+		expect(result.message).toContain('Codex device authentication verified');
 
 		validateCliAuthSpy.mockRestore();
 	});
 
-	it('does not use host-global local auth fallback during unscoped connection validation', async () => {
-		vi.mocked(pipelineHelpers.hasLocalCodexAuth).mockResolvedValue(false);
+	it('does not use host-global device auth fallback during unscoped connection validation', async () => {
+		vi.mocked(pipelineHelpers.hasDeviceCodexAuth).mockResolvedValue(false);
 
 		const result = await plugin.validateConnection({
-			authMode: 'local'
+			authMode: 'device-auth'
 		});
 
-		expect(pipelineHelpers.hasLocalCodexAuth).toHaveBeenCalledWith({ authMode: 'local' }, undefined, {
+		expect(pipelineHelpers.hasDeviceCodexAuth).toHaveBeenCalledWith({ authMode: 'device-auth' }, undefined, {
 			allowHostFallback: false
 		});
 		expect(result.success).toBe(false);

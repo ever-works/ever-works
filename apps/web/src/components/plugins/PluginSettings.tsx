@@ -24,20 +24,22 @@ import { PluginSettingsFormFields } from './PluginSettingsFormFields';
 import { PluginReadme } from './PluginReadme';
 import { PluginEnablePanel } from './PluginEnablePanel';
 import { PluginDisableWarning } from './PluginDisableWarning';
+import { PluginDeviceAuthConnection } from '@/components/settings/PluginDeviceAuthConnection';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
 import { PluginOnboardingWizard } from '@/components/settings/PluginOnboardingWizard';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 import { usePluginToggle } from '@/lib/hooks/use-plugin-toggle';
+import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';
 
 interface PluginSettingsProps {
     plugin: UserPlugin;
     oauthConnection?: OAuthConnectionInfo | null;
-    localAuthStatus?: import('@/lib/api/plugins').PluginLocalAuthStatus | null;
+    deviceAuthStatus?: PluginDeviceAuthStatus | null;
 }
 
-export function PluginSettings({ plugin, oauthConnection, localAuthStatus }: PluginSettingsProps) {
+export function PluginSettings({ plugin, oauthConnection, deviceAuthStatus }: PluginSettingsProps) {
     const t = useTranslations('dashboard.plugins');
     const tOnboarding = useTranslations('onboarding.plugins');
     const byokTrigger = plugin.uiHints?.byok?.triggerField;
@@ -122,14 +124,9 @@ export function PluginSettings({ plugin, oauthConnection, localAuthStatus }: Plu
     const showSetupButton =
         setupLink &&
         (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !displaySettings[f]));
-
-    const usesClaudeWizard =
-        plugin.pluginId === 'claude-code' && Boolean(plugin.uiHints?.onboardingWizard);
-    const usesGeminiWizard =
-        plugin.pluginId === 'gemini' && Boolean(plugin.uiHints?.onboardingWizard);
-    const usesSimAiWizard =
-        plugin.pluginId === 'sim-ai' && Boolean(plugin.uiHints?.onboardingWizard);
-    const usesCustomWizard = usesClaudeWizard || usesGeminiWizard || usesSimAiWizard;
+    const hasDeviceAuth =
+        plugin.capabilities.includes('device-auth') && deviceAuthStatus !== undefined;
+    const deviceAuthModeField = plugin.uiHints?.deviceAuth?.authModeField ?? 'authMode';
 
     return (
         <div className="space-y-6">
@@ -285,6 +282,15 @@ export function PluginSettings({ plugin, oauthConnection, localAuthStatus }: Plu
                 />
             )}
 
+            {hasDeviceAuth && (
+                <PluginDeviceAuthConnection
+                    pluginId={plugin.pluginId}
+                    pluginName={plugin.name}
+                    initialStatus={deviceAuthStatus ?? null}
+                    onActivate={() => handleFieldChange(deviceAuthModeField, 'device-auth', false)}
+                />
+            )}
+
             {plugin.uiHints?.organizationSettings && (
                 <GitHubOrganizationsSettings
                     plugin={plugin}
@@ -307,7 +313,7 @@ export function PluginSettings({ plugin, oauthConnection, localAuthStatus }: Plu
                             <PluginOnboardingWizard
                                 plugin={plugin}
                                 initialSettings={plugin.settings || {}}
-                                initialLocalAuthStatus={localAuthStatus ?? null}
+                                initialDeviceAuthStatus={deviceAuthStatus ?? null}
                                 visibleProperties={visibleProperties}
                                 getFieldValue={getFieldValue}
                                 handleFieldChange={handleFieldChange}
@@ -378,7 +384,7 @@ export function PluginSettings({ plugin, oauthConnection, localAuthStatus }: Plu
                         )}
                     </div>
 
-                    {!usesCustomWizard && (
+                    {!plugin.uiHints?.onboardingWizard && (
                         <div className="flex items-center gap-3 px-6 py-4 border-t border-border dark:border-border-dark">
                             <Button
                                 variant="primary"

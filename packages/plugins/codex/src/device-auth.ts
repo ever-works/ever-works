@@ -3,7 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import type { LocalAuthStatus } from '@ever-works/plugin';
+import type { DeviceAuthStatus } from '@ever-works/plugin';
 
 import { ensureBinary } from './utils/binary-manager.js';
 import { buildSubprocessEnv } from './utils/subprocess-env.js';
@@ -15,7 +15,7 @@ type LoggerLike = {
 	debug?(message: string, ...args: unknown[]): void;
 };
 
-type LocalAuthSession = {
+type DeviceAuthSession = {
 	process: ReturnType<typeof spawn>;
 	verificationUri?: string;
 	userCode?: string;
@@ -24,7 +24,7 @@ type LocalAuthSession = {
 	error?: string;
 };
 
-const sessionByUser = new Map<string, LocalAuthSession>();
+const sessionByUser = new Map<string, DeviceAuthSession>();
 const lastFailureByUser = new Map<string, string>();
 
 function getBinaryLogger(logger?: LoggerLike) {
@@ -39,10 +39,10 @@ function getBinaryLogger(logger?: LoggerLike) {
 	};
 }
 
-export async function getLocalAuthStatus(userId: string, logger?: LoggerLike): Promise<LocalAuthStatus> {
+export async function getDeviceAuthStatus(userId: string, logger?: LoggerLike): Promise<DeviceAuthStatus> {
 	const codexHome = getManagedCodexHome(userId);
 	const installed = await isCodexInstalled(logger);
-	const connected = installed ? await verifyLocalAuthConnection(codexHome, logger) : false;
+	const connected = installed ? await verifyDeviceAuthConnection(codexHome, logger) : false;
 	const session = getActiveSession(userId);
 
 	if (connected && session) {
@@ -57,9 +57,15 @@ export async function getLocalAuthStatus(userId: string, logger?: LoggerLike): P
 		installed,
 		connected,
 		pending: Boolean(session && !connected),
-		scope: 'machine-local',
-		verificationUri: session?.verificationUri,
-		userCode: session?.userCode,
+		scope: 'user',
+		flowType: 'device-code',
+		prompt:
+			session?.verificationUri && session?.userCode
+				? {
+						verificationUri: session.verificationUri,
+						userCode: session.userCode
+					}
+				: undefined,
 		message: buildStatusMessage({
 			installed,
 			connected,
@@ -69,7 +75,7 @@ export async function getLocalAuthStatus(userId: string, logger?: LoggerLike): P
 	};
 }
 
-export async function startLocalAuth(userId: string, logger?: LoggerLike): Promise<LocalAuthStatus> {
+export async function startDeviceAuth(userId: string, logger?: LoggerLike): Promise<DeviceAuthStatus> {
 	const codexHome = getManagedCodexHome(userId);
 	const installed = await isCodexInstalled(logger);
 	if (!installed) {
@@ -77,7 +83,8 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 			installed: false,
 			connected: false,
 			pending: false,
-			scope: 'machine-local',
+			scope: 'user',
+			flowType: 'device-code',
 			message: 'Codex CLI is not installed on this machine.'
 		};
 	}
@@ -89,8 +96,9 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 			installed: true,
 			connected: true,
 			pending: false,
-			scope: 'machine-local',
-			message: 'Local Codex CLI auth is already connected.'
+			scope: 'user',
+			flowType: 'device-code',
+			message: 'Codex device authentication is already connected for this user.'
 		};
 	}
 
@@ -100,9 +108,15 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 			installed: true,
 			connected: false,
 			pending: true,
-			scope: 'machine-local',
-			verificationUri: existing.verificationUri,
-			userCode: existing.userCode,
+			scope: 'user',
+			flowType: 'device-code',
+			prompt:
+				existing.verificationUri && existing.userCode
+					? {
+							verificationUri: existing.verificationUri,
+							userCode: existing.userCode
+						}
+					: undefined,
 			message: existing.verificationUri
 				? 'Codex device authentication is already in progress.'
 				: 'Codex device authentication is starting...'
@@ -118,7 +132,7 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 		stdio: ['ignore', 'pipe', 'pipe']
 	});
 
-	const session: LocalAuthSession = {
+	const session: DeviceAuthSession = {
 		process: child,
 		startedAt: Date.now(),
 		status: 'pending'
@@ -197,7 +211,8 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 				installed: true,
 				connected: false,
 				pending: false,
-				scope: 'machine-local',
+				scope: 'user',
+				flowType: 'device-code',
 				message: session.error || 'Failed to start Codex device authentication.'
 			};
 		}
@@ -206,9 +221,15 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 			installed: true,
 			connected: false,
 			pending: true,
-			scope: 'machine-local',
-			verificationUri: session.verificationUri,
-			userCode: session.userCode,
+			scope: 'user',
+			flowType: 'device-code',
+			prompt:
+				session.verificationUri && session.userCode
+					? {
+							verificationUri: session.verificationUri,
+							userCode: session.userCode
+						}
+					: undefined,
 			message: 'Codex device authentication is starting on the backend machine.'
 		};
 	}
@@ -217,18 +238,24 @@ export async function startLocalAuth(userId: string, logger?: LoggerLike): Promi
 		installed: true,
 		connected: false,
 		pending: true,
-		scope: 'machine-local',
-		verificationUri: session.verificationUri,
-		userCode: session.userCode,
+		scope: 'user',
+		flowType: 'device-code',
+		prompt:
+			session.verificationUri && session.userCode
+				? {
+						verificationUri: session.verificationUri,
+						userCode: session.userCode
+					}
+				: undefined,
 		message: 'Open the device-auth page and enter the code shown below.'
 	};
 }
 
-export async function verifyLocalAuthConnection(codexHome?: string, logger?: LoggerLike): Promise<boolean> {
+export async function verifyDeviceAuthConnection(codexHome?: string, logger?: LoggerLike): Promise<boolean> {
 	return isConnected(codexHome, logger);
 }
 
-async function waitForDevicePrompt(session: LocalAuthSession, timeoutMs: number): Promise<boolean> {
+async function waitForDevicePrompt(session: DeviceAuthSession, timeoutMs: number): Promise<boolean> {
 	const startedAt = Date.now();
 	while (Date.now() - startedAt < timeoutMs) {
 		if (session.verificationUri && session.userCode) {
@@ -309,7 +336,7 @@ function getAuthPath(codexHome?: string): string {
 	return path.join(resolvedCodexHome, 'auth.json');
 }
 
-function getActiveSession(userId: string): LocalAuthSession | undefined {
+function getActiveSession(userId: string): DeviceAuthSession | undefined {
 	const session = sessionByUser.get(userId);
 	if (!session) {
 		return undefined;

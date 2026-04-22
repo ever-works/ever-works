@@ -99,7 +99,7 @@ src/
   steps.ts                 # Pipeline step definitions
   form-schema.ts           # Form fields, groups, validation
   prompt-keys.ts           # Prompt facade keys
-  local-auth.ts            # Device auth flow (codex login --device-auth)
+  device-auth.ts            # Device auth flow (codex login --device-auth)
   index.ts                 # Public exports
   prompt/
     system-prompt.ts       # Default prompts and variable builders

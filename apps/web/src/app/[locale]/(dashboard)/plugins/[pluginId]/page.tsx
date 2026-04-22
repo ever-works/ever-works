@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { pluginsAPI } from '@/lib/api/plugins';
+import { deviceAuthAPI } from '@/lib/api/plugins-capabilities/device-auth';
 import { oauthAPI, OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import { PluginSettings } from '@/components/plugins/PluginSettings';
 import { notFound } from 'next/navigation';
@@ -33,12 +34,12 @@ export default async function PluginDetailPage({ params }: PluginDetailPageProps
         }
     }
 
-    let localAuthStatus = null;
-    if (plugin.capabilities.includes('local-auth') || plugin.uiHints?.localAuth) {
+    let deviceAuthStatus = null;
+    if (plugin.capabilities.includes('device-auth')) {
         try {
-            localAuthStatus = await pluginsAPI.getLocalAuthStatus(plugin.pluginId);
+            deviceAuthStatus = await deviceAuthAPI.getStatus(plugin.pluginId);
         } catch {
-            localAuthStatus = null;
+            deviceAuthStatus = null;
         }
     }
 
@@ -47,7 +48,7 @@ export default async function PluginDetailPage({ params }: PluginDetailPageProps
             <PluginSettings
                 plugin={plugin}
                 oauthConnection={oauthConnection}
-                localAuthStatus={localAuthStatus}
+                deviceAuthStatus={deviceAuthStatus}
             />
         </div>
     );

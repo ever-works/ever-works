@@ -11,9 +11,9 @@ import { SettingsSchemaValidatorService } from '../services/settings-schema-vali
 import { PluginSettingsService } from '../services/plugin-settings.service';
 import type { RegisteredPlugin } from '../services/plugin-registry.service';
 import type {
-    ILocalAuthProvider,
+    IDeviceAuthProvider,
     IPlugin,
-    LocalAuthStatus,
+    DeviceAuthStatus,
     PluginManifest,
     JsonSchema,
 } from '@ever-works/plugin';
@@ -1825,54 +1825,58 @@ describe('PluginOperationsService', () => {
         });
     });
 
-    describe('plugin local auth capability', () => {
-        const createLocalAuthPlugin = (): IPlugin & ILocalAuthProvider =>
+    describe('plugin device auth capability', () => {
+        const createDeviceAuthPlugin = (): IPlugin & IDeviceAuthProvider =>
             ({
                 ...createMockPlugin(),
-                getLocalAuthStatus: jest.fn().mockResolvedValue({
+                getDeviceAuthStatus: jest.fn().mockResolvedValue({
                     installed: true,
                     connected: true,
                     pending: false,
-                    scope: 'machine-local',
+                    scope: 'user',
+                    flowType: 'device-code',
                     message: 'Connected',
-                } satisfies LocalAuthStatus),
-                startLocalAuth: jest.fn().mockResolvedValue({
+                } satisfies DeviceAuthStatus),
+                startDeviceAuth: jest.fn().mockResolvedValue({
                     installed: true,
                     connected: false,
                     pending: true,
-                    scope: 'machine-local',
-                    verificationUri: 'https://auth.openai.com/codex/device',
-                    userCode: 'ABCD-EFGH',
+                    scope: 'user',
+                    flowType: 'device-code',
+                    prompt: {
+                        verificationUri: 'https://auth.openai.com/codex/device',
+                        userCode: 'ABCD-EFGH',
+                    },
                     message: 'Pending',
-                } satisfies LocalAuthStatus),
-            }) as unknown as IPlugin & ILocalAuthProvider;
+                } satisfies DeviceAuthStatus),
+            }) as unknown as IPlugin & IDeviceAuthProvider;
 
-        it('should delegate local auth status to plugins that support it', async () => {
-            const plugin = createLocalAuthPlugin();
+        it('should delegate device auth status to plugins that support it', async () => {
+            const plugin = createDeviceAuthPlugin();
             jest.spyOn(pluginRegistryService, 'getPlugin').mockReturnValue(plugin);
 
-            const result = await service.getPluginLocalAuthStatus('test-plugin', 'user-1');
+            const result = await service.getPluginDeviceAuthStatus('test-plugin', 'user-1');
 
-            expect(plugin.getLocalAuthStatus).toHaveBeenCalledWith('user-1');
+            expect(plugin.getDeviceAuthStatus).toHaveBeenCalledWith('user-1');
             expect(result.connected).toBe(true);
         });
 
-        it('should delegate start local auth to plugins that support it', async () => {
-            const plugin = createLocalAuthPlugin();
+        it('should delegate start device auth to plugins that support it', async () => {
+            const plugin = createDeviceAuthPlugin();
             jest.spyOn(pluginRegistryService, 'getPlugin').mockReturnValue(plugin);
 
-            const result = await service.startPluginLocalAuth('test-plugin', 'user-1');
+            const result = await service.startPluginDeviceAuth('test-plugin', 'user-1');
 
-            expect(plugin.startLocalAuth).toHaveBeenCalledWith('user-1');
+            expect(plugin.startDeviceAuth).toHaveBeenCalledWith('user-1');
             expect(result.pending).toBe(true);
         });
 
-        it('should reject local auth calls for plugins without the capability', async () => {
+        it('should reject device auth calls for plugins without the capability', async () => {
             jest.spyOn(pluginRegistryService, 'getPlugin').mockReturnValue(createMockPlugin());
 
-            await expect(service.getPluginLocalAuthStatus('test-plugin', 'user-1')).rejects.toThrow(
-                BadRequestException,
-            );
+            await expect(
+                service.getPluginDeviceAuthStatus('test-plugin', 'user-1'),
+            ).rejects.toThrow(BadRequestException);
         });
     });
 

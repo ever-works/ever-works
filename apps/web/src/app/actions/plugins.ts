@@ -1,8 +1,11 @@
 'use server';
 
 import { pluginsAPI } from '@/lib/api/plugins';
+import {
+    deviceAuthAPI,
+    type PluginDeviceAuthStatus,
+} from '@/lib/api/plugins-capabilities/device-auth';
 import { revalidatePath } from 'next/cache';
-import type { PluginLocalAuthStatus } from '@/lib/api/plugins';
 
 export interface ActionResult<T = unknown> {
     success: boolean;
@@ -208,34 +211,34 @@ export async function setGlobalPipelineDefault(
     }
 }
 
-export async function getPluginLocalAuthStatus(
+export async function getPluginDeviceAuthStatus(
     pluginId: string,
-): Promise<ActionResult<PluginLocalAuthStatus>> {
+): Promise<ActionResult<PluginDeviceAuthStatus>> {
     try {
-        const result = await pluginsAPI.getLocalAuthStatus(pluginId);
+        const result = await deviceAuthAPI.getStatus(pluginId);
         return { success: true, data: result };
     } catch (error) {
-        console.error('Failed to get local auth status:', error);
+        console.error('Failed to get device auth status:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to get local auth status',
+            error: error instanceof Error ? error.message : 'Failed to get device auth status',
         };
     }
 }
 
-export async function startPluginLocalAuth(
+export async function startPluginDeviceAuth(
     pluginId: string,
-): Promise<ActionResult<PluginLocalAuthStatus>> {
+): Promise<ActionResult<PluginDeviceAuthStatus>> {
     try {
-        const result = await pluginsAPI.startLocalAuth(pluginId);
+        const result = await deviceAuthAPI.start(pluginId);
         revalidatePath('/plugins');
         revalidatePath(`/plugins/${pluginId}`);
         return { success: true, data: result };
     } catch (error) {
-        console.error('Failed to start local auth:', error);
+        console.error('Failed to start device auth:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to start local auth',
+            error: error instanceof Error ? error.message : 'Failed to start device auth',
         };
     }
 }

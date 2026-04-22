@@ -178,9 +178,9 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				type: 'string',
 				title: 'Authentication Mode',
 				description:
-					"Use `machine-local` to rely on this machine's existing Gemini login, `api-key` for Google AI Studio keys, or `vertex` for Google Cloud / Vertex AI authentication.",
+					'Use `api-key` for Google AI Studio keys or `vertex` for Google Cloud / Vertex AI authentication.',
 				default: 'api-key',
-				enum: ['machine-local', 'api-key', 'vertex'],
+				enum: ['api-key', 'vertex'],
 				'x-scope': 'user'
 			},
 			apiKey: {
@@ -263,30 +263,9 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		return value;
 	}
 
-	private resolveAuthMode(settings: Record<string, unknown>): 'machine-local' | 'api-key' | 'vertex' {
+	private resolveAuthMode(settings: Record<string, unknown>): 'api-key' | 'vertex' {
 		const value = settings.authMode;
-		return value === 'machine-local' || value === 'vertex' ? value : 'api-key';
-	}
-
-	private async hasCachedMachineAuth(): Promise<boolean> {
-		const homeDir = os.homedir();
-		const candidatePaths = [
-			path.join(homeDir, '.gemini', 'google_accounts.json'),
-			path.join(homeDir, '.gemini', 'oauth_creds.json')
-		];
-
-		for (const candidatePath of candidatePaths) {
-			try {
-				const stats = await fs.stat(candidatePath);
-				if (stats.isFile() && stats.size > 0) {
-					return true;
-				}
-			} catch {
-				// Keep checking the remaining known auth paths.
-			}
-		}
-
-		return false;
+		return value === 'vertex' ? 'vertex' : 'api-key';
 	}
 
 	async isAvailable(settings?: Record<string, unknown>): Promise<boolean> {
@@ -304,7 +283,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			return result.valid;
 		}
 
-		return this.hasCachedMachineAuth();
+		return false;
 	}
 
 	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
@@ -328,19 +307,17 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				: { success: false, message: result.detail || 'Vertex AI authentication is not configured correctly.' };
 		}
 
-		return (await this.hasCachedMachineAuth())
-			? { success: true, message: 'Machine-local Gemini authentication is available.' }
-			: { success: false, message: 'No cached Gemini login was found on this machine.' };
+		return { success: false, message: 'Gemini authentication is not configured correctly.' };
 	}
 
 	validateSettings(settings: Record<string, unknown>): ValidationResult {
 		const errors: Array<{ path: string; message: string }> = [];
 		const authMode = settings.authMode;
 
-		if (authMode !== undefined && authMode !== 'machine-local' && authMode !== 'api-key' && authMode !== 'vertex') {
+		if (authMode !== undefined && authMode !== 'api-key' && authMode !== 'vertex') {
 			errors.push({
 				path: 'authMode',
-				message: 'Authentication mode must be "machine-local", "api-key", or "vertex"'
+				message: 'Authentication mode must be "api-key" or "vertex"'
 			});
 		}
 
@@ -415,41 +392,31 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			readme: [
 				'# Gemini Generator Plugin',
 				'',
-				'Full pipeline plugin that delegates the entire directory generation to Gemini CLI. This plugin runs a single Gemini CLI session that autonomously handles web search, content creation, and file generation.',
+				'Use Gemini as the pipeline engine for directory generation inside Ever Works.',
 				'',
-				'## How it works',
+				'Gemini researches sources, generates structured directory items, and returns the finished results to Ever Works as a complete pipeline run.',
 				'',
-				'The plugin runs 6 sequential steps:',
+				'Choose this plugin when you want Gemini to handle the full research and generation workflow for a directory.',
 				'',
-				'1. **Setup Gemini CLI** - Installs and caches the Gemini CLI runtime',
-				'2. **Prepare Context** - Creates a temporary workspace and seeds it with existing items and metadata',
-				'3. **Generate Items** - Executes Gemini CLI to research and generate directory items as JSON files',
-				'4. **Collect Results** - Reads the generated JSON files back to build the pipeline result',
-				'5. **Capture Screenshots** - Takes screenshots for items that need images',
-				'6. **Cleanup** - Removes the temporary workspace',
+				'## What It Does',
 				'',
-				'## Settings',
+				'- Researches sources for the current directory topic.',
+				'- Generates structured item data for Ever Works.',
+				'- Reuses your directory context and existing items during generation.',
+				'- Can work with screenshot providers for item imagery.',
 				'',
-				'| Setting        | Description                       |',
-				'| -------------- | --------------------------------- |',
-				'| `authMode`     | Machine-local, API key, or Vertex AI auth mode |',
-				'| `apiKey`       | Gemini API key (AI Studio)                  |',
-				'| `googleApiKey` | Google Cloud API key for Vertex AI (optional) |',
-				'| `googleCloudProject` | Google Cloud project for Vertex AI      |',
-				'| `googleCloudLocation` | Google Cloud location for Vertex AI    |',
+				'## Authentication',
 				'',
-				'### Authentication',
+				'- **API Key**: connect with a Google AI Studio Gemini API key.',
+				'- **Vertex AI**: connect with Google Cloud project settings for Vertex AI.',
 				'',
-				'Gemini CLI supports three modes in this plugin:',
-				'',
-				'- **Machine-local**: Use an existing local Google login cached by Gemini CLI',
-				'- **API Key**: Use `GEMINI_API_KEY` from Google AI Studio',
-				'- **Vertex AI**: Use Google Cloud / Vertex AI environment-based authentication',
-				'',
-				'Gemini CLI official docs: https://google-gemini.github.io/gemini-cli/docs/get-started/authentication.html',
+				'Authentication is configured from Ever Works user settings rather than shared host login state.',
 				'## Usage',
 				'',
-				"Enable the plugin for a directory and trigger generation with `providers.pipeline: 'gemini'`."
+				'1. Choose API Key or Vertex AI authentication.',
+				'2. Save the required Gemini settings.',
+				'3. Enable the plugin for a directory.',
+				'4. Select `gemini` as the pipeline provider for generation.'
 			].join('\n'),
 			homepage: 'https://github.com/google-gemini/gemini-cli',
 			icon: {
@@ -596,8 +563,6 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 
 			const version = (settings.version as string) || DEFAULT_CLI_VERSION;
 			const model = settings.model as string | undefined;
-			const authMode = this.resolveAuthMode(settings);
-
 			// ── Step 1: Setup Gemini CLI ──────────────────────────────
 			const setupStepStartedAt = this.startStep('setup-gemini', onLogEntry);
 			reportProgress(onProgress, 0, 0, 'Setup Gemini CLI');
@@ -613,9 +578,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 
 			const configDir = path.join(BASE_TEMP_DIR, 'config', userId);
 			const workspacePath = await createWorkspace(userId, directory.id);
-			if (authMode !== 'machine-local') {
-				await ensureOnboardingConfig(configDir);
-			}
+			await ensureOnboardingConfig(configDir);
 			await seedExistingItems(workspacePath, existing.items);
 			await seedMetadata(workspacePath, {
 				directory: { name: directory.name, description: directory.description },
@@ -665,10 +628,10 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			let execResult: ExecuteResult;
 			try {
 				const { onStdoutLine, onStderrLine } = this.createGeminiStreamHandlers(onLogEntry);
-				const executionEnv: Record<string, string> = { ...authEnv };
-				if (authMode !== 'machine-local') {
-					executionEnv.GEMINI_CONFIG_DIR = configDir;
-				}
+				const executionEnv: Record<string, string> = {
+					...authEnv,
+					GEMINI_CONFIG_DIR: configDir
+				};
 
 				const { promise, kill } = executeGemini({
 					binaryPath,

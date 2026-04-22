@@ -10,7 +10,7 @@ export const PLUGIN_CAPABILITIES = {
 	DEPLOYMENT: 'deployment',
 	GIT_PROVIDER: 'git-provider',
 	OAUTH: 'oauth',
-	LOCAL_AUTH: 'local-auth',
+	DEVICE_AUTH: 'device-auth',
 	PROMPT_PROVIDER: 'prompt-provider'
 } as const;
 

@@ -90,7 +90,7 @@ export const HIDDEN_CAPABILITIES = new Set([
     'form-schema-provider',
     'pipeline-modifier',
     'oauth',
-    'local-auth',
+    'device-auth',
 ]);
 
 /**

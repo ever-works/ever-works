@@ -140,6 +140,7 @@ describe('GeminiPlugin', () => {
 	it('should define Gemini auth fields as user-scoped settings', () => {
 		const props = plugin.settingsSchema.properties!;
 		expect(props.authMode.default).toBe('api-key');
+		expect(props.authMode.enum).toEqual(['api-key', 'vertex']);
 		expect(props.apiKey['x-secret']).toBe(true);
 		expect(props.apiKey['x-scope']).toBe('user');
 		expect(props.googleApiKey['x-secret']).toBe(true);
@@ -148,6 +149,11 @@ describe('GeminiPlugin', () => {
 	});
 
 	it('should validate auth settings based on auth mode', () => {
+		expect(plugin.validateSettings({ authMode: 'invalid-mode' })).toEqual({
+			valid: false,
+			errors: [{ path: 'authMode', message: 'Authentication mode must be "api-key" or "vertex"' }]
+		});
+
 		expect(plugin.validateSettings({ authMode: 'api-key' })).toEqual({
 			valid: false,
 			errors: [{ path: 'apiKey', message: 'API key is required when authMode is "api-key"' }]

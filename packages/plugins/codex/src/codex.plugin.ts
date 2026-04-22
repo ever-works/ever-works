@@ -4,15 +4,15 @@ import type {
 	FacadeOptions,
 	DirectoryReference,
 	ExistingItems,
+	IDeviceAuthProvider,
 	FormFieldDefinition,
 	FormFieldGroup,
 	GenerationRequest,
 	IFormSchemaProvider,
-	ILocalAuthProvider,
 	IPlugin,
 	IPipelinePlugin,
 	JsonSchema,
-	LocalAuthStatus,
+	DeviceAuthStatus,
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
 	PipelineResult,
@@ -56,7 +56,7 @@ import {
 import { PROMPT_KEYS } from './prompt-keys.js';
 import { executeCodex, type ExecuteResult } from './utils/process-runner.js';
 import { ensureBinary } from './utils/binary-manager.js';
-import { getLocalAuthStatus, startLocalAuth, verifyLocalAuthConnection } from './local-auth.js';
+import { getDeviceAuthStatus, startDeviceAuth, verifyDeviceAuthConnection } from './device-auth.js';
 import {
 	cleanupWorkspace,
 	collectMetadataFromItems,
@@ -72,7 +72,7 @@ import {
 	buildCancelledResult,
 	buildErrorResult,
 	buildMetrics,
-	hasLocalCodexAuth,
+	hasDeviceCodexAuth,
 	initializeState,
 	reportItemProgress,
 	reportProgress,
@@ -123,7 +123,7 @@ const MANIFEST: PluginManifest = {
 	name: 'Codex Generator',
 	version: '1.0.0',
 	category: 'pipeline',
-	capabilities: ['pipeline', 'form-schema-provider', 'local-auth'],
+	capabilities: ['pipeline', 'form-schema-provider', 'device-auth'],
 	description: 'Full pipeline plugin that delegates the entire generation to Codex',
 	author: { name: 'Ever Works Team' },
 	license: 'MIT',
@@ -144,8 +144,8 @@ const MANIFEST: PluginManifest = {
 		includeInOnboarding: true,
 		onboardingPriority: 2,
 		onboardingDescription:
-			'Connect Codex with an OpenAI API key or local Codex CLI auth for end-to-end directory generation.',
-		localAuth: {
+			'Connect Codex with an OpenAI API key or a user-scoped device authentication flow for end-to-end directory generation.',
+		deviceAuth: {
 			authModeField: 'authMode'
 		},
 		setupLink: {
@@ -158,69 +158,31 @@ const MANIFEST: PluginManifest = {
 	readme: [
 		'# Codex Generator Plugin',
 		'',
-		'Full pipeline plugin that delegates the entire directory generation to Codex. This plugin runs a single Codex session that researches, creates, and updates directory item JSON files inside a temporary workspace.',
+		'Use Codex as the pipeline engine for directory generation inside Ever Works.',
 		'',
-		'## How it works',
+		'Codex researches sources, generates structured directory items, and returns the finished results to Ever Works as a complete pipeline run.',
 		'',
-		'The plugin runs 6 sequential steps:',
+		'Choose this plugin when you want Codex to handle the full research and generation workflow instead of combining separate search and AI providers manually.',
 		'',
-		'1. **Setup Codex** - Downloads and caches the Codex CLI, then resolves authentication',
-		'2. **Prepare Context** - Creates a temporary workspace and seeds it with existing items and metadata',
-		'3. **Generate Items** - Executes Codex CLI to research and generate directory items as JSON files',
-		'4. **Collect Results** - Reads the generated JSON files back to build the pipeline result',
-		'5. **Capture Screenshots** - Takes screenshots for items that need images',
-		'6. **Cleanup** - Removes the temporary workspace',
+		'## What It Does',
 		'',
-		'## Settings',
+		'- Researches sources for the current directory topic.',
+		'- Generates structured item data for Ever Works.',
+		'- Reuses your directory context and existing items during generation.',
+		'- Can work with screenshot providers for item imagery.',
 		'',
-		'| Setting                 | Description                                                                 |',
-		'| ----------------------- | --------------------------------------------------------------------------- |',
-		'| `apiKey`                | OpenAI API key used for Codex execution                                     |',
-		'| `model`                 | Codex model to use for generation                                           |',
-		'| `unsafeBypassSandbox`   | Hidden opt-in flag to bypass Codex sandboxing on incompatible host systems  |',
+		'## Authentication',
 		'',
-		'### Authentication',
+		'- **API Key**: connect with an OpenAI API key.',
+		'- **Device Auth**: start the device flow from Ever Works, open the verification page, and enter the displayed code to connect your account.',
 		'',
-		'Codex supports two authentication modes:',
-		'',
-		'1. **API Key** - Provide `apiKey` in plugin settings.',
-		'2. **Local Codex Auth** - If no `apiKey` is configured, the plugin can reuse local Codex CLI auth from a managed per-user `CODEX_HOME`.',
-		'',
-		'**API Key**:',
-		'',
-		'Get one from [platform.openai.com/account/api-keys](https://platform.openai.com/account/api-keys)',
-		'',
-		'**Local Codex Auth**:',
-		'',
-		'```bash',
-		'codex login',
-		'```',
-		'',
-		'This signs the local Codex CLI into your OpenAI account and stores reusable local auth inside a per-user managed Codex home for subsequent runs.',
-		'',
-		'### Sandbox Compatibility',
-		'',
-		'Codex normally runs with its own sandboxed execution path. Some host environments may block Codex sandboxing. In those cases, the hidden `unsafeBypassSandbox` setting can opt into `--dangerously-bypass-approvals-and-sandbox`.',
-		'',
-		'Use that mode only in environments that are already externally sandboxed or otherwise trusted.',
+		'Authentication is user-scoped in Ever Works, so one user setup does not replace another.',
 		'',
 		'## Usage',
 		'',
-		"Enable the plugin for a directory and trigger generation with `providers.pipeline: 'codex'`.",
-		'',
-		'## Manual Smoke Test',
-		'',
-		'You can validate the real Codex CLI integration locally with:',
-		'',
-		'```bash',
-		'pnpm --filter @ever-works/codex-plugin smoke',
-		'```',
-		'',
-		'If your host requires the dangerous bypass mode, run:',
-		'',
-		'```bash',
-		'CODEX_SMOKE_BYPASS_SANDBOX=1 pnpm --filter @ever-works/codex-plugin smoke',
-		'```'
+		'1. Connect Codex with API key or device auth.',
+		'2. Enable the plugin for a directory.',
+		'3. Select `codex` as the pipeline provider for generation.'
 	].join('\n'),
 	homepage: 'https://github.com/openai/codex'
 };
@@ -228,7 +190,7 @@ const MANIFEST: PluginManifest = {
 const LOG_MESSAGE_MAX_LENGTH = 500;
 const RECOVERY_ITEMS_SCHEMA_FILE = 'recovered-items.schema.json';
 const RECOVERY_ITEMS_OUTPUT_FILE = 'recovered-items.json';
-const UNSCOPED_LOCAL_AUTH_OPTIONS = { allowHostFallback: false } as const;
+const UNSCOPED_DEVICE_AUTH_OPTIONS = { allowHostFallback: false } as const;
 const STEP_CONTEXT_BY_ID = new Map(
 	STEP_DEFINITIONS.map((step, stepIndex) => [step.id, { stepIndex, stepName: step.name }])
 );
@@ -266,7 +228,7 @@ const RECOVERY_OUTPUT_SCHEMA = {
 	}
 } as const;
 
-export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider, ILocalAuthProvider {
+export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider, IDeviceAuthProvider {
 	readonly id = 'codex';
 	readonly name = 'Codex Generator';
 	readonly version = '1.0.0';
@@ -274,7 +236,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	readonly capabilities = [
 		PLUGIN_CAPABILITIES.PIPELINE,
 		PLUGIN_CAPABILITIES.FORM_SCHEMA_PROVIDER,
-		PLUGIN_CAPABILITIES.LOCAL_AUTH
+		PLUGIN_CAPABILITIES.DEVICE_AUTH
 	] as const;
 	readonly configurationMode = 'user-required' as const;
 	readonly handledConfigFields = ['*'] as const;
@@ -285,8 +247,8 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			authMode: {
 				type: 'string',
 				title: 'Authentication Mode',
-				description: 'Choose whether Codex uses an OpenAI API key or local Codex CLI auth.',
-				enum: ['api-key', 'local'],
+				description: 'Choose whether Codex uses an OpenAI API key or user-scoped device authentication.',
+				enum: ['api-key', 'device-auth'],
 				default: 'api-key',
 				'x-scope': 'user',
 				'x-hidden': true
@@ -367,7 +329,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			return apiKey ? this.validateApiKey(apiKey, model) : false;
 		}
 
-		if (authMode === 'local') {
+		if (authMode === 'device-auth') {
 			return this.validateCliAuth(resolved);
 		}
 
@@ -399,10 +361,10 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	validateSettings(settings: Record<string, unknown>): ValidationResult {
-		if (settings.authMode !== undefined && settings.authMode !== 'api-key' && settings.authMode !== 'local') {
+		if (settings.authMode !== undefined && settings.authMode !== 'api-key' && settings.authMode !== 'device-auth') {
 			return {
 				valid: false,
-				errors: [{ path: 'authMode', message: 'Authentication mode must be "api-key" or "local"' }]
+				errors: [{ path: 'authMode', message: 'Authentication mode must be "api-key" or "device-auth"' }]
 			};
 		}
 		if (settings.apiKey !== undefined && typeof settings.apiKey !== 'string') {
@@ -448,22 +410,22 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 					};
 		}
 
-		if (authMode === 'local') {
-			if (!(await hasLocalCodexAuth(settings, undefined, UNSCOPED_LOCAL_AUTH_OPTIONS))) {
+		if (authMode === 'device-auth') {
+			if (!(await hasDeviceCodexAuth(settings, undefined, UNSCOPED_DEVICE_AUTH_OPTIONS))) {
 				return {
 					success: false,
 					message:
-						'Local Codex CLI auth cannot be verified from unscoped settings alone. Start local auth for this user first or configure an OpenAI API key.'
+						'Codex device auth cannot be verified from unscoped settings alone. Start device auth for this user first or configure an OpenAI API key.'
 				};
 			}
 
 			const valid = await this.validateCliAuth(settings);
 			return valid
-				? { success: true, message: 'Local Codex CLI auth verified.' }
+				? { success: true, message: 'Codex device authentication verified.' }
 				: {
 						success: false,
 						message:
-							'Local Codex CLI auth could not be verified. Re-run `codex login` or switch to an OpenAI API key.'
+							'Codex device authentication could not be verified. Restart the device-auth flow or switch to an OpenAI API key.'
 					};
 		}
 
@@ -478,29 +440,29 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 					};
 		}
 
-		if (await hasLocalCodexAuth(settings, undefined, UNSCOPED_LOCAL_AUTH_OPTIONS)) {
+		if (await hasDeviceCodexAuth(settings, undefined, UNSCOPED_DEVICE_AUTH_OPTIONS)) {
 			const valid = await this.validateCliAuth(settings);
 			return valid
-				? { success: true, message: 'Local Codex CLI auth verified.' }
+				? { success: true, message: 'Codex device authentication verified.' }
 				: {
 						success: false,
 						message:
-							'Local Codex CLI auth could not be verified. Re-run `codex login` or provide an OpenAI API key.'
+							'Codex device authentication could not be verified. Restart the device-auth flow or provide an OpenAI API key.'
 					};
 		}
 
 		return {
 			success: false,
-			message: 'Configure an OpenAI API key or sign in locally with Codex CLI first'
+			message: 'Configure an OpenAI API key or start Codex device authentication first.'
 		};
 	}
 
-	async getLocalAuthStatus(userId: string): Promise<LocalAuthStatus> {
-		return getLocalAuthStatus(userId, this.context?.logger ?? console);
+	async getDeviceAuthStatus(userId: string): Promise<DeviceAuthStatus> {
+		return getDeviceAuthStatus(userId, this.context?.logger ?? console);
 	}
 
-	async startLocalAuth(userId: string): Promise<LocalAuthStatus> {
-		return startLocalAuth(userId, this.context?.logger ?? console);
+	async startDeviceAuth(userId: string): Promise<DeviceAuthStatus> {
+		return startDeviceAuth(userId, this.context?.logger ?? console);
 	}
 
 	async execute(
@@ -1243,12 +1205,12 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	private async validateCliAuth(settings: Record<string, unknown>): Promise<boolean> {
-		const executionAuth = await resolveExecutionAuth(settings, undefined, UNSCOPED_LOCAL_AUTH_OPTIONS);
-		if (!executionAuth || executionAuth.mode !== 'local') {
+		const executionAuth = await resolveExecutionAuth(settings, undefined, UNSCOPED_DEVICE_AUTH_OPTIONS);
+		if (!executionAuth || executionAuth.mode !== 'device-auth') {
 			return false;
 		}
 
-		return verifyLocalAuthConnection(executionAuth.codexHome, this.context?.logger ?? console);
+		return verifyDeviceAuthConnection(executionAuth.codexHome, this.context?.logger ?? console);
 	}
 
 	private handleError(error: Error, startTime: number): PipelineResult {

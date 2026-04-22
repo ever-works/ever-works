@@ -1,6 +1,5 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
-import type { LocalAuthStatus } from '@ever-works/plugin';
 import type {
     PluginResponse,
     UserPluginResponse,
@@ -36,7 +35,6 @@ export type DirectoryPluginListResponse = IDirectoryPluginListResponse;
 export type SettingsMenuResponse = ISettingsMenuResponse;
 export type SettingsMenuCategory = ISettingsMenuCategory;
 export type SettingsMenuPlugin = ISettingsMenuPlugin;
-export type PluginLocalAuthStatus = LocalAuthStatus;
 
 // ============================================
 // API Client
@@ -155,19 +153,6 @@ export const pluginsAPI = {
             details?: Record<string, unknown>;
         }>({
             endpoint: `/plugins/${pluginId}/validate-connection`,
-            data: {},
-            method: 'POST',
-            wrapInData: false,
-        });
-    },
-
-    getLocalAuthStatus: async (pluginId: string): Promise<PluginLocalAuthStatus> => {
-        return serverFetch<PluginLocalAuthStatus>(`/plugins/${pluginId}/local-auth-status`);
-    },
-
-    startLocalAuth: async (pluginId: string): Promise<PluginLocalAuthStatus> => {
-        return serverMutation<PluginLocalAuthStatus>({
-            endpoint: `/plugins/${pluginId}/start-local-auth`,
             data: {},
             method: 'POST',
             wrapInData: false,

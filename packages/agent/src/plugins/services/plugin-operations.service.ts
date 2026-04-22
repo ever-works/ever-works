@@ -11,9 +11,9 @@ import pickBy from 'lodash/pickBy';
 import {
     type IPlugin,
     type JsonSchema,
-    type LocalAuthStatus,
+    type DeviceAuthStatus,
     type PluginManifest,
-    isLocalAuthProvider,
+    isDeviceAuthProvider,
     toPluginSettingsSchemaProperty,
     PLUGIN_CAPABILITIES,
 } from '@ever-works/plugin';
@@ -290,14 +290,14 @@ export class PluginOperationsService {
             .join(' ');
     }
 
-    private getLocalAuthProvider(pluginId: string) {
+    private getDeviceAuthProvider(pluginId: string) {
         const plugin = this.pluginRegistryService.getPlugin(pluginId);
         if (!plugin) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
 
-        if (!isLocalAuthProvider(plugin)) {
-            throw new BadRequestException(`Plugin "${pluginId}" does not support local auth`);
+        if (!isDeviceAuthProvider(plugin)) {
+            throw new BadRequestException(`Plugin "${pluginId}" does not support device auth`);
         }
 
         return plugin;
@@ -319,14 +319,14 @@ export class PluginOperationsService {
         return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId);
     }
 
-    async getPluginLocalAuthStatus(pluginId: string, userId: string): Promise<LocalAuthStatus> {
-        const plugin = this.getLocalAuthProvider(pluginId);
-        return plugin.getLocalAuthStatus(userId);
+    async getPluginDeviceAuthStatus(pluginId: string, userId: string): Promise<DeviceAuthStatus> {
+        const plugin = this.getDeviceAuthProvider(pluginId);
+        return plugin.getDeviceAuthStatus(userId);
     }
 
-    async startPluginLocalAuth(pluginId: string, userId: string): Promise<LocalAuthStatus> {
-        const plugin = this.getLocalAuthProvider(pluginId);
-        return plugin.startLocalAuth(userId);
+    async startPluginDeviceAuth(pluginId: string, userId: string): Promise<DeviceAuthStatus> {
+        const plugin = this.getDeviceAuthProvider(pluginId);
+        return plugin.startDeviceAuth(userId);
     }
 
     // ============================================
@@ -1213,34 +1213,32 @@ export class PluginOperationsService {
             includeSecrets: true,
         });
 
-        if (isLocalAuthProvider(registered.plugin)) {
+        if (isDeviceAuthProvider(registered.plugin)) {
             const authModeField =
-                registered.manifest.uiHints?.localAuth?.authModeField ?? 'authMode';
+                registered.manifest.uiHints?.deviceAuth?.authModeField ?? 'authMode';
             const authMode =
                 typeof settings[authModeField] === 'string' ? settings[authModeField] : undefined;
-            const prefersLocalAuth =
-                authMode === undefined || authMode === 'local' || authMode === 'machine-local';
+            const prefersDeviceAuth = authMode === undefined || authMode === 'device-auth';
 
-            if (prefersLocalAuth) {
+            if (prefersDeviceAuth) {
                 try {
-                    const localAuthStatus = await registered.plugin.getLocalAuthStatus(userId);
+                    const deviceAuthStatus = await registered.plugin.getDeviceAuthStatus(userId);
 
                     if (
-                        localAuthStatus.connected ||
-                        localAuthStatus.pending ||
-                        authMode === 'local' ||
-                        authMode === 'machine-local'
+                        deviceAuthStatus.connected ||
+                        deviceAuthStatus.pending ||
+                        authMode === 'device-auth'
                     ) {
                         return {
-                            connected: localAuthStatus.connected,
-                            pending: localAuthStatus.pending,
-                            scope: localAuthStatus.scope,
-                            message: localAuthStatus.message,
+                            connected: deviceAuthStatus.connected,
+                            pending: deviceAuthStatus.pending,
+                            scope: deviceAuthStatus.scope,
+                            message: deviceAuthStatus.message,
                         };
                     }
                 } catch (error) {
                     this.logger.warn(
-                        `Failed to read local auth status for plugin "${registered.plugin.id}": ${error}`,
+                        `Failed to read device auth status for plugin "${registered.plugin.id}": ${error}`,
                     );
                 }
             }

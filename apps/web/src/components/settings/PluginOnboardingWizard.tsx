@@ -6,17 +6,14 @@ import { ArrowRight, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PluginSettingsField } from '@/components/plugins/form/PluginSettingsField';
 import { cn } from '@/lib/utils/cn';
-import type {
-    PluginLocalAuthStatus,
-    PluginSettingsSchemaProperty,
-    UserPlugin,
-} from '@/lib/api/plugins';
-import { getPluginLocalAuthStatus, startPluginLocalAuth } from '@/app/actions/plugins';
+import type { PluginSettingsSchemaProperty, UserPlugin } from '@/lib/api/plugins';
+import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';
+import { usePluginDeviceAuth } from '@/lib/hooks/use-plugin-device-auth';
 
 interface PluginOnboardingWizardProps {
     plugin: UserPlugin;
     initialSettings: Record<string, unknown>;
-    initialLocalAuthStatus?: PluginLocalAuthStatus | null;
+    initialDeviceAuthStatus?: PluginDeviceAuthStatus | null;
     visibleProperties: Record<string, PluginSettingsSchemaProperty>;
     getFieldValue: (key: string, propSchema: PluginSettingsSchemaProperty) => unknown;
     handleFieldChange: (key: string, value: unknown, isSecret: boolean) => void;
@@ -151,25 +148,25 @@ function AuthModeOption({
     );
 }
 
-function LocalAuthStatusPanel({
-    localAuthStatus,
-    localAuthError,
-    isLoadingLocalAuth,
-    isStartingLocalAuth,
+function DeviceAuthStatusPanel({
+    deviceAuthStatus,
+    deviceAuthError,
+    isLoadingDeviceAuth,
+    isStartingDeviceAuth,
     onStart,
     onRefresh,
     copy,
 }: {
-    localAuthStatus: PluginLocalAuthStatus | null;
-    localAuthError: string | null;
-    isLoadingLocalAuth: boolean;
-    isStartingLocalAuth: boolean;
+    deviceAuthStatus: PluginDeviceAuthStatus | null;
+    deviceAuthError: string | null;
+    isLoadingDeviceAuth: boolean;
+    isStartingDeviceAuth: boolean;
     onStart: () => void;
     onRefresh: () => void;
     copy: {
         title: string;
         fallbackMessage: string;
-        machineScoped: string;
+        backendHint: string;
         deviceCode: string;
         verificationUrl: string;
         notInstalled: string;
@@ -187,54 +184,54 @@ function LocalAuthStatusPanel({
                         {copy.title}
                     </p>
                     <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark">
-                        {localAuthStatus?.message || copy.fallbackMessage}
+                        {deviceAuthStatus?.message || copy.fallbackMessage}
                     </p>
                 </div>
-                {(isLoadingLocalAuth || isStartingLocalAuth) && (
+                {(isLoadingDeviceAuth || isStartingDeviceAuth) && (
                     <Loader2 className="w-4 h-4 animate-spin text-text-muted dark:text-text-muted-dark shrink-0" />
                 )}
             </div>
 
-            {localAuthStatus?.scope === 'machine-local' && (
+            {deviceAuthStatus && (
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                    {copy.machineScoped}
+                    {copy.backendHint}
                 </p>
             )}
 
-            {localAuthStatus?.userCode && (
+            {deviceAuthStatus?.prompt?.userCode && (
                 <div className="rounded-lg bg-surface-secondary/70 dark:bg-surface-secondary-dark/60 px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted dark:text-text-muted-dark">
                         {copy.deviceCode}
                     </p>
                     <p className="mt-2 font-mono text-lg font-semibold text-text dark:text-text-dark">
-                        {localAuthStatus.userCode}
+                        {deviceAuthStatus.prompt.userCode}
                     </p>
                 </div>
             )}
 
-            {localAuthStatus?.verificationUri && (
+            {deviceAuthStatus?.prompt?.verificationUri && (
                 <div className="rounded-lg bg-surface-secondary/70 dark:bg-surface-secondary-dark/60 px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted dark:text-text-muted-dark">
                         {copy.verificationUrl}
                     </p>
                     <p className="mt-2 text-sm text-text dark:text-text-dark break-all">
-                        {localAuthStatus.verificationUri}
+                        {deviceAuthStatus.prompt.verificationUri}
                     </p>
                 </div>
             )}
 
-            {localAuthError && <p className="text-sm text-danger">{localAuthError}</p>}
+            {deviceAuthError && <p className="text-sm text-danger">{deviceAuthError}</p>}
 
             <div className="flex flex-wrap gap-3">
-                {!localAuthStatus?.installed ? (
+                {!deviceAuthStatus?.installed ? (
                     <p className="text-sm text-danger">{copy.notInstalled}</p>
-                ) : localAuthStatus.connected ? (
+                ) : deviceAuthStatus.connected ? (
                     <span className="inline-flex items-center rounded-lg bg-success/10 px-3 py-2 text-sm font-medium text-success">
                         {copy.connected}
                     </span>
                 ) : (
-                    <Button type="button" onClick={onStart} loading={isStartingLocalAuth}>
-                        {localAuthStatus?.pending ? copy.restart : copy.start}
+                    <Button type="button" onClick={onStart} loading={isStartingDeviceAuth}>
+                        {deviceAuthStatus?.pending ? copy.restart : copy.start}
                     </Button>
                 )}
 
@@ -242,7 +239,7 @@ function LocalAuthStatusPanel({
                     type="button"
                     variant="secondary"
                     onClick={onRefresh}
-                    disabled={isLoadingLocalAuth}
+                    disabled={isLoadingDeviceAuth}
                 >
                     {copy.refresh}
                 </Button>
@@ -304,7 +301,7 @@ function VerifyStepPanel({
 export function PluginOnboardingWizard({
     plugin,
     initialSettings,
-    initialLocalAuthStatus = null,
+    initialDeviceAuthStatus = null,
     visibleProperties,
     getFieldValue,
     handleFieldChange,
@@ -317,67 +314,55 @@ export function PluginOnboardingWizard({
     const tOnboarding = useTranslations('onboarding');
     const tWizard = useTranslations('onboarding.plugins.wizard');
     const [step, setStep] = useState(0);
-    const [localAuthStatus, setLocalAuthStatus] = useState<PluginLocalAuthStatus | null>(
-        initialLocalAuthStatus,
-    );
-    const [localAuthError, setLocalAuthError] = useState<string | null>(null);
-    const [isLoadingLocalAuth, setIsLoadingLocalAuth] = useState(false);
-    const [isStartingLocalAuth, setIsStartingLocalAuth] = useState(false);
-
-    const supportsLocalAuth =
-        plugin.capabilities.includes('local-auth') || Boolean(plugin.uiHints?.localAuth);
-    const authModeField = plugin.uiHints?.localAuth?.authModeField || 'authMode';
+    const supportsDeviceAuth = plugin.capabilities.includes('device-auth');
+    const authModeField = plugin.uiHints?.deviceAuth?.authModeField || 'authMode';
     const configuredAuthMode =
         typeof initialSettings[authModeField] === 'string' ? initialSettings[authModeField] : null;
-    const [selectedAuthMode, setSelectedAuthMode] = useState<'api-key' | 'local'>(() => {
-        if (configuredAuthMode === 'api-key' || configuredAuthMode === 'local') {
+    const [selectedAuthMode, setSelectedAuthMode] = useState<'api-key' | 'device-auth'>(() => {
+        if (configuredAuthMode === 'api-key' || configuredAuthMode === 'device-auth') {
             return configuredAuthMode;
         }
 
-        return supportsLocalAuth && initialLocalAuthStatus?.connected ? 'local' : 'api-key';
+        return supportsDeviceAuth && initialDeviceAuthStatus?.connected ? 'device-auth' : 'api-key';
     });
     const initializedAuthMode = useRef(false);
+    const activateDeviceAuth = useCallback(() => {
+        handleFieldChange(authModeField, 'device-auth', false);
+        setSelectedAuthMode('device-auth');
+    }, [authModeField, handleFieldChange]);
+
+    const {
+        status: deviceAuthStatus,
+        error: deviceAuthError,
+        isLoading: isLoadingDeviceAuth,
+        isStarting: isStartingDeviceAuth,
+        refresh: refreshDeviceAuthStatus,
+        start: startDeviceAuth,
+    } = usePluginDeviceAuth({
+        pluginId: plugin.pluginId,
+        initialStatus: initialDeviceAuthStatus,
+        loadErrorMessage: tWizard('errors.loadStatus'),
+        startErrorMessage: tWizard('errors.start'),
+        onActivate: activateDeviceAuth,
+    });
 
     useEffect(() => {
-        if (!supportsLocalAuth || initializedAuthMode.current) {
+        if (!supportsDeviceAuth || initializedAuthMode.current) {
             return;
         }
 
-        if (configuredAuthMode !== 'api-key' && configuredAuthMode !== 'local') {
+        if (configuredAuthMode !== 'api-key' && configuredAuthMode !== 'device-auth') {
             handleFieldChange(authModeField, selectedAuthMode, false);
         }
 
         initializedAuthMode.current = true;
-    }, [authModeField, configuredAuthMode, handleFieldChange, selectedAuthMode, supportsLocalAuth]);
-
-    const refreshLocalAuthStatus = useCallback(async () => {
-        setIsLoadingLocalAuth(true);
-        setLocalAuthError(null);
-
-        try {
-            const status = await getPluginLocalAuthStatus(plugin.pluginId);
-            if (!status.success || !status.data) {
-                setLocalAuthError(status.error || tWizard('errors.loadStatus'));
-                return;
-            }
-
-            setLocalAuthStatus(status.data);
-        } finally {
-            setIsLoadingLocalAuth(false);
-        }
-    }, [plugin.pluginId, tWizard]);
-
-    useEffect(() => {
-        if (!localAuthStatus?.pending) {
-            return;
-        }
-
-        const timer = window.setInterval(() => {
-            void refreshLocalAuthStatus();
-        }, 2000);
-
-        return () => window.clearInterval(timer);
-    }, [localAuthStatus?.pending, refreshLocalAuthStatus]);
+    }, [
+        authModeField,
+        configuredAuthMode,
+        handleFieldChange,
+        selectedAuthMode,
+        supportsDeviceAuth,
+    ]);
 
     const orderedFields = useMemo(() => Object.entries(visibleProperties), [visibleProperties]);
     const configurationFields = orderedFields.filter(([key, schema]) => {
@@ -411,7 +396,7 @@ export function PluginOnboardingWizard({
             });
         }
 
-        if (supportsLocalAuth || credentialFields.length > 0) {
+        if (supportsDeviceAuth || credentialFields.length > 0) {
             result.push({
                 key: 'credentials',
                 title: tWizard('steps.credentials.title'),
@@ -431,45 +416,23 @@ export function PluginOnboardingWizard({
         credentialFields.length,
         plugin.name,
         plugin.uiHints?.onboardingDescription,
-        supportsLocalAuth,
+        supportsDeviceAuth,
         tWizard,
     ]);
 
     const currentStep = steps[step];
 
-    const setAuthMode = (mode: 'api-key' | 'local') => {
+    const setAuthMode = (mode: 'api-key' | 'device-auth') => {
         setSelectedAuthMode(mode);
         handleFieldChange(authModeField, mode, false);
     };
 
-    const handleStartLocalAuth = async () => {
-        setIsStartingLocalAuth(true);
-        setLocalAuthError(null);
-
-        try {
-            const result = await startPluginLocalAuth(plugin.pluginId);
-            if (!result.success || !result.data) {
-                setLocalAuthError(result.error || tWizard('errors.start'));
-                return;
-            }
-
-            setLocalAuthStatus(result.data);
-            setAuthMode('local');
-
-            if (result.data.verificationUri) {
-                window.open(result.data.verificationUri, '_blank', 'noopener,noreferrer');
-            }
-        } finally {
-            setIsStartingLocalAuth(false);
-        }
-    };
-
-    const setupStatusLabel = localAuthStatus?.connected
-        ? tWizard('localAuth.badges.connected')
-        : localAuthStatus?.pending
-          ? tWizard('localAuth.badges.pending')
-          : selectedAuthMode === 'local'
-            ? tWizard('authModes.local.title')
+    const setupStatusLabel = deviceAuthStatus?.connected
+        ? tWizard('deviceAuth.badges.connected')
+        : deviceAuthStatus?.pending
+          ? tWizard('deviceAuth.badges.pending')
+          : selectedAuthMode === 'device-auth'
+            ? tWizard('authModes.deviceAuth.title')
             : tWizard('authModes.apiKey.title');
 
     return (
@@ -519,7 +482,7 @@ export function PluginOnboardingWizard({
 
                 {currentStep.key === 'credentials' && (
                     <div className="space-y-4">
-                        {supportsLocalAuth && (
+                        {supportsDeviceAuth && (
                             <div className="space-y-4">
                                 <div className="grid gap-4 md:grid-cols-2">
                                     {apiKeyField && (
@@ -532,23 +495,23 @@ export function PluginOnboardingWizard({
                                     )}
 
                                     <AuthModeOption
-                                        selected={selectedAuthMode === 'local'}
-                                        title={tWizard('authModes.local.title')}
-                                        description={tWizard('authModes.local.description')}
+                                        selected={selectedAuthMode === 'device-auth'}
+                                        title={tWizard('authModes.deviceAuth.title')}
+                                        description={tWizard('authModes.deviceAuth.description')}
                                         badge={
-                                            localAuthStatus?.connected
+                                            deviceAuthStatus?.connected
                                                 ? {
-                                                      label: tWizard('localAuth.badges.connected'),
+                                                      label: tWizard('deviceAuth.badges.connected'),
                                                       tone: 'success',
                                                   }
-                                                : localAuthStatus?.pending
+                                                : deviceAuthStatus?.pending
                                                   ? {
-                                                        label: tWizard('localAuth.badges.pending'),
+                                                        label: tWizard('deviceAuth.badges.pending'),
                                                         tone: 'primary',
                                                     }
                                                   : undefined
                                         }
-                                        onClick={() => setAuthMode('local')}
+                                        onClick={() => setAuthMode('device-auth')}
                                     />
                                 </div>
 
@@ -568,36 +531,36 @@ export function PluginOnboardingWizard({
                                     />
                                 )}
 
-                                {selectedAuthMode === 'local' && (
-                                    <LocalAuthStatusPanel
-                                        localAuthStatus={localAuthStatus}
-                                        localAuthError={localAuthError}
-                                        isLoadingLocalAuth={isLoadingLocalAuth}
-                                        isStartingLocalAuth={isStartingLocalAuth}
-                                        onStart={() => void handleStartLocalAuth()}
-                                        onRefresh={() => void refreshLocalAuthStatus()}
+                                {selectedAuthMode === 'device-auth' && (
+                                    <DeviceAuthStatusPanel
+                                        deviceAuthStatus={deviceAuthStatus}
+                                        deviceAuthError={deviceAuthError}
+                                        isLoadingDeviceAuth={isLoadingDeviceAuth}
+                                        isStartingDeviceAuth={isStartingDeviceAuth}
+                                        onStart={() => void startDeviceAuth()}
+                                        onRefresh={() => void refreshDeviceAuthStatus()}
                                         copy={{
-                                            title: tWizard('localAuth.status.title'),
-                                            fallbackMessage: tWizard('localAuth.status.fallback'),
-                                            machineScoped: tWizard(
-                                                'localAuth.status.machineScoped',
-                                            ),
-                                            deviceCode: tWizard('localAuth.status.deviceCode'),
+                                            title: tWizard('deviceAuth.status.title'),
+                                            fallbackMessage: tWizard('deviceAuth.status.fallback'),
+                                            backendHint: tWizard('deviceAuth.status.backendHint'),
+                                            deviceCode: tWizard('deviceAuth.status.deviceCode'),
                                             verificationUrl: tWizard(
-                                                'localAuth.status.verificationUrl',
+                                                'deviceAuth.status.verificationUrl',
                                             ),
-                                            notInstalled: tWizard('localAuth.actions.notInstalled'),
-                                            connected: tWizard('localAuth.actions.connected'),
-                                            start: tWizard('localAuth.actions.start'),
-                                            restart: tWizard('localAuth.actions.restart'),
-                                            refresh: tWizard('localAuth.actions.refresh'),
+                                            notInstalled: tWizard(
+                                                'deviceAuth.actions.notInstalled',
+                                            ),
+                                            connected: tWizard('deviceAuth.actions.connected'),
+                                            start: tWizard('deviceAuth.actions.start'),
+                                            restart: tWizard('deviceAuth.actions.restart'),
+                                            refresh: tWizard('deviceAuth.actions.refresh'),
                                         }}
                                     />
                                 )}
                             </div>
                         )}
 
-                        {!supportsLocalAuth &&
+                        {!supportsDeviceAuth &&
                             credentialFields.map(([key, schema]) => (
                                 <PluginSettingsField
                                     key={key}

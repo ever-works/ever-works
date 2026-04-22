@@ -19,21 +19,11 @@ During step 3, a **taxonomy watcher** monitors the workspace for new item files 
 
 ## Authentication
 
-Gemini CLI supports three authentication modes:
+Gemini supports two authentication modes in Ever Works:
 
 ### API Key (default)
 
 Provide a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) in plugin settings (`apiKey` field).
-
-### Machine-Local
-
-Uses an existing local Google login cached by Gemini CLI at `~/.gemini/`. Authenticate manually:
-
-```bash
-gemini login
-```
-
-### API Key
 
 ### Vertex AI
 
@@ -45,11 +35,14 @@ Use Google Cloud / Vertex AI environment-based authentication. Requires:
 
 The onboarding UI provides a 3-step flow: choose auth mode, configure credentials, and verify the connection.
 
+This plugin does not reuse host machine Gemini CLI login state from `~/.gemini/`.
+Credentials must come from Ever Works user settings so each user keeps isolated auth.
+
 ## Settings
 
 | Setting               | Type    | Scope  | Description                                                       |
 | --------------------- | ------- | ------ | ----------------------------------------------------------------- |
-| `authMode`            | string  | user   | `machine-local`, `api-key`, or `vertex`                           |
+| `authMode`            | string  | user   | `api-key` or `vertex`                                             |
 | `apiKey`              | string  | user   | Gemini API key (secret, supports env var `PLUGIN_GEMINI_API_KEY`) |
 | `googleApiKey`        | string  | user   | Google Cloud API key for Vertex AI (secret, optional)             |
 | `googleCloudProject`  | string  | user   | Google Cloud project ID for Vertex AI                             |

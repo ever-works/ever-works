@@ -197,10 +197,10 @@ export interface PluginResponse {
 export interface PluginConnectionStatus {
 	/** Whether the plugin currently has enough auth/configuration to be considered connected. */
 	connected: boolean;
-	/** Whether an interactive local-auth flow is still in progress. */
+	/** Whether an interactive auth flow is still in progress. */
 	pending?: boolean;
 	/** Scope of the active connection, when known. */
-	scope?: 'user' | 'directory' | 'machine-local';
+	scope?: 'user' | 'directory';
 	/** Human-readable status message. */
 	message?: string;
 }
