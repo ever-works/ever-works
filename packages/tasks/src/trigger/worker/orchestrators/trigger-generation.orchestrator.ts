@@ -1,4 +1,5 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { GENERATION_CANCELLED } from '@ever-works/agent/constants';
 import { DataGeneratorService, GenerationStats } from '@ever-works/agent/generators';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
 import { WebsiteGeneratorService } from '@ever-works/agent/generators';
@@ -13,8 +14,6 @@ import { NotificationService } from '@ever-works/agent/notifications';
 import { normalizeGeneratorError } from '@ever-works/agent/services';
 import { calculateDurationSeconds } from '@ever-works/agent/utils';
 import { BaseOrchestrator } from './base-orchestrator';
-
-const GENERATION_CANCELLED = 'Generation cancelled';
 
 export type TriggerGenerationOptions = {
     directory: Directory;
