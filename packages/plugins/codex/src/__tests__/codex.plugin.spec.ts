@@ -96,6 +96,7 @@ function createMockContext(settingsOverride?: PluginSettings): PluginContext {
 			}
 		),
 		getResolvedSettings: vi.fn(),
+		updateSettings: vi.fn(),
 		onEvent: vi.fn().mockReturnValue({ unsubscribe: vi.fn() }),
 		emitEvent: vi.fn(),
 		registerCustomCapability: vi.fn(),
@@ -235,11 +236,9 @@ describe('CodexPlugin', () => {
 			authMode: 'device-auth'
 		});
 
-		expect(pipelineHelpers.hasDeviceCodexAuth).toHaveBeenCalledWith({ authMode: 'device-auth' }, undefined, {
-			allowHostFallback: false
-		});
+		expect(pipelineHelpers.hasDeviceCodexAuth).toHaveBeenCalledWith({ authMode: 'device-auth' });
 		expect(result.success).toBe(false);
-		expect(result.message).toContain('cannot be verified from unscoped settings alone');
+		expect(result.message).toContain('is not configured for this user');
 	});
 
 	describe('execute', () => {
@@ -440,15 +439,14 @@ describe('CodexPlugin', () => {
 			recoverySpy.mockRestore();
 		});
 
-		it('executes using local auth mode when resolved settings use CODEX_HOME', async () => {
+		it('executes using device-auth mode when resolved settings include a portable auth payload', async () => {
 			vi.mocked(pipelineHelpers.resolveSettings).mockResolvedValueOnce({
 				model: 'codex-mini-latest',
-				codexHome: '/tmp/codex-home'
+				deviceAuthAuthJson: '{"token":"abc"}'
 			});
 			vi.mocked(pipelineHelpers.resolveExecutionAuth).mockResolvedValueOnce({
-				mode: 'local',
-				codexHome: '/tmp/codex-home',
-				env: { CODEX_HOME: '/tmp/codex-home' }
+				mode: 'device-auth',
+				authJson: '{"token":"abc"}'
 			});
 
 			await plugin.onLoad(createMockContext());
@@ -458,7 +456,9 @@ describe('CodexPlugin', () => {
 			expect(result.success).toBe(true);
 			expect(processRunner.executeCodex).toHaveBeenCalledWith(
 				expect.objectContaining({
-					env: { CODEX_HOME: '/tmp/codex-home' }
+					env: expect.objectContaining({
+						CODEX_HOME: expect.stringContaining('/_meta/device-auth/.codex')
+					})
 				})
 			);
 		});

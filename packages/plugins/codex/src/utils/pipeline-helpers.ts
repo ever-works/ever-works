@@ -1,5 +1,7 @@
 import * as fs from 'fs/promises';
+import * as os from 'os';
 import * as path from 'path';
+import { randomUUID } from 'node:crypto';
 
 import type { PluginSettings } from '@ever-works/plugin';
 import { createPipelineRuntimeHelpers } from '@ever-works/plugin';
@@ -7,35 +9,19 @@ import { createPipelineRuntimeHelpers } from '@ever-works/plugin';
 import type { CodexStepId } from '../types.js';
 import { CODEX_STEP_IDS } from '../types.js';
 import { STEP_DEFINITIONS } from '../steps.js';
-import { verifyDeviceAuthConnection } from '../device-auth.js';
-import { resolveCodexHome } from './codex-home.js';
 export { getManagedCodexHome, resolveCodexHome } from './codex-home.js';
 
-export interface ResolvedExecutionAuth {
-	readonly env: Record<string, string>;
-	readonly mode: 'api-key' | 'device-auth';
-	readonly codexHome?: string;
-}
+export const DEVICE_AUTH_AUTH_JSON_SETTING = 'deviceAuthAuthJson';
 
-export interface DeviceAuthResolutionOptions {
-	readonly allowHostFallback?: boolean;
-}
-
-function hasConfiguredCodexHome(settings: PluginSettings): boolean {
-	return typeof settings.codexHome === 'string' && settings.codexHome.trim().length > 0;
-}
-
-function shouldUseHostFallback(
-	settings: PluginSettings,
-	userId: string | undefined,
-	options?: DeviceAuthResolutionOptions
-): boolean {
-	if (userId || hasConfiguredCodexHome(settings)) {
-		return true;
-	}
-
-	return options?.allowHostFallback !== false;
-}
+export type ResolvedExecutionAuth =
+	| {
+			readonly env: Record<string, string>;
+			readonly mode: 'api-key';
+	  }
+	| {
+			readonly authJson: string;
+			readonly mode: 'device-auth';
+	  };
 
 const runtime = createPipelineRuntimeHelpers<CodexStepId>({
 	stepDefinitions: STEP_DEFINITIONS,
@@ -52,36 +38,31 @@ export const buildErrorResult = runtime.buildErrorResult;
 export const buildCancelledResult = runtime.buildCancelledResult;
 export const delay = runtime.delay;
 
-export async function hasDeviceCodexAuth(
-	settings: PluginSettings,
-	userId?: string,
-	options?: DeviceAuthResolutionOptions
-): Promise<boolean> {
-	if (!shouldUseHostFallback(settings, userId, options)) {
-		return false;
+function getUsableSecret(value: unknown): string | undefined {
+	if (typeof value !== 'string') {
+		return undefined;
 	}
 
-	const codexHome = resolveCodexHome(settings, userId);
-	const authPath = path.join(codexHome, 'auth.json');
-	try {
-		const stats = await fs.stat(authPath);
-		if (stats.isFile()) {
-			return true;
-		}
-	} catch {
-		// Fall back to Codex CLI status below.
+	const trimmed = value.trim();
+	if (!trimmed || trimmed.includes('••••')) {
+		return undefined;
 	}
 
-	return verifyDeviceAuthConnection(codexHome);
+	return trimmed;
 }
 
-export async function resolveExecutionAuth(
-	settings: PluginSettings,
-	userId?: string,
-	options?: DeviceAuthResolutionOptions
-): Promise<ResolvedExecutionAuth | null> {
+export function getPortableDeviceAuthJson(settings: PluginSettings): string | undefined {
+	return getUsableSecret(settings[DEVICE_AUTH_AUTH_JSON_SETTING]);
+}
+
+export async function hasDeviceCodexAuth(settings: PluginSettings): Promise<boolean> {
+	return Boolean(getPortableDeviceAuthJson(settings));
+}
+
+export async function resolveExecutionAuth(settings: PluginSettings): Promise<ResolvedExecutionAuth | null> {
 	const authMode = typeof settings.authMode === 'string' ? settings.authMode : undefined;
-	const apiKey = typeof settings.apiKey === 'string' ? settings.apiKey.trim() : '';
+	const apiKey = getUsableSecret(settings.apiKey);
+	const deviceAuthAuthJson = getPortableDeviceAuthJson(settings);
 
 	if (authMode === 'api-key' && apiKey) {
 		return {
@@ -91,16 +72,12 @@ export async function resolveExecutionAuth(
 	}
 
 	if (authMode === 'device-auth') {
-		const codexHome = resolveCodexHome(settings, userId);
-		if (!(await hasDeviceCodexAuth(settings, userId, options))) {
+		if (!deviceAuthAuthJson) {
 			return null;
 		}
 		return {
 			mode: 'device-auth',
-			codexHome,
-			env: {
-				CODEX_HOME: codexHome
-			}
+			authJson: deviceAuthAuthJson
 		};
 	}
 
@@ -111,16 +88,32 @@ export async function resolveExecutionAuth(
 		};
 	}
 
-	if (await hasDeviceCodexAuth(settings, userId, options)) {
-		const codexHome = resolveCodexHome(settings, userId);
+	if (deviceAuthAuthJson) {
 		return {
 			mode: 'device-auth',
-			codexHome,
-			env: {
-				CODEX_HOME: codexHome
-			}
+			authJson: deviceAuthAuthJson
 		};
 	}
 
 	return null;
+}
+
+export async function materializeDeviceAuthHome(authJson: string, baseDir?: string): Promise<string> {
+	const rootDir = baseDir
+		? path.resolve(baseDir)
+		: await fs.mkdtemp(path.join(os.tmpdir(), `ever-works-codex-auth-${randomUUID()}-`));
+	const codexHome = path.join(rootDir, '.codex');
+
+	await fs.mkdir(codexHome, { recursive: true });
+	await fs.writeFile(path.join(codexHome, 'auth.json'), authJson, 'utf-8');
+
+	return codexHome;
+}
+
+export async function cleanupDeviceAuthHome(codexHome: string): Promise<void> {
+	try {
+		await fs.rm(path.dirname(codexHome), { recursive: true, force: true });
+	} catch {
+		// Cleanup failures are non-fatal.
+	}
 }

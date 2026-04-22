@@ -15,6 +15,8 @@ type LoggerLike = {
 	debug?(message: string, ...args: unknown[]): void;
 };
 
+type PersistDeviceAuthFn = (authJson: string) => Promise<void> | void;
+
 type DeviceAuthSession = {
 	process: ReturnType<typeof spawn>;
 	verificationUri?: string;
@@ -45,7 +47,11 @@ function getBinaryLogger(logger?: LoggerLike) {
 	};
 }
 
-export async function getDeviceAuthStatus(userId: string, logger?: LoggerLike): Promise<DeviceAuthStatus> {
+export async function getDeviceAuthStatus(
+	userId: string,
+	logger?: LoggerLike,
+	onConnected?: PersistDeviceAuthFn
+): Promise<DeviceAuthStatus> {
 	const codexHome = getManagedCodexHome(userId);
 	const installed = await isCodexInstalled(logger);
 	const connected = installed ? await verifyDeviceAuthConnection(codexHome, logger) : false;
@@ -56,6 +62,7 @@ export async function getDeviceAuthStatus(userId: string, logger?: LoggerLike): 
 	}
 
 	if (connected) {
+		await persistDeviceAuthIfAvailable(codexHome, onConnected);
 		lastFailureByUser.delete(userId);
 	}
 
@@ -81,7 +88,11 @@ export async function getDeviceAuthStatus(userId: string, logger?: LoggerLike): 
 	};
 }
 
-export async function startDeviceAuth(userId: string, logger?: LoggerLike): Promise<DeviceAuthStatus> {
+export async function startDeviceAuth(
+	userId: string,
+	logger?: LoggerLike,
+	onConnected?: PersistDeviceAuthFn
+): Promise<DeviceAuthStatus> {
 	const codexHome = getManagedCodexHome(userId);
 	const installed = await isCodexInstalled(logger);
 	if (!installed) {
@@ -96,6 +107,7 @@ export async function startDeviceAuth(userId: string, logger?: LoggerLike): Prom
 	}
 
 	if (await isConnected(codexHome, logger)) {
+		await persistDeviceAuthIfAvailable(codexHome, onConnected);
 		disposeSession(userId);
 		lastFailureByUser.delete(userId);
 		return {
@@ -189,6 +201,7 @@ export async function startDeviceAuth(userId: string, logger?: LoggerLike): Prom
 		const connected = await hasAuthFile(codexHome);
 		if (connected) {
 			session.status = 'connected';
+			await persistDeviceAuthIfAvailable(codexHome, onConnected);
 			disposeSession(userId);
 			return;
 		}
@@ -285,7 +298,7 @@ function stripAnsi(value: string): string {
 	return value.replace(/\u001B\[[0-9;]*[A-Za-z]/gu, '');
 }
 
-async function isCodexInstalled(logger?: LoggerLike): Promise<boolean> {
+export async function isCodexInstalled(logger?: LoggerLike): Promise<boolean> {
 	try {
 		const codexCommand = await ensureBinary(undefined, getBinaryLogger(logger));
 		return await new Promise((resolve) => {
@@ -347,6 +360,27 @@ async function hasAuthFile(codexHome?: string): Promise<boolean> {
 function getAuthPath(codexHome?: string): string {
 	const resolvedCodexHome = codexHome || process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
 	return path.join(resolvedCodexHome, 'auth.json');
+}
+
+async function readAuthJson(codexHome?: string): Promise<string | null> {
+	try {
+		return await fs.readFile(getAuthPath(codexHome), 'utf-8');
+	} catch {
+		return null;
+	}
+}
+
+async function persistDeviceAuthIfAvailable(codexHome: string, onConnected?: PersistDeviceAuthFn): Promise<void> {
+	if (!onConnected) {
+		return;
+	}
+
+	const authJson = await readAuthJson(codexHome);
+	if (!authJson) {
+		return;
+	}
+
+	await onConnected(authJson);
 }
 
 function getActiveSession(userId: string): DeviceAuthSession | undefined {

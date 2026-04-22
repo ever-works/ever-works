@@ -88,6 +88,20 @@ describe('device-auth', () => {
 		expect(result.flowType).toBe('device-code');
 	});
 
+	it('persists an already-authenticated local session when status is requested', async () => {
+		const userId = 'user-status-persisted';
+		const codexHome = getManagedCodexHome(userId);
+		await fs.mkdir(codexHome, { recursive: true });
+		await fs.writeFile(path.join(codexHome, 'auth.json'), '{"ok":true}', 'utf-8');
+
+		const persistSpy = vi.fn();
+		const { getDeviceAuthStatus } = await import('../device-auth.js');
+		const result = await getDeviceAuthStatus(userId, undefined, persistSpy);
+
+		expect(result.connected).toBe(true);
+		expect(persistSpy).toHaveBeenCalledWith('{"ok":true}');
+	});
+
 	it('starts device auth with a managed per-user CODEX_HOME', async () => {
 		const userId = 'user-device-auth';
 		const codexHome = getManagedCodexHome(userId);

@@ -56,7 +56,7 @@ import {
 import { PROMPT_KEYS } from './prompt-keys.js';
 import { executeCodex, type ExecuteResult } from './utils/process-runner.js';
 import { ensureBinary } from './utils/binary-manager.js';
-import { getDeviceAuthStatus, startDeviceAuth, verifyDeviceAuthConnection } from './device-auth.js';
+import { getDeviceAuthStatus, isCodexInstalled, startDeviceAuth, verifyDeviceAuthConnection } from './device-auth.js';
 import {
 	cleanupWorkspace,
 	collectMetadataFromItems,
@@ -72,8 +72,11 @@ import {
 	buildCancelledResult,
 	buildErrorResult,
 	buildMetrics,
+	cleanupDeviceAuthHome,
+	DEVICE_AUTH_AUTH_JSON_SETTING,
 	hasDeviceCodexAuth,
 	initializeState,
+	materializeDeviceAuthHome,
 	reportItemProgress,
 	reportProgress,
 	resolveExecutionAuth,
@@ -190,7 +193,6 @@ const MANIFEST: PluginManifest = {
 const LOG_MESSAGE_MAX_LENGTH = 500;
 const RECOVERY_ITEMS_SCHEMA_FILE = 'recovered-items.schema.json';
 const RECOVERY_ITEMS_OUTPUT_FILE = 'recovered-items.json';
-const UNSCOPED_DEVICE_AUTH_OPTIONS = { allowHostFallback: false } as const;
 const STEP_CONTEXT_BY_ID = new Map(
 	STEP_DEFINITIONS.map((step, stepIndex) => [step.id, { stepIndex, stepName: step.name }])
 );
@@ -261,6 +263,14 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				'x-scope': 'user',
 				'x-envVar': 'OPENAI_API_KEY'
 			},
+			[DEVICE_AUTH_AUTH_JSON_SETTING]: {
+				type: 'string',
+				title: 'Device Auth Session',
+				description: 'Portable device-auth payload used to materialize a runtime CODEX_HOME for Codex CLI.',
+				'x-secret': true,
+				'x-scope': 'user',
+				'x-hidden': true
+			},
 			model: {
 				type: 'string',
 				title: 'Model',
@@ -317,6 +327,42 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	private getRealSecret(value: unknown): string | undefined {
 		if (typeof value !== 'string' || !value || value.includes('••••')) return undefined;
 		return value;
+	}
+
+	private async persistDeviceAuthPayload(userId: string, authJson: string): Promise<void> {
+		if (!this.context) {
+			return;
+		}
+
+		await this.context.updateSettings('user', userId, {
+			settings: { authMode: 'device-auth' },
+			secretSettings: {
+				[DEVICE_AUTH_AUTH_JSON_SETTING]: authJson
+			}
+		});
+	}
+
+	private async getPersistedDeviceAuthStatus(userId: string): Promise<DeviceAuthStatus | null> {
+		if (!this.context) {
+			return null;
+		}
+
+		const settings = await this.context.getSettings('user', userId);
+		const authJson = this.getRealSecret(settings[DEVICE_AUTH_AUTH_JSON_SETTING]);
+		if (!authJson) {
+			return null;
+		}
+
+		const installed = await isCodexInstalled(this.context.logger);
+
+		return {
+			installed,
+			connected: true,
+			pending: false,
+			scope: 'user',
+			flowType: 'device-code',
+			message: 'Codex device authentication is connected for this user.'
+		};
 	}
 
 	async isAvailable(settings?: Record<string, unknown>): Promise<boolean> {
@@ -396,7 +442,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			if (!apiKey) {
 				return {
 					success: false,
-					message: 'Provide an OpenAI API key or switch to local Codex auth first.'
+					message: 'Provide an OpenAI API key or switch to device authentication first.'
 				};
 			}
 
@@ -406,16 +452,16 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				: {
 						success: false,
 						message:
-							'OpenAI API key validation failed. Verify the key, model access, and billing, or switch to local `codex login`.'
+							'OpenAI API key validation failed. Verify the key, model access, and billing, or switch to device authentication.'
 					};
 		}
 
 		if (authMode === 'device-auth') {
-			if (!(await hasDeviceCodexAuth(settings, undefined, UNSCOPED_DEVICE_AUTH_OPTIONS))) {
+			if (!(await hasDeviceCodexAuth(settings))) {
 				return {
 					success: false,
 					message:
-						'Codex device auth cannot be verified from unscoped settings alone. Start device auth for this user first or configure an OpenAI API key.'
+						'Codex device authentication is not configured for this user. Complete device auth first or configure an OpenAI API key.'
 				};
 			}
 
@@ -436,11 +482,11 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				: {
 						success: false,
 						message:
-							'OpenAI API key validation failed. Verify the key, model access, and billing, or use local `codex login`.'
+							'OpenAI API key validation failed. Verify the key, model access, and billing, or use device authentication.'
 					};
 		}
 
-		if (await hasDeviceCodexAuth(settings, undefined, UNSCOPED_DEVICE_AUTH_OPTIONS)) {
+		if (await hasDeviceCodexAuth(settings)) {
 			const valid = await this.validateCliAuth(settings);
 			return valid
 				? { success: true, message: 'Codex device authentication verified.' }
@@ -458,11 +504,25 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	async getDeviceAuthStatus(userId: string): Promise<DeviceAuthStatus> {
-		return getDeviceAuthStatus(userId, this.context?.logger ?? console);
+		const persisted = await this.getPersistedDeviceAuthStatus(userId);
+		if (persisted) {
+			return persisted;
+		}
+
+		return getDeviceAuthStatus(userId, this.context?.logger ?? console, async (authJson) =>
+			this.persistDeviceAuthPayload(userId, authJson)
+		);
 	}
 
 	async startDeviceAuth(userId: string): Promise<DeviceAuthStatus> {
-		return startDeviceAuth(userId, this.context?.logger ?? console);
+		const persisted = await this.getPersistedDeviceAuthStatus(userId);
+		if (persisted) {
+			return persisted;
+		}
+
+		return startDeviceAuth(userId, this.context?.logger ?? console, async (authJson) =>
+			this.persistDeviceAuthPayload(userId, authJson)
+		);
 	}
 
 	async execute(
@@ -501,16 +561,17 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 		let workspaceCreated = false;
 		let workspacePath: string | null = null;
+		let executionAuthEnv: Record<string, string> | null = null;
 
 		try {
 			const setupStartedAt = this.startStep('setup-codex', onLogEntry);
 			reportProgress(onProgress, 0, 5, 'Setup Codex');
 
 			const settings = await resolveSettings(this.context, userId, directory.id);
-			const executionAuth = await resolveExecutionAuth(settings, userId);
+			const executionAuth = await resolveExecutionAuth(settings);
 			if (!executionAuth) {
 				throw new Error(
-					'No Codex authentication available. Configure an OpenAI API key or sign in locally with Codex CLI.'
+					'No Codex authentication available. Configure an OpenAI API key or complete device authentication first.'
 				);
 			}
 
@@ -521,7 +582,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				stepId: 'setup-codex',
 				event: 'message',
 				level: 'info',
-				message: `Using Codex ${executionAuth.mode === 'api-key' ? 'API key' : 'local auth'} mode`
+				message: `Using Codex ${executionAuth.mode === 'api-key' ? 'API key' : 'device auth'} mode`
 			});
 			this.completeStep('setup-codex', setupStartedAt, onLogEntry);
 
@@ -538,6 +599,16 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				tags: existing.tags,
 				brands: existing.brands
 			});
+
+			executionAuthEnv =
+				executionAuth.mode === 'api-key'
+					? executionAuth.env
+					: {
+							CODEX_HOME: await materializeDeviceAuthHome(
+								executionAuth.authJson,
+								path.join(workspacePath, '_meta', 'device-auth')
+							)
+						};
 			this.completeStep('prepare-context', prepareStartedAt, onLogEntry);
 
 			const generateStartedAt = this.startStep('generate-items', onLogEntry);
@@ -569,7 +640,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			try {
 				executionResult = await this.runCodexPrompt({
 					workspacePath,
-					executionAuthEnv: executionAuth.env,
+					executionAuthEnv: executionAuthEnv ?? {},
 					model: typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL,
 					bypassApprovalsAndSandbox: settings.unsafeBypassSandbox === true,
 					prompt,
@@ -622,7 +693,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 					executionResult = await this.runCodexPrompt({
 						workspacePath,
-						executionAuthEnv: executionAuth.env,
+						executionAuthEnv: executionAuthEnv ?? {},
 						model: typeof settings.model === 'string' ? settings.model : DEFAULT_MODEL,
 						bypassApprovalsAndSandbox: true,
 						prompt,
@@ -652,7 +723,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 						existing,
 						workspacePath,
 						settings,
-						executionAuthEnv: executionAuth.env,
+						executionAuthEnv: executionAuthEnv ?? {},
 						preferBypass: shouldRetryWithBypass,
 						onLogEntry,
 						signal
@@ -1205,12 +1276,17 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	private async validateCliAuth(settings: Record<string, unknown>): Promise<boolean> {
-		const executionAuth = await resolveExecutionAuth(settings, undefined, UNSCOPED_DEVICE_AUTH_OPTIONS);
+		const executionAuth = await resolveExecutionAuth(settings);
 		if (!executionAuth || executionAuth.mode !== 'device-auth') {
 			return false;
 		}
 
-		return verifyDeviceAuthConnection(executionAuth.codexHome, this.context?.logger ?? console);
+		const codexHome = await materializeDeviceAuthHome(executionAuth.authJson);
+		try {
+			return await verifyDeviceAuthConnection(codexHome, this.context?.logger ?? console);
+		} finally {
+			await cleanupDeviceAuthHome(codexHome);
+		}
 	}
 
 	private handleError(error: Error, startTime: number): PipelineResult {
