@@ -413,7 +413,10 @@ export class DirectoryRepository {
                 'activeWebsites',
             )
             .addSelect(
-                'COALESCE(SUM(CASE WHEN directory.generationStartedAt IS NOT NULL AND directory.generationFinishedAt IS NULL THEN 1 ELSE 0 END), 0)',
+                // `generateStatus` is stored as TypeORM `simple-json`, so it is persisted as plain text
+                // across the supported databases in this repo. Keep this query portable by matching the
+                // serialized status field instead of using engine-specific JSON operators.
+                `COALESCE(SUM(CASE WHEN directory.generateStatus LIKE '%"status":"generating"%' THEN 1 ELSE 0 END), 0)`,
                 'generatingCount',
             )
             .getRawOne();

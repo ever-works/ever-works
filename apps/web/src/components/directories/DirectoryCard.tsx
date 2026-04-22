@@ -41,9 +41,11 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
     const isScheduled = directory.scheduledStatus === DirectoryScheduleStatus.ACTIVE;
     const userRole = directory.userRole;
     const isShared = userRole && userRole !== DirectoryMemberRole.OWNER;
+    const shouldShowScheduledSuffix =
+        isScheduled && status !== GenerateStatusType.GENERATING && !isOpening;
     const statusLabel = isOpening
         ? t('status.opening')
-        : isScheduled
+        : shouldShowScheduledSuffix
           ? `${tStatus(statusConfig.labelKey)} - Scheduled`
           : tStatus(statusConfig.labelKey);
     const isGenerating = statusConfig.labelKey === 'generating' || isOpening;

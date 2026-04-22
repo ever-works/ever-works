@@ -24,8 +24,6 @@ import type {
 	ConnectionValidationResult
 } from '@ever-works/plugin';
 import { buildSuccessPipelineResult, substituteVariables } from '@ever-works/plugin';
-import * as fs from 'fs/promises';
-import * as os from 'os';
 import * as path from 'path';
 import * as https from 'https';
 
@@ -61,7 +59,8 @@ import {
 	resolveAuthEnv,
 	buildMetrics,
 	buildErrorResult,
-	buildCancelledResult
+	buildCancelledResult,
+	finalizeCompletedState
 } from './utils/pipeline-helpers.js';
 import {
 	getFormFields as formFields,
@@ -155,6 +154,17 @@ interface GeminiLogOptions {
 	readonly durationMs?: number;
 }
 
+function buildIsolatedGeminiEnv(configDir: string, env: Record<string, string>): Record<string, string> {
+	return {
+		...env,
+		HOME: configDir,
+		XDG_CONFIG_HOME: path.join(configDir, '.config'),
+		XDG_DATA_HOME: path.join(configDir, '.local', 'share'),
+		XDG_CACHE_HOME: path.join(configDir, '.cache'),
+		GEMINI_CONFIG_DIR: configDir
+	};
+}
+
 /**
  * Gemini Generator Plugin
  *
@@ -174,15 +184,6 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {
-			authMode: {
-				type: 'string',
-				title: 'Authentication Mode',
-				description:
-					"Use `machine-local` to rely on this machine's existing Gemini login, `api-key` for Google AI Studio keys, or `vertex` for Google Cloud / Vertex AI authentication.",
-				default: 'api-key',
-				enum: ['machine-local', 'api-key', 'vertex'],
-				'x-scope': 'user'
-			},
 			apiKey: {
 				type: 'string',
 				title: 'API Key',
@@ -190,26 +191,6 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				'x-secret': true,
 				'x-scope': 'user',
 				'x-envVar': 'PLUGIN_GEMINI_API_KEY'
-			},
-			googleApiKey: {
-				type: 'string',
-				title: 'Google Cloud API Key',
-				description: 'Optional Google Cloud API key for Vertex AI mode.',
-				'x-secret': true,
-				'x-scope': 'user'
-			},
-			googleCloudProject: {
-				type: 'string',
-				title: 'Google Cloud Project',
-				description: 'Required for Vertex AI mode.',
-				'x-scope': 'user'
-			},
-			googleCloudLocation: {
-				type: 'string',
-				title: 'Google Cloud Location',
-				description: 'Required for Vertex AI mode, for example `us-central1`.',
-				default: 'us-central1',
-				'x-scope': 'user'
 			},
 			version: {
 				type: 'string',
@@ -263,101 +244,30 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		return value;
 	}
 
-	private resolveAuthMode(settings: Record<string, unknown>): 'machine-local' | 'api-key' | 'vertex' {
-		const value = settings.authMode;
-		return value === 'machine-local' || value === 'vertex' ? value : 'api-key';
-	}
-
-	private async hasCachedMachineAuth(): Promise<boolean> {
-		const homeDir = os.homedir();
-		const candidatePaths = [
-			path.join(homeDir, '.gemini', 'google_accounts.json'),
-			path.join(homeDir, '.gemini', 'oauth_creds.json')
-		];
-
-		for (const candidatePath of candidatePaths) {
-			try {
-				const stats = await fs.stat(candidatePath);
-				if (stats.isFile() && stats.size > 0) {
-					return true;
-				}
-			} catch {
-				// Keep checking the remaining known auth paths.
-			}
-		}
-
-		return false;
-	}
-
 	async isAvailable(settings?: Record<string, unknown>): Promise<boolean> {
 		const resolved = settings || {};
-		const authMode = this.resolveAuthMode(resolved);
-		if (authMode === 'api-key') {
-			const apiKey = this.getRealSecret(resolved.apiKey);
-			return apiKey
-				? this.validateApiKey(apiKey, (resolved.model as string | undefined) || DEFAULT_MODEL)
-				: false;
-		}
-
-		if (authMode === 'vertex') {
-			const result = await this.validateCliAuth(resolved);
-			return result.valid;
-		}
-
-		return this.hasCachedMachineAuth();
+		const apiKey = this.getRealSecret(resolved.apiKey);
+		return apiKey ? this.validateApiKey(apiKey, (resolved.model as string | undefined) || DEFAULT_MODEL) : false;
 	}
 
 	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
-		const authMode = this.resolveAuthMode(settings);
-		if (authMode === 'api-key') {
-			const apiKey = this.getRealSecret(settings.apiKey);
-			if (!apiKey) {
-				return { success: false, message: 'No Gemini API key configured.' };
-			}
-			const model = (settings.model as string | undefined) || DEFAULT_MODEL;
-			const valid = await this.validateApiKey(apiKey, model);
-			return valid
-				? { success: true, message: 'Gemini API key verified.' }
-				: { success: false, message: 'Gemini API key is invalid or the API is unreachable.' };
+		const apiKey = this.getRealSecret(settings.apiKey);
+		if (!apiKey) {
+			return { success: false, message: 'No Gemini API key configured.' };
 		}
 
-		if (authMode === 'vertex') {
-			const result = await this.validateCliAuth(settings);
-			return result.valid
-				? { success: true, message: 'Vertex AI authentication verified.' }
-				: { success: false, message: result.detail || 'Vertex AI authentication is not configured correctly.' };
-		}
-
-		return (await this.hasCachedMachineAuth())
-			? { success: true, message: 'Machine-local Gemini authentication is available.' }
-			: { success: false, message: 'No cached Gemini login was found on this machine.' };
+		const model = (settings.model as string | undefined) || DEFAULT_MODEL;
+		const valid = await this.validateApiKey(apiKey, model);
+		return valid
+			? { success: true, message: 'Gemini API key verified.' }
+			: { success: false, message: 'Gemini API key is invalid or the API is unreachable.' };
 	}
 
 	validateSettings(settings: Record<string, unknown>): ValidationResult {
 		const errors: Array<{ path: string; message: string }> = [];
-		const authMode = settings.authMode;
-
-		if (authMode !== undefined && authMode !== 'machine-local' && authMode !== 'api-key' && authMode !== 'vertex') {
-			errors.push({
-				path: 'authMode',
-				message: 'Authentication mode must be "machine-local", "api-key", or "vertex"'
-			});
-		}
 
 		if (settings.apiKey !== undefined && typeof settings.apiKey !== 'string') {
 			errors.push({ path: 'apiKey', message: 'API key must be a string when provided' });
-		}
-		if (settings.googleApiKey !== undefined && typeof settings.googleApiKey !== 'string') {
-			errors.push({ path: 'googleApiKey', message: 'Google Cloud API key must be a string when provided' });
-		}
-		if (settings.googleCloudProject !== undefined && typeof settings.googleCloudProject !== 'string') {
-			errors.push({ path: 'googleCloudProject', message: 'Google Cloud project must be a string when provided' });
-		}
-		if (settings.googleCloudLocation !== undefined && typeof settings.googleCloudLocation !== 'string') {
-			errors.push({
-				path: 'googleCloudLocation',
-				message: 'Google Cloud location must be a string when provided'
-			});
 		}
 		if (settings.model !== undefined && typeof settings.model !== 'string') {
 			errors.push({ path: 'model', message: 'Model must be a string when provided' });
@@ -366,27 +276,9 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			errors.push({ path: 'version', message: 'CLI version must be a string when provided' });
 		}
 
-		if (authMode === 'api-key') {
-			const apiKey = settings.apiKey;
-			if (typeof apiKey !== 'string' || apiKey.trim() === '') {
-				errors.push({ path: 'apiKey', message: 'API key is required when authMode is "api-key"' });
-			}
-		}
-
-		if (authMode === 'vertex') {
-			if (typeof settings.googleCloudProject !== 'string' || settings.googleCloudProject.trim() === '') {
-				errors.push({
-					path: 'googleCloudProject',
-					message: 'Google Cloud project is required when authMode is "vertex"'
-				});
-			}
-
-			if (typeof settings.googleCloudLocation !== 'string' || settings.googleCloudLocation.trim() === '') {
-				errors.push({
-					path: 'googleCloudLocation',
-					message: 'Google Cloud location is required when authMode is "vertex"'
-				});
-			}
+		const apiKey = settings.apiKey;
+		if (typeof apiKey !== 'string' || apiKey.trim() === '') {
+			errors.push({ path: 'apiKey', message: 'API key is required.' });
 		}
 
 		return errors.length > 0 ? { valid: false, errors } : { valid: true };
@@ -406,51 +298,33 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			autoEnable: false,
 			visibility: 'public',
 			selectableProviderCategories: ['screenshot'],
-			uiHints: {
-				onboardingWizard: true,
-				includeInOnboarding: true,
-				onboardingPriority: 1,
-				completionFields: ['authMode', 'apiKey', 'googleApiKey', 'googleCloudProject', 'googleCloudLocation'],
-				onboardingDescription: 'Connect your AI assistant to power content generation across your directories.'
-			},
 			readme: [
 				'# Gemini Generator Plugin',
 				'',
-				'Full pipeline plugin that delegates the entire directory generation to Gemini CLI. This plugin runs a single Gemini CLI session that autonomously handles web search, content creation, and file generation.',
+				'Use Gemini as the pipeline engine for directory generation inside Ever Works.',
 				'',
-				'## How it works',
+				'Gemini researches sources, generates structured directory items, and returns the finished results to Ever Works as a complete pipeline run.',
 				'',
-				'The plugin runs 6 sequential steps:',
+				'Choose this plugin when you want Gemini to handle the full research and generation workflow for a directory.',
 				'',
-				'1. **Setup Gemini CLI** - Installs and caches the Gemini CLI runtime',
-				'2. **Prepare Context** - Creates a temporary workspace and seeds it with existing items and metadata',
-				'3. **Generate Items** - Executes Gemini CLI to research and generate directory items as JSON files',
-				'4. **Collect Results** - Reads the generated JSON files back to build the pipeline result',
-				'5. **Capture Screenshots** - Takes screenshots for items that need images',
-				'6. **Cleanup** - Removes the temporary workspace',
+				'## What It Does',
 				'',
-				'## Settings',
+				'- Researches sources for the current directory topic.',
+				'- Generates structured item data for Ever Works.',
+				'- Reuses your directory context and existing items during generation.',
+				'- Can work with screenshot providers for item imagery.',
 				'',
-				'| Setting        | Description                       |',
-				'| -------------- | --------------------------------- |',
-				'| `authMode`     | Machine-local, API key, or Vertex AI auth mode |',
-				'| `apiKey`       | Gemini API key (AI Studio)                  |',
-				'| `googleApiKey` | Google Cloud API key for Vertex AI (optional) |',
-				'| `googleCloudProject` | Google Cloud project for Vertex AI      |',
-				'| `googleCloudLocation` | Google Cloud location for Vertex AI    |',
+				'## Authentication',
 				'',
-				'### Authentication',
+				'- Connect with a Google AI Studio Gemini API key.',
 				'',
-				'Gemini CLI supports three modes in this plugin:',
-				'',
-				'- **Machine-local**: Use an existing local Google login cached by Gemini CLI',
-				'- **API Key**: Use `GEMINI_API_KEY` from Google AI Studio',
-				'- **Vertex AI**: Use Google Cloud / Vertex AI environment-based authentication',
-				'',
-				'Gemini CLI official docs: https://google-gemini.github.io/gemini-cli/docs/get-started/authentication.html',
+				'Authentication is configured from Ever Works user settings rather than shared host login state.',
+				'The runtime uses an isolated per-user Gemini home/config directory instead of the machine user home.',
 				'## Usage',
 				'',
-				"Enable the plugin for a directory and trigger generation with `providers.pipeline: 'gemini'`."
+				'1. Save your Gemini API key in plugin settings.',
+				'2. Enable the plugin for a directory.',
+				'3. Select `gemini` as the pipeline provider for generation.'
 			].join('\n'),
 			homepage: 'https://github.com/google-gemini/gemini-cli',
 			icon: {
@@ -491,49 +365,6 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		});
 	}
 
-	private async validateCliAuth(settings: Record<string, unknown>): Promise<{ valid: boolean; detail?: string }> {
-		const authEnv = resolveAuthEnv(settings);
-
-		const version = (settings.version as string) || DEFAULT_CLI_VERSION;
-		let tempDir: string | null = null;
-		let killProcess: (() => void) | null = null;
-
-		try {
-			const binaryPath = await ensureBinary(version, this.context?.logger || console);
-			const workspacePath = await fs.mkdtemp(path.join(os.tmpdir(), 'ever-works-gemini-validate-'));
-			tempDir = workspacePath;
-
-			const execution = executeGemini({
-				binaryPath,
-				prompt: 'Reply with OK.',
-				systemPrompt: 'Reply with the single word OK. Nothing else.',
-				cwd: workspacePath,
-				env: authEnv,
-				model: settings.model as string | undefined
-			});
-			killProcess = execution.kill;
-
-			const result = await Promise.race([
-				execution.promise,
-				new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Validation timed out')), 30_000))
-			]);
-
-			if (result.exitCode === 0) {
-				return { valid: true };
-			}
-
-			const detail = this.extractErrorDetail(result);
-			return { valid: false, detail };
-		} catch (err) {
-			return { valid: false, detail: err instanceof Error ? err.message : 'CLI validation failed.' };
-		} finally {
-			killProcess?.();
-			if (tempDir) {
-				await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
-			}
-		}
-	}
-
 	// ── IFormSchemaProvider ─────────────────────────────────────────────
 
 	getFormFields(): FormFieldDefinition[] {
@@ -566,18 +397,30 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		onProgress?: PipelineProgressCallback
 	): Promise<PipelineResult> {
 		const startTime = Date.now();
-		this.abortController = new AbortController();
-		const signal = options?.signal ?? this.abortController.signal;
+		const userId = directory.user?.id;
+		if (!userId) {
+			return this.handleError(new Error('User ID is required'), startTime);
+		}
+
+		if (this.abortController) {
+			return this.handleError(
+				new Error(
+					'Gemini Generator is already executing another generation. Wait for it to finish or cancel it first.'
+				),
+				startTime
+			);
+		}
+
+		const abortController = new AbortController();
+		this.abortController = abortController;
+		const signal = options?.signal ?? abortController.signal;
 		const onLogEntry = options?.onLogEntry;
 
 		this.state = initializeState();
 
 		const logger = this.context?.logger ?? console;
-		const userId = directory.user?.id;
-
-		if (!userId) {
-			return this.handleError(new Error('User ID is required'), startTime);
-		}
+		let workspacePath: string | null = null;
+		let configDir: string | null = null;
 
 		try {
 			const settings = await resolveSettings(this.context, userId, directory.id);
@@ -587,13 +430,11 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 
 			const version = (settings.version as string) || DEFAULT_CLI_VERSION;
 			const model = settings.model as string | undefined;
-			const authMode = this.resolveAuthMode(settings);
-
 			// ── Step 1: Setup Gemini CLI ──────────────────────────────
 			const setupStepStartedAt = this.startStep('setup-gemini', onLogEntry);
 			reportProgress(onProgress, 0, 0, 'Setup Gemini CLI');
 
-			const binaryPath = await ensureBinary(version, logger);
+			const cliCommand = ensureBinary(version, logger);
 			this.completeStep('setup-gemini', setupStepStartedAt, onLogEntry);
 
 			if (signal.aborted) return this.handleCancel(startTime);
@@ -602,11 +443,9 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			const prepareContextStepStartedAt = this.startStep('prepare-context', onLogEntry);
 			reportProgress(onProgress, 1, 20, 'Prepare Context');
 
-			const configDir = path.join(BASE_TEMP_DIR, 'config', userId);
-			const workspacePath = await createWorkspace(userId, directory.id);
-			if (authMode !== 'machine-local') {
-				await ensureOnboardingConfig(configDir);
-			}
+			configDir = path.join(BASE_TEMP_DIR, 'config', userId);
+			workspacePath = await createWorkspace(userId, directory.id);
+			await ensureOnboardingConfig(configDir);
 			await seedExistingItems(workspacePath, existing.items);
 			await seedMetadata(workspacePath, {
 				directory: { name: directory.name, description: directory.description },
@@ -617,7 +456,13 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			});
 			this.completeStep('prepare-context', prepareContextStepStartedAt, onLogEntry);
 
-			if (signal.aborted) return this.handleCancel(startTime);
+			if (signal.aborted) {
+				if (workspacePath) {
+					await cleanupWorkspace(workspacePath);
+					workspacePath = null;
+				}
+				return this.handleCancel(startTime);
+			}
 
 			// ── Step 3: Generate Items ─────────────────────────────────
 			const generateItemsStepStartedAt = this.startStep('generate-items', onLogEntry);
@@ -656,13 +501,11 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			let execResult: ExecuteResult;
 			try {
 				const { onStdoutLine, onStderrLine } = this.createGeminiStreamHandlers(onLogEntry);
-				const executionEnv: Record<string, string> = { ...authEnv };
-				if (authMode !== 'machine-local') {
-					executionEnv.GEMINI_CONFIG_DIR = configDir;
-				}
+				const executionEnv = buildIsolatedGeminiEnv(configDir, authEnv);
 
 				const { promise, kill } = executeGemini({
-					binaryPath,
+					command: cliCommand.command,
+					commandArgs: cliCommand.args,
 					prompt: userPrompt,
 					systemPrompt,
 					cwd: workspacePath,
@@ -682,6 +525,10 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 
 			if (execResult.killed || signal.aborted) {
 				this.failStep('generate-items', new Error('Cancelled'), onLogEntry);
+				if (workspacePath) {
+					await cleanupWorkspace(workspacePath);
+					workspacePath = null;
+				}
 				return this.handleCancel(startTime);
 			}
 
@@ -741,14 +588,22 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			const cleanupStepStartedAt = this.startStep('cleanup', onLogEntry);
 			reportProgress(onProgress, 5, 95, 'Cleanup');
 
-			await cleanupWorkspace(userId, directory.id);
+			if (workspacePath) {
+				await cleanupWorkspace(workspacePath);
+				workspacePath = null;
+			}
 			this.completeStep('cleanup', cleanupStepStartedAt, onLogEntry);
+
+			if (signal.aborted) {
+				return this.handleCancel(startTime);
+			}
 
 			// ── Build result ───────────────────────────────────────────
 			reportProgress(onProgress, 6, 100, 'Complete');
 
 			const duration = Date.now() - startTime;
 			const warnings = [...(generationWarning ? [generationWarning] : []), ...screenshotWarnings];
+			this.state = finalizeCompletedState(this.state!);
 
 			return buildSuccessPipelineResult(
 				{
@@ -774,8 +629,15 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				this.failStep(runningStepId, err, onLogEntry);
 			}
 			logger.error(`Gemini CLI pipeline failed: ${err.message}`);
-			await cleanupWorkspace(userId, directory.id);
+			if (workspacePath) {
+				await cleanupWorkspace(workspacePath);
+			}
 			return this.handleError(err, startTime);
+		} finally {
+			if (this.abortController === abortController) {
+				this.abortController = null;
+				this.killProcess = null;
+			}
 		}
 	}
 

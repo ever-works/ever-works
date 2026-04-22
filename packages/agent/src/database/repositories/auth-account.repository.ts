@@ -4,6 +4,21 @@ import { randomUUID } from 'node:crypto';
 import { Not, Repository } from 'typeorm';
 import { AuthAccount } from '../../entities';
 
+/**
+ * Namespace prefix for provider accounts created via the plugin-capability OAuth
+ * integration flow (distinct from social sign-in accounts).
+ *
+ * Sign-in and plugin integration request different OAuth scopes — sign-in is
+ * minimal (identity only), integrations request full scopes like `repo`.
+ * Storing them under separate keys prevents one flow from overwriting the other
+ * and lets downstream consumers prefer the broader-scope integration token.
+ */
+export const PLUGIN_PROVIDER_PREFIX = 'plugin:';
+
+export function buildPluginProviderId(providerId: string): string {
+    return `${PLUGIN_PROVIDER_PREFIX}${providerId}`;
+}
+
 const PROVIDER_ACCOUNT_ALREADY_LINKED_CODE = 'PROVIDER_ACCOUNT_ALREADY_LINKED';
 const PROVIDER_ACCOUNT_RECORD_CONFLICT_CODE = 'PROVIDER_ACCOUNT_RECORD_CONFLICT';
 const PROVIDER_ACCOUNT_ALREADY_LINKED_MESSAGE =

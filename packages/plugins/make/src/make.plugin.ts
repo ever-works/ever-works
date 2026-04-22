@@ -38,7 +38,8 @@ import {
 	resolveSettings,
 	buildMetrics,
 	buildErrorResult,
-	buildCancelledResult
+	buildCancelledResult,
+	finalizeCompletedState
 } from './utils/pipeline-helpers.js';
 import {
 	getFormFields as formFields,
@@ -500,6 +501,8 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 				executionId: execResult.executionId,
 				makeDuration: execResult.makeDuration
 			};
+			state = finalizeCompletedState(state);
+			this._lastState = state;
 
 			return buildSuccessPipelineResult(
 				{
@@ -522,6 +525,10 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 			const err = error instanceof Error ? error : new Error(String(error));
 			logger.error(`Make.com pipeline failed: ${err.message}`);
 			return handleError(err);
+		} finally {
+			if (this._lastAbortController === abortController) {
+				this._lastAbortController = null;
+			}
 		}
 	}
 

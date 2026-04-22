@@ -9,6 +9,7 @@ import type {
     PluginEnvironment,
     EnvironmentVariables,
     PluginSettings,
+    PluginSettingsWrite,
     ResolvedSettings,
     SettingScope,
     PluginEventName,
@@ -114,6 +115,54 @@ export class PluginContextFactoryService {
                     ...options,
                     includeSecrets: true,
                 });
+            },
+
+            updateSettings: async (
+                scope: 'user' | 'directory',
+                scopeId: string | undefined,
+                data: PluginSettingsWrite,
+            ): Promise<void> => {
+                const settings = data.settings ?? {};
+                const secretSettings = data.secretSettings ?? {};
+                const combined = { ...settings, ...secretSettings };
+                const secretKeys = Object.keys(secretSettings);
+
+                if (Object.keys(combined).length === 0) {
+                    return;
+                }
+
+                if (scope === 'user') {
+                    const targetUserId = scopeId ?? scopeOptions?.userId;
+                    if (!targetUserId) {
+                        throw new Error(
+                            `Plugin "${pluginId}" attempted to update user settings without a userId`,
+                        );
+                    }
+
+                    await this.settingsService.updateUserSettings(
+                        pluginId,
+                        targetUserId,
+                        combined,
+                        {
+                            secretKeys,
+                        },
+                    );
+                    return;
+                }
+
+                const targetDirectoryId = scopeId ?? scopeOptions?.directoryId;
+                if (!targetDirectoryId) {
+                    throw new Error(
+                        `Plugin "${pluginId}" attempted to update directory settings without a directoryId`,
+                    );
+                }
+
+                await this.settingsService.updateDirectorySettings(
+                    pluginId,
+                    targetDirectoryId,
+                    combined,
+                    { secretKeys },
+                );
             },
 
             onEvent: <T extends PluginEventName>(

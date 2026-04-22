@@ -9,7 +9,10 @@ import type {
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES, isOAuthPlugin } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
-import { AuthAccountRepository } from '../database/repositories/auth-account.repository';
+import {
+    AuthAccountRepository,
+    buildPluginProviderId,
+} from '../database/repositories/auth-account.repository';
 import { FacadeError } from './base.facade';
 
 export class OAuthFacadeError extends FacadeError {
@@ -120,7 +123,7 @@ export class OAuthFacadeService implements IOAuthFacade {
 
             const account = await this.authAccountRepository.findProviderAccount(
                 userId,
-                providerId,
+                buildPluginProviderId(providerId),
             );
             return account !== null && this.isUsableProviderAccount(providerId, account);
         } catch {
@@ -139,7 +142,7 @@ export class OAuthFacadeService implements IOAuthFacade {
 
             const account = await this.authAccountRepository.findProviderAccount(
                 userId,
-                providerId,
+                buildPluginProviderId(providerId),
             );
             if (!account || !this.isUsableProviderAccount(providerId, account)) {
                 return null;
@@ -158,11 +161,12 @@ export class OAuthFacadeService implements IOAuthFacade {
         );
         if (!isEnabled) return;
 
+        const namespacedProviderId = buildPluginProviderId(providerId);
         try {
             const plugin = this.getPluginSync(providerId);
             const account = await this.authAccountRepository.findProviderAccount(
                 userId,
-                providerId,
+                namespacedProviderId,
             );
             if (account?.accessToken && plugin.revokeToken) {
                 await plugin.revokeToken(account.accessToken);
@@ -171,7 +175,7 @@ export class OAuthFacadeService implements IOAuthFacade {
             // Continue even if remote revocation fails
         }
 
-        await this.authAccountRepository.deleteProviderAccount(userId, providerId);
+        await this.authAccountRepository.deleteProviderAccount(userId, namespacedProviderId);
     }
 
     private getPluginSync(providerId: string): IOAuthPlugin {

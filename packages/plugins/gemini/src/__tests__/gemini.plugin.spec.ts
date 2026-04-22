@@ -99,11 +99,10 @@ function createMockContext(settingsOverride?: PluginSettings): PluginContext {
 		services: {},
 		getSettings: vi.fn().mockResolvedValue(
 			settingsOverride ?? {
-				authMode: 'api-key',
 				apiKey: 'test-key',
 				version: 'latest',
 				maxTurns: 20,
-				model: 'gemini-2.5-pro'
+				model: 'gemini-2.5-flash'
 			}
 		),
 		getResolvedSettings: vi.fn(),
@@ -139,37 +138,28 @@ describe('GeminiPlugin', () => {
 
 	it('should define Gemini auth fields as user-scoped settings', () => {
 		const props = plugin.settingsSchema.properties!;
-		expect(props.authMode.default).toBe('api-key');
 		expect(props.apiKey['x-secret']).toBe(true);
 		expect(props.apiKey['x-scope']).toBe('user');
-		expect(props.googleApiKey['x-secret']).toBe(true);
-		expect(props.googleCloudProject['x-scope']).toBe('user');
-		expect(props.googleCloudLocation.default).toBe('us-central1');
+		expect(props.authMode).toBeUndefined();
+		expect(props.googleCloudProject).toBeUndefined();
+		expect(props.googleCloudLocation).toBeUndefined();
 	});
 
-	it('should validate auth settings based on auth mode', () => {
-		expect(plugin.validateSettings({ authMode: 'api-key' })).toEqual({
+	it('should validate API key settings', () => {
+		expect(plugin.validateSettings({})).toEqual({
 			valid: false,
-			errors: [{ path: 'apiKey', message: 'API key is required when authMode is "api-key"' }]
+			errors: [{ path: 'apiKey', message: 'API key is required.' }]
 		});
 
-		expect(plugin.validateSettings({ authMode: 'vertex', googleCloudLocation: 'us-central1' })).toEqual({
+		expect(plugin.validateSettings({ apiKey: 123 })).toEqual({
 			valid: false,
 			errors: [
-				{
-					path: 'googleCloudProject',
-					message: 'Google Cloud project is required when authMode is "vertex"'
-				}
+				{ path: 'apiKey', message: 'API key must be a string when provided' },
+				{ path: 'apiKey', message: 'API key is required.' }
 			]
 		});
 
-		expect(
-			plugin.validateSettings({
-				authMode: 'vertex',
-				googleCloudProject: 'ever-works',
-				googleCloudLocation: 'us-central1'
-			})
-		).toEqual({ valid: true });
+		expect(plugin.validateSettings({ apiKey: 'test-key' })).toEqual({ valid: true });
 	});
 
 	it('should validate form input bounds and types', () => {
@@ -238,6 +228,20 @@ describe('GeminiPlugin', () => {
 			expect(result.outputs.tags).toHaveLength(1);
 			expect(result.metrics!.itemsProcessed).toBe(1);
 			expect(result.warnings).toBeUndefined();
+
+			const { executeGemini } = await import('../utils/process-runner');
+			expect(vi.mocked(executeGemini)).toHaveBeenCalledWith(
+				expect.objectContaining({
+					env: expect.objectContaining({
+						GEMINI_CONFIG_DIR: '/tmp/gemini-generator/config/user1',
+						HOME: '/tmp/gemini-generator/config/user1',
+						XDG_CONFIG_HOME: '/tmp/gemini-generator/config/user1/.config',
+						XDG_DATA_HOME: '/tmp/gemini-generator/config/user1/.local/share',
+						XDG_CACHE_HOME: '/tmp/gemini-generator/config/user1/.cache',
+						GEMINI_API_KEY: 'test-key'
+					})
+				})
+			);
 		});
 
 		it('should report progress ending at 100%', async () => {

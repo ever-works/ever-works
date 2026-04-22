@@ -24,21 +24,22 @@ import { PluginSettingsFormFields } from './PluginSettingsFormFields';
 import { PluginReadme } from './PluginReadme';
 import { PluginEnablePanel } from './PluginEnablePanel';
 import { PluginDisableWarning } from './PluginDisableWarning';
+import { PluginDeviceAuthConnection } from '@/components/settings/PluginDeviceAuthConnection';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
-import { ClaudeCodeOnboardingWizard } from '@/components/settings/ClaudeCodeOnboardingWizard';
-import { GeminiOnboardingWizard } from '@/components/settings/GeminiOnboardingWizard';
 import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
-import { SimAiOnboardingWizard } from '@/components/settings/SimAiOnboardingWizard';
+import { PluginOnboardingWizard } from '@/components/settings/PluginOnboardingWizard';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 import { usePluginToggle } from '@/lib/hooks/use-plugin-toggle';
+import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';
 
 interface PluginSettingsProps {
     plugin: UserPlugin;
     oauthConnection?: OAuthConnectionInfo | null;
+    deviceAuthStatus?: PluginDeviceAuthStatus | null;
 }
 
-export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps) {
+export function PluginSettings({ plugin, oauthConnection, deviceAuthStatus }: PluginSettingsProps) {
     const t = useTranslations('dashboard.plugins');
     const tOnboarding = useTranslations('onboarding.plugins');
     const byokTrigger = plugin.uiHints?.byok?.triggerField;
@@ -54,7 +55,11 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
         }) => {
             const result = await updatePluginSettings(plugin.pluginId, data);
             if (!result.success) {
-                throw new Error(result.error);
+                const errorMessage = result.error || t('saveError');
+                if (errorMessage.includes('not installed for this user')) {
+                    return { validationError: t('enableFirstToSave') };
+                }
+                throw new Error(errorMessage);
             }
 
             const validation = (result.data as Record<string, unknown>)?.validation as
@@ -69,7 +74,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                 return { validationSuccess: validation.message };
             }
         },
-        [plugin.pluginId],
+        [plugin.pluginId, t],
     );
 
     const {
@@ -119,14 +124,11 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
     const showSetupButton =
         setupLink &&
         (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !displaySettings[f]));
-    const usesClaudeWizard =
-        plugin.pluginId === 'claude-code' && Boolean(plugin.uiHints?.onboardingWizard);
+    const hasDeviceAuth =
+        plugin.capabilities.includes('device-auth') && deviceAuthStatus !== undefined;
 
-    const usesGeminiWizard =
-        plugin.pluginId === 'gemini' && Boolean(plugin.uiHints?.onboardingWizard);
-    const usesSimAiWizard =
-        plugin.pluginId === 'sim-ai' && Boolean(plugin.uiHints?.onboardingWizard);
-    const usesCustomWizard = usesClaudeWizard || usesGeminiWizard || usesSimAiWizard;
+    const showsOnboardingWizard = Boolean(plugin.uiHints?.onboardingWizard);
+    const deviceAuthModeField = plugin.uiHints?.deviceAuth?.authModeField ?? 'authMode';
 
     return (
         <div className="space-y-6">
@@ -282,6 +284,15 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                 />
             )}
 
+            {hasDeviceAuth && !showsOnboardingWizard && (
+                <PluginDeviceAuthConnection
+                    pluginId={plugin.pluginId}
+                    pluginName={plugin.name}
+                    initialStatus={deviceAuthStatus ?? null}
+                    onActivate={() => handleFieldChange(deviceAuthModeField, 'device-auth', false)}
+                />
+            )}
+
             {plugin.uiHints?.organizationSettings && (
                 <GitHubOrganizationsSettings
                     plugin={plugin}
@@ -300,44 +311,20 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                     </div>
 
                     <div className="p-6">
-                        {usesCustomWizard ? (
-                            usesSimAiWizard ? (
-                                <SimAiOnboardingWizard
-                                    pluginId={plugin.pluginId}
-                                    visibleProperties={visibleProperties}
-                                    getFieldValue={getFieldValue}
-                                    handleFieldChange={handleFieldChange}
-                                    handleSave={handleSave}
-                                    isSaving={isSaving}
-                                    saveSuccess={saveSuccess}
-                                    validationError={validationError}
-                                    saveMessage={saveMessage}
-                                />
-                            ) : usesGeminiWizard ? (
-                                <GeminiOnboardingWizard
-                                    pluginId={plugin.pluginId}
-                                    visibleProperties={visibleProperties}
-                                    getFieldValue={getFieldValue}
-                                    handleFieldChange={handleFieldChange}
-                                    handleSave={handleSave}
-                                    isSaving={isSaving}
-                                    saveSuccess={saveSuccess}
-                                    validationError={validationError}
-                                    saveMessage={saveMessage}
-                                />
-                            ) : (
-                                <ClaudeCodeOnboardingWizard
-                                    pluginId={plugin.pluginId}
-                                    visibleProperties={visibleProperties}
-                                    getFieldValue={getFieldValue}
-                                    handleFieldChange={handleFieldChange}
-                                    handleSave={handleSave}
-                                    isSaving={isSaving}
-                                    saveSuccess={saveSuccess}
-                                    validationError={validationError}
-                                    saveMessage={saveMessage}
-                                />
-                            )
+                        {showsOnboardingWizard ? (
+                            <PluginOnboardingWizard
+                                plugin={plugin}
+                                initialSettings={plugin.settings || {}}
+                                initialDeviceAuthStatus={deviceAuthStatus ?? null}
+                                visibleProperties={visibleProperties}
+                                getFieldValue={getFieldValue}
+                                handleFieldChange={handleFieldChange}
+                                handleSave={handleSave}
+                                isSaving={isSaving}
+                                saveSuccess={saveSuccess}
+                                validationError={validationError}
+                                saveMessage={saveMessage}
+                            />
                         ) : (
                             <div className="space-y-5">
                                 {plugin.uiHints?.byok && !byokRevealed && (
@@ -399,7 +386,7 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                         )}
                     </div>
 
-                    {!usesCustomWizard && (
+                    {!plugin.uiHints?.onboardingWizard && (
                         <div className="flex items-center gap-3 px-6 py-4 border-t border-border dark:border-border-dark">
                             <Button
                                 variant="primary"

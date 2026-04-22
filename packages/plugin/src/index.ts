@@ -40,6 +40,7 @@ export {
 	type PluginSettingsSchemaProperty,
 	type PluginSettingsSchema,
 	type PluginResponse,
+	type PluginConnectionStatus,
 	type UserPluginResponse,
 	type DirectoryPluginResponse,
 	type PluginListResponse,

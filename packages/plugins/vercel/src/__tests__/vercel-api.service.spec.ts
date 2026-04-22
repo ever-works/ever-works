@@ -41,10 +41,16 @@ describe('VercelApiService', () => {
 			expect(result).toBeNull();
 		});
 
-		it('should return null for invalid token (without mocking, this hits real API)', async () => {
-			// This test documents the expected behavior when the token is invalid
-			// In real usage, this would hit the Vercel API
-			// We expect it to return null for any non-valid token
+		it('should return null for invalid token when the API rejects', async () => {
+			service.createSDK = async () =>
+				({
+					user: {
+						getAuthUser: async () => {
+							throw new Error('Unauthorized');
+						}
+					}
+				}) as any;
+
 			const result = await service.validateToken('invalid-token-123');
 			expect(result).toBeNull();
 		});

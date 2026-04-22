@@ -52,13 +52,29 @@ export function executeOpenCode(options: ExecuteOptions): {
 
 		args.push(options.prompt);
 
+		const passthroughEnvKeys = [
+			'HTTP_PROXY',
+			'HTTPS_PROXY',
+			'ALL_PROXY',
+			'NO_PROXY',
+			'SSL_CERT_FILE',
+			'SSL_CERT_DIR',
+			'NODE_EXTRA_CA_CERTS'
+		] as const;
+
 		const env: Record<string, string> = {
 			PATH: process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin',
 			HOME: process.env.HOME ?? os.homedir(),
 			TMPDIR: process.env.TMPDIR ?? os.tmpdir(),
-			...options.env,
 			OPENCODE_DISABLE_AUTOUPDATE: '1'
 		};
+		for (const key of passthroughEnvKeys) {
+			const value = process.env[key];
+			if (value) {
+				env[key] = value;
+			}
+		}
+		Object.assign(env, options.env);
 
 		childProcess = spawn(options.binaryPath, args, {
 			cwd: options.cwd,

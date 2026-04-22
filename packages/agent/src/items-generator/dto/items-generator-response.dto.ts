@@ -13,7 +13,7 @@ export interface ItemsGeneratorMetrics {
 }
 
 export interface ItemsGeneratorResponseDto {
-    status: 'success' | 'error' | 'pending';
+    status: 'success' | 'error' | 'pending' | 'skipped';
     slug: string;
     message: string;
     metrics?: ItemsGeneratorMetrics;

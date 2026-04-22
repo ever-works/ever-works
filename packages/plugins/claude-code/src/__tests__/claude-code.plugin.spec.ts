@@ -202,6 +202,15 @@ describe('ClaudeCodePlugin', () => {
 			expect(result.outputs.tags).toHaveLength(1);
 			expect(result.metrics!.itemsProcessed).toBe(1);
 			expect(result.warnings).toBeUndefined();
+
+			const { executeClaudeCode } = await import('../utils/process-runner');
+			expect(vi.mocked(executeClaudeCode)).toHaveBeenCalledWith(
+				expect.objectContaining({
+					env: expect.objectContaining({
+						CLAUDE_CODE_CONFIG_DIR: '/tmp/claude-code-generator/config/user1'
+					})
+				})
+			);
 		});
 
 		it('should report progress ending at 100%', async () => {
