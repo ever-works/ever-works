@@ -19,11 +19,11 @@ export const directoryScheduleDispatcherTask = schedules.task({
 
         try {
             const dispatcher = appContext.get(DirectoryScheduleDispatcherService);
-            const dispatched = await dispatcher.dispatchDue();
+            const summary = await dispatcher.dispatchDue();
 
             return {
-                dispatched,
                 intervalMinutes: interval,
+                ...summary,
             };
         } finally {
             await appContext.close();

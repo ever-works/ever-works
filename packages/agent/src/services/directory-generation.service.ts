@@ -946,7 +946,9 @@ Only include image URLs that are absolute URLs (starting with http).`;
         }
     }
 
-    async runScheduledUpdate(schedule: DirectorySchedule) {
+    async runScheduledUpdate(
+        schedule: DirectorySchedule,
+    ): Promise<ItemsGeneratorResponseDto | void> {
         let user: User | null = null;
         try {
             user = (schedule.user as User) || (await this.userRepository.findById(schedule.userId));
@@ -967,7 +969,11 @@ Only include image URLs that are absolute URLs (starting with http).`;
                     status: 'skipped',
                     reason: 'Entitlement check failed — schedule paused',
                 });
-                return;
+                return {
+                    slug: schedule.directory?.slug ?? schedule.directoryId,
+                    status: 'skipped',
+                    message: 'Entitlement check failed — schedule paused',
+                };
             }
 
             const directory =
