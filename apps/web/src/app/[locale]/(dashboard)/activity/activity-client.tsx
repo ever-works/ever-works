@@ -226,6 +226,19 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         }
     };
 
+    const refreshCurrentPage = useCallback(() => {
+        void fetchSummary();
+        void fetchActivities(
+            page,
+            {
+                actionType,
+                status,
+                search: debouncedSearch,
+            },
+            false,
+        );
+    }, [fetchActivities, fetchSummary, page, actionType, status, debouncedSearch]);
+
     const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
     const summaryCards = [
         { key: 'in_progress', count: summary.in_progress, label: t('filters.statuses.inProgress') },
@@ -338,7 +351,11 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                 />
             ) : (
                 <>
-                    <ActivityTable activities={activities} loading={loading} />
+                    <ActivityTable
+                        activities={activities}
+                        loading={loading}
+                        onStopRequested={refreshCurrentPage}
+                    />
 
                     {totalPages > 1 && (
                         <div className="flex items-center justify-between">

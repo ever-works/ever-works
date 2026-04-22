@@ -27,10 +27,35 @@ import type { Response } from 'express';
 @ApiBearerAuth('JWT-auth')
 @Controller('api/activity-log')
 export class ActivityLogController {
+    private readonly reconcileInFlight = new Map<string, Promise<void>>();
+
     constructor(
         private readonly activityLogService: ActivityLogService,
         private readonly directoryRepository: DirectoryRepository,
     ) {}
+
+    private async reconcileActivities(userId: string) {
+        const existing = this.reconcileInFlight.get(userId);
+        if (existing) {
+            await existing;
+            return;
+        }
+
+        const reconcilePromise: Promise<void> = this.activityLogService
+            .reconcileStaleGenerationActivities(userId)
+            .then(() => undefined)
+            .catch(() => {
+                // Activity listing should remain available even if stale-state cleanup fails.
+            })
+            .finally(() => {
+                if (this.reconcileInFlight.get(userId) === reconcilePromise) {
+                    this.reconcileInFlight.delete(userId);
+                }
+            });
+
+        this.reconcileInFlight.set(userId, reconcilePromise);
+        await reconcilePromise;
+    }
 
     @Get()
     @ApiOperation({
@@ -57,6 +82,8 @@ export class ActivityLogController {
         @Query('limit', new DefaultValuePipe(25), ParseIntPipe) limit?: number,
         @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset?: number,
     ) {
+        await this.reconcileActivities(auth.userId);
+
         const result = await this.activityLogService.findAll({
             userId: auth.userId,
             actionType: actionType as ActivityActionType,
@@ -82,6 +109,8 @@ export class ActivityLogController {
     })
     @ApiResponse({ status: 200, description: 'Running operations count' })
     async getRunningCount(@CurrentUser() auth: AuthenticatedUser) {
+        await this.reconcileActivities(auth.userId);
+
         const count = await this.activityLogService.countRunning(auth.userId);
         return { count };
     }
@@ -93,6 +122,8 @@ export class ActivityLogController {
     })
     @ApiResponse({ status: 200, description: 'Activity summary counts' })
     async getSummary(@CurrentUser() auth: AuthenticatedUser) {
+        await this.reconcileActivities(auth.userId);
+
         const counts = await this.activityLogService.summarizeStatuses(auth.userId);
         return { counts };
     }
@@ -140,6 +171,8 @@ export class ActivityLogController {
     @ApiResponse({ status: 200, description: 'Activity log entry details' })
     @ApiResponse({ status: 404, description: 'Activity not found' })
     async getActivity(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        await this.reconcileActivities(auth.userId);
+
         const activity = await this.activityLogService.findByIdAndUserId(id, auth.userId);
         if (!activity) {
             throw new NotFoundException('Activity not found');

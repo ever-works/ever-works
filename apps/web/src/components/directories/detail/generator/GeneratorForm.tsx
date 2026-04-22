@@ -23,10 +23,15 @@ import {
 } from '@/components/ui/dialog';
 import { generateItems, updateItems } from '@/app/actions/dashboard/generator';
 import { useTranslations } from 'next-intl';
-import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/enums';
+import {
+    GenerateStatusType,
+    GenerationMethod,
+    WebsiteRepositoryCreationMethod,
+} from '@/lib/api/enums';
 import { getFormSchema } from '@/app/actions/dashboard/generator-form';
 import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import { ProviderSelectionSection } from '@/components/directories/shared/ProviderSelectionSection';
+import { GenerationProgress } from './GenerationProgress';
 
 interface GeneratorFormProps {
     directoryId: string;
@@ -38,6 +43,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const router = useRouter();
     const t = useTranslations('dashboard.directoryDetail.generator');
     const [isPending, startTransition] = useTransition();
+    const [optimisticGenerating, setOptimisticGenerating] = useState(false);
     const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
     const [confirmRecreate, setConfirmRecreate] = useState(false);
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
@@ -157,6 +163,18 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
         setPluginConfig(values);
     }, []);
 
+    const optimisticDirectory: Directory = {
+        ...directory,
+        generateStatus:
+            directory.generateStatus?.status === GenerateStatusType.GENERATING
+                ? directory.generateStatus
+                : {
+                      status: GenerateStatusType.GENERATING,
+                      progress: 0,
+                      recentLogs: [],
+                  },
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -219,6 +237,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             }
 
             if (result.success) {
+                setOptimisticGenerating(true);
                 toast.success(result.message || t('operationStartedSuccessfully'));
                 router.refresh();
             } else {
@@ -237,6 +256,10 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
         }
         return t('updateItems');
     };
+
+    if (optimisticGenerating) {
+        return <GenerationProgress directory={optimisticDirectory} />;
+    }
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl">

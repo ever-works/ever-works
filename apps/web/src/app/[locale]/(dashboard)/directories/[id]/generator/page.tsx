@@ -18,16 +18,10 @@ export default async function DirectoryGeneratorPage({ params }: Params) {
     const { id } = await params;
 
     let directory;
-    let config;
 
     try {
-        const [directoryRes, configRes] = await Promise.all([
-            directoryAPI.get(id),
-            directoryAPI.getConfig(id).catch(() => ({ config: undefined })),
-        ]);
-
+        const directoryRes = await directoryAPI.get(id);
         directory = directoryRes.directory;
-        config = configRes.config;
     } catch {
         notFound();
     }
@@ -40,6 +34,15 @@ export default async function DirectoryGeneratorPage({ params }: Params) {
     // If currently generating, show progress
     if (directory.generateStatus?.status === GenerateStatusType.GENERATING) {
         return <GenerationProgress directory={directory} />;
+    }
+
+    let config;
+
+    try {
+        const configRes = await directoryAPI.getConfig(id).catch(() => ({ config: undefined }));
+        config = configRes.config;
+    } catch {
+        config = undefined;
     }
 
     return <GeneratorForm directoryId={id} directory={directory} config={config} />;
