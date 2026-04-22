@@ -73,6 +73,11 @@
 			"types": "./dist/keywords/index.d.ts",
 			"import": "./dist/keywords/index.js",
 			"require": "./dist/keywords/index.cjs"
+		},
+		"./cli-pipeline": {
+			"types": "./dist/cli-pipeline/index.d.ts",
+			"import": "./dist/cli-pipeline/index.js",
+			"require": "./dist/cli-pipeline/index.cjs"
 		}
 	},
 	"files": [

@@ -1,6 +1,10 @@
 'use server';
 
 import { pluginsAPI } from '@/lib/api/plugins';
+import {
+    deviceAuthAPI,
+    type PluginDeviceAuthStatus,
+} from '@/lib/api/plugins-capabilities/device-auth';
 import { revalidatePath } from 'next/cache';
 
 export interface ActionResult<T = unknown> {
@@ -203,6 +207,38 @@ export async function setGlobalPipelineDefault(
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to set global pipeline default',
+        };
+    }
+}
+
+export async function getPluginDeviceAuthStatus(
+    pluginId: string,
+): Promise<ActionResult<PluginDeviceAuthStatus>> {
+    try {
+        const result = await deviceAuthAPI.getStatus(pluginId);
+        return { success: true, data: result };
+    } catch (error) {
+        console.error('Failed to get device auth status:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to get device auth status',
+        };
+    }
+}
+
+export async function startPluginDeviceAuth(
+    pluginId: string,
+): Promise<ActionResult<PluginDeviceAuthStatus>> {
+    try {
+        const result = await deviceAuthAPI.start(pluginId);
+        revalidatePath('/plugins');
+        revalidatePath(`/plugins/${pluginId}`);
+        return { success: true, data: result };
+    } catch (error) {
+        console.error('Failed to start device auth:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to start device auth',
         };
     }
 }

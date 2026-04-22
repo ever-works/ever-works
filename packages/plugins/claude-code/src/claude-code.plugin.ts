@@ -61,7 +61,8 @@ import {
 	resolveAuthEnv,
 	buildMetrics,
 	buildErrorResult,
-	buildCancelledResult
+	buildCancelledResult,
+	finalizeCompletedState
 } from './utils/pipeline-helpers.js';
 import {
 	getFormFields as formFields,
@@ -272,12 +273,12 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			return false;
 		}
 
-		if (apiKey) {
-			return this.validateApiKey(apiKey, (resolved.model as string | undefined) || 'sonnet');
+		if (oauthToken) {
+			const result = await this.validateCliAuth(resolved);
+			return result.valid;
 		}
 
-		const result = await this.validateCliAuth(resolved);
-		return result.valid;
+		return this.validateApiKey(apiKey!, (resolved.model as string | undefined) || 'sonnet');
 	}
 
 	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
@@ -288,21 +289,21 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			return { success: false, message: 'No credentials configured. Set an API key or connect via OAuth.' };
 		}
 
-		if (apiKey) {
-			const model = (settings.model as string | undefined) || 'sonnet';
-			const valid = await this.validateApiKey(apiKey, model);
-			return valid
-				? { success: true, message: 'Anthropic API key verified.' }
-				: { success: false, message: 'Anthropic API key is invalid or the API is unreachable.' };
+		if (oauthToken) {
+			const result = await this.validateCliAuth(settings);
+			return result.valid
+				? { success: true, message: 'OAuth token verified.' }
+				: {
+						success: false,
+						message: `OAuth token validation failed: ${result.detail || 'unknown error'}. Please re-run \`claude setup-token\`.`
+					};
 		}
 
-		const result = await this.validateCliAuth(settings);
-		return result.valid
-			? { success: true, message: 'OAuth token verified.' }
-			: {
-					success: false,
-					message: `OAuth token validation failed: ${result.detail || 'unknown error'}. Please re-run \`claude setup-token\`.`
-				};
+		const model = (settings.model as string | undefined) || 'sonnet';
+		const valid = await this.validateApiKey(apiKey!, model);
+		return valid
+			? { success: true, message: 'Anthropic API key verified.' }
+			: { success: false, message: 'Anthropic API key is invalid or the API is unreachable.' };
 	}
 
 	getManifest(): PluginManifest {
@@ -323,7 +324,6 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				onboardingWizard: true,
 				includeInOnboarding: true,
 				onboardingPriority: 1,
-				completionFields: ['oauthToken', 'apiKey'],
 				onboardingDescription: 'Connect your AI assistant to power content generation across your directories.'
 			},
 			readme: [
@@ -483,18 +483,30 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 		onProgress?: PipelineProgressCallback
 	): Promise<PipelineResult> {
 		const startTime = Date.now();
-		this.abortController = new AbortController();
-		const signal = options?.signal ?? this.abortController.signal;
+		const userId = directory.user?.id;
+		if (!userId) {
+			return this.handleError(new Error('User ID is required'), startTime);
+		}
+
+		if (this.abortController) {
+			return this.handleError(
+				new Error(
+					'Claude Code Generator is already executing another generation. Wait for it to finish or cancel it first.'
+				),
+				startTime
+			);
+		}
+
+		const abortController = new AbortController();
+		this.abortController = abortController;
+		const signal = options?.signal ?? abortController.signal;
 		const onLogEntry = options?.onLogEntry;
 
 		this.state = initializeState();
 
 		const logger = this.context?.logger ?? console;
-		const userId = directory.user?.id;
-
-		if (!userId) {
-			return this.handleError(new Error('User ID is required'), startTime);
-		}
+		let workspacePath: string | null = null;
+		let configDir: string | null = null;
 
 		try {
 			const settings = await resolveSettings(this.context, userId, directory.id);
@@ -520,8 +532,8 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			const prepareContextStepStartedAt = this.startStep('prepare-context', onLogEntry);
 			reportProgress(onProgress, 1, 20, 'Prepare Context');
 
-			const configDir = `${BASE_TEMP_DIR}/${userId}`;
-			const workspacePath = await createWorkspace(userId, directory.id);
+			configDir = path.join(BASE_TEMP_DIR, 'config', userId);
+			workspacePath = await createWorkspace(userId, directory.id);
 			await ensureOnboardingConfig(configDir);
 			await seedExistingItems(workspacePath, existing.items);
 			await seedMetadata(workspacePath, {
@@ -644,14 +656,22 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			const cleanupStepStartedAt = this.startStep('cleanup', onLogEntry);
 			reportProgress(onProgress, 5, 95, 'Cleanup');
 
-			await cleanupWorkspace(userId, directory.id);
+			if (workspacePath) {
+				await cleanupWorkspace(workspacePath);
+				workspacePath = null;
+			}
 			this.completeStep('cleanup', cleanupStepStartedAt, onLogEntry);
+
+			if (signal.aborted) {
+				return this.handleCancel(startTime);
+			}
 
 			// ── Build result ───────────────────────────────────────────
 			reportProgress(onProgress, 6, 100, 'Complete');
 
 			const duration = Date.now() - startTime;
 			const warnings = [...(generationWarning ? [generationWarning] : []), ...screenshotWarnings];
+			this.state = finalizeCompletedState(this.state!);
 
 			return buildSuccessPipelineResult(
 				{
@@ -677,8 +697,15 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				this.failStep(runningStepId, err, onLogEntry);
 			}
 			logger.error(`Claude Code pipeline failed: ${err.message}`);
-			await cleanupWorkspace(userId, directory.id);
+			if (workspacePath) {
+				await cleanupWorkspace(workspacePath);
+			}
 			return this.handleError(err, startTime);
+		} finally {
+			if (this.abortController === abortController) {
+				this.abortController = null;
+				this.killProcess = null;
+			}
 		}
 	}
 

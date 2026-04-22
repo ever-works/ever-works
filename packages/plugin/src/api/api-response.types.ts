@@ -194,6 +194,17 @@ export interface PluginResponse {
 	uiHints?: PluginUiHints;
 }
 
+export interface PluginConnectionStatus {
+	/** Whether the plugin currently has enough auth/configuration to be considered connected. */
+	connected: boolean;
+	/** Whether an interactive auth flow is still in progress. */
+	pending?: boolean;
+	/** Scope of the active connection, when known. */
+	scope?: 'user' | 'directory';
+	/** Human-readable status message. */
+	message?: string;
+}
+
 /**
  * Plugin response with user-specific data
  */
@@ -213,6 +224,8 @@ export interface UserPluginResponse extends PluginResponse {
 	userPluginId?: string;
 	/** Whether this plugin is auto-enabled for all directories */
 	autoEnableForDirectories?: boolean;
+	/** Generic connection/readiness status used by onboarding and settings UI. */
+	connectionStatus?: PluginConnectionStatus;
 }
 
 /**

@@ -25,7 +25,11 @@ import type {
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
-import { AuthAccountRepository } from '../database/repositories/auth-account.repository';
+import {
+    AuthAccountRepository,
+    buildPluginProviderId,
+} from '../database/repositories/auth-account.repository';
+import type { AuthAccount } from '../entities';
 import { FacadeError } from './base.facade';
 
 // Facade-specific types that don't require token (facade resolves token internally)
@@ -140,6 +144,51 @@ export class GitFacadeService implements IGitFacade {
         return plugins.length > 0 && plugins.some((p) => p.state === 'loaded');
     }
 
+    /**
+     * Resolve the provider account used for git operations.
+     *
+     * Prefers the plugin-integration OAuth account (broader scopes like `repo`)
+     * over the social sign-in account (minimal identity scopes), so a user who
+     * completed the GitHub integration flow can create repositories even when
+     * their sign-in token lacks write access.
+     */
+    private async findGitProviderAccount(
+        userId: string,
+        pluginId: string,
+    ): Promise<AuthAccount | null> {
+        const pluginAccount = await this.authAccountRepository.findProviderAccount(
+            userId,
+            buildPluginProviderId(pluginId),
+        );
+        if (pluginAccount) return pluginAccount;
+        return this.authAccountRepository.findProviderAccount(userId, pluginId);
+    }
+
+    private async findUsableGitProviderAccount(
+        userId: string,
+        pluginId: string,
+    ): Promise<AuthAccount | null> {
+        const pluginAccount = await this.authAccountRepository.findProviderAccount(
+            userId,
+            buildPluginProviderId(pluginId),
+        );
+
+        if (pluginAccount && this.canUseOAuthAccountForGit(pluginId, pluginAccount)) {
+            return pluginAccount;
+        }
+
+        const providerAccount = await this.authAccountRepository.findProviderAccount(
+            userId,
+            pluginId,
+        );
+
+        if (providerAccount && this.canUseOAuthAccountForGit(pluginId, providerAccount)) {
+            return providerAccount;
+        }
+
+        return null;
+    }
+
     getAvailableProviders(): GitProviderInfo[] {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.map((p) => ({
@@ -164,11 +213,8 @@ export class GitFacadeService implements IGitFacade {
             );
 
             // Check connected provider account first
-            const account = await this.authAccountRepository.findProviderAccount(
-                options.userId,
-                plugin.id,
-            );
-            if (account && this.canUseOAuthAccountForGit(plugin.id, account)) {
+            const account = await this.findUsableGitProviderAccount(options.userId, plugin.id);
+            if (account) {
                 return true;
             }
 
@@ -196,11 +242,8 @@ export class GitFacadeService implements IGitFacade {
             );
 
             // Try connected provider account first
-            const account = await this.authAccountRepository.findProviderAccount(
-                options.userId,
-                plugin.id,
-            );
-            if (account && this.canUseOAuthAccountForGit(plugin.id, account)) {
+            const account = await this.findUsableGitProviderAccount(options.userId, plugin.id);
+            if (account) {
                 return account.accessToken || null;
             }
 
@@ -222,10 +265,7 @@ export class GitFacadeService implements IGitFacade {
             );
 
             // Try to get committer info from the connected provider account first
-            const account = await this.authAccountRepository.findProviderAccount(
-                options.userId,
-                plugin.id,
-            );
+            const account = await this.findGitProviderAccount(options.userId, plugin.id);
             if (account) {
                 const username =
                     ((account.metadata as Record<string, unknown> | null | undefined)?.login as
@@ -776,11 +816,8 @@ export class GitFacadeService implements IGitFacade {
         }
 
         // 1. Try the connected provider account first (for OAuth-based plugins like GitHub)
-        const account = await this.authAccountRepository.findProviderAccount(
-            options.userId,
-            plugin.id,
-        );
-        if (account && this.canUseOAuthAccountForGit(plugin.id, account)) {
+        const account = await this.findUsableGitProviderAccount(options.userId, plugin.id);
+        if (account?.accessToken) {
             return { plugin, token: account.accessToken };
         }
 

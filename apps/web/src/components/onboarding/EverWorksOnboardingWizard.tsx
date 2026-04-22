@@ -49,6 +49,9 @@ function isPluginConnected(
     if (isOAuth) {
         return oauthConnections[plugin.pluginId]?.connected === true;
     }
+    if (plugin.connectionStatus) {
+        return plugin.connectionStatus.connected === true;
+    }
     const fields = plugin.uiHints?.completionFields;
     if (fields && fields.length > 0) {
         return fields.every((f) => {

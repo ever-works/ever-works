@@ -1444,12 +1444,37 @@ Only include image URLs that are absolute URLs (starting with http).`;
         }
 
         if (generated.hasExistingItems || newItemsCount > 0) {
-            await this.websiteGenerator.initialize(
-                directory,
-                user,
-                dto.website_repository_creation_method,
-            );
+            try {
+                await this.websiteGenerator.initialize(
+                    directory,
+                    user,
+                    dto.website_repository_creation_method,
+                );
+            } catch (error) {
+                if (
+                    this.isNonFatalWebsiteGenerationError(error, newItemsCount, updatedItemsCount)
+                ) {
+                    const warning = `Website repository setup skipped: ${normalizeGeneratorError(error)}`;
+                    acc.warnings = [...(acc.warnings || []), warning];
+                    this.logger.warn(warning);
+                } else {
+                    throw error;
+                }
+            }
         }
+    }
+
+    private isNonFatalWebsiteGenerationError(
+        error: unknown,
+        newItemsCount: number,
+        updatedItemsCount: number,
+    ): boolean {
+        if (newItemsCount <= 0 && updatedItemsCount <= 0) {
+            return false;
+        }
+
+        const normalizedError = normalizeGeneratorError(error).toLowerCase();
+        return normalizedError.includes('repository not found');
     }
 
     private async markGenerationStarted(

@@ -20,6 +20,7 @@ import { SearchModule } from './plugins-capabilities/search/search.module';
 import { PluginsModule } from './plugins/plugins.module';
 import { GitProviderModule } from './plugins-capabilities/git-provider/git-provider.module';
 import { OAuthModule } from './plugins-capabilities/oauth/oauth.module';
+import { DeviceAuthModule } from './plugins-capabilities/device-auth/device-auth.module';
 import { DeployModule } from './plugins-capabilities/deploy/deploy.module';
 import { AiConversationModule } from './ai-conversation/ai-conversation.module';
 import { AccountModule } from './account/account.module';
@@ -61,6 +62,7 @@ import { CacheFactory } from '@ever-works/agent/cache';
         PluginsModule,
         GitProviderModule,
         OAuthModule,
+        DeviceAuthModule,
         DeployModule,
         AiConversationModule,
         AccountModule,

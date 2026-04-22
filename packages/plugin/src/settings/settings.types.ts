@@ -69,6 +69,11 @@ export interface SettingsUpdate {
 	readonly userId?: string;
 }
 
+export interface PluginSettingsWrite {
+	readonly settings?: Record<string, unknown>;
+	readonly secretSettings?: Record<string, unknown>;
+}
+
 export interface SettingsMigration {
 	readonly fromVersion: number;
 	readonly toVersion: number;

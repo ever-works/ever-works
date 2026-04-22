@@ -89,6 +89,7 @@ describe('PluginLifecycleManagerService', () => {
         },
         getSettings: jest.fn(),
         getResolvedSettings: jest.fn(),
+        updateSettings: jest.fn(),
         onEvent: jest.fn(),
         emitEvent: jest.fn(),
         registerCustomCapability: jest.fn(),

@@ -86,7 +86,12 @@ export function getCategoryLabel(category: string): string {
  * Capabilities that are internal implementation contracts and should not be
  * shown to users as selectable providers or displayed as capability badges.
  */
-export const HIDDEN_CAPABILITIES = new Set(['form-schema-provider', 'pipeline-modifier', 'oauth']);
+export const HIDDEN_CAPABILITIES = new Set([
+    'form-schema-provider',
+    'pipeline-modifier',
+    'oauth',
+    'device-auth',
+]);
 
 /**
  * Mapping of plugin capabilities to human-readable labels
