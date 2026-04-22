@@ -23,11 +23,14 @@ import { DirectoryRepository } from '@ever-works/agent/database';
 import type { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 import type { Response } from 'express';
 
+const ACTIVITY_RECONCILE_TTL_MS = 5000;
+
 @ApiTags('Activity Log')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/activity-log')
 export class ActivityLogController {
     private readonly reconcileInFlight = new Map<string, Promise<void>>();
+    private readonly reconcileCompletedAt = new Map<string, number>();
 
     constructor(
         private readonly activityLogService: ActivityLogService,
@@ -41,9 +44,19 @@ export class ActivityLogController {
             return;
         }
 
+        const lastCompletedAt = this.reconcileCompletedAt.get(userId);
+        if (
+            typeof lastCompletedAt === 'number' &&
+            Date.now() - lastCompletedAt < ACTIVITY_RECONCILE_TTL_MS
+        ) {
+            return;
+        }
+
         const reconcilePromise: Promise<void> = this.activityLogService
             .reconcileStaleGenerationActivities(userId)
-            .then(() => undefined)
+            .then(() => {
+                this.reconcileCompletedAt.set(userId, Date.now());
+            })
             .catch(() => {
                 // Activity listing should remain available even if stale-state cleanup fails.
             })
