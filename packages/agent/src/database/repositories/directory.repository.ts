@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, IsNull, Brackets, Raw, LessThanOrEqual } from 'typeorm';
+import { Repository, LessThan, IsNull, Brackets, Raw, LessThanOrEqual, In } from 'typeorm';
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities';
 import { prepareLikeSearchTerm } from '../utils';
@@ -73,6 +73,19 @@ export class DirectoryRepository {
     async findById(id: string): Promise<Directory | null> {
         return this.repository.findOne({
             where: { id },
+            relations: ['user'],
+        });
+    }
+
+    async findByIds(ids: string[]): Promise<Directory[]> {
+        const uniqueIds = [...new Set(ids.filter(Boolean))];
+
+        if (uniqueIds.length === 0) {
+            return [];
+        }
+
+        return this.repository.find({
+            where: { id: In(uniqueIds) },
             relations: ['user'],
         });
     }

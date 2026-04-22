@@ -6,7 +6,7 @@ import { TriggerGenerationOrchestrator } from '../../trigger/worker/orchestrator
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
 import { createTaskContext } from '../../trigger/worker/utils/task-context.utils';
 
-export const directoryGenerationTask = task({
+export const directoryGenerationTask = task<'directory-generation', DirectoryGenerationPayload>({
     id: 'directory-generation',
     maxDuration: 3600 * 5, // 5 hours
     onFailure: async ({ payload, error }) => {
@@ -68,7 +68,7 @@ export const directoryGenerationTask = task({
             // Best-effort — if we can't boot the context, nothing more we can do
         }
     },
-    run: async (payload: DirectoryGenerationPayload) => {
+    run: async (payload: DirectoryGenerationPayload, { signal }) => {
         return withWorkerContext('DirectoryGeneration', async (appContext) => {
             const { orchestrator, directory, user } = await createTaskContext(
                 appContext,
@@ -78,20 +78,25 @@ export const directoryGenerationTask = task({
             const scheduleService = appContext.get(DirectoryScheduleService);
 
             try {
-                await orchestrator.run({
+                const finalStatus = await orchestrator.run({
                     directory,
                     user,
                     dto: payload.dto,
                     historyId: payload.historyId,
                     historyStartedAt: payload.historyStartedAt,
+                    signal,
                 });
 
                 if (payload.triggerSource === 'schedule' && payload.scheduleId) {
-                    await scheduleService.markRunCompleted({
-                        scheduleId: payload.scheduleId,
-                        historyId: payload.historyId,
-                        status: GenerateStatusType.GENERATED,
-                    });
+                    if (finalStatus === GenerateStatusType.CANCELLED) {
+                        await scheduleService.markRunFailed(payload.scheduleId, 'cancelled');
+                    } else {
+                        await scheduleService.markRunCompleted({
+                            scheduleId: payload.scheduleId,
+                            historyId: payload.historyId,
+                            status: GenerateStatusType.GENERATED,
+                        });
+                    }
                 }
             } catch (error) {
                 // Mark schedule as failed. The onFailure handler also calls markRunFailed,

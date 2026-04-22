@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
@@ -9,16 +8,6 @@ import './globals.css';
 import { themeInitScript } from '@/lib/theme-init';
 import { TopLoader } from '@/components/ui/top-loader';
 import { APP_NAME } from '@/lib/constants';
-
-const geistSans = Geist({
-    variable: '--font-geist-sans',
-    subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-    variable: '--font-geist-mono',
-    subsets: ['latin'],
-});
 
 export const metadata: Metadata = {
     title: {
@@ -49,10 +38,7 @@ export default async function RootLayout({
             <head>
                 <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
             </head>
-            <body
-                className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-                suppressHydrationWarning
-            >
+            <body className="antialiased" suppressHydrationWarning>
                 <TopLoader />
                 <NextIntlClientProvider>
                     {children}

@@ -30,6 +30,7 @@ import type {
 } from '@ever-works/plugin';
 import type { DirectoryHistoryChangeEntry } from '@ever-works/contracts/api';
 import type { GenerationLogCollector } from './generation-log-collector';
+import { GENERATION_CANCELLED } from '@src/constants/messages';
 
 const PARALLEL_WRITE_CONCURRENCY = 10;
 
@@ -96,11 +97,28 @@ export class DataGeneratorService {
         directory: Directory,
         user: User,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
-        options?: { tryResume?: boolean; logCollector?: GenerationLogCollector },
+        options?: {
+            tryResume?: boolean;
+            logCollector?: GenerationLogCollector;
+            signal?: AbortSignal;
+        },
     ): Promise<InitializeResult> {
         this.logger.debug(
             `Initializing data repository for directory: ${JSON.stringify(createItemsGeneratorDto)}`,
         );
+
+        const throwIfCancelled = () => {
+            if (options?.signal?.aborted) {
+                const reason = options.signal.reason;
+                if (reason instanceof Error) {
+                    throw reason;
+                }
+
+                const error = new Error(GENERATION_CANCELLED);
+                error.name = 'AbortError';
+                throw error;
+            }
+        };
 
         let existingData = {
             existingItems: [],
@@ -121,6 +139,8 @@ export class DataGeneratorService {
                 .existingItems;
         }
 
+        throwIfCancelled();
+
         const existed = existingData.existingItems.length > 0;
 
         const logCollector = options?.logCollector;
@@ -136,6 +156,7 @@ export class DataGeneratorService {
             },
             options?.tryResume,
             logCollector ? (entry) => logCollector.log(entry) : undefined,
+            options?.signal,
         );
 
         const warnings = pipelineResult.warnings?.slice();
@@ -155,6 +176,8 @@ export class DataGeneratorService {
                 warnings,
             };
         }
+
+        throwIfCancelled();
 
         // If no items were generated, we don't need to do anything else
         if (!pipelineResult || pipelineResult.outputs.items.length === 0) {
@@ -189,6 +212,8 @@ export class DataGeneratorService {
         const owner = directory.getRepoOwner();
         const repo = directory.getDataRepo();
 
+        throwIfCancelled();
+
         // Creating repository
         const createdRepository = assertCreatedRepositoryTarget(
             await this.gitFacade.createRepository(
@@ -206,6 +231,7 @@ export class DataGeneratorService {
         );
 
         this.logger.log(`Successfully created repository: ${createdRepository.fullName}`);
+        throwIfCancelled();
 
         // Cloning repository
         let dest: string;
@@ -251,6 +277,7 @@ export class DataGeneratorService {
         }
 
         this.logger.log(`Cloned repository to ${dest}`);
+        throwIfCancelled();
 
         try {
             // Ensure directories exist
@@ -366,6 +393,7 @@ export class DataGeneratorService {
 
             // write categories, tags, readme, license, config, markdown template
             await Promise.all(promises);
+            throwIfCancelled();
 
             // Commit changes
             await this.gitFacade.addAll(provider, data.dir);
@@ -470,6 +498,7 @@ export class DataGeneratorService {
                 },
                 { concurrency: PARALLEL_WRITE_CONCURRENCY },
             );
+            throwIfCancelled();
 
             // Batch commit all items at once
             if (newItems.length > 0) {
@@ -1023,6 +1052,7 @@ export class DataGeneratorService {
         onProgress?: (progress: PipelineProgress) => void,
         tryResume?: boolean,
         onLogEntry?: (log: import('@ever-works/contracts/api').GenerationStepLog) => void,
+        signal?: AbortSignal,
     ): Promise<PipelineResult> {
         // Handle existing data reset for RECREATE mode
         let existing = { ...existingData };
@@ -1075,7 +1105,13 @@ export class DataGeneratorService {
 
         this.logger.log(`Executing pipeline for directory "${directory.slug}" (user: ${user.id})`);
 
-        const pipelineOptions = onLogEntry ? { onLogEntry } : undefined;
+        const pipelineOptions =
+            onLogEntry || signal
+                ? {
+                      ...(onLogEntry ? { onLogEntry } : {}),
+                      ...(signal ? { signal } : {}),
+                  }
+                : undefined;
 
         // Execute the pipeline - the orchestrator handles plugin resolution
         return tryResume

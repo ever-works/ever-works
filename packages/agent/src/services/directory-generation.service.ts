@@ -76,6 +76,7 @@ import {
 } from '@ever-works/contracts/api';
 import { buildDirectoryChangelog } from '../utils/directory-changelog.utils';
 import { GenerationLogCollector } from '@src/generators/data-generator/generation-log-collector';
+import { GENERATION_CANCELLED } from '@src/constants/messages';
 
 export interface BulkCaptureImagesDto {
     itemSlugs?: string[];
@@ -117,6 +118,7 @@ export type UpdateItemsGeneratorOptions = {
 @Injectable()
 export class DirectoryGenerationService {
     private readonly logger = new Logger(DirectoryGenerationService.name);
+    private readonly generationAbortControllers = new Map<string, AbortController>();
 
     constructor(
         private readonly dataGenerator: DataGeneratorService,
@@ -322,6 +324,81 @@ export class DirectoryGenerationService {
             parameters: payload,
             message: `Processing update for '${directory.name}'. Check logs or data directory for updates.`,
             historyId: history.id,
+        };
+    }
+
+    async cancelGeneration(
+        directoryId: string,
+        user: User,
+    ): Promise<{
+        status: 'success';
+        message: string;
+        mode: 'trigger' | 'in_process' | 'stale' | 'already_finished';
+    }> {
+        const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
+
+        if (directory.generateStatus?.status !== GenerateStatusType.GENERATING) {
+            throw new ConflictException(`Directory "${directory.name}" is not generating`);
+        }
+
+        const history =
+            await this.generationHistoryRepository.findLatestInProgressByDirectory(directoryId);
+
+        if (history?.triggerRunId) {
+            if (!this.generationDispatcher) {
+                throw new BadRequestException({
+                    status: 'error',
+                    message: 'Generation cancellation is not available in this environment.',
+                });
+            }
+
+            const cancelled = await this.generationDispatcher.cancelDirectoryGeneration(
+                history.triggerRunId,
+            );
+
+            if (cancelled) {
+                return {
+                    status: 'success',
+                    message: 'Cancellation requested. The generation will stop shortly.',
+                    mode: 'trigger',
+                };
+            }
+
+            const refreshedDirectory = await this.directoryRepository.findById(directoryId);
+
+            if (
+                refreshedDirectory?.generateStatus?.status &&
+                refreshedDirectory.generateStatus.status !== GenerateStatusType.GENERATING
+            ) {
+                return {
+                    status: 'success',
+                    message: `Directory "${refreshedDirectory.name}" is no longer generating.`,
+                    mode: 'already_finished',
+                };
+            }
+
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Failed to cancel the active generation run. Please try again.',
+            });
+        }
+
+        const controller = this.generationAbortControllers.get(directoryId);
+        if (controller) {
+            controller.abort(this.createGenerationCancelledError());
+            return {
+                status: 'success',
+                message: 'Cancellation requested. The generation will stop shortly.',
+                mode: 'in_process',
+            };
+        }
+
+        await this.finalizeCancelledGeneration(directory.id, history, history?.scheduleId ?? null);
+
+        return {
+            status: 'success',
+            message: 'Generation was marked as cancelled.',
+            mode: 'stale',
         };
     }
 
@@ -1236,8 +1313,10 @@ Only include image URLs that are absolute URLs (starting with http).`;
         context: GenerationTriggerContext = DEFAULT_TRIGGER_CONTEXT,
     ) {
         const startTime = new Date();
+        const abortController = new AbortController();
 
         await this.markGenerationStarted(directory.id, startTime, history);
+        this.generationAbortControllers.set(directory.id, abortController);
 
         const acc: { stats: GenerationStats | null; warnings?: string[] } = {
             stats: null,
@@ -1266,7 +1345,15 @@ Only include image URLs that are absolute URLs (starting with http).`;
             : undefined;
 
         try {
-            await this.executeGenerationPipeline(directory, user, dto, context, acc, logCollector);
+            await this.executeGenerationPipeline(
+                directory,
+                user,
+                dto,
+                context,
+                acc,
+                logCollector,
+                abortController.signal,
+            );
         } catch (error) {
             generationError = error;
         } finally {
@@ -1283,6 +1370,8 @@ Only include image URLs that are absolute URLs (starting with http).`;
                 });
             } catch (finalizeError) {
                 this.logger.error('Failed to finalize generation status:', finalizeError);
+            } finally {
+                this.generationAbortControllers.delete(directory.id);
             }
         }
 
@@ -1313,10 +1402,12 @@ Only include image URLs that are absolute URLs (starting with http).`;
         context: GenerationTriggerContext,
         acc: { stats: GenerationStats | null; warnings?: string[] },
         logCollector?: GenerationLogCollector,
+        signal?: AbortSignal,
     ): Promise<void> {
         const generated = await this.dataGenerator.initialize(directory, user, dto, {
             tryResume: context.triggeredBy === 'schedule',
             logCollector,
+            signal,
         });
 
         acc.warnings = generated.warnings;
@@ -1331,11 +1422,19 @@ Only include image URLs that are absolute URLs (starting with http).`;
         const newItemsCount = generated.stats?.newItemsCount ?? 0;
         const updatedItemsCount = generated.stats?.updatedItemsCount ?? 0;
 
+        if (signal?.aborted) {
+            throw this.createGenerationCancelledError();
+        }
+
         if (newItemsCount > 0 || updatedItemsCount > 0) {
             await this.markdownGenerator.initialize(directory, user, {
                 generation_method: dto.generation_method,
                 pr_update: generated.prUpdate,
             });
+        }
+
+        if (signal?.aborted) {
+            throw this.createGenerationCancelledError();
         }
 
         if (generated.hasExistingItems || newItemsCount > 0) {
@@ -1383,14 +1482,25 @@ Only include image URLs that are absolute URLs (starting with http).`;
         const { directoryId, startTime, history, error, stats, warnings, context } = params;
         const endTime = new Date();
         const durationInSeconds = calculateDurationSeconds(startTime, endTime);
-        const finalStatus = error ? GenerateStatusType.ERROR : GenerateStatusType.GENERATED;
+        const wasCancelled = this.isGenerationCancelledError(error);
+        const finalStatus = wasCancelled
+            ? GenerateStatusType.CANCELLED
+            : error
+              ? GenerateStatusType.ERROR
+              : GenerateStatusType.GENERATED;
 
         // 1. Finalize directory status
         await Promise.all([
             this.directoryRepository.recordGenerationFinishTime(directoryId, endTime),
             this.directoryRepository.updateGenerateStatus(directoryId, {
                 status: finalStatus,
-                ...(error ? { error: normalizeGeneratorError(error) } : { step: null }),
+                ...(error
+                    ? {
+                          error: wasCancelled
+                              ? GENERATION_CANCELLED
+                              : normalizeGeneratorError(error),
+                      }
+                    : { step: null }),
                 warnings,
             }),
         ]);
@@ -1401,7 +1511,13 @@ Only include image URLs that are absolute URLs (starting with http).`;
                 status: finalStatus,
                 finishedAt: endTime,
                 durationInSeconds,
-                ...(error ? { errorMessage: normalizeGeneratorError(error) } : {}),
+                ...(error
+                    ? {
+                          errorMessage: wasCancelled
+                              ? GENERATION_CANCELLED
+                              : normalizeGeneratorError(error),
+                      }
+                    : {}),
                 ...buildStatsUpdate(stats),
             });
         }
@@ -1412,6 +1528,65 @@ Only include image URLs that are absolute URLs (starting with http).`;
                 ? { status: 'failed', reason: normalizeGeneratorError(error) }
                 : { status: 'completed', historyId: history?.id };
             await this.directoryScheduleService.finalizeScheduleRun(context.scheduleId, outcome);
+        }
+    }
+
+    private createGenerationCancelledError(): Error {
+        const error = new Error(GENERATION_CANCELLED);
+        error.name = 'AbortError';
+        return error;
+    }
+
+    private isGenerationCancelledError(error: unknown): boolean {
+        if (!error) {
+            return false;
+        }
+
+        if (error instanceof Error) {
+            const message = error.message.toLowerCase();
+            return error.name === 'AbortError' || message === GENERATION_CANCELLED.toLowerCase();
+        }
+
+        return false;
+    }
+
+    private async finalizeCancelledGeneration(
+        directoryId: string,
+        history?: DirectoryGenerationHistory | null,
+        scheduleId?: string | null,
+    ): Promise<void> {
+        const finishedAt = new Date();
+        const startedAt = history?.startedAt ?? finishedAt;
+
+        await Promise.all([
+            this.directoryRepository.recordGenerationFinishTime(directoryId, finishedAt),
+            this.directoryRepository.updateGenerateStatus(directoryId, {
+                status: GenerateStatusType.CANCELLED,
+                error: GENERATION_CANCELLED,
+                step: null,
+            }),
+            history
+                ? this.generationHistoryRepository.updateEntry(history.id, {
+                      status: GenerateStatusType.CANCELLED,
+                      finishedAt,
+                      durationInSeconds: calculateDurationSeconds(startedAt, finishedAt),
+                      errorMessage: GENERATION_CANCELLED,
+                  })
+                : Promise.resolve(null),
+            scheduleId
+                ? this.directoryScheduleService.finalizeScheduleRun(scheduleId, {
+                      status: 'failed',
+                      reason: GENERATION_CANCELLED,
+                  })
+                : Promise.resolve(),
+        ]);
+
+        const completedDirectory = await this.directoryRepository.findById(directoryId);
+        if (completedDirectory) {
+            this.eventEmitter.emit(
+                DirectoryGenerationCompletedEvent.EVENT_NAME,
+                new DirectoryGenerationCompletedEvent(completedDirectory),
+            );
         }
     }
 

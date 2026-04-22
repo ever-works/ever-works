@@ -513,6 +513,22 @@ export class DirectoriesController {
         });
     }
 
+    @Post('directories/:id/cancel-generation')
+    @HttpCode(HttpStatus.ACCEPTED)
+    @ApiOperation({
+        summary: 'Cancel generation',
+        description: 'Request cancellation of the active generation for a directory',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 202, description: 'Generation cancellation requested' })
+    async cancelGeneration(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+    ): Promise<{ status: 'success'; message: string; mode: string }> {
+        const user = await this.authService.getUser(auth.userId);
+        return this.directoryGenerationService.cancelGeneration(id, user);
+    }
+
     @Get('directories/:id/schedule')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
