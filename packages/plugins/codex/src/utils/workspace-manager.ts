@@ -3,13 +3,7 @@ import * as path from 'path';
 import { createHash, randomUUID } from 'node:crypto';
 
 import type { Brand, Category, ItemData, Tag } from '@ever-works/plugin';
-import {
-	collectMetadataFromItems,
-	jsonrepair,
-	normalizeItemTags,
-	slugify,
-	validateRequiredItemFields
-} from '@ever-works/plugin';
+import { jsonrepair, normalizeItemTags, slugify, validateRequiredItemFields } from '@ever-works/plugin';
 
 import { BASE_TEMP_DIR } from '../types.js';
 
