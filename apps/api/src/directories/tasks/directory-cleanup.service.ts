@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { CacheEntryRepository } from '@ever-works/agent/cache';
@@ -18,6 +19,7 @@ export class DirectoryCleanupService {
         private readonly repository: DirectoryRepository,
         private readonly cacheRepository: CacheEntryRepository,
         private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
+        private readonly eventEmitter: EventEmitter2,
     ) {}
 
     // Runs every 10 minutes
@@ -96,5 +98,14 @@ export class DirectoryCleanupService {
         }
 
         await Promise.all(promises);
+
+        const updatedDirectory = await this.repository.findById(directory.id);
+
+        if (updatedDirectory) {
+            this.eventEmitter.emit(
+                DirectoryGenerationCompletedEvent.EVENT_NAME,
+                new DirectoryGenerationCompletedEvent(updatedDirectory),
+            );
+        }
     }
 }

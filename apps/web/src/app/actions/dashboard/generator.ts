@@ -139,6 +139,26 @@ export async function updateItems(directoryId: string, data: UpdateItemsGenerato
     }
 }
 
+export async function cancelGeneration(directoryId: string) {
+    const t = await getTranslations('actions.generator');
+
+    try {
+        const result = await itemsGeneratorAPI.cancel(directoryId);
+
+        return {
+            success: true,
+            data: result,
+            message: result.message || t('generationCancellationRequested'),
+        };
+    } catch (error) {
+        console.error('Failed to cancel generation:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : t('failedToCancelGeneration'),
+        };
+    }
+}
+
 export async function regenerateMarkdown(directoryId: string) {
     const t = await getTranslations('actions.generator');
 
