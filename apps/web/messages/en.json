@@ -543,7 +543,11 @@
             },
             "actions": {
                 "export": "Export CSV",
-                "clearFilters": "Clear filters"
+                "clearFilters": "Clear filters",
+                "stop": "Stop",
+                "stopping": "Stopping...",
+                "stopRequested": "Generation cancellation requested",
+                "stopFailed": "Failed to stop generation"
             },
             "empty": {
                 "title": "No activities yet",
@@ -1087,7 +1091,11 @@
                 "generating": {
                     "title": "Generation in Progress",
                     "description": "Processing your request...",
-                    "processing": "Processing..."
+                    "processing": "Processing...",
+                    "stop": "Stop",
+                    "stopping": "Stopping...",
+                    "stopRequested": "Generation cancellation requested",
+                    "stopFailed": "Failed to stop generation"
                 },
                 "generated": {
                     "title": "Generation Complete",
@@ -1620,7 +1628,7 @@
                 "repositoryPlaceholder": "Brief description of the repository (optional)",
                 "startGeneration": "Start Generation",
                 "regenerateItems": "Regenerate Items",
-                "updateItems": "Update Items",
+                "updateItems": "Run Generation",
                 "recreateDirectory": "Recreate Directory",
                 "showAdvancedOptions": "Show Advanced Options",
                 "hideAdvancedOptions": "Hide Advanced Options",
@@ -1742,7 +1750,8 @@
                 "progress": "Progress",
                 "closeNote": "This may take a few minutes. You can close this page and come back later.",
                 "showLogs": "Show step logs",
-                "hideLogs": "Hide step logs"
+                "hideLogs": "Hide step logs",
+                "waitingForLogs": "Waiting for live logs to arrive..."
             },
             "settings": {
                 "sourceSettings": "Source Repository",
@@ -2752,7 +2761,7 @@
             "githubOrganizations": {
                 "title": "GitHub Organizations",
                 "description": "Review the organizations available from your GitHub connection and add any extra organizations you want Ever Works to target.",
-                "noOrganizations": "No organizations found yet.",
+                "noOrganizations": "No organizations are available from the current GitHub connection.",
                 "connectToLoad": "Connect GitHub to load your organizations.",
                 "placeholder": "Add organization by login",
                 "addButton": "Add organization",
@@ -2960,8 +2969,10 @@
             "promptRequired": "Prompt is required",
             "nameRequired": "Name is required",
             "generationStartedSuccessfully": "Generation started successfully",
+            "generationCancellationRequested": "Generation cancellation requested",
             "updateStartedSuccessfully": "Update started successfully",
             "failedToGenerateItems": "Failed to generate items",
+            "failedToCancelGeneration": "Failed to cancel generation",
             "failedToUpdateItems": "Failed to update items",
             "markdownRegeneratedSuccessfully": "Markdown regenerated successfully",
             "failedToRegenerateMarkdown": "Failed to regenerate markdown",

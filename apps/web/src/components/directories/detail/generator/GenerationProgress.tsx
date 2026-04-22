@@ -135,8 +135,8 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
     const progressPercentage = getStepProgress(generateStatus);
     const stepText = getStepText(generateStatus, t('steps.processing'));
     const itemsText = getItemsProcessedText(generateStatus);
-    const recentLogs = generateStatus?.recentLogs;
-    const hasLogs = recentLogs && recentLogs.length > 0;
+    const recentLogs = generateStatus?.recentLogs ?? [];
+    const hasLogs = recentLogs.length > 0;
 
     return (
         <div className="gp-enter max-w-2xl mx-auto py-12">
@@ -184,36 +184,37 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
                     <ProgressBar percentage={progressPercentage} />
                 </div>
 
-                {hasLogs && (
-                    <div className="px-8 pb-4 space-y-3">
-                        <button
-                            type="button"
-                            onClick={() => setShowLogs((prev) => !prev)}
-                            className={cn(
-                                'group inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-200',
-                                showLogs
-                                    ? 'bg-white/6 text-text dark:text-text-dark ring-1 ring-white/15'
-                                    : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
-                            )}
-                        >
-                            <Terminal className="h-3.5 w-3.5 transition-transform duration-200 group-hover:scale-110" />
-                            {showLogs ? t('hideLogs') : t('showLogs')}
-                            {showLogs ? (
-                                <ChevronUp className="h-3 w-3 ml-0.5 opacity-40" />
-                            ) : (
-                                <ChevronDown className="h-3 w-3 ml-0.5 opacity-40" />
-                            )}
-                        </button>
-
-                        {showLogs && (
-                            <TerminalLogViewer
-                                logs={recentLogs!}
-                                title={t('showLogs')}
-                                showCursor
-                            />
+                <div className="px-8 pb-4 space-y-3">
+                    <button
+                        type="button"
+                        onClick={() => setShowLogs((prev) => !prev)}
+                        className={cn(
+                            'group inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-200',
+                            showLogs
+                                ? 'bg-white/6 text-text dark:text-text-dark ring-1 ring-white/15'
+                                : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
                         )}
-                    </div>
-                )}
+                    >
+                        <Terminal className="h-3.5 w-3.5 transition-transform duration-200 group-hover:scale-110" />
+                        {showLogs ? t('hideLogs') : t('showLogs')}
+                        {showLogs ? (
+                            <ChevronUp className="h-3 w-3 ml-0.5 opacity-40" />
+                        ) : (
+                            <ChevronDown className="h-3 w-3 ml-0.5 opacity-40" />
+                        )}
+                    </button>
+
+                    {showLogs && (
+                        <div className="space-y-2">
+                            <TerminalLogViewer logs={recentLogs} title={t('showLogs')} showCursor />
+                            {!hasLogs && (
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('waitingForLogs')}
+                                </p>
+                            )}
+                        </div>
+                    )}
+                </div>
 
                 <div className="mx-8 mb-6 mt-2 flex items-start gap-2.5 rounded-lg bg-surface-secondary dark:bg-surface-secondary-dark px-4 py-3">
                     <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-text-muted dark:text-text-muted-dark" />

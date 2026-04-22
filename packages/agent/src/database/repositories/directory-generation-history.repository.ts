@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, MoreThan, Repository } from 'typeorm';
 import { DirectoryGenerationHistory, GenerationMetrics } from '@src/entities';
 import { GenerateStatusType } from '@src/entities/types';
 import {
@@ -43,6 +43,8 @@ type HistoryUpdateParams = {
     changelog?: DirectoryChangelog | null;
     logs?: GenerationStepLog[] | null;
 };
+
+const LATEST_POSITIVE_ITEM_COUNTS_BATCH_MULTIPLIER = 10;
 
 @Injectable()
 export class DirectoryGenerationHistoryRepository {
@@ -144,45 +146,39 @@ export class DirectoryGenerationHistoryRepository {
             return new Map();
         }
 
-        const rows = await this.repository
-            .createQueryBuilder('history')
-            .select('history.directoryId', 'directoryId')
-            .addSelect('history.totalItemsCount', 'totalItemsCount')
-            .where('history.directoryId IN (:...directoryIds)', {
-                directoryIds: uniqueDirectoryIds,
-            })
-            .andWhere('history.totalItemsCount > 0')
-            .andWhere((queryBuilder) => {
-                const subQuery = queryBuilder
-                    .subQuery()
-                    .select('1')
-                    .from(DirectoryGenerationHistory, 'newer')
-                    .where('newer.directoryId = history.directoryId')
-                    .andWhere('newer.totalItemsCount > 0')
-                    .andWhere(
-                        `(
-                            newer.startedAt > history.startedAt
-                            OR (
-                                newer.startedAt = history.startedAt
-                                AND newer.createdAt > history.createdAt
-                            )
-                        )`,
-                    )
-                    .getQuery();
-
-                return `NOT EXISTS ${subQuery}`;
-            })
-            .getRawMany<{ directoryId: string; totalItemsCount: string | number }>();
-
         const counts = new Map<string, number>();
-        for (const row of rows) {
-            const current = counts.get(row.directoryId);
-            const totalItemsCount = Number(row.totalItemsCount);
+        const batchSize = Math.max(
+            uniqueDirectoryIds.length * LATEST_POSITIVE_ITEM_COUNTS_BATCH_MULTIPLIER,
+            uniqueDirectoryIds.length,
+        );
+        let skip = 0;
 
-            // If multiple rows tie on timestamps, keep the largest positive count deterministically.
-            if (current === undefined || totalItemsCount > current) {
-                counts.set(row.directoryId, totalItemsCount);
+        while (counts.size < uniqueDirectoryIds.length) {
+            const records = await this.repository.find({
+                where: {
+                    directoryId: In(uniqueDirectoryIds),
+                    totalItemsCount: MoreThan(0),
+                },
+                order: { startedAt: 'DESC', createdAt: 'DESC' },
+                take: batchSize,
+                skip,
+            });
+
+            if (records.length === 0) {
+                break;
             }
+
+            for (const record of records) {
+                if (!counts.has(record.directoryId)) {
+                    counts.set(record.directoryId, record.totalItemsCount);
+                }
+            }
+
+            if (records.length < batchSize) {
+                break;
+            }
+
+            skip += records.length;
         }
 
         return counts;
