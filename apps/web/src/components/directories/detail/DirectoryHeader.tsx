@@ -4,7 +4,7 @@ import { Directory } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
 import { useTranslations } from 'next-intl';
-import { DirectoryMemberRole, DirectoryScheduleStatus } from '@/lib/api/enums';
+import { DirectoryMemberRole, DirectoryScheduleStatus, GenerateStatusType } from '@/lib/api/enums';
 import { Link as IconLink, Users, Cog, Github, Clock } from 'lucide-react';
 import { useDirectoryDetail, useDirectoryPermissions } from './DirectoryDetailContext';
 import { getStepText, getItemsProcessedText } from '@/lib/utils/generator-steps';
@@ -32,7 +32,7 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
     const isScheduled = directory.scheduledStatus === DirectoryScheduleStatus.ACTIVE;
     const StatusIcon = statusStyle.icon;
     const shouldShowScheduledSuffix =
-        isScheduled && directory.generateStatus?.status !== 'generating';
+        isScheduled && directory.generateStatus?.status !== GenerateStatusType.GENERATING;
     const statusLabel = shouldShowScheduledSuffix
         ? `${t(`status.${statusStyle.labelKey}`)} - Scheduled`
         : t(`status.${statusStyle.labelKey}`);
