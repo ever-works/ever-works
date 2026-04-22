@@ -61,7 +61,8 @@ import {
 	resolveAuthEnv,
 	buildMetrics,
 	buildErrorResult,
-	buildCancelledResult
+	buildCancelledResult,
+	finalizeCompletedState
 } from './utils/pipeline-helpers.js';
 import {
 	getFormFields as formFields,
@@ -153,6 +154,17 @@ interface GeminiLogOptions {
 	readonly message: string;
 	readonly stepId?: GeminiStepId;
 	readonly durationMs?: number;
+}
+
+function buildIsolatedGeminiEnv(configDir: string, env: Record<string, string>): Record<string, string> {
+	return {
+		...env,
+		HOME: configDir,
+		XDG_CONFIG_HOME: path.join(configDir, '.config'),
+		XDG_DATA_HOME: path.join(configDir, '.local', 'share'),
+		XDG_CACHE_HOME: path.join(configDir, '.cache'),
+		GEMINI_CONFIG_DIR: configDir
+	};
 }
 
 /**
@@ -411,6 +423,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				'- **Vertex AI**: connect with Google Cloud project settings for Vertex AI.',
 				'',
 				'Authentication is configured from Ever Works user settings rather than shared host login state.',
+				'The runtime uses an isolated per-user Gemini home/config directory instead of the machine user home.',
 				'## Usage',
 				'',
 				'1. Choose API Key or Vertex AI authentication.',
@@ -465,16 +478,20 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		let killProcess: (() => void) | null = null;
 
 		try {
-			const binaryPath = await ensureBinary(version, this.context?.logger || console);
-			const workspacePath = await fs.mkdtemp(path.join(os.tmpdir(), 'ever-works-gemini-validate-'));
-			tempDir = workspacePath;
+			const cliCommand = ensureBinary(version, this.context?.logger || console);
+			tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ever-works-gemini-validate-'));
+			const configDir = path.join(tempDir, 'config-home');
+			const workspacePath = path.join(tempDir, 'workspace');
+			await fs.mkdir(workspacePath, { recursive: true });
+			await ensureOnboardingConfig(configDir);
 
 			const execution = executeGemini({
-				binaryPath,
+				command: cliCommand.command,
+				commandArgs: cliCommand.args,
 				prompt: 'Reply with OK.',
 				systemPrompt: 'Reply with the single word OK. Nothing else.',
 				cwd: workspacePath,
-				env: authEnv,
+				env: buildIsolatedGeminiEnv(configDir, authEnv),
 				model: settings.model as string | undefined
 			});
 			killProcess = execution.kill;
@@ -532,6 +549,11 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		onProgress?: PipelineProgressCallback
 	): Promise<PipelineResult> {
 		const startTime = Date.now();
+		const userId = directory.user?.id;
+		if (!userId) {
+			return this.handleError(new Error('User ID is required'), startTime);
+		}
+
 		if (this.abortController) {
 			return this.handleError(
 				new Error(
@@ -549,11 +571,8 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		this.state = initializeState();
 
 		const logger = this.context?.logger ?? console;
-		const userId = directory.user?.id;
-
-		if (!userId) {
-			return this.handleError(new Error('User ID is required'), startTime);
-		}
+		let workspacePath: string | null = null;
+		let configDir: string | null = null;
 
 		try {
 			const settings = await resolveSettings(this.context, userId, directory.id);
@@ -567,7 +586,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			const setupStepStartedAt = this.startStep('setup-gemini', onLogEntry);
 			reportProgress(onProgress, 0, 0, 'Setup Gemini CLI');
 
-			const binaryPath = await ensureBinary(version, logger);
+			const cliCommand = ensureBinary(version, logger);
 			this.completeStep('setup-gemini', setupStepStartedAt, onLogEntry);
 
 			if (signal.aborted) return this.handleCancel(startTime);
@@ -576,8 +595,8 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			const prepareContextStepStartedAt = this.startStep('prepare-context', onLogEntry);
 			reportProgress(onProgress, 1, 20, 'Prepare Context');
 
-			const configDir = path.join(BASE_TEMP_DIR, 'config', userId);
-			const workspacePath = await createWorkspace(userId, directory.id);
+			configDir = path.join(BASE_TEMP_DIR, 'config', userId);
+			workspacePath = await createWorkspace(userId, directory.id);
 			await ensureOnboardingConfig(configDir);
 			await seedExistingItems(workspacePath, existing.items);
 			await seedMetadata(workspacePath, {
@@ -589,7 +608,13 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			});
 			this.completeStep('prepare-context', prepareContextStepStartedAt, onLogEntry);
 
-			if (signal.aborted) return this.handleCancel(startTime);
+			if (signal.aborted) {
+				if (workspacePath) {
+					await cleanupWorkspace(workspacePath);
+					workspacePath = null;
+				}
+				return this.handleCancel(startTime);
+			}
 
 			// ── Step 3: Generate Items ─────────────────────────────────
 			const generateItemsStepStartedAt = this.startStep('generate-items', onLogEntry);
@@ -628,13 +653,11 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			let execResult: ExecuteResult;
 			try {
 				const { onStdoutLine, onStderrLine } = this.createGeminiStreamHandlers(onLogEntry);
-				const executionEnv: Record<string, string> = {
-					...authEnv,
-					GEMINI_CONFIG_DIR: configDir
-				};
+				const executionEnv = buildIsolatedGeminiEnv(configDir, authEnv);
 
 				const { promise, kill } = executeGemini({
-					binaryPath,
+					command: cliCommand.command,
+					commandArgs: cliCommand.args,
 					prompt: userPrompt,
 					systemPrompt,
 					cwd: workspacePath,
@@ -654,6 +677,10 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 
 			if (execResult.killed || signal.aborted) {
 				this.failStep('generate-items', new Error('Cancelled'), onLogEntry);
+				if (workspacePath) {
+					await cleanupWorkspace(workspacePath);
+					workspacePath = null;
+				}
 				return this.handleCancel(startTime);
 			}
 
@@ -713,14 +740,22 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			const cleanupStepStartedAt = this.startStep('cleanup', onLogEntry);
 			reportProgress(onProgress, 5, 95, 'Cleanup');
 
-			await cleanupWorkspace(userId, directory.id);
+			if (workspacePath) {
+				await cleanupWorkspace(workspacePath);
+				workspacePath = null;
+			}
 			this.completeStep('cleanup', cleanupStepStartedAt, onLogEntry);
+
+			if (signal.aborted) {
+				return this.handleCancel(startTime);
+			}
 
 			// ── Build result ───────────────────────────────────────────
 			reportProgress(onProgress, 6, 100, 'Complete');
 
 			const duration = Date.now() - startTime;
 			const warnings = [...(generationWarning ? [generationWarning] : []), ...screenshotWarnings];
+			this.state = finalizeCompletedState(this.state!);
 
 			return buildSuccessPipelineResult(
 				{
@@ -746,7 +781,9 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				this.failStep(runningStepId, err, onLogEntry);
 			}
 			logger.error(`Gemini CLI pipeline failed: ${err.message}`);
-			await cleanupWorkspace(userId, directory.id);
+			if (workspacePath) {
+				await cleanupWorkspace(workspacePath);
+			}
 			return this.handleError(err, startTime);
 		} finally {
 			if (this.abortController === abortController) {

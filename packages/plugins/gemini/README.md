@@ -37,6 +37,7 @@ The onboarding UI provides a 3-step flow: choose auth mode, configure credential
 
 This plugin does not reuse host machine Gemini CLI login state from `~/.gemini/`.
 Credentials must come from Ever Works user settings so each user keeps isolated auth.
+The runtime also uses an isolated per-user Gemini home/config directory instead of the machine user's home.
 
 ## Settings
 
@@ -79,10 +80,10 @@ Both support variable substitution for directory context, existing items, catego
 
 ## Binary Management
 
-The plugin installs the Gemini CLI via npm:
+The plugin runs Gemini CLI through `npx`:
 
-- Packages are cached at `{tmpdir}/gemini-generator/bin/gemini-{version}/`
-- Uses `@google/gemini-cli` npm package
+- Uses `npx --yes @google/gemini-cli`
+- Supports version pinning through `@google/gemini-cli@<version>`
 - Default version: `latest`
 
 ## Error Handling

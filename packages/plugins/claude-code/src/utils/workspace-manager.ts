@@ -57,16 +57,12 @@ export function getWorkspacePath(userId: string, directoryId: string): string {
 }
 
 /**
- * Create a fresh workspace directory with _meta/ subdirectory.
- * Removes any existing workspace first.
+ * Create a fresh per-run workspace directory with _meta/ subdirectory.
  */
 export async function createWorkspace(userId: string, directoryId: string): Promise<string> {
-	const workspacePath = getWorkspacePath(userId, directoryId);
-
-	// Clean up any existing workspace
-	await fs.rm(workspacePath, { recursive: true, force: true });
-
-	// Create workspace and metadata directory
+	const workspaceRoot = getWorkspacePath(userId, directoryId);
+	await fs.mkdir(workspaceRoot, { recursive: true });
+	const workspacePath = await fs.mkdtemp(path.join(workspaceRoot, 'run-'));
 	await fs.mkdir(path.join(workspacePath, '_meta'), { recursive: true });
 
 	return workspacePath;
@@ -265,12 +261,10 @@ export async function ensureOnboardingConfig(configDir: string): Promise<void> {
 }
 
 /**
- * Clean up the workspace directory and remove its project entry
- * from .claude.json so stale paths don't accumulate. Never throws.
+ * Clean up a generated workspace directory. Never throws.
  */
-export async function cleanupWorkspace(userId: string, directoryId: string): Promise<void> {
+export async function cleanupWorkspace(workspacePath: string): Promise<void> {
 	try {
-		const workspacePath = getWorkspacePath(userId, directoryId);
 		await fs.rm(workspacePath, { recursive: true, force: true });
 	} catch {
 		// Cleanup failures are non-fatal

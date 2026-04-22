@@ -52,7 +52,7 @@ export function updateStepState(
 	return {
 		...state,
 		steps,
-		currentStep: status === 'running' ? stepId : state.currentStep,
+		currentStep: status === 'running' ? stepId : state.currentStep === stepId ? undefined : state.currentStep,
 		completedSteps:
 			status === 'completed' || status === 'skipped' ? [...state.completedSteps, stepId] : state.completedSteps,
 		failedSteps: status === 'failed' ? [...state.failedSteps, stepId] : state.failedSteps
@@ -125,6 +125,16 @@ export function buildMetrics(
 	};
 }
 
+export function finalizeCompletedState(state: PipelineState<MakeStepId>): PipelineState<MakeStepId> {
+	return {
+		...state,
+		isRunning: false,
+		isCancelled: false,
+		currentStep: undefined,
+		completedAt: Date.now()
+	};
+}
+
 export function buildErrorResult(
 	state: PipelineState<MakeStepId> | null,
 	error: Error,
@@ -138,6 +148,14 @@ export function buildErrorResult(
 			break;
 		}
 	}
+
+	currentState = {
+		...currentState,
+		isRunning: false,
+		isCancelled: false,
+		currentStep: undefined,
+		completedAt: Date.now()
+	};
 
 	return {
 		state: currentState,
@@ -160,6 +178,7 @@ export function buildCancelledResult(
 		...(state ?? initializeState()),
 		isRunning: false,
 		isCancelled: true,
+		currentStep: undefined,
 		completedAt: Date.now()
 	};
 

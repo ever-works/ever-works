@@ -57,7 +57,7 @@ export function updateStepState(
 	return {
 		...state,
 		steps,
-		currentStep: status === 'running' ? stepId : state.currentStep,
+		currentStep: status === 'running' ? stepId : state.currentStep === stepId ? undefined : state.currentStep,
 		completedSteps,
 		failedSteps
 	};
@@ -136,6 +136,16 @@ export function buildMetrics(startTime: number, duration: number, itemCount: num
 	};
 }
 
+export function finalizeCompletedState(state: PipelineState<OpenCodeStepId>): PipelineState<OpenCodeStepId> {
+	return {
+		...state,
+		isRunning: false,
+		isCancelled: false,
+		currentStep: undefined,
+		completedAt: Date.now()
+	};
+}
+
 export function buildErrorResult(
 	state: PipelineState<OpenCodeStepId> | null,
 	error: Error,
@@ -149,6 +159,14 @@ export function buildErrorResult(
 			break;
 		}
 	}
+
+	currentState = {
+		...currentState,
+		isRunning: false,
+		isCancelled: false,
+		currentStep: undefined,
+		completedAt: Date.now()
+	};
 
 	return {
 		state: currentState,
@@ -173,6 +191,7 @@ export function buildCancelledResult(
 		...currentState,
 		isRunning: false,
 		isCancelled: true,
+		currentStep: undefined,
 		completedAt: Date.now()
 	};
 

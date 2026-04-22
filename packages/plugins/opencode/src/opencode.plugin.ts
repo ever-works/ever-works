@@ -55,7 +55,8 @@ import {
 	resolveSettings,
 	buildMetrics,
 	buildErrorResult,
-	buildCancelledResult
+	buildCancelledResult,
+	finalizeCompletedState
 } from './utils/pipeline-helpers.js';
 import { prepareOpenCodeSessionConfig, cleanupOpenCodeSessionConfig } from './utils/opencode-config.js';
 import {
@@ -259,6 +260,16 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		onProgress?: PipelineProgressCallback
 	): Promise<PipelineResult> {
 		const startTime = Date.now();
+		const execContext = options?.execContext;
+		if (!execContext) {
+			return this.handleError(new Error('Execution context (execContext) is required for opencode'), startTime);
+		}
+
+		const userId = execContext.user?.id ?? directory.user?.id;
+		if (!userId) {
+			return this.handleError(new Error('User ID is required'), startTime);
+		}
+
 		if (this.abortController) {
 			return this.handleError(
 				new Error(
@@ -272,23 +283,13 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		this.abortController = abortController;
 		const signal = options?.signal ?? abortController.signal;
 		const onLogEntry = options?.onLogEntry;
-		const execContext = options?.execContext;
 
 		this.state = initializeState();
 
 		const logger = this.context?.logger ?? console;
-		if (!execContext) {
-			return this.handleError(new Error('Execution context (execContext) is required for opencode'), startTime);
-		}
-
-		const userId = execContext.user?.id ?? directory.user?.id;
-
-		if (!userId) {
-			return this.handleError(new Error('User ID is required'), startTime);
-		}
-
 		const facadeOptions: FacadeOptions = { userId, directoryId: directory.id };
 		let sessionConfig: Awaited<ReturnType<typeof prepareOpenCodeSessionConfig>> | null = null;
+		let workspacePath: string | null = null;
 
 		try {
 			const settings = await resolveSettings(this.context, userId, directory.id);
@@ -316,8 +317,10 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			this.completeStep('setup-opencode', setupStepStartedAt, onLogEntry);
 
 			if (signal.aborted) {
-				await cleanupWorkspace(userId, directory.id);
-				await cleanupOpenCodeSessionConfig(userId, directory.id);
+				if (workspacePath) {
+					await cleanupWorkspace(workspacePath);
+					workspacePath = null;
+				}
 				return this.handleCancel(startTime);
 			}
 
@@ -325,7 +328,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			const prepareContextStepStartedAt = this.startStep('prepare-context', onLogEntry);
 			reportProgress(onProgress, 1, 20, 'Prepare Context');
 
-			const workspacePath = await createWorkspace(userId, directory.id);
+			workspacePath = await createWorkspace(userId, directory.id);
 			sessionConfig = await prepareOpenCodeSessionConfig({
 				userId,
 				directoryId: directory.id,
@@ -343,8 +346,14 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			this.completeStep('prepare-context', prepareContextStepStartedAt, onLogEntry);
 
 			if (signal.aborted) {
-				await cleanupWorkspace(userId, directory.id);
-				await cleanupOpenCodeSessionConfig(userId, directory.id);
+				if (workspacePath) {
+					await cleanupWorkspace(workspacePath);
+					workspacePath = null;
+				}
+				if (sessionConfig) {
+					await cleanupOpenCodeSessionConfig(sessionConfig.sessionDir);
+					sessionConfig = null;
+				}
 				return this.handleCancel(startTime);
 			}
 
@@ -403,8 +412,14 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 
 			if (execResult.killed || signal.aborted) {
 				this.failStep('generate-items', new Error('Cancelled'), onLogEntry);
-				await cleanupWorkspace(userId, directory.id);
-				await cleanupOpenCodeSessionConfig(userId, directory.id);
+				if (workspacePath) {
+					await cleanupWorkspace(workspacePath);
+					workspacePath = null;
+				}
+				if (sessionConfig) {
+					await cleanupOpenCodeSessionConfig(sessionConfig.sessionDir);
+					sessionConfig = null;
+				}
 				return this.handleCancel(startTime);
 			}
 
@@ -458,15 +473,26 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			const cleanupStepStartedAt = this.startStep('cleanup', onLogEntry);
 			reportProgress(onProgress, 5, 95, 'Cleanup');
 
-			await cleanupWorkspace(userId, directory.id);
-			await cleanupOpenCodeSessionConfig(userId, directory.id);
+			if (workspacePath) {
+				await cleanupWorkspace(workspacePath);
+				workspacePath = null;
+			}
+			if (sessionConfig) {
+				await cleanupOpenCodeSessionConfig(sessionConfig.sessionDir);
+				sessionConfig = null;
+			}
 			this.completeStep('cleanup', cleanupStepStartedAt, onLogEntry);
+
+			if (signal.aborted) {
+				return this.handleCancel(startTime);
+			}
 
 			// ── Build result ───────────────────────────────────────────
 			reportProgress(onProgress, 6, 100, 'Complete');
 
 			const duration = Date.now() - startTime;
 			const warnings = [...(generationWarning ? [generationWarning] : []), ...screenshotWarnings];
+			this.state = finalizeCompletedState(this.state!);
 
 			return buildSuccessPipelineResult(
 				{
@@ -492,8 +518,12 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				this.failStep(runningStepId, err, onLogEntry);
 			}
 			logger.error(`OpenCode pipeline failed: ${err.message}`);
-			await cleanupWorkspace(userId, directory.id);
-			await cleanupOpenCodeSessionConfig(userId, directory.id);
+			if (workspacePath) {
+				await cleanupWorkspace(workspacePath);
+			}
+			if (sessionConfig) {
+				await cleanupOpenCodeSessionConfig(sessionConfig.sessionDir);
+			}
 			return this.handleError(err, startTime);
 		} finally {
 			if (this.abortController === abortController) {

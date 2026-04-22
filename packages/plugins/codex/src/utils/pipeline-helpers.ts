@@ -201,12 +201,8 @@ export async function resolveExecutionAuth(
 	}
 
 	if (authMode === 'device-auth') {
-		if (!shouldUseHostFallback(settings, userId, options)) {
-			return null;
-		}
-
 		const codexHome = resolveCodexHome(settings, userId);
-		if (!(await verifyDeviceAuthConnection(codexHome))) {
+		if (!(await hasDeviceCodexAuth(settings, userId, options))) {
 			return null;
 		}
 		return {

@@ -60,7 +60,8 @@ import {
 	resolveSettings,
 	buildMetrics,
 	buildErrorResult,
-	buildCancelledResult
+	buildCancelledResult,
+	finalizeCompletedState
 } from './utils/pipeline-helpers.js';
 import { extractSimpleKeywords, appendToJsonlIndex } from './utils/data-source-helpers.js';
 import { createToolCallRepairFn, withToolCallingRetry } from './utils/tool-call-resilience.js';
@@ -188,15 +189,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		onProgress?: PipelineProgressCallback
 	): Promise<PipelineResult> {
 		const startTime = Date.now();
-		this.abortController = new AbortController();
-		const signal = options?.signal ?? this.abortController.signal;
-
-		this.state = initializeState();
-
-		const logger = this.context?.logger ?? console;
 		const execContext = options?.execContext;
-		const onLogEntry = options?.onLogEntry;
-
 		if (!execContext) {
 			return this.handleError(
 				new Error('Execution context (execContext) is required for agent-pipeline'),
@@ -209,9 +202,26 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			return this.handleError(new Error('User ID is required'), startTime);
 		}
 
+		if (this.abortController) {
+			return this.handleError(
+				new Error(
+					'Agent Pipeline is already executing another generation. Wait for it to finish or cancel it first.'
+				),
+				startTime
+			);
+		}
+
+		this.abortController = new AbortController();
+		const signal = options?.signal ?? this.abortController.signal;
+		this.state = initializeState();
+
+		const logger = this.context?.logger ?? console;
+		const onLogEntry = options?.onLogEntry;
+
 		const facadeOptions: FacadeOptions = { userId, directoryId: directory.id };
 
 		const tokenAccumulator = new TokenUsageAccumulator();
+		let workspacePath: string | null = null;
 
 		try {
 			// ── Step 1: Prepare Context ────────────────────────────────
@@ -232,7 +242,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				);
 			}
 
-			const workspacePath = await createWorkspace(userId, directory.id, existing, directory, request);
+			workspacePath = await createWorkspace(userId, directory.id, existing, directory, request);
 			const dataSourceItems = await this.queryDataSources(
 				execContext,
 				directory,
@@ -303,20 +313,30 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			reportProgress(onProgress, 4, 95, 'Cleanup');
 			this.emitLog(onLogEntry, 'step_started', 'Cleanup', 4);
 
-			await cleanupWorkspace(userId, directory.id);
+			if (workspacePath) {
+				await cleanupWorkspace(workspacePath);
+				workspacePath = null;
+			}
 
 			this.setState('cleanup', 'completed');
 			this.emitLog(onLogEntry, 'step_completed', 'Cleanup', 4);
 
+			if (signal.aborted) return this.handleCancel(startTime);
+
 			// ── Build result ───────────────────────────────────────────
 			reportProgress(onProgress, 5, 100, 'Complete');
+			this.state = finalizeCompletedState(this.state!);
 
 			return this.buildSuccessResult(items, metadata, startTime, warnings, tokenUsage);
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
 			logger.error(`Agent pipeline failed: ${err.message}`);
-			await cleanupWorkspace(userId, directory.id);
+			if (workspacePath) {
+				await cleanupWorkspace(workspacePath);
+			}
 			return this.handleError(err, startTime);
+		} finally {
+			this.abortController = null;
 		}
 	}
 

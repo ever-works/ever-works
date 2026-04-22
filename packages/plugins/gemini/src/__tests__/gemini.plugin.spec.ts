@@ -244,6 +244,20 @@ describe('GeminiPlugin', () => {
 			expect(result.outputs.tags).toHaveLength(1);
 			expect(result.metrics!.itemsProcessed).toBe(1);
 			expect(result.warnings).toBeUndefined();
+
+			const { executeGemini } = await import('../utils/process-runner');
+			expect(vi.mocked(executeGemini)).toHaveBeenCalledWith(
+				expect.objectContaining({
+					env: expect.objectContaining({
+						GEMINI_CONFIG_DIR: '/tmp/gemini-generator/config/user1',
+						HOME: '/tmp/gemini-generator/config/user1',
+						XDG_CONFIG_HOME: '/tmp/gemini-generator/config/user1/.config',
+						XDG_DATA_HOME: '/tmp/gemini-generator/config/user1/.local/share',
+						XDG_CACHE_HOME: '/tmp/gemini-generator/config/user1/.cache',
+						GEMINI_API_KEY: 'test-key'
+					})
+				})
+			);
 		});
 
 		it('should report progress ending at 100%', async () => {

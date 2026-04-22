@@ -52,25 +52,27 @@ export function updateStepState(
 	if (!existing) return state;
 
 	const now = Date.now();
+	const isTerminal = status === 'completed' || status === 'failed' || status === 'skipped';
 	const updated: StepState<GeminiStepId> = {
 		...existing,
 		status,
 		startedAt: status === 'running' ? now : existing.startedAt,
-		completedAt: status === 'completed' || status === 'failed' ? now : undefined,
+		completedAt: isTerminal ? now : existing.completedAt,
 		error: error ?? existing.error
 	};
 
 	const steps = new Map(state.steps);
 	steps.set(stepId, updated);
 
-	const completedSteps = status === 'completed' ? [...state.completedSteps, stepId] : state.completedSteps;
+	const completedSteps =
+		status === 'completed' || status === 'skipped' ? [...state.completedSteps, stepId] : state.completedSteps;
 
 	const failedSteps = status === 'failed' ? [...state.failedSteps, stepId] : state.failedSteps;
 
 	return {
 		...state,
 		steps,
-		currentStep: status === 'running' ? stepId : state.currentStep,
+		currentStep: status === 'running' ? stepId : state.currentStep === stepId ? undefined : state.currentStep,
 		completedSteps,
 		failedSteps
 	};
@@ -174,6 +176,16 @@ export function buildMetrics(startTime: number, duration: number, itemCount: num
 	};
 }
 
+export function finalizeCompletedState(state: PipelineState<GeminiStepId>): PipelineState<GeminiStepId> {
+	return {
+		...state,
+		isRunning: false,
+		isCancelled: false,
+		currentStep: undefined,
+		completedAt: Date.now()
+	};
+}
+
 export function buildErrorResult(
 	state: PipelineState<GeminiStepId> | null,
 	error: Error,
@@ -187,6 +199,14 @@ export function buildErrorResult(
 			break;
 		}
 	}
+
+	currentState = {
+		...currentState,
+		isRunning: false,
+		isCancelled: false,
+		currentStep: undefined,
+		completedAt: Date.now()
+	};
 
 	return {
 		state: currentState,
@@ -211,6 +231,7 @@ export function buildCancelledResult(
 		...currentState,
 		isRunning: false,
 		isCancelled: true,
+		currentStep: undefined,
 		completedAt: Date.now()
 	};
 

@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { randomUUID } from 'node:crypto';
 import type { AiProviderConfig } from '@ever-works/plugin';
 import { BASE_TEMP_DIR } from '../types.js';
 
@@ -11,7 +12,7 @@ export interface OpenCodeSessionConfig {
 	readonly env: Record<string, string>;
 }
 
-function getSessionDir(userId: string, directoryId: string): string {
+function getSessionRoot(userId: string, directoryId: string): string {
 	return path.join(BASE_TEMP_DIR, userId, 'opencode', directoryId);
 }
 
@@ -59,11 +60,12 @@ export async function prepareOpenCodeSessionConfig(options: {
 	model: string;
 }): Promise<OpenCodeSessionConfig> {
 	const { userId, directoryId, providerConfig, model } = options;
-	const sessionDir = getSessionDir(userId, directoryId);
+	const sessionRoot = getSessionRoot(userId, directoryId);
+	await fs.mkdir(sessionRoot, { recursive: true });
+	const sessionDir = path.join(sessionRoot, `run-${randomUUID()}`);
 	const configDir = path.join(sessionDir, 'config');
 	const dataHome = path.join(sessionDir, 'data');
 
-	await fs.rm(sessionDir, { recursive: true, force: true });
 	await fs.mkdir(configDir, { recursive: true });
 	await fs.mkdir(path.join(dataHome, 'opencode'), { recursive: true });
 
@@ -85,9 +87,9 @@ export async function prepareOpenCodeSessionConfig(options: {
 	};
 }
 
-export async function cleanupOpenCodeSessionConfig(userId: string, directoryId: string): Promise<void> {
+export async function cleanupOpenCodeSessionConfig(sessionDir: string): Promise<void> {
 	try {
-		await fs.rm(getSessionDir(userId, directoryId), { recursive: true, force: true });
+		await fs.rm(sessionDir, { recursive: true, force: true });
 	} catch {
 		// Cleanup failures are non-fatal
 	}

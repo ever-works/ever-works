@@ -40,19 +40,21 @@ export function updateStepState(
 
 	const now = Date.now();
 	const steps = new Map(state.steps);
+	const isTerminal = status === 'completed' || status === 'failed' || status === 'skipped';
 	steps.set(stepId, {
 		...existing,
 		status,
 		startedAt: status === 'running' ? now : existing.startedAt,
-		completedAt: status === 'completed' || status === 'failed' ? now : undefined,
+		completedAt: isTerminal ? now : existing.completedAt,
 		error: error ?? existing.error
 	});
 
 	return {
 		...state,
 		steps,
-		currentStep: status === 'running' ? stepId : state.currentStep,
-		completedSteps: status === 'completed' ? [...state.completedSteps, stepId] : state.completedSteps,
+		currentStep: status === 'running' ? stepId : state.currentStep === stepId ? undefined : state.currentStep,
+		completedSteps:
+			status === 'completed' || status === 'skipped' ? [...state.completedSteps, stepId] : state.completedSteps,
 		failedSteps: status === 'failed' ? [...state.failedSteps, stepId] : state.failedSteps
 	};
 }
@@ -87,13 +89,14 @@ export async function resolveSettings(
 			context.getSettings('directory', directoryId)
 		]);
 
+		const merged: PluginSettings = { ...userSettings };
 		for (const key in directorySettings) {
 			if (directorySettings[key] !== undefined && directorySettings[key] !== null) {
-				userSettings[key] = directorySettings[key];
+				merged[key] = directorySettings[key];
 			}
 		}
 
-		return userSettings;
+		return merged;
 	} catch {
 		return {};
 	}
@@ -114,6 +117,16 @@ export function buildMetrics(
 	};
 }
 
+export function finalizeCompletedState(state: PipelineState<SimAiStepId>): PipelineState<SimAiStepId> {
+	return {
+		...state,
+		isRunning: false,
+		isCancelled: false,
+		currentStep: undefined,
+		completedAt: Date.now()
+	};
+}
+
 export function buildErrorResult(
 	state: PipelineState<SimAiStepId> | null,
 	error: Error,
@@ -128,6 +141,14 @@ export function buildErrorResult(
 			break;
 		}
 	}
+
+	currentState = {
+		...currentState,
+		isRunning: false,
+		isCancelled: false,
+		currentStep: undefined,
+		completedAt: Date.now()
+	};
 
 	return {
 		state: currentState,
@@ -150,6 +171,7 @@ export function buildCancelledResult(
 		...(state ?? initializeState()),
 		isRunning: false,
 		isCancelled: true,
+		currentStep: undefined,
 		completedAt: Date.now()
 	};
 
