@@ -55,7 +55,7 @@ export class DirectoryScheduleDispatcherService {
         await this.directoryScheduleService.recoverStuckSchedules();
 
         const schedules = await this.scheduleRepository.findDue(limit);
-        const summary: DirectoryScheduleDispatchSummary = {
+        let summary: DirectoryScheduleDispatchSummary = {
             limit,
             dueCount: schedules.length,
             dispatched: 0,
