@@ -32,20 +32,22 @@ export class MarkdownGeneratorService {
         const directoryOwner = getDirectoryOwner(directory);
         const committer = directory.resolveCommitter(user);
         const description = directory.description;
+        const mainRepoOwner = directory.getRepoOwner('directory');
+        const mainRepo = directory.getMainRepo();
 
         // Create repository through facade
         const markdownRepository = assertCreatedRepositoryTarget(
             await this.gitFacade.createRepository(
                 {
-                    name: directory.slug,
+                    name: mainRepo,
                     description,
-                    organization: directory.organization ? directory.getRepoOwner() : undefined,
+                    organization: directory.organization ? mainRepoOwner : undefined,
                     isPrivate: true,
                 },
                 { userId: directoryOwner.id, providerId: directory.gitProvider },
             ),
-            directory.getRepoOwner(),
-            directory.slug,
+            mainRepoOwner,
+            mainRepo,
             'Markdown repository',
         );
 
@@ -220,8 +222,8 @@ export class MarkdownGeneratorService {
                 const pr = await this.gitFacade
                     .createPullRequest(
                         {
-                            owner: directory.getRepoOwner(),
-                            repo: directory.slug,
+                            owner: mainRepoOwner,
+                            repo: mainRepo,
                             base: defaultBranch,
                             head: pr_update.branch,
                             title: pr_update.title,
@@ -257,11 +259,13 @@ export class MarkdownGeneratorService {
     async removeItemDetail(directory: Directory, user: User, slug: string, branch?: string) {
         const directoryOwner = getDirectoryOwner(directory);
         const committer = directory.resolveCommitter(user);
+        const mainRepoOwner = directory.getRepoOwner('directory');
+        const mainRepo = directory.getMainRepo();
 
         const markdownPath = await this.gitFacade.cloneOrPull(
             {
-                owner: directory.getRepoOwner(),
-                repo: directory.slug,
+                owner: mainRepoOwner,
+                repo: mainRepo,
                 committer,
             },
             { userId: directoryOwner.id, providerId: directory.gitProvider },
@@ -285,10 +289,12 @@ export class MarkdownGeneratorService {
      */
     async removeRepository(directory: Directory, user: User): Promise<void> {
         const directoryOwner = getDirectoryOwner(directory);
+        const mainRepoOwner = directory.getRepoOwner('directory');
+        const mainRepo = directory.getMainRepo();
 
         try {
             // Delete the repository
-            await this.gitFacade.deleteRepository(directory.getRepoOwner(), directory.slug, {
+            await this.gitFacade.deleteRepository(mainRepoOwner, mainRepo, {
                 userId: directoryOwner.id,
                 providerId: directory.gitProvider,
             });
@@ -302,11 +308,11 @@ export class MarkdownGeneratorService {
             new MarkdownRepository(dataDir).cleanup();
 
             this.logger.log(
-                `Successfully deleted markdown repository: ${directory.getRepoOwner()}/${directory.slug}`,
+                `Successfully deleted markdown repository: ${mainRepoOwner}/${mainRepo}`,
             );
         } catch (error) {
             this.logger.error(
-                `Failed to delete markdown repository ${directory.getRepoOwner()}/${directory.slug}:`,
+                `Failed to delete markdown repository ${mainRepoOwner}/${mainRepo}:`,
                 error,
             );
             throw error;

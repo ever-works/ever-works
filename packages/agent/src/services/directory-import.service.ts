@@ -98,6 +98,20 @@ export class DirectoryImportService {
         };
     }
 
+    private getWorksConfigConflictRepoNames(
+        slug: string,
+        worksConfig?: { websiteRepo?: string } | null,
+    ): string[] {
+        const repoNames = [`${slug}-data`];
+
+        const websiteRepo =
+            this.worksConfigService.parseRepositoryReference(worksConfig?.websiteRepo)?.repo ||
+            `${slug}-website`;
+        repoNames.push(websiteRepo);
+
+        return Array.from(new Set(repoNames.filter(Boolean)));
+    }
+
     /**
      * Analyze a repository to detect its type and structure
      */
@@ -122,6 +136,14 @@ export class DirectoryImportService {
                     slug,
                     token,
                     providerId,
+                    result.detectedType === ImportSourceTypeEnum.WORKS_CONFIG
+                        ? {
+                              includeRepoNames: this.getWorksConfigConflictRepoNames(
+                                  slug,
+                                  result.worksConfig,
+                              ),
+                          }
+                        : undefined,
                 );
                 if (conflict.hasConflict) {
                     result.slugConflict = conflict;
@@ -260,15 +282,6 @@ export class DirectoryImportService {
                 });
             }
 
-            if (dto.sourceType !== ImportSourceTypeEnum.LINK_EXISTING) {
-                slug = await this.resolveSlugConflicts(
-                    slug,
-                    dto.owner || user.username,
-                    user,
-                    dto.gitProvider,
-                );
-            }
-
             let worksConfig: ParsedWorksConfig | null = null;
             if (dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG) {
                 const token = await this.getProviderToken(user, dto.gitProvider);
@@ -285,6 +298,18 @@ export class DirectoryImportService {
                         message: 'works.yml is missing initial_prompt',
                     };
                 }
+            }
+
+            if (dto.sourceType !== ImportSourceTypeEnum.LINK_EXISTING) {
+                slug = await this.resolveSlugConflicts(
+                    slug,
+                    dto.owner || user.username,
+                    user,
+                    dto.gitProvider,
+                    dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG
+                        ? this.getWorksConfigConflictRepoNames(slug, worksConfig)
+                        : undefined,
+                );
             }
 
             // For link_existing, the owner must be the source repo's owner
@@ -333,11 +358,17 @@ export class DirectoryImportService {
                     type: dto.sourceType as ImportSourceType,
                     importedAt: new Date(),
                     worksConfig: this.toWorksConfigSnapshot(worksConfig),
-                    relatedRepositories: worksConfig?.websiteRepositoryTarget
-                        ? {
-                              website: worksConfig.websiteRepositoryTarget,
-                          }
-                        : undefined,
+                    relatedRepositories: {
+                        directory: {
+                            owner: parsed.owner,
+                            repo: parsed.repo,
+                        },
+                        ...(worksConfig?.websiteRepositoryTarget
+                            ? {
+                                  website: worksConfig.websiteRepositoryTarget,
+                              }
+                            : {}),
+                    },
                 };
             }
 
@@ -780,12 +811,18 @@ export class DirectoryImportService {
                 repo: source.repo,
                 type: ImportSourceTypeEnum.WORKS_CONFIG as ImportSourceType,
                 worksConfig: this.toWorksConfigSnapshot(worksConfig),
-                relatedRepositories: worksConfig?.websiteRepositoryTarget
-                    ? {
-                          ...(directory.sourceRepository?.relatedRepositories || {}),
-                          website: worksConfig.websiteRepositoryTarget,
-                      }
-                    : directory.sourceRepository?.relatedRepositories,
+                relatedRepositories: {
+                    ...(directory.sourceRepository?.relatedRepositories || {}),
+                    directory: {
+                        owner: source.owner,
+                        repo: source.repo,
+                    },
+                    ...(worksConfig?.websiteRepositoryTarget
+                        ? {
+                              website: worksConfig.websiteRepositoryTarget,
+                          }
+                        : {}),
+                },
             },
         });
 
@@ -841,6 +878,7 @@ export class DirectoryImportService {
         repoOwner: string,
         user: User,
         gitProvider: string,
+        includeRepoNames?: string[],
     ): Promise<string> {
         const token = await this.getProviderToken(user, gitProvider);
         if (!token) {
@@ -852,6 +890,7 @@ export class DirectoryImportService {
             slug,
             token,
             gitProvider,
+            includeRepoNames ? { includeRepoNames } : undefined,
         );
 
         if (!conflict.hasConflict) {

@@ -656,12 +656,22 @@ export class SourceRepoAnalyzerService {
         slug: string,
         token: string,
         provider?: string,
+        options?: {
+            includeRepoNames?: string[];
+        },
     ): Promise<{
         hasConflict: boolean;
         conflictingRepos: string[];
         suggestedSlug: string;
     }> {
-        const repoNames = [slug, `${slug}-data`, `${slug}-website`];
+        const repoNames = Array.from(
+            new Set(
+                (options?.includeRepoNames?.length
+                    ? options.includeRepoNames
+                    : [slug, `${slug}-data`, `${slug}-website`]
+                ).filter((repoName) => typeof repoName === 'string' && repoName.length > 0),
+            ),
+        );
         const conflictingRepos: string[] = [];
 
         await Promise.all(
@@ -688,7 +698,19 @@ export class SourceRepoAnalyzerService {
         let suggestedSlug = slug;
         for (let i = 2; i <= 10; i++) {
             const candidate = `${slug}-${i}`;
-            const candidateRepos = [candidate, `${candidate}-data`, `${candidate}-website`];
+            const candidateRepos = Array.from(
+                new Set(
+                    options?.includeRepoNames?.length
+                        ? options.includeRepoNames.map((repoName) =>
+                              repoName === slug
+                                  ? candidate
+                                  : repoName.startsWith(`${slug}-`)
+                                    ? `${candidate}${repoName.slice(slug.length)}`
+                                    : repoName,
+                          )
+                        : [candidate, `${candidate}-data`, `${candidate}-website`],
+                ),
+            );
             let candidateConflicts = false;
 
             for (const repo of candidateRepos) {

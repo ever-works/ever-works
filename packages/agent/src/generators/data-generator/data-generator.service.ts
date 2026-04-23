@@ -1239,12 +1239,12 @@ export class DataGeneratorService {
 
     private getDefaultReadme(directory: Directory) {
         // Construct URL based on directory's repo provider
-        const owner = directory.getRepoOwner();
-        const repo = directory.slug;
+        const owner = directory.getRepoOwner('directory');
+        const repo = directory.getMainRepo();
         const markdownURL = this.gitFacade.getWebUrl(directory.gitProvider, owner, repo);
         return (
             `# ${directory.getDataRepo()}\n\n` +
-            `This repository holds data used to generate [${directory.slug}](${markdownURL})\n\n`
+            `This repository holds data used to generate [${repo}](${markdownURL})\n\n`
         );
     }
 
