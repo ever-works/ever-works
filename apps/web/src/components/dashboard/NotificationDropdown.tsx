@@ -16,6 +16,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { Bell, X } from 'lucide-react';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface NotificationDropdownProps {
     className?: string;
@@ -51,17 +52,16 @@ function NotificationItem({
     return (
         <div
             className={cn(
-                'p-3 border-l-4 cursor-pointer transition-colors',
-                styles.dropdown.border,
-                !notification.isRead && styles.dropdown.bg,
+                'p-3 cursor-pointer transition-colors',
+                !notification.isRead,
                 notification.isRead && 'bg-transparent',
-                'hover:bg-gray-50 dark:hover:bg-gray-800/50',
+                'hover:bg-gray-50 dark:hover:bg-white/4',
             )}
             onClick={handleClick}
         >
             <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 mt-0.5">
-                    <TypeIcon className={cn('w-5 h-5', styles.iconColor)} />
+                    <TypeIcon className={cn('w-4 h-4', styles.iconColor)} />
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
@@ -81,7 +81,7 @@ function NotificationItem({
                                     e.stopPropagation();
                                     onDismiss(notification.id);
                                 }}
-                                className="flex-shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                                className="flex-shrink-0 p-1 cursor-pointer rounded hover:bg-gray-200 dark:hover:bg-white/10"
                                 aria-label={dismissLabel}
                                 title={dismissLabel}
                             >
@@ -89,7 +89,7 @@ function NotificationItem({
                             </button>
                         )}
                     </div>
-                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1 line-clamp-2">
+                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark mt-1 line-clamp-2">
                         {notification.message}
                     </p>
                     <div className="flex items-center justify-between mt-2">
@@ -227,23 +227,25 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
 
     return (
         <div className={cn('relative', className)} ref={dropdownRef}>
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className={cn(
-                    'p-1 rounded-md relative cursor-pointer',
-                    'text-text-secondary dark:text-text-secondary-dark',
-                    'hover:text-text dark:hover:text-text-dark',
-                    'hover:bg-surface dark:hover:bg-surface-secondary-dark',
-                )}
-            >
-                <Bell className="w-3.5 h-3.5" />
+            <Tooltip content={t('notifications.title')} position="bottom">
+                <button
+                    onClick={() => setIsOpen(!isOpen)}
+                    className={cn(
+                        'p-1 rounded-md relative cursor-pointer',
+                        'text-text-secondary dark:text-text-secondary-dark',
+                        'hover:text-text dark:hover:text-text-dark',
+                        'hover:bg-surface dark:hover:bg-surface-secondary-dark',
+                    )}
+                >
+                    <Bell className="w-3.5 h-3.5" />
 
-                {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-danger rounded-full">
-                        {unreadCount > 99 ? '99+' : unreadCount}
-                    </span>
-                )}
-            </button>
+                    {unreadCount > 0 && (
+                        <span className="absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-danger rounded-full">
+                            {unreadCount > 99 ? '99+' : unreadCount}
+                        </span>
+                    )}
+                </button>
+            </Tooltip>
 
             {isOpen && (
                 <div
