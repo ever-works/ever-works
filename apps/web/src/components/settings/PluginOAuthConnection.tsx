@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
+import { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';
 import Image from 'next/image';
 import { Check, Link as LinkIcon, Unlink, RefreshCw, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,8 +16,9 @@ import { usePathname } from '@/i18n/navigation';
 interface PluginOAuthConnectionProps {
     pluginId: string;
     pluginName: string;
-    connection: OAuthConnectionInfo | null;
+    connection: OAuthConnectionInfo | GitProviderConnectionInfo | null;
     returnPath?: string;
+    allowDisconnect?: boolean;
 }
 
 export function PluginOAuthConnection({
@@ -24,6 +26,7 @@ export function PluginOAuthConnection({
     pluginName,
     connection,
     returnPath,
+    allowDisconnect = true,
 }: PluginOAuthConnectionProps) {
     const [isPending, startTransition] = useTransition();
     const t = useTranslations('dashboard.plugins.oauth');
@@ -179,16 +182,18 @@ export function PluginOAuthConnection({
                                 />
                                 {isPending ? t('reconnecting') : t('reconnect')}
                             </Button>
-                            <Button
-                                onClick={handleDisconnect}
-                                disabled={isPending}
-                                variant="ghost"
-                                size="sm"
-                                className="gap-1.5 text-sm text-danger hover:text-danger hover:bg-danger/10"
-                            >
-                                <Unlink className="w-4 h-4 stroke-[1.5]" />
-                                {t('disconnect')}
-                            </Button>
+                            {allowDisconnect && (
+                                <Button
+                                    onClick={handleDisconnect}
+                                    disabled={isPending}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="gap-1.5 text-sm text-danger hover:text-danger hover:bg-danger/10"
+                                >
+                                    <Unlink className="w-4 h-4 stroke-[1.5]" />
+                                    {t('disconnect')}
+                                </Button>
+                            )}
                         </>
                     ) : (
                         <Button

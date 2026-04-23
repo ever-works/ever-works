@@ -1,25 +1,37 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { AuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils/cn';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NotificationDropdown } from './NotificationDropdown';
 import { DirectorySwitcher } from './DirectorySwitcher';
 import { Tooltip } from '@/components/ui/tooltip';
-import { Menu, HelpCircle } from 'lucide-react';
+import { Menu, HelpCircle, Sparkles, X } from 'lucide-react';
+
+interface DashboardHeaderOnboardingBadge {
+    currentStep: number;
+    totalSteps: number;
+    onOpen: () => void;
+    onDismiss: () => void;
+}
 
 interface DashboardHeaderProps {
     user: AuthUser;
     onMenuClick: () => void;
     isSidebarOpen?: boolean;
     onHelpClick?: () => void;
+    onboardingBadge?: DashboardHeaderOnboardingBadge;
 }
 
 export function DashboardHeader({
     onMenuClick,
     isSidebarOpen = true,
     onHelpClick,
+    onboardingBadge,
 }: DashboardHeaderProps) {
+    const t = useTranslations('dashboard.header');
+
     return (
         <header
             className={cn(
@@ -48,6 +60,32 @@ export function DashboardHeader({
                         )}
 
                         <DirectorySwitcher />
+
+                        {onboardingBadge && (
+                            <div className="flex max-w-[170px] items-center overflow-hidden rounded-full border border-border bg-surface-secondary/70 text-xs text-text-secondary shadow-sm dark:border-border-dark dark:bg-surface-secondary-dark/60 dark:text-text-secondary-dark sm:max-w-none">
+                                <button
+                                    type="button"
+                                    onClick={onboardingBadge.onOpen}
+                                    className="inline-flex min-w-0 items-center gap-2 px-3 py-1.5 font-medium transition-colors hover:bg-surface dark:hover:bg-surface-dark"
+                                >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    <span className="truncate whitespace-nowrap">
+                                        {t('onboarding.badge', {
+                                            currentStep: onboardingBadge.currentStep,
+                                            totalSteps: onboardingBadge.totalSteps,
+                                        })}
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onboardingBadge.onDismiss}
+                                    className="border-l border-border px-2 py-1.5 text-text-muted transition-colors hover:bg-surface hover:text-text dark:border-border-dark dark:text-text-muted-dark dark:hover:bg-surface-dark dark:hover:text-text-dark"
+                                    aria-label={t('onboarding.dismiss')}
+                                >
+                                    <X className="h-3.5 w-3.5" />
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex shrink-0 items-center gap-4">

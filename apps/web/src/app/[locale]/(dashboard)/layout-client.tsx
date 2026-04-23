@@ -14,6 +14,12 @@ import { ChatPanel } from '@/components/ai/ChatPanel';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { ConnectGithubModal } from '@/components/auth/connect-github-modal';
 import { BackgroundActivityProvider } from '@/lib/hooks/use-background-activity';
+import { EverWorksOnboardingWizard } from '@/components/onboarding/EverWorksOnboardingWizard';
+import { useOnboardingState } from '@/components/onboarding/use-onboarding-state';
+import type { UserPlugin } from '@/lib/api/plugins';
+import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
+import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';
+import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';
 
 interface DashboardLayoutClientProps {
     user: AuthUser;
@@ -21,6 +27,10 @@ interface DashboardLayoutClientProps {
     initialChatOpen?: boolean;
     initialSidebarCollapsed?: boolean;
     hasGithubConnected?: boolean;
+    onboardingTotalDirectories: number;
+    onboardingPlugins: UserPlugin[];
+    onboardingConnections: Record<string, OAuthConnectionInfo | GitProviderConnectionInfo | null>;
+    onboardingDeviceAuthStatuses: Record<string, PluginDeviceAuthStatus | null>;
 }
 
 const COOKIE_OPTS = `path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
@@ -31,19 +41,34 @@ export function DashboardLayoutClient({
     initialChatOpen = false,
     initialSidebarCollapsed = false,
     hasGithubConnected = false,
+    onboardingTotalDirectories,
+    onboardingPlugins,
+    onboardingConnections,
+    onboardingDeviceAuthStatuses,
 }: DashboardLayoutClientProps) {
     const DEFAULT_CHAT_WIDTH = 380;
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [helpOpen, setHelpOpen] = useState(false);
+    const [onboardingOpen, setOnboardingOpen] = useState(false);
     const [chatOpen, setChatOpenRaw] = useState(initialChatOpen);
     const [sidebarCollapsed, setSidebarCollapsedRaw] = useState(initialSidebarCollapsed);
     const [chatWidth, setChatWidth] = useState<number>(DEFAULT_CHAT_WIDTH);
     const [isChatExpanded, setIsChatExpanded] = useState(false);
     const chatRef = useRef<HTMLDivElement | null>(null);
+    const [onboardingState, setOnboardingState] = useOnboardingState();
 
     const prevWidthRef = useRef<number | null>(null);
     const [mainStyle, setMainStyle] = useState<React.CSSProperties | undefined>(undefined);
     const [isMobile, setIsMobile] = useState<boolean>(false);
+    const onboardingTotalSteps = onboardingPlugins.length + 2;
+    const onboardingCurrentStep = Math.min(onboardingState.step, onboardingTotalSteps - 1) + 1;
+    const shouldAutoOpenOnboarding =
+        onboardingTotalDirectories === 0 && !onboardingState.modalDismissed;
+    const isOnboardingOpen = onboardingOpen || shouldAutoOpenOnboarding;
+    const showOnboardingBadge =
+        onboardingTotalDirectories === 0 &&
+        onboardingState.modalDismissed &&
+        !onboardingState.headerDismissed;
 
     const setChatOpen = useCallback((value: boolean, resetOnOpen = true) => {
         setChatOpenRaw(value);
@@ -167,6 +192,21 @@ export function DashboardLayoutClient({
     const openHelp = useCallback(() => setHelpOpen(true), []);
     const closeHelp = useCallback(() => setHelpOpen(false), []);
     const toggleChat = useCallback(() => setChatOpen(!chatOpen), [chatOpen, setChatOpen]);
+    const openOnboarding = useCallback(() => setOnboardingOpen(true), []);
+    const closeOnboarding = useCallback(() => {
+        setOnboardingOpen(false);
+        setOnboardingState({
+            ...onboardingState,
+            modalDismissed: true,
+        });
+    }, [onboardingState, setOnboardingState]);
+    const dismissOnboardingBadge = useCallback(() => {
+        setOnboardingState({
+            ...onboardingState,
+            modalDismissed: true,
+            headerDismissed: true,
+        });
+    }, [onboardingState, setOnboardingState]);
 
     // Ensure chat is in resizable (non-expanded) mode. Used when user interacts
     // with the sidebar so we collapse the expanded view back to the resizable width.
@@ -234,6 +274,16 @@ export function DashboardLayoutClient({
     return (
         <BackgroundActivityProvider>
             <ChatProvider>
+                <EverWorksOnboardingWizard
+                    open={isOnboardingOpen}
+                    state={onboardingState}
+                    plugins={onboardingPlugins}
+                    connections={onboardingConnections}
+                    deviceAuthStatuses={onboardingDeviceAuthStatuses}
+                    onStateChange={setOnboardingState}
+                    onClose={closeOnboarding}
+                />
+
                 <Suspense fallback={null}>
                     <DashboardToasts />
                 </Suspense>
@@ -351,6 +401,16 @@ export function DashboardLayoutClient({
                             onMenuClick={() => setSidebarOpen(!sidebarOpen)}
                             isSidebarOpen={sidebarOpen}
                             onHelpClick={openHelp}
+                            onboardingBadge={
+                                showOnboardingBadge
+                                    ? {
+                                          currentStep: onboardingCurrentStep,
+                                          totalSteps: onboardingTotalSteps,
+                                          onOpen: openOnboarding,
+                                          onDismiss: dismissOnboardingBadge,
+                                      }
+                                    : undefined
+                            }
                         />
 
                         <main
@@ -366,7 +426,15 @@ export function DashboardLayoutClient({
                     </div>
                 </div>
 
-                <HelpDrawer open={helpOpen} onClose={closeHelp} />
+                <HelpDrawer
+                    open={helpOpen}
+                    onClose={closeHelp}
+                    onboarding={{
+                        currentStep: onboardingCurrentStep,
+                        totalSteps: onboardingTotalSteps,
+                        onOpen: openOnboarding,
+                    }}
+                />
             </ChatProvider>
         </BackgroundActivityProvider>
     );

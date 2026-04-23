@@ -465,6 +465,10 @@
         "header": {
             "welcome": "Welcome back, {username}!",
             "subtitle": "Manage your AI-powered directories and track their performance",
+            "onboarding": {
+                "badge": "Onboarding {currentStep}/{totalSteps}",
+                "dismiss": "Hide onboarding shortcut"
+            },
             "notifications": {
                 "title": "Notifications",
                 "empty": "No new notifications",
@@ -473,6 +477,11 @@
             "help": {
                 "title": "Help & Resources",
                 "subtitle": "Quick tips and useful links to help you get started",
+                "onboarding": {
+                    "title": "Onboarding",
+                    "description": "Reopen the guided setup anytime and continue where you left off.",
+                    "action": "Open onboarding ({currentStep}/{totalSteps})"
+                },
                 "quickTips": {
                     "title": "Quick Tips",
                     "tip1": "Create your first directory by clicking the 'Create Directory' button on the dashboard.",

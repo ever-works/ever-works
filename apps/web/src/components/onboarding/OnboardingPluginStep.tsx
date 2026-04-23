@@ -5,8 +5,11 @@ import { useTranslations } from 'next-intl';
 import { Save, CheckCircle2, AlertCircle } from 'lucide-react';
 import type { UserPlugin } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
+import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';
+import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';
 import { updatePluginSettings } from '@/app/actions/plugins';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
+import { PluginOnboardingWizard } from '@/components/settings/PluginOnboardingWizard';
 import { PluginSettingsFormFields } from '@/components/plugins/PluginSettingsFormFields';
 import { Button } from '@/components/ui/button';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
@@ -14,11 +17,18 @@ import { ROUTES } from '@/lib/constants';
 
 interface OnboardingPluginStepProps {
     plugin: UserPlugin;
-    oauthConnection?: OAuthConnectionInfo | null;
+    connection?: OAuthConnectionInfo | GitProviderConnectionInfo | null;
+    deviceAuthStatus?: PluginDeviceAuthStatus | null;
     returnPath?: string;
 }
 
-function FieldBasedPluginStep({ plugin }: { plugin: UserPlugin }) {
+function FieldBasedPluginStep({
+    plugin,
+    deviceAuthStatus,
+}: {
+    plugin: UserPlugin;
+    deviceAuthStatus?: PluginDeviceAuthStatus | null;
+}) {
     const t = useTranslations('onboarding.pluginStep');
 
     const onSave = useCallback(
@@ -66,6 +76,7 @@ function FieldBasedPluginStep({ plugin }: { plugin: UserPlugin }) {
 
     const displaySettings = plugin.resolvedSettings || plugin.settings || {};
     const setupLink = plugin.uiHints?.setupLink;
+    const showsOnboardingWizard = Boolean(plugin.uiHints?.onboardingWizard);
     const showSetupButton =
         setupLink &&
         (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !displaySettings[f]));
@@ -73,6 +84,24 @@ function FieldBasedPluginStep({ plugin }: { plugin: UserPlugin }) {
     if (!hasSettings) {
         return (
             <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('noSettings')}</p>
+        );
+    }
+
+    if (showsOnboardingWizard) {
+        return (
+            <PluginOnboardingWizard
+                plugin={plugin}
+                initialSettings={plugin.settings || {}}
+                initialDeviceAuthStatus={deviceAuthStatus ?? null}
+                visibleProperties={visibleProperties}
+                getFieldValue={getFieldValue}
+                handleFieldChange={handleFieldChange}
+                handleSave={handleSave}
+                isSaving={isSaving}
+                saveSuccess={saveSuccess}
+                validationError={validationError}
+                saveMessage={saveMessage}
+            />
         );
     }
 
@@ -129,21 +158,24 @@ function FieldBasedPluginStep({ plugin }: { plugin: UserPlugin }) {
 
 export function OnboardingPluginStep({
     plugin,
-    oauthConnection,
+    connection,
+    deviceAuthStatus,
     returnPath,
 }: OnboardingPluginStepProps) {
     const isOAuth = plugin.capabilities.includes('oauth');
+    const isGitProvider = plugin.capabilities.includes('git-provider');
 
-    if (isOAuth && oauthConnection !== undefined) {
+    if (isOAuth && connection !== undefined) {
         return (
             <PluginOAuthConnection
                 pluginId={plugin.pluginId}
                 pluginName={plugin.name}
-                connection={oauthConnection}
+                connection={connection}
                 returnPath={returnPath ?? ROUTES.DASHBOARD}
+                allowDisconnect={!isGitProvider}
             />
         );
     }
 
-    return <FieldBasedPluginStep plugin={plugin} />;
+    return <FieldBasedPluginStep plugin={plugin} deviceAuthStatus={deviceAuthStatus} />;
 }
