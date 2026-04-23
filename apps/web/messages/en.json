@@ -240,7 +240,66 @@
         "plugins": {
             "byokDescription": "Connect your own key to unlock the full configuration.",
             "byokDefaultButton": "Bring your own key",
-            "setupTokenDescription": "Create a token first, then paste it below and save to verify the connection."
+            "setupTokenDescription": "Create a token first, then paste it below and save to verify the connection.",
+            "wizard": {
+                "setupLabel": "Setup",
+                "back": "Back",
+                "continue": "Continue",
+                "errors": {
+                    "loadStatus": "Failed to load device authentication status.",
+                    "start": "Failed to start device authentication."
+                },
+                "steps": {
+                    "configure": {
+                        "title": "Configuration",
+                        "description": "Configure {pluginName} settings."
+                    },
+                    "credentials": {
+                        "title": "Credentials",
+                        "description": "Configure credentials for {pluginName}."
+                    },
+                    "verify": {
+                        "title": "Verify",
+                        "description": "Save settings and verify the connection.",
+                        "cardTitle": "Verify Connection",
+                        "cardDescription": "Save the current settings and run the plugin connection validation.",
+                        "action": "Save and Verify",
+                        "successDefault": "Connection verified successfully."
+                    }
+                },
+                "authModes": {
+                    "apiKey": {
+                        "eyebrow": "User-scoped",
+                        "title": "API Key",
+                        "description": "Use a user-scoped API key for this plugin."
+                    },
+                    "deviceAuth": {
+                        "eyebrow": "User-scoped",
+                        "title": "Device Authentication",
+                        "description": "Start a device-code flow for this plugin and complete it in your browser."
+                    }
+                },
+                "deviceAuth": {
+                    "badges": {
+                        "connected": "Connected",
+                        "pending": "Pending"
+                    },
+                    "status": {
+                        "title": "Device Authentication Status",
+                        "fallback": "Start or refresh device authentication for this plugin.",
+                        "backendHint": "Device authentication is stored in a managed backend workspace for your user account. It must be completed and used on the same Ever Works deployment.",
+                        "deviceCode": "Device Code",
+                        "verificationUrl": "Verification URL"
+                    },
+                    "actions": {
+                        "notInstalled": "The required CLI is not installed on this machine.",
+                        "connected": "Device authentication connected",
+                        "start": "Start Device Auth",
+                        "restart": "Restart Device Auth",
+                        "refresh": "Refresh Status"
+                    }
+                }
+            }
         },
         "claudeWizard": {
             "label": "Claude Code setup",
@@ -264,6 +323,50 @@
                     "checkDescription": "Saving here runs a Claude API or CLI check depending on which credential you supplied.",
                     "button": "Verify and finish setup",
                     "successDefault": "Claude connection verified."
+                }
+            }
+        },
+        "codexWizard": {
+            "label": "Codex setup",
+            "title": "Set up Codex in three steps",
+            "subtitle": "This flow keeps the recommended configuration visible and verifies the connection before you finish.",
+            "stepIndex": "Step {index}",
+            "continueButton": "Continue",
+            "steps": {
+                "model": {
+                    "title": "Pick a model",
+                    "description": "Choose the Codex model you want to run for end-to-end directory generation."
+                },
+                "credentials": {
+                    "title": "Add credentials",
+                    "description": "Choose whether Codex should use an OpenAI API key or the Codex CLI login available on the backend machine.",
+                    "api": {
+                        "title": "OpenAI API key",
+                        "description": "Use an OpenAI API key for Codex execution."
+                    },
+                    "local": {
+                        "title": "Backend Codex login",
+                        "description": "Reuse the Codex CLI session already available on the machine running Ever Works.",
+                        "machineTitle": "Backend Codex CLI authentication",
+                        "machineDescription": "This checks `codex login status` and the local Codex auth file on the backend machine.",
+                        "connected": "Connected",
+                        "pending": "Pending",
+                        "connectButton": "Connect Codex CLI",
+                        "retryButton": "Open login again",
+                        "connectedButton": "Connected on backend machine",
+                        "notInstalled": "Codex CLI is not installed on the backend machine.",
+                        "codeLabel": "Device code",
+                        "pathLabel": "Auth file: {path}",
+                        "error": "Failed to read Codex CLI authentication status."
+                    }
+                },
+                "verify": {
+                    "title": "Verify connection",
+                    "description": "Save settings and run a live connection check against Codex before finishing.",
+                    "checkTitle": "Run a live Codex validation",
+                    "checkDescription": "Saving here runs a Codex API-key or local-CLI validation depending on how you configured authentication.",
+                    "button": "Verify and finish setup",
+                    "successDefault": "Codex connection verified."
                 }
             }
         },
@@ -291,12 +394,6 @@
                 }
             },
             "modes": {
-                "machine-local": {
-                    "title": "Use the machine-local Gemini login",
-                    "description": "Reuse the Gemini CLI login already cached on this machine. This is best when Gemini has already been authenticated locally.",
-                    "hint": "No secret is required here. Gemini will reuse the cached login from this machine, typically under ~/.gemini.",
-                    "verifyHint": "Saving here checks whether a cached machine-local Gemini login is present and usable."
-                },
                 "api-key": {
                     "description": "Paste a Gemini API key from Google AI Studio.",
                     "verifyHint": "Saving here verifies your Gemini API key against the selected model."
@@ -446,7 +543,11 @@
             },
             "actions": {
                 "export": "Export CSV",
-                "clearFilters": "Clear filters"
+                "clearFilters": "Clear filters",
+                "stop": "Stop",
+                "stopping": "Stopping...",
+                "stopRequested": "Generation cancellation requested",
+                "stopFailed": "Failed to stop generation"
             },
             "empty": {
                 "title": "No activities yet",
@@ -990,7 +1091,11 @@
                 "generating": {
                     "title": "Generation in Progress",
                     "description": "Processing your request...",
-                    "processing": "Processing..."
+                    "processing": "Processing...",
+                    "stop": "Stop",
+                    "stopping": "Stopping...",
+                    "stopRequested": "Generation cancellation requested",
+                    "stopFailed": "Failed to stop generation"
                 },
                 "generated": {
                     "title": "Generation Complete",
@@ -1645,7 +1750,8 @@
                 "progress": "Progress",
                 "closeNote": "This may take a few minutes. You can close this page and come back later.",
                 "showLogs": "Show step logs",
-                "hideLogs": "Hide step logs"
+                "hideLogs": "Hide step logs",
+                "waitingForLogs": "Waiting for live logs to arrive..."
             },
             "settings": {
                 "sourceSettings": "Source Repository",
@@ -2595,6 +2701,7 @@
             "cancel": "Cancel",
             "missingRequiredFields": "Missing required fields: {fields}",
             "saveError": "Failed to save settings. Please try again.",
+            "enableFirstToSave": "Enable this plugin first, then save its settings.",
             "goToPluginSettings": "Go to plugin settings",
             "userLevelRequiredError": "User-level required settings must be configured first",
             "modelSelect": {
@@ -2633,6 +2740,23 @@
                 "connectError": "Failed to connect. Please try again.",
                 "reconnectError": "Failed to reconnect. Please try again.",
                 "disconnectError": "Failed to disconnect. Please try again."
+            },
+            "deviceAuth": {
+                "title": "Device Authentication",
+                "connected": "Connected",
+                "pending": "Pending",
+                "notConnected": "Not connected",
+                "description": "Connect {plugin} for this Ever Works user with a device-code flow.",
+                "backendHint": "This auth is stored in a managed backend workspace for your user account and is only usable from this Ever Works deployment.",
+                "deviceCode": "Device Code",
+                "verificationUrl": "Verification URL",
+                "start": "Start",
+                "restart": "Restart",
+                "refresh": "Refresh",
+                "open": "Open",
+                "notInstalled": "The required CLI is not installed on this machine.",
+                "loadError": "Failed to load device authentication status.",
+                "startError": "Failed to start device authentication."
             },
             "githubOrganizations": {
                 "title": "GitHub Organizations",
@@ -2845,8 +2969,10 @@
             "promptRequired": "Prompt is required",
             "nameRequired": "Name is required",
             "generationStartedSuccessfully": "Generation started successfully",
+            "generationCancellationRequested": "Generation cancellation requested",
             "updateStartedSuccessfully": "Update started successfully",
             "failedToGenerateItems": "Failed to generate items",
+            "failedToCancelGeneration": "Failed to cancel generation",
             "failedToUpdateItems": "Failed to update items",
             "markdownRegeneratedSuccessfully": "Markdown regenerated successfully",
             "failedToRegenerateMarkdown": "Failed to regenerate markdown",

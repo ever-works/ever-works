@@ -11,12 +11,15 @@ import pickBy from 'lodash/pickBy';
 import {
     type IPlugin,
     type JsonSchema,
+    type DeviceAuthStatus,
     type PluginManifest,
+    isDeviceAuthProvider,
     toPluginSettingsSchemaProperty,
     PLUGIN_CAPABILITIES,
 } from '@ever-works/plugin';
 import type {
     PluginResponse,
+    PluginConnectionStatus,
     UserPluginResponse,
     DirectoryPluginResponse,
     PluginListResponse,
@@ -287,6 +290,19 @@ export class PluginOperationsService {
             .join(' ');
     }
 
+    private getDeviceAuthProvider(pluginId: string) {
+        const plugin = this.pluginRegistryService.getPlugin(pluginId);
+        if (!plugin) {
+            throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        }
+
+        if (!isDeviceAuthProvider(plugin)) {
+            throw new BadRequestException(`Plugin "${pluginId}" does not support device auth`);
+        }
+
+        return plugin;
+    }
+
     /**
      * Get a single plugin by ID with user-specific status
      */
@@ -301,6 +317,16 @@ export class PluginOperationsService {
         });
 
         return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId);
+    }
+
+    async getPluginDeviceAuthStatus(pluginId: string, userId: string): Promise<DeviceAuthStatus> {
+        const plugin = this.getDeviceAuthProvider(pluginId);
+        return plugin.getDeviceAuthStatus(userId);
+    }
+
+    async startPluginDeviceAuth(pluginId: string, userId: string): Promise<DeviceAuthStatus> {
+        const plugin = this.getDeviceAuthProvider(pluginId);
+        return plugin.startDeviceAuth(userId);
     }
 
     // ============================================
@@ -1154,16 +1180,117 @@ export class PluginOperationsService {
         userId: string,
     ): Promise<UserPluginResponse> {
         const response = this.toUserPluginResponse(registered, userPlugin);
-        const resolvedSettings = await this.getResolvedDisplaySettings(registered, userId);
+        const [resolvedSettings, connectionStatus] = await Promise.all([
+            this.getResolvedDisplaySettings(registered, userId),
+            this.getConnectionStatus(registered, userId),
+        ]);
 
-        if (!resolvedSettings) {
+        if (!resolvedSettings && !connectionStatus) {
             return response;
         }
 
         return {
             ...response,
             resolvedSettings,
+            connectionStatus,
         };
+    }
+
+    private async getConnectionStatus(
+        registered: RegisteredPlugin,
+        userId: string,
+    ): Promise<PluginConnectionStatus | undefined> {
+        if (!registered.manifest?.uiHints?.includeInOnboarding) {
+            return undefined;
+        }
+
+        if (registered.plugin.capabilities.includes('oauth')) {
+            return undefined;
+        }
+
+        const settings = await this.settingsService.getSettings(registered.plugin.id, {
+            userId,
+            includeSecrets: true,
+        });
+
+        if (isDeviceAuthProvider(registered.plugin)) {
+            const authModeField =
+                registered.manifest.uiHints?.deviceAuth?.authModeField ?? 'authMode';
+            const authMode =
+                typeof settings[authModeField] === 'string' ? settings[authModeField] : undefined;
+            const prefersDeviceAuth = authMode === undefined || authMode === 'device-auth';
+
+            if (prefersDeviceAuth) {
+                try {
+                    const deviceAuthStatus = await registered.plugin.getDeviceAuthStatus(userId);
+
+                    if (
+                        deviceAuthStatus.connected ||
+                        deviceAuthStatus.pending ||
+                        authMode === 'device-auth'
+                    ) {
+                        return {
+                            connected: deviceAuthStatus.connected,
+                            pending: deviceAuthStatus.pending,
+                            scope: deviceAuthStatus.scope,
+                            message: deviceAuthStatus.message,
+                        };
+                    }
+                } catch (error) {
+                    this.logger.warn(
+                        `Failed to read device auth status for plugin "${registered.plugin.id}": ${error}`,
+                    );
+                }
+            }
+        }
+
+        const plugin = registered.plugin as unknown as Record<string, unknown>;
+        const validateConnection = plugin.validateConnection as
+            | ((s: Record<string, unknown>) => Promise<{ success: boolean; message: string }>)
+            | undefined;
+
+        if (typeof validateConnection === 'function') {
+            try {
+                const result = await validateConnection.call(registered.plugin, settings);
+                return {
+                    connected: result.success,
+                    scope: 'user',
+                    message: result.message,
+                };
+            } catch (error) {
+                this.logger.warn(
+                    `Failed to validate onboarding connection for plugin "${registered.plugin.id}": ${error}`,
+                );
+                return {
+                    connected: false,
+                    scope: 'user',
+                    message: `${registered.plugin.name} is not configured yet.`,
+                };
+            }
+        }
+
+        const isAvailable = plugin.isAvailable as
+            | ((s?: Record<string, unknown>) => Promise<boolean>)
+            | undefined;
+
+        if (typeof isAvailable === 'function') {
+            try {
+                const available = await isAvailable.call(registered.plugin, settings);
+                return {
+                    connected: available,
+                    scope: 'user',
+                    message: available
+                        ? `${registered.plugin.name} is configured.`
+                        : `${registered.plugin.name} is not configured yet.`,
+                };
+            } catch (error) {
+                this.logger.warn(
+                    `Failed to resolve availability for plugin "${registered.plugin.id}": ${error}`,
+                );
+            }
+        }
+
+        return undefined;
     }
 
     private async getResolvedDisplaySettings(

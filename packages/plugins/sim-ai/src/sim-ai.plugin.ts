@@ -38,7 +38,8 @@ import {
 	resolveSettings,
 	buildMetrics,
 	buildErrorResult,
-	buildCancelledResult
+	buildCancelledResult,
+	finalizeCompletedState
 } from './utils/pipeline-helpers.js';
 import {
 	getFormFields as formFields,
@@ -379,6 +380,8 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				workflowId,
 				simDuration: execResult.simDuration
 			};
+			state = finalizeCompletedState(state);
+			this._lastState = state;
 
 			return buildSuccessPipelineResult(
 				{
@@ -401,6 +404,10 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			const err = error instanceof Error ? error : new Error(String(error));
 			logger.error(`SIM AI pipeline failed: ${err.message}`);
 			return handleError(err);
+		} finally {
+			if (this._lastAbortController === abortController) {
+				this._lastAbortController = null;
+			}
 		}
 	}
 

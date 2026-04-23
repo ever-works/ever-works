@@ -49,6 +49,7 @@ vi.mock('../utils/opencode-config', () => ({
 	prepareOpenCodeSessionConfig: vi.fn().mockResolvedValue({
 		sessionDir: '/tmp/opencode-generator/user1/opencode/dir1',
 		configDir: '/tmp/opencode-generator/user1/opencode/dir1/config',
+		model: 'everworks/test-complex-model',
 		env: {
 			HOME: '/tmp/opencode-generator/user1/opencode/dir1',
 			XDG_DATA_HOME: '/tmp/opencode-generator/user1/opencode/dir1/data',
@@ -241,6 +242,23 @@ describe('OpenCodePlugin', () => {
 			expect(result.outputs.tags).toHaveLength(1);
 			expect(result.metrics!.itemsProcessed).toBe(1);
 			expect(result.warnings).toBeUndefined();
+		});
+
+		it('should invoke OpenCode with the provider-qualified session model', async () => {
+			const ctx = createMockContext();
+			await plugin.onLoad(ctx);
+
+			const { executeOpenCode } = await import('../utils/process-runner');
+
+			await plugin.execute(directory, request, existing, {
+				execContext: createExecContext()
+			});
+
+			expect(vi.mocked(executeOpenCode)).toHaveBeenCalledWith(
+				expect.objectContaining({
+					model: 'everworks/test-complex-model'
+				})
+			);
 		});
 
 		it('should report progress ending at 100%', async () => {

@@ -33,6 +33,7 @@
 		"@ever-works/plugin": "workspace:*"
 	},
 	"devDependencies": {
+		"@types/node": "^22.0.0",
 		"@ever-works/plugin": "workspace:*",
 		"@types/turndown": "^5.0.5",
 		"tsup": "^8.4.0",

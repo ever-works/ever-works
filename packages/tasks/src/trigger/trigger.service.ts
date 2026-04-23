@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { configure } from '@trigger.dev/sdk';
+import { configure, runs } from '@trigger.dev/sdk';
 import { config } from '@ever-works/agent/config';
 import {
     DirectoryGenerationPayload,
@@ -70,6 +70,23 @@ export class TriggerService implements DirectoryGenerationDispatcher, DirectoryI
         } catch (error) {
             this.logger.error('Failed to dispatch directory-generation task', error as Error);
             return null;
+        }
+    }
+
+    async cancelDirectoryGeneration(runId: string): Promise<boolean> {
+        if (!this.ensureConfigured()) {
+            return false;
+        }
+
+        try {
+            await runs.cancel(runId);
+            return true;
+        } catch (error) {
+            this.logger.error(
+                `Failed to cancel directory-generation task ${runId}`,
+                error as Error,
+            );
+            return false;
         }
     }
 

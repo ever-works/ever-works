@@ -56,6 +56,10 @@
             "types": "./dist/config/index.d.ts",
             "default": "./dist/config/index.js"
         },
+        "./constants": {
+            "types": "./dist/constants/index.d.ts",
+            "default": "./dist/constants/index.js"
+        },
         "./cache": {
             "types": "./dist/cache/index.d.ts",
             "default": "./dist/cache/index.js"
@@ -156,7 +160,7 @@
         "ts-node": "^10.9.2",
         "tsconfig-paths": "^4.2.0",
         "typescript": "^5.9.3",
-        "typescript-eslint": "^8.51.0"
+        "typescript-eslint": "8.53.1"
     },
     "dependencies": {
         "@ever-works/contracts": "workspace:*",

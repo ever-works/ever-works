@@ -38,14 +38,17 @@ export class ActivityLogListener {
         try {
             const directory = event.directory;
             const itemCount = directory.itemsCount || 0;
+            const generateStatus = directory.generateStatus?.status;
             const status =
-                directory.generateStatus?.status === 'error'
+                generateStatus === 'error' || generateStatus === 'cancelled'
                     ? ActivityStatus.FAILED
                     : ActivityStatus.COMPLETED;
             const summary =
-                status === ActivityStatus.FAILED
-                    ? `Generation failed for ${directory.name}`
-                    : `Generated ${itemCount} items for ${directory.name}`;
+                generateStatus === 'cancelled'
+                    ? `Generation cancelled for ${directory.name}`
+                    : status === ActivityStatus.FAILED
+                      ? `Generation failed for ${directory.name}`
+                      : `Generated ${itemCount} items for ${directory.name}`;
             const details = {
                 itemsCount: itemCount,
                 generateStatus: directory.generateStatus,

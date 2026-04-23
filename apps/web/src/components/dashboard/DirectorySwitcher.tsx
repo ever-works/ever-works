@@ -65,6 +65,21 @@ export function DirectorySwitcher() {
         () => directories.filter((directory) => matchesDirectoryQuery(directory, deferredQuery)),
         [deferredQuery, directories],
     );
+    const currentDirectoryStatus = useMemo(() => {
+        if (!currentDirectory) {
+            return null;
+        }
+
+        const hasWarnings = !!currentDirectory.generateStatus?.warnings?.length;
+        const statusStyle = getGenerationStatusConfig(currentDirectory.generateStatus?.status, {
+            hasWarnings,
+        });
+
+        return {
+            ...statusStyle,
+            label: tStatus(statusStyle.labelKey),
+        };
+    }, [currentDirectory, tStatus]);
 
     useEffect(() => {
         inputRef.current?.blur();
@@ -178,6 +193,16 @@ export function DirectorySwitcher() {
                             placeholder={t('search')}
                         />
 
+                        {currentDirectoryStatus && (
+                            <DirectoryStatusBadge
+                                className="shrink-0"
+                                label={currentDirectoryStatus.label}
+                                badgeClassName={currentDirectoryStatus.badge}
+                                animate={currentDirectoryStatus.animate}
+                                Icon={currentDirectoryStatus.icon}
+                            />
+                        )}
+
                         <ComboboxButton
                             className={cn(
                                 'flex h-6 w-6 shrink-0 items-center justify-center rounded-md',
@@ -218,7 +243,6 @@ export function DirectorySwitcher() {
                                         { hasWarnings },
                                     );
                                     const statusLabel = tStatus(statusStyle.labelKey);
-                                    const StatusIcon = statusStyle.icon;
 
                                     return (
                                         <ComboboxOption
@@ -249,25 +273,12 @@ export function DirectorySwitcher() {
                                                 </div>
 
                                                 <div className="flex shrink-0 items-center gap-2 self-center">
-                                                    <span
-                                                        className={cn(
-                                                            'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
-                                                            statusStyle.badge,
-                                                        )}
-                                                    >
-                                                        <StatusIcon
-                                                            className={cn(
-                                                                'h-3 w-3',
-                                                                statusStyle.animate &&
-                                                                    'animate-spin',
-                                                            )}
-                                                        />
-                                                        {statusStyle.animate ? (
-                                                            <ShinyText text={statusLabel} />
-                                                        ) : (
-                                                            statusLabel
-                                                        )}
-                                                    </span>
+                                                    <DirectoryStatusBadge
+                                                        label={statusLabel}
+                                                        badgeClassName={statusStyle.badge}
+                                                        animate={statusStyle.animate}
+                                                        Icon={statusStyle.icon}
+                                                    />
 
                                                     {isCurrentDirectory && (
                                                         <Check className="h-4 w-4 shrink-0 text-primary dark:text-primary-dark" />
@@ -283,5 +294,32 @@ export function DirectorySwitcher() {
                 </div>
             </Combobox>
         </div>
+    );
+}
+
+function DirectoryStatusBadge({
+    label,
+    badgeClassName,
+    animate,
+    Icon,
+    className,
+}: {
+    label: string;
+    badgeClassName: string;
+    animate: boolean;
+    Icon: React.ComponentType<{ className?: string }>;
+    className?: string;
+}) {
+    return (
+        <span
+            className={cn(
+                'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
+                badgeClassName,
+                className,
+            )}
+        >
+            <Icon className={cn('h-3 w-3', animate && 'animate-spin')} />
+            {animate ? <ShinyText text={label} /> : label}
+        </span>
     );
 }

@@ -77,6 +77,7 @@ const CAPABILITY_METHOD_REQUIREMENTS: Record<string, string[]> = {
         'exchangeCodeForToken',
         'getAuthenticatedUser',
     ],
+    [PLUGIN_CAPABILITIES.DEVICE_AUTH]: ['getDeviceAuthStatus', 'startDeviceAuth'],
     [PLUGIN_CAPABILITIES.DEPLOYMENT]: ['deploy', 'getDeploymentStatus'],
     [PLUGIN_CAPABILITIES.SCREENSHOT]: ['capture', 'isAvailable'],
     [PLUGIN_CAPABILITIES.SEARCH]: ['search', 'isAvailable'],

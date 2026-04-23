@@ -10,7 +10,13 @@ import { PluginRegistryService } from '../services/plugin-registry.service';
 import { SettingsSchemaValidatorService } from '../services/settings-schema-validator.service';
 import { PluginSettingsService } from '../services/plugin-settings.service';
 import type { RegisteredPlugin } from '../services/plugin-registry.service';
-import type { IPlugin, PluginManifest, JsonSchema } from '@ever-works/plugin';
+import type {
+    IDeviceAuthProvider,
+    IPlugin,
+    DeviceAuthStatus,
+    PluginManifest,
+    JsonSchema,
+} from '@ever-works/plugin';
 
 // Mock the facades module to avoid transitive cross-package @src path resolution issues
 jest.mock('../../facades', () => ({
@@ -133,6 +139,7 @@ describe('PluginOperationsService', () => {
                     provide: PluginRegistryService,
                     useValue: {
                         get: jest.fn().mockReturnValue(createRegisteredPlugin()),
+                        getPlugin: jest.fn().mockReturnValue(createMockPlugin()),
                         getAll: jest.fn().mockReturnValue([createRegisteredPlugin()]),
                         getAvailableCategories: jest.fn().mockReturnValue(['utility']),
                         getAvailableCapabilities: jest.fn().mockReturnValue(['test']),
@@ -1815,6 +1822,61 @@ describe('PluginOperationsService', () => {
                 expect.objectContaining({ enabled: false }),
             );
             expect(directoryPluginRepository.save).toHaveBeenCalled();
+        });
+    });
+
+    describe('plugin device auth capability', () => {
+        const createDeviceAuthPlugin = (): IPlugin & IDeviceAuthProvider =>
+            ({
+                ...createMockPlugin(),
+                getDeviceAuthStatus: jest.fn().mockResolvedValue({
+                    installed: true,
+                    connected: true,
+                    pending: false,
+                    scope: 'user',
+                    flowType: 'device-code',
+                    message: 'Connected',
+                } satisfies DeviceAuthStatus),
+                startDeviceAuth: jest.fn().mockResolvedValue({
+                    installed: true,
+                    connected: false,
+                    pending: true,
+                    scope: 'user',
+                    flowType: 'device-code',
+                    prompt: {
+                        verificationUri: 'https://auth.openai.com/codex/device',
+                        userCode: 'ABCD-EFGH',
+                    },
+                    message: 'Pending',
+                } satisfies DeviceAuthStatus),
+            }) as unknown as IPlugin & IDeviceAuthProvider;
+
+        it('should delegate device auth status to plugins that support it', async () => {
+            const plugin = createDeviceAuthPlugin();
+            jest.spyOn(pluginRegistryService, 'getPlugin').mockReturnValue(plugin);
+
+            const result = await service.getPluginDeviceAuthStatus('test-plugin', 'user-1');
+
+            expect(plugin.getDeviceAuthStatus).toHaveBeenCalledWith('user-1');
+            expect(result.connected).toBe(true);
+        });
+
+        it('should delegate start device auth to plugins that support it', async () => {
+            const plugin = createDeviceAuthPlugin();
+            jest.spyOn(pluginRegistryService, 'getPlugin').mockReturnValue(plugin);
+
+            const result = await service.startPluginDeviceAuth('test-plugin', 'user-1');
+
+            expect(plugin.startDeviceAuth).toHaveBeenCalledWith('user-1');
+            expect(result.pending).toBe(true);
+        });
+
+        it('should reject device auth calls for plugins without the capability', async () => {
+            jest.spyOn(pluginRegistryService, 'getPlugin').mockReturnValue(createMockPlugin());
+
+            await expect(
+                service.getPluginDeviceAuthStatus('test-plugin', 'user-1'),
+            ).rejects.toThrow(BadRequestException);
         });
     });
 
