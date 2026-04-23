@@ -78,7 +78,7 @@ function createRef(): ZapierActionRef {
 	return {
 		appKey: 'slack',
 		actionType: 'write',
-		actionKey: 'send_message',
+		actionKey: 'custom',
 		authenticationId: 12345
 	};
 }
@@ -132,14 +132,14 @@ describe('ZapierClient', () => {
 
 	describe('validateAction', () => {
 		it('should unwrap the .data action metadata on success', async () => {
-			mockGetAction.mockResolvedValue({ data: { key: 'send_message' } });
+			mockGetAction.mockResolvedValue({ data: { key: 'custom' } });
 			const client = createClient();
 
-			await expect(client.validateAction(createRef())).resolves.toEqual({ key: 'send_message' });
+			await expect(client.validateAction(createRef())).resolves.toEqual({ key: 'custom' });
 			expect(mockGetAction).toHaveBeenCalledWith({
 				appKey: 'slack',
 				actionType: 'write',
-				actionKey: 'send_message'
+				actionKey: 'custom'
 			});
 		});
 
@@ -193,7 +193,7 @@ describe('ZapierClient', () => {
 			expect(mockRunAction).toHaveBeenCalledWith({
 				appKey: 'slack',
 				actionType: 'write',
-				actionKey: 'send_message',
+				actionKey: 'custom',
 				authenticationId: 12345,
 				inputs: { custom: 'input' }
 			});

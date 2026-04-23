@@ -48,7 +48,8 @@ export interface ZapierActionRef {
 	appKey: string;
 	actionType: ZapierActionType;
 	actionKey: string;
-	authenticationId: number;
+	/** Zapier returns UUID strings in SDK 1.x; legacy numeric IDs are still accepted. */
+	authenticationId: string | number;
 }
 
 /** How the plugin should interpret the action's `data` payload. */
@@ -126,7 +127,7 @@ export interface ZapierSettings {
 	defaultAppKey?: string;
 	defaultActionType?: ZapierActionType;
 	defaultActionKey?: string;
-	defaultAuthenticationId?: number;
+	defaultAuthenticationId?: string | number;
 	timeoutMs: number;
 	resultShape: ZapierResultShape;
 	fieldMapping: ZapierFieldMapping;
@@ -137,7 +138,7 @@ export interface ZapierPipelineMetrics {
 	appKey: string;
 	actionType: ZapierActionType;
 	actionKey: string;
-	authenticationId: number;
+	authenticationId: string | number;
 	resultShape: ZapierResultShape;
 	zapierDuration?: number;
 	itemsReturned?: number;

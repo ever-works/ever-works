@@ -125,13 +125,14 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			defaultActionKey: {
 				type: 'string',
 				title: 'Default Action Key',
-				description: 'Default action slug within the app (e.g. send_message).',
+				description: 'Default action slug within the app (e.g. custom).',
 				'x-scope': 'user'
 			},
 			defaultAuthenticationId: {
-				type: 'number',
+				type: 'string',
 				title: 'Default Authentication ID',
-				description: 'Numeric Zapier authentication (connection) ID to use when not overridden in the form.',
+				description:
+					'Zapier authentication (connection) ID to use when not overridden in the form. Accepts UUID strings (SDK 1.x) or legacy numeric IDs.',
 				'x-scope': 'user'
 			}
 		},
@@ -209,7 +210,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 					actionType,
 					actionKey,
 					// validateAction ignores authenticationId but the type requires it
-					authenticationId: authenticationId ?? 0
+					authenticationId: authenticationId ?? ''
 				});
 				return {
 					success: true,
@@ -535,7 +536,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		const actionType = ((config.action_type as ZapierActionType) || settings.defaultActionType) as ZapierActionType;
 		const actionKey = (trimOrUndefined(config.action_key) || settings.defaultActionKey || '').trim();
 		const authenticationId =
-			normalizeAuthId(config.authentication_id) ?? settings.defaultAuthenticationId ?? Number.NaN;
+			normalizeAuthId(config.authentication_id) ?? settings.defaultAuthenticationId ?? '';
 
 		return {
 			appKey,
@@ -550,7 +551,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		if (!ref.appKey) missing.push('app_key');
 		if (!ref.actionType) missing.push('action_type');
 		if (!ref.actionKey) missing.push('action_key');
-		if (!Number.isFinite(ref.authenticationId) || ref.authenticationId <= 0) {
+		if (!isValidAuthId(ref.authenticationId)) {
 			missing.push('authentication_id');
 		}
 		return missing;
@@ -639,13 +640,24 @@ function trimOrUndefined(value: unknown): string | undefined {
 	return trimmed === '' ? undefined : trimmed;
 }
 
-function normalizeAuthId(value: unknown): number | undefined {
+function normalizeAuthId(value: unknown): string | number | undefined {
 	if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
-	if (typeof value === 'string' && value.trim() !== '') {
-		const parsed = Number(value);
-		if (Number.isFinite(parsed) && parsed > 0) return parsed;
+	if (typeof value === 'string') {
+		const trimmed = value.trim();
+		if (trimmed === '') return undefined;
+		// Preserve UUID-style IDs as strings; coerce numeric strings to numbers for backward compat.
+		if (/^\d+$/.test(trimmed)) {
+			const parsed = Number(trimmed);
+			return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+		}
+		return trimmed;
 	}
 	return undefined;
+}
+
+function isValidAuthId(value: string | number): boolean {
+	if (typeof value === 'number') return Number.isFinite(value) && value > 0;
+	return typeof value === 'string' && value.trim() !== '';
 }
 
 function hasAccessToken(settings: Record<string, unknown>): boolean {

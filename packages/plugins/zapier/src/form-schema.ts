@@ -27,17 +27,17 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'action_key',
 			type: 'text',
 			label: 'Zapier Action Key',
-			description: 'Override the default action key for this generation (e.g. send_message)',
-			placeholder: 'e.g. send_message',
+			description: 'Override the default action key for this generation (e.g. custom)',
+			placeholder: 'e.g. custom',
 			group: 'action'
 		},
 		{
 			name: 'authentication_id',
-			type: 'number',
+			type: 'text',
 			label: 'Authentication ID',
 			description:
-				'The numeric Zapier authentication ID that should run the action. Required — the plugin never auto-selects a connection.',
-			placeholder: 'e.g. 12345',
+				'The Zapier authentication (connection) ID that should run the action. Accepts UUID strings (SDK 1.x) or legacy numeric IDs. Required — the plugin never auto-selects a connection.',
+			placeholder: 'e.g. 020432e5-b0c7-8ba5-ab2b-4496db8112e0',
 			group: 'action'
 		},
 		{

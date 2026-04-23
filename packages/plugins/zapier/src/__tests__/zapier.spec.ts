@@ -114,7 +114,7 @@ function createRequest(overrides?: Partial<GenerationRequest>): GenerationReques
 		config: {
 			app_key: 'slack',
 			action_type: 'write',
-			action_key: 'send_message',
+			action_key: 'custom',
 			authentication_id: 12345,
 			target_items: 50
 		},
@@ -137,7 +137,7 @@ function errorMessage(error: Error | string | undefined): string {
 }
 
 function mockSuccessfulAction() {
-	mockGetAction.mockResolvedValue({ data: { key: 'send_message', label: 'Send Message' } });
+	mockGetAction.mockResolvedValue({ data: { key: 'custom', label: 'Send Message' } });
 	mockRunAction.mockResolvedValue({
 		data: [
 			{
@@ -269,10 +269,10 @@ describe('ZapierPlugin', () => {
 	});
 
 	describe('getFormFields', () => {
-		it('should include authentication_id as a number field', () => {
+		it('should include authentication_id as a text field (accepts UUID and numeric IDs)', () => {
 			const field = plugin.getFormFields().find((f) => f.name === 'authentication_id');
 			expect(field).toBeDefined();
-			expect(field!.type).toBe('number');
+			expect(field!.type).toBe('text');
 		});
 
 		it('should include result_shape with structured and native options', () => {
@@ -356,7 +356,7 @@ describe('ZapierPlugin', () => {
 		it('should fail when authentication_id is missing — never auto-resolves', async () => {
 			const result = await plugin.execute(
 				createDirectory(),
-				createRequest({ config: { app_key: 'slack', action_type: 'write', action_key: 'send_message' } }),
+				createRequest({ config: { app_key: 'slack', action_type: 'write', action_key: 'custom' } }),
 				createExisting()
 			);
 			expect(result.success).toBe(false);
@@ -378,7 +378,7 @@ describe('ZapierPlugin', () => {
 				expect.objectContaining({
 					appKey: 'slack',
 					actionType: 'write',
-					actionKey: 'send_message',
+					actionKey: 'custom',
 					authenticationId: 12345
 				})
 			);
@@ -450,7 +450,7 @@ describe('ZapierPlugin', () => {
 		});
 
 		it('should surface Zapier action errors', async () => {
-			mockGetAction.mockResolvedValue({ data: { key: 'send_message' } });
+			mockGetAction.mockResolvedValue({ data: { key: 'custom' } });
 			mockRunAction.mockRejectedValue(new ZapierActionError('Invalid channel'));
 
 			const result = await plugin.execute(createDirectory(), createRequest(), createExisting());
@@ -480,14 +480,14 @@ describe('ZapierPlugin', () => {
 		});
 
 		it('should validate the default action when a full triple is provided', async () => {
-			mockGetAction.mockResolvedValue({ data: { key: 'send_message' } });
+			mockGetAction.mockResolvedValue({ data: { key: 'custom' } });
 			await plugin.onLoad(createMockContext());
 
 			const result = await plugin.validateConnection({
 				accessToken: 'test-token',
 				defaultAppKey: 'slack',
 				defaultActionType: 'write',
-				defaultActionKey: 'send_message'
+				defaultActionKey: 'custom'
 			});
 
 			expect(result.success).toBe(true);
@@ -495,14 +495,14 @@ describe('ZapierPlugin', () => {
 		});
 
 		it('should flatten wrapped settings values', async () => {
-			mockGetAction.mockResolvedValue({ data: { key: 'send_message' } });
+			mockGetAction.mockResolvedValue({ data: { key: 'custom' } });
 			await plugin.onLoad(createMockContext());
 
 			const result = await plugin.validateConnection({
 				accessToken: { value: 'wrapped-token' },
 				defaultAppKey: { value: 'slack' },
 				defaultActionType: { value: 'write' },
-				defaultActionKey: { value: 'send_message' }
+				defaultActionKey: { value: 'custom' }
 			});
 
 			expect(result.success).toBe(true);

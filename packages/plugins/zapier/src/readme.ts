@@ -25,7 +25,7 @@ export const README = [
 	'5. Identify the action you want to run. Every Zapier action is addressed by a triple:',
 	'   - `app_key` — the app slug (e.g. `slack`, `google_sheets`)',
 	'   - `action_type` — one of `search | filter | read | read_bulk | run | search_and_write | search_or_write | write`',
-	'   - `action_key` — the action slug (e.g. `send_message`)',
+	'   - `action_key` — the action slug (e.g. `custom`)',
 	'6. Look up the **authentication ID** (the numeric id of the Zapier connection that should run the action) and set it in settings or per-generation.',
 	'',
 	'> **Note.** The plugin always requires an explicit authentication ID — it will not auto-pick a connection on your behalf.',
