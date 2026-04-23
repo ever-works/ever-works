@@ -734,11 +734,13 @@ export class DirectoryScheduleService {
     }
 
     private validateProviderOverrides(overrides: ProvidersDto): void {
-        const dtoFields = Object.entries(SELECTABLE_PROVIDER_CATEGORIES).map(
-            ([, def]) => def.uiKey,
-        );
+        const dtoFields = (
+            Object.values(SELECTABLE_PROVIDER_CATEGORIES) as Array<{
+                uiKey: keyof ProvidersDto;
+            }>
+        ).map((category) => category.uiKey);
         for (const field of dtoFields) {
-            const pluginId = overrides[field as keyof ProvidersDto];
+            const pluginId = overrides[field];
             if (pluginId) {
                 const registered = this.pluginRegistry.get(pluginId);
                 if (!registered) {

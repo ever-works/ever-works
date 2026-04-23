@@ -1145,11 +1145,12 @@ Only include image URLs that are absolute URLs (starting with http).`;
     ): Promise<void> {
         if (!providers) return;
 
-        const uiKeys = Object.values(SELECTABLE_PROVIDER_CATEGORIES).map((c) => c.uiKey);
+        const uiKeys = (
+            Object.values(SELECTABLE_PROVIDER_CATEGORIES) as Array<{ uiKey: keyof ProvidersDto }>
+        ).map((category) => category.uiKey);
 
         for (const uiKey of uiKeys) {
-            const key = uiKey as keyof ProvidersDto;
-            const pluginId = providers[key];
+            const pluginId = providers[uiKey];
             if (!pluginId) continue;
 
             // Check if the plugin is currently enabled for this scope.
@@ -1164,7 +1165,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
                 this.logger.warn(
                     `Provider "${pluginId}" (${uiKey}) is disabled for directory ${directoryId}, removing from request`,
                 );
-                delete providers[key];
+                delete providers[uiKey];
                 continue;
             }
 

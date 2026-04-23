@@ -15,6 +15,7 @@ import {
     type SourceValidationSettingsDto,
     type UpdateSourceValidationPayload,
     type GenerationStepLog,
+    type ProvidersDto,
 } from '@ever-works/contracts/api';
 import { APIResponse, ItemData, Category, Tag, Collection } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
@@ -397,7 +398,7 @@ export interface AnalyzeRepositoryResponseDto {
         model?: string;
         websiteRepo?: string;
         scheduleCadence?: string | null;
-        providers?: Record<string, string>;
+        providers?: ProvidersDto;
         additionalAgentsCount?: number;
     };
     relatedDataRepo?: { name: string; owner: string };
