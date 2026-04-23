@@ -38,9 +38,9 @@ const STATUS_CONFIGS: Record<string, GenerationStatusConfig> = {
         icon: Loader2,
         animate: true,
         labelKey: 'generating',
-        badge: 'bg-gray-900 text-gray-100 dark:bg-white/10 dark:text-white/90',
+        badge: 'bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-white/90',
         card: {
-            borderBg: 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03]',
+            borderBg: 'border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/[0.03]',
             iconBg: 'bg-gray-100 dark:bg-white/8',
             iconColor: 'text-gray-700 dark:text-white/80',
         },
