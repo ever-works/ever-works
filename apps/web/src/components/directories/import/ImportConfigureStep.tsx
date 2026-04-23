@@ -40,6 +40,7 @@ interface AnalysisResult {
         model?: string;
         websiteRepo?: string;
         scheduleCadence?: string | null;
+        providers?: Record<string, string>;
         additionalAgentsCount?: number;
     };
     slugConflict?: {
