@@ -38,6 +38,9 @@ export interface GenerationRequest {
 	/** Prompt or topic for generation */
 	readonly prompt?: string;
 
+	/** Optional AI model override applied across AI facade calls for this request */
+	readonly aiModel?: string;
+
 	/** Generation method (create-update or recreate) */
 	readonly generationMethod?: 'create-update' | 'recreate' | string;
 

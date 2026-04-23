@@ -1079,6 +1079,7 @@ export class DataGeneratorService {
         const request: GenerationRequest = {
             name: dto.name,
             prompt: dto.prompt,
+            aiModel: dto.model,
             generationMethod: dto.generation_method,
             config: dto.pluginConfig || {},
             pluginConfig: dto._processedPluginConfig || undefined,

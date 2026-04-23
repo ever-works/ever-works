@@ -323,6 +323,7 @@ export class ImportExecutorService {
             const generationDto: CreateItemsGeneratorDto = {
                 name: directory.name,
                 prompt: resolvedWorksConfig.initialPrompt,
+                model: resolvedWorksConfig.model,
                 providers: {
                     ...(resolvedWorksConfig.providers ?? {}),
                     ...(providers ?? {}),

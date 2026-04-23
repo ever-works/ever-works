@@ -82,6 +82,7 @@ export class FullPipelineExecutorService {
             const execContext = this.facadeService.createStepExecutionContext(
                 directory,
                 request.providers,
+                request.aiModel,
                 options?.signal,
             );
 
