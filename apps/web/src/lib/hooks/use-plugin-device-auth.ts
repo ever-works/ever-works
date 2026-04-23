@@ -27,6 +27,11 @@ export function usePluginDeviceAuth({
         initialStatus?.prompt?.verificationUri ?? null,
     );
 
+    useEffect(() => {
+        setStatus(initialStatus ?? null);
+        handledVerificationUriRef.current = initialStatus?.prompt?.verificationUri ?? null;
+    }, [initialStatus]);
+
     const openVerificationUri = useCallback((verificationUri?: string | null) => {
         if (!verificationUri || typeof window === 'undefined') {
             return;

@@ -9,11 +9,16 @@ import { X, ExternalLink, BookOpen, Keyboard } from 'lucide-react';
 interface HelpDrawerProps {
     open: boolean;
     onClose: () => void;
+    onboarding?: {
+        currentStep: number;
+        totalSteps: number;
+        onOpen: () => void;
+    };
 }
 
 const DOCS_URL = 'https://docs.ever.works/docs';
 
-export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
+export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
     const t = useTranslations('dashboard.header.help');
 
     const quickTips = [
@@ -109,6 +114,49 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
 
                                         {/* Content */}
                                         <div className="flex-1 px-6 py-6 space-y-8">
+                                            {onboarding && (
+                                                <section>
+                                                    <h3
+                                                        className={cn(
+                                                            'text-sm font-semibold uppercase tracking-wider mb-4',
+                                                            'text-text-secondary dark:text-text-secondary-dark',
+                                                        )}
+                                                    >
+                                                        {t('onboarding.title')}
+                                                    </h3>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            onboarding.onOpen();
+                                                            onClose();
+                                                        }}
+                                                        className={cn(
+                                                            'w-full rounded-xl border p-4 text-left transition-colors',
+                                                            'border-border dark:border-border-dark',
+                                                            'bg-surface dark:bg-surface-secondary-dark',
+                                                            'hover:border-primary/50 hover:bg-surface-secondary dark:hover:bg-surface-dark',
+                                                        )}
+                                                    >
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div className="space-y-1">
+                                                                <p className="text-sm font-medium text-text dark:text-text-dark">
+                                                                    {t('onboarding.action', {
+                                                                        currentStep:
+                                                                            onboarding.currentStep,
+                                                                        totalSteps:
+                                                                            onboarding.totalSteps,
+                                                                    })}
+                                                                </p>
+                                                                <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                                                                    {t('onboarding.description')}
+                                                                </p>
+                                                            </div>
+                                                            <BookOpen className="h-5 w-5 flex-shrink-0 text-text-secondary dark:text-text-secondary-dark" />
+                                                        </div>
+                                                    </button>
+                                                </section>
+                                            )}
+
                                             {/* Quick Tips Section */}
                                             <section>
                                                 <h3
