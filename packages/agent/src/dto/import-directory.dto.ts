@@ -61,6 +61,7 @@ export class AnalyzeRepositoryResponseDto {
         model?: string;
         websiteRepo?: string;
         scheduleCadence?: string | null;
+        providers?: Record<string, string>;
         additionalAgentsCount?: number;
     };
     relatedDataRepo?: { name: string; owner: string };

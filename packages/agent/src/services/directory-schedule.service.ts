@@ -141,10 +141,15 @@ export class DirectoryScheduleService {
         const alwaysCreatePullRequest =
             dto.alwaysCreatePullRequest ?? existing?.alwaysCreatePullRequest ?? false;
 
+        const importedProviderOverrides =
+            directory.sourceRepository?.type === 'works_config'
+                ? (directory.sourceRepository.worksConfig?.providers ?? null)
+                : null;
+
         const providerOverrides =
             dto.providerOverrides !== undefined
                 ? dto.providerOverrides
-                : (existing?.providerOverrides ?? null);
+                : (existing?.providerOverrides ?? importedProviderOverrides);
 
         if (providerOverrides) {
             this.validateProviderOverrides(providerOverrides);

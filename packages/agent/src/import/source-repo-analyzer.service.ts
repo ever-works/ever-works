@@ -218,6 +218,7 @@ export class SourceRepoAnalyzerService {
                     model: detectionResult.worksConfig.model,
                     websiteRepo: detectionResult.worksConfig.websiteRepo,
                     scheduleCadence: detectionResult.worksConfig.scheduleCadence ?? null,
+                    providers: detectionResult.worksConfig.providers,
                     additionalAgentsCount: detectionResult.worksConfig.additionalAgentsCount,
                 };
             }

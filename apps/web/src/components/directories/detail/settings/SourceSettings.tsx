@@ -44,6 +44,16 @@ export function SourceSettings() {
     const appliedSchedule = directory.scheduledUpdatesEnabled
         ? directory.scheduledCadence || 'enabled'
         : 'disabled';
+    const importedProviders =
+        worksConfig?.providers && Object.keys(worksConfig.providers).length > 0
+            ? Object.entries(worksConfig.providers)
+                  .map(([capability, provider]) => `${capability}: ${provider}`)
+                  .join(', ')
+            : null;
+    const appliedProviderOverrides =
+        directory.scheduledUpdatesEnabled && sourceRepository.type === 'works_config'
+            ? importedProviders
+            : null;
 
     const metadataRows = [
         { label: 'Source Type', value: sourceTypeLabel },
@@ -67,6 +77,16 @@ export function SourceSettings() {
                   label: 'Schedule',
                   value: worksConfig.scheduleCadence,
                   hint: `Applied: ${appliedSchedule}`,
+              }
+            : null,
+        importedProviders
+            ? {
+                  label: 'Providers',
+                  value: importedProviders,
+                  hint: appliedProviderOverrides
+                      ? `Applied: ${appliedProviderOverrides}`
+                      : 'Imported from works.yml',
+                  multiline: true,
               }
             : null,
         websiteTarget

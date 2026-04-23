@@ -90,6 +90,10 @@ export class DirectoryImportService {
             model: worksConfig.model,
             websiteRepo: worksConfig.websiteRepo,
             scheduleCadence: worksConfig.scheduleCadence ?? null,
+            providers:
+                worksConfig.providers && Object.keys(worksConfig.providers).length > 0
+                    ? worksConfig.providers
+                    : undefined,
             additionalAgentsCount: worksConfig.additionalAgentsCount,
         };
     }
@@ -784,6 +788,21 @@ export class DirectoryImportService {
                     : directory.sourceRepository?.relatedRepositories,
             },
         });
+
+        if (
+            directory.scheduledUpdatesEnabled &&
+            (worksConfig?.scheduleCadence || worksConfig?.providers)
+        ) {
+            await this.directoryScheduleService.updateSchedule(
+                directory.id,
+                {
+                    cadence: worksConfig?.scheduleCadence ?? undefined,
+                    providerOverrides:
+                        worksConfig?.providers !== undefined ? worksConfig.providers : undefined,
+                },
+                user,
+            );
+        }
 
         return this.importExecutor.importFromWorksConfig({
             directory,

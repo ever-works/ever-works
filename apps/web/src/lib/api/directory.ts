@@ -139,6 +139,7 @@ export interface WorksConfigSnapshot {
     model?: string;
     websiteRepo?: string;
     scheduleCadence?: DirectoryScheduleCadence | null;
+    providers?: Record<string, string>;
     additionalAgentsCount?: number;
 }
 
@@ -396,6 +397,7 @@ export interface AnalyzeRepositoryResponseDto {
         model?: string;
         websiteRepo?: string;
         scheduleCadence?: string | null;
+        providers?: Record<string, string>;
         additionalAgentsCount?: number;
     };
     relatedDataRepo?: { name: string; owner: string };

@@ -17,6 +17,7 @@ import type {
     GenerateStatus,
     DirectoryMemberRole,
 } from './types';
+import type { ProvidersDto } from '@ever-works/contracts/api';
 import type { PRUpdate } from '@src/generators/data-generator';
 import { DirectoryGenerationHistory } from './directory-generation-history.entity';
 import { TimestampColumn } from './_types';
@@ -302,6 +303,7 @@ export type WorksConfigSnapshot = {
     model?: string;
     websiteRepo?: string;
     scheduleCadence?: DirectoryScheduleCadence | null;
+    providers?: ProvidersDto;
     additionalAgentsCount?: number;
 };
 

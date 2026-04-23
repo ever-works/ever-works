@@ -240,6 +240,21 @@ export function ImportConfigureStep({
                                             Schedule: {analysisResult.worksConfig.scheduleCadence}
                                         </span>
                                     )}
+                                    {analysisResult.worksConfig?.providers &&
+                                        Object.keys(analysisResult.worksConfig.providers).length >
+                                            0 && (
+                                            <span>
+                                                Providers:{' '}
+                                                {Object.entries(
+                                                    analysisResult.worksConfig.providers,
+                                                )
+                                                    .map(
+                                                        ([capability, provider]) =>
+                                                            `${capability}=${provider}`,
+                                                    )
+                                                    .join(', ')}
+                                            </span>
+                                        )}
                                 </div>
                             )}
                         </div>

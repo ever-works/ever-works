@@ -12,6 +12,7 @@ export interface WorksConfigSummary {
     model?: string;
     websiteRepo?: string;
     scheduleCadence?: DirectoryScheduleCadence | null;
+    providers?: ProvidersDto;
     additionalAgentsCount?: number;
 }
 
