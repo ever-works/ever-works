@@ -1,0 +1,60 @@
+{
+	"name": "@ever-works/claude-managed-agent-plugin",
+	"version": "1.0.0",
+	"description": "Claude Managed Agent pipeline plugin for Ever Works",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@anthropic-ai/sdk": "0.90.0",
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.1"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "claude-managed-agent",
+			"name": "Claude Managed Agent",
+			"version": "1.0.0",
+			"category": "pipeline",
+			"capabilities": [
+				"pipeline",
+				"form-schema-provider"
+			],
+			"description": "Hosted Claude Managed Agent pipeline for directory generation in Ever Works",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"builtIn": true,
+			"autoEnable": false,
+			"visibility": "public"
+		}
+	}
+}
