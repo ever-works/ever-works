@@ -78,11 +78,11 @@ export function TerminalLogViewer({
             )}
         >
             {/* Title Bar */}
-            <div className="flex items-center gap-2 bg-surface-tertiary dark:bg-surface-tertiary-dark px-4 py-2 border-b border-border dark:border-border-dark">
+            <div className="flex items-center gap-2 bg-gray-100 dark:bg-white/4 px-4 py-2 border-b border-border dark:border-border-dark">
                 <div className="flex gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-full bg-red-400/60" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-amber-400/60" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/60" />
+                    <span className="h-2 w-2 rounded-full bg-red-400/60" />
+                    <span className="h-2 w-2 rounded-full bg-amber-400/60" />
+                    <span className="h-2 w-2 rounded-full bg-emerald-400/60" />
                 </div>
                 {title && (
                     <span className="text-[10px] font-medium text-text-muted dark:text-text-muted-dark uppercase tracking-wider ml-1">
@@ -92,7 +92,7 @@ export function TerminalLogViewer({
             </div>
 
             {/* Terminal Body */}
-            <div ref={scrollRef} className={cn(maxHeight, 'overflow-y-auto bg-[#0d1117] p-4')}>
+            <div ref={scrollRef} className={cn(maxHeight, 'overflow-y-auto bg-white dark:bg-transparent p-4')}>
                 {logs.map((log, i) => (
                     <LogLine key={i} log={log} />
                 ))}
