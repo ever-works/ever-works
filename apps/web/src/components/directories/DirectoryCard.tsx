@@ -7,7 +7,11 @@ import { Link, usePathname } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import type { Directory } from '@/lib/api/directory';
-import { DirectoryMemberRole, DirectoryScheduleStatus, DirectoryScheduleCadence } from '@/lib/api/enums';
+import {
+    DirectoryMemberRole,
+    DirectoryScheduleStatus,
+    DirectoryScheduleCadence,
+} from '@/lib/api/enums';
 import { Github, Users, FolderClosed, AlertTriangle } from 'lucide-react';
 import { ShowDateTime } from '../ui/show-datetime';
 import { Tooltip } from '../ui/tooltip';
@@ -40,7 +44,9 @@ const formatDate = (date: string, locale: string) => {
 const formatScheduledDate = (date: string, locale: string) => {
     const d = new Date(date);
     const datePart = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(d);
-    const timePart = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(d);
+    const timePart = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(
+        d,
+    );
     return `${datePart}, ${timePart}`;
 };
 
@@ -237,9 +243,9 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                                 ) : (
                                     baseStatusLabel
                                 )}
-                                {statusConfig.labelKey === 'generatedWithWarnings' && !isGenerating && !isOpening && (
-                                    <AlertTriangle className="w-3 h-3" />
-                                )}
+                                {statusConfig.labelKey === 'generatedWithWarnings' &&
+                                    !isGenerating &&
+                                    !isOpening && <AlertTriangle className="w-3 h-3" />}
                             </span>
                         )}
                         {showScheduledBadge && (
