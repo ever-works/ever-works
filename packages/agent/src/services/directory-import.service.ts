@@ -52,6 +52,7 @@ import { slugifyText } from '@src/utils/text.utils';
 import { GenerationMethod } from '@src/items-generator/dto';
 import { DirectoryGenerationHistory } from '@src/entities/directory-generation-history.entity';
 import { GeneratorFormSchemaService } from './generator-form-schema.service';
+import { PluginOperationsService } from '@src/plugins/services/plugin-operations.service';
 
 import { OperationTriggerContext, DEFAULT_TRIGGER_CONTEXT } from './types/trigger-context.types';
 
@@ -71,6 +72,7 @@ export class DirectoryImportService {
         private readonly worksConfigService: WorksConfigService,
         private readonly directoryScheduleService: DirectoryScheduleService,
         private readonly generatorFormSchemaService: GeneratorFormSchemaService,
+        private readonly pluginOperationsService: PluginOperationsService,
         private readonly eventEmitter: EventEmitter2,
         @Optional()
         @Inject(DIRECTORY_IMPORT_DISPATCHER)
@@ -110,6 +112,47 @@ export class DirectoryImportService {
         repoNames.push(websiteRepo);
 
         return Array.from(new Set(repoNames.filter(Boolean)));
+    }
+
+    private getPipelinePluginSettingsFromWorksConfig(
+        worksConfig?: ParsedWorksConfig | null,
+    ): { pluginId: 'codex' | 'claude-code'; settings: Record<string, unknown> } | null {
+        const pipelineId = worksConfig?.providers?.pipeline;
+        const model = worksConfig?.model;
+
+        if (!model) {
+            return null;
+        }
+
+        if (pipelineId === 'codex' || pipelineId === 'claude-code') {
+            return {
+                pluginId: pipelineId,
+                settings: { model },
+            };
+        }
+
+        return null;
+    }
+
+    private async applyWorksConfigPipelineSettings(
+        directoryId: string,
+        userId: string,
+        worksConfig?: ParsedWorksConfig | null,
+    ): Promise<void> {
+        const pipelineSettings = this.getPipelinePluginSettingsFromWorksConfig(worksConfig);
+        if (!pipelineSettings) {
+            return;
+        }
+
+        await this.pluginOperationsService.enablePluginForDirectory(
+            directoryId,
+            pipelineSettings.pluginId,
+            userId,
+            {
+                activeCapability: 'pipeline',
+                settings: pipelineSettings.settings,
+            },
+        );
     }
 
     /**
@@ -275,7 +318,7 @@ export class DirectoryImportService {
                 };
             }
 
-            // Validate AI provider is configured before creating directory
+            // Validate selected providers are configured before creating directory
             if (dto.sourceType === ImportSourceTypeEnum.AWESOME_README) {
                 await this.generatorFormSchemaService.validateSelectedProviders(dto.providers, {
                     userId: user.id,
@@ -298,6 +341,11 @@ export class DirectoryImportService {
                         message: 'works.yml is missing initial_prompt',
                     };
                 }
+
+                await this.generatorFormSchemaService.validateSelectedProviders(
+                    worksConfig.providers,
+                    { userId: user.id },
+                );
             }
 
             if (dto.sourceType !== ImportSourceTypeEnum.LINK_EXISTING) {
@@ -333,6 +381,10 @@ export class DirectoryImportService {
 
             if (dto.sourceType === ImportSourceTypeEnum.LINK_EXISTING) {
                 return this.handleLinkExisting(directory, dto, parsed, user);
+            }
+
+            if (dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG) {
+                await this.applyWorksConfigPipelineSettings(directory.id, user.id, worksConfig);
             }
 
             const updateData: Partial<Directory> = {
@@ -840,6 +892,8 @@ export class DirectoryImportService {
                 user,
             );
         }
+
+        await this.applyWorksConfigPipelineSettings(directory.id, user.id, worksConfig);
 
         return this.importExecutor.importFromWorksConfig({
             directory,
