@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { useTranslations } from 'next-intl';
-import { Save, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Save, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import type { UserPlugin } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';
@@ -19,7 +19,21 @@ interface OnboardingPluginStepProps {
     plugin: UserPlugin;
     connection?: OAuthConnectionInfo | GitProviderConnectionInfo | null;
     deviceAuthStatus?: PluginDeviceAuthStatus | null;
+    isStatusLoading?: boolean;
     returnPath?: string;
+}
+
+function OnboardingStatusLoading() {
+    const t = useTranslations('onboarding.pluginStep');
+
+    return (
+        <div className="rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-4">
+            <div className="flex items-center gap-3 text-sm text-text-muted dark:text-text-muted-dark">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{t('loadingStatus')}</span>
+            </div>
+        </div>
+    );
 }
 
 function FieldBasedPluginStep({
@@ -160,10 +174,17 @@ export function OnboardingPluginStep({
     plugin,
     connection,
     deviceAuthStatus,
+    isStatusLoading = false,
     returnPath,
 }: OnboardingPluginStepProps) {
     const isOAuth = plugin.capabilities.includes('oauth');
     const isGitProvider = plugin.capabilities.includes('git-provider');
+    const needsRemoteStatus =
+        isOAuth || isGitProvider || plugin.capabilities.includes('device-auth');
+
+    if (isStatusLoading && needsRemoteStatus && !connection && !deviceAuthStatus) {
+        return <OnboardingStatusLoading />;
+    }
 
     if (isOAuth && connection !== undefined) {
         return (

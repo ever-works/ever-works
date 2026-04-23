@@ -235,7 +235,8 @@
             "saveButton": "Save settings",
             "savedSuccess": "Settings saved.",
             "noSettings": "No configuration required for this plugin.",
-            "getTokenPrompt": "Create a token first, then paste it below and save to verify the connection."
+            "getTokenPrompt": "Create a token first, then paste it below and save to verify the connection.",
+            "loadingStatus": "Loading connection status..."
         },
         "plugins": {
             "byokDescription": "Connect your own key to unlock the full configuration.",

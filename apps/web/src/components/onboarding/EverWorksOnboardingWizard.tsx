@@ -31,6 +31,7 @@ interface EverWorksOnboardingWizardProps {
     plugins: UserPlugin[];
     connections: Record<string, OAuthConnectionInfo | GitProviderConnectionInfo | null>;
     deviceAuthStatuses: Record<string, PluginDeviceAuthStatus | null>;
+    isStatusLoading?: boolean;
     onStateChange: (state: OnboardingState) => void;
     onClose: () => void;
 }
@@ -66,6 +67,7 @@ export function EverWorksOnboardingWizard({
     plugins,
     connections,
     deviceAuthStatuses,
+    isStatusLoading = false,
     onStateChange,
     onClose,
 }: EverWorksOnboardingWizardProps) {
@@ -294,6 +296,7 @@ export function EverWorksOnboardingWizard({
                                         deviceAuthStatus={
                                             deviceAuthStatuses[currentStep.plugin.pluginId]
                                         }
+                                        isStatusLoading={isStatusLoading}
                                         returnPath={ROUTES.DASHBOARD}
                                     />
                                 </div>

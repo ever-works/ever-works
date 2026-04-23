@@ -11,6 +11,7 @@ import { Footer } from '@/components/footer';
 import { HelpDrawer } from '@/components/dashboard/HelpDrawer';
 import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ChatPanel } from '@/components/ai/ChatPanel';
+import { getOnboardingPluginStatuses } from '@/app/actions/dashboard/onboarding';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { ConnectGithubModal } from '@/components/auth/connect-github-modal';
 import { BackgroundActivityProvider } from '@/lib/hooks/use-background-activity';
@@ -29,8 +30,11 @@ interface DashboardLayoutClientProps {
     hasGithubConnected?: boolean;
     onboardingTotalDirectories: number;
     onboardingPlugins: UserPlugin[];
-    onboardingConnections: Record<string, OAuthConnectionInfo | GitProviderConnectionInfo | null>;
-    onboardingDeviceAuthStatuses: Record<string, PluginDeviceAuthStatus | null>;
+    initialOnboardingConnections: Record<
+        string,
+        OAuthConnectionInfo | GitProviderConnectionInfo | null
+    >;
+    initialOnboardingDeviceAuthStatuses: Record<string, PluginDeviceAuthStatus | null>;
 }
 
 const COOKIE_OPTS = `path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
@@ -43,8 +47,8 @@ export function DashboardLayoutClient({
     hasGithubConnected = false,
     onboardingTotalDirectories,
     onboardingPlugins,
-    onboardingConnections,
-    onboardingDeviceAuthStatuses,
+    initialOnboardingConnections,
+    initialOnboardingDeviceAuthStatuses,
 }: DashboardLayoutClientProps) {
     const DEFAULT_CHAT_WIDTH = 380;
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -56,6 +60,14 @@ export function DashboardLayoutClient({
     const [isChatExpanded, setIsChatExpanded] = useState(false);
     const chatRef = useRef<HTMLDivElement | null>(null);
     const [onboardingState, setOnboardingState] = useOnboardingState();
+    const [onboardingConnections, setOnboardingConnections] = useState(
+        initialOnboardingConnections,
+    );
+    const [onboardingDeviceAuthStatuses, setOnboardingDeviceAuthStatuses] = useState(
+        initialOnboardingDeviceAuthStatuses,
+    );
+    const [isLoadingOnboardingStatuses, setIsLoadingOnboardingStatuses] = useState(false);
+    const [hasRequestedOnboardingStatuses, setHasRequestedOnboardingStatuses] = useState(false);
 
     const prevWidthRef = useRef<number | null>(null);
     const [mainStyle, setMainStyle] = useState<React.CSSProperties | undefined>(undefined);
@@ -69,6 +81,47 @@ export function DashboardLayoutClient({
         onboardingTotalDirectories === 0 &&
         onboardingState.modalDismissed &&
         !onboardingState.headerDismissed;
+
+    const loadOnboardingStatuses = useCallback(async () => {
+        if (onboardingPlugins.length === 0) {
+            setHasRequestedOnboardingStatuses(true);
+            return;
+        }
+
+        setHasRequestedOnboardingStatuses(true);
+        setIsLoadingOnboardingStatuses(true);
+
+        try {
+            const result = await getOnboardingPluginStatuses(
+                onboardingPlugins.map((plugin) => ({
+                    pluginId: plugin.pluginId,
+                    capabilities: plugin.capabilities,
+                })),
+            );
+
+            if (!result.success || !result.data) {
+                return;
+            }
+
+            setOnboardingConnections(result.data.connections);
+            setOnboardingDeviceAuthStatuses(result.data.deviceAuthStatuses);
+        } finally {
+            setIsLoadingOnboardingStatuses(false);
+        }
+    }, [onboardingPlugins]);
+
+    useEffect(() => {
+        if (!isOnboardingOpen || hasRequestedOnboardingStatuses || isLoadingOnboardingStatuses) {
+            return;
+        }
+
+        void loadOnboardingStatuses();
+    }, [
+        hasRequestedOnboardingStatuses,
+        isLoadingOnboardingStatuses,
+        isOnboardingOpen,
+        loadOnboardingStatuses,
+    ]);
 
     const setChatOpen = useCallback((value: boolean, resetOnOpen = true) => {
         setChatOpenRaw(value);
@@ -280,6 +333,7 @@ export function DashboardLayoutClient({
                     plugins={onboardingPlugins}
                     connections={onboardingConnections}
                     deviceAuthStatuses={onboardingDeviceAuthStatuses}
+                    isStatusLoading={isLoadingOnboardingStatuses}
                     onStateChange={setOnboardingState}
                     onClose={closeOnboarding}
                 />
