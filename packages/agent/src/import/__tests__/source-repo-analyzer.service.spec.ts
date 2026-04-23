@@ -4,7 +4,9 @@ describe('SourceRepoAnalyzerService.checkSlugConflicts', () => {
     it('checks only derived repos when explicit repo names are provided', async () => {
         const repositoryExists = jest
             .fn()
-            .mockImplementation(async (_owner: string, repo: string) => repo === 'compare-cloud-pricing-data');
+            .mockImplementation(
+                async (_owner: string, repo: string) => repo === 'compare-cloud-pricing-data',
+            );
 
         const service = new SourceRepoAnalyzerService(
             {
@@ -34,10 +36,15 @@ describe('SourceRepoAnalyzerService.checkSlugConflicts', () => {
 
     it('rewrites explicit derived repo names when suggesting an alternative slug', async () => {
         const checkedRepos: string[] = [];
-        const repositoryExists = jest.fn().mockImplementation(async (_owner: string, repo: string) => {
-            checkedRepos.push(repo);
-            return repo === 'compare-cloud-pricing-data' || repo === 'compare-cloud-pricing-website';
-        });
+        const repositoryExists = jest
+            .fn()
+            .mockImplementation(async (_owner: string, repo: string) => {
+                checkedRepos.push(repo);
+                return (
+                    repo === 'compare-cloud-pricing-data' ||
+                    repo === 'compare-cloud-pricing-website'
+                );
+            });
 
         const service = new SourceRepoAnalyzerService(
             {
