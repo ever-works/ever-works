@@ -97,7 +97,7 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
             aria-busy={isOpening}
             className={cn(
                 'relative flex flex-col rounded-lg p-4 shadow-xs overflow-hidden',
-                'bg-card dark:bg-card-primary-dark',
+                'bg-card dark:bg-card-primary-dark/70',
                 'border border-card-border dark:border-white/9',
                 'hover:border-primary-500/50 dark:hover:border-white/20',
                 'transition-colors',

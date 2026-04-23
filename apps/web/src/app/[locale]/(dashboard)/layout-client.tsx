@@ -354,7 +354,7 @@ export function DashboardLayoutClient({
                         />
 
                         <main
-                            className="flex-1 flex flex-col overflow-y-auto bg-surface dark:bg-surface-dark min-h-0"
+                            className="flex-1 flex flex-col overflow-y-auto bg-white dark:bg-surface-dark min-h-0"
                             id="main-content"
                         >
                             <div className="flex-1 mx-auto w-full px-4 @sm/main:px-6 @3xl/main:px-8 py-6 @3xl/main:py-8 max-w-full @5xl/main:max-w-7xl">
