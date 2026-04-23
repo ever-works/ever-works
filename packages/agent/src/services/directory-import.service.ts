@@ -28,7 +28,12 @@ import {
     GetUserRepositoriesResponseDto,
     GitRepoDto,
 } from '@src/dto/import-directory.dto';
-import { Directory, ImportSourceType, SourceRepository } from '@src/entities/directory.entity';
+import {
+    Directory,
+    ImportSourceType,
+    SourceRepository,
+    type WorksConfigSnapshot,
+} from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
 import { DirectoryGenerationCompletedEvent } from '@src/events';
 import { buildImportStatsUpdate } from '@src/directory-operations';
@@ -71,6 +76,23 @@ export class DirectoryImportService {
         @Inject(DIRECTORY_IMPORT_DISPATCHER)
         private readonly importDispatcher?: DirectoryImportDispatcher,
     ) {}
+
+    private toWorksConfigSnapshot(
+        worksConfig?: ParsedWorksConfig | null,
+    ): WorksConfigSnapshot | undefined {
+        if (!worksConfig) {
+            return undefined;
+        }
+
+        return {
+            name: worksConfig.name,
+            initialPrompt: worksConfig.initialPrompt,
+            model: worksConfig.model,
+            websiteRepo: worksConfig.websiteRepo,
+            scheduleCadence: worksConfig.scheduleCadence ?? null,
+            additionalAgentsCount: worksConfig.additionalAgentsCount,
+        };
+    }
 
     /**
      * Analyze a repository to detect its type and structure
@@ -306,6 +328,7 @@ export class DirectoryImportService {
                     repo: parsed.repo,
                     type: dto.sourceType as ImportSourceType,
                     importedAt: new Date(),
+                    worksConfig: this.toWorksConfigSnapshot(worksConfig),
                     relatedRepositories: worksConfig?.websiteRepositoryTarget
                         ? {
                               website: worksConfig.websiteRepositoryTarget,
@@ -733,12 +756,41 @@ export class DirectoryImportService {
         source: { owner: string; repo: string },
     ): Promise<DirectoryImportResult> {
         const token = await this.getProviderToken(user, directory.gitProvider);
+        const worksConfig = await this.worksConfigService.loadFromRepository(
+            source.owner,
+            source.repo,
+            directory.gitProvider,
+            token,
+        );
+
+        await this.directoryRepository.update(directory.id, {
+            sourceRepository: {
+                ...(directory.sourceRepository || {
+                    url: this.gitFacade.getWebUrl(directory.gitProvider, source.owner, source.repo),
+                    owner: source.owner,
+                    repo: source.repo,
+                    type: ImportSourceTypeEnum.WORKS_CONFIG as ImportSourceType,
+                    importedAt: new Date(),
+                }),
+                owner: source.owner,
+                repo: source.repo,
+                type: ImportSourceTypeEnum.WORKS_CONFIG as ImportSourceType,
+                worksConfig: this.toWorksConfigSnapshot(worksConfig),
+                relatedRepositories: worksConfig?.websiteRepositoryTarget
+                    ? {
+                          ...(directory.sourceRepository?.relatedRepositories || {}),
+                          website: worksConfig.websiteRepositoryTarget,
+                      }
+                    : directory.sourceRepository?.relatedRepositories,
+            },
+        });
 
         return this.importExecutor.importFromWorksConfig({
             directory,
             user,
             source,
             token,
+            worksConfig,
         });
     }
 

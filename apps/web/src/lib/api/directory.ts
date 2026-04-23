@@ -119,6 +119,7 @@ export interface SourceRepository {
     type: ImportSourceType;
     importedAt: string;
     relatedRepositories?: RelatedRepositories;
+    worksConfig?: WorksConfigSnapshot;
 }
 
 export interface RepositoryTarget {
@@ -130,6 +131,15 @@ export interface RelatedRepositories {
     data?: RepositoryTarget;
     directory?: RepositoryTarget;
     website?: RepositoryTarget;
+}
+
+export interface WorksConfigSnapshot {
+    name?: string;
+    initialPrompt?: string;
+    model?: string;
+    websiteRepo?: string;
+    scheduleCadence?: DirectoryScheduleCadence | null;
+    additionalAgentsCount?: number;
 }
 
 export interface RepoVisibility {

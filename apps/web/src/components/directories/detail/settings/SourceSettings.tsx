@@ -10,6 +10,13 @@ import { updateDirectorySchedule } from '@/app/actions/dashboard/directories';
 import { useRouter } from '@/i18n/navigation';
 import { toast } from 'sonner';
 
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+    data_repo: 'Data Repository',
+    awesome_readme: 'Awesome README',
+    link_existing: 'Linked Existing Repositories',
+    works_config: 'works.yml',
+};
+
 export function SourceSettings() {
     const t = useTranslations('dashboard.directoryDetail.settings');
     const { context } = useSettings();
@@ -20,6 +27,67 @@ export function SourceSettings() {
     if (!directory.sourceRepository) {
         return null;
     }
+
+    const sourceRepository = directory.sourceRepository;
+    const worksConfig = sourceRepository.worksConfig;
+    const sourceTypeLabel =
+        SOURCE_TYPE_LABELS[sourceRepository.type] || sourceRepository.type.replace(/_/g, ' ');
+    const fallbackOwner = directory.owner || sourceRepository.owner;
+    const websiteTarget =
+        sourceRepository.relatedRepositories?.website?.owner &&
+        sourceRepository.relatedRepositories?.website?.repo
+            ? `${sourceRepository.relatedRepositories.website.owner}/${sourceRepository.relatedRepositories.website.repo}`
+            : worksConfig?.websiteRepo || null;
+    const appliedWebsiteRepo = sourceRepository.relatedRepositories?.website
+        ? `${sourceRepository.relatedRepositories.website.owner || fallbackOwner}/${sourceRepository.relatedRepositories.website.repo}`
+        : `${fallbackOwner}/${directory.slug}-website`;
+    const appliedSchedule = directory.scheduledUpdatesEnabled
+        ? directory.scheduledCadence || 'enabled'
+        : 'disabled';
+
+    const metadataRows = [
+        { label: 'Source Type', value: sourceTypeLabel },
+        worksConfig?.name ? { label: 'Config Name', value: worksConfig.name } : null,
+        worksConfig?.initialPrompt
+            ? {
+                  label: 'Initial Prompt',
+                  value: worksConfig.initialPrompt,
+                  multiline: true,
+              }
+            : null,
+        worksConfig?.model
+            ? {
+                  label: 'Model',
+                  value: worksConfig.model,
+                  hint: 'Imported from works.yml',
+              }
+            : null,
+        worksConfig?.scheduleCadence
+            ? {
+                  label: 'Schedule',
+                  value: worksConfig.scheduleCadence,
+                  hint: `Applied: ${appliedSchedule}`,
+              }
+            : null,
+        websiteTarget
+            ? {
+                  label: 'Website Repo',
+                  value: websiteTarget,
+                  hint: `Applied: ${appliedWebsiteRepo}`,
+              }
+            : null,
+        typeof worksConfig?.additionalAgentsCount === 'number'
+            ? {
+                  label: 'Additional Agents',
+                  value: String(worksConfig.additionalAgentsCount),
+              }
+            : null,
+    ].filter(Boolean) as Array<{
+        label: string;
+        value: string;
+        hint?: string;
+        multiline?: boolean;
+    }>;
 
     const handleSyncToggle = async (enabled: boolean) => {
         setIsSyncing(true);
@@ -70,6 +138,32 @@ export function SourceSettings() {
                         <ExternalLink className="h-3 w-3" />
                     </a>
                 </div>
+
+                {metadataRows.length > 0 && (
+                    <div className="space-y-3 pt-2">
+                        {metadataRows.map((row) => (
+                            <div key={row.label} className="flex flex-col gap-1">
+                                <span className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                                    {row.label}
+                                </span>
+                                {row.multiline ? (
+                                    <div className="rounded-md bg-surface px-3 py-2 text-sm text-text dark:bg-surface-dark dark:text-text-dark">
+                                        {row.value}
+                                    </div>
+                                ) : (
+                                    <span className="text-sm text-text dark:text-text-dark">
+                                        {row.value}
+                                    </span>
+                                )}
+                                {row.hint && (
+                                    <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                                        {row.hint}
+                                    </span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
 
                 <div className="flex items-center justify-between pt-2">
                     <div>

@@ -296,6 +296,15 @@ export type RelatedRepositories = {
     website?: RepositoryTarget;
 };
 
+export type WorksConfigSnapshot = {
+    name?: string;
+    initialPrompt?: string;
+    model?: string;
+    websiteRepo?: string;
+    scheduleCadence?: DirectoryScheduleCadence | null;
+    additionalAgentsCount?: number;
+};
+
 export interface SourceRepository {
     url: string;
     owner: string;
@@ -303,6 +312,7 @@ export interface SourceRepository {
     type: ImportSourceType;
     importedAt: Date;
     relatedRepositories?: RelatedRepositories;
+    worksConfig?: WorksConfigSnapshot;
 }
 
 export interface RepoVisibility {
