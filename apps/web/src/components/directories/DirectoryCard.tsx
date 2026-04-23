@@ -7,9 +7,8 @@ import { Link, usePathname } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import type { Directory } from '@/lib/api/directory';
-import { DirectoryMemberRole } from '@/lib/api/enums';
-import { DirectoryScheduleStatus } from '@/lib/api/enums';
-import { Github, Users, FolderClosed, Clock, AlertTriangle } from 'lucide-react';
+import { DirectoryMemberRole, DirectoryScheduleStatus, DirectoryScheduleCadence } from '@/lib/api/enums';
+import { Github, Users, FolderClosed, AlertTriangle } from 'lucide-react';
 import { ShowDateTime } from '../ui/show-datetime';
 import { Tooltip } from '../ui/tooltip';
 import { ShinyText } from '../ui/ShinyText';
@@ -20,6 +19,16 @@ interface DirectoryCardProps {
 
 const OPENING_RESET_MS = 8000;
 
+const CADENCE_LABELS: Partial<Record<DirectoryScheduleCadence, string>> = {
+    [DirectoryScheduleCadence.HOURLY]: '1h',
+    [DirectoryScheduleCadence.EVERY_3_HOURS]: '3h',
+    [DirectoryScheduleCadence.EVERY_8_HOURS]: '8h',
+    [DirectoryScheduleCadence.EVERY_12_HOURS]: '12h',
+    [DirectoryScheduleCadence.DAILY]: '1d',
+    [DirectoryScheduleCadence.WEEKLY]: '7d',
+    [DirectoryScheduleCadence.MONTHLY]: '30d',
+};
+
 const formatDate = (date: string, locale: string) => {
     return new Date(date).toLocaleDateString(locale, {
         month: 'short',
@@ -27,6 +36,42 @@ const formatDate = (date: string, locale: string) => {
         year: 'numeric',
     });
 };
+
+const formatScheduledDate = (date: string, locale: string) => {
+    const d = new Date(date);
+    const datePart = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(d);
+    const timePart = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(d);
+    return `${datePart}, ${timePart}`;
+};
+
+function AnimatedClock({ className }: { className?: string }) {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={className}
+            aria-hidden="true"
+        >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="12" x2="12" y2="8" />
+            <line x1="12" y1="12" x2="16" y2="12">
+                <animateTransform
+                    attributeName="transform"
+                    type="rotate"
+                    from="0 12 12"
+                    to="360 12 12"
+                    dur="8s"
+                    repeatCount="indefinite"
+                />
+            </line>
+            <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+        </svg>
+    );
+}
 
 export function DirectoryCard({ directory }: DirectoryCardProps) {
     const t = useTranslations('dashboard.directoryCard');
@@ -42,7 +87,7 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
     const isShared = userRole && userRole !== DirectoryMemberRole.OWNER;
     const isGenerating = statusConfig.labelKey === 'generating' || isOpening;
     const showStatusBadge = !isScheduled || isGenerating || isOpening;
-    const showScheduledBadge = isScheduled && !isOpening;
+    const showScheduledBadge = isScheduled && !isOpening && !isGenerating;
     const baseStatusLabel = isOpening
         ? t('status.opening')
         : statusConfig.labelKey === 'generatedWithWarnings'
@@ -150,9 +195,9 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                 </div>
 
                 <div className="flex-1 mb-4">
-                    <div className="inline-flex items-center gap-1 mt-0.5 mb-3 bg-primary-400/10 dark:bg-white/10 self-start max-w-full px-1.5 rounded-full">
+                    <div className="inline-flex items-center gap-1 mt-0.5 mb-3 bg-primary-400/10 dark:bg-white/10 self-start max-w-full px-1.5 py-0.5 rounded-full">
                         <Github className="w-3 h-3 shrink-0 text-gray-600 dark:text-gray-200" />
-                        <span className="text-sm font-mono text-gray-600 dark:text-gray-200 truncate">
+                        <span className="text-xs text-gray-600 dark:text-gray-200 truncate">
                             {directory.owner && (
                                 <span className="text-gray-400 dark:text-gray-400">
                                     {directory.owner}/
@@ -192,7 +237,7 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                                 ) : (
                                     baseStatusLabel
                                 )}
-                                {hasWarnings && !isGenerating && !isOpening && (
+                                {statusConfig.labelKey === 'generatedWithWarnings' && !isGenerating && !isOpening && (
                                     <AlertTriangle className="w-3 h-3" />
                                 )}
                             </span>
@@ -206,7 +251,7 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                             >
                                 {hasWarnings && <AlertTriangle className="w-3 h-3" />}
                                 {baseStatusLabel}
-                                <Clock className="w-3 h-3" />
+                                <AnimatedClock className="w-3 h-3" />
                             </span>
                         )}
                         {isShared && (
@@ -223,14 +268,27 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                             </Tooltip>
                         )}
                     </div>
-                    {directory.updatedAt && (
+                    {isScheduled && directory.scheduledNextRunAt ? (
+                        <span className="flex items-center gap-1.5 text-[11px] text-text-muted dark:text-text-muted-dark">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-blue-700 dark:text-blue-300 shrink-0">
+                                <AnimatedClock className="w-3 h-3" />
+                                {directory.scheduledCadence
+                                    ? (CADENCE_LABELS[directory.scheduledCadence] ?? '')
+                                    : ''}
+                            </span>
+                            <ShowDateTime
+                                value={directory.scheduledNextRunAt}
+                                customFormatter={formatScheduledDate}
+                            />
+                        </span>
+                    ) : directory.updatedAt ? (
                         <span className="text-[11px] text-text-muted dark:text-text-muted-dark">
                             <ShowDateTime
                                 value={directory.updatedAt}
                                 customFormatter={formatDate}
                             />
                         </span>
-                    )}
+                    ) : null}
                 </div>
             </div>
         </Link>
