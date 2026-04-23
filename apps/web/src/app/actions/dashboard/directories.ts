@@ -570,7 +570,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
 
     const importSchema = z.object({
         sourceUrl: z.string().url(t('import.invalidUrl')),
-        sourceType: z.enum(['data_repo', 'awesome_readme', 'link_existing']),
+        sourceType: z.enum(['data_repo', 'awesome_readme', 'link_existing', 'works_config']),
         name: z
             .string()
             .min(1, t('name.required'))

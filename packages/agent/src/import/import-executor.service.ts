@@ -11,6 +11,8 @@ import { User } from '@src/entities/user.entity';
 import { DirectoryImportResult, DirectoryImportErrorCode } from '@src/tasks/directory-import.types';
 import { GIT_TOKEN_NOT_AVAILABLE } from '@src/constants/messages';
 import type { ProvidersDto } from '@ever-works/contracts/api';
+import { CreateItemsGeneratorDto } from '@src/items-generator/dto';
+import { WorksConfigService, type ParsedWorksConfig } from './works-config.service';
 
 export interface ExecuteBySourceTypeOptions {
     directory: Directory;
@@ -23,6 +25,7 @@ export interface ExecuteBySourceTypeOptions {
     createMissingRepos?: boolean;
     expansionFactor?: number;
     providers?: ProvidersDto;
+    worksConfig?: ParsedWorksConfig | null;
 }
 
 export interface ImportFromDataRepoOptions {
@@ -49,6 +52,15 @@ export interface LinkExistingDataRepoOptions {
     createMissingRepos?: boolean;
 }
 
+export interface ImportFromWorksConfigOptions {
+    directory: Directory;
+    user: User;
+    source: { owner: string; repo: string };
+    token?: string;
+    providers?: ProvidersDto;
+    worksConfig?: ParsedWorksConfig | null;
+}
+
 @Injectable()
 export class ImportExecutorService {
     private readonly logger = new Logger(ImportExecutorService.name);
@@ -59,6 +71,7 @@ export class ImportExecutorService {
         private readonly markdownGenerator: MarkdownGeneratorService,
         private readonly websiteGenerator: WebsiteGeneratorService,
         private readonly sourceRepoAnalyzer: SourceRepoAnalyzerService,
+        private readonly worksConfigService: WorksConfigService,
     ) {}
 
     async importFromDataRepo(options: ImportFromDataRepoOptions): Promise<DirectoryImportResult> {
@@ -283,6 +296,73 @@ export class ImportExecutorService {
         }
     }
 
+    async importFromWorksConfig(
+        options: ImportFromWorksConfigOptions,
+    ): Promise<DirectoryImportResult> {
+        const { directory, user, source, token, providers, worksConfig } = options;
+
+        try {
+            const resolvedWorksConfig =
+                worksConfig ??
+                (await this.worksConfigService.loadFromRepository(
+                    source.owner,
+                    source.repo,
+                    directory.gitProvider,
+                    token,
+                ));
+
+            if (!resolvedWorksConfig?.initialPrompt) {
+                return {
+                    success: false,
+                    directoryId: directory.id,
+                    error: 'works.yml is missing initial_prompt',
+                    errorCode: DirectoryImportErrorCode.PARSE_FAILED,
+                };
+            }
+
+            const generationDto: CreateItemsGeneratorDto = {
+                name: directory.name,
+                prompt: resolvedWorksConfig.initialPrompt,
+                providers: {
+                    ...(resolvedWorksConfig.providers ?? {}),
+                    ...(providers ?? {}),
+                },
+                pluginConfig: {},
+            };
+
+            if (!generationDto.providers || Object.keys(generationDto.providers).length === 0) {
+                delete generationDto.providers;
+            }
+
+            const genResult = await this.dataGenerator.initialize(directory, user, generationDto);
+
+            if (genResult.success !== false) {
+                await this.markdownGenerator.initialize(directory, user);
+                await this.websiteGenerator.initialize(directory, user);
+            }
+
+            return {
+                success: genResult.success !== false,
+                directoryId: directory.id,
+                itemsImported: genResult.success ? genResult.stats.totalItemsCount : 0,
+                stats: genResult.success ? genResult.stats : undefined,
+                error: genResult.success === false ? genResult.error.message : undefined,
+                errorCode:
+                    genResult.success === false
+                        ? DirectoryImportErrorCode.GENERATION_FAILED
+                        : undefined,
+            };
+        } catch (error) {
+            this.logger.error('Failed to import from works config', error);
+            return {
+                success: false,
+                directoryId: directory.id,
+                error: (error as Error).message,
+                errorCode: DirectoryImportErrorCode.GENERATION_FAILED,
+            };
+        }
+    }
+
     async executeBySourceType(opts: ExecuteBySourceTypeOptions): Promise<DirectoryImportResult> {
         const { directory, user, sourceType, token } = opts;
 
@@ -318,6 +398,15 @@ export class ImportExecutorService {
                     createMissingRepos: opts.createMissingRepos ?? false,
                 });
             }
+            case 'works_config':
+                return this.importFromWorksConfig({
+                    directory,
+                    user,
+                    source: { owner: opts.sourceOwner, repo: opts.sourceRepo },
+                    token,
+                    providers: opts.providers,
+                    worksConfig: opts.worksConfig,
+                });
             default:
                 throw new Error(`Unsupported source type: ${sourceType}`);
         }

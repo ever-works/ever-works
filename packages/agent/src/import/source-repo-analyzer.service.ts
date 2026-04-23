@@ -6,6 +6,7 @@ import {
     AnalyzeForLinkingResponseDto,
     RelatedRepoStatus,
 } from '@src/dto/import-directory.dto';
+import { WorksConfigService } from './works-config.service';
 
 interface ParsedRepoUrl {
     owner: string;
@@ -37,7 +38,10 @@ const GIT_PROVIDER_PATTERNS: Array<{
 export class SourceRepoAnalyzerService {
     private readonly logger = new Logger(SourceRepoAnalyzerService.name);
 
-    constructor(private readonly gitFacade: GitFacadeService) {}
+    constructor(
+        private readonly gitFacade: GitFacadeService,
+        private readonly worksConfigService: WorksConfigService,
+    ) {}
 
     /**
      * Parse a git repository URL into owner and repo components.
@@ -207,6 +211,17 @@ export class SourceRepoAnalyzerService {
                 structure: detectionResult.structure,
             };
 
+            if (detectionResult.worksConfig) {
+                response.worksConfig = {
+                    name: detectionResult.worksConfig.name,
+                    initialPrompt: detectionResult.worksConfig.initialPrompt,
+                    model: detectionResult.worksConfig.model,
+                    websiteRepo: detectionResult.worksConfig.websiteRepo,
+                    scheduleCadence: detectionResult.worksConfig.scheduleCadence ?? null,
+                    additionalAgentsCount: detectionResult.worksConfig.additionalAgentsCount,
+                };
+            }
+
             if (detectionResult.type === 'data_repo') {
                 response.hasDataRepoWriteAccess = repoInfo.permissions?.push ?? true;
             } else {
@@ -245,13 +260,18 @@ export class SourceRepoAnalyzerService {
             hasConfig: boolean;
             hasDataFolder: boolean;
             hasReadme: boolean;
+            hasWorksConfig?: boolean;
             itemCount?: number;
             categoryCount?: number;
         };
+        worksConfig?: ReturnType<WorksConfigService['parse']>;
     }> {
         const hasConfig =
             contents.some((c) => c.name === 'config.yml' && c.type === 'file') ||
             contents.some((c) => c.name === 'config.yaml' && c.type === 'file');
+        const hasWorksConfig =
+            contents.some((c) => c.name === 'works.yml' && c.type === 'file') ||
+            contents.some((c) => c.name === 'works.yaml' && c.type === 'file');
 
         const hasDataFolder = contents.some((c) => c.name === 'data' && c.type === 'dir');
 
@@ -263,10 +283,27 @@ export class SourceRepoAnalyzerService {
             hasConfig,
             hasDataFolder,
             hasReadme,
+            hasWorksConfig,
             isMultiFile: false,
             itemCount: undefined as number | undefined,
             categoryCount: undefined as number | undefined,
         };
+
+        if (hasWorksConfig) {
+            try {
+                const worksConfig = await this.worksConfigService.loadFromRepository(
+                    owner,
+                    repo,
+                    provider,
+                    token,
+                );
+
+                return { type: 'works_config', structure, worksConfig: worksConfig ?? undefined };
+            } catch (err) {
+                this.logger.warn(`Failed to parse works.yml for ${owner}/${repo}`, err);
+                return { type: 'works_config', structure };
+            }
+        }
 
         if (hasConfig && hasDataFolder) {
             try {

@@ -16,6 +16,7 @@ import { WebsiteGeneratorService } from '@src/generators/website-generator/websi
 import { GitFacadeService } from '@src/facades/git.facade';
 import { SourceRepoAnalyzerService } from '@src/import/source-repo-analyzer.service';
 import { ImportExecutorService } from '@src/import/import-executor.service';
+import { WorksConfigService, type ParsedWorksConfig } from '@src/import/works-config.service';
 import {
     AnalyzeRepositoryDto,
     AnalyzeRepositoryResponseDto,
@@ -62,6 +63,7 @@ export class DirectoryImportService {
         private readonly gitFacade: GitFacadeService,
         private readonly sourceRepoAnalyzer: SourceRepoAnalyzerService,
         private readonly importExecutor: ImportExecutorService,
+        private readonly worksConfigService: WorksConfigService,
         private readonly directoryScheduleService: DirectoryScheduleService,
         private readonly generatorFormSchemaService: GeneratorFormSchemaService,
         private readonly eventEmitter: EventEmitter2,
@@ -241,6 +243,24 @@ export class DirectoryImportService {
                 );
             }
 
+            let worksConfig: ParsedWorksConfig | null = null;
+            if (dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG) {
+                const token = await this.getProviderToken(user, dto.gitProvider);
+                worksConfig = await this.worksConfigService.loadFromRepository(
+                    parsed.owner,
+                    parsed.repo,
+                    dto.gitProvider,
+                    token,
+                );
+
+                if (!worksConfig?.initialPrompt) {
+                    return {
+                        status: 'error',
+                        message: 'works.yml is missing initial_prompt',
+                    };
+                }
+            }
+
             // For link_existing, the owner must be the source repo's owner
             // since the repos already exist under that account
             const directoryOwner =
@@ -279,6 +299,14 @@ export class DirectoryImportService {
                     type: dto.sourceType as ImportSourceType,
                     importedAt: new Date(),
                 };
+            } else if (dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG) {
+                updateData.sourceRepository = {
+                    url: dto.sourceUrl,
+                    owner: parsed.owner,
+                    repo: parsed.repo,
+                    type: dto.sourceType as ImportSourceType,
+                    importedAt: new Date(),
+                };
             }
 
             await this.directoryRepository.update(directory.id, updateData);
@@ -300,7 +328,15 @@ export class DirectoryImportService {
             });
 
             // Dispatch to Trigger.dev or run in-process with fallback
-            await this.dispatchImportTask(directory, user, dto, parsed, history, context);
+            await this.dispatchImportTask(
+                directory,
+                user,
+                dto,
+                parsed,
+                history,
+                context,
+                worksConfig,
+            );
 
             // Enable sync schedule only for awesome_readme imports
             if (dto.sync !== false && dto.sourceType === ImportSourceTypeEnum.AWESOME_README) {
@@ -349,6 +385,7 @@ export class DirectoryImportService {
         parsed: { owner: string; repo: string },
         history: DirectoryGenerationHistory,
         context: OperationTriggerContext,
+        worksConfig?: ParsedWorksConfig | null,
     ): Promise<void> {
         await Promise.all([
             this.directoryRepository.recordGenerationStartTime(directory.id, new Date()),
@@ -376,6 +413,7 @@ export class DirectoryImportService {
             },
             providers: dto.providers,
             enrichmentConfig: dto.enrichmentConfig,
+            worksConfig: worksConfig ?? null,
         };
 
         const dispatchedId = this.importDispatcher
@@ -396,9 +434,9 @@ export class DirectoryImportService {
         // If triggered by schedule, await to prevent concurrency explosion
         // For user/api triggers, fire-and-forget
         if (context.triggeredBy === 'schedule') {
-            await this.processImport(directory, user, dto, parsed, history);
+            await this.processImport(directory, user, dto, parsed, history, worksConfig);
         } else {
-            void this.processImport(directory, user, dto, parsed, history);
+            void this.processImport(directory, user, dto, parsed, history, worksConfig);
         }
     }
 
@@ -411,6 +449,7 @@ export class DirectoryImportService {
         dto: ImportDirectoryDto,
         parsed: { owner: string; repo: string },
         history: DirectoryGenerationHistory,
+        worksConfig?: ParsedWorksConfig | null,
     ): Promise<void> {
         const startTime = new Date();
 
@@ -442,6 +481,7 @@ export class DirectoryImportService {
                 createMissingRepos: dto.createMissingRepos,
                 expansionFactor: dto.enrichmentConfig?.expansionFactor,
                 providers: dto.providers,
+                worksConfig,
             });
 
             if (!result.success) {
@@ -466,6 +506,25 @@ export class DirectoryImportService {
                 durationInSeconds: calculateDurationSeconds(startTime, endTime),
                 ...buildImportStatsUpdate(result),
             });
+
+            if (
+                dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG &&
+                worksConfig?.scheduleCadence
+            ) {
+                await this.directoryScheduleService.updateSchedule(
+                    directory.id,
+                    {
+                        enable: true,
+                        cadence: worksConfig.scheduleCadence,
+                        alwaysCreatePullRequest: true,
+                        providerOverrides:
+                            worksConfig.providers && Object.keys(worksConfig.providers).length > 0
+                                ? worksConfig.providers
+                                : null,
+                    },
+                    user,
+                );
+            }
 
             this.eventEmitter.emit(
                 DirectoryGenerationCompletedEvent.EVENT_NAME,
@@ -530,6 +589,11 @@ export class DirectoryImportService {
                 });
             } else if (sourceRepo.type === ImportSourceTypeEnum.AWESOME_README) {
                 result = await this.syncFromAwesomeReadme(directory, user, sourceRepo.url);
+            } else if (sourceRepo.type === ImportSourceTypeEnum.WORKS_CONFIG) {
+                result = await this.syncFromWorksConfig(directory, user, {
+                    owner: sourceRepo.owner,
+                    repo: sourceRepo.repo,
+                });
             } else {
                 // For LINK_EXISTING or others, we assume it's up to date via direct git operations
                 return {
@@ -655,6 +719,21 @@ export class DirectoryImportService {
             user,
             sourceUrl,
             updateWithPullRequest: true,
+        });
+    }
+
+    private async syncFromWorksConfig(
+        directory: Directory,
+        user: User,
+        source: { owner: string; repo: string },
+    ): Promise<DirectoryImportResult> {
+        const token = await this.getProviderToken(user, directory.gitProvider);
+
+        return this.importExecutor.importFromWorksConfig({
+            directory,
+            user,
+            source,
+            token,
         });
     }
 

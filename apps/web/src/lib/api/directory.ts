@@ -342,7 +342,7 @@ export interface SyncDirectoryResponse {
 }
 
 // Import types
-export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing';
+export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing' | 'works_config';
 
 export interface ImportEnrichmentConfig {
     expansionFactor?: number;
@@ -364,8 +364,17 @@ export interface AnalyzeRepositoryResponseDto {
         hasConfig: boolean;
         hasDataFolder: boolean;
         hasReadme: boolean;
+        hasWorksConfig?: boolean;
         itemCount?: number;
         categoryCount?: number;
+    };
+    worksConfig?: {
+        name?: string;
+        initialPrompt?: string;
+        model?: string;
+        websiteRepo?: string;
+        scheduleCadence?: string | null;
+        additionalAgentsCount?: number;
     };
     relatedDataRepo?: { name: string; owner: string };
     baseSlug?: string;

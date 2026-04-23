@@ -37,16 +37,25 @@ interface AnalysisResult {
     sourceUrl: string;
     owner: string;
     repo: string;
-    detectedType: 'data_repo' | 'awesome_readme' | 'link_existing' | null;
+    detectedType: 'data_repo' | 'awesome_readme' | 'link_existing' | 'works_config' | null;
     isPublic: boolean;
     requiresAuth: boolean;
     structure?: {
         hasConfig: boolean;
         hasDataFolder: boolean;
         hasReadme: boolean;
+        hasWorksConfig?: boolean;
         isMultiFile?: boolean;
         itemCount?: number;
         categoryCount?: number;
+    };
+    worksConfig?: {
+        name?: string;
+        initialPrompt?: string;
+        model?: string;
+        websiteRepo?: string;
+        scheduleCadence?: string | null;
+        additionalAgentsCount?: number;
     };
     relatedDataRepo?: { name: string; owner: string };
     baseSlug?: string;
@@ -103,7 +112,10 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                     setStep('source');
                 } else {
                     if (result.data.repo) {
-                        let repoName = result.data.baseSlug || result.data.repo;
+                        let repoName =
+                            result.data.worksConfig?.name ||
+                            result.data.baseSlug ||
+                            result.data.repo;
                         if (repoName.endsWith('-data')) {
                             repoName = repoName.slice(0, -5);
                         } else if (repoName.endsWith('-website')) {

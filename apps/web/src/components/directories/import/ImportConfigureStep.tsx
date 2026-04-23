@@ -16,7 +16,7 @@ import type { GeneratorFormSchema } from '@/lib/api/types-only';
 import type { ImportEnrichmentConfig } from '@/lib/api/directory';
 import { Upload, CheckCircle2, FileText, Database, ArrowLeft, Sparkles } from 'lucide-react';
 
-type DetectedType = 'data_repo' | 'awesome_readme' | 'link_existing' | null;
+type DetectedType = 'data_repo' | 'awesome_readme' | 'link_existing' | 'works_config' | null;
 
 interface AnalysisResult {
     sourceUrl: string;
@@ -29,9 +29,18 @@ interface AnalysisResult {
         hasConfig: boolean;
         hasDataFolder: boolean;
         hasReadme: boolean;
+        hasWorksConfig?: boolean;
         isMultiFile?: boolean;
         itemCount?: number;
         categoryCount?: number;
+    };
+    worksConfig?: {
+        name?: string;
+        initialPrompt?: string;
+        model?: string;
+        websiteRepo?: string;
+        scheduleCadence?: string | null;
+        additionalAgentsCount?: number;
     };
     slugConflict?: {
         hasConflict: boolean;
@@ -187,7 +196,9 @@ export function ImportConfigureStep({
                                 <h4 className="font-medium text-text dark:text-text-dark">
                                     {analysisResult.detectedType === 'data_repo'
                                         ? t('detectedType.dataRepo')
-                                        : t('detectedType.awesomeReadme')}
+                                        : analysisResult.detectedType === 'works_config'
+                                          ? 'Works config repository'
+                                          : t('detectedType.awesomeReadme')}
                                 </h4>
                                 <span
                                     className={cn(
@@ -197,12 +208,19 @@ export function ImportConfigureStep({
                                 >
                                     {analysisResult.detectedType === 'data_repo'
                                         ? t('badges.dataRepo')
-                                        : t('badges.awesomeReadme')}
+                                        : analysisResult.detectedType === 'works_config'
+                                          ? 'works.yml'
+                                          : t('badges.awesomeReadme')}
                                 </span>
                             </div>
                             <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                                 {analysisResult.owner}/{analysisResult.repo}
                             </p>
+                            {analysisResult.worksConfig?.initialPrompt && (
+                                <p className="mt-2 text-sm text-text-secondary dark:text-text-secondary-dark line-clamp-2">
+                                    {analysisResult.worksConfig.initialPrompt}
+                                </p>
+                            )}
                             {analysisResult.structure && (
                                 <div className="mt-2 flex gap-4 text-xs text-text-muted dark:text-text-muted-dark">
                                     {analysisResult.structure.itemCount !== undefined && (
@@ -215,6 +233,11 @@ export function ImportConfigureStep({
                                         <span>
                                             {analysisResult.structure.categoryCount}{' '}
                                             {t('preview.categories')}
+                                        </span>
+                                    )}
+                                    {analysisResult.worksConfig?.scheduleCadence && (
+                                        <span>
+                                            Schedule: {analysisResult.worksConfig.scheduleCadence}
                                         </span>
                                     )}
                                 </div>

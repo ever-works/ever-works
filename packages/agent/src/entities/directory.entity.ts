@@ -274,7 +274,7 @@ export interface MarkdownReadmeConfig {
     overwriteDefaultFooter?: boolean;
 }
 
-export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing';
+export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing' | 'works_config';
 
 export interface SourceRepository {
     url: string;

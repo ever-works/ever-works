@@ -20,6 +20,7 @@ export enum ImportSourceTypeEnum {
     DATA_REPO = 'data_repo',
     AWESOME_README = 'awesome_readme',
     LINK_EXISTING = 'link_existing',
+    WORKS_CONFIG = 'works_config',
 }
 
 export class ImportEnrichmentConfigDto {
@@ -49,9 +50,18 @@ export class AnalyzeRepositoryResponseDto {
         hasConfig: boolean;
         hasDataFolder: boolean;
         hasReadme: boolean;
+        hasWorksConfig?: boolean;
         isMultiFile?: boolean;
         itemCount?: number;
         categoryCount?: number;
+    };
+    worksConfig?: {
+        name?: string;
+        initialPrompt?: string;
+        model?: string;
+        websiteRepo?: string;
+        scheduleCadence?: string | null;
+        additionalAgentsCount?: number;
     };
     relatedDataRepo?: { name: string; owner: string };
     baseSlug?: string;
