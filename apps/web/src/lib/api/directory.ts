@@ -118,6 +118,18 @@ export interface SourceRepository {
     repo: string;
     type: ImportSourceType;
     importedAt: string;
+    relatedRepositories?: RelatedRepositories;
+}
+
+export interface RepositoryTarget {
+    owner?: string;
+    repo: string;
+}
+
+export interface RelatedRepositories {
+    data?: RepositoryTarget;
+    directory?: RepositoryTarget;
+    website?: RepositoryTarget;
 }
 
 export interface RepoVisibility {

@@ -199,19 +199,28 @@ export class Directory {
     updatedAt: Date;
 
     getDataRepo() {
-        return `${this.slug}-data`;
+        return this.sourceRepository?.relatedRepositories?.data?.repo || `${this.slug}-data`;
     }
 
     getWebsiteRepo() {
-        return `${this.slug}-website`;
+        return this.sourceRepository?.relatedRepositories?.website?.repo || `${this.slug}-website`;
     }
 
     getMainRepo() {
-        return this.slug;
+        return this.sourceRepository?.relatedRepositories?.directory?.repo || this.slug;
     }
 
-    getRepoOwner(): string {
-        return this.owner || this.user?.username || '';
+    getRepoOwner(type?: 'data' | 'directory' | 'website'): string {
+        const relatedOwner =
+            type === 'data'
+                ? this.sourceRepository?.relatedRepositories?.data?.owner
+                : type === 'website'
+                  ? this.sourceRepository?.relatedRepositories?.website?.owner
+                  : type === 'directory'
+                    ? this.sourceRepository?.relatedRepositories?.directory?.owner
+                    : undefined;
+
+        return relatedOwner || this.owner || this.user?.username || '';
     }
 
     /**
@@ -276,12 +285,24 @@ export interface MarkdownReadmeConfig {
 
 export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing' | 'works_config';
 
+export type RepositoryTarget = {
+    owner?: string;
+    repo: string;
+};
+
+export type RelatedRepositories = {
+    data?: RepositoryTarget;
+    directory?: RepositoryTarget;
+    website?: RepositoryTarget;
+};
+
 export interface SourceRepository {
     url: string;
     owner: string;
     repo: string;
     type: ImportSourceType;
     importedAt: Date;
+    relatedRepositories?: RelatedRepositories;
 }
 
 export interface RepoVisibility {

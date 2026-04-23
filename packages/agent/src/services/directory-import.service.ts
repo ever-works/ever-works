@@ -306,6 +306,11 @@ export class DirectoryImportService {
                     repo: parsed.repo,
                     type: dto.sourceType as ImportSourceType,
                     importedAt: new Date(),
+                    relatedRepositories: worksConfig?.websiteRepositoryTarget
+                        ? {
+                              website: worksConfig.websiteRepositoryTarget,
+                          }
+                        : undefined,
                 };
             }
 

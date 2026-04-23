@@ -24,8 +24,6 @@ export class RepositoryManagementService {
     ) {}
 
     async getRepositoriesStatus(directory: Directory, user: User): Promise<RepositoryStatus[]> {
-        const owner = directory.getRepoOwner();
-
         const repos: { type: RepositoryType; name: string }[] = [
             { type: 'data', name: directory.getDataRepo() },
             { type: 'directory', name: directory.getMainRepo() },
@@ -34,6 +32,7 @@ export class RepositoryManagementService {
 
         const results = await Promise.all(
             repos.map(async (repo) => {
+                const owner = directory.getRepoOwner(repo.type);
                 try {
                     const data = await this.gitFacade.getRepository(owner, repo.name, {
                         userId: user.id,
@@ -90,7 +89,7 @@ export class RepositoryManagementService {
         repoType: RepositoryType,
         isPrivate: boolean,
     ): Promise<RepositoryStatus> {
-        const owner = directory.getRepoOwner();
+        const owner = directory.getRepoOwner(repoType);
         let repoName: string;
 
         switch (repoType) {

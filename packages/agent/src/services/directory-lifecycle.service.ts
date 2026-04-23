@@ -252,7 +252,7 @@ export class DirectoryLifecycleService {
                 try {
                     await this.websiteGenerator.removeRepository(directory, user);
                     deletedRepositories.push(
-                        `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
+                        `${directory.getRepoOwner('website')}/${directory.getWebsiteRepo()}`,
                     );
                 } catch (error) {
                     if (error instanceof HttpException) {

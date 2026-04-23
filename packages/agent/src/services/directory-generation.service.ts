@@ -922,12 +922,14 @@ Only include image URLs that are absolute URLs (starting with http).`;
             const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
 
             const result = await this.websiteUpdateService.updateRepository(directory, user);
+            const websiteOwner = directory.getRepoOwner('website');
+            const websiteRepo = directory.getWebsiteRepo();
 
             return {
                 status: 'success',
                 slug: directory.slug,
-                owner: directory.getRepoOwner(),
-                repository: `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
+                owner: websiteOwner,
+                repository: `${websiteOwner}/${websiteRepo}`,
                 message: result.message,
                 method_used: result.method,
             };

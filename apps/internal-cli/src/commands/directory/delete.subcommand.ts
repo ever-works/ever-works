@@ -66,7 +66,7 @@ export class DeleteSubCommand extends CommandRunner {
             }
             if (deleteOptions.delete_website_repository) {
                 repositoriesToDelete.push(
-                    `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
+                    `${directory.getRepoOwner('website')}/${directory.getWebsiteRepo()}`,
                 );
             }
 

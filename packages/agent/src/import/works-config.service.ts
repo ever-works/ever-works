@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DirectoryScheduleCadence, type ProvidersDto } from '@ever-works/contracts/api';
 import * as yaml from 'yaml';
 import { GitFacadeService } from '@src/facades/git.facade';
+import type { RepositoryTarget } from '@src/entities/directory.entity';
 
 const WORKS_CONFIG_FILENAMES = ['works.yml', 'works.yaml'] as const;
 
@@ -16,6 +17,7 @@ export interface WorksConfigSummary {
 
 export interface ParsedWorksConfig extends WorksConfigSummary {
     providers?: ProvidersDto;
+    websiteRepositoryTarget?: RepositoryTarget;
     raw: Record<string, unknown>;
 }
 
@@ -78,6 +80,35 @@ export class WorksConfigService {
             scheduleCadence: this.readScheduleCadence(raw),
             additionalAgentsCount: Array.isArray(raw.agents) ? raw.agents.length : 0,
             providers: this.readProviders(raw),
+            websiteRepositoryTarget: this.parseRepositoryReference(
+                this.readString(raw, [
+                    'website_repo',
+                    'websiteRepo',
+                    'website_repository',
+                    'websiteRepository',
+                ]),
+            ),
+        };
+    }
+
+    parseRepositoryReference(value?: string): RepositoryTarget | undefined {
+        if (!value) {
+            return undefined;
+        }
+
+        const trimmed = value
+            .trim()
+            .replace(/\.git$/, '')
+            .replace(/\/$/, '');
+        const slashIndex = trimmed.lastIndexOf('/');
+
+        if (slashIndex <= 0 || slashIndex === trimmed.length - 1) {
+            return { repo: trimmed };
+        }
+
+        return {
+            owner: trimmed.slice(0, slashIndex),
+            repo: trimmed.slice(slashIndex + 1),
         };
     }
 
