@@ -213,7 +213,7 @@ export class DirectoryImportService {
         const token = await this.getProviderToken(user, providerId);
         const result = await this.sourceRepoAnalyzer.analyzeRepository(dto.sourceUrl, token);
 
-        if (!result.error && result.repo && token) {
+        if (!result.error && result.repo && token && result.detectedType) {
             const repoOwner = result.owner || user.username;
             const baseSlug = result.baseSlug || result.repo;
             const slug = slugifyText(

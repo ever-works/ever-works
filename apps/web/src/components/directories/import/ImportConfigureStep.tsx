@@ -115,6 +115,17 @@ export function ImportConfigureStep({
 
     const effectiveSourceType = analysisResult?.detectedType || manualSourceType;
     const isAwesomeReadme = effectiveSourceType === 'awesome_readme';
+    const isMissingSupportedConfig =
+        !!analysisResult &&
+        !analysisResult.detectedType &&
+        !analysisResult.structure?.hasConfig &&
+        !analysisResult.structure?.hasWorksConfig &&
+        !analysisResult.structure?.hasReadme &&
+        !analysisResult.structure?.hasDataFolder;
+
+    const detectionMessage = isMissingSupportedConfig
+        ? t('detectionFailedMissingConfig')
+        : t('detectionFailed');
 
     // Load form schema when pipeline changes (same pattern as DirectoryAICreator)
     useEffect(() => {
@@ -268,7 +279,7 @@ export function ImportConfigureStep({
                 <div className="space-y-4">
                     <div className="p-4 rounded-lg bg-info/5 border border-info/20">
                         <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                            {t('detectionFailed')}
+                            {detectionMessage}
                         </p>
                         <p className="text-sm text-text-muted dark:text-text-muted-dark mt-1">
                             {analysisResult.owner}/{analysisResult.repo}

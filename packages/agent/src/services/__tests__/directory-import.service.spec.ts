@@ -83,4 +83,59 @@ describe('DirectoryImportService.analyzeRepository', () => {
         );
         expect(result.slugConflict).toBeUndefined();
     });
+
+    it('does not run slug conflict checks when repository format is not detected', async () => {
+        const sourceRepoAnalyzer = {
+            analyzeRepository: jest.fn().mockResolvedValue({
+                sourceUrl: 'https://github.com/Ntermast/Compare-Cloud-Pricing',
+                owner: 'Ntermast',
+                repo: 'Compare-Cloud-Pricing',
+                detectedType: null,
+                isPublic: true,
+                requiresAuth: false,
+                structure: {
+                    hasConfig: false,
+                    hasDataFolder: false,
+                    hasReadme: false,
+                    hasWorksConfig: false,
+                },
+            }),
+            parseGitUrl: jest.fn(),
+            checkSlugConflicts: jest.fn(),
+        };
+
+        const service = new DirectoryImportService(
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {
+                getAccessToken: jest.fn().mockResolvedValue('token'),
+            } as any,
+            sourceRepoAnalyzer as any,
+            {} as any,
+            {
+                parseRepositoryReference: jest.fn(),
+            } as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+        );
+
+        const result = await service.analyzeRepository(
+            {
+                sourceUrl: 'https://github.com/Ntermast/Compare-Cloud-Pricing',
+                gitProvider: 'github',
+            },
+            {
+                id: 'user-1',
+                username: 'Ntermast',
+            } as any,
+        );
+
+        expect(sourceRepoAnalyzer.checkSlugConflicts).not.toHaveBeenCalled();
+        expect(result.slugConflict).toBeUndefined();
+    });
 });
