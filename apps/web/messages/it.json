@@ -1061,6 +1061,7 @@
                     "plans": {
                         "free": "Gratuito",
                         "standard": "Standard",
+                        "pro": "Pro",
                         "premium": "Premium",
                         "unmetered": "Senza limiti"
                     },

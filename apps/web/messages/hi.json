@@ -1061,6 +1061,7 @@
                     "plans": {
                         "free": "मुफ्त",
                         "standard": "मानक",
+                        "pro": "Pro",
                         "premium": "प्रीमियम",
                         "unmetered": "असीमित"
                     },

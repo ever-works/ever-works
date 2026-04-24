@@ -90,11 +90,9 @@ export function DashboardHeader({
                     </div>
 
                     <div className="flex shrink-0 items-center gap-4">
-                        <Tooltip content={t('notifications.title')} position="bottom">
-                            <div>
-                                <NotificationDropdown />
-                            </div>
-                        </Tooltip>
+                        <div className="mt-2">
+                            <NotificationDropdown />
+                        </div>
 
                         <Tooltip content={tTheme('toggle')} position="bottom">
                             <div>

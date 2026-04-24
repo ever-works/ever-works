@@ -2168,6 +2168,99 @@
                     "dnsName": "Nombre:",
                     "dnsValue": "Valor:",
                     "copyButton": "Copiar"
+                },
+                "card": {
+                    "title": "Automatización",
+                    "subtitle": {
+                        "enabled": "Ajusta cadencia, facturación y protecciones para que las actualizaciones programadas sigan siendo confiables.",
+                        "disabled": "Automatiza actualizaciones sin límites de suscripción: configura cadencia y protecciones libremente."
+                    },
+                    "summary": {
+                        "status": "Estado",
+                        "nextRun": "Próxima ejecución",
+                        "lastRun": "Última ejecución",
+                        "failures": "Fallos",
+                        "notScheduled": "No programado",
+                        "never": "Nunca",
+                        "statusMap": {
+                            "active": "Automatización activa",
+                            "paused": "Pausado",
+                            "canceled": "Cancelado",
+                            "disabled": "Deshabilitado"
+                        },
+                        "nextSourceValidation": "Próxima validación de fuente"
+                    },
+                    "fields": {
+                        "automation": "Automatización",
+                        "automationHelp": "Pausar para detener temporalmente ejecuciones futuras.",
+                        "billing": "Modo de facturación",
+                        "billingHelp": "Las suscripciones desbloquean ejecuciones ilimitadas. Pago por uso cobra por ejecución.",
+                        "cadence": "Cadencia",
+                        "cadenceHelp": "Plan actual: {plan}",
+                        "cadenceOpen": "Todas las cadencias están disponibles mientras las suscripciones están deshabilitadas.",
+                        "maxFailures": "Límite de fallos",
+                        "maxFailuresHelp": "Pausar automáticamente cuando ocurran esta cantidad de fallos.",
+                        "createPullRequest": "Crear Pull Requests",
+                        "createPullRequestHelp": "Cuando está habilitado, las actualizaciones programadas crean un pull request en lugar de hacer commit directamente.",
+                        "sourceValidationCadence": "Frecuencia de validación de fuente",
+                        "sourceValidationCadenceHelp": "Por defecto usa la misma frecuencia que tus actualizaciones, pero puedes reducirla o aumentarla."
+                    },
+                    "billing": {
+                        "subscription": "Suscripción",
+                        "usage": "Pago por uso"
+                    },
+                    "cadence": {
+                        "hourly": "Cada hora",
+                        "every_3_hours": "Every 3 hours",
+                        "every_8_hours": "Every 8 hours",
+                        "every_12_hours": "Every 12 hours",
+                        "daily": "Cada día",
+                        "weekly": "Cada semana",
+                        "monthly": "Cada mes"
+                    },
+                    "plans": {
+                        "free": "Gratis",
+                        "standard": "Estándar",
+                        "pro": "Pro",
+                        "premium": "Premium",
+                        "unmetered": "Sin límite"
+                    },
+                    "usageRequired": "Cambia a pago por uso para usar esta cadencia.",
+                    "cadenceAllowed": "Cadencia permitida en tu plan.",
+                    "actions": {
+                        "save": "Guardar cambios",
+                        "saving": "Guardando...",
+                        "runNow": "Ejecutar ahora",
+                        "starting": "Iniciando...",
+                        "cancel": "Cancelar programación",
+                        "cancelling": "Cancelando..."
+                    },
+                    "success": {
+                        "saved": "Programación guardada.",
+                        "runStarted": "Ejecución programada iniciada.",
+                        "cancelled": "Programación cancelada."
+                    },
+                    "errors": {
+                        "requireUsage": "Habilita facturación de pago por uso para usar esta cadencia.",
+                        "updateFailed": "Error al actualizar la programación.",
+                        "runFailed": "Error al iniciar la ejecución.",
+                        "cancelFailed": "Error al cancelar la programación."
+                    },
+                    "empty": {
+                        "title": "Ejecuta una generación manual primero",
+                        "description": "Completa una ejecución manual exitosa para desbloquear la programación automática. Una vez que tu directorio tenga datos, podemos mantenerlo actualizado.",
+                        "refresh": "Actualizar estado"
+                    },
+                    "requiresGeneration": "Ejecuta al menos una generación de elementos antes de habilitar programaciones."
+                },
+                "actions": {
+                    "invalid": "Datos inválidos",
+                    "updated": "Programación actualizada.",
+                    "updateFailed": "Error al actualizar la programación.",
+                    "runStarted": "Ejecución programada iniciada.",
+                    "runFailed": "Error al activar la ejecución.",
+                    "cancelled": "Programación cancelada.",
+                    "cancelFailed": "Error al cancelar la programación."
                 }
             }
         },

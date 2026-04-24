@@ -2168,6 +2168,96 @@
                     "dnsName": "שם:",
                     "dnsValue": "ערך:",
                     "copyButton": "העתק"
+                },
+                "card": {
+                    "title": "אוטומציה",
+                    "subtitle": {
+                        "enabled": "התאם קצב, חיוב והגנות כדי שהעדכונים המתוזמנים יישארו אמינים.",
+                        "disabled": "הפוך עדכונים לאוטומטיים ללא מגבלות מנוי - הגדר בחופשיות קצב והגנות."
+                    },
+                    "summary": {
+                        "status": "מצב",
+                        "nextRun": "הרצה הבאה",
+                        "lastRun": "הרצה אחרונה",
+                        "failures": "כשלים",
+                        "notScheduled": "לא מתוזמן",
+                        "never": "מעולם לא",
+                        "statusMap": {
+                            "active": "אוטומציה פעילה",
+                            "paused": "מושהה",
+                            "canceled": "בוטל",
+                            "disabled": "מושבת"
+                        },
+                        "nextSourceValidation": "אימות המקור הבא"
+                    },
+                    "fields": {
+                        "automation": "אוטומציה",
+                        "automationHelp": "השהה כדי לעצור זמנית הרצות עתידיות.",
+                        "billing": "מצב חיוב",
+                        "billingHelp": "מנויים משחררים הרצות בלתי מוגבלות. תשלום לפי שימוש מחייב לפי הרצה.",
+                        "cadence": "קצב",
+                        "cadenceHelp": "תוכנית נוכחית: {plan}",
+                        "cadenceOpen": "כל הקצבים זמינים כל עוד המנויים מושבתים.",
+                        "maxFailures": "מגבלת כשלים",
+                        "maxFailuresHelp": "השהה אוטומטית לאחר מספר זה של כשלים.",
+                        "createPullRequest": "צור Pull Requests",
+                        "createPullRequestHelp": "כאשר מופעל, עדכונים מתוזמנים יוצרים בקשת משיכה במקום קומיט ישיר.",
+                        "sourceValidationCadence": "תדירות אימות מקור",
+                        "sourceValidationCadenceHelp": "ברירת המחדל היא אותה תדירות כמו לעדכונים שלך, אבל אפשר להאט או להאיץ אותה."
+                    },
+                    "billing": {
+                        "subscription": "מנוי",
+                        "usage": "תשלום לפי שימוש"
+                    },
+                    "cadence": {
+                        "hourly": "כל שעה",
+                        "daily": "כל יום",
+                        "weekly": "כל שבוע",
+                        "monthly": "כל חודש"
+                    },
+                    "plans": {
+                        "free": "חינם",
+                        "standard": "סטנדרטי",
+                        "pro": "Pro",
+                        "premium": "פרימיום",
+                        "unmetered": "בלתי מוגבל"
+                    },
+                    "usageRequired": "עבור לתשלום לפי שימוש כדי להשתמש בקצב זה.",
+                    "cadenceAllowed": "קצב מותר בתוכנית שלך.",
+                    "actions": {
+                        "save": "שמור שינויים",
+                        "saving": "שומר...",
+                        "runNow": "הרץ עכשיו",
+                        "starting": "מתחיל...",
+                        "cancel": "בטל תזמון",
+                        "cancelling": "מבטל..."
+                    },
+                    "success": {
+                        "saved": "התזמון נשמר.",
+                        "runStarted": "הרצה מתוזמנת החלה.",
+                        "cancelled": "התזמון בוטל."
+                    },
+                    "errors": {
+                        "requireUsage": "הפעל חיוב לפי שימוש כדי להשתמש בקצב זה.",
+                        "updateFailed": "עדכון התזמון נכשל.",
+                        "runFailed": "הפעלת ההרצה נכשלה.",
+                        "cancelFailed": "ביטול התזמון נכשל."
+                    },
+                    "empty": {
+                        "title": "בצע קודם יצירה ידנית",
+                        "description": "השלם הרצה ידנית מוצלחת כדי לשחרר תזמון אוטומטי. ברגע שהמדריך שלך מכיל נתונים, נוכל לתחזק אותו מעודכן.",
+                        "refresh": "רענן מצב"
+                    },
+                    "requiresGeneration": "בצע לפחות יצירת פריטים אחת לפני הפעלת תזמונים."
+                },
+                "actions": {
+                    "invalid": "נתונים לא חוקיים",
+                    "updated": "התזמון עודכן.",
+                    "updateFailed": "עדכון התזמון נכשל.",
+                    "runStarted": "הרצה מתוזמנת החלה.",
+                    "runFailed": "הפעלת ההרצה נכשלה.",
+                    "cancelled": "התזמון בוטל.",
+                    "cancelFailed": "ביטול התזמון נכשל."
                 }
             }
         },

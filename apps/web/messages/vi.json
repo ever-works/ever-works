@@ -1061,6 +1061,7 @@
                     "plans": {
                         "free": "Miễn phí",
                         "standard": "Tiêu chuẩn",
+                        "pro": "Pro",
                         "premium": "Cao cấp",
                         "unmetered": "Không giới hạn"
                     },

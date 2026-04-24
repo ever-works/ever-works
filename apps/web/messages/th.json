@@ -1061,6 +1061,7 @@
                     "plans": {
                         "free": "ฟรี",
                         "standard": "มาตรฐาน",
+                        "pro": "Pro",
                         "premium": "พรีเมียม",
                         "unmetered": "ไม่จำกัด"
                     },

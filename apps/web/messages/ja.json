@@ -1061,6 +1061,7 @@
                     "plans": {
                         "free": "無料",
                         "standard": "スタンダード",
+                        "pro": "Pro",
                         "premium": "プレミアム",
                         "unmetered": "無制限"
                     },

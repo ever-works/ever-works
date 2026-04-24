@@ -1060,7 +1060,8 @@
                     },
                     "plans": {
                         "free": "Darmowy",
-                        "standard": "Standard",
+                        "standard": "Standardowy",
+                        "pro": "Pro",
                         "premium": "Premium",
                         "unmetered": "Bez limitu"
                     },

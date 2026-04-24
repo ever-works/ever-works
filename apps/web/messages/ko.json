@@ -1060,7 +1060,8 @@
                     },
                     "plans": {
                         "free": "무료",
-                        "standard": "표준",
+                        "standard": "스탠다드",
+                        "pro": "Pro",
                         "premium": "프리미엄",
                         "unmetered": "측정 없음"
                     },

@@ -75,7 +75,7 @@ export function ComparisonsPageClient({
     const [queryB, setQueryB] = useState('');
     const [showManualForm, setShowManualForm] = useState(false);
     const [deleteSlug, setDeleteSlug] = useState<string | null>(null);
-    const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+    const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
     const [currentPage, setCurrentPage] = useState(1);
 
     // AI Model settings state
@@ -854,7 +854,7 @@ export function ComparisonsPageClient({
                                             </Button>
                                         </div>
                                     </div>
-                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-secondary dark:text-text-secondary-dark">
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-gray-400 dark:text-text-secondary-dark/60">
                                         <span>
                                             {comparison.item_a_name} {t('vs')}{' '}
                                             {comparison.item_b_name}
@@ -864,7 +864,7 @@ export function ComparisonsPageClient({
                                         <span className="text-border dark:text-border-dark">|</span>
                                         <span>{formatComparisonDate(comparison.generated_at)}</span>
                                     </div>
-                                    <p className="mt-2 text-sm text-text-secondary dark:text-text-secondary-dark line-clamp-2">
+                                    <p className="mt-2 text-xs text-text-secondary dark:text-text-secondary-dark line-clamp-2 leading-relaxed">
                                         {comparison.summary}
                                     </p>
                                     {comparison.verdict_winner && (
