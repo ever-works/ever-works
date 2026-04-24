@@ -846,7 +846,7 @@ export function ComparisonsPageClient({
                                             </Button>
                                         </div>
                                     </div>
-                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-secondary dark:text-text-secondary-dark">
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-gray-400 dark:text-text-secondary-dark/60">
                                         <span>
                                             {comparison.item_a_name} {t('vs')}{' '}
                                             {comparison.item_b_name}
