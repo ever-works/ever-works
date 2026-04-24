@@ -52,9 +52,10 @@ function NotificationItem({
     return (
         <div
             className={cn(
-                'p-3 cursor-pointer transition-colors',
-                !notification.isRead,
-                notification.isRead && 'bg-transparent',
+                'p-3 cursor-pointer transition-colors border-l-2',
+                !notification.isRead
+                    ? [styles.dropdown.bg, styles.dropdown.border]
+                    : 'bg-transparent border-l-transparent',
                 'hover:bg-gray-50 dark:hover:bg-white/4',
             )}
             onClick={handleClick}
