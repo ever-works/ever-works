@@ -1060,6 +1060,7 @@
                     },
                     "plans": {
                         "free": "免费",
+                        "pro": "专业版",
                         "standard": "标准",
                         "premium": "高级",
                         "unmetered": "无限"
@@ -2168,99 +2169,6 @@
                     "dnsName": "名称：",
                     "dnsValue": "值：",
                     "copyButton": "复制"
-                },
-                "card": {
-                    "title": "自动化",
-                    "subtitle": {
-                        "enabled": "调整频率、计费和保护措施，确保计划更新保持可靠。",
-                        "disabled": "无订阅限制地自动化更新 - 自由设置频率和错误保护。"
-                    },
-                    "summary": {
-                        "status": "状态",
-                        "nextRun": "下次运行",
-                        "lastRun": "上次运行",
-                        "failures": "失败次数",
-                        "notScheduled": "未计划",
-                        "never": "从未",
-                        "statusMap": {
-                            "active": "自动化运行中",
-                            "paused": "已暂停",
-                            "canceled": "已取消",
-                            "disabled": "已禁用"
-                        },
-                        "nextSourceValidation": "下次来源校验"
-                    },
-                    "fields": {
-                        "automation": "自动化",
-                        "automationHelp": "暂停以临时停止未来的运行。",
-                        "billing": "计费模式",
-                        "billingHelp": "订阅解锁无限运行。按使用付费按执行收费。",
-                        "cadence": "频率",
-                        "cadenceHelp": "当前方案：{plan}",
-                        "cadenceOpen": "订阅禁用时所有频率均可用。",
-                        "maxFailures": "失败限制",
-                        "maxFailuresHelp": "发生此数量的失败后自动暂停。",
-                        "createPullRequest": "创建 Pull Request",
-                        "createPullRequestHelp": "启用后，计划更新将创建 pull request 而不是直接提交。",
-                        "sourceValidationCadence": "来源校验频率",
-                        "sourceValidationCadenceHelp": "默认与更新频率一致，但你也可以将其调慢或调快。"
-                    },
-                    "billing": {
-                        "subscription": "订阅",
-                        "usage": "按使用付费"
-                    },
-                    "cadence": {
-                        "hourly": "每小时",
-                        "every_3_hours": "Every 3 hours",
-                        "every_8_hours": "Every 8 hours",
-                        "every_12_hours": "Every 12 hours",
-                        "daily": "每天",
-                        "weekly": "每周",
-                        "monthly": "每月"
-                    },
-                    "plans": {
-                        "free": "免费",
-                        "standard": "标准",
-                        "pro": "Pro",
-                        "premium": "高级",
-                        "unmetered": "无限制"
-                    },
-                    "usageRequired": "切换到按使用付费以使用此频率。",
-                    "cadenceAllowed": "您的方案允许此频率。",
-                    "actions": {
-                        "save": "保存更改",
-                        "saving": "保存中...",
-                        "runNow": "立即运行",
-                        "starting": "启动中...",
-                        "cancel": "取消计划",
-                        "cancelling": "取消中..."
-                    },
-                    "success": {
-                        "saved": "计划已保存。",
-                        "runStarted": "计划运行已开始。",
-                        "cancelled": "计划已取消。"
-                    },
-                    "errors": {
-                        "requireUsage": "启用按使用付费计费以使用此频率。",
-                        "updateFailed": "更新计划失败。",
-                        "runFailed": "启动运行失败。",
-                        "cancelFailed": "取消计划失败。"
-                    },
-                    "empty": {
-                        "title": "请先运行手动生成",
-                        "description": "完成一次成功的手动运行以解锁自动计划。一旦您的目录有了数据，我们可以为您保持更新。",
-                        "refresh": "刷新状态"
-                    },
-                    "requiresGeneration": "在启用计划之前，请至少运行一次项目生成。"
-                },
-                "actions": {
-                    "invalid": "数据无效",
-                    "updated": "计划已更新。",
-                    "updateFailed": "更新计划失败。",
-                    "runStarted": "计划运行已开始。",
-                    "runFailed": "触发运行失败。",
-                    "cancelled": "计划已取消。",
-                    "cancelFailed": "取消计划失败。"
                 }
             }
         },

@@ -143,7 +143,8 @@ export class ActivityLogService {
                         resolvedStatus,
                         {
                             ...existingDetails,
-                            itemsCount: latestHistory?.totalItemsCount ?? directory?.itemsCount ?? 0,
+                            itemsCount:
+                                latestHistory?.totalItemsCount ?? directory?.itemsCount ?? 0,
                             newItemsCount: latestHistory?.newItemsCount ?? 0,
                             updatedItemsCount: latestHistory?.updatedItemsCount ?? 0,
                             generateStatus: directory?.generateStatus ?? null,

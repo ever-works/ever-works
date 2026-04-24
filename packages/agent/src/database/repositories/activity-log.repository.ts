@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import { ActivityLog } from '../../entities/activity-log.entity';
-import {
-    buildCaseInsensitiveLikeClause,
-    prepareCaseInsensitiveContainsPattern
-} from '../utils';
+import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
 import type {
     ActivityLogQueryOptions,
     ActivityActionType,
@@ -123,10 +120,10 @@ export class ActivityLogRepository {
                     new Brackets((searchQb) => {
                         searchQb
                             .where(buildCaseInsensitiveLikeClause('activity.summary'), {
-                                search: searchPattern
+                                search: searchPattern,
                             })
                             .orWhere(buildCaseInsensitiveLikeClause('directory.name'), {
-                                search: searchPattern
+                                search: searchPattern,
                             });
                     }),
                 );
