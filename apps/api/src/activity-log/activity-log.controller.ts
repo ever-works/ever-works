@@ -161,6 +161,8 @@ export class ActivityLogController {
         @Query('dateFrom') dateFrom?: string,
         @Query('dateTo') dateTo?: string,
     ) {
+        await this.reconcileActivities(auth.userId);
+
         const csv = await this.activityLogService.exportCsv({
             userId: auth.userId,
             actionType: actionType as ActivityActionType,

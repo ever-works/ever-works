@@ -66,7 +66,7 @@ export function GeneratorSubTabs({ directoryId }: GeneratorSubTabsProps) {
             <nav
                 ref={navRef}
                 className="relative inline-flex items-center gap-1 rounded-lg border border-border dark:border-border-dark bg-muted/40 dark:bg-muted/10 p-1"
-                aria-label="Generator tabs"
+                aria-label={t('navigationLabel')}
             >
                 {/* Sliding pill background */}
                 {pillStyle && (

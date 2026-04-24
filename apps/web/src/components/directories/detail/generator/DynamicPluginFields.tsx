@@ -362,6 +362,7 @@ interface JsonFieldProps {
 }
 
 function JsonField({ field, value, onChange }: JsonFieldProps) {
+    const t = useTranslations('dashboard.directoryDetail.generator');
     const [rawText, setRawText] = useState(() =>
         value && Object.keys(value).length > 0 ? JSON.stringify(value, null, 2) : '',
     );
@@ -379,13 +380,13 @@ function JsonField({ field, value, onChange }: JsonFieldProps) {
         try {
             const parsed = JSON.parse(text);
             if (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null) {
-                setError('Must be a JSON object');
+                setError(t('jsonObjectError'));
                 return;
             }
             setError(null);
             onChange(parsed as Record<string, unknown>);
         } catch {
-            setError('Invalid JSON');
+            setError(t('invalidJsonError'));
         }
     };
 

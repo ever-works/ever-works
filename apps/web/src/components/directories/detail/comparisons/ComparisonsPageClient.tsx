@@ -37,6 +37,7 @@ import type { ComparisonData } from '@/lib/api/directory';
 import type { ProviderOption } from '@/lib/api/types-only';
 import { ROUTES } from '@/lib/constants';
 import { buildPublicComparisonUrl, formatComparisonDate } from '@/lib/utils/comparison';
+import { ProviderSelector } from '@/components/directories/detail/generator/ProviderSelector';
 import {
     generateNextComparison,
     generateManualComparison,
@@ -74,7 +75,7 @@ export function ComparisonsPageClient({
     const [queryB, setQueryB] = useState('');
     const [showManualForm, setShowManualForm] = useState(false);
     const [deleteSlug, setDeleteSlug] = useState<string | null>(null);
-    const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+    const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
     const [currentPage, setCurrentPage] = useState(1);
 
     // AI Model settings state
@@ -134,6 +135,9 @@ export function ComparisonsPageClient({
 
     const selectedItemAObj = items.find((item) => item.slug === selectedItemA) ?? null;
     const selectedItemBObj = items.find((item) => item.slug === selectedItemB) ?? null;
+    const selectedProviderOption =
+        availableProviders.find((provider) => provider.id === aiProvider) ?? null;
+    const selectedProviderConfigured = selectedProviderOption?.configured ?? true;
 
     const filteredItemsA = items
         .filter((item) => item.slug !== selectedItemB)
@@ -281,7 +285,8 @@ export function ComparisonsPageClient({
         setAiModel('');
         setAvailableModels([]);
 
-        if (!providerId) return;
+        const provider = availableProviders.find((entry) => entry.id === providerId);
+        if (!providerId || !provider?.configured) return;
 
         setIsLoadingModels(true);
         try {
@@ -371,59 +376,62 @@ export function ComparisonsPageClient({
                     </button>
                     {showAiSettings && (
                         <div className="border-t border-border dark:border-border-dark px-4 py-4 space-y-4">
-                            <div className="flex gap-4 items-end">
-                                <div className="flex-1">
-                                    <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
-                                        {t('aiModel.provider')}
-                                    </label>
-                                    <Select
-                                        value={aiProvider || '__default__'}
-                                        onValueChange={(val) =>
-                                            handleProviderChange(val === '__default__' ? '' : val)
+                            <div className="space-y-4">
+                                <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark">
+                                    <div className="border-b border-border dark:border-border-dark px-5 py-3">
+                                        <p className="text-sm font-medium text-text dark:text-text-dark">
+                                            {t('aiModel.provider')}
+                                        </p>
+                                    </div>
+                                    <ProviderSelector
+                                        label={t('aiModel.provider')}
+                                        providers={availableProviders}
+                                        value={aiProvider || null}
+                                        onChange={(providerId) =>
+                                            handleProviderChange(providerId ?? '')
                                         }
-                                    >
-                                        <option value="__default__">{t('aiModel.default')}</option>
-                                        {availableProviders.map((p) => (
-                                            <option key={p.id} value={p.id}>
-                                                {p.name}
-                                                {p.isDefault
-                                                    ? ` ${t('aiModel.defaultSuffix')}`
-                                                    : ''}
-                                            </option>
-                                        ))}
-                                    </Select>
+                                        disabled={isSavingAiConfig}
+                                    />
                                 </div>
-                                <div className="flex-1">
-                                    <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
-                                        {t('aiModel.model')}
-                                    </label>
-                                    <Select
-                                        value={aiModel || '__provider_default__'}
-                                        onValueChange={(val) =>
-                                            setAiModel(val === '__provider_default__' ? '' : val)
-                                        }
-                                        disabled={!aiProvider || isLoadingModels}
-                                    >
-                                        <option value="__provider_default__">
-                                            {isLoadingModels
-                                                ? t('aiModel.loadingModels')
-                                                : t('aiModel.providerDefault')}
-                                        </option>
-                                        {availableModels.map((m) => (
-                                            <option key={m.id} value={m.id}>
-                                                {m.name}
+                                <div className="flex gap-4 items-end">
+                                    <div className="flex-1">
+                                        <label className="block text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
+                                            {t('aiModel.model')}
+                                        </label>
+                                        <Select
+                                            value={aiModel || '__provider_default__'}
+                                            onValueChange={(val) =>
+                                                setAiModel(
+                                                    val === '__provider_default__' ? '' : val,
+                                                )
+                                            }
+                                            disabled={
+                                                !aiProvider ||
+                                                !selectedProviderConfigured ||
+                                                isLoadingModels
+                                            }
+                                        >
+                                            <option value="__provider_default__">
+                                                {isLoadingModels
+                                                    ? t('aiModel.loadingModels')
+                                                    : t('aiModel.providerDefault')}
                                             </option>
-                                        ))}
-                                    </Select>
+                                            {availableModels.map((m) => (
+                                                <option key={m.id} value={m.id}>
+                                                    {m.name}
+                                                </option>
+                                            ))}
+                                        </Select>
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        onClick={handleSaveAiConfig}
+                                        disabled={isSavingAiConfig || !selectedProviderConfigured}
+                                        loading={isSavingAiConfig}
+                                    >
+                                        {t('actions.save')}
+                                    </Button>
                                 </div>
-                                <Button
-                                    size="sm"
-                                    onClick={handleSaveAiConfig}
-                                    disabled={isSavingAiConfig}
-                                    loading={isSavingAiConfig}
-                                >
-                                    {t('actions.save')}
-                                </Button>
                             </div>
                             <div className="flex items-center justify-between">
                                 <div>
@@ -846,7 +854,7 @@ export function ComparisonsPageClient({
                                             </Button>
                                         </div>
                                     </div>
-                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-secondary dark:text-text-secondary-dark">
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-gray-400 dark:text-text-secondary-dark/60">
                                         <span>
                                             {comparison.item_a_name} {t('vs')}{' '}
                                             {comparison.item_b_name}
@@ -856,7 +864,7 @@ export function ComparisonsPageClient({
                                         <span className="text-border dark:text-border-dark">|</span>
                                         <span>{formatComparisonDate(comparison.generated_at)}</span>
                                     </div>
-                                    <p className="mt-2 text-sm text-text-secondary dark:text-text-secondary-dark line-clamp-2">
+                                    <p className="mt-2 text-xs text-text-secondary dark:text-text-secondary-dark line-clamp-2 leading-relaxed">
                                         {comparison.summary}
                                     </p>
                                     {comparison.verdict_winner && (

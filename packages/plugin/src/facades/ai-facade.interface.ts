@@ -168,7 +168,13 @@ export interface IAiFacade extends IBaseFacade {
 	getProviderConfig(facadeOptions: FacadeOptions): Promise<AiProviderConfig>;
 
 	/**
-	 * Resolve context window size (tokens) for a model via OpenRouter directory.
+	 * Resolve model metadata for the configured provider or a shared catalog fallback.
+	 * Returns `null` when metadata cannot be resolved.
+	 */
+	resolveModelMetadata(modelId: string, facadeOptions: FacadeOptions): Promise<AiModel | null>;
+
+	/**
+	 * Resolve context window size (tokens) for a model via provider metadata or catalog fallback.
 	 * Never throws — returns a safe default (128K) on any failure.
 	 */
 	resolveModelContextLength(modelId: string, facadeOptions: FacadeOptions): Promise<number>;

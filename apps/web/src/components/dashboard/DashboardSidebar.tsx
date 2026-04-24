@@ -152,7 +152,9 @@ export function DashboardSidebar({
                                 >
                                     <Tooltip
                                         content={
-                                            isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+                                            isCollapsed
+                                                ? t('tooltips.expandSidebar')
+                                                : t('tooltips.collapseSidebar')
                                         }
                                         position="right"
                                     >

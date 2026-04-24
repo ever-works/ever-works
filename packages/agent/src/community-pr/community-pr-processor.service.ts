@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
+import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 import { GitFacadeService, type GitFacadeOptions } from '../facades/git.facade';
 import { AiFacadeService } from '../facades/ai.facade';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
@@ -19,6 +20,7 @@ import { buildDirectoryChangelog } from '../utils/directory-changelog.utils';
 
 const MAX_PROCESSED_PR_NUMBERS = 500;
 const MAX_CHANGE_CONTEXT_LENGTH = 50_000;
+const COMMUNITY_PR_LOCK_TTL_MS = 30 * 60 * 1000;
 
 const extractedItemSchema = z.object({
     items: z.array(
@@ -37,6 +39,13 @@ export interface CommunityPrProcessingResult {
     errors: Array<{ directoryId: string; error: string }>;
 }
 
+type CommunityPrTriggerSource = 'user' | 'schedule' | 'api';
+
+interface CommunityPrSinglePrResult {
+    outcome: 'applied' | 'ignored';
+    itemsAdded: number;
+}
+
 @Injectable()
 export class CommunityPrProcessorService {
     private readonly logger = new Logger(CommunityPrProcessorService.name);
@@ -46,6 +55,7 @@ export class CommunityPrProcessorService {
         private readonly aiFacade: AiFacadeService,
         private readonly directoryRepository: DirectoryRepository,
         private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
+        private readonly taskLockService: DistributedTaskLockService,
     ) {}
 
     private async recordCommunityPrHistory(params: {
@@ -53,6 +63,7 @@ export class CommunityPrProcessorService {
         userId: string;
         prNumber: number;
         entries: DirectoryHistoryChangeEntry[];
+        triggeredBy: CommunityPrTriggerSource;
     }): Promise<void> {
         const now = new Date();
 
@@ -64,7 +75,7 @@ export class CommunityPrProcessorService {
             finishedAt: now,
             durationInSeconds: 0,
             newItemsCount: params.entries.length,
-            triggeredBy: 'user',
+            triggeredBy: params.triggeredBy,
             activityType: DirectoryHistoryActivityType.COMMUNITY_PR_MERGED,
             changelog: buildDirectoryChangelog(
                 params.entries,
@@ -73,7 +84,52 @@ export class CommunityPrProcessorService {
         });
     }
 
-    async processAllDirectories(): Promise<CommunityPrProcessingResult> {
+    private directoryLockKey(directoryId: string): string {
+        return `community-pr:${directoryId}`;
+    }
+
+    private isPrHandled(state: CommunityPrState, pr: GitPullRequest): boolean {
+        const processedRecords = state.processedPrs ?? [];
+        const record = processedRecords.find((entry) => entry.number === pr.number);
+        if (record) {
+            return record.updatedAt === pr.updatedAt;
+        }
+
+        return (state.processedPrNumbers ?? []).includes(pr.number);
+    }
+
+    private markPrHandled(
+        state: CommunityPrState,
+        pr: GitPullRequest,
+        outcome: CommunityPrSinglePrResult['outcome'],
+    ): void {
+        state.processedPrNumbers = Array.from(
+            new Set([...(state.processedPrNumbers ?? []), pr.number]),
+        );
+
+        const processedRecords = (state.processedPrs ?? []).filter(
+            (entry) => entry.number !== pr.number,
+        );
+        processedRecords.push({
+            number: pr.number,
+            updatedAt: pr.updatedAt,
+            outcome,
+        });
+
+        if (state.processedPrNumbers.length > MAX_PROCESSED_PR_NUMBERS) {
+            state.processedPrNumbers = state.processedPrNumbers.slice(-MAX_PROCESSED_PR_NUMBERS);
+        }
+
+        if (processedRecords.length > MAX_PROCESSED_PR_NUMBERS) {
+            state.processedPrs = processedRecords.slice(-MAX_PROCESSED_PR_NUMBERS);
+        } else {
+            state.processedPrs = processedRecords;
+        }
+    }
+
+    async processAllDirectories(
+        triggeredBy: CommunityPrTriggerSource = 'schedule',
+    ): Promise<CommunityPrProcessingResult> {
         const directories = await this.directoryRepository.findWithCommunityPrEnabled();
         const result: CommunityPrProcessingResult = { processed: 0, errors: [] };
 
@@ -86,7 +142,7 @@ export class CommunityPrProcessorService {
 
                 const autoClose = directory.communityPrAutoClose;
 
-                const count = await this.processDirectory(directory, state, autoClose);
+                const count = await this.processDirectory(directory, state, autoClose, triggeredBy);
                 result.processed += count;
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
@@ -103,83 +159,98 @@ export class CommunityPrProcessorService {
         directory: Directory,
         state?: CommunityPrState,
         autoClose?: boolean,
+        triggeredBy: CommunityPrTriggerSource = 'api',
     ): Promise<number> {
-        const owner = directory.getRepoOwner();
-        const mainRepo = directory.getMainRepo();
-        const gitOptions: GitFacadeOptions = {
-            userId: directory.userId,
-            providerId: directory.gitProvider,
-        };
+        const lockResult = await this.taskLockService.runExclusive(
+            this.directoryLockKey(directory.id),
+            async () => {
+                const owner = directory.getRepoOwner();
+                const mainRepo = directory.getMainRepo();
+                const gitOptions: GitFacadeOptions = {
+                    userId: directory.userId,
+                    providerId: directory.gitProvider,
+                };
 
-        const openPRs = await this.gitFacade.listPullRequests(
-            owner,
-            mainRepo,
-            { state: 'open', perPage: 100 },
-            gitOptions,
+                const openPRs = await this.gitFacade.listPullRequests(
+                    owner,
+                    mainRepo,
+                    { state: 'open', perPage: 100 },
+                    gitOptions,
+                );
+
+                if (openPRs.length === 0) {
+                    return 0;
+                }
+
+                const currentState: CommunityPrState = state ||
+                    directory.communityPrState || {
+                        processedPrNumbers: [],
+                        totalItemsAdded: 0,
+                    };
+
+                const shouldAutoClose =
+                    autoClose === undefined ? directory.communityPrAutoClose : autoClose;
+
+                const unprocessedPRs = openPRs.filter((pr) => !this.isPrHandled(currentState, pr));
+
+                if (unprocessedPRs.length === 0) {
+                    return 0;
+                }
+
+                let totalItemsAdded = 0;
+                let lastError: string | null = null;
+
+                for (const pr of unprocessedPRs) {
+                    try {
+                        const prResult = await this.processSinglePr(
+                            directory,
+                            pr,
+                            gitOptions,
+                            shouldAutoClose,
+                            triggeredBy,
+                        );
+                        totalItemsAdded += prResult.itemsAdded;
+                        this.markPrHandled(currentState, pr, prResult.outcome);
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : String(error);
+                        const stack = error instanceof Error ? error.stack : undefined;
+                        this.logger.error(
+                            `Failed to process PR #${pr.number} for directory ${directory.id}: ${message}`,
+                            stack,
+                        );
+                        lastError = message;
+                    }
+                }
+
+                currentState.lastProcessedAt = new Date().toISOString();
+                currentState.lastError = lastError;
+                currentState.totalItemsAdded =
+                    (currentState.totalItemsAdded || 0) + totalItemsAdded;
+
+                await this.directoryRepository.update(directory.id, {
+                    communityPrState: currentState,
+                });
+
+                if (totalItemsAdded > 0) {
+                    await this.directoryRepository.increment(
+                        directory.id,
+                        'itemsCount',
+                        totalItemsAdded,
+                    );
+                }
+
+                return totalItemsAdded;
+            },
+            {
+                ttlMs: COMMUNITY_PR_LOCK_TTL_MS,
+                onLocked: () =>
+                    this.logger.debug(
+                        `Skipping community PR processing for directory ${directory.id} because another instance is already processing it`,
+                    ),
+            },
         );
 
-        if (openPRs.length === 0) {
-            return 0;
-        }
-
-        // If no state provided, load from directory entity
-        if (!state) {
-            state = directory.communityPrState || {
-                processedPrNumbers: [],
-                totalItemsAdded: 0,
-            };
-        }
-
-        if (autoClose === undefined) {
-            autoClose = directory.communityPrAutoClose;
-        }
-
-        const processedSet = new Set(state.processedPrNumbers);
-        const unprocessedPRs = openPRs.filter((pr) => !processedSet.has(pr.number));
-
-        if (unprocessedPRs.length === 0) {
-            return 0;
-        }
-
-        let totalItemsAdded = 0;
-
-        for (const pr of unprocessedPRs) {
-            try {
-                const itemsAdded = await this.processSinglePr(directory, pr, gitOptions, autoClose);
-                totalItemsAdded += itemsAdded;
-            } catch (error) {
-                const message = error instanceof Error ? error.message : String(error);
-                const stack = error instanceof Error ? error.stack : undefined;
-                this.logger.error(
-                    `Failed to process PR #${pr.number} for directory ${directory.id}: ${message}`,
-                    stack,
-                );
-                state.lastError = error instanceof Error ? error.message : String(error);
-            } finally {
-                if (!state.processedPrNumbers) {
-                    state.processedPrNumbers = [];
-                }
-                state.processedPrNumbers.push(pr.number);
-            }
-        }
-
-        // Cap processedPrNumbers to prevent unbounded growth
-        if (state.processedPrNumbers.length > MAX_PROCESSED_PR_NUMBERS) {
-            state.processedPrNumbers = state.processedPrNumbers.slice(-MAX_PROCESSED_PR_NUMBERS);
-        }
-
-        state.lastProcessedAt = new Date().toISOString();
-        state.totalItemsAdded = (state.totalItemsAdded || 0) + totalItemsAdded;
-
-        // Persist updated state to directory
-        await this.directoryRepository.update(directory.id, { communityPrState: state });
-
-        // Atomically increment directory itemsCount
-        if (totalItemsAdded > 0) {
-            await this.directoryRepository.increment(directory.id, 'itemsCount', totalItemsAdded);
-        }
-
-        return totalItemsAdded;
+        return lockResult.result ?? 0;
     }
 
     private async processSinglePr(
@@ -187,7 +258,8 @@ export class CommunityPrProcessorService {
         pr: GitPullRequest,
         gitOptions: GitFacadeOptions,
         autoClose: boolean,
-    ): Promise<number> {
+        triggeredBy: CommunityPrTriggerSource,
+    ): Promise<CommunityPrSinglePrResult> {
         const owner = directory.getRepoOwner();
         const mainRepo = directory.getMainRepo();
         const dataRepo = directory.getDataRepo();
@@ -212,14 +284,7 @@ export class CommunityPrProcessorService {
         }
 
         if (!changeContext.trim()) {
-            await this.gitFacade.createPullRequestComment(
-                owner,
-                mainRepo,
-                pr.number,
-                'Thank you for your contribution! However, I was unable to extract any meaningful changes from this PR. Please ensure the PR contains additions to the directory listing.',
-                gitOptions,
-            );
-            return 0;
+            return { outcome: 'ignored', itemsAdded: 0 };
         }
 
         // Clone/pull data repo
@@ -249,19 +314,23 @@ export class CommunityPrProcessorService {
         const extractedItems = aiResponse.result;
 
         if (!extractedItems.items || extractedItems.items.length === 0) {
-            await this.gitFacade.createPullRequestComment(
-                owner,
-                mainRepo,
-                pr.number,
-                'Thank you for your contribution! I reviewed this PR but could not extract any directory items from the changes. This PR may contain formatting changes or other non-item updates.',
-                gitOptions,
-            );
-            return 0;
+            return { outcome: 'ignored', itemsAdded: 0 };
         }
 
         // Write items to data repo
+        const addedEntries: DirectoryHistoryChangeEntry[] = [];
+        const seenSlugs = new Set<string>();
+
         for (const item of extractedItems.items) {
             const slug = slugifyText(item.name);
+            if (!slug || seenSlugs.has(slug) || (await data.itemExists(slug))) {
+                this.logger.warn(
+                    `Skipping community PR item "${item.name}" for directory ${directory.id} because slug "${slug}" already exists`,
+                );
+                continue;
+            }
+
+            seenSlugs.add(slug);
             const itemData = {
                 name: item.name,
                 slug,
@@ -277,6 +346,17 @@ export class CommunityPrProcessorService {
 
             const markdown = `# ${item.name}\n\n${item.description}\n\n[${item.source_url}](${item.source_url})`;
             await data.writeItemMarkdown(itemData, markdown);
+
+            addedEntries.push({
+                entityType: 'item',
+                action: 'added',
+                name: item.name,
+                slug,
+            });
+        }
+
+        if (addedEntries.length === 0) {
+            return { outcome: 'ignored', itemsAdded: 0 };
         }
 
         // Commit and push
@@ -284,38 +364,55 @@ export class CommunityPrProcessorService {
         await this.gitFacade.commit(
             directory.gitProvider,
             dest,
-            `Add ${extractedItems.items.length} item(s) from community PR #${pr.number}`,
+            `Add ${addedEntries.length} item(s) from community PR #${pr.number}`,
         );
         await this.gitFacade.push({ dir: dest }, gitOptions);
 
-        await this.recordCommunityPrHistory({
-            directoryId: directory.id,
-            userId: directory.userId,
-            prNumber: pr.number,
-            entries: extractedItems.items.map((item) => ({
-                entityType: 'item',
-                action: 'added',
-                name: item.name,
-                slug: slugifyText(item.name),
-            })),
-        });
+        try {
+            await this.recordCommunityPrHistory({
+                directoryId: directory.id,
+                userId: directory.userId,
+                prNumber: pr.number,
+                entries: addedEntries,
+                triggeredBy,
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+                `Community PR #${pr.number} for directory ${directory.id} was applied but history recording failed: ${message}`,
+            );
+        }
 
         // Comment on PR
-        const itemNames = extractedItems.items.map((i) => `- ${i.name}`).join('\n');
-        await this.gitFacade.createPullRequestComment(
-            owner,
-            mainRepo,
-            pr.number,
-            `Thank you for your contribution! The following items have been added to the directory:\n\n${itemNames}\n\nThe data repository has been updated automatically.`,
-            gitOptions,
-        );
+        const itemNames = addedEntries.map((entry) => `- ${entry.name}`).join('\n');
+        try {
+            await this.gitFacade.createPullRequestComment(
+                owner,
+                mainRepo,
+                pr.number,
+                `Thank you for your contribution! The following items have been added to the directory:\n\n${itemNames}\n\nThe data repository has been updated automatically.`,
+                gitOptions,
+            );
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+                `Community PR #${pr.number} for directory ${directory.id} was applied but commenting failed: ${message}`,
+            );
+        }
 
         // Optionally close the PR
         if (autoClose) {
-            await this.gitFacade.closePullRequest(owner, mainRepo, pr.number, gitOptions);
+            try {
+                await this.gitFacade.closePullRequest(owner, mainRepo, pr.number, gitOptions);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                this.logger.warn(
+                    `Community PR #${pr.number} for directory ${directory.id} was applied but auto-close failed: ${message}`,
+                );
+            }
         }
 
-        return extractedItems.items.length;
+        return { outcome: 'applied', itemsAdded: addedEntries.length };
     }
 
     private buildExtractionPrompt(vars: {

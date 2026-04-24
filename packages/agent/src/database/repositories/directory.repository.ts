@@ -3,14 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, IsNull, Brackets, Raw, LessThanOrEqual, In } from 'typeorm';
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities';
-import { prepareLikeSearchTerm } from '../utils';
+import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
 
 /**
  * Cross-database case-insensitive LIKE using LOWER() function.
  * Works with SQLite, PostgreSQL, and MySQL.
  */
 function caseInsensitiveLike(search: string) {
-    return Raw((alias) => `LOWER(${alias}) LIKE LOWER(:search)`, { search: `%${search}%` });
+    return Raw((alias) => buildCaseInsensitiveLikeClause(alias), { search });
 }
 
 @Injectable()
@@ -96,14 +96,14 @@ export class DirectoryRepository {
         let whereConditions: any = [];
 
         if (search) {
-            const sanitizedSearch = prepareLikeSearchTerm(search);
+            const searchPattern = prepareCaseInsensitiveContainsPattern(search);
 
-            if (sanitizedSearch) {
+            if (searchPattern) {
                 // Create OR conditions for search using cross-database case-insensitive LIKE
                 const searchConditions = [
-                    { name: caseInsensitiveLike(sanitizedSearch) },
-                    { description: caseInsensitiveLike(sanitizedSearch) },
-                    { slug: caseInsensitiveLike(sanitizedSearch) },
+                    { name: caseInsensitiveLike(searchPattern) },
+                    { description: caseInsensitiveLike(searchPattern) },
+                    { slug: caseInsensitiveLike(searchPattern) },
                 ];
 
                 // If userId is specified, add it to each search condition
@@ -293,16 +293,17 @@ export class DirectoryRepository {
 
         // Apply search filter using cross-database case-insensitive LIKE
         if (search) {
-            const sanitizedSearch = prepareLikeSearchTerm(search);
-            if (sanitizedSearch) {
-                const searchPattern = `%${sanitizedSearch.toLowerCase()}%`;
+            const searchPattern = prepareCaseInsensitiveContainsPattern(search);
+            if (searchPattern) {
                 queryBuilder.andWhere(
                     new Brackets((qb) => {
-                        qb.where('LOWER(directory.name) LIKE :search', { search: searchPattern })
-                            .orWhere('LOWER(directory.description) LIKE :search', {
+                        qb.where(buildCaseInsensitiveLikeClause('directory.name'), {
+                            search: searchPattern,
+                        })
+                            .orWhere(buildCaseInsensitiveLikeClause('directory.description'), {
                                 search: searchPattern,
                             })
-                            .orWhere('LOWER(directory.slug) LIKE :search', {
+                            .orWhere(buildCaseInsensitiveLikeClause('directory.slug'), {
                                 search: searchPattern,
                             });
                     }),
@@ -355,16 +356,17 @@ export class DirectoryRepository {
 
         // Apply search filter using cross-database case-insensitive LIKE
         if (search) {
-            const sanitizedSearch = prepareLikeSearchTerm(search);
-            if (sanitizedSearch) {
-                const searchPattern = `%${sanitizedSearch.toLowerCase()}%`;
+            const searchPattern = prepareCaseInsensitiveContainsPattern(search);
+            if (searchPattern) {
                 queryBuilder.andWhere(
                     new Brackets((qb) => {
-                        qb.where('LOWER(directory.name) LIKE :search', { search: searchPattern })
-                            .orWhere('LOWER(directory.description) LIKE :search', {
+                        qb.where(buildCaseInsensitiveLikeClause('directory.name'), {
+                            search: searchPattern,
+                        })
+                            .orWhere(buildCaseInsensitiveLikeClause('directory.description'), {
                                 search: searchPattern,
                             })
-                            .orWhere('LOWER(directory.slug) LIKE :search', {
+                            .orWhere(buildCaseInsensitiveLikeClause('directory.slug'), {
                                 search: searchPattern,
                             });
                     }),

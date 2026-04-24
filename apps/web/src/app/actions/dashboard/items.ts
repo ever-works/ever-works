@@ -212,7 +212,10 @@ export async function checkItemHealth(directoryId: string, itemSlug: string) {
     }
 }
 
-export async function captureScreenshot(sourceUrl: string) {
+export async function captureScreenshot(
+    sourceUrl: string,
+    options?: { directoryId?: string; providerOverride?: string },
+) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
@@ -221,7 +224,7 @@ export async function captureScreenshot(sourceUrl: string) {
     const t = await getTranslations('dashboard.directoryDetail.items.screenshot');
 
     try {
-        const availability = await screenshotAPI.checkAvailability();
+        const availability = await screenshotAPI.checkAvailability(options?.directoryId);
 
         if (!availability.available) {
             return {
@@ -230,8 +233,27 @@ export async function captureScreenshot(sourceUrl: string) {
             };
         }
 
+        const configuredProviders = availability.providers.filter(
+            (provider) => provider.configured,
+        );
+        const providerOverride =
+            options?.providerOverride ??
+            (availability.activeProvider?.configured
+                ? availability.activeProvider.id
+                : undefined) ??
+            configuredProviders[0]?.id;
+
+        if (!providerOverride) {
+            return {
+                success: false,
+                error: t('notConfigured'),
+            };
+        }
+
         const response = await screenshotAPI.getScreenshotUrl({
             url: sourceUrl,
+            providerOverride,
+            directoryId: options?.directoryId,
             blockAds: true,
             blockTrackers: true,
             blockCookieBanners: true,
@@ -258,20 +280,21 @@ export async function captureScreenshot(sourceUrl: string) {
     }
 }
 
-export async function checkScreenshotAvailability() {
+export async function checkScreenshotAvailability(directoryId?: string) {
     const user = await getAuthFromCookie();
     if (!user) {
-        return { available: false };
+        return { available: false, providers: [], activeProvider: null };
     }
 
     try {
-        const availability = await screenshotAPI.checkAvailability();
+        const availability = await screenshotAPI.checkAvailability(directoryId);
         return {
             available: availability.available,
             providers: availability.providers,
+            activeProvider: availability.activeProvider ?? null,
         };
     } catch {
-        return { available: false };
+        return { available: false, providers: [], activeProvider: null };
     }
 }
 
