@@ -217,7 +217,7 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
                 setUnreadCount((prev) => Math.max(0, prev - 1));
             }
         } else {
-            toast.error(result.error || 'Failed to dismiss notification');
+            toast.error(result.error || t('notifications.dismissFailed'));
         }
     };
 

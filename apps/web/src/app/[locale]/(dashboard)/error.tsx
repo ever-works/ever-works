@@ -31,7 +31,7 @@ export default function DashboardError({
                 </p>
                 {error.digest && (
                     <p className="text-xs text-text-muted dark:text-text-muted-dark mb-6 font-mono bg-surface-secondary dark:bg-surface-secondary-dark px-3 py-1.5 rounded-md inline-block">
-                        Error ID: {error.digest}
+                        {t('errorId')}: {error.digest}
                     </p>
                 )}
                 <div className="flex items-center justify-center gap-3">

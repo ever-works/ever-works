@@ -1,6 +1,7 @@
 'use client';
 
 import { InputHTMLAttributes, useId, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 
@@ -21,6 +22,7 @@ const Input = ({
     variant = 'default',
     ...props
 }: InputProps) => {
+    const t = useTranslations('common.ui');
     const inputReactId = useId();
     const inputId = id || inputReactId;
     const inputRef = useRef<HTMLInputElement>(null);
@@ -92,7 +94,7 @@ const Input = ({
                         <button
                             type="button"
                             tabIndex={-1}
-                            aria-label="Increment"
+                            aria-label={t('increment')}
                             onMouseDown={(e) => {
                                 e.preventDefault();
                                 handleStep('up');
@@ -111,7 +113,7 @@ const Input = ({
                         <button
                             type="button"
                             tabIndex={-1}
-                            aria-label="Decrement"
+                            aria-label={t('decrement')}
                             onMouseDown={(e) => {
                                 e.preventDefault();
                                 handleStep('down');

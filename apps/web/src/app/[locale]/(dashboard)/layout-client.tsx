@@ -3,6 +3,7 @@
 import { AuthUser } from '@/lib/auth';
 import React, { Suspense, useState, useCallback, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { Tooltip } from '@/components/ui/tooltip';
 import DashboardToasts from './toasts';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
@@ -50,6 +51,7 @@ export function DashboardLayoutClient({
     initialOnboardingConnections,
     initialOnboardingDeviceAuthStatuses,
 }: DashboardLayoutClientProps) {
+    const tChat = useTranslations('dashboard.aiChat');
     const DEFAULT_CHAT_WIDTH = 380;
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [helpOpen, setHelpOpen] = useState(false);
@@ -391,10 +393,12 @@ export function DashboardLayoutClient({
                                 <div className="relative w-full h-full bg-transparent">
                                     <div className="h-full bg-white dark:bg-surface-dark shadow-lg">
                                         <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-                                            <div className="text-sm font-medium">Chat</div>
+                                            <div className="text-sm font-medium">
+                                                {tChat('panelTitle')}
+                                            </div>
                                             <div className="flex items-center gap-2">
                                                 <button
-                                                    aria-label="Close chat"
+                                                    aria-label={tChat('closeChat')}
                                                     onClick={() => setChatOpen(false)}
                                                     className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-surface-secondary"
                                                 >
@@ -420,7 +424,7 @@ export function DashboardLayoutClient({
                         <div className="relative">
                             <div className="flex flex-col items-center w-5 -ml-3.5 absolute -right-3 top-1/2 -translate-y-1/2 z-10">
                                 <button
-                                    aria-label="Collapse chat"
+                                    aria-label={tChat('collapseChat')}
                                     onClick={handleCollapse}
                                     className="w-5 h-5 flex -ml-1.5 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white cursor-pointer items-center border rounded-full p-1 justify-center bg-white dark:bg-surface-dark"
                                 >
@@ -429,12 +433,12 @@ export function DashboardLayoutClient({
                                 <div
                                     onPointerDown={startDrag}
                                     className="w-2.5 h-5 -ml-1 my-1.5 flex text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white items-center justify-center cursor-col-resize dark:bg-surface-dark"
-                                    title="Drag to resize chat"
+                                    title={tChat('resizeChat')}
                                 >
                                     <GripVertical className="w-full h-4 text-text-muted/70" />
                                 </div>
                                 <button
-                                    aria-label="Expand chat"
+                                    aria-label={tChat('expandChat')}
                                     onClick={handleExpand}
                                     className="w-5 h-5 flex -ml-1.5 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white cursor-pointer items-center border rounded-full p-1 justify-center bg-white dark:bg-surface-dark"
                                 >

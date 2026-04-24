@@ -592,9 +592,9 @@ function ScheduleFormContent({
                         readOnlyReason
                             ? readOnlyReason
                             : isGenerationRunning
-                              ? 'Generation is running, please wait it to finish'
+                              ? t('errors.generationRunning')
                               : !isActive
-                                ? 'Schedule must be active to run now'
+                                ? t('errors.scheduleInactive')
                                 : undefined
                     }
                     className="gap-2 text-sm"

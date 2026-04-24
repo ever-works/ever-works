@@ -20,6 +20,7 @@ const DOCS_URL = 'https://docs.ever.works/docs';
 
 export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
     const t = useTranslations('dashboard.header.help');
+    const tCommon = useTranslations('common.ui');
 
     const quickTips = [
         { icon: '1', text: t('quickTips.tip1') },
@@ -104,7 +105,9 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                     )}
                                                 >
                                                     <X className="w-5 h-5" />
-                                                    <span className="sr-only">Close</span>
+                                                    <span className="sr-only">
+                                                        {tCommon('close')}
+                                                    </span>
                                                 </button>
                                             </div>
                                             <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark">

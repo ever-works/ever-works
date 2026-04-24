@@ -1,6 +1,14 @@
 'use client';
 
-import { useState, useCallback, memo, Dispatch, SetStateAction, KeyboardEvent } from 'react';
+import {
+    useState,
+    useCallback,
+    memo,
+    Dispatch,
+    SetStateAction,
+    KeyboardEvent,
+    useEffect,
+} from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -12,6 +20,7 @@ import { extractItemDetails, captureScreenshot } from '@/app/actions/dashboard/i
 import { toast } from 'sonner';
 import { CategoriesField } from './CategoriesField';
 import { useItemsContext } from './ItemsContext';
+import { ScreenshotProviderDialog } from './ScreenshotProviderDialog';
 
 export interface ItemFormData {
     name: string;
@@ -45,8 +54,14 @@ export const AddItemForm = memo(function AddItemForm({
     isPending,
 }: AddItemFormProps) {
     const t = useTranslations('dashboard.directoryDetail.items.addModal');
+    const itemsT = useTranslations('dashboard.directoryDetail.items');
+    const { directoryId, screenshotProviders, activeScreenshotProvider } = useItemsContext();
     const [isExtracting, setIsExtracting] = useState(false);
     const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);
+    const [isScreenshotDialogOpen, setIsScreenshotDialogOpen] = useState(false);
+    const [selectedScreenshotProvider, setSelectedScreenshotProvider] = useState<string | null>(
+        null,
+    );
     const [tagInput, setTagInput] = useState('');
     const [imageInput, setImageInput] = useState('');
 
@@ -168,7 +183,27 @@ export const AddItemForm = memo(function AddItemForm({
         });
     };
 
-    const handleCaptureScreenshot = async () => {
+    useEffect(() => {
+        if (!isScreenshotDialogOpen) {
+            return;
+        }
+
+        const initialProvider =
+            screenshotProviders.find(
+                (provider) => provider.id === activeScreenshotProvider?.id && provider.configured,
+            )?.id ??
+            screenshotProviders.find((provider) => provider.configured)?.id ??
+            null;
+
+        setSelectedScreenshotProvider((current) =>
+            current &&
+            screenshotProviders.some((provider) => provider.id === current && provider.configured)
+                ? current
+                : initialProvider,
+        );
+    }, [activeScreenshotProvider, isScreenshotDialogOpen, screenshotProviders]);
+
+    const handleOpenScreenshotDialog = () => {
         if (!formData.source_url) {
             toast.error(t('errors.urlRequired'));
             return;
@@ -179,9 +214,18 @@ export const AddItemForm = memo(function AddItemForm({
             return;
         }
 
+        setIsScreenshotDialogOpen(true);
+    };
+
+    const handleCaptureScreenshot = async (providerOverride: string) => {
+        setIsScreenshotDialogOpen(false);
+
         setIsCapturingScreenshot(true);
         try {
-            const result = await captureScreenshot(formData.source_url);
+            const result = await captureScreenshot(formData.source_url, {
+                directoryId,
+                providerOverride,
+            });
 
             if (result.success && result.imageUrl) {
                 if (!formData.images.includes(result.imageUrl)) {
@@ -202,154 +246,179 @@ export const AddItemForm = memo(function AddItemForm({
         }
     };
 
+    const handleConfirmCaptureScreenshot = async () => {
+        if (!selectedScreenshotProvider) {
+            toast.error(itemsT('screenshot.providerRequired'));
+            return;
+        }
+
+        await handleCaptureScreenshot(selectedScreenshotProvider);
+    };
+
     return (
-        <div className="space-y-4">
-            {/* Source URL with Extract Button */}
-            <div className="space-y-2">
-                <label className="text-sm font-medium text-text dark:text-text-dark">
-                    {t('sourceUrl')} *
-                </label>
-                <div className="flex gap-2">
+        <>
+            <div className="space-y-4">
+                {/* Source URL with Extract Button */}
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-text dark:text-text-dark">
+                        {t('sourceUrl')} *
+                    </label>
+                    <div className="flex gap-2">
+                        <Input
+                            type="url"
+                            value={formData.source_url}
+                            onChange={(e) =>
+                                setFormData({ ...formData, source_url: e.target.value })
+                            }
+                            placeholder={t('sourceUrlPlaceholder')}
+                            variant="form"
+                            className="flex-1"
+                            disabled={isPending}
+                        />
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={handleExtractFromUrl}
+                            disabled={isPending || isExtracting || !formData.source_url}
+                            className="shrink-0"
+                        >
+                            {isExtracting ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Link2 className="w-4 h-4" />
+                            )}
+                            <span className="ml-2">{t('extract')}</span>
+                        </Button>
+                    </div>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('sourceUrlHelp')}
+                    </p>
+                </div>
+
+                {/* Name */}
+                <Input
+                    label={`${t('name')} *`}
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder={t('namePlaceholder')}
+                    variant="form"
+                    disabled={isPending}
+                />
+
+                {/* Description */}
+                <Textarea
+                    label={`${t('description')} *`}
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder={t('descriptionPlaceholder')}
+                    rows={3}
+                    variant="form"
+                    disabled={isPending}
+                />
+
+                {/* Categories */}
+                <CategoriesField
+                    existingCategories={categories}
+                    selectedCategories={formData.categories}
+                    onAddCategory={handleAddCategory}
+                    onRemoveCategory={handleRemoveCategory}
+                    isPending={isPending}
+                />
+
+                {/* Tags */}
+                <TagsField
+                    tags={formData.tags}
+                    tagInput={tagInput}
+                    setTagInput={setTagInput}
+                    onAddTag={handleAddTag}
+                    onRemoveTag={handleRemoveTag}
+                    isPending={isPending}
+                />
+
+                {/* Slug (optional) */}
+                <div className="space-y-2">
                     <Input
-                        type="url"
-                        value={formData.source_url}
-                        onChange={(e) => setFormData({ ...formData, source_url: e.target.value })}
-                        placeholder={t('sourceUrlPlaceholder')}
+                        label={t('slug')}
+                        type="text"
+                        value={formData.slug}
+                        onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                        placeholder={t('slugPlaceholder')}
                         variant="form"
-                        className="flex-1"
                         disabled={isPending}
                     />
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={handleExtractFromUrl}
-                        disabled={isPending || isExtracting || !formData.source_url}
-                        className="shrink-0"
-                    >
-                        {isExtracting ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                            <Link2 className="w-4 h-4" />
-                        )}
-                        <span className="ml-2">{t('extract')}</span>
-                    </Button>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('slugHelp')}
+                    </p>
                 </div>
-                <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                    {t('sourceUrlHelp')}
-                </p>
-            </div>
 
-            {/* Name */}
-            <Input
-                label={`${t('name')} *`}
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder={t('namePlaceholder')}
-                variant="form"
-                disabled={isPending}
-            />
-
-            {/* Description */}
-            <Textarea
-                label={`${t('description')} *`}
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder={t('descriptionPlaceholder')}
-                rows={3}
-                variant="form"
-                disabled={isPending}
-            />
-
-            {/* Categories */}
-            <CategoriesField
-                existingCategories={categories}
-                selectedCategories={formData.categories}
-                onAddCategory={handleAddCategory}
-                onRemoveCategory={handleRemoveCategory}
-                isPending={isPending}
-            />
-
-            {/* Tags */}
-            <TagsField
-                tags={formData.tags}
-                tagInput={tagInput}
-                setTagInput={setTagInput}
-                onAddTag={handleAddTag}
-                onRemoveTag={handleRemoveTag}
-                isPending={isPending}
-            />
-
-            {/* Slug (optional) */}
-            <div className="space-y-2">
+                {/* Brand (optional) */}
                 <Input
-                    label={t('slug')}
+                    label={t('brand')}
                     type="text"
-                    value={formData.slug}
-                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                    placeholder={t('slugPlaceholder')}
+                    value={formData.brand}
+                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                    placeholder={t('brandPlaceholder')}
                     variant="form"
                     disabled={isPending}
                 />
-                <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('slugHelp')}</p>
+
+                {/* Brand Logo URL (optional) */}
+                <Input
+                    label={t('brandLogoUrl')}
+                    type="url"
+                    value={formData.brand_logo_url}
+                    onChange={(e) => setFormData({ ...formData, brand_logo_url: e.target.value })}
+                    placeholder={t('brandLogoUrlPlaceholder')}
+                    variant="form"
+                    disabled={isPending}
+                />
+
+                {/* Images (optional) */}
+                <ImagesField
+                    images={formData.images}
+                    imageInput={imageInput}
+                    setImageInput={setImageInput}
+                    onAddImage={handleAddImage}
+                    onRemoveImage={handleRemoveImage}
+                    onCaptureScreenshot={handleOpenScreenshotDialog}
+                    isCapturingScreenshot={isCapturingScreenshot}
+                    sourceUrl={formData.source_url}
+                    isPending={isPending}
+                />
+
+                {/* Options */}
+                <div className="space-y-3">
+                    <Checkbox
+                        checked={formData.featured}
+                        onChange={(e) => setFormData({ ...formData, featured: e.target.checked })}
+                        label={t('featured')}
+                        description={t('featuredHelp')}
+                        variant="form"
+                        disabled={isPending}
+                    />
+
+                    <Checkbox
+                        checked={updateWithPR}
+                        onChange={(e) => setUpdateWithPR(e.target.checked)}
+                        label={t('updateWithPR')}
+                        description={t('updateWithPRHelp')}
+                        variant="form"
+                        disabled={isPending}
+                    />
+                </div>
             </div>
 
-            {/* Brand (optional) */}
-            <Input
-                label={t('brand')}
-                type="text"
-                value={formData.brand}
-                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                placeholder={t('brandPlaceholder')}
-                variant="form"
-                disabled={isPending}
+            <ScreenshotProviderDialog
+                open={isScreenshotDialogOpen}
+                onOpenChange={setIsScreenshotDialogOpen}
+                providers={screenshotProviders}
+                selectedProvider={selectedScreenshotProvider}
+                onSelectedProviderChange={setSelectedScreenshotProvider}
+                onConfirm={handleConfirmCaptureScreenshot}
+                isSubmitting={isCapturingScreenshot}
             />
-
-            {/* Brand Logo URL (optional) */}
-            <Input
-                label={t('brandLogoUrl')}
-                type="url"
-                value={formData.brand_logo_url}
-                onChange={(e) => setFormData({ ...formData, brand_logo_url: e.target.value })}
-                placeholder={t('brandLogoUrlPlaceholder')}
-                variant="form"
-                disabled={isPending}
-            />
-
-            {/* Images (optional) */}
-            <ImagesField
-                images={formData.images}
-                imageInput={imageInput}
-                setImageInput={setImageInput}
-                onAddImage={handleAddImage}
-                onRemoveImage={handleRemoveImage}
-                onCaptureScreenshot={handleCaptureScreenshot}
-                isCapturingScreenshot={isCapturingScreenshot}
-                sourceUrl={formData.source_url}
-                isPending={isPending}
-            />
-
-            {/* Options */}
-            <div className="space-y-3">
-                <Checkbox
-                    checked={formData.featured}
-                    onChange={(e) => setFormData({ ...formData, featured: e.target.checked })}
-                    label={t('featured')}
-                    description={t('featuredHelp')}
-                    variant="form"
-                    disabled={isPending}
-                />
-
-                <Checkbox
-                    checked={updateWithPR}
-                    onChange={(e) => setUpdateWithPR(e.target.checked)}
-                    label={t('updateWithPR')}
-                    description={t('updateWithPRHelp')}
-                    variant="form"
-                    disabled={isPending}
-                />
-            </div>
-        </div>
+        </>
     );
 });
 
@@ -451,7 +520,7 @@ const ImagesField = memo(function ImagesField({
     isPending,
 }: ImagesFieldProps) {
     const t = useTranslations('dashboard.directoryDetail.items.addModal');
-    const { screenshotAvailable } = useItemsContext();
+    const { screenshotProviders } = useItemsContext();
 
     const isValidHttpUrl = (value: string) => {
         try {
@@ -492,7 +561,7 @@ const ImagesField = memo(function ImagesField({
                     <Plus className="w-4 h-4" />
                 </Button>
             </div>
-            {screenshotAvailable && (
+            {screenshotProviders.length > 0 && (
                 <div className="flex items-center gap-2">
                     <Button
                         type="button"

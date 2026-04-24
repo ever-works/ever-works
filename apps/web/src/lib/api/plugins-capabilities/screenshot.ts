@@ -1,14 +1,18 @@
 import 'server-only';
+import type { ProviderOption } from '../types-only';
 import { serverFetch, serverMutation } from '../server-api';
 
 export interface CheckAvailabilityResponse {
     status: 'success' | 'error';
     available: boolean;
-    providers: string[];
+    providers: ProviderOption[];
+    activeProvider?: ProviderOption | null;
 }
 
 export interface CaptureScreenshotDto {
     url: string;
+    providerOverride?: string;
+    directoryId?: string;
     viewportWidth?: number;
     viewportHeight?: number;
     format?: 'png' | 'jpg' | 'webp';
@@ -34,8 +38,9 @@ export interface GetScreenshotUrlResponse {
 }
 
 export const screenshotAPI = {
-    checkAvailability: async () => {
-        return serverFetch<CheckAvailabilityResponse>('/screenshot/check-availability');
+    checkAvailability: async (directoryId?: string) => {
+        const query = directoryId ? `?directoryId=${encodeURIComponent(directoryId)}` : '';
+        return serverFetch<CheckAvailabilityResponse>(`/screenshot/check-availability${query}`);
     },
 
     capture: async (data: CaptureScreenshotDto) => {
