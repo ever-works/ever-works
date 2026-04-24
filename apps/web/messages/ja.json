@@ -2,35 +2,36 @@
     "auth": {
         "error": {
             "title": "認証エラー",
-            "subtitle": "認証中に問題が発生しました",
+            "subtitle": "認証に問題が発生しました",
             "errorOccurred": "エラーが発生しました",
-            "somethingWentWrong": "問題が発生しました",
-            "generic": "予期せぬエラーが発生しました。後でもう一度お試しください。",
-            "invalidCredentials": "メールアドレスまたはパスワードが正しくありません。",
-            "emailNotVerified": "サインインする前にメールアドレスを確認してください。",
-            "accountLocked": "セキュリティ上の理由から、アカウントがロックされています。",
-            "sessionExpired": "セッションの有効期限が切れました。もう一度サインインしてください。",
+            "somethingWentWrong": "何かがうまくいきませんでした",
+            "generic": "予期しないエラーが発生しました。後でもう一度お試しください。",
+            "invalidCredentials": "入力されたメールアドレスまたはパスワードが正しくありません。",
+            "emailNotVerified": "サインイン前にメールアドレスを確認してください。",
+            "accountLocked": "セキュリティ上の理由でアカウントがロックされました。",
+            "sessionExpired": "セッションが期限切れになりました。もう一度サインインしてください。",
             "networkError": "接続できません。インターネット接続を確認してください。",
             "oauth": {
-                "missingCode": "認証コードがありません。もう一度サインインをお試しください。",
-                "invalidState": "認証状態が無効です。もう一度サインインをお試しください。",
+                "missingCode": "認証コードが欠落しています。もう一度サインインをお試しください。",
+                "invalidState": "無効な認証状態です。もう一度サインインをお試しください。",
                 "unsupportedProvider": "この認証プロバイダーはサポートされていません。",
-                "callbackFailed": "認証を完了できませんでした。もう一度お試しください。"
+                "providerConflict": "このプロバイダーアカウントはすでに別のユーザーにリンクされています。予期しない場合は別のアカウントを使用するか、サポートに連絡してください。",
+                "callbackFailed": "認証の完了に失敗しました。もう一度お試しください。"
             },
             "resetPassword": {
-                "missingToken": "パスワードリセットリンクが無効です。確認トークンがありません。",
-                "invalidToken": "パスワードリセットリンクが無効であるか、改ざんされています。",
-                "expiredToken": "パスワードリセットリンクの有効期限が切れています。新しいリンクをリクエストしてください。",
-                "failed": "パスワードのリセットに失敗しました。もう一度お試しになるか、新しいリセットリンクをリクエストしてください。"
+                "missingToken": "パスワードリセットリンクが無効です。確認トークンが欠落しています。",
+                "invalidToken": "パスワードリセットリンクが無効または改ざんされています。",
+                "expiredToken": "パスワードリセットリンクが期限切れです。新しいものをリクエストしてください。",
+                "failed": "パスワードのリセットに失敗しました。もう一度お試しください、または新しいリセットリンクをリクエストしてください。"
             },
             "verifyEmail": {
-                "missingToken": "メール確認リンクが無効です。確認トークンがありません。",
-                "invalidToken": "メール確認リンクが無効であるか、すでに使用されています。",
-                "expiredToken": "メール確認リンクの有効期限が切れています。新しいリンクをリクエストしてください。",
-                "failed": "メールの確認に失敗しました。もう一度お試しになるか、新しい確認リンクをリクエストしてください。"
+                "missingToken": "メール確認リンクが無効です。確認トークンが欠落しています。",
+                "invalidToken": "メール確認リンクが無効またはすでに使用されています。",
+                "expiredToken": "メール確認リンクが期限切れです。新しいものをリクエストしてください。",
+                "failed": "メールの確認に失敗しました。もう一度お試しください、または新しい確認リンクをリクエストしてください。"
             },
             "authorize": {
-                "invalidRedirectUrl": "リダイレクトURLが無効であるか許可されていません。これが誤りだと思われる場合はサポートにお問い合わせください。"
+                "invalidRedirectUrl": "リダイレクトURLが無効または許可されていません。このエラーだと思われる場合はサポートに連絡してください。"
             },
             "actions": {
                 "backToLogin": "ログインに戻る",
@@ -58,44 +59,44 @@
                     "placeholder": "パスワードを入力"
                 },
                 "forgotPassword": "パスワードをお忘れですか？",
-                "rememberMe": "30日間ログイン状態を保持",
+                "rememberMe": "30日間私を覚えていて",
                 "submit": "サインイン",
                 "submitting": "サインイン中..."
             },
             "socialLogin": {
-                "divider": "または次で続行",
+                "divider": "または次の方法で続行",
                 "google": "Google",
                 "github": "GitHub"
             },
             "signUp": {
                 "text": "アカウントをお持ちでないですか？",
-                "link": "新規登録"
+                "link": "サインアップ"
             },
             "errors": {
-                "invalidCredentials": "メールアドレスまたはパスワードが無効です"
+                "invalidCredentials": "無効なメールアドレスまたはパスワード"
             },
             "passwordReset": {
-                "success": "パスワードリセットが完了しました！",
-                "canLogin": "新しいパスワードでログインできます。"
+                "success": "パスワードリセットが成功しました！",
+                "canLogin": "新しいパスワードでサインインできます。"
             }
         },
         "forgotPassword": {
             "title": "パスワードをお忘れですか？",
-            "subtitle": "心配いりません。リセット手順をお送りします",
+            "subtitle": "心配いりません、リセット手順をお送りします",
             "successTitle": "メールを確認してください",
-            "successSubtitle": "パスワードリセット手順をお送りしました",
+            "successSubtitle": "パスワードリセットの手順をお送りしました",
             "form": {
                 "email": {
                     "label": "メールアドレス",
-                    "placeholder": "メールアドレスを入力"
+                    "placeholder": "メールを入力"
                 },
                 "submit": "リセットリンクを送信",
                 "submitting": "送信中..."
             },
             "success": {
-                "title": "メール送信完了",
-                "message": "パスワードリセット手順を {email} に送信しました",
-                "checkSpam": "メールが届かない場合は、スパムフォルダを確認してください。"
+                "title": "メールが正常に送信されました",
+                "message": "パスワードリセットの手順を {email} に送信しました",
+                "checkSpam": "メールが見つからない場合は、迷惑メールフォルダを確認してください。"
             },
             "errors": {
                 "failed": "リセットメールの送信に失敗しました。もう一度お試しください。"
@@ -103,29 +104,29 @@
             "backToLogin": "ログインに戻る",
             "noAccount": {
                 "text": "アカウントをお持ちでないですか？",
-                "link": "新規登録"
+                "link": "サインアップ"
             }
         },
         "resetPassword": {
             "title": "パスワードをリセット",
             "subtitle": "新しいパスワードを以下に入力",
-            "successTitle": "パスワードリセット完了",
+            "successTitle": "パスワードリセット成功",
             "successSubtitle": "パスワードが更新されました",
             "form": {
                 "password": {
                     "label": "新しいパスワード",
                     "placeholder": "新しいパスワードを入力",
-                    "helperText": "6文字以上で、小文字と数字/記号を含めてください",
+                    "helperText": "最低6文字で、小文字と数字/特殊文字を含む必要があります",
                     "errors": {
-                        "minLength": "パスワードは6文字以上必要です",
-                        "lowercase": "パスワードには少なくとも1つの小文字を含めてください",
-                        "numberOrSpecial": "パスワードには少なくとも1つの数字または記号を含めてください",
-                        "cannotStartWith": "パスワードはドットまたは改行で始めることはできません"
+                        "minLength": "パスワードは最低6文字必要です",
+                        "lowercase": "パスワードには最低1つの小文字を含む必要があります",
+                        "numberOrSpecial": "パスワードには最低1つの数字または特殊文字を含む必要があります",
+                        "cannotStartWith": "パスワードはドットまたは改行で始まることができません"
                     }
                 },
                 "confirmPassword": {
-                    "label": "新しいパスワード（確認）",
-                    "placeholder": "新しいパスワードを確認入力",
+                    "label": "新しいパスワードを確認",
+                    "placeholder": "新しいパスワードを確認",
                     "errors": {
                         "noMatch": "パスワードが一致しません"
                     }
@@ -134,25 +135,25 @@
                 "submitting": "リセット中..."
             },
             "success": {
-                "title": "パスワードリセット完了",
+                "title": "パスワードリセット成功",
                 "message": "パスワードが正常に更新されました。新しいパスワードでログインできます。",
-                "loginButton": "ログインへ進む"
+                "loginButton": "ログインへ"
             },
             "errors": {
-                "failed": "パスワードのリセットに失敗しました。もう一度お試しになるか、新しいリセットリンクをリクエストしてください。",
+                "failed": "パスワードのリセットに失敗しました。もう一度お試しください、または新しいリセットリンクをリクエストしてください。",
                 "noToken": "無効なリセットリンク",
                 "invalidLink": "無効なリセットリンク",
-                "missingTokenMessage": "パスワードリセットリンクが無効であるか不完全です。新しいパスワードリセットをリクエストしてください。",
+                "missingTokenMessage": "パスワードリセットリンクが無効または不完全です。新しいパスワードリセットをリクエストしてください。",
                 "requestNewLink": "新しいリセットリンクをリクエスト"
             },
             "backToLogin": "ログインに戻る"
         },
         "register": {
             "title": "アカウントを作成",
-            "subtitle": "今日から素晴らしいディレクトリの構築を始めましょう",
+            "subtitle": "今日から素晴らしいディレクトリを作成開始",
             "form": {
                 "name": {
-                    "label": "氏名",
+                    "label": "フルネーム",
                     "placeholder": "John Doe"
                 },
                 "email": {
@@ -162,23 +163,23 @@
                 "password": {
                     "label": "パスワード",
                     "placeholder": "強力なパスワードを作成",
-                    "hint": "8文字以上必要です"
+                    "hint": "最低8文字必要です"
                 },
                 "confirmPassword": {
-                    "label": "パスワード（確認）",
-                    "placeholder": "パスワードを確認入力"
+                    "label": "パスワードを確認",
+                    "placeholder": "パスワードを確認"
                 },
                 "terms": {
-                    "text": "以下に同意します",
+                    "text": "私は以下のことに同意します：",
                     "termsLink": "利用規約",
                     "and": "および",
                     "privacyLink": "プライバシーポリシー"
                 },
-                "submit": "アカウント作成",
+                "submit": "アカウントを作成",
                 "submitting": "アカウント作成中..."
             },
             "socialSignUp": {
-                "divider": "または次で登録",
+                "divider": "または次の方法でサインアップ",
                 "google": "Google",
                 "github": "GitHub"
             },
@@ -188,86 +189,432 @@
             },
             "errors": {
                 "passwordsDoNotMatch": "パスワードが一致しません",
-                "passwordTooShort": "パスワードは8文字以上必要です",
+                "passwordTooShort": "パスワードは最低8文字必要です",
                 "generic": "エラーが発生しました。もう一度お試しください。"
+            }
+        }
+    },
+    "onboarding": {
+        "label": "はじめに",
+        "title": "Ever Works へようこそ",
+        "subtitle": "数分で最初のディレクトリを作成・公開しましょう。",
+        "skipButton": "今はスキップ",
+        "nextButton": "次へ",
+        "stepIndex": "ステップ {index}",
+        "steps": {
+            "welcome": {
+                "title": "Ever Works とは？",
+                "description": "Ever Works はオープンソースのディレクトリビルダーです。ツール、求人、リンク、製品などの構造化されたコンテンツディレクトリを作成し、ライブウェブサイトとして公開します。",
+                "detail": "セットアップを始めましょう。以下のプロバイダーを接続し、最初のディレクトリを作成してください。",
+                "feature1": {
+                    "title": "AI 駆動のコンテンツ",
+                    "description": "AI プロバイダーを使用してディレクトリ項目を自動生成・充実させます。"
+                },
+                "feature2": {
+                    "title": "即時公開",
+                    "description": "1 クリックで Vercel にデプロイ — サーバー設定不要です。"
+                },
+                "feature3": {
+                    "title": "Git ベース",
+                    "description": "すべてのディレクトリは、あなたが所有・管理する GitHub リポジトリです。"
+                }
+            },
+            "directory": {
+                "title": "最初のディレクトリを作成",
+                "description": "ディレクトリはコンテンツのハブです。項目を追加し、レイアウトを設定し、1 クリックで公開できます。",
+                "detail": "準備完了です！最初のディレクトリを作成して、コンテンツの構築と公開を始めましょう。",
+                "action": "ディレクトリを作成"
+            },
+            "publish": {
+                "title": "公開する",
+                "description": "Vercel または GitHub を接続してディレクトリを公開ウェブサイトとしてデプロイ — ホスティング設定不要です。",
+                "action": "公開設定"
+            }
+        },
+        "pluginStep": {
+            "saveButton": "設定を保存",
+            "savedSuccess": "設定を保存しました。",
+            "noSettings": "このプラグインには設定不要です。",
+            "getTokenPrompt": "まずトークンを作成し、以下に貼り付けて保存して接続を検証してください。",
+            "loadingStatus": "接続状態を読み込み中..."
+        },
+        "plugins": {
+            "byokDescription": "独自のキーを接続して完全な設定をアンロックします。",
+            "byokDefaultButton": "自分のキーを使う",
+            "setupTokenDescription": "まずトークンを作成し、以下に貼り付けて保存して接続を検証してください。",
+            "wizard": {
+                "setupLabel": "セットアップ",
+                "back": "戻る",
+                "continue": "続ける",
+                "errors": {
+                    "loadStatus": "デバイス認証状態の読み込みに失敗しました。",
+                    "start": "デバイス認証の開始に失敗しました。"
+                },
+                "steps": {
+                    "configure": {
+                        "title": "設定",
+                        "description": "{pluginName} の設定を構成します。"
+                    },
+                    "credentials": {
+                        "title": "認証情報",
+                        "description": "{pluginName} の認証情報を設定します。"
+                    },
+                    "verify": {
+                        "title": "検証",
+                        "description": "設定を保存して接続を検証します。",
+                        "cardTitle": "接続を検証",
+                        "cardDescription": "現在の設定を保存し、プラグイン接続の検証を実行します。",
+                        "action": "保存して検証",
+                        "successDefault": "接続が正常に検証されました。"
+                    }
+                },
+                "authModes": {
+                    "apiKey": {
+                        "eyebrow": "ユーザー スコープ",
+                        "title": "API キー",
+                        "description": "このプラグインにユーザー スコープの API キーを使用します。"
+                    },
+                    "deviceAuth": {
+                        "eyebrow": "ユーザー スコープ",
+                        "title": "デバイス認証",
+                        "description": "このプラグインのデバイスコードフローを開始し、ブラウザで完了します。"
+                    }
+                },
+                "deviceAuth": {
+                    "badges": {
+                        "connected": "接続済み",
+                        "pending": "保留中"
+                    },
+                    "status": {
+                        "title": "デバイス認証状態",
+                        "fallback": "このプラグインのデバイス認証を開始または更新します。",
+                        "backendHint": "デバイス認証はユーザーアカウントの管理バックエンドワークスペースに保存されます。同じ Ever Works デプロイメントで完了および使用する必要があります。",
+                        "deviceCode": "デバイスコード",
+                        "verificationUrl": "検証 URL"
+                    },
+                    "actions": {
+                        "notInstalled": "このマシンに必要な CLI がインストールされていません。",
+                        "connected": "デバイス認証が接続されました",
+                        "start": "デバイス認証を開始",
+                        "restart": "デバイス認証を再起動",
+                        "refresh": "状態を更新"
+                    }
+                }
+            }
+        },
+        "claudeWizard": {
+            "label": "Claude Code のセットアップ",
+            "title": "3 ステップで Claude Code をセットアップ",
+            "subtitle": "このフローは推奨設定を表示し、完了前に接続を検証します。",
+            "stepIndex": "ステップ {index}",
+            "continueButton": "続ける",
+            "steps": {
+                "model": {
+                    "title": "モデルを選択",
+                    "description": "Sonnet は品質と速度の推奨バランスとして事前選択されていますが、サポートされる任意のモデルに切り替えられます。"
+                },
+                "credentials": {
+                    "title": "認証情報を追加",
+                    "description": "Claude Code の OAuth トークンまたは Anthropic API キーを貼り付けます。どちらでも動作します。"
+                },
+                "verify": {
+                    "title": "接続を検証",
+                    "description": "設定を保存し、完了前に Claude に対してライブ接続チェックを実行します。",
+                    "checkTitle": "ライブ Claude 検証を実行",
+                    "checkDescription": "ここで保存すると、提供した認証情報に応じて Claude API または CLI チェックが実行されます。",
+                    "button": "検証してセットアップ完了",
+                    "successDefault": "Claude 接続が検証されました。"
+                }
+            }
+        },
+        "codexWizard": {
+            "label": "Codex のセットアップ",
+            "title": "3 ステップで Codex をセットアップ",
+            "subtitle": "このフローは推奨設定を表示し、完了前に接続を検証します。",
+            "stepIndex": "ステップ {index}",
+            "continueButton": "続ける",
+            "steps": {
+                "model": {
+                    "title": "モデルを選択",
+                    "description": "エンドツーエンドのディレクトリ生成に使用する Codex モデルを選択してください。"
+                },
+                "credentials": {
+                    "title": "認証情報を追加",
+                    "description": "Codex が OpenAI API キーまたはバックエンドマシンで利用可能な Codex CLI ログインを使用するかを選択してください。",
+                    "api": {
+                        "title": "OpenAI API キー",
+                        "description": "Codex 実行に OpenAI API キーを使用します。"
+                    },
+                    "local": {
+                        "title": "バックエンド Codex ログイン",
+                        "description": "Ever Works を実行するマシンで既に利用可能な Codex CLI セッションを再利用します。",
+                        "machineTitle": "バックエンド Codex CLI 認証",
+                        "machineDescription": "バックエンドマシンの `codex login status` とローカル Codex 認証ファイルをチェックします。",
+                        "connected": "接続済み",
+                        "pending": "保留中",
+                        "connectButton": "Codex CLI を接続",
+                        "retryButton": "ログインを再度開く",
+                        "connectedButton": "バックエンドマシンで接続済み",
+                        "notInstalled": "バックエンドマシンに Codex CLI がインストールされていません。",
+                        "codeLabel": "デバイスコード",
+                        "pathLabel": "認証ファイル: {path}",
+                        "error": "Codex CLI 認証状態の読み取りに失敗しました。"
+                    }
+                },
+                "verify": {
+                    "title": "接続を検証",
+                    "description": "設定を保存し、完了前に Codex に対してライブ接続チェックを実行します。",
+                    "checkTitle": "ライブ Codex 検証を実行",
+                    "checkDescription": "ここで保存すると、認証の設定に応じて Codex API キーまたはローカル CLI 検証が実行されます。",
+                    "button": "検証してセットアップ完了",
+                    "successDefault": "Codex 接続が検証されました。"
+                }
+            }
+        },
+        "geminiWizard": {
+            "label": "Gemini のセットアップ",
+            "title": "3 ステップで Gemini をセットアップ",
+            "subtitle": "このマシンで Gemini が認証する方法を選択し、完了前に接続を検証します。",
+            "stepIndex": "ステップ {index}",
+            "continueButton": "続ける",
+            "steps": {
+                "mode": {
+                    "title": "認証モードを選択",
+                    "description": "このプラグインが使用する Gemini 認証フローを選択し、同時にモデルを確認します。"
+                },
+                "credentials": {
+                    "title": "アクセスを設定",
+                    "description": "選択した Gemini 認証フローに必要な認証情報を追加します。"
+                },
+                "verify": {
+                    "title": "接続を検証",
+                    "description": "設定を保存し、完了前にライブ Gemini 検証を実行します。",
+                    "checkTitle": "ライブ Gemini 検証を実行",
+                    "button": "検証してセットアップ完了",
+                    "successDefault": "Gemini 接続が検証されました。"
+                }
+            },
+            "modes": {
+                "api-key": {
+                    "description": "Google AI Studio から Gemini API キーを貼り付けます。",
+                    "verifyHint": "ここで保存すると、選択したモデルに対して Gemini API キーを検証します。"
+                },
+                "vertex": {
+                    "description": "Vertex AI に使用する Google Cloud プロジェクトの詳細を提供します。",
+                    "verifyHint": "ここで保存すると、Vertex AI 設定を使用してライブ Gemini CLI 検証を実行します。"
+                }
+            }
+        },
+        "simWizard": {
+            "label": "SIM AI のセットアップ",
+            "title": "2 ステップで SIM AI をセットアップ",
+            "subtitle": "SIM AI API キーを追加し、接続を検証して SIM ワークフローにディレクトリ生成を委任します。",
+            "stepIndex": "ステップ {index}",
+            "continueButton": "続ける",
+            "steps": {
+                "credentials": {
+                    "title": "API キーを追加",
+                    "description": "ダッシュボードから SIM AI API キーを貼り付けます。セルフホストインスタンスを使用する場合は、カスタムベース URL をオプションで設定してください。"
+                },
+                "verify": {
+                    "title": "接続を検証",
+                    "description": "API キーを保存し、SIM AI に対してライブ接続チェックを実行します。",
+                    "checkTitle": "ライブ SIM AI 検証を実行",
+                    "checkDescription": "ここで保存すると、API キーが有効で SIM AI に接続できるかを検証します。",
+                    "button": "検証してセットアップ完了",
+                    "successDefault": "SIM AI 接続が検証されました。"
+                }
             }
         }
     },
     "dashboard": {
         "title": "ダッシュボード",
+        "connectGithub": {
+            "title": "GitHub アカウントを接続",
+            "description": "ディレクトリリポジトリの作成と管理には GitHub が必要です。アカウントを接続して開始してください。",
+            "connect": "GitHub を接続",
+            "dismiss": "後でやります"
+        },
         "toasts": {
             "newUser": {
-                "title": "{companyName} へようこそ！🎉",
-                "description": "アカウントが正常に作成されました。メールを確認してアカウントを認証してください。"
+                "title": "{companyName} へようこそ！ 🎉",
+                "description": "アカウントが正常に作成されました。アカウントを認証するにはメールを確認してください。"
             },
             "emailVerification": {
-                "title": "メールアドレスを確認",
-                "description": "確認リンクをメールアドレスに送信しました。受信トレイとスパムフォルダを確認してください。",
+                "title": "メールを認証",
+                "description": "認証リンクをメールアドレスに送信しました。受信トレイと迷惑メールフォルダを確認してください。",
                 "action": "メールを再送信"
             },
             "verified": {
-                "title": "メール認証完了！✅",
-                "description": "メールアドレスが確認されました。すべての機能にフルアクセスできます。"
+                "title": "メールが正常に認証されました！ ✅",
+                "description": "メールアドレスが認証されました。すべての機能にフルアクセスできます。"
             },
             "oauthConnected": {
-                "title": "GitHub アカウントと接続完了",
-                "description": "アカウントが GitHub と正常に接続されました。",
+                "title": "アカウントが接続されました",
+                "description": "アカウントが {provider} に正常に接続されました。",
                 "defaultProvider": "Git プロバイダー"
+            },
+            "oauthConflict": {
+                "title": "プロバイダーアカウントがすでにリンク済み",
+                "description": "この {provider} アカウントは、別の Ever Works ユーザーにすでにリンクされています。"
+            },
+            "oauthConnectFailed": {
+                "title": "接続に失敗しました",
+                "description": "{provider} アカウントを接続できませんでした。もう一度お試しください。"
             }
         },
         "header": {
-            "welcome": "おかえりなさい、{username} さん！",
+            "welcome": "おかえりなさい、{username}！",
             "subtitle": "AI 駆動のディレクトリを管理し、パフォーマンスを追跡",
+            "onboarding": {
+                "badge": "オンボーディング {currentStep}/{totalSteps}",
+                "dismiss": "オンボーディングショートカットを非表示"
+            },
+            "tooltips": {
+                "openSidebar": "サイドバーを開く",
+                "help": "ヘルプとドキュメント"
+            },
             "notifications": {
                 "title": "通知",
-                "empty": "新しい通知はありません"
+                "empty": "新しい通知はありません",
+                "fetchFailed": "通知の読み込みに失敗しました",
+                "dismissFailed": "通知の非表示に失敗しました"
             },
             "help": {
                 "title": "ヘルプとリソース",
-                "subtitle": "クイックヒントと便利なリンク",
+                "subtitle": "開始するためのクイックヒントと便利なリンク",
+                "onboarding": {
+                    "title": "オンボーディング",
+                    "description": "いつでもガイド付きセットアップを再開し、途中から続けられます。",
+                    "action": "オンボーディングを開く ({currentStep}/{totalSteps})"
+                },
                 "quickTips": {
                     "title": "クイックヒント",
-                    "tip1": "AIチャットを使用して自然言語でディレクトリを作成",
-                    "tip2": "既存のawesomeリストやデータリポジトリをインポート",
-                    "tip3": "設定でディレクトリの外観をカスタマイズ"
+                    "tip1": "ダッシュボードの「ディレクトリを作成」ボタンをクリックして最初のディレクトリを作成します。",
+                    "tip2": "AI ジェネレーターを使用して、ディレクトリに関連アイテムを自動的に追加します。",
+                    "tip3": "GitHub アカウントを接続して、ディレクトリをリポジトリとして同期・デプロイします。"
                 },
                 "shortcuts": {
                     "title": "キーボードショートカット",
-                    "search": "検索",
-                    "newDirectory": "新規ディレクトリ",
-                    "help": "ヘルプ",
-                    "hint": "?を押すとすべてのショートカットを表示"
+                    "search": "ディレクトリを検索",
+                    "newDirectory": "新しいディレクトリを作成",
+                    "help": "ヘルプを開く",
+                    "hint": "Mac では Cmd、Windows/Linux では Ctrl を使用"
                 },
                 "links": {
-                    "title": "便利なリンク",
-                    "github": "GitHubリポジトリ",
+                    "title": "リソース",
+                    "github": "GitHub リポジトリ",
                     "issues": "問題を報告",
                     "docs": "ドキュメント",
                     "comingSoon": "近日公開"
                 },
-                "version": "バージョン {version}"
+                "version": "Ever Works v{version}"
+            }
+        },
+        "activity": {
+            "title": "アクティビティログ",
+            "subtitle": "ディレクトリ全体のすべての操作を追跡",
+            "loading": "読み込み中...",
+            "fetchFailed": "アクティビティの読み込みに失敗しました",
+            "exportFailed": "アクティビティログのエクスポートに失敗しました",
+            "showing": "全 {total} 件中 {from} から {to} を表示",
+            "columns": {
+                "status": "ステータス",
+                "dateTime": "日時",
+                "directory": "ディレクトリ",
+                "type": "タイプ",
+                "summary": "概要"
+            },
+            "filters": {
+                "search": "アクティビティを検索...",
+                "types": {
+                    "allTypes": "すべてのタイプ",
+                    "generation": "生成",
+                    "comparison": "比較",
+                    "deployment": "デプロイ",
+                    "directoryCreated": "ディレクトリ作成",
+                    "directoryUpdated": "ディレクトリ更新",
+                    "directoryDeleted": "ディレクトリ削除",
+                    "pluginEnabled": "プラグイン有効",
+                    "pluginDisabled": "プラグイン無効",
+                    "pluginConfigured": "プラグイン設定",
+                    "memberInvited": "メンバー招待",
+                    "memberRoleChanged": "ロール変更",
+                    "memberRemoved": "メンバー削除",
+                    "scheduleCreated": "スケジュール作成",
+                    "scheduleExecuted": "スケジュール実行",
+                    "import": "インポート",
+                    "login": "ログイン",
+                    "signup": "サインアップ",
+                    "passwordChanged": "パスワード変更"
+                },
+                "statuses": {
+                    "allStatuses": "すべてのステータス",
+                    "pending": "保留中",
+                    "inProgress": "進行中",
+                    "completed": "完了",
+                    "failed": "失敗"
+                }
+            },
+            "actions": {
+                "export": "CSV をエクスポート",
+                "clearFilters": "フィルターをクリア",
+                "stop": "停止",
+                "stopping": "停止中...",
+                "stopRequested": "生成キャンセルをリクエストしました",
+                "stopFailed": "生成の停止に失敗しました"
+            },
+            "empty": {
+                "title": "まだアクティビティはありません",
+                "description": "プラットフォームを使用すると、ここにアクティビティが表示されます。",
+                "noResults": "一致するアクティビティがありません",
+                "noResultsDescription": "現在のフィルターに一致するアクティビティがありません。検索またはフィルターを調整してみてください。"
+            },
+            "detail": {
+                "title": "詳細",
+                "expand": "詳細を展開",
+                "collapse": "詳細を折りたたむ",
+                "event": "イベント",
+                "action": "アクション",
+                "status": "ステータス",
+                "created": "作成日",
+                "fields": "詳細",
+                "liveLogs": "ライブログ",
+                "metadata": "メタデータ",
+                "rawJson": "生 JSON"
+            },
+            "pagination": {
+                "previous": "前へ",
+                "next": "次へ",
+                "pageOf": "{total} ページ中 {page} ページ"
             }
         },
         "directories": {
             "title": "ディレクトリ",
             "subtitle": "AI 駆動のディレクトリを管理・整理",
+            "summary": {
+                "totalDirectories": "ディレクトリ合計",
+                "generating": "生成中",
+                "totalItems": "アイテム合計"
+            },
             "recent": "最近のディレクトリ",
-            "viewAll": "すべて表示（{count}）",
+            "viewAll": "すべて表示 ({count})",
             "search": "ディレクトリを検索...",
-            "create": "ディレクトリ作成",
-            "showing": "{current} / {total} 件のディレクトリを表示中",
+            "create": "ディレクトリを作成",
+            "showing": "{total} ディレクトリ中 {current} を表示中",
+            "searchFailed": "ディレクトリの検索に失敗しました。もう一度お試しください。",
             "pagination": {
                 "previous": "前へ",
                 "next": "次へ"
             },
             "empty": {
-                "title": "ディレクトリがまだありません",
-                "description": "最初の AI 駆動ディレクトリを作成して、コンテンツの整理と表示を始めましょう。",
+                "title": "まだディレクトリはありません",
+                "description": "コンテンツの整理と表示を開始するために、最初の AI 駆動ディレクトリを作成してください。",
                 "action": "最初のディレクトリを作成",
                 "notFound": {
                     "title": "ディレクトリが見つかりません",
-                    "withSearch": "検索条件を調整してみてください",
-                    "withoutSearch": "最初の AI 駆動ディレクトリを作成して始めましょう"
+                    "withSearch": "検索語を調整してみてください",
+                    "withoutSearch": "開始するために最初の AI 駆動ディレクトリを作成してください"
                 }
             }
         },
@@ -277,10 +624,114 @@
             "tabs": {
                 "profile": "プロフィール",
                 "security": "セキュリティ",
-                "apiTokens": "API & トークン",
-                "oauth": "接続済みアカウント",
-                "notifications": "通知",
-                "dangerZone": "危険な操作"
+                "apiKeys": "API キー",
+                "data": "データ",
+                "gitProviders": "Git プロバイダー",
+                "dangerZone": "危険ゾーン"
+            },
+            "data": {
+                "exportTitle": "データをエクスポート",
+                "exportDescription": "ディレクトリ、プラグイン設定、プロフィール情報を含むアカウントデータを JSON ファイルとしてダウンロードします。",
+                "includeSecrets": "シークレット設定（API キー、トークン）を含める — マスクされた値としてエクスポート",
+                "secretsWarning": "シークレット設定はマスクされた値としてエクスポートされます。インポート前に実際の認証情報に手動で置き換える必要があります。",
+                "exportButton": "データをエクスポート",
+                "exporting": "エクスポート中...",
+                "exportSuccess": "データが正常にエクスポートされました",
+                "exportError": "データのエクスポートに失敗しました",
+                "importTitle": "データをインポート",
+                "importDescription": "以前エクスポートした JSON ファイルからデータをインポートします。スラグが一致するディレクトリの競合を解決できます。",
+                "importButton": "データをインポート",
+                "syncTitle": "GitHub 同期",
+                "syncDescription": "バックアップとインスタンス間の移行のために、アカウント設定をプライベート GitHub リポジトリに同期します。",
+                "import": {
+                    "dropzone": "JSON エクスポートファイルをここにドラッグアンドドロップするか、クリックして参照してください",
+                    "selectFile": "ファイルを選択",
+                    "analyzing": "解析中...",
+                    "invalidFileType": "JSON ファイルを選択してください",
+                    "invalidJson": "無効な JSON ファイルです",
+                    "previewError": "インポートファイルの解析に失敗しました",
+                    "summary": "インポート要約",
+                    "directories": "ディレクトリ",
+                    "items": "項目",
+                    "userPlugins": "ユーザー プラグイン",
+                    "version": "フォーマット バージョン",
+                    "missingPlugins": "これらのプラグインはインストールされておらず、スキップされます",
+                    "conflicts": "スラグ競合",
+                    "existingDirectory": "既存",
+                    "incoming": "インポート",
+                    "strategySkip": "スキップ（既存を保持）",
+                    "strategyOverwrite": "既存を上書き",
+                    "strategyRename": "新しいスラグでインポート",
+                    "secretsIncluded": "このエクスポートにはインポートされるシークレット設定が含まれています。",
+                    "maskedSecretsWarning": "このファイルにはマスクされたシークレット値（MASKED:***）が含まれています。インポート前に JSON ファイルを開き、全てのマスクされた値を実際の API キーおよび認証情報に置き換えてください。マスクされた値はインポート時にスキップされます。",
+                    "applyImport": "インポートを実行",
+                    "applying": "インポート中...",
+                    "importSuccess": "データが正常にインポートされました",
+                    "importFailed": "エラーでインポートが完了しました",
+                    "importError": "データのインポートに失敗しました",
+                    "cancel": "キャンセル",
+                    "done": "完了",
+                    "validationErrors": "検証エラー",
+                    "resultSuccess": "インポートが正常に完了しました",
+                    "resultFailed": "インポートに失敗しました",
+                    "directoriesCreated": "ディレクトリが作成されました",
+                    "directoriesUpdated": "ディレクトリが更新されました",
+                    "directoriesSkipped": "ディレクトリがスキップされました",
+                    "pluginsImported": "プラグインがインポートされました",
+                    "warnings": "警告",
+                    "errors": "エラー"
+                },
+                "sync": {
+                    "loading": "同期状態を読み込み中...",
+                    "connectGitHub": "GitHub を接続",
+                    "connectGitHubDescription": "同期を有効にするには、Git プロバイダー設定で GitHub アカウントを接続してください。",
+                    "setupSync": "GitHub 同期を設定",
+                    "createNewRepo": "新しいプライベート リポジトリを作成（ever-works-config）",
+                    "or": "または",
+                    "repoPlaceholder": "owner/repo-name",
+                    "connect": "接続",
+                    "cancel": "キャンセル",
+                    "configureSuccess": "同期リポジトリを設定しました",
+                    "configureError": "同期の設定に失敗しました",
+                    "invalidRepoName": "有効なリポジトリ名（owner/repo）を入力してください",
+                    "lastPush": "最終プッシュ",
+                    "lastPull": "最終プル",
+                    "push": "GitHub にプッシュ",
+                    "pull": "GitHub からプル",
+                    "disconnect": "切断",
+                    "pushSuccess": "設定を GitHub にプッシュしました",
+                    "pushError": "GitHub へのプッシュに失敗しました",
+                    "pullError": "GitHub からのプルに失敗しました",
+                    "disconnectSuccess": "同期が切断されました",
+                    "disconnectError": "切断に失敗しました",
+                    "includeSecrets": "API キーとシークレットを含める（マスク）",
+                    "secretsWarning": "シークレット値は GitHub リポジトリにマスクされたプレースホルダーとして保存されます。実際の認証情報は GitHub にプッシュされません。"
+                }
+            },
+            "pluginCategories": {
+                "ai-provider": "AI プロバイダー",
+                "deployment": "デプロイ",
+                "search": "検索",
+                "screenshot": "スクリーンショット",
+                "content-extractor": "コンテンツ エクストラクター",
+                "data-source": "データ ソース",
+                "git-provider": "Git プロバイダー",
+                "pipeline": "パイプライン"
+            },
+            "plugins": {
+                "configure": "設定",
+                "noPluginsInCategory": "このカテゴリにプラグインはありません",
+                "requiredSettingsMissing": "必須設定が構成されていません",
+                "backToCategory": "{category} に戻る",
+                "pipelineDefault": {
+                    "title": "デフォルト パイプライン",
+                    "description": "ディレクトリ項目生成時にデフォルトで使用するパイプラインを選択します。",
+                    "autoLabel": "自動",
+                    "autoDescription": "各ディレクトリにシステム解決のパイプラインを使用",
+                    "enforceLabel": "このデフォルトを強制",
+                    "enforceDescription": "ディレクトリに独自のパイプラインが設定されていても、このパイプラインを常に事前選択します。フォームで手動でパイプラインを切り替えることは可能です。",
+                    "saveFailed": "デフォルト パイプラインの保存に失敗しました"
+                }
             },
             "profile": {
                 "title": "プロフィール設定",
@@ -299,238 +750,310 @@
                     "save": "変更を保存"
                 },
                 "messages": {
-                    "success": "プロフィールを更新しました",
+                    "success": "プロフィールが正常に更新されました",
                     "usernameRequired": "ユーザー名は必須です",
                     "error": "プロフィールの更新に失敗しました",
-                    "unexpectedError": "予期せぬエラーが発生しました"
+                    "unexpectedError": "予期しないエラーが発生しました"
+                },
+                "emailVerification": {
+                    "title": "メールが検証されていません",
+                    "description": "メールアドレスを確認してください。受信トレイに確認リンクが届いています。",
+                    "resend": "再送信",
+                    "sent": "確認メールを送信しました。受信トレイを確認してください。",
+                    "sendFailed": "確認メールの送信に失敗しました。もう一度お試しください。"
+                },
+                "committer": {
+                    "title": "Git コミッター",
+                    "description": "git コミットで使用する名前とメールを上書きします。アカウント名 ({defaultName}) とメール ({defaultEmail}) を使用する場合は空にしてください。",
+                    "nameLabel": "コミッター名",
+                    "emailLabel": "コミッター メール"
                 }
             },
             "security": {
                 "title": "セキュリティ設定",
-                "subtitle": "アカウントセキュリティと認証を管理",
+                "subtitle": "アカウントのセキュリティと認証を管理",
                 "changePassword": {
-                    "title": "パスワード変更",
+                    "title": "パスワードを変更",
                     "currentPassword": "現在のパスワード",
                     "newPassword": "新しいパスワード",
-                    "confirmPassword": "新しいパスワード（確認）",
+                    "confirmPassword": "新しいパスワードを確認",
                     "showPasswords": "パスワードを表示",
                     "placeholders": {
                         "current": "現在のパスワードを入力",
-                        "new": "新しいパスワードを入力（8文字以上）",
-                        "confirm": "新しいパスワードを確認入力"
+                        "new": "新しいパスワードを入力（最小 8 文字）",
+                        "confirm": "新しいパスワードを確認"
                     },
                     "actions": {
                         "update": "パスワードを更新"
                     },
                     "messages": {
-                        "success": "パスワードを更新しました",
-                        "fillAllFields": "すべてのパスワード項目を入力してください",
-                        "minLength": "新しいパスワードは8文字以上必要です",
+                        "success": "パスワードが正常に更新されました",
+                        "fillAllFields": "すべてのパスワードフィールドを入力してください",
+                        "minLength": "新しいパスワードは少なくとも 8 文字である必要があります",
                         "mismatch": "新しいパスワードが一致しません",
-                        "sameAsCurrent": "新しいパスワードは現在のパスワードと異なるものにしてください",
+                        "sameAsCurrent": "新しいパスワードは現在のパスワードと異する必要があります",
                         "error": "パスワードの更新に失敗しました",
-                        "unexpectedError": "予期せぬエラーが発生しました"
+                        "unexpectedError": "予期しないエラーが発生しました"
                     }
                 },
                 "twoFactor": {
-                    "title": "二段階認証",
+                    "title": "二要素認証",
                     "subtitle": "アカウントに追加のセキュリティ層を追加",
-                    "action": "近日公開予定"
+                    "action": "近日公開"
                 },
                 "sessions": {
-                    "title": "アクティブセッション",
-                    "subtitle": "デバイス間のアクティブセッションを管理",
-                    "action": "セッションを表示（近日公開予定）"
+                    "title": "アクティブなセッション",
+                    "subtitle": "デバイス間のアクティブなセッションを管理",
+                    "action": "セッションを表示（近日公開）"
                 }
             },
             "oauth": {
                 "title": "接続済みアカウント",
-                "subtitle": "外部アカウントを接続して機能を拡張",
+                "subtitle": "拡張機能のために外部アカウントを接続",
                 "github": {
                     "name": "GitHub",
-                    "connected": "GitHub リポジトリでディレクトリを作成・管理",
-                    "disconnected": "リポジトリからディレクトリを作成するために接続",
+                    "connected": "GitHub リポジトリでディレクトリを作成および管理",
+                    "disconnected": "リポジトリからディレクトリを作成するには接続してください",
                     "scopes": "スコープ",
+                    "organizations": "接続済み組織",
+                    "organizationsHint": "追加の組織へのアクセスを許可するには再接続を使用",
                     "actions": {
                         "connect": "接続",
+                        "reconnect": "再接続",
                         "disconnect": "切断",
-                        "confirmDisconnect": "GitHub アカウントの切断を本当に実行しますか？",
-                        "reconnect": "Reconnect"
+                        "confirmDisconnect": "GitHub アカウントを切断してもよろしいですか？"
                     },
                     "messages": {
-                        "disconnected": "GitHub アカウントを切断しました",
+                        "disconnected": "GitHub アカウントが切断されました",
                         "connectError": "GitHub の接続に失敗しました",
                         "disconnectError": "GitHub の切断に失敗しました"
-                    },
-                    "organizations": "Connected Organizations",
-                    "organizationsHint": "Use Reconnect to grant access to additional organizations"
+                    }
+                }
+            },
+            "apiKeys": {
+                "title": "API キー",
+                "subtitle": "リソースへの外部アクセス用の API キーを管理",
+                "create": "API キーを作成",
+                "empty": "まだ API キーがありません。開始するには作成してください。",
+                "neverExpires": "無期限",
+                "columns": {
+                    "name": "名前",
+                    "key": "キー",
+                    "created": "作成日",
+                    "lastUsed": "最終使用",
+                    "expires": "有効期限",
+                    "actions": "操作"
+                },
+                "dialog": {
+                    "title": "API キーを作成",
+                    "nameLabel": "名前",
+                    "namePlaceholder": "例: My Integration",
+                    "expirationLabel": "有効期限",
+                    "cancel": "キャンセル",
+                    "createButton": "作成",
+                    "keyCreated": "API キーが作成されました",
+                    "keyWarning": "このキーを今すぐコピーしてください。再度表示することはできません。",
+                    "done": "完了",
+                    "copy": "クリップボードにコピー",
+                    "copied": "コピーしました！"
+                },
+                "revoke": {
+                    "title": "API キーを取り消す",
+                    "description": "API キー \"{name}\" を取り消してもよろしいですか？この操作は元に戻せません。このキーを使用している統合は動作しなくなります。",
+                    "cancel": "キャンセル",
+                    "confirm": "取り消す"
+                },
+                "messages": {
+                    "nameRequired": "API キーの名前を入力してください",
+                    "createSuccess": "API キーが正常に作成されました",
+                    "createError": "API キーの作成に失敗しました",
+                    "revokeSuccess": "API キーが正常に取り消されました",
+                    "revokeError": "API キーの取り消しに失敗しました",
+                    "copyError": "クリップボードへのコピーに失敗しました"
                 }
             }
         },
         "stats": {
-            "totalDirectories": "ディレクトリ総数",
-            "totalItems": "アイテム総数",
-            "activeWebsites": "アクティブWebサイト",
-            "fromLastMonth": "先月比"
+            "totalDirectories": "ディレクトリの合計",
+            "totalItems": "項目の合計",
+            "activeWebsites": "アクティブなウェブサイト",
+            "fromLastMonth": "先月から"
         },
         "directoryCard": {
             "status": {
                 "active": "アクティブ",
                 "notStarted": "未開始",
                 "generating": "生成中",
-                "generated": "生成完了",
+                "generated": "生成済み",
                 "error": "エラー",
-                "cancelled": "キャンセル済",
-                "idle": "待機中",
-                "opening": "開いています"
+                "cancelled": "キャンセル",
+                "idle": "アイドル",
+                "opening": "開集中"
             },
             "role": {
                 "owner": "所有者",
-                "manager": "マネージャー",
+                "manager": "管理者",
                 "editor": "編集者",
                 "viewer": "閲覧者"
             },
             "shared": {
-                "tooltip": "{role} として共有されています"
+                "tooltip": "{role} としてあなたと共有"
             },
-            "noDescription": "説明がありません",
-            "items": "{count} 件のアイテム",
-            "views": "{count} 回表示",
-            "updated": "更新日 {date}",
+            "noDescription": "説明が提供されていません",
+            "items": "{count} 項目",
+            "views": "{count} ビュー",
+            "updated": "{date} に更新",
             "viewAction": "表示 →",
             "openingTitle": "ディレクトリを開いています",
-            "openingMessage": "ディレクトリを準備しています。詳細はまもなく開きます。このページでお待ちください。"
+            "openingMessage": "ディレクトリを準備中です。詳細がまもなく開きます。このページに留まってください。"
         },
         "directoryList": {
-            "title": "あなたのディレクトリ",
-            "createButton": "ディレクトリ作成"
+            "title": "ディレクトリ",
+            "createButton": "ディレクトリを作成"
         },
         "directoryDetail": {
             "failedToGenerateItems": "アイテムの生成に失敗しました。もう一度お試しください。",
             "generationCompleted": "生成が正常に完了しました",
             "generationCancelled": "生成がキャンセルされました",
             "role": {
-                "owner": "所有者",
-                "manager": "マネージャー",
+                "owner": "オーナー",
+                "manager": "管理者",
                 "editor": "編集者",
                 "viewer": "閲覧者"
             },
             "shared": {
-                "tooltip": "{role} として共有されています"
+                "tooltip": "{role}としてあなたと共有"
             },
             "status": {
                 "notStarted": "未開始",
                 "generating": "生成中",
-                "generated": "生成完了",
+                "generated": "生成済み",
+                "generatedWithWarnings": "警告付きで生成",
                 "error": "エラー",
-                "cancelled": "キャンセル済"
+                "cancelled": "キャンセル済み"
             },
             "tabs": {
                 "overview": "概要",
                 "items": "アイテム",
-                "generator": "生成ツール",
+                "generator": "ジェネレーター",
                 "schedule": "スケジュール",
                 "history": "履歴",
+                "comparisons": "比較",
+                "plugins": "プラグイン",
                 "deploy": "デプロイ",
                 "members": "メンバー",
                 "settings": "設定"
             },
             "members": {
                 "title": "チームメンバー",
-                "subtitle": "このディレクトリへのアクセス権と権限を持つユーザーを管理します。",
+                "subtitle": "このディレクトリのアクセス権限とメンバーの権限を管理します。",
                 "inviteMember": "メンバーを招待",
-                "noMembers": "まだチームメンバーがいません。誰かを招待して共同作業を始めましょう。",
+                "noMembers": "まだチームメンバーがいません。コラボレーションのために誰かを招待しましょう。",
                 "roles": {
                     "creator": "作成者",
-                    "owner": "所有者",
-                    "manager": "マネージャー",
+                    "owner": "オーナー",
+                    "manager": "管理者",
                     "editor": "編集者",
                     "viewer": "閲覧者"
                 },
                 "roleDescriptions": {
-                    "owner": "削除やメンバー管理を含む完全な権限。",
+                    "owner": "削除やメンバー管理を含む完全な制御。",
                     "manager": "ディレクトリの編集とメンバー管理が可能ですが、削除はできません。",
-                    "editor": "ディレクトリのコンテンツ編集と生成の実行が可能。",
-                    "viewer": "ディレクトリを表示するための読み取り専用アクセス。"
+                    "editor": "ディレクトリの内容を編集し、生成を実行できます。",
+                    "viewer": "ディレクトリを閲覧する読み取り専用アクセス。"
                 },
                 "invite": {
                     "title": "チームメンバーを招待",
-                    "description": "このディレクトリでの共同作業に新しいメンバーを追加します。",
+                    "description": "このディレクトリでコラボレーションするための新しいメンバーを追加します。",
                     "emailLabel": "メールアドレス",
                     "emailPlaceholder": "colleague@example.com",
-                    "roleLabel": "ロール",
+                    "roleLabel": "役割",
                     "submit": "招待を送信",
                     "cancel": "キャンセル",
-                    "success": "メンバーを正常に招待しました。",
+                    "success": "メンバーの招待が成功しました。",
                     "errors": {
-                        "emailRequired": "メールアドレスは必須です。",
+                        "emailRequired": "メールアドレスが必要です。",
                         "failed": "メンバーの招待に失敗しました。もう一度お試しください。"
                     }
                 },
                 "confirmRemove": {
                     "title": "メンバーを削除",
-                    "description": "{username} をこのディレクトリから削除してもよろしいですか？すべてのアクセス権が失われます。",
+                    "description": "このディレクトリから {username} を削除してもよろしいですか？すべてのアクセス権が失われます。",
                     "confirm": "削除",
                     "cancel": "キャンセル"
                 },
-                "roleUpdated": "メンバーのロールを更新しました。",
-                "memberRemoved": "メンバーを正常に削除しました。",
+                "roleUpdated": "メンバーの役割が更新されました。",
+                "memberRemoved": "メンバーが正常に削除されました。",
                 "errors": {
-                    "updateFailed": "メンバーロールの更新に失敗しました。",
+                    "updateFailed": "メンバーの役割の更新に失敗しました。",
                     "removeFailed": "メンバーの削除に失敗しました。"
                 }
             },
             "schedule": {
                 "page": {
                     "title": "スケジュールされた更新",
-                    "subtitle": "{name} の更新を専用の間隔と障害処理で自動化します。",
-                    "fallbackName": "このディレクトリ"
+                    "subtitle": "専用の間隔と障害処理で {name} の更新を自動化します。",
+                    "fallbackName": "このディレクトリ",
+                    "loadFailed": "スケジュール設定の読み込みに失敗しました。",
+                    "providerCategories": {
+                        "pipeline": "パイプライン",
+                        "ai": "AI",
+                        "search": "検索",
+                        "screenshot": "スクリーンショット",
+                        "contentExtractor": "エクストラクター"
+                    }
                 },
                 "card": {
                     "title": "自動化",
                     "subtitle": {
-                        "enabled": "間隔、課金、保護策を調整して、スケジュールされた更新を確実に維持します。",
-                        "disabled": "サブスクリプション制限なしで更新を自動化—間隔と障害防止策を自由に設定できます。"
+                        "enabled": "スケジュールされた更新を信頼性高く保つために、間隔、請求、安全策を調整します。",
+                        "disabled": "サブスクリプション制限なしで更新を自動化—間隔と障害ガードを自由に設定。"
                     },
                     "summary": {
-                        "status": "ステータス",
-                        "nextRun": "次回実行",
-                        "lastRun": "前回実行",
-                        "failures": "失敗回数",
-                        "notScheduled": "未スケジュール",
+                        "status": "状態",
+                        "nextRun": "次回の実行",
+                        "lastRun": "最終実行",
+                        "failures": "障害",
+                        "notScheduled": "スケジュールされていません",
                         "never": "なし",
                         "statusMap": {
-                            "active": "自動化が有効",
-                            "paused": "一時停止中",
-                            "canceled": "キャンセル済",
+                            "active": "自動化中",
+                            "paused": "一時停止",
+                            "canceled": "キャンセル",
                             "disabled": "無効"
-                        },
-                        "nextSourceValidation": "次回のソース検証"
+                        }
                     },
                     "fields": {
                         "automation": "自動化",
-                        "automationHelp": "一時的に将来の実行を停止するには一時停止します。",
-                        "billing": "課金モード",
-                        "billingHelp": "サブスクリプションで無制限の実行が可能になります。従量課金では実行ごとに課金されます。",
+                        "automationHelp": "将来の実行を一時的に停止するには一時停止。",
+                        "billing": "請求モード",
+                        "billingHelp": "サブスクリプションで無制限の実行を解除。従量課金は実行ごとに請求。",
                         "cadence": "間隔",
                         "cadenceHelp": "現在のプラン: {plan}",
-                        "cadenceOpen": "サブスクリプションが無効な間は、すべての間隔が利用可能です。",
-                        "maxFailures": "失敗制限",
-                        "maxFailuresHelp": "この回数だけ失敗すると自動的に一時停止します。",
+                        "cadenceOpen": "サブスクリプションが無効の間はすべての間隔が利用可能です。",
+                        "maxFailures": "障害制限",
+                        "maxFailuresHelp": "この数の障害が発生したら自動的に一時停止。",
                         "createPullRequest": "プルリクエストを作成",
-                        "createPullRequestHelp": "有効にすると、スケジュールされた更新は直接コミットする代わりにプルリクエストを作成します。",
-                        "sourceValidationCadence": "ソース検証の頻度",
-                        "sourceValidationCadenceHelp": "既定では更新頻度と同じ設定になりますが、遅くしたり速くしたりできます。"
+                        "createPullRequestHelp": "有効にすると、スケジュールされた更新が直接コミットする代わりにプルリクエストを作成。",
+                        "pipeline": "パイプライン",
+                        "pipelineHelp": "スケジュールで実行されるパイプラインを上書き。最終手動生成と同じパイプラインを使用するにはデフォルトのまま。"
+                    },
+                    "pipeline": {
+                        "inherit": "最終実行の設定を使用",
+                        "notConfigured": "未設定"
+                    },
+                    "providers": {
+                        "title": "次回実行のアクティブプロバイダー"
                     },
                     "billing": {
                         "subscription": "サブスクリプション",
                         "usage": "従量課金"
                     },
                     "cadence": {
-                        "hourly": "毎時",
-                        "every_3_hours": "Every 3 hours",
-                        "every_8_hours": "Every 8 hours",
-                        "every_12_hours": "Every 12 hours",
+                        "hourly": "1時間ごと",
+                        "every_3_hours": "3時間ごと",
+                        "every_8_hours": "8時間ごと",
+                        "every_12_hours": "12時間ごと",
                         "daily": "毎日",
                         "weekly": "毎週",
                         "monthly": "毎月"
@@ -541,113 +1064,208 @@
                         "premium": "プレミアム",
                         "unmetered": "無制限"
                     },
-                    "usageRequired": "この間隔を使用するには、従量課金に切り替えてください。",
-                    "cadenceAllowed": "お使いのプランで許可されている間隔です。",
+                    "usageRequired": "この間隔を使用するには従量課金に切り替えてください。",
+                    "cadenceAllowed": "プランで許可された間隔。",
                     "actions": {
                         "save": "変更を保存",
                         "saving": "保存中...",
                         "runNow": "今すぐ実行",
                         "starting": "開始中...",
                         "cancel": "スケジュールをキャンセル",
-                        "cancelling": "キャンセル中..."
+                        "cancelling": "キャンセル中...",
+                        "startAutomation": "自動化を開始",
+                        "stopAutomation": "自動化を停止"
                     },
                     "success": {
-                        "saved": "スケジュールを保存しました。",
-                        "runStarted": "スケジュール実行を開始しました。",
-                        "cancelled": "スケジュールをキャンセルしました。"
+                        "saved": "スケジュールが保存されました。",
+                        "runStarted": "スケジュール実行が開始されました。",
+                        "cancelled": "スケジュールがキャンセルされました。",
+                        "started": "自動化が開始されました。",
+                        "stopped": "自動化が停止されました。"
                     },
                     "errors": {
-                        "requireUsage": "この間隔を使用するには従量課金課金を有効にしてください。",
+                        "requireUsage": "この間隔を使用するには従量課金請求を有効にしてください。",
                         "updateFailed": "スケジュールの更新に失敗しました。",
                         "runFailed": "実行の開始に失敗しました。",
-                        "cancelFailed": "スケジュールのキャンセルに失敗しました。"
+                        "cancelFailed": "スケジュールのキャンセルに失敗しました。",
+                        "generationRunning": "生成が実行中です。完了するまでお待ちください。",
+                        "scheduleInactive": "今すぐ実行するにはスケジュールがアクティブである必要があります。"
                     },
                     "empty": {
-                        "title": "まず手動生成を実行してください",
-                        "description": "少なくとも1回の手動実行を完了して、自動スケジューリングのロックを解除してください。ディレクトリにデータがあれば、最新の状態に保つことができます。",
-                        "refresh": "ステータスを更新"
+                        "title": "最初に手動生成を実行",
+                        "description": "自動スケジュールを解除するために1回成功した手動実行を完了してください。ディレクトリにデータがあると新鮮に保てます。",
+                        "refresh": "状態を更新"
                     },
-                    "requiresGeneration": "スケジュールを有効にする前に、少なくとも1回のアイテム生成を実行してください。"
+                    "requiresGeneration": "スケジュールを有効にする前に少なくとも1回のアイテム生成を実行してください。"
                 },
                 "actions": {
                     "invalid": "無効なデータ",
-                    "updated": "スケジュールを更新しました。",
+                    "updated": "スケジュールが更新されました。",
                     "updateFailed": "スケジュールの更新に失敗しました。",
-                    "runStarted": "スケジュール実行を開始しました。",
+                    "runStarted": "スケジュール実行が開始されました。",
                     "runFailed": "実行のトリガーに失敗しました。",
-                    "cancelled": "スケジュールをキャンセルしました。",
+                    "cancelled": "スケジュールがキャンセルされました。",
                     "cancelFailed": "スケジュールのキャンセルに失敗しました。"
                 }
             },
             "statusCard": {
                 "notStarted": {
-                    "title": "生成が開始されていません",
-                    "description": "ディレクトリにコンテンツを追加するためにアイテム生成を開始します。",
+                    "title": "生成未開始",
+                    "description": "ディレクトリにコンテンツを格納するためにアイテムの生成を開始してください。",
                     "action": "生成を開始"
                 },
                 "generating": {
                     "title": "生成中",
                     "description": "リクエストを処理中...",
-                    "processing": "処理中..."
+                    "processing": "処理中...",
+                    "stop": "停止",
+                    "stopping": "停止中...",
+                    "stopRequested": "生成のキャンセルがリクエストされました",
+                    "stopFailed": "生成の停止に失敗しました"
                 },
                 "generated": {
                     "title": "生成完了",
-                    "description": "ディレクトリへのアイテム追加が正常に完了しました。",
+                    "description": "ディレクトリに正常にアイテムが格納されました。",
+                    "withWarnings": "警告付きで完了:",
                     "viewItems": "アイテムを表示",
                     "regenerate": "再生成"
                 },
                 "error": {
-                    "title": "生成失敗",
+                    "title": "生成エラー",
                     "description": "生成中にエラーが発生しました。",
+                    "withWarnings": "エラーで生成に失敗:",
                     "retry": "生成を再試行"
                 },
                 "cancelled": {
                     "title": "生成キャンセル",
-                    "description": "前回の生成が完了前に停止されました。",
+                    "description": "前の生成が完了前に停止されました。",
                     "restart": "生成を再開"
                 }
             },
             "stats": {
-                "totalItems": "アイテム総数",
-                "categories": "カテゴリー数",
-                "generationStatus": "生成ステータス",
-                "daysActive": "稼働日数"
+                "totalItems": "アイテム合計",
+                "categories": "カテゴリ",
+                "comparisons": "比較",
+                "generationStatus": "生成状態",
+                "daysActive": "アクティブ日数"
+            },
+            "comparisons": {
+                "title": "比較",
+                "subtitle": "ディレクトリアイテム間の A vs B 比較ページ",
+                "vs": "対",
+                "winner": "勝者: {name}",
+                "tie": "引き分け",
+                "actions": {
+                    "compareItems": "アイテムを比較",
+                    "generateNext": "次を生成",
+                    "generating": "生成中...",
+                    "generateAll": "すべて生成",
+                    "save": "保存",
+                    "stop": "停止",
+                    "generate": "生成",
+                    "cancel": "キャンセル",
+                    "delete": "削除"
+                },
+                "aiModel": {
+                    "title": "AIモデル",
+                    "provider": "プロバイダー",
+                    "model": "モデル",
+                    "default": "デフォルト",
+                    "defaultSuffix": "(デフォルト)",
+                    "loadingModels": "モデルを読み込み中...",
+                    "providerDefault": "プロバイダーデフォルト",
+                    "extendedAnalysisLabel": "拡張分析",
+                    "extendedAnalysisDescription": "各比較に沿った詳細な深掘り分析を生成"
+                },
+                "manualForm": {
+                    "title": "2つのアイテムを比較",
+                    "itemA": "アイテム A",
+                    "itemB": "アイテム B",
+                    "searchPlaceholder": "アイテムを検索...",
+                    "noItems": "アイテムが見つかりません"
+                },
+                "progress": {
+                    "generating": "比較生成中: {completed} / {total} 完了",
+                    "error": "{count, plural, one {# エラー} other {# エラー}}",
+                    "stopped": "停止。{count, plural, one {# 比較} other {# 比較}} を生成、{errors, plural, one {# エラー} other {# エラー}}。",
+                    "done": "完了！{count, plural, one {# 比較} other {# 比較}} を生成。",
+                    "stages": {
+                        "researching": "{itemA} と {itemB} を調査中...",
+                        "analyzing": "比較データを分析中...",
+                        "writing": "比較記事を執筆中...",
+                        "writing_extended": "拡張分析を執筆中...",
+                        "saving": "保存と公開中..."
+                    }
+                },
+                "pagination": {
+                    "showing": "{from}–{to} / {total} を表示中"
+                },
+                "empty": {
+                    "title": "まだ比較なし",
+                    "description": "アイテムを自動選択するには「次を生成」をクリック、特定のペアを選択するには「アイテムを比較」をクリック。"
+                },
+                "deleteDialog": {
+                    "title": "比較を削除",
+                    "confirmation": "\"{title}\" を削除してもよろしいですか？この操作は元に戻せません。"
+                },
+                "generateAllDialog": {
+                    "title": "すべての比較を生成",
+                    "confirmation": "残りの {count} {count, plural, one {比較} other {比較}} を生成しますか？数分かかる場合があります。いつでも停止可能です。"
+                },
+                "toast": {
+                    "selectTwo": "比較する2つのアイテムを選択してください",
+                    "cannotCompareSelf": "アイテムを自身と比較できません",
+                    "noRemaining": "生成する残りのペアがありません",
+                    "consecutiveErrors": "3回の連続エラー後に停止",
+                    "deleted": "比較が削除されました",
+                    "aiConfigSaved": "AIモデル設定が保存されました",
+                    "aiConfigFailed": "AI設定の保存に失敗しました"
+                },
+                "detail": {
+                    "backToComparisons": "比較に戻る",
+                    "summary": "概要",
+                    "dimensions": "評価軸",
+                    "verdict": "判定",
+                    "article": "記事",
+                    "extendedAnalysis": "拡張分析",
+                    "sources": "ソース"
+                }
             },
             "history": {
                 "title": "生成履歴",
-                "subtitle": "過去の生成実行、作成されたアイテム、実行詳細を追跡します。",
-                "error": "さらに読み込めませんでした",
+                "subtitle": "過去の生成実行、作成されたアイテム、実行詳細を追跡。",
+                "error": "エントリの読み込みに失敗しました",
                 "empty": {
-                    "title": "まだ履歴がありません",
-                    "description": "生成をリクエストすると、進行状況と結果がここに表示されます。"
+                    "title": "まだ履歴なし",
+                    "description": "ここに進捗と結果を表示するには生成をリクエスト。"
                 },
                 "status": {
-                    "generating": "進行中",
+                    "generating": "実行中",
                     "generated": "完了",
                     "error": "失敗",
-                    "cancelled": "キャンセル済"
+                    "cancelled": "キャンセル"
                 },
                 "table": {
                     "run": "実行",
-                    "status": "ステータス",
+                    "status": "状態",
                     "newItems": "新規アイテム",
-                    "updatedItems": "更新済み",
+                    "updatedItems": "更新",
                     "totalItems": "合計",
-                    "duration": "所要時間",
-                    "startedAt": "開始日時",
-                    "tokens": "トークン数",
+                    "duration": "期間",
+                    "startedAt": "開始",
+                    "tokens": "トークン",
                     "cost": "コスト"
                 },
-                "loadMore": "もっと読み込む",
-                "noMore": "これ以上の記録はありません",
+                "loadMore": "さらに読み込み",
+                "noMore": "これ以上記録なし",
                 "unknown": "不明",
                 "activity": {
                     "generation": "生成",
-                    "item_added": "項目を追加",
-                    "item_updated": "項目を更新",
-                    "item_removed": "項目を削除",
-                    "comparison_added": "比較を追加",
-                    "comparison_removed": "比較を削除",
+                    "item_added": "アイテム追加",
+                    "item_updated": "アイテム更新",
+                    "item_removed": "アイテム削除",
+                    "comparison_added": "比較追加",
+                    "comparison_removed": "比較削除",
                     "category_change": "カテゴリ変更",
                     "tag_change": "タグ変更",
                     "collection_change": "コレクション変更",
@@ -657,58 +1275,64 @@
                     "added": "追加",
                     "updated": "更新",
                     "removed": "削除",
-                    "fields": "項目",
-                    "expand": "変更履歴の詳細を展開",
-                    "collapse": "変更履歴の詳細を折りたたむ"
+                    "fields": "フィールド",
+                    "expand": "詳細を展開",
+                    "collapse": "詳細を折りたたみ",
+                    "stepLogs": "ステップログ",
+                    "changes": "変更"
+                },
+                "trigger": {
+                    "schedule": "スケジュール",
+                    "api": "API"
                 },
                 "filters": {
                     "label": "アクティビティ",
                     "all": "すべてのアクティビティ",
                     "generation": "生成",
-                    "items": "項目",
+                    "items": "アイテム",
                     "comparisons": "比較",
-                    "taxonomy": "分類",
+                    "taxonomy": "分類法",
                     "community_pr": "コミュニティPR"
                 },
                 "pagination": {
-                    "showing": "{total}件中 {from}-{to}件を表示"
+                    "showing": "{from}-{to} / {total} を表示中"
                 }
             },
             "info": {
                 "title": "ディレクトリ情報",
-                "yourRole": "あなたのロール",
+                "yourRole": "あなたの役割",
                 "role": {
-                    "owner": "所有者",
-                    "manager": "マネージャー",
+                    "owner": "オーナー",
+                    "manager": "管理者",
                     "editor": "編集者",
                     "viewer": "閲覧者"
                 },
                 "slug": "スラッグ",
                 "repositories": "リポジトリ",
                 "dataRepo": "データリポジトリ",
-                "websiteRepo": "Webサイトリポジトリ",
-                "mainRepo": "メインリポジトリ",
+                "websiteRepo": "ウェブサイトリポジトリ",
+                "mainRepo": "メインレポジトリ",
                 "gitProvider": "Gitプロバイダー",
                 "organization": "組織",
                 "created": "作成日",
-                "lastUpdated": "最終更新日",
-                "readmeHeader": "README ヘッダー",
-                "readmeFooter": "README フッター",
+                "lastUpdated": "最終更新",
+                "readmeHeader": "READMEヘッダー",
+                "readmeFooter": "READMEフッター",
                 "custom": "カスタム",
                 "customOverwrite": "カスタム（上書き）",
                 "yes": "はい",
                 "no": "いいえ",
-                "deployProvider": "Deploy Provider",
-                "notConnected": "Not connected",
-                "notConfigured": "Not configured",
-                "viewSite": "View site"
+                "deployProvider": "デプロイプロバイダー",
+                "notConnected": "未接続",
+                "notConfigured": "未設定",
+                "viewSite": "サイトを表示"
             },
             "config": {
                 "title": "設定詳細",
                 "initialPrompt": "初期生成プロンプト",
                 "companyDetails": "会社情報",
                 "companyName": "会社名",
-                "companyWebsite": "Webサイト",
+                "companyWebsite": "ウェブサイト",
                 "generationSettings": "生成設定",
                 "generationMethod": "生成方法",
                 "autoApproval": "自動承認",
@@ -718,372 +1342,460 @@
                 "disabled": "無効",
                 "pullRequestUpdate": "プルリクエスト詳細",
                 "branch": "ブランチ",
-                "prTitle": "PR タイトル",
-                "mainRepository": "メインリポジトリ",
+                "prTitle": "PRタイトル",
+                "mainRepository": "メインレポジトリ",
                 "dataRepository": "データリポジトリ"
             },
             "activity": {
                 "title": "最近のアクティビティ",
-                "noActivity": "まだアクティビティはありません",
+                "noActivity": "まだアクティビティなし",
                 "created": "ディレクトリ作成",
                 "directoryCreated": "ディレクトリが正常に作成されました",
                 "justNow": "たった今"
             },
             "items": {
-                "title": "ディレクトリアイテム",
-                "subtitle": "ディレクトリ内のアイテムを管理・整理",
-                "noItemsTitle": "まだアイテムがありません",
-                "noItemsDescription": "ディレクトリにはまだアイテムがありません。アイテムを生成してコンテンツを追加してください。",
-                "generateItems": "アイテムを生成",
-                "searchPlaceholder": "アイテムを検索...",
-                "allCategories": "すべてのカテゴリー",
-                "showing": "{current} / {total} 件のアイテムを表示中",
-                "noMatch": "検索条件に一致するアイテムがありません",
+                "title": "ディレクトリ項目",
+                "subtitle": "ディレクトリの項目を管理および整理",
+                "noItemsTitle": "まだ項目がありません",
+                "noItemsDescription": "ディレクトリにまだ項目がありません。項目を生成してディレクトリにコンテンツを追加してください。",
+                "generateItems": "項目を生成",
+                "searchPlaceholder": "項目を検索...",
+                "allCategories": "すべてのカテゴリ",
+                "showing": "{total} 項目中 {current} 項目を表示",
+                "noMatch": "検索条件に一致する項目がありません",
                 "source": "ソース",
-                "addItem": "アイテムを追加",
+                "viewOnWebsite": "ウェブサイトで表示",
+                "openSourceUrl": "ソース URL を開く",
+                "addItem": "項目を追加",
                 "delete": "削除",
                 "deleteWithPR": "プルリクエストで削除",
-                "deleteConfirm": "\"{name}\" を削除してもよろしいですか？",
-                "deleteSuccess": "アイテムを削除しました",
-                "deleteFailed": "アイテムの削除に失敗しました",
-                "deleteError": "アイテム削除中にエラーが発生しました",
-                "updateSuccess": "アイテムを更新しました",
-                "updateFailed": "アイテムの更新に失敗しました",
-                "updateError": "アイテム更新中にエラーが発生しました",
-                "updateItem": "アイテムを更新",
-                "loadingMore": "さらに読み込み中...（{current} / {total}）",
+                "deleteConfirm": "「{name}」を削除してもよろしいですか？",
+                "deleteSuccess": "項目が正常に削除されました",
+                "deleteFailed": "項目の削除に失敗しました",
+                "deleteError": "項目の削除中にエラーが発生しました",
+                "updateSuccess": "項目が正常に更新されました",
+                "updateFailed": "項目の更新に失敗しました",
+                "updateError": "項目の更新中にエラーが発生しました",
+                "updateItem": "項目を更新",
+                "loadingMore": "さらに読み込み中... ({current} / {total})",
                 "addModal": {
-                    "title": "新しいアイテムを追加",
+                    "title": "新しい項目を追加",
                     "sourceUrl": "ソース URL",
                     "sourceUrlPlaceholder": "https://example.com/product",
-                    "sourceUrlHelp": "「抽出」をクリックして、URLから自動的にアイテム詳細を取得",
+                    "sourceUrlHelp": "「抽出」をクリックして URL から項目の詳細を自動取得",
                     "extract": "抽出",
-                    "extractSuccess": "アイテム詳細を正常に抽出しました",
-                    "extractFailed": "アイテム詳細の抽出に失敗しました",
-                    "extractError": "詳細抽出中にエラーが発生しました",
+                    "extractSuccess": "項目の詳細が正常に抽出されました",
+                    "extractFailed": "項目の詳細の抽出に失敗しました",
+                    "extractError": "詳細の抽出中にエラーが発生しました",
                     "name": "名前",
-                    "namePlaceholder": "アイテム名を入力",
+                    "namePlaceholder": "項目名を入力",
                     "description": "説明",
-                    "descriptionPlaceholder": "アイテムの簡単な説明を入力",
-                    "category": "カテゴリー",
+                    "descriptionPlaceholder": "項目の簡単な説明を入力",
+                    "category": "カテゴリ",
+                    "categories": "カテゴリ",
+                    "existingCategories": "既存から選択",
+                    "addNewCategory": "または新しいカテゴリを追加",
+                    "categoryPlaceholder": "カテゴリを検索または作成...",
+                    "addMoreCategories": "さらに追加...",
+                    "createCategory": "作成",
+                    "noMatchingCategories": "一致するカテゴリがありません",
+                    "noCategories": "まだカテゴリがありません。入力して作成してください。",
+                    "categoriesRequired": "少なくとも 1 つのカテゴリを選択してください",
                     "tags": "タグ",
                     "tagPlaceholder": "タグを追加して Enter を押す",
-                    "slug": "スラッグ（オプション）",
+                    "slug": "スラッグ (オプション)",
                     "slugPlaceholder": "custom-item-slug",
-                    "slugHelp": "URLフレンドリーな識別子。空のままにすると自動生成されます",
-                    "brand": "ブランド（オプション）",
+                    "slugHelp": "URL フレンドリーな識別子。空の場合自動生成されます",
+                    "brand": "ブランド (オプション)",
                     "brandPlaceholder": "ブランド名を入力",
-                    "brandLogoUrl": "ブランドロゴ URL（オプション）",
+                    "brandLogoUrl": "ブランドロゴ URL (オプション)",
                     "brandLogoUrlPlaceholder": "https://example.com/logo.png",
-                    "images": "画像（オプション）",
+                    "images": "画像 (オプション)",
                     "imagePlaceholder": "https://example.com/screenshot.png",
-                    "imagesHelp": "画像 URL（スクリーンショット、製品画像）を追加",
-                    "featured": "おすすめアイテム",
-                    "featuredHelp": "このアイテムをディレクトリのおすすめとしてマーク",
+                    "imagesHelp": "画像 URL を追加 (スクリーンショット、製品画像)",
+                    "captureScreenshot": "スクリーンショットをキャプチャ",
+                    "captureScreenshotHelp": "ソース URL からスクリーンショットを自動キャプチャ",
+                    "screenshotSuccess": "スクリーンショットが正常にキャプチャされました",
+                    "screenshotFailed": "スクリーンショットのキャプチャに失敗しました",
+                    "screenshotError": "スクリーンショットのキャプチャ中にエラーが発生しました",
+                    "featured": "注目項目",
+                    "featuredHelp": "ディレクトリでこの項目を注目としてマーク",
                     "updateWithPR": "プルリクエストを作成",
-                    "updateWithPRHelp": "変更を直接コミットする代わりにプルリクエストとして送信",
+                    "updateWithPRHelp": "直接コミットではなくプルリクエストで変更を送信",
                     "cancel": "キャンセル",
                     "adding": "追加中...",
-                    "addItem": "アイテムを追加",
-                    "success": "アイテムを追加しました",
-                    "successDescription": "アイテムがディレクトリに追加されました",
-                    "failed": "アイテムの追加に失敗しました",
-                    "error": "アイテム追加中にエラーが発生しました",
+                    "addItem": "項目を追加",
+                    "success": "項目が正常に追加されました",
+                    "successDescription": "項目がディレクトリに追加されました",
+                    "failed": "項目の追加に失敗しました",
+                    "error": "項目の追加中にエラーが発生しました",
                     "errors": {
                         "urlRequired": "抽出にはソース URL が必要です",
                         "invalidUrl": "http:// または https:// を含む有効な URL を入力してください",
                         "invalidImageUrl": "有効な画像 URL を入力してください",
-                        "requiredFields": "すべての必須項目を入力してください"
-                    },
-                    "categories": "Categories",
-                    "existingCategories": "Select from existing",
-                    "addNewCategory": "Or add new category",
-                    "categoryPlaceholder": "Search or create category...",
-                    "addMoreCategories": "Add more...",
-                    "createCategory": "Create",
-                    "noMatchingCategories": "No matching categories",
-                    "noCategories": "No categories yet. Type to create one.",
-                    "categoriesRequired": "Select at least one category",
-                    "captureScreenshot": "Capture Screenshot",
-                    "captureScreenshotHelp": "Auto-capture a screenshot from the source URL",
-                    "screenshotSuccess": "Screenshot captured successfully",
-                    "screenshotFailed": "Failed to capture screenshot",
-                    "screenshotError": "An error occurred while capturing screenshot"
+                        "requiredFields": "すべての必須フィールドを入力してください"
+                    }
                 },
                 "editDisplay": "表示を編集",
-                "editDisplayDescription": "おすすめステータスを切り替え、表示順序を設定します。",
-                "orderLabel": "表示順序（オプション）",
-                "orderHelp": "おすすめ/非おすすめグループ内で、数字が小さいほど早く表示されます。",
-                "deleteDialogTitle": "アイテムを削除",
+                "editDisplayDescription": "注目ステータスを切り替え、表示順序を設定。",
+                "orderLabel": "表示順序 (オプション)",
+                "orderHelp": "小さい数字ほど注目/非注目グループ内で先に表示されます。",
+                "deleteDialogTitle": "項目を削除",
                 "deleteDialogDescription": "これにより {name} がリポジトリから削除されます。",
                 "createPRLabel": "プルリクエストを作成",
-                "createPRHelp": "有効にすると、変更は直接コミットではなく PR 経由で提案されます。",
-                "reasonLabel": "理由（オプション）",
-                "reasonPlaceholder": "なぜこのアイテムを削除するのですか？",
-                "confirmDelete": "アイテムを削除",
-                "captureScreenshot": "Capture screenshot",
+                "createPRHelp": "有効の場合、変更は直接コミットではなく PR で提案されます。",
+                "captureScreenshot": "スクリーンショットをキャプチャ",
                 "screenshot": {
-                    "noSourceUrl": "No source URL available for this item",
-                    "success": "Screenshot captured successfully",
-                    "failed": "Failed to capture screenshot",
-                    "error": "An error occurred while capturing screenshot",
-                    "notConfigured": "Screenshot service is not configured. Please add your ScreenshotOne API key in Settings.",
-                    "captureFailed": "Failed to capture image",
-                    "captureSuccess": "Image captured successfully",
-                    "captureError": "An error occurred while capturing image",
-                    "bulkCaptureComplete": "Bulk image capture completed",
-                    "bulkCaptureError": "An error occurred during bulk image capture"
+                    "noSourceUrl": "この項目にソース URL がありません",
+                    "success": "スクリーンショットが正常にキャプチャされました",
+                    "failed": "スクリーンショットのキャプチャに失敗しました",
+                    "error": "スクリーンショットのキャプチャ中にエラーが発生しました",
+                    "notConfigured": "スクリーンショットサービスが設定されていません",
+                    "providerLabel": "プロバイダ",
+                    "providerRequired": "スクリーンショットプロバイダを選択してください",
+                    "selectProviderTitle": "スクリーンショットプロバイダを選択",
+                    "selectProviderDescription": "この項目で使用するスクリーンショットプロバイダを選択。",
+                    "selected": "選択済み",
+                    "confirmCapture": "スクリーンショットをキャプチャ",
+                    "captureFailed": "画像のキャプチャに失敗しました",
+                    "captureSuccess": "画像が正常にキャプチャされました",
+                    "captureError": "画像のキャプチャ中にエラーが発生しました",
+                    "bulkCaptureComplete": "一括画像キャプチャが完了しました",
+                    "bulkCaptureError": "一括画像キャプチャ中にエラーが発生しました"
                 },
+                "reasonLabel": "理由 (オプション)",
+                "reasonPlaceholder": "この項目を削除する理由は？",
+                "confirmDelete": "項目を削除",
                 "tabs": {
-                    "browseItems": "Browse Items",
-                    "categories": "Categories",
-                    "tags": "Tags",
-                    "sourceHealth": "Source Health"
+                    "browseItems": "項目を閲覧",
+                    "categories": "カテゴリ",
+                    "tags": "タグ",
+                    "collections": "コレクション",
+                    "sourceHealth": "ソースの健全性",
+                    "navigationLabel": "項目タブ"
                 },
                 "taxonomy": {
                     "categories": {
-                        "searchPlaceholder": "Search categories...",
-                        "add": "Add Category",
-                        "addFirst": "Add First Category",
-                        "showing": "Showing {current} of {total} categories",
-                        "empty": "No categories yet",
-                        "noMatch": "No categories match your search",
+                        "searchPlaceholder": "カテゴリを検索...",
+                        "add": "カテゴリを追加",
+                        "addFirst": "最初の カテゴリを追加",
+                        "showing": "{total} カテゴリ中 {current} を表示中",
+                        "empty": "まだカテゴリがありません",
+                        "noMatch": "検索に一致するカテゴリがありません",
                         "columns": {
-                            "name": "Name",
-                            "description": "Description",
-                            "items": "Items",
-                            "priority": "Priority",
-                            "actions": "Actions"
+                            "name": "名前",
+                            "description": "説明",
+                            "items": "項目",
+                            "priority": "優先度",
+                            "actions": "アクション"
                         },
-                        "createSuccess": "Category created successfully",
-                        "createFailed": "Failed to create category",
-                        "updateSuccess": "Category updated successfully",
-                        "updateFailed": "Failed to update category",
-                        "deleteSuccess": "Category deleted successfully",
-                        "deleteFailed": "Failed to delete category",
-                        "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
-                        "deleteHasItems": "Cannot delete category with {count} items assigned",
+                        "createSuccess": "カテゴリが正常に作成されました",
+                        "createFailed": "カテゴリの作成に失敗しました",
+                        "updateSuccess": "カテゴリが正常に更新されました",
+                        "updateFailed": "カテゴリの更新に失敗しました",
+                        "deleteSuccess": "カテゴリが正常に削除されました",
+                        "deleteFailed": "カテゴリの削除に失敗しました",
+                        "deleteConfirm": "「{name}」を削除してもよろしいですか？",
+                        "deleteHasItems": "{count} 個の項目が割り当てられているカテゴリは削除できません",
                         "modal": {
-                            "createTitle": "Create Category",
-                            "editTitle": "Edit Category",
-                            "name": "Name",
-                            "namePlaceholder": "e.g., Monitoring Tools",
-                            "description": "Description",
-                            "descriptionPlaceholder": "Brief description of this category",
-                            "iconUrl": "Icon URL",
+                            "createTitle": "カテゴリを作成",
+                            "editTitle": "カテゴリを編集",
+                            "name": "名前",
+                            "namePlaceholder": "例: 監視ツール",
+                            "description": "説明",
+                            "descriptionPlaceholder": "このカテゴリの簡単な説明",
+                            "iconUrl": "アイコン URL",
                             "iconUrlPlaceholder": "https://example.com/icon.png",
-                            "iconUrlHelp": "Optional URL to an icon image",
-                            "priority": "Priority",
-                            "priorityPlaceholder": "e.g., 1",
-                            "priorityHelp": "Lower numbers appear first in lists",
-                            "cancel": "Cancel",
-                            "save": "Save",
-                            "create": "Create",
-                            "saving": "Saving...",
+                            "iconUrlHelp": "アイコン画像のオプション URL",
+                            "priority": "優先度",
+                            "priorityPlaceholder": "例: 1",
+                            "priorityHelp": "小さい数字ほどリストの上位に表示されます",
+                            "cancel": "キャンセル",
+                            "save": "保存",
+                            "create": "作成",
+                            "saving": "保存中...",
                             "errors": {
-                                "nameRequired": "Category name is required",
-                                "nameExists": "A category with this name already exists"
+                                "nameRequired": "カテゴリ名が必要です",
+                                "nameExists": "この名前のカテゴリはすでに存在します"
                             }
                         }
                     },
                     "tags": {
-                        "searchPlaceholder": "Search tags...",
-                        "add": "Add Tag",
-                        "addFirst": "Add First Tag",
-                        "showing": "Showing {current} of {total} tags",
-                        "empty": "No tags yet",
-                        "noMatch": "No tags match your search",
+                        "searchPlaceholder": "タグを検索...",
+                        "add": "タグを追加",
+                        "addFirst": "最初の タグを追加",
+                        "showing": "{total} タグ中 {current} を表示中",
+                        "empty": "まだタグがありません",
+                        "noMatch": "検索に一致するタグがありません",
                         "columns": {
-                            "name": "Name",
-                            "items": "Items",
-                            "actions": "Actions"
+                            "name": "名前",
+                            "items": "項目",
+                            "actions": "アクション"
                         },
-                        "createSuccess": "Tag created successfully",
-                        "createFailed": "Failed to create tag",
-                        "updateSuccess": "Tag updated successfully",
-                        "updateFailed": "Failed to update tag",
-                        "deleteSuccess": "Tag deleted successfully",
-                        "deleteFailed": "Failed to delete tag",
-                        "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
-                        "deleteHasItems": "Cannot delete tag with {count} items assigned",
+                        "createSuccess": "タグが正常に作成されました",
+                        "createFailed": "タグの作成に失敗しました",
+                        "updateSuccess": "タグが正常に更新されました",
+                        "updateFailed": "タグの更新に失敗しました",
+                        "deleteSuccess": "タグが正常に削除されました",
+                        "deleteFailed": "タグの削除に失敗しました",
+                        "deleteConfirm": "「{name}」を削除してもよろしいですか？",
+                        "deleteHasItems": "{count} 個の項目が割り当てられているタグは削除できません",
                         "modal": {
-                            "createTitle": "Create Tag",
-                            "editTitle": "Edit Tag",
-                            "name": "Name",
-                            "namePlaceholder": "e.g., open-source",
-                            "nameHelp": "Use lowercase with hyphens for multi-word tags",
-                            "cancel": "Cancel",
-                            "save": "Save",
-                            "create": "Create",
-                            "saving": "Saving...",
+                            "createTitle": "タグを作成",
+                            "editTitle": "タグを編集",
+                            "name": "名前",
+                            "namePlaceholder": "例: open-source",
+                            "nameHelp": "複数語のタグは小文字とハイフンを使用",
+                            "cancel": "キャンセル",
+                            "save": "保存",
+                            "create": "作成",
+                            "saving": "保存中...",
                             "errors": {
-                                "nameRequired": "Tag name is required",
-                                "nameExists": "A tag with this name already exists"
+                                "nameRequired": "タグ名が必要です",
+                                "nameExists": "この名前のタグはすでに存在します"
+                            }
+                        }
+                    },
+                    "collections": {
+                        "searchPlaceholder": "コレクションを検索...",
+                        "add": "コレクションを追加",
+                        "addFirst": "最初の コレクションを追加",
+                        "showing": "{total} コレクション中 {current} を表示中",
+                        "empty": "まだコレクションがありません",
+                        "noMatch": "検索に一致するコレクションがありません",
+                        "columns": {
+                            "name": "名前",
+                            "description": "説明",
+                            "items": "項目",
+                            "priority": "優先度",
+                            "actions": "アクション"
+                        },
+                        "createSuccess": "コレクションが正常に作成されました",
+                        "createFailed": "コレクションの作成に失敗しました",
+                        "updateSuccess": "コレクションが正常に更新されました",
+                        "updateFailed": "コレクションの更新に失敗しました",
+                        "deleteSuccess": "コレクションが正常に削除されました",
+                        "deleteFailed": "コレクションの削除に失敗しました",
+                        "deleteConfirm": "「{name}」を削除してもよろしいですか？",
+                        "deleteHasItems": "{count} 個の項目が割り当てられているコレクションは削除できません",
+                        "modal": {
+                            "createTitle": "コレクションを作成",
+                            "editTitle": "コレクションを編集",
+                            "name": "名前",
+                            "namePlaceholder": "例: エディターのおすすめ",
+                            "description": "説明",
+                            "descriptionPlaceholder": "このコレクションの簡単な説明",
+                            "iconUrl": "アイコン URL",
+                            "iconUrlPlaceholder": "https://example.com/icon.png",
+                            "iconUrlHelp": "アイコン画像のオプション URL",
+                            "priority": "優先度",
+                            "priorityPlaceholder": "例: 1",
+                            "priorityHelp": "小さい数字ほどリストの上位に表示されます",
+                            "cancel": "キャンセル",
+                            "save": "保存",
+                            "create": "作成",
+                            "saving": "保存中...",
+                            "errors": {
+                                "nameRequired": "コレクション名が必要です",
+                                "nameExists": "この名前のコレクションはすでに存在します"
                             }
                         }
                     }
                 },
                 "sourceValidation": {
                     "recheckSource": "ソースを再確認",
-                    "checkCompleted": "ソース確認が完了しました",
-                    "checkFailed": "ソース確認に失敗しました",
-                    "failedToCheckSource": "項目のソースを確認できませんでした",
+                    "checkCompleted": "項目ソースの確認が完了しました",
+                    "checkFailed": "項目ソースの確認に失敗しました",
+                    "failedToCheckSource": "項目ソースの確認に失敗しました",
                     "brokenLink": "リンク切れ",
+                    "needsReview": "レビュー必要",
                     "healthy": "正常",
                     "couldNotVerify": "確認できませんでした",
-                    "sourceMayHaveIssues": "ソースに問題がある可能性があります",
-                    "sourceChecked": "ソース確認済み",
+                    "sourceMayHaveIssues": "ソースに問題がある可能性",
+                    "sourceChecked": "ソースを確認済み",
                     "reachable": "到達可能",
-                    "reachabilityInconclusive": "自動到達性チェックは結論が出ませんでした",
+                    "reachabilityInconclusive": "自動到達性確認が不明瞭",
                     "accurateSource": "正確なソース",
-                    "sourceTooGeneric": "ソースが汎用的すぎます",
+                    "sourceTooGeneric": "ソースが一般的すぎる",
                     "weakSource": "弱いソース",
-                    "sourceAccuracyUnknown": "ソースの正確性は不明です",
+                    "sourceAccuracyUnknown": "ソースの正確性不明",
                     "useSuggestedSource": "提案を適用",
-                    "suggestedSourceApplied": "提案されたソースを適用しました",
-                    "failedToUseSuggestedSource": "提案されたソースを使用できませんでした",
-                    "needsReview": "Needs review"
+                    "suggestedSourceApplied": "提案ソースが適用されました",
+                    "failedToUseSuggestedSource": "提案ソースの使用に失敗しました"
                 },
                 "sourceValidationSettings": {
-                    "title": "Source Health Checks",
-                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
-                    "enableLabel": "Enable scheduled checks",
-                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
-                    "cadenceLabel": "Check frequency",
-                    "cadenceHelp": "How often to run source validation on your items.",
-                    "save": "Save",
-                    "saving": "Saving...",
-                    "saveSuccess": "Source validation settings saved",
-                    "saveFailed": "Failed to save source validation settings"
+                    "title": "ソース健全性チェック",
+                    "subtitle": "項目ソース URL を定期スケジュールで自動チェック。",
+                    "enableLabel": "定期チェックを有効化",
+                    "enableHelp": "すべての項目ソース URL が到達可能で正確かを定期的に確認。",
+                    "cadenceLabel": "チェック頻度",
+                    "cadenceHelp": "項目のソース検証をどのくらいの頻度で実行するか。",
+                    "save": "保存",
+                    "saving": "保存中...",
+                    "saveSuccess": "ソース検証設定が保存されました",
+                    "saveFailed": "ソース検証設定の保存に失敗しました"
                 }
             },
             "generator": {
+                "tabs": {
+                    "generate": "生成",
+                    "schedule": "スケジュール",
+                    "history": "履歴",
+                    "comparisons": "比較",
+                    "navigationLabel": "ジェネレーター タブ"
+                },
                 "regenerationWarning": "再生成の警告",
-                "regenerationWarningDescription": "このディレクトリは既に生成されています。新たな生成を開始すると既存のアイテムが置き換えられます。",
+                "regenerationWarningDescription": "このディレクトリはすでに生成されています。新規生成を開始すると、既存のアイテムが置き換えられます。",
                 "requiredInfo": "必須情報",
-                "updateConfiguration": "設定を更新",
-                "promptRequired": "プロンプトは必須です",
-                "operationStartedSuccessfully": "操作を正常に開始しました",
+                "updateConfiguration": "構成の更新",
+                "promptRequired": "プロンプトが必要です",
+                "unconfiguredProviders": "{providers} が設定されていません。生成前に Settings → Plugins を訪れて設定してください。",
+                "operationStartedSuccessfully": "操作が正常に開始されました",
                 "failedToStartOperation": "操作の開始に失敗しました",
+                "loadingFormSchema": "フォーム構成を読み込み中...",
+                "failedToLoadFormSchema": "フォーム構成の読み込みに失敗しました",
+                "selectOption": "オプションを選択",
                 "directoryName": "ディレクトリ名",
                 "generationPrompt": "生成プロンプト",
-                "recommended": "推奨",
-                "promptPlaceholder": "このディレクトリで生成すべきアイテムについて説明してください...",
+                "recommended": "おすすめ",
+                "promptPlaceholder": "このディレクトリに生成するアイテムを記述してください...",
                 "promptHelperText": "生成したいコンテンツの種類について具体的に記述してください",
-                "repositoryDescription": "リポジトリ説明",
+                "repositoryDescription": "リポジトリの説明",
                 "repositoryPlaceholder": "リポジトリの簡単な説明（オプション）",
                 "startGeneration": "生成を開始",
                 "regenerateItems": "アイテムを再生成",
-                "updateItems": "アイテムを更新",
+                "updateItems": "生成を実行",
                 "recreateDirectory": "ディレクトリを再作成",
                 "showAdvancedOptions": "詳細オプションを表示",
                 "hideAdvancedOptions": "詳細オプションを非表示",
                 "cancel": "キャンセル",
                 "companyInformation": "会社情報",
-                "companyInfoDescription": "ブランドコンテンツのためのオプションの会社詳細",
+                "companyInfoDescription": "ブランドコンテンツ用のオプションの会社詳細",
                 "companyName": "会社名",
                 "companyNamePlaceholder": "会社名を入力",
-                "companyWebsite": "会社Webサイト",
+                "companyWebsite": "会社ウェブサイト",
                 "companyWebsitePlaceholder": "https://example.com",
-                "categoriesKeywords": "カテゴリー & キーワード",
-                "categoriesDescription": "コンテンツ整理のためのカテゴリーとキーワードを定義",
-                "initialCategories": "初期カテゴリー",
-                "priorityCategories": "優先カテゴリー",
-                "targetKeywords": "ターゲットキーワード",
-                "addCategoryPlaceholder": "カテゴリーを追加",
-                "addPriorityCategoryPlaceholder": "優先カテゴリーを追加",
+                "categoriesKeywords": "カテゴリとキーワード",
+                "categoriesDescription": "コンテンツ整理のためのカテゴリとキーワードを定義",
+                "initialCategories": "初期カテゴリ",
+                "priorityCategories": "優先カテゴリ",
+                "targetKeywords": "対象キーワード",
+                "addCategoryPlaceholder": "カテゴリを追加",
+                "addPriorityCategoryPlaceholder": "優先カテゴリを追加",
                 "addKeywordPlaceholder": "キーワードを追加",
                 "add": "追加",
                 "sourceUrls": "ソース URL",
-                "sourceUrlsDescription": "コンテンツ抽出用の特定の URL を追加",
+                "sourceUrlsDescription": "コンテンツを抽出する特定の URL を追加",
                 "sourceUrlPlaceholder": "https://example.com/page",
                 "addUrl": "URL を追加",
                 "noSourceUrlsMessage": "ソース URL が追加されていません。ジェネレーターは検索を使用してコンテンツを見つけます。",
-                "advancedConfig": "詳細設定",
-                "advancedConfigDescription": "生成パラメーターと動作を微調整",
+                "advancedConfig": "詳細構成",
+                "advancedConfigDescription": "生成パラメータと動作を微調整",
                 "generationMethod": "生成方法",
                 "methodCreateUpdate": "作成または更新",
-                "methodRecreate": "再作成（すべて置換）",
+                "methodRecreate": "再作成（すべて置き換え）",
                 "updateWithPullRequest": "プルリクエストで更新",
-                "updateWithPullRequestDescription": "直接コミットの代わりにプルリクエストを作成",
-                "enableBadgeEvaluation": "バッジ評価を有効化",
-                "enableBadgeEvaluationDescription": "アイテムの品質バッジを評価・追加",
-                "websiteRepositoryCreationMethod": "Webサイトリポジトリ作成方法",
+                "updateWithPullRequestDescription": "直接コミットではなくプルリクエストを作成",
+                "enableBadgeEvaluation": "バッジ評価を有効にする",
+                "enableBadgeEvaluationDescription": "アイテムに品質バッジを評価して追加",
+                "captureScreenshots": "アイテムのスクリーンショットをキャプチャ",
+                "captureScreenshotsDescription": "生成中に各アイテムのスクリーンショットまたは商品画像を自動的にキャプチャ",
+                "websiteRepositoryCreationMethod": "ウェブサイト リポジトリ作成方法",
                 "methodDuplicate": "複製",
                 "methodFork": "フォーク",
                 "directoryNamePlaceholder": "ディレクトリ名を入力",
                 "methodCreateFromTemplate": "テンプレートから作成",
-                "aiProcessingConfiguration": "AI 処理設定",
+                "aiProcessingConfiguration": "AI 処理構成",
                 "maxSearchQueries": "最大検索クエリ数",
-                "resultsPerQuery": "クエリごとの結果数",
+                "resultsPerQuery": "クエリあたりの結果数",
                 "maxPagesToProcess": "処理する最大ページ数",
-                "relevanceThreshold": "関連性の閾値",
-                "aiFirstGeneration": "AI先行生成",
-                "aiFirstGenerationDescription": "Web検索の前に、初期アイテムのAI生成を有効にします。",
+                "relevanceThreshold": "関連性しきい値",
+                "aiFirstGeneration": "AI 優先生成",
+                "aiFirstGenerationDescription": "ウェブ検索前に初期アイテムの AI 生成を有効にする。",
                 "contentFiltering": "コンテンツフィルタリング",
-                "contentFilteringDescription": "コンテンツ品質フィルタリングを有効化",
+                "contentFilteringDescription": "コンテンツ品質フィルタリングを有効にする",
                 "recreateConfirmTitle": "ディレクトリデータを再作成しますか？",
-                "recreateConfirmDescription": "再作成は既存のアイテムを削除し、一から再生成します。この操作は元に戻せません。",
-                "confirmRecreate": "はい、再作成します",
-                "recreateInlineTitle": "再作成により既存アイテムが削除されます",
-                "recreateInlineDescription": "このモードは現在のアイテムを削除し、一から再構築します。すべてを置き換えたい場合のみ続行してください。",
-                "captureScreenshots": "Capture Item Screenshots",
-                "captureScreenshotsDescription": "Automatically capture screenshots or product images for each item during generation",
-                "companyNameDescription": "Used to personalize generated content with your brand identity.",
-                "companyWebsiteDescription": "AI will analyze your website to better understand your brand context.",
-                "initialCategoriesDescription": "Seed categories to organize items. The AI will use these as a starting point.",
-                "priorityCategoriesDescription": "Categories that will appear first in the generated output. Useful for highlighting important sections.",
-                "targetKeywordsDescription": "Keywords to guide the AI search and content generation. More specific keywords yield better results.",
-                "sourceUrlsFieldDescription": "Specific URLs to extract content from. If empty, the generator will search the web automatically.",
-                "generationMethodDescription": "Choose whether to update existing items or recreate everything from scratch.",
-                "websiteRepositoryCreationMethodDescription": "How the website repository is created. Template is recommended for most cases.",
-                "maxSearchQueriesDescription": "Number of search queries the AI will generate to find relevant content (1-50).",
-                "resultsPerQueryDescription": "Maximum results to retrieve per search query (1-20).",
-                "maxPagesToProcessDescription": "Maximum web pages to process for content extraction (1-100).",
-                "relevanceThresholdDescription": "Minimum relevance score (0-1) for content to be included. Higher values mean stricter filtering.",
-                "dataGeneration": "Data Generation Options",
-                "dataGenerationDescription": "Configure data volume and entity generation",
-                "dataVolumeMode": "Data Volume Mode",
-                "dataVolumeModeReal": "Real",
-                "dataVolumeModeRealDescription": "Generate full production-ready data",
-                "dataVolumeModeSample": "Sample",
-                "dataVolumeModeSampleDescription": "Generate minimal sample data (~10 items)",
-                "entityGeneration": "Entity Generation",
-                "generateCategories": "Generate Categories",
-                "generateCategoriesDescription": "Create category structure for organizing items",
-                "generateTags": "Generate Tags",
-                "generateTagsDescription": "Create tags for flexible item labeling",
-                "generateBrands": "Generate Brands",
-                "generateBrandsDescription": "Extract and create brand entities from items"
+                "recreateConfirmDescription": "再作成すると既存のアイテムを削除し、ゼロから再生成します。この操作は元に戻せません。",
+                "confirmRecreate": "はい、再作成",
+                "recreateInlineTitle": "再作成すると既存のアイテムが削除されます",
+                "recreateInlineDescription": "このモードは現在のアイテムを削除し、ゼロから再構築します。すべてを置き換えたい場合にのみ進めてください。",
+                "companyNameDescription": "生成コンテンツをブランドアイデンティティでパーソナライズするために使用されます。",
+                "companyWebsiteDescription": "AI がウェブサイトを分析してブランドの文脈をより良く理解します。",
+                "initialCategoriesDescription": "アイテムを整理するためのシードカテゴリ。AI はこれを起点として使用します。",
+                "priorityCategoriesDescription": "生成出力で最初に表示されるカテゴリ。重要なセクションを強調するために便利です。",
+                "targetKeywordsDescription": "AI 検索とコンテンツ生成をガイドするキーワード。より具体的なキーワードでより良い結果が得られます。",
+                "sourceUrlsFieldDescription": "コンテンツを抽出する特定の URL。空の場合は、ジェネレーターが自動的にウェブを検索します。",
+                "generationMethodDescription": "既存のアイテムを更新するか、すべてをゼロから再作成するかを選択。",
+                "websiteRepositoryCreationMethodDescription": "ウェブサイト リポジトリの作成方法。ほとんどの場合でテンプレートをおすすめします。",
+                "maxSearchQueriesDescription": "AI が関連コンテンツを見つけるために生成する検索クエリ数（1-50）。",
+                "resultsPerQueryDescription": "検索クエリあたりの最大取得結果数（1-20）。",
+                "maxPagesToProcessDescription": "コンテンツ抽出のために処理する最大ウェブページ数（1-100）。",
+                "relevanceThresholdDescription": "含めるコンテンツの最小関連性スコア（0-1）。高い値ほど厳密なフィルタリング。",
+                "dataGeneration": "データ生成オプション",
+                "dataGenerationDescription": "データ量とエンティティ生成を設定",
+                "dataVolumeMode": "データ量モード",
+                "dataVolumeModeReal": "本番",
+                "dataVolumeModeRealDescription": "完全な本番準備データ生成",
+                "dataVolumeModeSample": "サンプル",
+                "dataVolumeModeSampleDescription": "最小サンプルデータ生成（約 10 アイテム）",
+                "entityGeneration": "エンティティ生成",
+                "generateCategories": "カテゴリを生成",
+                "generateCategoriesDescription": "アイテム整理のためのカテゴリ構造を作成",
+                "generateTags": "タグを生成",
+                "generateTagsDescription": "アイテムの柔軟なラベル付けのためのタグを作成",
+                "generateBrands": "ブランドを生成",
+                "generateBrandsDescription": "アイテムからブランドエンティティを抽出して作成",
+                "pipelineMode": "パイプライン モード",
+                "standardPipeline": "標準パイプライン",
+                "standardPipelineDescription": "個別のプロバイダ選択付きステップバイステップ パイプラインを使用",
+                "providerSelection": "プロバイダ選択",
+                "providerSelectionDescription": "各機能で使用するプロバイダを選択",
+                "searchProvider": "検索プロバイダ",
+                "searchProviderDescription": "ウェブ検索とコンテンツ検出のためのプロバイダ",
+                "screenshotProvider": "スクリーンショット プロバイダ",
+                "screenshotProviderDescription": "アイテムのスクリーンショットキャプチャのためのプロバイダ",
+                "aiProvider": "AI プロバイダ",
+                "aiProviderDescription": "コンテンツ生成と抽出のための AI モデルプロバイダ",
+                "contentExtractorProvider": "コンテンツ抽出",
+                "contentExtractorProviderDescription": "ウェブページからコンテンツを抽出するプロバイダ",
+                "useDirectoryDefault": "ディレクトリ既定を使用",
+                "default": "既定",
+                "notConfigured": "未設定",
+                "notConfiguredTooltip": "このプロバイダは設定が必要です。Settings → Plugins を訪れて設定してください。",
+                "jsonObjectError": "値は JSON オブジェクトである必要があります",
+                "invalidJsonError": "無効な JSON 形式"
             },
             "progress": {
                 "title": "生成中",
                 "processingRequest": "リクエストを処理中...",
                 "steps": {
-                    "promptComparison": "プロンプトを比較中",
-                    "promptProcessing": "プロンプトを処理中",
-                    "domainDetection": "ドメインタイプを検出中",
-                    "aiFirstItemsGeneration": "初期 AI アイテムを生成中",
-                    "searchQueriesGeneration": "検索クエリを作成中",
-                    "webSearch": "Web検索中",
-                    "contentRetrieval": "コンテンツを取得中",
-                    "contentFiltering": "関連コンテンツをフィルタリング中",
-                    "itemsExtraction": "コンテンツからアイテムを抽出中",
-                    "deduplicationDataAggregation": "重複を削除してデータを集計中",
-                    "categoriesTagsProcessing": "カテゴリーとタグを処理中",
-                    "sourcesValidation": "ソースを検証中",
-                    "badgesProcessing": "品質バッジを処理中",
-                    "markdownGeneration": "マークダウンコンテンツを生成中",
+                    "promptComparison": "プロンプトを比較",
+                    "promptProcessing": "プロンプトを処理",
+                    "domainDetection": "ドメイン タイプを検出",
+                    "aiFirstItemsGeneration": "初期 AI アイテムを生成",
+                    "searchQueriesGeneration": "検索クエリを作成",
+                    "webSearch": "ウェブを検索",
+                    "contentRetrieval": "コンテンツを取得",
+                    "contentFiltering": "関連コンテンツをフィルタリング",
+                    "itemsExtraction": "コンテンツからアイテムを抽出",
+                    "deduplicationDataAggregation": "重複を削除しデータを集計",
+                    "categoriesTagsProcessing": "カテゴリとタグを処理",
+                    "sourcesValidation": "ソースを検証",
+                    "badgesProcessing": "品質バッジを処理",
+                    "markdownGeneration": "Markdown コンテンツを生成",
                     "processing": "処理中..."
                 },
-                "progress": "進行状況",
-                "closeNote": "数分かかる場合があります。このページを閉じて後で戻ることもできます。"
+                "progress": "進捗",
+                "closeNote": "数分かかる場合があります。このページを閉じて後で戻ることができます。",
+                "showLogs": "ステップ ログを表示",
+                "hideLogs": "ステップ ログを非表示",
+                "waitingForLogs": "ライブログの到着を待機中..."
             },
             "settings": {
-                "sourceSettings": "ソースリポジトリ",
+                "sourceSettings": "ソース リポジトリ",
                 "originalSource": "元のソース",
                 "syncEnabled": "同期が有効",
-                "syncDescription": "ソースリポジトリからの更新を自動的にプルします。",
+                "syncDescription": "ソース リポジトリから自動的に更新を引き込む。",
                 "syncUpdateFailed": "同期設定の更新に失敗しました",
                 "syncDisabled": "同期が無効",
                 "generalSettings": "一般設定",
@@ -1096,213 +1808,276 @@
                 "organizationNamePlaceholder": "組織名を入力",
                 "readmeConfiguration": "README 設定",
                 "readmeTitle": "README 設定",
-                "customHeader": "カスタムヘッダー",
-                "customHeaderPlaceholder": "README ヘッダーにカスタムコンテンツを追加",
-                "overwriteDefaultHeader": "デフォルトヘッダーを上書き",
-                "customFooter": "カスタムフッター",
-                "cantDeleteWhileGenerating": "アイテム生成中はディレクトリを削除できません。",
-                "customFooterPlaceholder": "README フッターにカスタムコンテンツを追加",
-                "overwriteDefaultFooter": "デフォルトフッターを上書き",
-                "dangerZone": "危険な操作",
-                "dangerTitle": "危険な操作",
-                "deleteWarning": "ディレクトリを削除すると、元に戻せません。十分ご注意ください。",
-                "dangerDescription": "ディレクトリを削除すると、元に戻せません。十分ご注意ください。",
+                "customHeader": "カスタム ヘッダー",
+                "customHeaderPlaceholder": "README ヘッダーにカスタム コンテンツを追加",
+                "overwriteDefaultHeader": "デフォルト ヘッダーを上書き",
+                "customFooter": "カスタム フッター",
+                "cantDeleteWhileGenerating": "アイテムが生成中はディレクトリを削除できません。",
+                "customFooterPlaceholder": "README フッターにカスタム コンテンツを追加",
+                "overwriteDefaultFooter": "デフォルト フッターを上書き",
+                "dangerZone": "危険領域",
+                "dangerTitle": "危険領域",
+                "deleteWarning": "ディレクトリを削除すると元に戻せません。確実に実行してください。",
+                "dangerDescription": "ディレクトリを削除すると元に戻せません。確実に実行してください。",
                 "deleteOptions": "削除するものを選択：",
-                "deleteDataRepository": "データリポジトリを削除",
-                "deleteDataRepositoryDescription": "GitHub から JSON データリポジトリを削除",
-                "deleteMarkdownRepository": "マークダウンリポジトリを削除",
-                "deleteMarkdownRepositoryDescription": "README を含むマークダウンリポジトリを削除",
-                "deleteWebsiteRepository": "Webサイトリポジトリを削除",
-                "deleteWebsiteRepositoryDescription": "デプロイされたWebサイトリポジトリを削除",
-                "deleteConfirm": "本当に実行しますか？",
-                "deleteConfirmDetail": "この操作は元に戻せません。ディレクトリと選択されたリポジトリは永久に削除されます。",
-                "confirmDirectoryName": "確認のためディレクトリ名を入力",
+                "deleteDataRepository": "データ リポジトリを削除",
+                "deleteDataRepositoryDescription": "GitHub から JSON データ リポジトリを削除",
+                "deleteMarkdownRepository": "Markdown リポジトリを削除",
+                "deleteMarkdownRepositoryDescription": "README を含む Markdown リポジトリを削除",
+                "deleteWebsiteRepository": "ウェブサイト リポジトリを削除",
+                "deleteWebsiteRepositoryDescription": "デプロイされたウェブサイト リポジトリを削除",
+                "deleteConfirm": "本当に削除しますか？",
+                "deleteConfirmDetail": "この操作は元に戻せません。ディレクトリと選択したリポジトリが永久に削除されます。",
+                "confirmDirectoryName": "削除確認のためディレクトリ名を入力",
                 "confirmDirectoryNameDescription": "削除を確認するには「{name}」と入力してください",
                 "deleteNameMismatch": "ディレクトリ名が一致しません",
                 "deleteButton": "ディレクトリを削除",
-                "deleteConfirmButton": "はい、削除します",
-                "deleteSuccess": "ディレクトリを削除しました",
+                "deleteConfirmButton": "はい、削除",
+                "deleteSuccess": "ディレクトリが正常に削除されました",
                 "deleteFailed": "ディレクトリの削除に失敗しました",
-                "yesDelete": "はい、削除します",
+                "yesDelete": "はい、削除",
                 "cancel": "キャンセル",
                 "saveChanges": "変更を保存",
                 "updateReadme": "README を更新",
-                "updateSuccess": "設定を更新しました",
+                "updateSuccess": "設定が正常に更新されました",
                 "updateFailed": "設定の更新に失敗しました",
-                "visibilityUpdateFailed": "Failed to update repository visibility",
-                "visibilityWarningTitle": "Make Repository Private?",
-                "visibilityWarningDescription": "You are about to make {name} private.",
-                "visibilityWarningPermanent": "This action has permanent consequences:",
-                "visibilityWarningStars": "All stars will be permanently lost",
-                "visibilityWarningWatchers": "All watchers will be removed",
-                "visibilityWarningNotRestored": "Stars and watchers will NOT be restored if you make the repository public again",
-                "visibilityConfirmPrivate": "Yes, Make Private",
+                "deployProvider": {
+                    "title": "デプロイ プロバイダー",
+                    "description": "ディレクトリ ウェブサイトをデプロイする場所を選択",
+                    "configure": "設定",
+                    "ready": "デプロイの準備完了",
+                    "notConfigured": "未設定",
+                    "deployed": "デプロイ済み",
+                    "viewSite": "サイトを表示",
+                    "updateSuccess": "デプロイ プロバイダーが正常に更新されました",
+                    "updateFailed": "デプロイ プロバイダーの更新に失敗しました"
+                },
+                "visibilityUpdateFailed": "リポジトリの表示設定の更新に失敗しました",
+                "visibilityUpdated": "{name} は現在 {visibility} です",
+                "repositoryVisibilityTitle": "リポジトリの表示設定",
+                "repositoryTypes": {
+                    "main": "メイン",
+                    "data": "データ",
+                    "website": "ウェブサイト"
+                },
+                "repositoryTypeSuffix": "リポジトリ",
+                "visibilityWarningTitle": "リポジトリを非公開にしますか？",
+                "visibilityWarningDescription": "{name} を非公開にしようとしています。",
+                "visibilityWarningPermanent": "この操作には永久的な影響があります：",
+                "visibilityWarningStars": "すべてのスターが永久に失われます",
+                "visibilityWarningWatchers": "すべてのウォッチャーが削除されます",
+                "visibilityWarningNotRestored": "リポジトリを再び公開にしても、スターとウォッチャーは復元されません",
+                "visibilityConfirmPrivate": "はい、非公開にする",
                 "advancedPrompts": {
-                    "title": "Advanced Prompts",
-                    "subtitle": "Customize AI prompts for directory generation. Leave empty to use defaults.",
-                    "save": "Save Prompts",
-                    "saveSuccess": "Advanced prompts saved successfully",
-                    "saveFailed": "Failed to save advanced prompts",
+                    "title": "標準パイプライン",
+                    "subtitle": "カスタム プロンプト",
+                    "comparisonTitle": "比較",
+                    "comparisonSubtitle": "カスタム プロンプト",
+                    "save": "プロンプトを保存",
+                    "saveSuccess": "詳細プロンプトが正常に保存されました",
+                    "saveFailed": "詳細プロンプトの保存に失敗しました",
+                    "saveComparisonSuccess": "比較プロンプトが正常に保存されました",
                     "prompts": {
                         "relevanceAssessment": {
-                            "title": "Relevance Assessment",
-                            "description": "Additional instructions for filtering web pages by relevance to your directory topic.",
-                            "placeholder": "e.g., Only include pages that focus on open-source projects..."
+                            "title": "関連性評価",
+                            "description": "ディレクトリ トピックとの関連性でウェブページをフィルタリングするための追加指示。",
+                            "placeholder": "例: オープンソース プロジェクトに焦点を当てたページのみを含める..."
                         },
                         "itemGeneration": {
-                            "title": "Item Generation",
-                            "description": "Additional instructions for AI-generated initial items before web search.",
-                            "placeholder": "e.g., Focus on enterprise-grade solutions with active maintenance..."
+                            "title": "アイテム生成",
+                            "description": "ウェブ検索前の AI 生成初期アイテムのための追加指示。",
+                            "placeholder": "例: 積極的にメンテナンスされているエンタープライズ グレードのソリューションに焦点..."
                         },
                         "itemExtraction": {
-                            "title": "Item Extraction",
-                            "description": "Additional instructions for extracting items from web page content.",
-                            "placeholder": "e.g., Prioritize tools with official documentation links..."
+                            "title": "アイテム抽出",
+                            "description": "ウェブページ コンテンツからアイテムを抽出するための追加指示。",
+                            "placeholder": "例: 公式ドキュメント リンクがあるツールを優先..."
                         },
                         "searchQuery": {
-                            "title": "Search Query Generation",
-                            "description": "Additional instructions for generating search queries to find content.",
-                            "placeholder": "e.g., Include queries targeting GitHub repositories and official docs..."
+                            "title": "検索クエリ生成",
+                            "description": "コンテンツを見つけするための検索クエリを生成するための追加指示。",
+                            "placeholder": "例: GitHub リポジトリや公式ドキュメントを対象としたクエリを含める..."
                         },
                         "categorization": {
-                            "title": "Categorization",
-                            "description": "Additional instructions for categorizing and tagging extracted items.",
-                            "placeholder": "e.g., Use technical categories like 'CLI Tools', 'Libraries', 'Frameworks'..."
+                            "title": "分類",
+                            "description": "抽出されたアイテムを分類およびタグ付けするための追加指示。",
+                            "placeholder": "例: 'CLI ツール'、'ライブラリ'、'フレームワーク' などの技術カテゴリを使用..."
                         },
                         "deduplication": {
-                            "title": "Deduplication",
-                            "description": "Additional instructions for identifying and removing duplicate items.",
-                            "placeholder": "e.g., Consider items with similar GitHub repos as duplicates..."
+                            "title": "重複除去",
+                            "description": "重複アイテムを特定して削除するための追加指示。",
+                            "placeholder": "例: 類似した GitHub リポジトリを持つアイテムを重複とみなす..."
                         },
                         "sourceValidation": {
-                            "title": "Source Validation",
-                            "description": "Additional instructions for validating item source URLs.",
-                            "placeholder": "e.g., Prefer official project websites over third-party reviews..."
+                            "title": "ソース検証",
+                            "description": "アイテムのソース URL を検証するための追加指示。",
+                            "placeholder": "例: サードパーティのレビューより公式プロジェクト ウェブサイトを優先..."
+                        },
+                        "comparisonCustomPrompt": {
+                            "title": "カスタム プロンプト",
+                            "description": "比較生成プロンプトに追加される追加指示。",
+                            "placeholder": "例: 「価格差に焦点を当てる」、「カジュアルなトーンで書く」"
                         }
                     }
                 },
+                "communityPrProcessing": "コミュニティ PR",
+                "communityPrEnableLabel": "コミュニティ PR を有効化",
+                "communityPrEnableDescription": "コミュニティから提出されたプル リクエストを自動的に処理",
+                "communityPrAutoCloseLabel": "処理後に PR を自動クローズ",
+                "communityPrAutoCloseDescription": "処理された後、コミュニティ プル リクエストを自動的にクローズ",
+                "communityPrEnabled": "コミュニティ PR 処理が有効",
+                "communityPrDisabled": "コミュニティ PR 処理が無効",
+                "communityPrSettingsUpdated": "コミュニティ PR 設定が更新されました",
+                "communityPrUpdateFailed": "コミュニティ PR 設定の更新に失敗しました",
                 "websiteConfig": {
-                    "title": "Website Configuration",
-                    "subtitle": "Customize how your directory website looks and behaves",
-                    "loadFailed": "Failed to load website settings",
-                    "saveSuccess": "Website settings saved successfully",
-                    "saveFailed": "Failed to save website settings",
-                    "save": "Save Settings",
+                    "title": "ウェブサイト設定",
+                    "subtitle": "ディレクトリ ウェブサイトの外観と動作をカスタマイズ",
+                    "loadFailed": "ウェブサイト設定の読み込みに失敗しました",
+                    "saveSuccess": "ウェブサイト設定が正常に保存されました",
+                    "saveFailed": "ウェブサイト設定の保存に失敗しました",
+                    "save": "設定を保存",
+                    "tabs": {
+                        "general": "一般",
+                        "header": "ヘッダー",
+                        "homepage": "ホームページ",
+                        "footer": "フッター"
+                    },
                     "sections": {
                         "siteName": {
-                            "title": "Site Identity",
-                            "label": "Site Name",
-                            "placeholder": "My Directory",
-                            "helper": "The name displayed on your website header and browser tab"
+                            "title": "サイト ID",
+                            "label": "サイト名",
+                            "placeholder": "マイ ディレクトリ",
+                            "helper": "ウェブサイト ヘッダーとブラウザ タブに表示される名前"
+                        },
+                        "siteUrl": {
+                            "label": "サイト URL",
+                            "placeholder": "https://example.com",
+                            "helper": "会社またはディレクトリ ウェブサイトの URL"
                         },
                         "global": {
-                            "title": "Global Features",
-                            "categories": "Categories",
-                            "categoriesHelper": "Show category filtering and navigation",
-                            "tags": "Tags",
-                            "tagsHelper": "Show tag filtering and navigation",
-                            "companies": "Companies",
-                            "companiesHelper": "Show company information for items",
-                            "surveys": "Surveys",
-                            "surveysHelper": "Enable survey functionality"
+                            "title": "グローバル機能",
+                            "categories": "カテゴリ",
+                            "categoriesHelper": "カテゴリ フィルタリングとナビゲーションを表示",
+                            "collections": "コレクション",
+                            "collectionsHelper": "キュレーションされたコレクションを表示",
+                            "tags": "タグ",
+                            "tagsHelper": "タグ フィルタリングとナビゲーションを表示",
+                            "companies": "会社",
+                            "companiesHelper": "アイテムの会社情報を表示",
+                            "surveys": "アンケート",
+                            "surveysHelper": "アンケート機能を有効化"
                         },
                         "header": {
-                            "title": "Header Settings",
-                            "submit": "Submit Button",
-                            "submitHelper": "Show the submit item button in header",
-                            "pricing": "Pricing Link",
-                            "pricingHelper": "Show pricing link in header navigation",
-                            "layoutSelector": "Layout Selector",
-                            "layoutSelectorHelper": "Allow users to switch between layouts",
-                            "languageSelector": "Language Selector",
-                            "languageSelectorHelper": "Allow users to change language",
-                            "themeSelector": "Theme Selector",
-                            "themeSelectorHelper": "Allow users to switch between themes",
-                            "defaultLayout": "Default Layout",
-                            "defaultTheme": "Default Theme",
-                            "themeLight": "Light",
-                            "themeDark": "Dark",
-                            "themeSystem": "System",
-                            "defaultPagination": "Default Pagination",
-                            "paginationStandard": "Standard",
-                            "paginationInfinite": "Infinite Scroll",
-                            "paginationLoadMore": "Load More"
+                            "title": "ヘッダー設定",
+                            "submit": "送信ボタン",
+                            "submitHelper": "ヘッダーにアイテム送信ボタンを表示",
+                            "pricing": "価格リンク",
+                            "pricingHelper": "ヘッダー ナビゲーションに価格リンクを表示",
+                            "layoutSelector": "レイアウト選択",
+                            "layoutSelectorHelper": "ユーザーがレイアウトを切り替えられるようにする",
+                            "languageSelector": "言語選択",
+                            "languageSelectorHelper": "ユーザーが言語を変更できるようにする",
+                            "themeSelector": "テーマ選択",
+                            "themeSelectorHelper": "ユーザーがテーマを切り替えられるようにする",
+                            "defaults": "デフォルト",
+                            "defaultLayout": "デフォルト レイアウト",
+                            "layoutHome1": "ホーム 1",
+                            "layoutHome2": "ホーム 2",
+                            "layoutHome3": "ホーム 3",
+                            "defaultTheme": "デフォルト テーマ",
+                            "themeLight": "ライト",
+                            "themeDark": "ダーク",
+                            "themeSystem": "システム",
+                            "defaultPagination": "デフォルト ページネーション",
+                            "paginationStandard": "標準",
+                            "paginationInfinite": "無限スクロール",
+                            "paginationLoadMore": "もっと読み込む"
                         },
                         "homepage": {
-                            "title": "Homepage Settings",
-                            "hero": "Hero Section",
-                            "heroHelper": "Show the hero section with title and description",
-                            "search": "Search Bar",
-                            "searchHelper": "Show the search bar on homepage",
-                            "defaultView": "Default View",
-                            "viewClassic": "Classic",
-                            "viewGrid": "Grid",
-                            "viewList": "List",
-                            "defaultSort": "Default Sort",
-                            "sortPopularity": "Popularity",
-                            "sortNewest": "Newest",
-                            "sortAlphabetical": "Alphabetical"
+                            "title": "ホームページ設定",
+                            "hero": "ヒーローセクション",
+                            "heroHelper": "タイトルと説明付きのヒーローセクションを表示",
+                            "search": "検索バー",
+                            "searchHelper": "ホームページに検索バーを表示",
+                            "defaults": "デフォルト",
+                            "defaultView": "デフォルト ビュー",
+                            "viewClassic": "クラシック",
+                            "viewGrid": "グリッド",
+                            "viewList": "リスト",
+                            "defaultSort": "デフォルト ソート",
+                            "sortPopularity": "人気順",
+                            "sortNewest": "新着順",
+                            "sortAlphabetical": "アルファベット順"
                         },
                         "footer": {
-                            "title": "Footer Settings",
-                            "subscribe": "Newsletter Subscribe",
-                            "subscribeHelper": "Show newsletter subscription form",
-                            "version": "Version Display",
-                            "versionHelper": "Show version information in footer",
-                            "themeSelector": "Footer Theme Selector",
-                            "themeSelectorHelper": "Show theme toggle in footer"
+                            "title": "フッター設定",
+                            "subscribe": "ニュースレター登録",
+                            "subscribeHelper": "ニュースレター登録フォームを表示",
+                            "version": "バージョン表示",
+                            "versionHelper": "フッターにバージョン情報を表示",
+                            "themeSelector": "フッター テーマ選択",
+                            "themeSelectorHelper": "フッターにテーマ切り替えを表示"
                         },
                         "customMenu": {
-                            "title": "Custom Menu Links",
-                            "description": "Add custom links to your website header and footer navigation",
-                            "headerLinks": "Header Links",
-                            "footerLinks": "Footer Links",
-                            "addLink": "Add Link",
-                            "noLinks": "No custom links added",
-                            "labelPlaceholder": "Link label",
-                            "pathPlaceholder": "/about or https://...",
-                            "targetSelf": "Same tab",
-                            "targetBlank": "New tab"
+                            "title": "カスタム メニューリンク",
+                            "description": "ウェブサイト ヘッダーとフッター ナビゲーションにカスタム リンクを追加",
+                            "headerLinks": "ヘッダーリンク",
+                            "footerLinks": "フッターリンク",
+                            "addLink": "リンクを追加",
+                            "noLinks": "カスタム リンクが追加されていません",
+                            "labelPlaceholder": "リンク ラベル",
+                            "pathPlaceholder": "/about または https://...",
+                            "targetSelf": "同一タブ",
+                            "targetBlank": "新規タブ"
                         }
                     }
+                },
+                "committer": {
+                    "title": "Git コミッター",
+                    "description": "このディレクトリの git コミットでコミッター名とメールを上書き。ユーザー設定またはアカウント デフォルトを使用する場合は空のままに。",
+                    "nameLabel": "コミッター名",
+                    "emailLabel": "コミッター メール",
+                    "save": "コミッターを保存",
+                    "saved": "コミッター設定が保存されました",
+                    "saveFailed": "コミッター設定の保存に失敗しました"
                 }
             },
             "deploy": {
                 "noProviderAlert": {
-                    "title": "No Deployment Provider",
-                    "description": "Select a deployment provider to deploy your directory website.",
-                    "selectButton": "Select & Continue",
-                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                    "title": "デプロイプロバイダーがありません",
+                    "description": "ディレクトリウェブサイトをデプロイするには、デプロイプロバイダーを選択してください。",
+                    "selectButton": "選択して続行",
+                    "noProviders": "利用可能なデプロイプロバイダーがありません。まずデプロイプラグインをインストールしてください。"
                 },
                 "noTokenAlert": {
-                    "title": "{provider} Token Required",
-                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
-                    "configureButton": "API トークン設定へ移動",
-                    "getTokenButton": "Vercel トークンを取得",
+                    "title": "{provider} トークンが必要です",
+                    "description": "ディレクトリをデプロイするには、プラグイン設定で {provider} API トークンを設定する必要があります。",
+                    "configureButton": "プラグイン設定で設定",
+                    "getTokenButton": "API トークンを取得",
                     "howTo": {
-                        "title": "Vercel トークンの設定方法：",
-                        "step1": "「Vercel トークンを取得」をクリックして Vercel ダッシュボードを開く",
-                        "step2": "デプロイ権限を持つ新しいトークンを作成",
-                        "step3": "プラグイン設定 > {provider} で {provider} APIトークンを設定してください",
-                        "step4": "ここに戻ってディレクトリをデプロイしてください"
+                        "title": "デプロイの設定方法：",
+                        "step1": "「API トークンを取得」をクリックしてプロバイダーダッシュボードを開きます",
+                        "step2": "デプロイ権限を持つ新しいトークンを作成します",
+                        "step3": "プラグイン設定 > {provider} で {provider} API トークンを設定します",
+                        "step4": "ここに戻ってディレクトリをデプロイします"
                     }
                 },
                 "sharedNoTokenAlert": {
-                    "title": "デプロイメントが利用できません",
-                    "description": "ディレクトリ所有者がデプロイメント用の Vercel トークンを設定していません。デプロイメントを設定するにはディレクトリ所有者にお問い合わせください。",
-                    "hint": "コラボレーターとして、所有者が Vercel 統合を設定した後、デプロイメントをトリガーできます。"
+                    "title": "デプロイが利用できません",
+                    "description": "ディレクトリオーナーがデプロイを設定していません。ディレクトリオーナーにデプロイの設定を依頼してください。",
+                    "hint": "コラボレーターとして、オーナーがデプロイプロバイダーを設定したら、デプロイをトリガーできます。"
                 },
                 "form": {
                     "deployment": {
-                        "title": "Vercel にデプロイ",
-                        "description": "Vercel 上にディレクトリ Web サイトリポジトリをデプロイします。",
-                        "deployButton": "{provider}にデプロイ",
+                        "title": "ウェブサイトをデプロイ",
+                        "description": "ディレクトリウェブサイトリポジトリをデプロイします。",
+                        "deployButton": "{provider} にデプロイ",
                         "deployingButton": "デプロイ中...",
-                        "deployingStateButton": "デプロイ中（{state}）...",
-                        "successMessage": "Webサイトが正常にデプロイされました！",
+                        "deployingStateButton": "デプロイ中 ({state})...",
+                        "successMessage": "ウェブサイトが正常にデプロイされました！",
                         "teamSelection": {
-                            "title": "Vercel チームを選択",
-                            "description": "このディレクトリをデプロイする Vercel チームを選択します。",
+                            "title": "チームを選択",
+                            "description": "このディレクトリをデプロイするチームを選択してください。",
                             "label": "チーム",
                             "placeholder": "チームを選択",
                             "confirmButton": "チームにデプロイ",
@@ -1310,122 +2085,174 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "Webサイトリポジトリを更新",
-                        "description": "テンプレートの最新変更を次に同期",
-                        "websiteRepository": "Webサイトリポジトリ",
+                        "title": "ウェブサイトリポジトリを更新",
+                        "description": "テンプレートからの最新の変更を",
+                        "websiteRepository": "ウェブサイトリポジトリに同期",
                         "updateButton": "リポジトリを更新",
                         "updatingButton": "更新中..."
                     },
                     "messages": {
-                        "deploySuccess": "デプロイを正常に開始しました",
-                        "deployPending": "デプロイがキューに入り、まもなく開始されます",
-                        "deployFailed": "Vercel へのデプロイに失敗しました",
+                        "deploySuccess": "デプロイが正常に開始されました",
+                        "deployPending": "デプロイがキューに入れられ、間もなく開始されます",
+                        "deployFailed": "デプロイに失敗しました",
                         "deployError": "デプロイ中にエラーが発生しました",
-                        "updateSuccess": "リポジトリを正常に更新しました",
+                        "saveSettingsFailed": "設定の保存に失敗しました",
+                        "saveSettingsBeforeDeploymentFailed": "デプロイ前の設定保存に失敗しました",
+                        "updateSuccess": "リポジトリが正常に更新されました",
                         "updateFailed": "リポジトリの更新に失敗しました",
-                        "updateError": "リポジトリ更新中にエラーが発生しました"
+                        "updateError": "リポジトリの更新中にエラーが発生しました"
                     },
                     "info": {
-                        "deployInfo": "デプロイには通常 1～3 分かかります。完了すると URL が表示されます。",
-                        "updateInfo": "更新は、次のデプロイのためにディレクトリコンテンツをWebサイトリポジトリに同期します。"
+                        "deployInfo": "デプロイには通常1〜3分かかります。完了したらURLが通知されます。",
+                        "updateInfo": "更新により、ディレクトリコンテンツが次のデプロイのためにウェブサイトリポジトリに同期されます。"
                     },
                     "websiteTemplate": {
                         "title": "自動テンプレート更新",
-                        "description": "Webサイトを最新のテンプレート変更と自動的に同期します。",
-                        "autoUpdate": "自動的に更新",
-                        "autoUpdateDescription": "テンプレートの更新を毎時チェックし、自動的に適用します。",
+                        "description": "ウェブサイトを最新のテンプレート変更と自動的に同期します。",
+                        "autoUpdate": "自動更新",
+                        "autoUpdateDescription": "1時間ごとにテンプレート更新をチェックし、自動的に適用します。",
                         "useBeta": "テンプレートのベータ版を使用",
-                        "useBetaDescription": "安定版の main ブランチではなく、stage ブランチを使用します。",
+                        "useBetaDescription": "安定したメインbranchの代わりにstage branchを使用します。",
                         "lastUpdated": "最終更新",
                         "lastChecked": "最終チェック",
                         "lastError": "最終エラー",
-                        "updateSuccess": "設定を更新しました",
+                        "updateSuccess": "設定が正常に更新されました",
                         "updateFailed": "設定の更新に失敗しました",
-                        "githubRequired": "GitHub connection required. Please connect your GitHub account in Settings to enable automatic updates."
+                        "githubRequired": "GitHub接続が必要です。設定でGitHubアカウントを接続して自動更新を有効にしてください。"
                     },
                     "configDialog": {
-                        "title": "Configure Before Deploy",
-                        "description": "Review and customize your website settings before deployment",
-                        "siteName": "Site Name",
-                        "siteNamePlaceholder": "My Directory",
-                        "siteNameHelper": "The name displayed on your website (default: Acme)",
-                        "advancedSettings": "Advanced Settings",
-                        "advancedSettingsDescription": "Configure additional website options",
-                        "loadFailed": "Failed to load current settings",
-                        "saveAndDeploy": "Save & Deploy",
-                        "skipAndDeploy": "Skip & Deploy",
-                        "cancel": "Cancel"
+                        "title": "デプロイ前に設定",
+                        "description": "デプロイ前にウェブサイト設定を確認・カスタマイズします",
+                        "siteName": "サイト名",
+                        "siteNamePlaceholder": "マイディレクトリ",
+                        "siteNameHelper": "ウェブサイトに表示される名前（デフォルト: Acme）",
+                        "tabGeneral": "全般",
+                        "tabHeader": "ヘッダー",
+                        "tabHomepage": "ホームページ",
+                        "tabFooter": "フッター",
+                        "featuresLabel": "有効な機能",
+                        "visibilityLabel": "表示設定",
+                        "defaultsLabel": "デフォルト",
+                        "advancedSettings": "詳細設定",
+                        "advancedSettingsDescription": "追加のウェブサイトオプションを設定",
+                        "loadFailed": "現在の設定の読み込みに失敗しました",
+                        "saveAndDeploy": "保存してデプロイ",
+                        "skipAndDeploy": "スキップしてデプロイ",
+                        "cancel": "キャンセル"
                     }
+                },
+                "domains": {
+                    "title": "カスタムドメイン",
+                    "description": "デプロイされたウェブサイトにカスタムドメインを追加します。",
+                    "placeholder": "example.com",
+                    "addButton": "追加",
+                    "loading": "ドメインを読み込み中...",
+                    "loadFailed": "ドメインの読み込みに失敗しました",
+                    "noDomains": "カスタムドメインが設定されていません。上記で追加して開始してください。",
+                    "added": "ドメインが追加されました。DNSを設定して検証してください。",
+                    "addedAndVerified": "ドメインが追加され、検証されました！",
+                    "addFailed": "ドメインの追加に失敗しました",
+                    "removed": "ドメインが削除されました",
+                    "removeFailed": "ドメインの削除に失敗しました",
+                    "verified": "ドメインが正常に検証されました！",
+                    "verifyPending": "DNSがまだ検証されていません。DNS設定を確認し、後で再試行してください。",
+                    "verifyFailed": "ドメインの検証に失敗しました",
+                    "copied": "クリップボードにコピーしました",
+                    "autoAssigned": "自動割り当て",
+                    "verifiedBadge": "検証済み",
+                    "pendingBadge": "保留中",
+                    "verifyButton": "DNSを検証",
+                    "removeButton": "ドメインを削除",
+                    "dnsInstructions": "DNS手順を表示",
+                    "dnsTitle": "以下のDNSレコードを設定：",
+                    "dnsName": "名前：",
+                    "dnsValue": "値：",
+                    "copyButton": "コピー"
                 }
             }
         },
         "directoryCreation": {
             "title": "新しいディレクトリを作成",
-            "subtitle": "ディレクトリの作成方法を選択",
+            "subtitle": "ディレクトリを作成する方法を選択してください",
             "backToOptions": "オプションに戻る",
+            "sidebar": {
+                "selectedProvider": "Git プロバイダー",
+                "selectedDeployProvider": "デプロイ プロバイダー"
+            },
+            "deployProvider": {
+                "title": "デプロイ プロバイダー",
+                "description": "ディレクトリウェブサイトをデプロイする場所を選択",
+                "noProviders": "利用可能なデプロイ プロバイダーがありません",
+                "notConfigured": "未設定",
+                "configured": "デプロイ準備完了",
+                "configureLink": "設定"
+            },
             "organizationSelector": {
                 "label": "リポジトリ所有者",
                 "loading": "組織を読み込み中...",
                 "personal": "個人アカウント",
-                "personalAccount": "リポジトリは個人アカウントの下に作成されます",
+                "personalAccount": "リポジトリはあなたの個人アカウントの下に作成されます",
                 "organizations": "組織",
-                "personalHelp": "リポジトリは個人の GitHub アカウントの下に作成されます",
+                "personalHelp": "リポジトリはあなたの個人 GitHub アカウントの下に作成されます",
                 "organizationHelp": "リポジトリは {org} 組織の下に作成されます",
-                "connectRequired": "リポジトリの作成先を選択するには、サイドバーでGitプロバイダーを接続してください。"
+                "connectRequired": "サイドバーで Git プロバイダーを接続して、リポジトリを作成する場所を選択してください。"
             },
             "ai": {
                 "title": "AI で作成",
-                "subtitle": "自然言語でディレクトリのアイデアを説明し、AI にセットアップを任せます",
-                "getStarted": "始める",
+                "subtitle": "ディレクトリのアイデアを自然言語で記述し、AI にセットアップを任せましょう",
+                "getStarted": "開始",
                 "formTitle": "AI でディレクトリを作成",
-                "formSubtitle": "ディレクトリのアイデアを説明し、AI にセットアップと初期コンテンツ生成を任せます",
+                "formSubtitle": "ディレクトリのアイデアを記述し、AI にセットアップと初期コンテンツ生成を任せましょう",
                 "directoryNameLabel": "ディレクトリ名",
-                "directoryNamePlaceholder": "例: 素晴らしい AI ツール",
+                "directoryNamePlaceholder": "例: Awesome AI Tools",
                 "directoryNameHelp": "空のままにすると AI が名前を提案します",
-                "promptLabel": "ディレクトリを説明",
-                "githubRequired": "最初に GitHub アカウントを接続してください。",
-                "promptPlaceholder": "作成したいディレクトリの種類、含めるべきアイテム、特定の要件などを説明してください...",
-                "inspirationText": "インスピレーションが必要ですか？ 以下をお試しください：",
+                "promptLabel": "ディレクトリを記述",
+                "githubRequired": "まず GitHub アカウントを接続してください。",
+                "promptPlaceholder": "作成したいディレクトリの種類、含めるべきアイテム、特定の要件などを記述...",
+                "inspirationText": "インスピレーションが必要ですか？ これらのいずれかを試してみてください：",
                 "examplePrompts": {
                     "0": {
                         "name": "AI 開発者ツール",
-                        "prompt": "開発者向けの最高の AI ツールのディレクトリを作成"
+                        "prompt": "開発者向け最高の AI ツールのディレクトリを作成"
                     },
                     "1": {
-                        "name": "React コンポーネントハブ",
-                        "prompt": "オープンソースの React コンポーネントの厳選リストを構築"
+                        "name": "React コンポーネント ハブ",
+                        "prompt": "オープンソース React コンポーネントのキュレートリストを作成"
                     },
                     "2": {
                         "name": "リモートチームツール",
-                        "prompt": "リモートチーム向けの生産性アプリのディレクトリを生成"
+                        "prompt": "リモートチーム向け生産性アプリのディレクトリを生成"
                     },
                     "3": {
                         "name": "サステナブルファッション",
                         "prompt": "サステナブルファッションブランドのコレクションを作成"
                     }
                 },
-                "featuresTitle": "AI が行うこと：",
+                "featuresTitle": "AI があなたのために行うこと：",
                 "features": {
                     "0": "適切な名前と説明を生成",
-                    "1": "初期カテゴリーと構造を作成",
+                    "1": "初期カテゴリと構造を作成",
                     "2": "関連アイテムを自動的に見つけて追加",
-                    "3": "適切なドキュメントを含む GitHub リポジトリをセットアップ"
+                    "3": "適切なドキュメント付き GitHub リポジトリを設定"
                 },
                 "generateButton": "AI で生成",
                 "generatingButton": "ディレクトリを生成中...",
                 "cancelButton": "キャンセル",
                 "noteTitle": "注意：",
-                "noteText": "AI 生成は通常、リクエストの複雑さに応じて 2～5 分かかります。ディレクトリの準備ができたら通知されます。",
+                "noteText": "AI 生成はリクエストの複雑さにより通常 2-5 分かかります。ディレクトリが準備でき次第通知されます。",
                 "errors": {
-                    "promptRequired": "作成したいディレクトリの種類を説明してください",
-                    "nameRequired": "ディレクトリ名は必須です",
-                    "slugRequired": "ディレクトリスラッグは必須です",
-                    "descriptionRequired": "ディレクトリの説明は必須です"
+                    "promptRequired": "作成したいディレクトリの種類を記述してください",
+                    "unconfiguredProviders": "{providers} が未設定です。生成前に設定 → プラグインを訪れて設定してください。",
+                    "nameRequired": "ディレクトリ名が必要です",
+                    "slugRequired": "ディレクトリ スラグが必要です",
+                    "descriptionRequired": "ディレクトリ説明が必要です",
+                    "githubRequired": "まず GitHub アカウントを接続してください。",
+                    "createFailed": "ディレクトリ作成に失敗しました"
                 },
                 "success": {
                     "started": "ディレクトリ作成を開始しました！",
                     "generating": "AI がコンテンツを生成中です。数分かかる場合があります...",
-                    "created": "ディレクトリを正常に作成しました！"
+                    "created": "ディレクトリが正常に作成されました！"
                 },
                 "advancedSettings": "詳細設定",
                 "advancedSubtitle": "組織とリポジトリ設定を構成",
@@ -1436,23 +2263,23 @@
             },
             "manual": {
                 "title": "手動で作成",
-                "subtitle": "すべての設定とオプションを完全に制御してディレクトリを構成",
-                "configureNow": "今すぐ構成",
-                "formTitle": "ディレクトリを手動で作成",
-                "formSubtitle": "すべての設定を完全に制御してディレクトリを構成",
+                "subtitle": "すべての設定とオプションを完全に制御してディレクトリを設定",
+                "configureNow": "今すぐ設定",
+                "formTitle": "手動でディレクトリを作成",
+                "formSubtitle": "すべての設定を完全に制御してディレクトリを設定",
                 "basicInfo": "基本情報",
                 "nameLabel": "ディレクトリ名 *",
-                "namePlaceholder": "例: 素晴らしい AI ツール",
-                "slugLabel": "ディレクトリスラッグ *",
+                "namePlaceholder": "例: Awesome AI Tools",
+                "slugLabel": "ディレクトリ スラグ *",
                 "slugPlaceholder": "awesome-ai-tools",
-                "githubRequired": "最初に GitHub アカウントを接続してください。",
+                "githubRequired": "まず GitHub アカウントを接続してください。",
                 "slugHelp": "URL フレンドリーな識別子（小文字、数字、ハイフンのみ）",
                 "descriptionLabel": "説明 *",
-                "descriptionPlaceholder": "開発者向けの最高の AI ツールとリソースの厳選リスト",
+                "descriptionPlaceholder": "開発者向け最高の AI ツールとリソースのキュレートリスト",
                 "advancedSettings": "詳細設定",
                 "advancedSubtitle": "組織、カスタムヘッダーなど",
                 "organizationLabel": "組織の下に作成",
-                "organizationHelp": "個人アカウントではなく GitHub 組織の下にこのディレクトリを作成",
+                "organizationHelp": "このディレクトリを個人アカウントではなく GitHub 組織の下に作成",
                 "organizationNameLabel": "組織名",
                 "organizationNamePlaceholder": "my-organization",
                 "headerLabel": "カスタム README ヘッダー",
@@ -1462,24 +2289,27 @@
                 "footerPlaceholder": "README ファイルの下部にカスタムコンテンツを追加",
                 "footerOverwrite": "デフォルトフッターを完全に置き換え",
                 "createButton": "ディレクトリを作成",
-                "creatingButton": "ディレクトリ作成中...",
+                "creatingButton": "ディレクトリを作成中...",
                 "cancelButton": "キャンセル",
-                "nameRequired": "ディレクトリ名は必須です",
-                "slugRequired": "ディレクトリスラッグは必須です",
-                "descriptionRequired": "ディレクトリの説明は必須です",
+                "nameRequired": "ディレクトリ名が必要です",
+                "slugRequired": "ディレクトリ スラグが必要です",
+                "descriptionRequired": "ディレクトリ説明が必要です",
+                "createFailed": "ディレクトリ作成に失敗しました",
                 "success": {
-                    "created": "ディレクトリを正常に作成しました！"
+                    "created": "ディレクトリが正常に作成されました！"
                 }
             },
             "import": {
                 "title": "既存をインポート",
                 "subtitle": "既存の GitHub リポジトリからディレクトリをインポート",
                 "importNow": "今すぐインポート",
+                "aiProviderSettings": "AI プロバイダー",
+                "aiProviderSettingsDescription": "README 解析に使用する AI プロバイダーを選択",
                 "formTitle": "GitHub からディレクトリをインポート",
                 "formSubtitle": "既存の GitHub リポジトリからアイテムをインポートしてディレクトリを作成",
                 "sync": {
                     "title": "同期を維持",
-                    "description": "ソースリポジトリからの更新を自動的にプルします。"
+                    "description": "ソースリポジトリから自動的に更新を取得。"
                 },
                 "sourceMethod": {
                     "url": {
@@ -1487,72 +2317,96 @@
                         "description": "GitHub リポジトリ URL を直接入力"
                     },
                     "repository": {
-                        "title": "マイリポジトリ",
-                        "description": "GitHub リポジトリから選択"
+                        "title": "マイ リポジトリ",
+                        "description": "あなたの GitHub リポジトリから選択"
                     }
                 },
                 "urlLabel": "GitHub リポジトリ URL",
                 "urlPlaceholder": "https://github.com/owner/repository",
                 "urlHelp": "GitHub リポジトリの完全な URL を入力",
                 "supportedFormats": {
-                    "title": "サポートされているリポジトリ形式",
+                    "title": "サポートされるリポジトリ形式",
                     "dataRepo": {
-                        "title": "データリポジトリ",
+                        "title": "データ リポジトリ",
                         "description": "config.yml と data/ フォルダ構造を持つリポジトリ"
                     },
                     "awesomeReadme": {
                         "title": "Awesome リスト",
-                        "description": "マークダウン README を持つ厳選リストリポジトリ"
+                        "description": "Markdown README を持つキュレートリスト リポジトリ"
                     }
                 },
                 "analyzing": {
-                    "title": "リポジトリを分析中",
+                    "title": "リポジトリを解析中",
                     "subtitle": "リポジトリの種類と構造を検出中..."
                 },
                 "detectedType": {
-                    "dataRepo": "データリポジトリを検出",
+                    "dataRepo": "データ リポジトリを検出",
                     "awesomeReadme": "Awesome リストを検出"
                 },
                 "badges": {
-                    "dataRepo": "データリポジトリ",
+                    "dataRepo": "データ リポ",
                     "awesomeReadme": "Awesome リスト"
                 },
                 "preview": {
                     "items": "アイテム",
-                    "categories": "カテゴリー"
+                    "categories": "カテゴリ"
                 },
                 "nameLabel": "ディレクトリ名",
-                "namePlaceholder": "例: 私の素晴らしいディレクトリ",
+                "namePlaceholder": "例: マイ Awesome ディレクトリ",
                 "advancedSettings": "詳細設定",
                 "advancedSubtitle": "組織とリポジトリ設定を構成",
                 "attribution": {
-                    "title": "ソースの帰属：",
+                    "title": "ソース帰属：",
                     "text": "このディレクトリは {url} をソースとして参照します"
                 },
-                "analyzeButton": "リポジトリを分析",
+                "research": {
+                    "title": "インポート＆リサーチ モード",
+                    "description": "ソースリポジトリのアイテムをリサーチシードとして使用します。AI パイプラインが新しいアイテムを発見し、説明を書き直し、タクソノミーを拡張します。",
+                    "seedDetected": "~{count} 個のシードアイテムを検出",
+                    "expansionFactor": "拡張目標",
+                    "expansionDescription": "最終コレクションはソースに比べて何倍大きくすべきか？",
+                    "preview": "~{seedCount} シードアイテム → 目標 ~{targetCount} 最終アイテム (~{newItems} 個の新規アイテムを発見)",
+                    "enrichmentOptions": "エンハンスメント オプション",
+                    "enrichDescriptions": "説明を書き直し",
+                    "enrichDescriptionsHint": "AI がすべてのインポートされた説明を書き直し拡張します",
+                    "expandTaxonomy": "カテゴリ＆タグを拡張",
+                    "expandTaxonomyHint": "ソースタクソノミー以上の新しいカテゴリとタグを生成",
+                    "parsePrIssues": "PR＆イシューを解析",
+                    "parsePrIssuesHint": "プルリクエストとイシューから追加アイテムを抽出",
+                    "legalNote": "注意：",
+                    "legalDescription": "リサーチモードはソースリポジトリを入力データとしてのみ使用します。最終コレクションは主に新規発見アイテムとオリジナル AI 生成説明で構成されます。ソースコンテンツは逐語コピーされません。",
+                    "importButton": "インポート＆リサーチを開始",
+                    "importingButton": "リサーチパイプラインを開始中..."
+                },
+                "analyzeButton": "リポジトリを解析",
                 "importButton": "ディレクトリをインポート",
                 "importingButton": "インポート中...",
                 "backButton": "戻る",
                 "cancelButton": "キャンセル",
                 "importing": {
                     "title": "ディレクトリをインポート中",
-                    "subtitle": "ソースリポジトリからディレクトリをセットアップ中..."
+                    "subtitle": "ソースリポジトリからディレクトリを設定中..."
                 },
                 "repositorySelector": {
                     "title": "リポジトリを選択",
                     "searchPlaceholder": "リポジトリを検索...",
                     "loading": "リポジトリを読み込み中...",
                     "noRepositories": "リポジトリが見つかりません",
-                    "noResults": "検索条件に一致するリポジトリがありません",
+                    "noResults": "検索に一致するリポジトリがありません",
                     "tryAgain": "再試行",
-                    "loadMore": "さらに読み込む",
-                    "showing": "{shown} / {total} 件のリポジトリを表示中",
+                    "loadMore": "さらに読み込み",
+                    "showing": "{total} 件中 {shown} 件のリポジトリを表示",
                     "today": "今日",
                     "yesterday": "昨日",
-                    "daysAgo": "{days} 日前",
-                    "weeksAgo": "{weeks} 週間前",
-                    "repositoriesLoaded": "リポジトリを読み込みました",
+                    "daysAgo": "{days}日前",
+                    "weeksAgo": "{weeks}週間前",
+                    "repositoriesLoaded": "リポジトリ読み込み済み",
                     "moreAvailable": "さらに利用可能",
+                    "ownerLabel": "リポジトリ所有者",
+                    "personalAccount": "個人アカウント",
+                    "organizations": "組織",
+                    "showingPersonalRepos": "あなたの個人リポジトリを表示中",
+                    "showingOrgRepos": "{org} のリポジトリを表示中",
                     "errors": {
                         "fetchFailed": "リポジトリの読み込みに失敗しました"
                     }
@@ -1560,175 +2414,178 @@
                 "chooseMode": {
                     "title": "インポート方法を選択",
                     "repository": "リポジトリ: {owner}/{repo}",
-                    "repositoryWithItems": "リポジトリ: {owner}/{repo}（{itemCount} アイテム）",
+                    "repositoryWithItems": "リポジトリ: {owner}/{repo} ({itemCount} アイテム)",
                     "importCopy": {
-                        "title": "インポート & コピー",
-                        "description": "データのコピーを含む新しいリポジトリを作成します。フォークまたは新規開始に最適です。"
+                        "title": "インポート＆コピー",
+                        "description": "データのコピー付きで新しいリポジトリを作成。フォークや新しく始めるのに最適。"
                     },
                     "linkExisting": {
-                        "title": "既存にリンク",
-                        "description": "既存のリポジトリを直接使用します。コピーはなく、変更は自動的に同期されます。"
+                        "title": "既存をリンク",
+                        "description": "既存のリポジトリを直接使用。コピーなしで変更が自動同期。"
+                    },
+                    "research": {
+                        "title": "インポート＆リサーチ",
+                        "description": "リサーチシードとして使用し、AI で新規アイテムを自動発見しコンテンツを充実。"
                     },
                     "back": "戻る"
                 },
                 "linkConfirm": {
                     "title": "リポジトリをリンク",
-                    "descriptionMissing": "一部のリポジトリが見つかりませんでした。それらなしで続行するか、今すぐ作成できます。",
+                    "descriptionMissing": "一部のリポジトリが見つかりませんでした。なしで続行するか、今作成できます。",
                     "descriptionReady": "すべてのリポジトリが見つかりました。リンク準備完了。",
-                    "dataRepo": "データリポジトリ",
-                    "markdownRepo": "マークダウンリポジトリ",
-                    "websiteRepo": "Webサイトリポジトリ",
+                    "dataRepo": "データ リポジトリ",
+                    "markdownRepo": "Markdown リポジトリ",
+                    "websiteRepo": "ウェブサイト リポジトリ",
                     "found": "見つかりました",
-                    "notFound": "見つかりません",
+                    "notFound": "見つかりませんでした",
                     "cancel": "キャンセル",
                     "continueWithout": "なしで続行",
-                    "createMissing": "見つからないものを作成",
+                    "createMissing": "不足分を作成",
                     "creating": "作成中...",
                     "linking": "リンク中...",
                     "linkRepos": "リポジトリをリンク"
                 },
+                "detectionFailed": "形式を自動検出できませんでした。このリポジトリのインポート方法を選択してください。",
                 "errors": {
                     "urlRequired": "GitHub リポジトリ URL を入力してください",
-                    "unsupportedFormat": "このリポジトリ形式はサポートされていません。データリポジトリまたは Awesome リスト形式を使用してください。",
-                    "analyzeFailed": "リポジトリの分析に失敗しました",
-                    "analyzeForLinkingFailed": "リンクのための分析に失敗しました",
-                    "nameRequired": "ディレクトリ名は必須です",
-                    "noAnalysis": "まずリポジトリを分析してください",
-                    "githubRequired": "最初に GitHub アカウントを接続してください",
-                    "importFailed": "ディレクトリのインポートに失敗しました",
-                    "linkFailed": "ディレクトリのリンクに失敗しました"
+                    "unsupportedFormat": "このリポジトリ形式はサポートされていません。データ リポジトリまたは Awesome リスト形式を使用してください。",
+                    "analyzeFailed": "リポジトリの解析に失敗しました",
+                    "analyzeForLinkingFailed": "リンク用解析に失敗しました",
+                    "nameRequired": "ディレクトリ名が必要です",
+                    "noAnalysis": "まずリポジトリを解析してください",
+                    "githubRequired": "まず GitHub アカウントを接続してください",
+                    "importFailed": "ディレクトリインポートに失敗しました",
+                    "linkFailed": "ディレクトリリンクに失敗しました",
+                    "providerNotConfigured": "{provider} が未設定です。インポート前に設定 → プラグインを訪れて設定してください。"
                 },
                 "success": {
-                    "started": "インポートを開始しました！ディレクトリにリダイレクトします...",
+                    "started": "インポートを開始しました！ディレクトリにリダイレクト中...",
                     "linked": "ディレクトリを正常にリンクしました"
                 },
-                "detectionFailed": "フォーマットを自動検出できませんでした。このリポジトリのインポート方法を選択してください。"
-            }
-        },
-        "github": {
-            "connection": {
-                "alert": {
-                    "title": "GitHub が接続されていません",
-                    "subtitle": "GitHub アカウントを接続してディレクトリを作成・管理",
-                    "connectButton": "GitHub を接続",
-                    "connectingButton": "接続中..."
-                },
-                "status": {
-                    "title": "GitHub ステータス",
-                    "connected": "接続済み",
-                    "notConnected": "未接続",
-                    "connectedDescription": "ディレクトリは GitHub リポジトリとしてアカウントに保存されます。",
-                    "notConnectedDescription": "ディレクトリを作成・管理するために GitHub アカウントを接続してください。",
-                    "connectedAccount": "接続済みアカウント：",
-                    "requiredNote": "ディレクトリ作成に必要",
-                    "connectButton": "GitHub を接続",
-                    "connectingButton": "接続中...",
-                    "failedToConnect": "GitHub の接続に失敗しました"
+                "slugConflict": {
+                    "title": "リポジトリ名競合",
+                    "description": "この名前のリポジトリがアカウントに既に存在します。別の名前を使用するか提案を受け入れてください。",
+                    "useSuggestion": "代わりに「{slug}」を使用"
                 }
             }
         },
+        "gitProvider": {
+            "connection": {
+                "alert": {
+                    "title": "{provider} が接続されていません",
+                    "subtitle": "{provider} アカウントを接続してディレクトリを作成",
+                    "connectButton": "{provider} を接続",
+                    "connectingButton": "接続中..."
+                }
+            },
+            "selector": {
+                "title": "Git プロバイダーを選択",
+                "noProviders": "利用可能な Git プロバイダーがありません",
+                "notConnected": "未接続",
+                "connected": "接続済み",
+                "connecting": "接続中...",
+                "connect": "接続",
+                "connectError": "接続に失敗しました"
+            },
+            "settings": {
+                "title": "Git プロバイダー接続",
+                "subtitle": "Git プロバイダーアカウントを接続して、リポジトリをインポート、ディレクトリを作成、プロジェクトを管理します。",
+                "connectedCount": "{count, plural, =0 {プロバイダーが接続されていません} =1 {1 つのプロバイダーが接続済み} other {# つのプロバイダーが接続済み}}",
+                "noProvidersConnected": "プロバイダーが接続されていません",
+                "canImport": "リポジトリをインポートおよび管理できます",
+                "connectToStart": "開始するにはプロバイダーを接続してください",
+                "noProvidersTitle": "利用可能な Git プロバイダーがありません",
+                "noProvidersSubtitle": "現在、Git プロバイダープラグインが有効になっていません。Git プロバイダープラグインを有効にするには、管理者に連絡してください。",
+                "reconnect": "再接続",
+                "reconnecting": "再接続中...",
+                "disconnect": "切断",
+                "connect": "{provider} を接続",
+                "connecting": "接続中...",
+                "organizations": "組織 ({count})",
+                "organizationsNote": "アクセスを許可した組織のみが表示されます。",
+                "connectDescription": "{provider} アカウントを接続して、リポジトリをインポートし、プロジェクトを管理します。",
+                "selectedProvider": "選択したプロバイダー",
+                "confirmDisconnect": "{provider} を切断してもよろしいですか？",
+                "disconnected": "{provider} が切断されました",
+                "connectError": "接続に失敗しました",
+                "reconnectError": "再接続に失敗しました",
+                "disconnectError": "切断に失敗しました"
+            }
+        },
         "apiTokens": {
-            "title": "API & トークン",
-            "subtitle": "API キーとサードパーティ連携を管理",
-            "vercel": {
-                "title": "Vercel 統合",
-                "subtitle": "Vercel アカウントを接続してディレクトリをWebサイトとしてデプロイ",
+            "title": "API とトークン",
+            "subtitle": "API キーおよびサードパーティ統合を管理",
+            "deployment": {
+                "title": "デプロイ統合",
+                "subtitle": "プラグイン設定でデプロイプロバイダーを設定",
                 "connected": "接続済み",
                 "notConnected": "未接続",
-                "connectedMessage": "Vercel アカウントが接続されています。ディレクトリを Vercel にデプロイできます。",
-                "disconnect": "Vercel を切断",
+                "connectedMessage": "デプロイプロバイダーが設定されました。ディレクトリをデプロイできます。",
+                "disconnect": "切断",
                 "disconnecting": "削除中...",
-                "apiTokenLabel": "Vercel API トークン",
-                "placeholder": "vc_...",
+                "apiTokenLabel": "API トークン",
+                "placeholder": "API トークンを入力",
                 "showToken": "表示",
                 "hideToken": "非表示",
-                "getTokenHelp": "API トークンは以下から取得できます",
-                "vercelDashboard": "Vercel ダッシュボード",
+                "getTokenHelp": "プロバイダーダッシュボードから API トークンを取得できます",
+                "providerDashboard": "プロバイダーダッシュボード",
                 "save": "トークンを保存",
                 "saving": "保存中...",
                 "messages": {
-                    "tokenRequired": "有効な Vercel トークンを入力してください",
-                    "saveSuccess": "Vercel トークンを正常に保存しました",
-                    "saveFailed": "Vercel トークンの保存に失敗しました",
-                    "removeSuccess": "Vercel トークンを正常に削除しました",
-                    "removeFailed": "Vercel トークンの削除に失敗しました",
-                    "unexpectedError": "予期せぬエラーが発生しました"
+                    "tokenRequired": "有効なトークンを入力してください",
+                    "saveSuccess": "トークンが正常に保存されました",
+                    "saveFailed": "トークンの保存に失敗しました",
+                    "removeSuccess": "トークンが正常に削除されました",
+                    "removeFailed": "トークンの削除に失敗しました",
+                    "unexpectedError": "予期しないエラーが発生しました"
                 }
             },
             "apiKeys": {
                 "title": "API キー",
-                "subtitle": "プログラムによるアクセスのための API キーを生成・管理",
-                "generate": "API キーを生成（近日公開予定）"
+                "subtitle": "プログラムによるアクセス用の API キーを生成および管理",
+                "generate": "API キー生成 (近日公開)"
             },
             "webhooks": {
-                "title": "Webhook",
-                "subtitle": "リアルタイムアップデートを受信するための Webhook を構成",
-                "configure": "Webhook を構成（近日公開予定）"
-            },
-            "screenshotone": {
-                "title": "ScreenshotOne Integration",
-                "subtitle": "Automatically capture screenshots of directory items using ScreenshotOne",
-                "connected": "Connected",
-                "notConnected": "Not Connected",
-                "connectedMessage": "Your ScreenshotOne account is connected. Screenshots will be automatically captured for directory items.",
-                "disconnect": "Disconnect ScreenshotOne",
-                "disconnecting": "Removing...",
-                "accessKeyLabel": "Access Key",
-                "placeholder": "Your access key...",
-                "secretKeyLabel": "Secret Key (Optional)",
-                "secretKeyPlaceholder": "Your secret key...",
-                "showKey": "Show",
-                "hideKey": "Hide",
-                "accessKeyHelp": "Required. Used to authenticate with the ScreenshotOne API.",
-                "secretKeyHelp": "Optional. Enables signed URLs for enhanced security. Get your keys from",
-                "dashboard": "ScreenshotOne Dashboard",
-                "save": "Save Keys",
-                "saving": "Saving...",
-                "messages": {
-                    "accessKeyRequired": "Please enter a valid ScreenshotOne access key",
-                    "saveSuccess": "ScreenshotOne keys saved successfully",
-                    "saveFailed": "Failed to save ScreenshotOne keys",
-                    "removeSuccess": "ScreenshotOne keys removed successfully",
-                    "removeFailed": "Failed to remove ScreenshotOne keys",
-                    "unexpectedError": "An unexpected error occurred"
-                }
+                "title": "ウェブフック",
+                "subtitle": "リアルタイム更新を受信するためのウェブフックを設定",
+                "configure": "ウェブフック設定 (近日公開)"
             }
         },
         "notifications": {
             "title": "通知設定",
-            "subtitle": "重要な更新についてどのように通知を受け取るかを選択",
+            "subtitle": "重要な更新に関する通知方法を選択",
             "email": {
                 "title": "メール通知",
                 "directoryUpdates": {
                     "label": "ディレクトリ更新",
-                    "description": "ディレクトリの重要な更新について通知を受け取る"
+                    "description": "ディレクトリの重要な更新に関する通知を受け取る"
                 },
                 "newItems": {
-                    "label": "新しいアイテム",
-                    "description": "ディレクトリに新しいアイテムが追加されたときに通知を受け取る"
+                    "label": "新規アイテム",
+                    "description": "ディレクトリに新しいアイテムが追加されたときに通知"
                 },
                 "weeklyDigest": {
                     "label": "週間ダイジェスト",
                     "description": "ディレクトリアクティビティの週間サマリーを受信"
                 },
                 "marketing": {
-                    "label": "マーケティング & プロモーション",
-                    "description": "新機能とオファーについての更新を受信"
+                    "label": "マーケティングとプロモーション",
+                    "description": "新機能とオファーに関する更新を受信"
                 }
             },
             "app": {
                 "title": "アプリ内通知",
                 "newItems": {
-                    "label": "新しいアイテム",
-                    "description": "新しいディレクトリアイテムについて通知を表示"
+                    "label": "新規アイテム",
+                    "description": "新しいディレクトリアイテムの通知を表示"
                 },
                 "comments": {
                     "label": "コメント",
-                    "description": "ディレクトリへのコメントについて通知を受け取る"
+                    "description": "ディレクトリへのコメントに関する通知"
                 },
                 "mentions": {
-                    "label": "メンション",
-                    "description": "誰かがあなたにメンションしたときに通知を受け取る"
+                    "label": "@メンション",
+                    "description": "誰かがあなたをメンションしたときに通知"
                 },
                 "systemUpdates": {
                     "label": "システム更新",
@@ -1740,128 +2597,335 @@
                 "saving": "保存中..."
             },
             "messages": {
-                "success": "通知設定を更新しました",
+                "success": "通知設定が更新されました",
                 "error": "設定の更新に失敗しました",
-                "unexpectedError": "予期せぬエラーが発生しました"
+                "unexpectedError": "予期しないエラーが発生しました"
             }
         },
         "sidebar": {
             "menu": "メニュー",
             "aiChat": "AI チャット",
-            "newDirectory": "新しいディレクトリ",
+            "newDirectory": "新規ディレクトリ",
+            "activityIndicator": "ディレクトリ生成中",
             "navigation": {
                 "dashboard": "ダッシュボード",
+                "activity": "アクティビティ",
                 "directories": "ディレクトリ",
+                "plugins": "プラグイン",
                 "settings": "設定"
+            },
+            "tooltips": {
+                "expandSidebar": "サイドバーを展開",
+                "collapseSidebar": "サイドバーを折りたたみ"
+            },
+            "profileMenu": {
+                "accountSettings": "アカウント設定",
+                "helpDocs": "ヘルプとドキュメント",
+                "support": "サポート",
+                "keyboardShortcuts": "キーボードショートカット"
             },
             "signOut": "サインアウト",
             "signingOut": "サインアウト中..."
         },
         "dangerZone": {
-            "title": "危険な操作",
-            "subtitle": "元に戻せない破壊的な操作",
+            "title": "危険領域",
+            "subtitle": "元に戻せない破壊的なアクション",
             "export": {
                 "title": "データをエクスポート",
                 "subtitle": "すべてのディレクトリ、アイテム、設定をダウンロード",
-                "action": "データをエクスポート（近日公開予定）"
+                "action": "データエクスポート (近日公開)"
             },
             "delete": {
-                "title": "アカウントを削除",
-                "subtitle": "アカウントと関連するすべてのデータを永久に削除します。この操作は元に戻せません。",
+                "title": "アカウント削除",
+                "subtitle": "アカウントと関連データを永久に削除します。このアクションは元に戻せません。",
                 "button": "アカウントを削除",
-                "confirmTitle": "⚠️ これにより以下が永久に削除されます：",
+                "confirmTitle": "⚠️ 以下のものが永久に削除されます：",
                 "confirmItems": [
                     "アカウントとプロフィール",
                     "すべてのディレクトリ",
                     "すべてのディレクトリアイテムとデータ",
-                    "API キーと連携",
-                    "関連するすべてのWebサイト"
+                    "API キーと統合",
+                    "すべての関連ウェブサイト"
                 ],
-                "confirmLabel": "確認のためメール {email} を入力",
+                "confirmLabel": "確認のためメールアドレス {email} を入力",
                 "confirmPlaceholder": "メールアドレスを入力",
-                "confirmButton": "はい、アカウントを削除します",
+                "confirmButton": "はい、アカウントを削除",
                 "deleting": "削除中...",
                 "cancel": "キャンセル"
             },
             "messages": {
-                "confirmEmail": "確認のため正しくメールアドレスを入力してください",
-                "deleteSuccess": "アカウントを削除しました",
+                "confirmEmail": "確認のため正しいメールアドレスを入力してください",
+                "deleteSuccess": "アカウントが正常に削除されました",
                 "deleteFailed": "アカウントの削除に失敗しました",
-                "unexpectedError": "予期せぬエラーが発生しました"
+                "unexpectedError": "予期しないエラーが発生しました"
             }
         },
         "aiChat": {
             "title": "AI アシスタント",
+            "panelTitle": "チャット",
             "subtitle": "自然言語でディレクトリを作成",
-            "welcomeMessage": "こんにちは！自然言語を使ってディレクトリを作成するお手伝いをします。「アイツールのディレクトリを作成して」などと問いかけてみてください。",
-            "newChat": "新しいチャット",
-            "loadingConversation": "会話を読み込み中…",
-            "inputPlaceholder": "作成したいディレクトリを説明...",
+            "welcomeTitle": "AI アシスタントへようこそ 👋",
+            "welcomeSubtitle": "AI 駆動のアシスタントです。ディレクトリの作成、コンテンツ生成、データの整理について何でもお尋ねください。",
+            "welcomeMessage": "こんにちは！自然言語を使ってディレクトリを作成するお手伝いをします。「AI ツールのディレクトリを作成」などのように尋ねたり、必要なものを説明してください。",
+            "capabilities": {
+                "directoryCreation": "ディレクトリ作成",
+                "directoryCreationDesc": "自然言語の説明からディレクトリを構築",
+                "webResearch": "ウェブリサーチ",
+                "webResearchDesc": "ウェブ全体からデータを検索・収集",
+                "contentGeneration": "コンテンツ生成",
+                "contentGenerationDesc": "説明、カテゴリ、メタデータを生成",
+                "smartSuggestions": "スマート提案",
+                "smartSuggestionsDesc": "プロジェクト向けの AI 駆動の推奨事項を取得"
+            },
+            "newChat": "新規チャット",
+            "history": "履歴",
+            "loadingConversation": "会話の読み込み中…",
+            "inputPlaceholder": "何でもお尋ねください...",
             "sendButton": "送信",
-            "sendHint": "Enterで送信 · Shift+Enterで改行",
+            "stopGenerating": "生成を停止",
+            "sendHint": "Enter で送信 · Shift+Enter で改行",
+            "closeChat": "チャットを閉じる",
+            "collapseChat": "チャットを折りたたみ",
+            "resizeChat": "ドラッグしてチャットのサイズを変更",
+            "expandChat": "チャットを展開",
+            "providersError": "AI プロバイダーの読み込みに失敗しました。チャットが正しく動作しない可能性があります。",
             "providerNotConfigured": "このプロバイダーは設定されていません。プラグインで設定してください。",
             "editMessage": "メッセージを編集",
             "saveEdit": "保存して送信",
             "cancelEdit": "キャンセル",
             "edited": "(編集済み)",
-            "errors": {
-                "unableToSend": "メッセージを送信できませんでした。"
+            "thinking": "考え中...",
+            "toolCompleted": "完了",
+            "selectProvider": "プロバイダー",
+            "notConfigured": "未設定",
+            "gitNotConnected": "Git プロバイダーが接続されていません",
+            "gitNotConnectedDesc": "ディレクトリの作成と管理のため、Git プロバイダーを接続してください。",
+            "connectGithub": "GitHub を接続",
+            "gitConnectedAs": "{provider} 経由で {username} として接続済み",
+            "deployNotConfigured": "デプロイプロバイダーが設定されていません",
+            "deployNotConfiguredDesc": "ディレクトリウェブサイトを公開するため、デプロイプロバイダーを設定してください。",
+            "configureDeployProvider": "デプロイプロバイダーを設定",
+            "deployConfigured": "デプロイプロバイダー設定済み ({provider})",
+            "opened": "開いた",
+            "historyEmpty": "まだ会話がありません。チャットを始めて履歴を表示してください。",
+            "historyUntitled": "無題の会話",
+            "historyToday": "今日",
+            "historyYesterday": "昨日",
+            "historyDaysAgo": "{days}日前",
+            "suggestions": {
+                "s1": "ディレクトリを表示",
+                "s2": "AI ツールのディレクトリを作成",
+                "s3": "Git 接続を確認",
+                "s4": "統計を表示"
             },
-            "settingsModalTitle": "Directory Settings",
-            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
-            "inheritedFrom": "Inherited: {value}",
-            "inheritedSecret": "Inherited: ••••••••",
-            "resetToDefaults": "Reset to Defaults",
-            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
-            "resetSuccess": "Settings reset to defaults",
-            "cancel": "Cancel",
-            "clickToConfigure": "Click to configure"
+            "feelingLucky": "作成するディレクトリを提案",
+            "errors": {
+                "unableToSend": "メッセージの送信ができません"
+            }
         },
         "plugins": {
+            "title": "プラグイン",
+            "subtitle": "インストールされたプラグインとインテグレーションを管理",
+            "empty": "利用可能なプラグインがありません",
+            "noDescription": "説明が提供されていません",
+            "enabled": "有効",
+            "disabled": "無効",
+            "enable": "有効化",
+            "enableDescription": "このプラグインがディレクトリ間でどのように有効化されるかを構成します。",
+            "disable": "無効化",
+            "settings": "設定",
+            "saveSettings": "設定を保存",
+            "settingsTitle": "プラグイン設定",
+            "settingsSaved": "設定が正常に保存されました",
+            "noSettings": "このプラグインには構成可能な設定がありません",
+            "builtIn": "ビルトイン",
+            "system": "システム",
+            "docs": "ドキュメント",
+            "author": "作成者",
+            "documentation": "ドキュメント",
+            "about": "概要",
+            "backToPlugins": "プラグインに戻る",
+            "filters": {
+                "all": "すべて",
+                "enabledOnly": "有効なもののみ",
+                "search": "プラグインを検索...",
+                "clearSearch": "検索をクリア"
+            },
+            "searchEmpty": "「{query}」に一致するプラグインがありません",
+            "categories": {
+                "git": "Git",
+                "deployment": "デプロイ",
+                "screenshot": "スクリーンショット",
+                "search": "検索",
+                "content": "コンテンツ",
+                "dataSource": "データソース",
+                "ai": "AI",
+                "pipeline": "パイプライン"
+            },
+            "alwaysEnabled": "常に有効",
+            "disableWarning": "このプラグインを無効にすると、すべてのディレクトリで無効になります",
+            "cannotDisableSystem": "システムプラグインは無効にできません",
+            "disableFailed": "プラグインの無効化に失敗しました",
+            "autoEnableForDirectories": "すべてのディレクトリでも有効化",
+            "autoEnableForDirectoriesDescription": "このプラグインはすべてのディレクトリで自動的に有効になります。ディレクトリごとに無効にすることは可能です。",
+            "confirmDisable": "無効化の確認",
+            "cancel": "キャンセル",
+            "missingRequiredFields": "必須フィールドが不足しています: {fields}",
+            "saveError": "設定の保存に失敗しました。もう一度お試しください。",
+            "enableFirstToSave": "まずこのプラグインを有効にしてから設定を保存してください。",
+            "goToPluginSettings": "プラグイン設定に移動",
+            "userLevelRequiredError": "ユーザー レベルの必須設定を先に構成する必要があります",
+            "modelSelect": {
+                "placeholder": "モデルを選択...",
+                "loading": "モデルを読み込み中...",
+                "loadError": "モデルの読み込みに失敗しました",
+                "searchPlaceholder": "モデルを検索...",
+                "noModels": "モデルが見つかりません",
+                "context": "{value} ctx",
+                "customModelPlaceholder": "モデル ID を入力...",
+                "addCustomModel": "+ カスタムモデルを追加",
+                "add": "追加"
+            },
+            "settingsField": {
+                "selectPlaceholder": "選択...",
+                "fieldEncrypted": "このフィールドは暗号化されています",
+                "nullValue": "値が設定されていません",
+                "removeItem": "削除",
+                "addItem": "追加",
+                "modify": "変更",
+                "cancel": "キャンセル",
+                "enterNewValue": "新しい値を入力..."
+            },
+            "oauth": {
+                "title": "アカウント接続",
+                "connected": "接続済み",
+                "notConnected": "未接続",
+                "connect": "接続",
+                "disconnect": "切断",
+                "reconnect": "再接続",
+                "connecting": "接続中...",
+                "reconnecting": "再接続中...",
+                "connectDescription": "{plugin} アカウントを接続して完全な機能を有効にします",
+                "confirmDisconnect": "{plugin} を切断してもよろしいですか？",
+                "disconnected": "{plugin} が正常に切断されました",
+                "connectError": "接続に失敗しました。もう一度お試しください。",
+                "reconnectError": "再接続に失敗しました。もう一度お試しください。",
+                "disconnectError": "切断に失敗しました。もう一度お試しください。"
+            },
+            "deviceAuth": {
+                "title": "デバイス認証",
+                "connected": "接続済み",
+                "pending": "保留中",
+                "notConnected": "未接続",
+                "description": "デバイスコードフローでこの Ever Works ユーザーの {plugin} を接続します。",
+                "backendHint": "この認証はユーザーアカウントの管理されたバックエンドワークスペースに保存され、この Ever Works デプロイメントからのみ使用可能です。",
+                "deviceCode": "デバイスコード",
+                "verificationUrl": "検証 URL",
+                "start": "開始",
+                "restart": "再開",
+                "refresh": "更新",
+                "open": "開く",
+                "notInstalled": "必要な CLI がこのマシンにインストールされていません。",
+                "loadError": "デバイス認証ステータスの読み込みに失敗しました。",
+                "startError": "デバイス認証の開始に失敗しました。"
+            },
             "githubOrganizations": {
-                "title": "GitHub組織",
-                "description": "GitHubの接続から利用可能な組織を確認し、Ever Worksがターゲットにする追加の組織を追加してください。",
-                "noOrganizations": "まだ組織が見つかりません。",
-                "connectToLoad": "GitHubを接続して組織を読み込んでください。",
+                "title": "GitHub 組織",
+                "description": "GitHub 接続から利用可能な組織を確認し、Ever Works が対象とする追加の組織を追加します。",
+                "noOrganizations": "現在の GitHub 接続から利用可能な組織がありません。",
+                "connectToLoad": "組織を読み込むために GitHub を接続してください。",
                 "placeholder": "ログインで組織を追加",
                 "addButton": "組織を追加",
                 "saveButton": "組織を保存",
-                "savedSuccess": "組織のアクセスを保存しました。",
+                "savedSuccess": "組織アクセスを保存しました。",
                 "saveFailed": "保存に失敗しました。",
-                "removeLabel": "{login}を削除"
+                "removeLabel": "{login} を削除"
             }
+        },
+        "directoryPlugins": {
+            "title": "ディレクトリプラグイン",
+            "subtitle": "このディレクトリのプラグインを設定",
+            "active": "アクティブ",
+            "enable": "有効化",
+            "disable": "無効化",
+            "enableForDirectory": "このディレクトリで有効化",
+            "disableForDirectory": "このディレクトリで無効化",
+            "enableAtUserLevelFirst": "まず設定でこのプラグインを有効にしてください",
+            "disabledByUser": "ユーザー レベルで無効",
+            "systemAlwaysEnabled": "システムプラグイン - 常に有効",
+            "showSettings": "設定を表示",
+            "hideSettings": "設定を非表示",
+            "directorySettingsInfo": "ここでディレクトリ固有の設定を構成します",
+            "save": "保存",
+            "saved": "保存済み",
+            "showInstalledOnly": "インストール済みのみ表示",
+            "noInstalledPlugins": "プラグインがインストールされていません。プラグイン設定でプラグインをインストールしてください。",
+            "noPlugins": "利用可能なプラグインがありません",
+            "showAllPlugins": "すべてのプラグインを表示",
+            "capabilityProviders": "機能プロバイダー",
+            "capabilityProvidersDescription": "このディレクトリの各機能を提供するプラグインを選択",
+            "noProvidersAvailable": "利用可能なプロバイダーがありません",
+            "categories": {
+                "git": "Git",
+                "deployment": "デプロイ",
+                "screenshot": "スクリーンショット",
+                "search": "検索",
+                "content": "コンテンツ",
+                "dataSource": "データソース",
+                "ai": "AI",
+                "pipeline": "パイプライン"
+            },
+            "missingRequiredFields": "必須フィールドが不足しています: {fields}",
+            "saveError": "設定の保存に失敗しました。もう一度お試しください。",
+            "sendButton": "送信",
+            "errors": {
+                "unableToSend": "メッセージの送信ができません。"
+            },
+            "settingsModalTitle": "ディレクトリ設定",
+            "settingsModalDescription": "このディレクトリの設定を上書きします。未設定のフィールドはユーザー設定から継承されます。",
+            "inheritedFrom": "継承元: {value}",
+            "inheritedSecret": "継承元: ••••••••",
+            "resetToDefaults": "既定値にリセット",
+            "resetConfirm": "これにより、すべてのディレクトリ固有の上書きがクリアされます。設定はユーザー レベルの値に戻ります。",
+            "resetSuccess": "設定を既定値にリセットしました",
+            "cancel": "キャンセル",
+            "clickToConfigure": "構成するためにクリック",
+            "autoEnabledByUser": "ユーザー設定により自動有効",
+            "toggleError": "プラグインの切り替えに失敗しました",
+            "system": "システム",
+            "goToPluginSettings": "プラグイン設定に移動"
         }
     },
     "layout": {
         "auth": {
             "backToHome": "ホームに戻る",
             "feature": {
-                "title": "AI でディレクトリを構築",
-                "subtitle": "自然言語を使用して、数分で美しく検索可能なディレクトリを作成。コーディングは不要です。",
+                "title": "AIでディレクトリを構築",
+                "subtitle": "自然言語を使って数分で美しい検索可能なディレクトリを作成。コーディング不要。",
+                "badge": "AI搭載",
                 "benefits": {
                     "ai": {
-                        "title": "AI 駆動の作成",
-                        "description": "必要なものを説明し、AI に作業を任せます"
+                        "title": "AIによる作成",
+                        "description": "欲しいものを記述して、AIに作業を任せましょう"
                     },
                     "templates": {
                         "title": "プロフェッショナルなテンプレート",
-                        "description": "美しくカスタマイズ可能なデザインから始めましょう"
+                        "description": "美しいカスタマイズ可能なデザインから始めましょう"
                     },
                     "management": {
-                        "title": "簡単な管理",
+                        "title": "簡単管理",
                         "description": "コンテンツを簡単に更新・整理"
                     }
                 },
-                "badge": "AI搭載",
                 "howItWorks": {
-                    "step1": "アイデアを説明する",
-                    "step2": "テンプレートを選ぶ",
+                    "step1": "アイデアを説明",
+                    "step2": "テンプレートを選択",
                     "step3": "AIがコンテンツを生成",
-                    "step4": "公開して共有する"
+                    "step4": "公開と共有"
                 }
             },
             "footer": {
-                "copyright": "© {year} {companyName}。全著作権所有。",
+                "copyright": "© {year} {companyName}。すべての権利を留保します。",
                 "terms": "利用規約",
                 "privacy": "プライバシーポリシー",
                 "help": "ヘルプ"
@@ -1870,22 +2934,62 @@
     },
     "errors": {
         "global": {
-            "title": "問題が発生しました！",
-            "tryAgain": "再試行"
+            "title": "予期せぬエラーが発生しました！",
+            "description": "予期しないエラーが発生しました。もう一度お試しください。問題が続く場合はサポートにご連絡ください。",
+            "errorId": "エラー ID",
+            "tryAgain": "もう一度試す"
+        },
+        "notFound": {
+            "title": "ページが見つかりません",
+            "description": "お探しのページは存在しないか、移動されました。",
+            "backHome": "ダッシュボードに戻る",
+            "goBack": "戻る"
+        },
+        "dashboard": {
+            "title": "予期せぬエラーが発生しました",
+            "description": "予期しないエラーが発生しました。もう一度お試しください。問題が続く場合はサポートにご連絡ください。",
+            "errorId": "エラー ID",
+            "tryAgain": "もう一度試す"
         }
     },
     "metadata": {
         "title": "{companyName} - ディレクトリビルダー",
-        "description": "ディレクトリの構築と管理のための SaaS プラットフォーム"
+        "description": "ディレクトリを構築・管理するためのSaaSプラットフォーム",
+        "pages": {
+            "signIn": "サインイン",
+            "createAccount": "アカウント作成",
+            "forgotPassword": "パスワードをお忘れですか",
+            "resetPassword": "パスワードをリセット",
+            "authError": "認証エラー",
+            "dashboard": "ダッシュボード",
+            "activity": "アクティビティログ",
+            "directories": "ディレクトリ",
+            "newDirectory": "新規ディレクトリ",
+            "directory": "ディレクトリ",
+            "overview": "概要",
+            "items": "アイテム",
+            "generator": "ジェネレーター",
+            "settings": "設定",
+            "deploy": "デプロイ",
+            "members": "メンバー",
+            "history": "履歴",
+            "comparisons": "比較",
+            "plugins": "プラグイン",
+            "profile": "プロフィール",
+            "security": "セキュリティ",
+            "apiKeys": "APIキー",
+            "dangerZone": "危険ゾーン",
+            "pluginSettings": "プラグイン設定"
+        }
     },
     "api": {
         "errors": {
             "unauthorized": "この操作を実行する権限がありません",
-            "unauthorizedLogin": "認証エラー: 再度ログインしてください。",
+            "unauthorizedLogin": "未認証: 再度ログインしてください。",
             "forbidden": "禁止: この操作を実行する権限がありません。",
             "serverError": "サーバーエラー: {message}",
-            "unexpected": "予期せぬサーバーエラーが発生しました。",
-            "apiError": "API エラー: {status} {statusText}",
+            "unexpected": "予期しないサーバーエラーが発生しました。",
+            "apiError": "APIエラー: {status} {statusText}",
             "loginFailed": "ログインに失敗しました",
             "registerFailed": "登録に失敗しました",
             "unsupportedProvider": "サポートされていないプロバイダー",
@@ -1898,39 +3002,39 @@
         "directories": {
             "slug": {
                 "required": "スラッグは必須です",
-                "format": "スラッグは小文字、数字、ハイフンのみ使用できます"
+                "format": "スラッグは小文字の文字、数字、ハイフンのみを含めてください"
             },
             "name": {
                 "required": "名前は必須です",
-                "maxLength": "名前は100文字未満である必要があります"
+                "maxLength": "名前は100文字未満でなければなりません"
             },
             "description": {
                 "required": "説明は必須です",
-                "maxLength": "説明は500文字未満である必要があります"
+                "maxLength": "説明は500文字未満でなければなりません"
             },
             "prompt": {
-                "minLength": "プロンプトは10文字以上である必要があります",
-                "maxLength": "プロンプトは1000文字未満である必要があります"
+                "minLength": "プロンプトは少なくとも10文字である必要があります",
+                "maxLength": "プロンプトは1000文字未満でなければなりません"
             },
-            "oauthRequired": "OAuth 接続が必要です。最初に {provider} アカウントを接続してください。",
-            "githubRequired": "GitHub 接続が必要です。最初に GitHub アカウントを接続してください。",
-            "createSuccess": "ディレクトリを正常に作成しました！",
+            "oauthRequired": "OAuth接続が必要です。まず{provider}アカウントを接続してください。",
+            "githubRequired": "GitHub接続が必要です。まずGitHubアカウントを接続してください。",
+            "createSuccess": "ディレクトリが正常に作成されました！",
             "createFailed": "ディレクトリの作成に失敗しました",
-            "updateSuccess": "ディレクトリを正常に更新しました！",
+            "updateSuccess": "ディレクトリが正常に更新されました！",
             "updateFailed": "ディレクトリの更新に失敗しました",
-            "invalidGeneratedData": "有効なディレクトリデータの生成に失敗しました",
-            "aiGenerationStarted": "ディレクトリ作成を開始しました！AIがコンテンツを生成中...",
-            "invalidId": "無効なディレクトリ ID",
-            "deleteSuccess": "ディレクトリを正常に削除しました",
+            "invalidGeneratedData": "有効なディレクトリデータを生成できませんでした",
+            "aiGenerationStarted": "ディレクトリの作成が開始されました！AIがコンテンツを生成中です...",
+            "invalidId": "無効なディレクトリIDです",
+            "deleteSuccess": "ディレクトリが正常に削除されました",
             "deleteFailed": "ディレクトリの削除に失敗しました",
             "fetchFailed": "ディレクトリの取得に失敗しました",
             "organization": {
-                "requiredWhenOwnerProvided": "所有者が指定されている場合、組織を有効にする必要があります"
+                "requiredWhenOwnerProvided": "オーナーが指定されている場合、組織を有効にする必要があります"
             },
             "import": {
-                "invalidUrl": "有効な URL を入力してください",
-                "analyzeFailed": "リポジトリの分析に失敗しました",
-                "started": "インポートを正常に開始しました",
+                "invalidUrl": "有効なURLを入力してください",
+                "analyzeFailed": "リポジトリの解析に失敗しました",
+                "started": "インポートが正常に開始されました",
                 "failed": "ディレクトリのインポートに失敗しました",
                 "fetchReposFailed": "リポジトリの取得に失敗しました"
             }
@@ -1938,108 +3042,112 @@
         "generator": {
             "promptRequired": "プロンプトは必須です",
             "nameRequired": "名前は必須です",
-            "generationStartedSuccessfully": "生成を正常に開始しました",
-            "updateStartedSuccessfully": "更新を正常に開始しました",
+            "generationStartedSuccessfully": "生成が正常に開始されました",
+            "generationCancellationRequested": "生成のキャンセルがリクエストされました",
+            "updateStartedSuccessfully": "更新が正常に開始されました",
             "failedToGenerateItems": "アイテムの生成に失敗しました",
+            "failedToCancelGeneration": "生成のキャンセルに失敗しました",
             "failedToUpdateItems": "アイテムの更新に失敗しました",
-            "markdownRegeneratedSuccessfully": "マークダウンの再生成に成功しました",
-            "failedToRegenerateMarkdown": "マークダウンの再生成に失敗しました",
-            "notAuthorizedToAccessOrganization": "この組織にアクセスする権限がありません。支援については所有者 ({owner}) にお問い合わせください。"
+            "markdownRegeneratedSuccessfully": "Markdownが正常に再生成されました",
+            "failedToRegenerateMarkdown": "Markdownの再生成に失敗しました",
+            "notAuthorizedToAccessOrganization": "この組織にアクセスする権限がありません。オーナー({owner})にご連絡ください。",
+            "failedToLoadFormSchema": "フォーム設定の読み込みに失敗しました"
         },
         "settings": {
             "profile": {
                 "usernameRequired": "ユーザー名は必須です",
-                "usernameMaxLength": "ユーザー名は50文字未満である必要があります",
-                "usernameFormat": "ユーザー名は文字、数字、ダッシュ、アンダースコアのみ使用できます",
+                "usernameMaxLength": "ユーザー名は50文字未満でなければなりません",
+                "usernameFormat": "ユーザー名は文字、数字、ダッシュ、アンダースコアのみを含められます",
                 "updateFailed": "プロフィールの更新に失敗しました",
                 "notAuthenticated": "認証されていません"
             },
             "password": {
                 "currentRequired": "現在のパスワードは必須です",
-                "newMinLength": "パスワードは8文字以上である必要があります",
-                "newMaxLength": "パスワードは100文字未満である必要があります",
+                "newMinLength": "パスワードは少なくとも8文字である必要があります",
+                "newMaxLength": "パスワードは100文字未満でなければなりません",
                 "updateFailed": "パスワードの更新に失敗しました",
-                "updateSuccess": "パスワードを正常に更新しました",
+                "updateSuccess": "パスワードが正常に更新されました",
                 "notAuthenticated": "認証されていません"
             },
-            "vercel": {
+            "deployment": {
                 "notAuthenticated": "認証されていません",
                 "tokenRequired": "トークンは必須です",
-                "invalidFormat": "無効な Vercel トークン形式",
-                "saveFailed": "Vercel トークンの保存に失敗しました",
-                "saveSuccess": "Vercel トークンを正常に保存しました",
-                "validationFailed": "提供された Vercel トークンが無効です。再度確認して試してください。",
-                "removeFailed": "Vercel トークンの削除に失敗しました",
-                "removeSuccess": "Vercel トークンを正常に削除しました"
+                "invalidFormat": "トークンの形式が無効です",
+                "saveFailed": "デプロイトークンの保存に失敗しました",
+                "saveSuccess": "デプロイトークンが正常に保存されました",
+                "validationFailed": "提供されたトークンが無効です。もう一度確認してやり直してください。",
+                "removeFailed": "デプロイトークンの削除に失敗しました",
+                "removeSuccess": "デプロイトークンが正常に削除されました"
             },
             "github": {
                 "notAuthenticated": "認証されていません",
-                "disconnectFailed": "GitHub の切断に失敗しました",
-                "disconnectSuccess": "GitHub アカウントを正常に切断しました"
+                "disconnectFailed": "GitHubの切断に失敗しました",
+                "disconnectSuccess": "GitHubアカウントが正常に切断されました"
             },
             "notifications": {
                 "notAuthenticated": "認証されていません",
                 "updateFailed": "設定の更新に失敗しました",
-                "updateSuccess": "通知設定を正常に更新しました"
+                "updateSuccess": "通知設定が正常に更新されました"
             },
             "danger": {
                 "notAuthenticated": "認証されていません",
                 "deleteFailed": "アカウントの削除に失敗しました",
-                "deleteDisabled": "デモではアカウント削除は無効になっています"
+                "deleteDisabled": "デモではアカウント削除が無効です"
             },
-            "screenshotone": {
-                "notAuthenticated": "Not authenticated",
-                "accessKeyRequired": "Access key is required",
-                "saveFailed": "Failed to save ScreenshotOne keys",
-                "saveSuccess": "ScreenshotOne keys saved successfully",
-                "validationFailed": "The provided ScreenshotOne keys are invalid. Please double-check and try again.",
-                "removeFailed": "Failed to remove ScreenshotOne keys",
-                "removeSuccess": "ScreenshotOne keys removed successfully"
+            "emailVerification": {
+                "notAuthenticated": "認証されていません",
+                "sent": "確認メールを送信しました",
+                "sendFailed": "確認メールの送信に失敗しました"
             }
         },
         "deploy": {
-            "deployVercelFailed": "Vercel へのデプロイに失敗しました",
+            "deployFailed": "デプロイに失敗しました",
             "updateRepositoryFailed": "リポジトリの更新に失敗しました",
-            "updateSettingsFailed": "Web サイトテンプレート設定の更新に失敗しました"
+            "updateSettingsFailed": "ウェブサイトテンプレート設定の更新に失敗しました"
         }
     },
     "validation": {
         "auth": {
-            "invalidCredentials": "無効なメールアドレスまたはパスワード",
+            "invalidCredentials": "無効なメールアドレスまたはパスワードです",
             "account": {
-                "suspended": "アカウントは停止されています"
+                "suspended": "アカウントが停止されています"
             },
             "email": {
-                "required": "メールアドレスは必須です",
-                "invalid": "無効なメールアドレス",
-                "emailAlreadyRegistered": "メールアドレスは既に登録されています"
+                "required": "メールアドレスは空にできません",
+                "invalid": "無効なメールアドレスです",
+                "emailAlreadyRegistered": "このメールアドレスはすでに登録されています"
             },
             "password": {
-                "required": "パスワードは必須です",
-                "minLength": "パスワードは {length} 文字以上である必要があります",
-                "lowercase": "パスワードには少なくとも1つの小文字を含めてください",
-                "numberOrSpecial": "パスワードには少なくとも1つの数字または記号を含めてください",
+                "required": "パスワードは空にできません",
+                "minLength": "パスワードは少なくとも{length}文字である必要があります",
+                "lowercase": "パスワードには少なくとも1つの小文字を含める必要があります",
+                "numberOrSpecial": "パスワードには少なくとも1つの数字または特殊文字を含める必要があります",
                 "cannotStartWith": "パスワードはドットまたは改行で始めることはできません",
-                "digit": "パスワードには少なくとも1つの数字を含めてください"
+                "digit": "パスワードには少なくとも1つの数字を含める必要があります"
             },
             "username": {
-                "minLength": "ユーザー名は {length} 文字以上である必要があります"
+                "minLength": "ユーザー名は少なくとも{length}文字である必要があります"
             }
         }
     },
     "common": {
         "ui": {
             "close": "閉じる",
-            "dismiss": "閉じる"
+            "dismiss": "取り消す",
+            "selectLanguage": "言語を選択",
+            "increment": "増やす",
+            "decrement": "減らす",
+            "yes": "はい",
+            "no": "いいえ"
         },
         "theme": {
-            "toggle": "テーマを切り替え",
+            "toggle": "テーマの切り替え",
             "switchToLight": "ライトモードに切り替え",
             "switchToDark": "ダークモードに切り替え"
         },
         "visibility": {
-            "private": "プライベート",
-            "public": "パブリック"
+            "private": "非公開",
+            "public": "公開"
         }
     }
 }
