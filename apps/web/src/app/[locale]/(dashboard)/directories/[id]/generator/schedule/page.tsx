@@ -5,6 +5,7 @@ import {
 } from '@/components/directories/detail/schedule/DirectoryScheduleCard';
 import { DirectoryScheduleHeader } from '@/components/directories/detail/schedule/DirectoryScheduleHeader';
 import { canManageSchedule } from '@/lib/permissions';
+import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import type { ProviderOption } from '@/lib/api/types-only';
 import type { ProvidersDto } from '@ever-works/contracts/api';
@@ -16,17 +17,11 @@ function resolveActiveProviders(
     lastRunProviders: ProvidersDto | undefined,
     overrides: ProvidersDto | null | undefined,
     allProviders: Record<string, ProviderOption[]>,
+    labels: Record<ProviderCategoryKey, string>,
 ): ResolvedProvider[] {
-    const scheduleLabels: Record<ProviderCategoryKey, string> = {
-        pipeline: 'Pipeline',
-        ai: 'AI',
-        search: 'Search',
-        screenshot: 'Screenshot',
-        contentExtractor: 'Extractor',
-    };
     const categories = Object.entries(SELECTABLE_PROVIDER_CATEGORIES).map(([key, def]) => ({
         key: def.uiKey as keyof ProvidersDto,
-        label: scheduleLabels[key as ProviderCategoryKey],
+        label: labels[key as ProviderCategoryKey],
         options: allProviders[def.uiKey],
     }));
 
@@ -50,6 +45,7 @@ function resolveActiveProviders(
 
 export default async function DirectorySchedulePage({ params }: Params) {
     const { id } = await params;
+    const t = await getTranslations('dashboard.directoryDetail.schedule.page');
 
     let directory;
     let formSchema;
@@ -74,8 +70,7 @@ export default async function DirectorySchedulePage({ params }: Params) {
     try {
         scheduleRes = await directoryAPI.getSchedule(id);
     } catch (error) {
-        scheduleErrorMessage =
-            error instanceof Error ? error.message : 'Failed to load schedule settings.';
+        scheduleErrorMessage = error instanceof Error ? error.message : t('loadFailed');
     }
 
     if (!canManageSchedule(directory.userRole)) {
@@ -86,10 +81,19 @@ export default async function DirectorySchedulePage({ params }: Params) {
     const lastRunProviders = configRes?.config?.metadata?.last_request_data?.providers;
     const schedule = scheduleRes?.schedule || null;
 
+    const providerLabels: Record<ProviderCategoryKey, string> = {
+        pipeline: t('providerCategories.pipeline'),
+        ai: t('providerCategories.ai'),
+        search: t('providerCategories.search'),
+        screenshot: t('providerCategories.screenshot'),
+        contentExtractor: t('providerCategories.contentExtractor'),
+    };
+
     const activeProviders = resolveActiveProviders(
         lastRunProviders,
         schedule?.providerOverrides,
         formSchema?.providers ?? {},
+        providerLabels,
     );
 
     return (

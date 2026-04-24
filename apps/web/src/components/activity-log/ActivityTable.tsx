@@ -493,7 +493,9 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                                                 </h5>
                                                                 <TerminalLogViewer
                                                                     logs={liveLogs}
-                                                                    title={t('filters.types.generation')}
+                                                                    title={t(
+                                                                        'filters.types.generation',
+                                                                    )}
                                                                     maxHeight="max-h-72"
                                                                     showCursor={
                                                                         hydratedActivity.status ===

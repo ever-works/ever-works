@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { directoryAPI } from '@/lib/api';
 import { ComparisonDetailClient } from '@/components/directories/detail/comparisons/ComparisonDetailClient';
 
@@ -9,12 +10,13 @@ export async function generateMetadata({
     params: Promise<{ id: string; slug: string }>;
 }): Promise<Metadata> {
     const { id, slug } = await params;
+    const t = await getTranslations('metadata.pages');
 
     try {
         const result = await directoryAPI.getComparison(id, slug);
         return { title: result.comparison.title };
     } catch {
-        return { title: 'Comparison' };
+        return { title: t('comparisons') };
     }
 }
 

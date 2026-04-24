@@ -477,7 +477,8 @@
             "notifications": {
                 "title": "Notifications",
                 "empty": "No new notifications",
-                "fetchFailed": "Failed to load notifications"
+                "fetchFailed": "Failed to load notifications",
+                "dismissFailed": "Failed to dismiss notification"
             },
             "help": {
                 "title": "Help & Resources",
@@ -992,7 +993,15 @@
                 "page": {
                     "title": "Scheduled updates",
                     "subtitle": "Automate refreshes for {name} with a dedicated cadence and failure handling.",
-                    "fallbackName": "this directory"
+                    "fallbackName": "this directory",
+                    "loadFailed": "Failed to load schedule settings.",
+                    "providerCategories": {
+                        "pipeline": "Pipeline",
+                        "ai": "AI",
+                        "search": "Search",
+                        "screenshot": "Screenshot",
+                        "contentExtractor": "Extractor"
+                    }
                 },
                 "card": {
                     "title": "Automation",
@@ -1078,7 +1087,9 @@
                         "requireUsage": "Enable pay-per-use billing to use this cadence.",
                         "updateFailed": "Failed to update schedule.",
                         "runFailed": "Failed to start run.",
-                        "cancelFailed": "Failed to cancel schedule."
+                        "cancelFailed": "Failed to cancel schedule.",
+                        "generationRunning": "Generation is running, please wait for it to finish.",
+                        "scheduleInactive": "Schedule must be active to run now."
                     },
                     "empty": {
                         "title": "Run a manual generation first",
@@ -1744,7 +1755,9 @@
                 "useDirectoryDefault": "Use Directory Default",
                 "default": "Default",
                 "notConfigured": "Not configured",
-                "notConfiguredTooltip": "This provider requires configuration. Visit Settings → Plugins to set it up."
+                "notConfiguredTooltip": "This provider requires configuration. Visit Settings → Plugins to set it up.",
+                "jsonObjectError": "Value must be a JSON object",
+                "invalidJsonError": "Invalid JSON format"
             },
             "progress": {
                 "title": "Generation in Progress",
@@ -1834,6 +1847,14 @@
                     "updateFailed": "Failed to update deploy provider"
                 },
                 "visibilityUpdateFailed": "Failed to update repository visibility",
+                "visibilityUpdated": "{name} is now {visibility}",
+                "repositoryVisibilityTitle": "Repository Visibility",
+                "repositoryTypes": {
+                    "main": "Main",
+                    "data": "Data",
+                    "website": "Website"
+                },
+                "repositoryTypeSuffix": "repository",
                 "visibilityWarningTitle": "Make Repository Private?",
                 "visibilityWarningDescription": "You are about to make {name} private.",
                 "visibilityWarningPermanent": "This action has permanent consequences:",
@@ -2218,7 +2239,9 @@
                     "unconfiguredProviders": "{providers} not configured. Visit Settings → Plugins to set up before generating.",
                     "nameRequired": "Directory name is required",
                     "slugRequired": "Directory slug is required",
-                    "descriptionRequired": "Directory description is required"
+                    "descriptionRequired": "Directory description is required",
+                    "githubRequired": "Please connect your GitHub account first.",
+                    "createFailed": "Failed to create directory"
                 },
                 "success": {
                     "started": "Directory creation started!",
@@ -2265,6 +2288,7 @@
                 "nameRequired": "Directory name is required",
                 "slugRequired": "Directory slug is required",
                 "descriptionRequired": "Directory description is required",
+                "createFailed": "Failed to create directory",
                 "success": {
                     "created": "Directory created successfully!"
                 }
@@ -2454,7 +2478,8 @@
                 "notConnected": "Not connected",
                 "connected": "Connected",
                 "connecting": "Connecting...",
-                "connect": "Connect"
+                "connect": "Connect",
+                "connectError": "Failed to connect"
             },
             "settings": {
                 "title": "Git Provider Connections",
@@ -2473,7 +2498,12 @@
                 "organizations": "Organizations ({count})",
                 "organizationsNote": "Only organizations where you have granted access are shown.",
                 "connectDescription": "Connect your {provider} account to import repositories and manage your projects.",
-                "selectedProvider": "Selected Provider"
+                "selectedProvider": "Selected Provider",
+                "confirmDisconnect": "Are you sure you want to disconnect {provider}?",
+                "disconnected": "{provider} disconnected",
+                "connectError": "Failed to connect",
+                "reconnectError": "Failed to reconnect",
+                "disconnectError": "Failed to disconnect"
             }
         },
         "apiTokens": {
