@@ -487,6 +487,7 @@ export class DirectoryImportService {
             }
 
             await this.directoryRepository.update(directory.id, updateData);
+            Object.assign(directory, updateData);
 
             const history = await this.generationHistoryRepository.createEntry({
                 directoryId: directory.id,

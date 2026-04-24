@@ -202,3 +202,125 @@ describe('DirectoryImportService.analyzeRepository', () => {
         expect(result.slugConflict).toBeUndefined();
     });
 });
+
+describe('DirectoryImportService.initiateImport', () => {
+    it('passes updated works_config source repository data to the import dispatcher path', async () => {
+        const directoryRepository = {
+            findByOwnerAndSlug: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockResolvedValue({
+                id: 'dir-1',
+                slug: 'compare-cloud-pricing',
+                name: 'Compare Cloud Pricing',
+                owner: 'Ntermast',
+                organization: false,
+                gitProvider: 'github',
+            }),
+            update: jest.fn().mockResolvedValue(undefined),
+        };
+
+        const generationHistoryRepository = {
+            createEntry: jest.fn().mockResolvedValue({
+                id: 'history-1',
+                startedAt: new Date('2026-04-24T00:00:00.000Z'),
+            }),
+        };
+
+        const sourceRepoAnalyzer = {
+            parseGitUrl: jest.fn().mockReturnValue({
+                owner: 'Ntermast',
+                repo: 'Compare-Cloud-Pricing',
+                provider: 'github',
+            }),
+            checkSlugConflicts: jest.fn().mockResolvedValue({
+                hasConflict: false,
+                conflictingRepos: [],
+                suggestedSlug: 'compare-cloud-pricing',
+            }),
+        };
+
+        const worksConfigService = {
+            loadFromRepository: jest.fn().mockResolvedValue({
+                initialPrompt: 'Build everything',
+                websiteRepo: 'Ntermast/Compare-Cloud-Pricing',
+                websiteRepositoryTarget: {
+                    owner: 'Ntermast',
+                    repo: 'Compare-Cloud-Pricing',
+                },
+                providers: {
+                    ai: 'groq',
+                    pipeline: 'agent-pipeline',
+                },
+            }),
+            parseRepositoryReference: jest.fn().mockImplementation((value?: string) => {
+                if (!value) {
+                    return undefined;
+                }
+
+                const [owner, repo] = value.split('/');
+                return repo ? { owner, repo } : { repo: owner };
+            }),
+        };
+
+        const service = new DirectoryImportService(
+            directoryRepository as any,
+            generationHistoryRepository as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {
+                getAccessToken: jest.fn().mockResolvedValue('token'),
+            } as any,
+            sourceRepoAnalyzer as any,
+            {} as any,
+            worksConfigService as any,
+            {} as any,
+            {
+                validateSelectedProviders: jest.fn().mockResolvedValue(undefined),
+            } as any,
+            {
+                enablePluginForDirectory: jest.fn().mockResolvedValue(undefined),
+            } as any,
+            {
+                emit: jest.fn(),
+            } as any,
+        );
+
+        const dispatchImportTask = jest.fn().mockResolvedValue(undefined);
+        (service as any).dispatchImportTask = dispatchImportTask;
+
+        const result = await service.initiateImport(
+            {
+                sourceUrl: 'https://github.com/Ntermast/Compare-Cloud-Pricing',
+                sourceType: ImportSourceTypeEnum.WORKS_CONFIG,
+                name: 'Compare Cloud Pricing',
+                gitProvider: 'github',
+                deployProvider: 'vercel',
+                organization: false,
+            } as any,
+            {
+                id: 'user-1',
+                username: 'Ntermast',
+            } as any,
+        );
+
+        expect(result.status).toBe('success');
+        expect(dispatchImportTask).toHaveBeenCalled();
+
+        const dispatchedDirectory = dispatchImportTask.mock.calls[0][0];
+        expect(dispatchedDirectory.sourceRepository).toMatchObject({
+            owner: 'Ntermast',
+            repo: 'Compare-Cloud-Pricing',
+            type: ImportSourceTypeEnum.WORKS_CONFIG,
+            relatedRepositories: {
+                directory: {
+                    owner: 'Ntermast',
+                    repo: 'Compare-Cloud-Pricing',
+                },
+                website: {
+                    owner: 'Ntermast',
+                    repo: 'Compare-Cloud-Pricing',
+                },
+            },
+        });
+    });
+});
