@@ -51,7 +51,7 @@ const formatScheduledDate = (date: string, locale: string) => {
     return `${datePart}, ${timePart}`;
 };
 
-function DirectoryCard({ directory }: DirectoryCardProps) {
+export function DirectoryCard({ directory }: DirectoryCardProps) {
     const t = useTranslations('dashboard.directoryCard');
     const tStatus = useTranslations('dashboard.directoryDetail.status');
     const pathname = usePathname();
