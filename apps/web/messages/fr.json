@@ -1317,6 +1317,7 @@
                     "plans": {
                         "free": "Gratuit",
                         "standard": "Standard",
+                        "pro": "Pro",
                         "premium": "Premium",
                         "unmetered": "Illimité"
                     },

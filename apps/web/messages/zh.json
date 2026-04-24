@@ -1317,6 +1317,7 @@
                     "plans": {
                         "free": "免费",
                         "standard": "标准",
+                        "pro": "Pro",
                         "premium": "高级",
                         "unmetered": "无限制"
                     },
