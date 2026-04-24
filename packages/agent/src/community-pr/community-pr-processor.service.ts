@@ -103,9 +103,13 @@ export class CommunityPrProcessorService {
         pr: GitPullRequest,
         outcome: CommunityPrSinglePrResult['outcome'],
     ): void {
-        state.processedPrNumbers = Array.from(new Set([...(state.processedPrNumbers ?? []), pr.number]));
+        state.processedPrNumbers = Array.from(
+            new Set([...(state.processedPrNumbers ?? []), pr.number]),
+        );
 
-        const processedRecords = (state.processedPrs ?? []).filter((entry) => entry.number !== pr.number);
+        const processedRecords = (state.processedPrs ?? []).filter(
+            (entry) => entry.number !== pr.number,
+        );
         processedRecords.push({
             number: pr.number,
             updatedAt: pr.updatedAt,
@@ -178,10 +182,11 @@ export class CommunityPrProcessorService {
                     return 0;
                 }
 
-                const currentState: CommunityPrState = state || directory.communityPrState || {
-                    processedPrNumbers: [],
-                    totalItemsAdded: 0,
-                };
+                const currentState: CommunityPrState = state ||
+                    directory.communityPrState || {
+                        processedPrNumbers: [],
+                        totalItemsAdded: 0,
+                    };
 
                 const shouldAutoClose =
                     autoClose === undefined ? directory.communityPrAutoClose : autoClose;
@@ -222,10 +227,16 @@ export class CommunityPrProcessorService {
                 currentState.totalItemsAdded =
                     (currentState.totalItemsAdded || 0) + totalItemsAdded;
 
-                await this.directoryRepository.update(directory.id, { communityPrState: currentState });
+                await this.directoryRepository.update(directory.id, {
+                    communityPrState: currentState,
+                });
 
                 if (totalItemsAdded > 0) {
-                    await this.directoryRepository.increment(directory.id, 'itemsCount', totalItemsAdded);
+                    await this.directoryRepository.increment(
+                        directory.id,
+                        'itemsCount',
+                        totalItemsAdded,
+                    );
                 }
 
                 return totalItemsAdded;
