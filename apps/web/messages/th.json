@@ -585,7 +585,8 @@
             },
             "summary": {
                 "generation": {
-                    "completed": "เพิ่ม {added}. เปลี่ยน {changed}. รวมทั้งหมด: {total}"
+                    "withChanges": "เพิ่ม {added}. แก้ไข {changed}. รวม: {total}",
+                    "noChanges": "ไม่มีรายการแก้ไข. รวม: {total}"
                 }
             },
             "pagination": {

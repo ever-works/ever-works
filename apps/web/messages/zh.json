@@ -585,7 +585,8 @@
             },
             "summary": {
                 "generation": {
-                    "completed": "已添加 {added}。已更改 {changed}。总数：{total}"
+                    "withChanges": "添加了 {added}。更改了 {changed}。总计：{total}",
+                    "noChanges": "无条目变更。总计：{total}"
                 }
             },
             "pagination": {

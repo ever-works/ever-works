@@ -1,11 +1,11 @@
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
 
 type ActivitySummaryTranslator = (
-    key: 'generation.completed',
+    key: 'generation.withChanges' | 'generation.noChanges',
     values: {
-        added: number;
-        changed: number;
         total: number;
+        added?: number;
+        changed?: number;
     },
 ) => string;
 
@@ -45,10 +45,18 @@ export function formatActivitySummary(
         const counts = readGenerationCounts(activity.details);
 
         if (hasGenerationCountData(counts)) {
-            return tSummary('generation.completed', {
-                added: counts.newItemsCount ?? 0,
-                changed: counts.updatedItemsCount ?? 0,
-                total: counts.totalItemsCount ?? counts.itemsCount ?? 0,
+            const added = counts.newItemsCount ?? 0;
+            const changed = counts.updatedItemsCount ?? 0;
+            const total = counts.totalItemsCount ?? counts.itemsCount ?? 0;
+
+            if (added === 0 && changed === 0) {
+                return tSummary('generation.noChanges', { total });
+            }
+
+            return tSummary('generation.withChanges', {
+                added,
+                changed,
+                total,
             });
         }
     }

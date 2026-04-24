@@ -585,7 +585,8 @@
             },
             "summary": {
                 "generation": {
-                    "completed": "추가됨 {added}. 변경됨 {changed}. 총계: {total}"
+                    "withChanges": "{added}개 추가. {changed}개 변경. 총계: {total}",
+                    "noChanges": "항목 변경 없음. 총계: {total}"
                 }
             },
             "pagination": {

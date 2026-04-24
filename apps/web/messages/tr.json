@@ -585,7 +585,8 @@
             },
             "summary": {
                 "generation": {
-                    "completed": "Eklendi {added}. Değiştirildi {changed}. Toplam: {total}"
+                    "withChanges": "{added} eklendi. {changed} değiştirildi. Toplam: {total}",
+                    "noChanges": "Öğe değişikliği yok. Toplam: {total}"
                 }
             },
             "pagination": {

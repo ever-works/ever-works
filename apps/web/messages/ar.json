@@ -583,6 +583,12 @@
                 "metadata": "البيانات الوصفية",
                 "rawJson": "JSON الخام"
             },
+            "summary": {
+                "generation": {
+                    "withChanges": "تم إضافة {added}. تم تعديل {changed}. الإجمالي: {total}",
+                    "noChanges": "لا توجد تغييرات في العناصر. الإجمالي: {total}"
+                }
+            },
             "pagination": {
                 "previous": "السابق",
                 "next": "التالي",
@@ -1060,6 +1066,7 @@
                     },
                     "plans": {
                         "free": "مجاني",
+                        "pro": "احترافي",
                         "standard": "قياسي",
                         "premium": "مميز",
                         "unmetered": "غير محدود"
@@ -1451,6 +1458,12 @@
                     "failed": "فشل في التقاط لقطة الشاشة",
                     "error": "حدث خطأ أثناء التقاط لقطة الشاشة",
                     "notConfigured": "خدمة لقطات الشاشة غير مُعدة",
+                    "providerLabel": "مزود",
+                    "providerRequired": "يرجى اختيار مزود لقطة الشاشة",
+                    "selectProviderTitle": "اختر مزود لقطة الشاشة",
+                    "selectProviderDescription": "حدد مزود لقطة الشاشة المستخدم لهذا العنصر.",
+                    "selected": "محدد",
+                    "confirmCapture": "التقاط لقطة الشاشة",
                     "captureFailed": "فشل في التقاط الصورة",
                     "captureSuccess": "تم التقاط الصورة بنجاح",
                     "captureError": "حدث خطأ أثناء التقاط الصورة",
@@ -1755,7 +1768,9 @@
                 "useDirectoryDefault": "استخدام الافتراضي للمجلد",
                 "default": "افتراضي",
                 "notConfigured": "غير مُهيأ",
-                "notConfiguredTooltip": "هذا المزود يتطلب الإعداد. قم بزيارة الإعدادات → الإضافات لإعداده."
+                "notConfiguredTooltip": "هذا المزود يتطلب الإعداد. قم بزيارة الإعدادات → الإضافات لإعداده.",
+                "jsonObjectError": "يجب أن تكون القيمة كائن JSON",
+                "invalidJsonError": "تنسيق JSON غير صالح"
             },
             "progress": {
                 "title": "التوليد جارٍ",
@@ -1845,6 +1860,14 @@
                     "updateFailed": "فشل في تحديث مزود النشر"
                 },
                 "visibilityUpdateFailed": "فشل في تحديث رؤية المستودع",
+                "visibilityUpdated": "{name} الآن {visibility}",
+                "repositoryVisibilityTitle": "رؤية المستودع",
+                "repositoryTypes": {
+                    "main": "رئيسي",
+                    "data": "بيانات",
+                    "website": "موقع ويب"
+                },
+                "repositoryTypeSuffix": "مستودع",
                 "visibilityWarningTitle": "جعل المستودع خاصًا؟",
                 "visibilityWarningDescription": "أنت على وشك جعل {name} خاصًا.",
                 "visibilityWarningPermanent": "هذا الإجراء له عواقب دائمة:",
@@ -2152,99 +2175,6 @@
                     "dnsName": "الاسم:",
                     "dnsValue": "القيمة:",
                     "copyButton": "نسخ"
-                },
-                "card": {
-                    "title": "الأتمتة",
-                    "subtitle": {
-                        "enabled": "ضبط الإيقاع والفوترة والحماية للحفاظ على موثوقية التحديثات المجدولة.",
-                        "disabled": "أتمتة التحديثات بدون قيود الاشتراك - حدد الإيقاع وحماية الأخطاء بحرية."
-                    },
-                    "summary": {
-                        "status": "الحالة",
-                        "nextRun": "التشغيل التالي",
-                        "lastRun": "آخر تشغيل",
-                        "failures": "الإخفاقات",
-                        "notScheduled": "غير مجدول",
-                        "never": "أبداً",
-                        "statusMap": {
-                            "active": "الأتمتة نشطة",
-                            "paused": "متوقف مؤقتاً",
-                            "canceled": "ملغى",
-                            "disabled": "معطل"
-                        },
-                        "nextSourceValidation": "التحقق التالي من المصدر"
-                    },
-                    "fields": {
-                        "automation": "الأتمتة",
-                        "automationHelp": "إيقاف مؤقت لوقف التشغيلات المستقبلية.",
-                        "billing": "وضع الفوترة",
-                        "billingHelp": "الاشتراكات تفتح تشغيلات غير محدودة. الدفع حسب الاستخدام يفرض رسوماً لكل تنفيذ.",
-                        "cadence": "الإيقاع",
-                        "cadenceHelp": "الخطة الحالية: {plan}",
-                        "cadenceOpen": "جميع الإيقاعات متاحة أثناء تعطيل الاشتراكات.",
-                        "maxFailures": "حد الإخفاق",
-                        "maxFailuresHelp": "إيقاف تلقائي بمجرد حدوث هذا العدد من الإخفاقات.",
-                        "createPullRequest": "إنشاء طلبات السحب",
-                        "createPullRequestHelp": "عند التمكين، تنشئ التحديثات المجدولة طلب سحب بدلاً من الالتزام مباشرة.",
-                        "sourceValidationCadence": "وتيرة التحقق من المصدر",
-                        "sourceValidationCadenceHelp": "يستخدم افتراضيًا نفس وتيرة التحديث لديك، لكن يمكنك تقليلها أو زيادتها."
-                    },
-                    "billing": {
-                        "subscription": "الاشتراك",
-                        "usage": "الدفع حسب الاستخدام"
-                    },
-                    "cadence": {
-                        "hourly": "كل ساعة",
-                        "every_3_hours": "Every 3 hours",
-                        "every_8_hours": "Every 8 hours",
-                        "every_12_hours": "Every 12 hours",
-                        "daily": "كل يوم",
-                        "weekly": "كل أسبوع",
-                        "monthly": "كل شهر"
-                    },
-                    "plans": {
-                        "free": "مجاني",
-                        "standard": "قياسي",
-                        "pro": "Pro",
-                        "premium": "مميز",
-                        "unmetered": "غير محدود"
-                    },
-                    "usageRequired": "انتقل إلى الدفع حسب الاستخدام لاستخدام هذا الإيقاع.",
-                    "cadenceAllowed": "الإيقاع مسموح به في خطتك.",
-                    "actions": {
-                        "save": "حفظ التغييرات",
-                        "saving": "جارٍ الحفظ...",
-                        "runNow": "تشغيل الآن",
-                        "starting": "جارٍ البدء...",
-                        "cancel": "إلغاء الجدول",
-                        "cancelling": "جارٍ الإلغاء..."
-                    },
-                    "success": {
-                        "saved": "تم حفظ الجدول.",
-                        "runStarted": "بدأ التشغيل المجدول.",
-                        "cancelled": "تم إلغاء الجدول."
-                    },
-                    "errors": {
-                        "requireUsage": "قم بتمكين فوترة الدفع حسب الاستخدام لاستخدام هذا الإيقاع.",
-                        "updateFailed": "فشل تحديث الجدول.",
-                        "runFailed": "فشل بدء التشغيل.",
-                        "cancelFailed": "فشل إلغاء الجدول."
-                    },
-                    "empty": {
-                        "title": "قم بتشغيل إنشاء يدوي أولاً",
-                        "description": "أكمل تشغيلاً يدوياً ناجحاً واحداً لفتح الجدولة التلقائية. بمجرد أن يحتوي دليلك على بيانات، يمكننا إبقائها محدثة لك.",
-                        "refresh": "تحديث الحالة"
-                    },
-                    "requiresGeneration": "قم بتشغيل إنشاء عنصر واحد على الأقل قبل تمكين الجداول."
-                },
-                "actions": {
-                    "invalid": "بيانات غير صالحة",
-                    "updated": "تم تحديث الجدول.",
-                    "updateFailed": "فشل تحديث الجدول.",
-                    "runStarted": "بدأ التشغيل المجدول.",
-                    "runFailed": "فشل تشغيل التنفيذ.",
-                    "cancelled": "تم إلغاء الجدول.",
-                    "cancelFailed": "فشل إلغاء الجدول."
                 }
             }
         },

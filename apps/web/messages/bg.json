@@ -585,7 +585,8 @@
             },
             "summary": {
                 "generation": {
-                    "completed": "Добавени {added}. Променени {changed}. Общо: {total}"
+                    "withChanges": "Добавени {added}. Променени {changed}. Общо: {total}",
+                    "noChanges": "Няма промени в елементите. Общо: {total}"
                 }
             },
             "pagination": {

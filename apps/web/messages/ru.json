@@ -585,7 +585,8 @@
             },
             "summary": {
                 "generation": {
-                    "completed": "Добавлено {added}. Изменено {changed}. Всего: {total}"
+                    "withChanges": "Добавлено {added}. Изменено {changed}. Всего: {total}",
+                    "noChanges": "Изменений нет. Всего: {total}"
                 }
             },
             "pagination": {

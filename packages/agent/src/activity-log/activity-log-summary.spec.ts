@@ -53,4 +53,14 @@ describe('activity log summary', () => {
             }),
         ).toBe('Added 1. Changed 2. Total: 3');
     });
+
+    it('formats zero-change runs more clearly', () => {
+        expect(
+            formatGenerationCountsSummary({
+                newItemsCount: 0,
+                updatedItemsCount: 0,
+                totalItemsCount: 86,
+            }),
+        ).toBe('No item changes. Total: 86');
+    });
 });

@@ -585,7 +585,8 @@
             },
             "summary": {
                 "generation": {
-                    "completed": "Додано {added}. Змінено {changed}. Всього: {total}"
+                    "withChanges": "Додано {added}. Змінено {changed}. Всього: {total}",
+                    "noChanges": "Немає змін елементів. Всього: {total}"
                 }
             },
             "pagination": {

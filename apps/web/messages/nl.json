@@ -585,7 +585,8 @@
             },
             "summary": {
                 "generation": {
-                    "completed": "Toegevoegd {added}. Gewijzigd {changed}. Totaal: {total}"
+                    "withChanges": "Toegevoegd {added}. Gewijzigd {changed}. Totaal: {total}",
+                    "noChanges": "Geen itemwijzigingen. Totaal: {total}"
                 }
             },
             "pagination": {

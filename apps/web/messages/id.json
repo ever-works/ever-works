@@ -585,7 +585,8 @@
             },
             "summary": {
                 "generation": {
-                    "completed": "Ditambahkan {added}. Diubah {changed}. Total: {total}"
+                    "withChanges": "Ditambahkan {added}. Diubah {changed}. Total: {total}",
+                    "noChanges": "Tidak ada perubahan item. Total: {total}"
                 }
             },
             "pagination": {

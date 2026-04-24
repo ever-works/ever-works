@@ -585,7 +585,8 @@
             },
             "summary": {
                 "generation": {
-                    "completed": "Adicionado {added}. Alterado {changed}. Total: {total}"
+                    "withChanges": "Adicionados {added}. Alterados {changed}. Total: {total}",
+                    "noChanges": "Sem alterações nos itens. Total: {total}"
                 }
             },
             "pagination": {

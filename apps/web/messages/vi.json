@@ -585,7 +585,8 @@
             },
             "summary": {
                 "generation": {
-                    "completed": "Đã thêm {added}. Đã thay đổi {changed}. Tổng cộng: {total}"
+                    "withChanges": "Đã thêm {added}. Đã thay đổi {changed}. Tổng cộng: {total}",
+                    "noChanges": "Không có thay đổi mục nào. Tổng cộng: {total}"
                 }
             },
             "pagination": {

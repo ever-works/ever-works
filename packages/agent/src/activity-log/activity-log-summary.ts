@@ -17,6 +17,10 @@ export function formatGenerationCountsSummary(counts?: GenerationCounts): string
     const changed = counts?.updatedItemsCount ?? 0;
     const total = counts?.totalItemsCount ?? counts?.itemsCount ?? 0;
 
+    if (added === 0 && changed === 0) {
+        return `No item changes. Total: ${total}`;
+    }
+
     return `Added ${added}. Changed ${changed}. Total: ${total}`;
 }
 

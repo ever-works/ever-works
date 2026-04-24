@@ -585,7 +585,8 @@
             },
             "summary": {
                 "generation": {
-                    "completed": "追加 {added}。変更 {changed}。合計: {total}"
+                    "withChanges": "追加 {added}。変更 {changed}。合計: {total}",
+                    "noChanges": "アイテムの変更なし。合計: {total}"
                 }
             },
             "pagination": {

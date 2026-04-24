@@ -585,7 +585,8 @@
             },
             "summary": {
                 "generation": {
-                    "completed": "נוספו {added}. שונו {changed}. סך הכל: {total}"
+                    "withChanges": "נוספו {added}. שונו {changed}. סה\"כ: {total}",
+                    "noChanges": "אין שינויים בפריטים. סה\"כ: {total}"
                 }
             },
             "pagination": {

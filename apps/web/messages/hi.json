@@ -585,7 +585,8 @@
             },
             "summary": {
                 "generation": {
-                    "completed": "{added} जोड़े गए। {changed} बदले गए। कुल: {total}"
+                    "withChanges": "{added} जोड़े गए। {changed} बदले गए। कुल: {total}",
+                    "noChanges": "कोई आइटम परिवर्तन नहीं। कुल: {total}"
                 }
             },
             "pagination": {
