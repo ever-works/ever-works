@@ -246,5 +246,101 @@ describe('model-catalog', () => {
                 },
             ]);
         });
+
+        it('should merge OpenRouter and models.dev metadata for the same model', async () => {
+            global.fetch = jest
+                .fn()
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: () =>
+                        Promise.resolve({
+                            data: [
+                                {
+                                    id: 'openai/gpt-5.1',
+                                    name: 'GPT-5.1',
+                                    context_length: 400000,
+                                },
+                            ],
+                        }),
+                })
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: () =>
+                        Promise.resolve({
+                            openai: {
+                                id: 'openai',
+                                name: 'OpenAI',
+                                models: {
+                                    'gpt-5.1': {
+                                        id: 'gpt-5.1',
+                                        cost: { input: 1.25, output: 10 },
+                                        limit: { output: 128000 },
+                                    },
+                                },
+                            },
+                        }),
+                });
+
+            const result = await fetchModelCatalog();
+
+            expect(result).toEqual([
+                {
+                    id: 'openai/gpt-5.1',
+                    modelId: 'gpt-5.1',
+                    name: 'GPT-5.1',
+                    providerId: 'openai',
+                    providerName: 'OpenAI',
+                    maxContextLength: 400000,
+                    maxOutputTokens: 128000,
+                    inputCostPer1k: 0.00125,
+                    outputCostPer1k: 0.01,
+                    source: 'openrouter',
+                },
+            ]);
+        });
+
+        it('should keep models.dev entries when OpenRouter succeeds without the requested model', async () => {
+            global.fetch = jest
+                .fn()
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: () => Promise.resolve({ data: [] }),
+                })
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: () =>
+                        Promise.resolve({
+                            xai: {
+                                id: 'xai',
+                                name: 'xAI',
+                                models: {
+                                    'grok-4.1-fast': {
+                                        id: 'grok-4.1-fast',
+                                        name: 'Grok 4.1 Fast',
+                                        cost: { input: 2, output: 10 },
+                                        limit: { context: 200000, output: 64000 },
+                                    },
+                                },
+                            },
+                        }),
+                });
+
+            const result = await fetchModelCatalog();
+
+            expect(result).toEqual([
+                {
+                    id: 'xai/grok-4.1-fast',
+                    modelId: 'grok-4.1-fast',
+                    name: 'Grok 4.1 Fast',
+                    providerId: 'xai',
+                    providerName: 'xAI',
+                    maxContextLength: 200000,
+                    maxOutputTokens: 64000,
+                    inputCostPer1k: 0.002,
+                    outputCostPer1k: 0.01,
+                    source: 'models.dev',
+                },
+            ]);
+        });
     });
 });

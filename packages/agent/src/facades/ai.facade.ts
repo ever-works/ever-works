@@ -503,17 +503,15 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         return {
             ...pluginModel,
             capabilities: {
-                ...mergedCatalogModel.capabilities,
                 ...pluginModel.capabilities,
                 maxContextLength:
-                    mergedCatalogModel.capabilities.maxContextLength ||
-                    pluginModel.capabilities.maxContextLength,
-                ...(mergedCatalogModel.capabilities.maxOutputTokens ||
-                pluginModel.capabilities.maxOutputTokens
+                    catalogModel.maxContextLength ?? pluginModel.capabilities.maxContextLength,
+                ...(catalogModel.maxOutputTokens !== undefined ||
+                pluginModel.capabilities.maxOutputTokens !== undefined
                     ? {
                           maxOutputTokens:
                               pluginModel.capabilities.maxOutputTokens ??
-                              mergedCatalogModel.capabilities.maxOutputTokens,
+                              catalogModel.maxOutputTokens,
                       }
                     : {}),
             },

@@ -923,16 +923,22 @@ describe('AiFacadeService', () => {
             expect(result).toBe(128_000);
         });
 
-        it('should cache OpenRouter response (second call does not refetch)', async () => {
-            global.fetch = jest.fn().mockResolvedValue({
-                ok: true,
-                json: () => Promise.resolve({ data: mockOpenRouterData }),
-            });
+        it('should cache catalog responses (second call does not refetch)', async () => {
+            global.fetch = jest
+                .fn()
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: () => Promise.resolve({ data: mockOpenRouterData }),
+                })
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: () => Promise.resolve({}),
+                });
 
             await service.resolveModelContextLength('gpt-4o', defaultFacadeOptions);
             await service.resolveModelContextLength('qwen3-32b', defaultFacadeOptions);
 
-            expect(global.fetch).toHaveBeenCalledTimes(1);
+            expect(global.fetch).toHaveBeenCalledTimes(2);
         });
 
         it('should never throw even on unexpected errors', async () => {
@@ -1039,6 +1045,55 @@ describe('AiFacadeService', () => {
                 inputCostPer1k: 0.00125,
                 outputCostPer1k: 0.01,
             });
+        });
+
+        it('should preserve plugin-specific context length when catalog entry lacks one', async () => {
+            global.fetch = jest
+                .fn()
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: () =>
+                        Promise.resolve({
+                            data: [
+                                {
+                                    id: 'openai/gpt-4o',
+                                    name: 'GPT-4o',
+                                    pricing: { prompt: '0.000005', completion: '0.000015' },
+                                },
+                            ],
+                        }),
+                })
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: () => Promise.resolve({}),
+                });
+
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
+            (aiPlugin.getModel as jest.Mock).mockResolvedValue({
+                id: 'gpt-4o',
+                name: 'GPT-4o',
+                capabilities: {
+                    ...mockCapabilities,
+                    maxContextLength: 32768,
+                },
+            });
+
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+
+            const model = await service.resolveModelMetadata('gpt-4o', defaultFacadeOptions);
+
+            expect(model).toMatchObject({
+                id: 'gpt-4o',
+                capabilities: {
+                    ...mockCapabilities,
+                    maxContextLength: 32768,
+                },
+                inputCostPer1k: 0.005,
+            });
+            expect(model?.outputCostPer1k).toBeCloseTo(0.015, 12);
         });
     });
 

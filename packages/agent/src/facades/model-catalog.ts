@@ -160,6 +160,41 @@ function pickRichest(candidates: readonly ModelCatalogEntry[]): ModelCatalogEntr
     return best;
 }
 
+function mergeCatalogEntries(
+    primary: ModelCatalogEntry,
+    secondary: ModelCatalogEntry,
+): ModelCatalogEntry {
+    return {
+        ...primary,
+        name: primary.name ?? secondary.name,
+        providerId: primary.providerId ?? secondary.providerId,
+        providerName: primary.providerName ?? secondary.providerName,
+        maxContextLength: primary.maxContextLength ?? secondary.maxContextLength,
+        maxOutputTokens: primary.maxOutputTokens ?? secondary.maxOutputTokens,
+        inputCostPer1k: primary.inputCostPer1k ?? secondary.inputCostPer1k,
+        outputCostPer1k: primary.outputCostPer1k ?? secondary.outputCostPer1k,
+    };
+}
+
+function mergeCatalogLists(
+    primary: readonly ModelCatalogEntry[],
+    secondary: readonly ModelCatalogEntry[],
+): ModelCatalogEntry[] {
+    const merged = new Map<string, ModelCatalogEntry>();
+
+    for (const entry of primary) {
+        merged.set(normalizeModelId(entry.id), entry);
+    }
+
+    for (const entry of secondary) {
+        const key = normalizeModelId(entry.id);
+        const existing = merged.get(key);
+        merged.set(key, existing ? mergeCatalogEntries(existing, entry) : entry);
+    }
+
+    return [...merged.values()];
+}
+
 function buildCandidates(modelId: string): string[] {
     const baseName = extractBaseName(modelId);
 
@@ -257,12 +292,20 @@ export async function fetchModelsDevCatalog(): Promise<ModelCatalogEntry[] | nul
  * Fetch generic model metadata, preferring OpenRouter and falling back to models.dev.
  */
 export async function fetchModelCatalog(): Promise<ModelCatalogEntry[] | null> {
-    const openRouterModels = await fetchOpenRouterModelCatalog();
-    if (openRouterModels) {
-        return openRouterModels;
+    const [openRouterResult, modelsDevResult] = await Promise.allSettled([
+        fetchOpenRouterModelCatalog(),
+        fetchModelsDevCatalog(),
+    ]);
+
+    const openRouterModels =
+        openRouterResult.status === 'fulfilled' ? openRouterResult.value : null;
+    const modelsDevModels = modelsDevResult.status === 'fulfilled' ? modelsDevResult.value : null;
+
+    if (openRouterModels && modelsDevModels) {
+        return mergeCatalogLists(openRouterModels, modelsDevModels);
     }
 
-    return fetchModelsDevCatalog();
+    return openRouterModels ?? modelsDevModels;
 }
 
 /**
