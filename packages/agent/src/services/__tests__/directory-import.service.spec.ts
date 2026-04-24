@@ -325,3 +325,91 @@ describe('DirectoryImportService.initiateImport', () => {
         });
     });
 });
+
+describe('DirectoryImportService.syncDirectory', () => {
+    it('updates the in-memory directory source repository before works config sync import runs', async () => {
+        const importExecutor = {
+            importFromWorksConfig: jest.fn().mockResolvedValue({
+                success: true,
+                directoryId: 'dir-1',
+                itemsImported: 0,
+            }),
+        };
+
+        const service = new DirectoryImportService(
+            {
+                update: jest.fn().mockResolvedValue(undefined),
+            } as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {
+                getAccessToken: jest.fn().mockResolvedValue('token'),
+                getWebUrl: jest
+                    .fn()
+                    .mockReturnValue('https://github.com/Ntermast/Compare-Cloud-Pricing'),
+            } as any,
+            {} as any,
+            importExecutor as any,
+            {
+                loadFromRepository: jest.fn().mockResolvedValue({
+                    initialPrompt: 'Build everything',
+                    websiteRepo: 'Ntermast/Compare-Cloud-Pricing-Website',
+                    websiteRepositoryTarget: {
+                        owner: 'Ntermast',
+                        repo: 'Compare-Cloud-Pricing-Website',
+                    },
+                }),
+            } as any,
+            {} as any,
+            {} as any,
+            {
+                enablePluginForDirectory: jest.fn().mockResolvedValue(undefined),
+            } as any,
+            {
+                emit: jest.fn(),
+            } as any,
+        );
+
+        const directory = {
+            id: 'dir-1',
+            gitProvider: 'github',
+            scheduledUpdatesEnabled: false,
+            sourceRepository: {
+                url: 'https://github.com/Ntermast/Compare-Cloud-Pricing',
+                owner: 'Ntermast',
+                repo: 'Compare-Cloud-Pricing',
+                type: ImportSourceTypeEnum.WORKS_CONFIG,
+                importedAt: new Date('2026-04-24T00:00:00.000Z'),
+                relatedRepositories: {
+                    website: {
+                        owner: 'Ntermast',
+                        repo: 'old-website-repo',
+                    },
+                },
+            },
+        } as any;
+
+        const result = await service.syncDirectory(directory, {
+            id: 'user-1',
+            username: 'Ntermast',
+        } as any);
+
+        expect(result.success).toBe(true);
+        expect(importExecutor.importFromWorksConfig).toHaveBeenCalledWith(
+            expect.objectContaining({
+                directory: expect.objectContaining({
+                    sourceRepository: expect.objectContaining({
+                        relatedRepositories: expect.objectContaining({
+                            website: {
+                                owner: 'Ntermast',
+                                repo: 'Compare-Cloud-Pricing-Website',
+                            },
+                        }),
+                    }),
+                }),
+            }),
+        );
+    });
+});

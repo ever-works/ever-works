@@ -92,4 +92,16 @@ schedule:
             loader.loadFromRepository('Ntermast', 'Compare-Cloud-Pricing', 'github', 'token'),
         ).rejects.toThrow('Invalid works config at works.yml:');
     });
+
+    it('parses website_repo from a full GitHub URL', () => {
+        const result = service.parse(`
+initial_prompt: Compare managed databases
+website_repo: https://github.com/Ntermast/Compare-Database-Pricing
+`);
+
+        expect(result.websiteRepositoryTarget).toEqual({
+            owner: 'Ntermast',
+            repo: 'Compare-Database-Pricing',
+        });
+    });
 });

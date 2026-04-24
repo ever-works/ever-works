@@ -27,6 +27,8 @@ export interface ParsedWorksConfig extends WorksConfigSummary {
     raw: Record<string, unknown>;
 }
 
+export type ResolvedWorksConfig = Omit<ParsedWorksConfig, 'raw'>;
+
 @Injectable()
 export class WorksConfigService {
     private readonly logger = new Logger(WorksConfigService.name);
@@ -118,15 +120,18 @@ export class WorksConfigService {
             .trim()
             .replace(/\.git$/, '')
             .replace(/\/$/, '');
-        const slashIndex = trimmed.lastIndexOf('/');
+        const normalized = trimmed
+            .replace(/^[a-z]+:\/\/[^/]+\//i, '')
+            .replace(/^[^@/\s]+@[^:]+:/, '');
+        const slashIndex = normalized.lastIndexOf('/');
 
-        if (slashIndex <= 0 || slashIndex === trimmed.length - 1) {
-            return { repo: trimmed };
+        if (slashIndex <= 0 || slashIndex === normalized.length - 1) {
+            return { repo: normalized };
         }
 
         return {
-            owner: trimmed.slice(0, slashIndex),
-            repo: trimmed.slice(slashIndex + 1),
+            owner: normalized.slice(0, slashIndex),
+            repo: normalized.slice(slashIndex + 1),
         };
     }
 

@@ -16,7 +16,11 @@ import { WebsiteGeneratorService } from '@src/generators/website-generator/websi
 import { GitFacadeService } from '@src/facades/git.facade';
 import { SourceRepoAnalyzerService } from '@src/import/source-repo-analyzer.service';
 import { ImportExecutorService } from '@src/import/import-executor.service';
-import { WorksConfigService, type ParsedWorksConfig } from '@src/import/works-config.service';
+import {
+    WorksConfigService,
+    type ParsedWorksConfig,
+    type ResolvedWorksConfig,
+} from '@src/import/works-config.service';
 import {
     AnalyzeRepositoryDto,
     AnalyzeRepositoryResponseDto,
@@ -98,6 +102,17 @@ export class DirectoryImportService {
                     : undefined,
             additionalAgentsCount: worksConfig.additionalAgentsCount,
         };
+    }
+
+    private toResolvedWorksConfig(
+        worksConfig?: ParsedWorksConfig | null,
+    ): ResolvedWorksConfig | null {
+        if (!worksConfig) {
+            return null;
+        }
+
+        const { raw: _raw, ...resolvedWorksConfig } = worksConfig;
+        return resolvedWorksConfig;
     }
 
     private getWorksConfigConflictRepoNames(
@@ -518,7 +533,7 @@ export class DirectoryImportService {
                 parsed,
                 history,
                 context,
-                worksConfig,
+                this.toResolvedWorksConfig(worksConfig),
             );
 
             // Enable sync schedule only for awesome_readme imports
@@ -568,7 +583,7 @@ export class DirectoryImportService {
         parsed: { owner: string; repo: string },
         history: DirectoryGenerationHistory,
         context: OperationTriggerContext,
-        worksConfig?: ParsedWorksConfig | null,
+        worksConfig?: ResolvedWorksConfig | null,
     ): Promise<void> {
         await Promise.all([
             this.directoryRepository.recordGenerationStartTime(directory.id, new Date()),
@@ -632,7 +647,7 @@ export class DirectoryImportService {
         dto: ImportDirectoryDto,
         parsed: { owner: string; repo: string },
         history: DirectoryGenerationHistory,
-        worksConfig?: ParsedWorksConfig | null,
+        worksConfig?: ResolvedWorksConfig | null,
     ): Promise<void> {
         const startTime = new Date();
 
@@ -917,34 +932,36 @@ export class DirectoryImportService {
             directory.gitProvider,
             token,
         );
-
-        await this.directoryRepository.update(directory.id, {
-            sourceRepository: {
-                ...(directory.sourceRepository || {
-                    url: this.gitFacade.getWebUrl(directory.gitProvider, source.owner, source.repo),
-                    owner: source.owner,
-                    repo: source.repo,
-                    type: ImportSourceTypeEnum.WORKS_CONFIG as ImportSourceType,
-                    importedAt: new Date(),
-                }),
+        const updatedSourceRepository: SourceRepository = {
+            ...(directory.sourceRepository || {
+                url: this.gitFacade.getWebUrl(directory.gitProvider, source.owner, source.repo),
                 owner: source.owner,
                 repo: source.repo,
                 type: ImportSourceTypeEnum.WORKS_CONFIG as ImportSourceType,
-                worksConfig: this.toWorksConfigSnapshot(worksConfig),
-                relatedRepositories: {
-                    ...(directory.sourceRepository?.relatedRepositories || {}),
-                    directory: {
-                        owner: source.owner,
-                        repo: source.repo,
-                    },
-                    ...(worksConfig?.websiteRepositoryTarget
-                        ? {
-                              website: worksConfig.websiteRepositoryTarget,
-                          }
-                        : {}),
+                importedAt: new Date(),
+            }),
+            owner: source.owner,
+            repo: source.repo,
+            type: ImportSourceTypeEnum.WORKS_CONFIG as ImportSourceType,
+            worksConfig: this.toWorksConfigSnapshot(worksConfig),
+            relatedRepositories: {
+                ...(directory.sourceRepository?.relatedRepositories || {}),
+                directory: {
+                    owner: source.owner,
+                    repo: source.repo,
                 },
+                ...(worksConfig?.websiteRepositoryTarget
+                    ? {
+                          website: worksConfig.websiteRepositoryTarget,
+                      }
+                    : {}),
             },
+        };
+
+        await this.directoryRepository.update(directory.id, {
+            sourceRepository: updatedSourceRepository,
         });
+        directory.sourceRepository = updatedSourceRepository;
 
         if (
             directory.scheduledUpdatesEnabled &&
@@ -968,7 +985,7 @@ export class DirectoryImportService {
             user,
             source,
             token,
-            worksConfig,
+            worksConfig: this.toResolvedWorksConfig(worksConfig),
         });
     }
 

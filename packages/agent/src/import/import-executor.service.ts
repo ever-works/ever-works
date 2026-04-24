@@ -12,7 +12,11 @@ import { DirectoryImportResult, DirectoryImportErrorCode } from '@src/tasks/dire
 import { GIT_TOKEN_NOT_AVAILABLE } from '@src/constants/messages';
 import type { ProvidersDto } from '@ever-works/contracts/api';
 import { CreateItemsGeneratorDto } from '@src/items-generator/dto';
-import { WorksConfigService, type ParsedWorksConfig } from './works-config.service';
+import {
+    WorksConfigService,
+    type ParsedWorksConfig,
+    type ResolvedWorksConfig,
+} from './works-config.service';
 
 export interface ExecuteBySourceTypeOptions {
     directory: Directory;
@@ -25,7 +29,7 @@ export interface ExecuteBySourceTypeOptions {
     createMissingRepos?: boolean;
     expansionFactor?: number;
     providers?: ProvidersDto;
-    worksConfig?: ParsedWorksConfig | null;
+    worksConfig?: ResolvedWorksConfig | null;
 }
 
 export interface ImportFromDataRepoOptions {
@@ -58,7 +62,7 @@ export interface ImportFromWorksConfigOptions {
     source: { owner: string; repo: string };
     token?: string;
     providers?: ProvidersDto;
-    worksConfig?: ParsedWorksConfig | null;
+    worksConfig?: ResolvedWorksConfig | null;
 }
 
 @Injectable()
