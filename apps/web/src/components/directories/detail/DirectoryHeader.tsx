@@ -4,13 +4,41 @@ import { Directory } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
 import { useTranslations } from 'next-intl';
-import { DirectoryMemberRole, DirectoryScheduleStatus, GenerateStatusType } from '@/lib/api/enums';
-import { Link as IconLink, Users, Cog, Github, Clock } from 'lucide-react';
+import { DirectoryMemberRole, DirectoryScheduleStatus } from '@/lib/api/enums';
+import { Link as IconLink, Users, Cog, Github, Clock, AlertTriangle } from 'lucide-react';
 import { useDirectoryDetail, useDirectoryPermissions } from './DirectoryDetailContext';
-import { getStepText, getItemsProcessedText } from '@/lib/utils/generator-steps';
 import { buildPublicComparisonUrl } from '@/lib/utils/comparison';
 import { Link, usePathname } from '@/i18n/navigation';
 import { ShinyText } from '@/components/ui/ShinyText';
+
+function AnimatedClock({ className }: { className?: string }) {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={className}
+            aria-hidden="true"
+        >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="12" x2="12" y2="8" />
+            <line x1="12" y1="12" x2="16" y2="12">
+                <animateTransform
+                    attributeName="transform"
+                    type="rotate"
+                    from="0 12 12"
+                    to="360 12 12"
+                    dur="8s"
+                    repeatCount="indefinite"
+                />
+            </line>
+            <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+        </svg>
+    );
+}
 
 interface DirectoryHeaderProps {
     directory: Directory;
@@ -18,7 +46,6 @@ interface DirectoryHeaderProps {
 
 export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
     const t = useTranslations('dashboard.directoryDetail');
-    const tProgress = useTranslations('dashboard.directoryDetail.progress');
     const { repoLinks } = useDirectoryDetail();
     const { role } = useDirectoryPermissions();
     const pathname = usePathname();
@@ -30,12 +57,13 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
         hasWarnings,
     });
     const isScheduled = directory.scheduledStatus === DirectoryScheduleStatus.ACTIVE;
-    const StatusIcon = statusStyle.icon;
-    const shouldShowScheduledSuffix =
-        isScheduled && directory.generateStatus?.status !== GenerateStatusType.GENERATING;
-    const statusLabel = shouldShowScheduledSuffix
-        ? `${t(`status.${statusStyle.labelKey}`)} - Scheduled`
-        : t(`status.${statusStyle.labelKey}`);
+    const isGenerating = statusStyle.labelKey === 'generating';
+    const showStatusBadge = !isScheduled || isGenerating;
+    const showScheduledBadge = isScheduled && !isGenerating;
+    const statusLabel =
+        statusStyle.labelKey === 'generatedWithWarnings'
+            ? t('status.generated')
+            : t(`status.${statusStyle.labelKey}`);
     const pathSegments = pathname.split('/').filter(Boolean);
     const comparisonsIndex = pathSegments.indexOf('comparisons');
     const comparisonSlug =
@@ -48,107 +76,119 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
             : directory.website;
 
     return (
-        <div className="mb-8 pb-6 border-b border-border dark:border-border-dark">
-            <div className="flex items-start justify-between">
-                <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                        <h1 className="text-3xl font-bold text-text dark:text-text-dark">
-                            {directory.name}
-                        </h1>
-                        {isShared && (
-                            <span
-                                className={cn(
-                                    'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium',
-                                    'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-                                )}
-                                title={t('shared.tooltip', { role: t(`role.${role}`) })}
-                            >
-                                <Users className="w-4 h-4" />
-                                {t(`role.${role}`)}
-                            </span>
-                        )}
-                        <span
-                            className={cn(
-                                'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium',
-                                statusStyle.badge,
-                            )}
-                        >
-                            <StatusIcon
-                                className={cn('w-3 h-3', statusStyle.animate && 'animate-spin')}
-                            />
-                            {statusStyle.animate ? <ShinyText text={statusLabel} /> : statusLabel}
-                            {directory.generateStatus?.step && statusStyle.animate && (
-                                <span className="text-xs opacity-75">
-                                    •{' '}
-                                    <span className="ml-1">
-                                        {getItemsProcessedText(directory.generateStatus) ||
-                                            getStepText(
-                                                directory.generateStatus,
-                                                tProgress('steps.processing'),
-                                            )}
-                                    </span>
+        <div className="relative mb-6">
+            <div className="relative">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                        {/* Title + inline status badges */}
+                        <div className="mb-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                            <h1 className="text-xl font-bold leading-tight text-text dark:text-text-dark sm:text-2xl">
+                                {directory.name}
+                            </h1>
+
+                            {showStatusBadge && (
+                                <span
+                                    className={cn(
+                                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-normal whitespace-nowrap shrink-0',
+                                        statusStyle.badge,
+                                        isGenerating && 'animate-pulse',
+                                    )}
+                                >
+                                    {isGenerating ? <ShinyText text={statusLabel} /> : statusLabel}
+                                    {statusStyle.labelKey === 'generatedWithWarnings' && (
+                                        <AlertTriangle className="w-3 h-3" />
+                                    )}
                                 </span>
                             )}
-                        </span>
-                    </div>
 
-                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark mb-4">
-                        {directory.description}
-                    </p>
+                            {showScheduledBadge && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-normal shrink-0 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                    {hasWarnings && <AlertTriangle className="w-3 h-3" />}
+                                    {statusLabel}
+                                    <AnimatedClock className="w-3 h-3" />
+                                </span>
+                            )}
 
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted dark:text-text-muted-dark">
-                        <div className="flex items-center gap-0.5">
-                            <Cog className="w-4 h-4" />
-                            <code className="px-1.5 py-0.5 bg-surface dark:bg-surface-dark rounded">
-                                {directory.slug}
-                            </code>
+                            {isShared && (
+                                <span
+                                    className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-normal shrink-0 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                                    title={t('shared.tooltip', { role: t(`role.${role}`) })}
+                                >
+                                    <Users className="w-3 h-3" />
+                                    {t(`role.${role}`)}
+                                </span>
+                            )}
                         </div>
 
-                        {directory.organization && directory.owner && (
-                            <div className="flex items-center gap-1.5">
-                                <Users className="w-4 h-4" />
-                                <span>{directory.owner}</span>
-                            </div>
+                        {/* Description */}
+                        {directory.description && (
+                            <p className="mt-1.5 text-sm leading-relaxed text-text-secondary dark:text-text-secondary-dark">
+                                {directory.description}
+                            </p>
                         )}
 
-                        {(() => {
-                            const innerJSX = (
-                                <>
-                                    <Github className="w-4 h-4" />
-                                    <span className="capitalize">{directory.gitProvider}</span>
-                                </>
-                            );
+                        {/* Meta row */}
+                        <div className="mt-4 flex flex-wrap items-center gap-3">
+                            {/* Slug */}
+                            <div className="flex items-center gap-1 text-[11px] text-text-secondary dark:text-text-secondary-dark">
+                                <Cog className="w-3.5 h-3.5 opacity-60" />
+                                <code className="rounded bg-black/5 px-1.5 py-0.5 font-mono dark:bg-white/8">
+                                    {directory.slug}
+                                </code>
+                            </div>
 
-                            if (repoLinks?.main) {
-                                return (
-                                    <a
-                                        href={repoLinks?.main}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-1.5"
-                                    >
-                                        {innerJSX}
-                                    </a>
+                            {directory.organization && directory.owner && (
+                                <div className="flex items-center gap-1 text-[11px] text-text-secondary dark:text-text-secondary-dark">
+                                    <Users className="w-3.5 h-3.5 opacity-60" />
+                                    <span>{directory.owner}</span>
+                                </div>
+                            )}
+
+                            {(() => {
+                                const inner = (
+                                    <>
+                                        <Github className="w-3.5 h-3.5 opacity-60" />
+                                        <span className="capitalize">{directory.gitProvider}</span>
+                                    </>
                                 );
-                            }
+                                if (repoLinks?.main) {
+                                    return (
+                                        <a
+                                            href={repoLinks.main}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-1 text-[11px] text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark transition-colors"
+                                        >
+                                            {inner}
+                                        </a>
+                                    );
+                                }
+                                return (
+                                    <div className="flex items-center gap-1 text-[11px] text-text-secondary dark:text-text-secondary-dark">
+                                        {inner}
+                                    </div>
+                                );
+                            })()}
 
-                            return <div className="flex items-center gap-1.5">{innerJSX}</div>;
-                        })()}
-
-                        <div className="flex items-center gap-1.5">
-                            <Clock className="w-4 h-4" />
-                            <span>{new Date(directory.createdAt).toLocaleDateString()}</span>
+                            <div className="flex items-center gap-1 text-[11px] text-text-secondary dark:text-text-secondary-dark">
+                                <Clock className="w-3.5 h-3.5 opacity-60" />
+                                <span>{new Date(directory.createdAt).toLocaleDateString()}</span>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                {externalWebsiteUrl && (
-                    <div className="ml-6">
-                        <Link href={externalWebsiteUrl} target="_blank" rel="noopener noreferrer">
+                    {/* External link */}
+                    {externalWebsiteUrl && (
+                        <Link
+                            href={externalWebsiteUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 rounded-lg border border-border dark:border-border-dark p-2 text-text-secondary dark:text-text-secondary-dark hover:border-primary/40 hover:text-primary dark:hover:text-primary transition-colors"
+                        >
                             <IconLink className="w-4 h-4" />
                         </Link>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
         </div>
     );

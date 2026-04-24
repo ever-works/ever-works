@@ -8,7 +8,7 @@ import {
     ComboboxOption,
     ComboboxOptions,
 } from '@headlessui/react';
-import { Check, ChevronDown, FolderOpen, LoaderCircle, Search } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, FolderOpen, LoaderCircle, Search } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter as useTopLoaderRouter } from 'nextjs-toploader/app';
@@ -74,10 +74,17 @@ export function DirectorySwitcher() {
         const statusStyle = getGenerationStatusConfig(currentDirectory.generateStatus?.status, {
             hasWarnings,
         });
+        const isGenerating = statusStyle.labelKey === 'generating';
+        const isGeneratedWithWarnings = statusStyle.labelKey === 'generatedWithWarnings';
+        const label = isGeneratedWithWarnings
+            ? tStatus('generated')
+            : tStatus(statusStyle.labelKey);
 
         return {
             ...statusStyle,
-            label: tStatus(statusStyle.labelKey),
+            label,
+            isGenerating,
+            isGeneratedWithWarnings,
         };
     }, [currentDirectory, tStatus]);
 
@@ -182,7 +189,7 @@ export function DirectorySwitcher() {
                             ref={inputRef}
                             aria-label={t('search')}
                             className={cn(
-                                'min-w-0 flex-1 bg-transparent text-sm outline-none',
+                                'min-w-0 flex-1 bg-transparent text-xs outline-none',
                                 'text-text dark:text-text-dark',
                                 'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
                             )}
@@ -198,8 +205,8 @@ export function DirectorySwitcher() {
                                 className="shrink-0"
                                 label={currentDirectoryStatus.label}
                                 badgeClassName={currentDirectoryStatus.badge}
-                                animate={currentDirectoryStatus.animate}
-                                Icon={currentDirectoryStatus.icon}
+                                isGenerating={currentDirectoryStatus.isGenerating}
+                                showWarningIcon={currentDirectoryStatus.isGeneratedWithWarnings}
                             />
                         )}
 
@@ -244,6 +251,13 @@ export function DirectorySwitcher() {
                                     );
                                     const statusLabel = tStatus(statusStyle.labelKey);
 
+                                    const isItemGenerating = statusStyle.labelKey === 'generating';
+                                    const isItemGeneratedWithWarnings =
+                                        statusStyle.labelKey === 'generatedWithWarnings';
+                                    const displayLabel = isItemGeneratedWithWarnings
+                                        ? tStatus('generated')
+                                        : statusLabel;
+
                                     return (
                                         <ComboboxOption
                                             key={directory.id}
@@ -274,10 +288,12 @@ export function DirectorySwitcher() {
 
                                                 <div className="flex shrink-0 items-center gap-2 self-center">
                                                     <DirectoryStatusBadge
-                                                        label={statusLabel}
+                                                        label={displayLabel}
                                                         badgeClassName={statusStyle.badge}
-                                                        animate={statusStyle.animate}
-                                                        Icon={statusStyle.icon}
+                                                        isGenerating={isItemGenerating}
+                                                        showWarningIcon={
+                                                            isItemGeneratedWithWarnings
+                                                        }
                                                     />
 
                                                     {isCurrentDirectory && (
@@ -300,26 +316,27 @@ export function DirectorySwitcher() {
 function DirectoryStatusBadge({
     label,
     badgeClassName,
-    animate,
-    Icon,
+    isGenerating,
+    showWarningIcon,
     className,
 }: {
     label: string;
     badgeClassName: string;
-    animate: boolean;
-    Icon: React.ComponentType<{ className?: string }>;
+    isGenerating: boolean;
+    showWarningIcon: boolean;
     className?: string;
 }) {
     return (
         <span
             className={cn(
-                'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
+                'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-normal whitespace-nowrap',
                 badgeClassName,
+                isGenerating && 'animate-pulse',
                 className,
             )}
         >
-            <Icon className={cn('h-3 w-3', animate && 'animate-spin')} />
-            {animate ? <ShinyText text={label} /> : label}
+            {isGenerating ? <ShinyText text={label} /> : label}
+            {showWarningIcon && <AlertTriangle className="h-3 w-3" />}
         </span>
     );
 }
