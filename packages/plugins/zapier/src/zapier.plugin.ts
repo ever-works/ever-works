@@ -329,11 +329,21 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			return handleError(new Error('User ID is required'));
 		}
 
+		let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
 		try {
 			const pluginSettings = await resolveSettings(this.context, userId, directory.id);
 			const config = (request.config || {}) as Record<string, unknown>;
 
 			const zapierSettings = this.resolveZapierSettings(pluginSettings, config);
+
+			// Enforce the user-configured timeout — abort the pipeline if the action exceeds the budget.
+			timeoutHandle = setTimeout(() => {
+				if (!signal.aborted) {
+					logger.warn(`Zapier action timed out after ${zapierSettings.timeoutMs}ms — aborting`);
+					abortController.abort();
+				}
+			}, zapierSettings.timeoutMs);
 			const actionRef = this.resolveActionRef(config, zapierSettings);
 
 			const missing = this.collectMissingActionFields(actionRef);
@@ -482,6 +492,8 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			const err = error instanceof Error ? error : new Error(String(error));
 			logger.error(`Zapier pipeline failed: ${err.message}`);
 			return handleError(err);
+		} finally {
+			if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
 		}
 	}
 

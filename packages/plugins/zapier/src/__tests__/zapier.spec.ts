@@ -407,6 +407,41 @@ describe('ZapierPlugin', () => {
 			expect(result.success).toBe(false);
 		});
 
+		it('should abort the action when the configured timeout elapses', async () => {
+			vi.useFakeTimers();
+			try {
+				// runAction never resolves on its own — only the timeout can rescue this.
+				mockRunAction.mockImplementation(
+					() =>
+						new Promise(() => {
+							/* never */
+						})
+				);
+
+				const result = plugin.execute(
+					createDirectory(),
+					createRequest({
+						config: {
+							app_key: 'slack',
+							action_type: 'write',
+							action_key: 'custom',
+							authentication_id: 12345,
+							action_timeout: 1 // 1 minute → 60_000 ms
+						}
+					}),
+					createExisting()
+				);
+
+				// Advance past the 60_000 ms budget; the internal timer must fire and abort.
+				await vi.advanceTimersByTimeAsync(61_000);
+
+				const settled = await result;
+				expect(settled.success).toBe(false);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
 		it('should expose state after execution', async () => {
 			await plugin.execute(createDirectory(), createRequest(), createExisting());
 			const state = plugin.getState();

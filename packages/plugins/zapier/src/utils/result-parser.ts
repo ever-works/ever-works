@@ -196,7 +196,7 @@ function isNonEmptyItem(item: ItemData): boolean {
 	return typeof item.name === 'string' && item.name.trim().length > 0;
 }
 
-/** Reads a field by a dot-separated path (e.g. `profile.name` or `fields[0].title`). */
+/** Reads a field by a dot-separated path (e.g. `profile.name` or `fields.0.title`). */
 function readField(record: Record<string, unknown>, path: string): unknown {
 	if (!path) return undefined;
 	const parts = path
