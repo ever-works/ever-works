@@ -44,4 +44,33 @@ schedule:
         expect(result.initialPrompt).toBe('Keep this repo up to date');
         expect(result.scheduleCadence).toBe(DirectoryScheduleCadence.EVERY_12_HOURS);
     });
+
+    it('loads works config from works_config/works.yaml when root file is absent', async () => {
+        const gitFacade = {
+            getFileContent: jest
+                .fn()
+                .mockRejectedValueOnce(new Error('not found'))
+                .mockRejectedValueOnce(new Error('not found'))
+                .mockRejectedValueOnce(new Error('not found'))
+                .mockResolvedValueOnce({
+                    content: 'initial_prompt: Build everything\n',
+                }),
+        };
+
+        const loader = new WorksConfigService(gitFacade as any);
+        const result = await loader.loadFromRepository('Ntermast', 'Compare-Cloud-Pricing', 'github', 'token');
+
+        expect(result).toMatchObject({
+            initialPrompt: 'Build everything',
+        });
+        expect(gitFacade.getFileContent).toHaveBeenLastCalledWith(
+            'Ntermast',
+            'Compare-Cloud-Pricing',
+            'works_config/works.yaml',
+            {
+                token: 'token',
+                providerId: 'github',
+            },
+        );
+    });
 });

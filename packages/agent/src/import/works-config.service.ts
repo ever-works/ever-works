@@ -4,7 +4,12 @@ import * as yaml from 'yaml';
 import { GitFacadeService } from '@src/facades/git.facade';
 import type { RepositoryTarget } from '@src/entities/directory.entity';
 
-const WORKS_CONFIG_FILENAMES = ['works.yml', 'works.yaml'] as const;
+const WORKS_CONFIG_FILEPATHS = [
+    'works.yml',
+    'works.yaml',
+    'works_config/works.yml',
+    'works_config/works.yaml',
+] as const;
 
 export interface WorksConfigSummary {
     name?: string;
@@ -34,7 +39,7 @@ export class WorksConfigService {
         providerId?: string,
         token?: string,
     ): Promise<ParsedWorksConfig | null> {
-        for (const filePath of WORKS_CONFIG_FILENAMES) {
+        for (const filePath of WORKS_CONFIG_FILEPATHS) {
             try {
                 const file = await this.gitFacade.getFileContent(owner, repo, filePath, {
                     token,

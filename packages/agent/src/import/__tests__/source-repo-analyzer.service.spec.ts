@@ -85,7 +85,7 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
             getDirectoryContents: jest
                 .fn()
                 .mockResolvedValueOnce([
-                    { name: 'works.yml', type: 'file', path: 'works.yml' },
+                    { name: 'works_config', type: 'dir', path: 'works_config' },
                     { name: 'data', type: 'dir', path: 'data' },
                     { name: 'README.md', type: 'file', path: 'README.md' },
                 ])
@@ -127,7 +127,7 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
                 permissions: { push: true },
             }),
             getDirectoryContents: jest.fn().mockResolvedValue([
-                { name: 'works.yml', type: 'file', path: 'works.yml' },
+                { name: 'works_config', type: 'dir', path: 'works_config' },
                 { name: 'README.md', type: 'file', path: 'README.md' },
             ]),
         };
