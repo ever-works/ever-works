@@ -33,7 +33,7 @@ describe('AiFacadeService', () => {
     const createMockAiPlugin = (
         id: string,
         providerName: string,
-        opts?: { withAskJson?: boolean },
+        opts?: { withAskJson?: boolean; providerType?: string },
     ): IAiProviderPlugin => ({
         id,
         name: `${providerName} Plugin`,
@@ -41,7 +41,7 @@ describe('AiFacadeService', () => {
         category: 'ai-provider',
         capabilities: ['ai-provider'],
         settingsSchema: { type: 'object', properties: {} },
-        providerType: 'openai',
+        providerType: opts?.providerType ?? 'openai',
         providerName,
         onLoad: jest.fn(),
         onUnload: jest.fn(),
@@ -213,6 +213,11 @@ describe('AiFacadeService', () => {
 
     describe('askJson', () => {
         const testSchema = z.object({ name: z.string() });
+        const originalFetch = global.fetch;
+
+        afterEach(() => {
+            global.fetch = originalFetch;
+        });
 
         it('should use plugin.askJson for efficient structured output', async () => {
             const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
@@ -386,6 +391,8 @@ describe('AiFacadeService', () => {
         });
 
         it('should return null cost when model pricing is not available', async () => {
+            global.fetch = jest.fn().mockRejectedValue(new Error('No catalog metadata'));
+
             const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
             // getModel returns null (default mock)
             const registered = createRegisteredPlugin(aiPlugin, {
@@ -401,6 +408,38 @@ describe('AiFacadeService', () => {
             );
 
             expect(result.cost).toBeNull();
+        });
+
+        it('should fall back to catalog pricing when plugin model metadata is missing', async () => {
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                json: () =>
+                    Promise.resolve({
+                        data: [
+                            {
+                                id: 'openai/gpt-4',
+                                name: 'GPT-4',
+                                context_length: 128000,
+                                pricing: { prompt: '0.00003', completion: '0.00006' },
+                            },
+                        ],
+                    }),
+            });
+
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+
+            const result = await service.askJson(
+                'Test',
+                testSchema,
+                undefined,
+                defaultFacadeOptions,
+            );
+
+            expect(result.cost).toBeCloseTo(0.0006, 6);
         });
 
         it('should auto-escalate from simple to medium on failure', async () => {
@@ -906,6 +945,100 @@ describe('AiFacadeService', () => {
 
             const result = await service.resolveModelContextLength('gpt-4o', defaultFacadeOptions);
             expect(result).toBe(128_000);
+        });
+    });
+
+    describe('resolveModelMetadata', () => {
+        const originalFetch = global.fetch;
+
+        afterEach(() => {
+            global.fetch = originalFetch;
+        });
+
+        it('should merge catalog context and pricing into plugin models', async () => {
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                json: () =>
+                    Promise.resolve({
+                        data: [
+                            {
+                                id: 'openai/gpt-4o',
+                                name: 'GPT-4o',
+                                context_length: 200000,
+                                pricing: { prompt: '0.000005', completion: '0.000015' },
+                            },
+                        ],
+                    }),
+            });
+
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
+            (aiPlugin.getModel as jest.Mock).mockResolvedValue({
+                id: 'gpt-4o',
+                name: 'GPT-4o',
+                capabilities: mockCapabilities,
+            });
+
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+
+            const model = await service.resolveModelMetadata('gpt-4o', defaultFacadeOptions);
+
+            expect(model).toMatchObject({
+                id: 'gpt-4o',
+                name: 'GPT-4o',
+                capabilities: {
+                    ...mockCapabilities,
+                    maxContextLength: 200000,
+                },
+                inputCostPer1k: 0.005,
+            });
+            expect(model?.outputCostPer1k).toBeCloseTo(0.015, 12);
+        });
+
+        it('should fall back to models.dev when OpenRouter metadata is unavailable', async () => {
+            global.fetch = jest
+                .fn()
+                .mockRejectedValueOnce(new Error('OpenRouter down'))
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: () =>
+                        Promise.resolve({
+                            openai: {
+                                id: 'openai',
+                                name: 'OpenAI',
+                                models: {
+                                    'gpt-5.1': {
+                                        id: 'gpt-5.1',
+                                        name: 'GPT-5.1',
+                                        cost: { input: 1.25, output: 10 },
+                                        limit: { context: 400000, output: 128000 },
+                                    },
+                                },
+                            },
+                        }),
+                });
+
+            const aiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
+            const registered = createRegisteredPlugin(aiPlugin, {
+                capabilities: ['ai-provider'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+
+            const model = await service.resolveModelMetadata('gpt-5.1', defaultFacadeOptions);
+
+            expect(model).toEqual({
+                id: 'openai/gpt-5.1',
+                name: 'GPT-5.1',
+                capabilities: {
+                    ...mockCapabilities,
+                    maxContextLength: 400000,
+                    maxOutputTokens: 128000,
+                },
+                inputCostPer1k: 0.00125,
+                outputCostPer1k: 0.01,
+            });
         });
     });
 

@@ -106,11 +106,15 @@ export function buildMetrics(
 	startTime: number,
 	duration: number,
 	itemCount: number,
-	tokenUsage?: TokenUsageBreakdown
+	tokenUsage?: TokenUsageBreakdown,
+	totalCost?: number
 ): AgentPipelineMetrics {
 	const metrics: AgentPipelineMetrics = { startTime, duration, itemsProcessed: itemCount, steps: {} };
 	if (tokenUsage) {
 		metrics.tokenUsage = tokenUsage;
+	}
+	if (typeof totalCost === 'number' && totalCost > 0) {
+		metrics.totalCost = totalCost;
 	}
 	return metrics;
 }

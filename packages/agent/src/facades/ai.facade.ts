@@ -22,8 +22,8 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import { BaseFacadeService, FacadeError } from './base.facade';
-import { fetchOpenRouterModels, fuzzyMatchModel } from './openrouter-model-lookup';
-import type { OpenRouterModelEntry } from './openrouter-model-lookup';
+import { fetchModelCatalog, matchModelCatalogEntry } from './model-catalog';
+import type { ModelCatalogEntry } from './model-catalog';
 
 export class AiFacadeError extends FacadeError {
     constructor(message: string, operation: string, provider?: string, cause?: Error) {
@@ -39,8 +39,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
 
     private static readonly CACHE_TTL = 3_600_000; // 1 hour
     private static readonly DEFAULT_CONTEXT = 128_000;
-    private openRouterModels: readonly OpenRouterModelEntry[] | null = null;
-    private openRouterCacheTime = 0;
+    private modelCatalog: readonly ModelCatalogEntry[] | null = null;
+    private modelCatalogCacheTime = 0;
 
     constructor(
         registry: PluginRegistryService,
@@ -205,8 +205,13 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         if (!usage) return null;
 
         try {
-            const modelInfo = await plugin.getModel(modelId, settings);
-            if (!modelInfo?.inputCostPer1k || !modelInfo?.outputCostPer1k) return null;
+            const modelInfo = await this.resolveModelMetadataForPlugin(plugin, modelId, settings);
+            if (
+                typeof modelInfo?.inputCostPer1k !== 'number' ||
+                typeof modelInfo?.outputCostPer1k !== 'number'
+            ) {
+                return null;
+            }
 
             const inputCost = (usage.promptTokens * modelInfo.inputCostPer1k) / 1000;
             const outputCost = (usage.completionTokens * modelInfo.outputCostPer1k) / 1000;
@@ -347,20 +352,39 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         };
     }
 
+    async resolveModelMetadata(
+        modelId: string,
+        facadeOptions: FacadeOptions,
+    ): Promise<AiModel | null> {
+        try {
+            const plugin = await this.resolvePlugin<IAiProviderPlugin>(
+                facadeOptions.providerOverride,
+                facadeOptions.userId,
+                facadeOptions.directoryId,
+            );
+
+            const settings = await this.getResolvedSettings(plugin.id, {
+                userId: facadeOptions.userId,
+                directoryId: facadeOptions.directoryId,
+            });
+
+            return this.resolveModelMetadataForPlugin(plugin, modelId, settings);
+        } catch {
+            const catalogModel = await this.resolveCatalogModel(modelId);
+            return catalogModel ? this.buildAiModelFromCatalog(catalogModel) : null;
+        }
+    }
+
     async resolveModelContextLength(
         modelId: string,
-        _facadeOptions: FacadeOptions,
+        facadeOptions: FacadeOptions,
     ): Promise<number> {
         try {
-            const models = await this.getCachedOpenRouterModels();
-            if (!models) return AiFacadeService.DEFAULT_CONTEXT;
-
-            const match = fuzzyMatchModel(modelId, models);
-            if (match?.context_length && match.context_length > 0) {
-                this.logger.debug(
-                    `Context length for "${modelId}": ${match.context_length} (matched "${match.id}")`,
-                );
-                return match.context_length;
+            const resolvedModel = await this.resolveModelMetadata(modelId, facadeOptions);
+            const contextLength = resolvedModel?.capabilities.maxContextLength;
+            if (typeof contextLength === 'number' && contextLength > 0) {
+                this.logger.debug(`Context length for "${modelId}": ${contextLength}`);
+                return contextLength;
             }
 
             return AiFacadeService.DEFAULT_CONTEXT;
@@ -369,20 +393,141 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         }
     }
 
-    private async getCachedOpenRouterModels(): Promise<readonly OpenRouterModelEntry[] | null> {
+    private async getCachedModelCatalog(): Promise<readonly ModelCatalogEntry[] | null> {
         const now = Date.now();
-        if (this.openRouterModels && now - this.openRouterCacheTime < AiFacadeService.CACHE_TTL) {
-            return this.openRouterModels;
+        if (this.modelCatalog && now - this.modelCatalogCacheTime < AiFacadeService.CACHE_TTL) {
+            return this.modelCatalog;
         }
 
-        const fresh = await fetchOpenRouterModels();
+        const fresh = await fetchModelCatalog();
         if (fresh) {
-            this.openRouterModels = fresh;
-            this.openRouterCacheTime = now;
+            this.modelCatalog = fresh;
+            this.modelCatalogCacheTime = now;
         }
 
         // Stale-while-revalidate: return cached data if fresh fetch failed
-        return this.openRouterModels;
+        return this.modelCatalog;
+    }
+
+    private async resolveModelMetadataForPlugin(
+        plugin: IAiProviderPlugin,
+        modelId: string,
+        settings?: Record<string, unknown>,
+    ): Promise<AiModel | null> {
+        const pluginModel = await plugin.getModel(modelId, settings).catch(() => null);
+        const catalogModel = await this.resolveCatalogModel(
+            modelId,
+            this.getProviderHint(plugin, modelId),
+        );
+
+        if (pluginModel && catalogModel) {
+            return this.mergeAiModelWithCatalog(
+                pluginModel,
+                catalogModel,
+                plugin.getCapabilities(),
+            );
+        }
+
+        if (pluginModel) {
+            return pluginModel;
+        }
+
+        if (catalogModel) {
+            return this.buildAiModelFromCatalog(catalogModel, plugin.getCapabilities());
+        }
+
+        return null;
+    }
+
+    private async resolveCatalogModel(
+        modelId: string,
+        providerHint?: string,
+    ): Promise<ModelCatalogEntry | null> {
+        const models = await this.getCachedModelCatalog();
+        if (!models) return null;
+
+        return matchModelCatalogEntry(modelId, models, providerHint);
+    }
+
+    private getProviderHint(plugin: IAiProviderPlugin, modelId: string): string | undefined {
+        const providerType = plugin.providerType?.trim().toLowerCase();
+        if (!providerType) return undefined;
+
+        if (providerType === 'openrouter') {
+            const slashIndex = modelId.indexOf('/');
+            return slashIndex > 0 ? modelId.slice(0, slashIndex).toLowerCase() : undefined;
+        }
+
+        return providerType;
+    }
+
+    private buildAiModelFromCatalog(
+        catalogModel: ModelCatalogEntry,
+        fallbackCapabilities?: AiModel['capabilities'],
+    ): AiModel {
+        return {
+            id: catalogModel.id,
+            name: catalogModel.name ?? catalogModel.modelId,
+            capabilities: {
+                supportsStructuredOutput: fallbackCapabilities?.supportsStructuredOutput ?? true,
+                supportsStreaming: fallbackCapabilities?.supportsStreaming ?? true,
+                supportsToolCalling: fallbackCapabilities?.supportsToolCalling ?? true,
+                supportsVision: fallbackCapabilities?.supportsVision ?? false,
+                maxContextLength:
+                    catalogModel.maxContextLength ??
+                    fallbackCapabilities?.maxContextLength ??
+                    AiFacadeService.DEFAULT_CONTEXT,
+                ...(catalogModel.maxOutputTokens || fallbackCapabilities?.maxOutputTokens
+                    ? {
+                          maxOutputTokens:
+                              catalogModel.maxOutputTokens ?? fallbackCapabilities?.maxOutputTokens,
+                      }
+                    : {}),
+            },
+            ...(catalogModel.inputCostPer1k !== undefined
+                ? { inputCostPer1k: catalogModel.inputCostPer1k }
+                : {}),
+            ...(catalogModel.outputCostPer1k !== undefined
+                ? { outputCostPer1k: catalogModel.outputCostPer1k }
+                : {}),
+        };
+    }
+
+    private mergeAiModelWithCatalog(
+        pluginModel: AiModel,
+        catalogModel: ModelCatalogEntry,
+        fallbackCapabilities?: AiModel['capabilities'],
+    ): AiModel {
+        const mergedCatalogModel = this.buildAiModelFromCatalog(catalogModel, fallbackCapabilities);
+
+        return {
+            ...pluginModel,
+            capabilities: {
+                ...mergedCatalogModel.capabilities,
+                ...pluginModel.capabilities,
+                maxContextLength:
+                    mergedCatalogModel.capabilities.maxContextLength ||
+                    pluginModel.capabilities.maxContextLength,
+                ...(mergedCatalogModel.capabilities.maxOutputTokens ||
+                pluginModel.capabilities.maxOutputTokens
+                    ? {
+                          maxOutputTokens:
+                              pluginModel.capabilities.maxOutputTokens ??
+                              mergedCatalogModel.capabilities.maxOutputTokens,
+                      }
+                    : {}),
+            },
+            ...(pluginModel.inputCostPer1k !== undefined
+                ? { inputCostPer1k: pluginModel.inputCostPer1k }
+                : mergedCatalogModel.inputCostPer1k !== undefined
+                  ? { inputCostPer1k: mergedCatalogModel.inputCostPer1k }
+                  : {}),
+            ...(pluginModel.outputCostPer1k !== undefined
+                ? { outputCostPer1k: pluginModel.outputCostPer1k }
+                : mergedCatalogModel.outputCostPer1k !== undefined
+                  ? { outputCostPer1k: mergedCatalogModel.outputCostPer1k }
+                  : {}),
+        };
     }
 
     // Resolve model: modelOverride > complexity-based > defaultModel > plugin default
