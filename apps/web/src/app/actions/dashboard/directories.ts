@@ -23,6 +23,7 @@ import { ROUTES } from '@/lib/constants';
 import { redirect } from 'next/navigation';
 import { sanitizeName, sanitizeDescription, sanitizePrompt } from '@/lib/utils/sanitize';
 import { slugify } from '@ever-works/plugin';
+import { ApiResponseError } from '@/lib/api/server-api';
 
 const readmeConfigSchema = z.object({
     header: z.string().optional(),
@@ -565,6 +566,22 @@ interface ImportDirectoryRequest {
     enrichmentConfig?: ImportEnrichmentConfig;
 }
 
+interface ImportDirectoryProviderErrors {
+    ai?: string;
+    search?: string;
+    contentExtractor?: string;
+    screenshot?: string;
+    pipeline?: string;
+}
+
+function isImportDirectoryProviderErrors(value: unknown): value is ImportDirectoryProviderErrors {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return false;
+    }
+
+    return Object.values(value).every((entry) => typeof entry === 'string');
+}
+
 export async function importDirectory(data: ImportDirectoryRequest) {
     const t = await getTranslations('actions.directories');
 
@@ -646,6 +663,22 @@ export async function importDirectory(data: ImportDirectoryRequest) {
         };
     } catch (error) {
         console.error('Failed to import directory:', error);
+
+        if (error instanceof ApiResponseError) {
+            const providerErrors = error.details?.providerErrors;
+            const resolvedPipelineId = error.details?.resolvedPipelineId;
+
+            return {
+                success: false,
+                error: error.message,
+                providerErrors: isImportDirectoryProviderErrors(providerErrors)
+                    ? providerErrors
+                    : undefined,
+                resolvedPipelineId:
+                    typeof resolvedPipelineId === 'string' ? resolvedPipelineId : undefined,
+            };
+        }
+
         return {
             success: false,
             error: error instanceof Error ? error.message : t('import.failed'),

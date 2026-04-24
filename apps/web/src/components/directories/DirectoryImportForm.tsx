@@ -69,6 +69,38 @@ interface AnalysisResult {
     error?: string;
 }
 
+interface ImportProviderErrors {
+    ai?: string;
+    search?: string;
+    contentExtractor?: string;
+    screenshot?: string;
+    pipeline?: string;
+}
+
+function formatProviderLabel(providerType: string): string {
+    if (providerType === 'contentExtractor') {
+        return 'Content extractor';
+    }
+
+    return providerType.charAt(0).toUpperCase() + providerType.slice(1);
+}
+
+function buildImportErrorMessage(
+    error?: string,
+    providerErrors?: ImportProviderErrors,
+): string | undefined {
+    const providerEntries = providerErrors ? Object.entries(providerErrors) : [];
+    if (providerEntries.length === 0) {
+        return error;
+    }
+
+    const providerMessage = providerEntries
+        .map(([providerType, message]) => `${formatProviderLabel(providerType)}: ${message}`)
+        .join('\n');
+
+    return error ? `${error}\n${providerMessage}` : providerMessage;
+}
+
 export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryImportFormProps) {
     const [step, setStep] = useState<ImportStep>('source');
     const [sourceMethod, setSourceMethod] = useState<'url' | 'repository'>('url');
@@ -262,7 +294,10 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
             } else if (result.requiresGitProvider) {
                 toast.error(result.error || 'Git provider connection required');
             } else {
-                toast.error(result.error || t('errors.importFailed'));
+                toast.error(
+                    buildImportErrorMessage(result.error, result.providerErrors) ||
+                        t('errors.importFailed'),
+                );
             }
         });
     };
