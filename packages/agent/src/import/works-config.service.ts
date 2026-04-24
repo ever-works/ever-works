@@ -40,20 +40,32 @@ export class WorksConfigService {
         token?: string,
     ): Promise<ParsedWorksConfig | null> {
         for (const filePath of WORKS_CONFIG_FILEPATHS) {
+            let file: { content: string; encoding: string } | null = null;
+
             try {
-                const file = await this.gitFacade.getFileContent(owner, repo, filePath, {
+                file = await this.gitFacade.getFileContent(owner, repo, filePath, {
                     token,
                     providerId,
                 });
-
-                if (!file?.content) {
-                    continue;
-                }
-
-                return this.parse(file.content);
             } catch (error) {
                 this.logger.debug(
                     `Failed to read ${filePath} from ${owner}/${repo}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+
+                continue;
+            }
+
+            if (!file?.content) {
+                continue;
+            }
+
+            try {
+                return this.parse(file.content);
+            } catch (error) {
+                throw new Error(
+                    `Invalid works config at ${filePath}: ${
                         error instanceof Error ? error.message : String(error)
                     }`,
                 );

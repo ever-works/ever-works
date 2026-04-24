@@ -58,7 +58,12 @@ schedule:
         };
 
         const loader = new WorksConfigService(gitFacade as any);
-        const result = await loader.loadFromRepository('Ntermast', 'Compare-Cloud-Pricing', 'github', 'token');
+        const result = await loader.loadFromRepository(
+            'Ntermast',
+            'Compare-Cloud-Pricing',
+            'github',
+            'token',
+        );
 
         expect(result).toMatchObject({
             initialPrompt: 'Build everything',
@@ -72,5 +77,19 @@ schedule:
                 providerId: 'github',
             },
         );
+    });
+
+    it('throws the actual parse error when a works config file exists but is invalid', async () => {
+        const gitFacade = {
+            getFileContent: jest.fn().mockResolvedValueOnce({
+                content: 'name: Compare Cloud Pricing\n  initial_prompt: broken\n',
+            }),
+        };
+
+        const loader = new WorksConfigService(gitFacade as any);
+
+        await expect(
+            loader.loadFromRepository('Ntermast', 'Compare-Cloud-Pricing', 'github', 'token'),
+        ).rejects.toThrow('Invalid works config at works.yml:');
     });
 });
