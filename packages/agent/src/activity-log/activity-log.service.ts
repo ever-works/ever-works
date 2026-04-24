@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { DirectoryGenerationHistoryRepository } from '@src/database/repositories/directory-generation-history.repository';
 import { ActivityLogRepository } from '@src/database/repositories/activity-log.repository';
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
 import {
@@ -21,10 +22,22 @@ export class ActivityLogService {
     constructor(
         private readonly repository: ActivityLogRepository,
         private readonly directoryRepository: DirectoryRepository,
+        private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
         @Optional()
         @Inject(ACTIVITY_LOG_ANALYTICS_DISPATCHER)
         private readonly analyticsDispatcher?: ActivityLogAnalyticsDispatcher,
     ) {}
+
+    formatGenerationSummary(counts?: {
+        newItemsCount?: number | null;
+        updatedItemsCount?: number | null;
+        totalItemsCount?: number | null;
+    }): string {
+        const added = counts?.newItemsCount ?? 0;
+        const changed = counts?.updatedItemsCount ?? 0;
+        const total = counts?.totalItemsCount ?? 0;
+        return `Added ${added}. Changed ${changed}. Total: ${total}`;
+    }
 
     private dispatchAnalytics(activity: ActivityLog) {
         if (!this.analyticsDispatcher) {
@@ -100,7 +113,11 @@ export class ActivityLogService {
                         continue;
                     }
 
-                    const itemCount = directory?.itemsCount || 0;
+                    const latestHistory = activity.directoryId
+                        ? await this.generationHistoryRepository.findLatestCompletedByDirectory(
+                              activity.directoryId,
+                          )
+                        : null;
                     const resolvedStatus =
                         !directory ||
                         directory.generateStatus?.status === GenerateStatusType.ERROR ||
@@ -113,7 +130,7 @@ export class ActivityLogService {
                           ? `Generation cancelled for ${directory.name}`
                           : directory.generateStatus?.status === GenerateStatusType.ERROR
                             ? `Generation failed for ${directory.name}`
-                            : `Generated ${itemCount} items for ${directory.name}`;
+                            : this.formatGenerationSummary(latestHistory);
                     const existingDetails =
                         activity.details &&
                         typeof activity.details === 'object' &&
@@ -126,7 +143,9 @@ export class ActivityLogService {
                         resolvedStatus,
                         {
                             ...existingDetails,
-                            itemsCount: itemCount,
+                            itemsCount: latestHistory?.totalItemsCount ?? directory?.itemsCount ?? 0,
+                            newItemsCount: latestHistory?.newItemsCount ?? 0,
+                            updatedItemsCount: latestHistory?.updatedItemsCount ?? 0,
                             generateStatus: directory?.generateStatus ?? null,
                         },
                         {
