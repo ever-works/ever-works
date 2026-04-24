@@ -559,7 +559,7 @@ function ScheduleFormContent({
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-                <Button onClick={saveSchedule} disabled={controlsDisabled} className='text-sm'>
+                <Button onClick={saveSchedule} disabled={controlsDisabled} className="text-sm">
                     {isSaving ? t('actions.saving') : t('actions.save')}
                 </Button>
 
