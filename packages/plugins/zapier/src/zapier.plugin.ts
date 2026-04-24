@@ -542,8 +542,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		const appKey = (trimOrUndefined(config.app_key) || settings.defaultAppKey || '').trim();
 		const actionType = ((config.action_type as ZapierActionType) || settings.defaultActionType) as ZapierActionType;
 		const actionKey = (trimOrUndefined(config.action_key) || settings.defaultActionKey || '').trim();
-		const authenticationId =
-			normalizeAuthId(config.authentication_id) ?? settings.defaultAuthenticationId ?? '';
+		const authenticationId = normalizeAuthId(config.authentication_id) ?? settings.defaultAuthenticationId ?? '';
 
 		return {
 			appKey,

@@ -22,9 +22,7 @@ interface PayloadOptions {
  * Collision handling: if the user's `action_params` contain a key that clashes
  * with an envelope key (e.g. `metadata`), the user's value wins via spread order.
  */
-export function buildWorkflowPayload(
-	options: PayloadOptions
-): ZapierWorkflowInput & Record<string, unknown> {
+export function buildWorkflowPayload(options: PayloadOptions): ZapierWorkflowInput & Record<string, unknown> {
 	const { directory, request, existing, config } = options;
 
 	const envelope: ZapierWorkflowInput = {
