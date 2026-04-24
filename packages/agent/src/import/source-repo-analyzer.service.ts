@@ -297,11 +297,11 @@ export class SourceRepoAnalyzerService {
             try {
                 worksConfig =
                     (await this.worksConfigService.loadFromRepository(
-                    owner,
-                    repo,
-                    provider,
-                    token,
-                )) ?? undefined;
+                        owner,
+                        repo,
+                        provider,
+                        token,
+                    )) ?? undefined;
             } catch (err) {
                 this.logger.warn(`Failed to parse works.yml for ${owner}/${repo}`, err);
             }

@@ -89,19 +89,14 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
                     { name: 'data', type: 'dir', path: 'data' },
                     { name: 'README.md', type: 'file', path: 'README.md' },
                 ])
-                .mockResolvedValueOnce([
-                    { name: 'item-a', type: 'dir', path: 'data/item-a' },
-                ]),
+                .mockResolvedValueOnce([{ name: 'item-a', type: 'dir', path: 'data/item-a' }]),
         };
 
         const worksConfigService = {
             loadFromRepository: jest.fn().mockResolvedValue(worksConfig),
         };
 
-        const service = new SourceRepoAnalyzerService(
-            gitFacade as any,
-            worksConfigService as any,
-        );
+        const service = new SourceRepoAnalyzerService(gitFacade as any, worksConfigService as any);
 
         const result = await service.analyzeRepository(
             'https://github.com/ever-works/compare-cloud-pricing-data',
@@ -139,10 +134,7 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
             }),
         };
 
-        const service = new SourceRepoAnalyzerService(
-            gitFacade as any,
-            worksConfigService as any,
-        );
+        const service = new SourceRepoAnalyzerService(gitFacade as any, worksConfigService as any);
 
         const result = await service.analyzeRepository(
             'https://github.com/ever-works/compare-cloud-pricing',
