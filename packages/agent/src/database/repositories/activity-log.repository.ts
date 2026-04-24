@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { ActivityLog } from '../../entities/activity-log.entity';
+import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
 import type {
     ActivityLogQueryOptions,
     ActivityActionType,
@@ -113,9 +114,20 @@ export class ActivityLogRepository {
         }
 
         if (options.search) {
-            qb.andWhere('(activity.summary LIKE :search OR directory.name LIKE :search)', {
-                search: `%${options.search}%`,
-            });
+            const searchPattern = prepareCaseInsensitiveContainsPattern(options.search);
+            if (searchPattern) {
+                qb.andWhere(
+                    new Brackets((searchQb) => {
+                        searchQb
+                            .where(buildCaseInsensitiveLikeClause('activity.summary'), {
+                                search: searchPattern,
+                            })
+                            .orWhere(buildCaseInsensitiveLikeClause('directory.name'), {
+                                search: searchPattern,
+                            });
+                    }),
+                );
+            }
         }
 
         const requestedLimit = options.limit || 25;

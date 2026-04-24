@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { formatDistanceToNow } from 'date-fns';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
+import { formatActivitySummary } from './activity-summary';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
 import { ActivityTypeBadge } from './ActivityTypeBadge';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
@@ -75,6 +76,8 @@ function hasStructuredData(value?: Record<string, unknown>) {
 }
 
 function DetailValue({ value }: { value: unknown }) {
+    const tCommon = useTranslations('common.ui');
+
     if (value === null || value === undefined) {
         return <span className="text-text-muted dark:text-text-muted-dark">—</span>;
     }
@@ -87,7 +90,7 @@ function DetailValue({ value }: { value: unknown }) {
                         : 'bg-muted/50 text-text-muted dark:text-text-muted-dark'
                 }`}
             >
-                {value ? 'Yes' : 'No'}
+                {value ? tCommon('yes') : tCommon('no')}
             </span>
         );
     }
@@ -172,6 +175,7 @@ function RawJsonPanel({
 
 export function ActivityTable({ activities, loading, onStopRequested }: ActivityTableProps) {
     const t = useTranslations('dashboard.activity');
+    const tSummary = useTranslations('dashboard.activity.summary');
     const [expandedIds, setExpandedIds] = useState<string[]>([]);
     const [hydratedActivities, setHydratedActivities] = useState<Record<string, ActivityLogEntry>>(
         {},
@@ -281,7 +285,7 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                     <thead className="bg-muted/50 dark:bg-muted/20">
                         <tr>
                             <th scope="col" className="w-8 px-3 py-3">
-                                <span className="sr-only">Expand</span>
+                                <span className="sr-only">{t('detail.expand')}</span>
                             </th>
                             <th
                                 scope="col"
@@ -332,6 +336,10 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                             const liveLogs = hydratedActivity.details?.liveLogs as
                                 | GenerationStepLog[]
                                 | undefined;
+                            const resolvedSummary = formatActivitySummary(
+                                hydratedActivity,
+                                tSummary,
+                            );
                             const detailsWithoutLiveLogs = hydratedActivity.details
                                 ? Object.fromEntries(
                                       Object.entries(hydratedActivity.details).filter(
@@ -410,7 +418,7 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                         <td className="px-4 py-3 text-xs text-text dark:text-text-dark max-w-md">
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0 flex-1 line-clamp-3 break-words">
-                                                    {activity.summary}
+                                                    {resolvedSummary}
                                                 </div>
                                                 {activity.actionType === 'generation' &&
                                                 activity.status === 'in_progress' &&
@@ -487,11 +495,13 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                                         {liveLogs && liveLogs.length > 0 && (
                                                             <section className="space-y-2">
                                                                 <h5 className="text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-                                                                    Live Logs
+                                                                    {t('detail.liveLogs')}
                                                                 </h5>
                                                                 <TerminalLogViewer
                                                                     logs={liveLogs}
-                                                                    title="Generation"
+                                                                    title={t(
+                                                                        'filters.types.generation',
+                                                                    )}
                                                                     maxHeight="max-h-72"
                                                                     showCursor={
                                                                         hydratedActivity.status ===

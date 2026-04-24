@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { config } from '@ever-works/agent/config';
 import { DirectoryRepository } from '@ever-works/agent/database';
 import { Directory } from '@ever-works/agent/entities';
@@ -12,6 +13,7 @@ export class WebsiteTemplateSchedulerService {
     constructor(
         private readonly directoryRepository: DirectoryRepository,
         private readonly websiteUpdateService: WebsiteUpdateService,
+        private readonly taskLockService: DistributedTaskLockService,
     ) {}
 
     /**
@@ -19,30 +21,43 @@ export class WebsiteTemplateSchedulerService {
      */
     @Cron(CronExpression.EVERY_HOUR)
     async handleScheduledTemplateUpdates() {
-        // Skip if feature is disabled
-        if (!config.websiteTemplate.autoUpdateEnabled()) {
-            return;
-        }
+        await this.taskLockService.runExclusive(
+            'directories:website-template-scheduler',
+            async () => {
+                // Skip if feature is disabled
+                if (!config.websiteTemplate.autoUpdateEnabled()) {
+                    return;
+                }
 
-        try {
-            const directories = await this.directoryRepository.findWithWebsiteAutoUpdateEnabled();
+                try {
+                    const directories =
+                        await this.directoryRepository.findWithWebsiteAutoUpdateEnabled();
 
-            if (directories.length === 0) {
-                return;
-            }
+                    if (directories.length === 0) {
+                        return;
+                    }
 
-            this.logger.log(
-                `Checking ${directories.length} directories for website template updates`,
-            );
+                    this.logger.log(
+                        `Checking ${directories.length} directories for website template updates`,
+                    );
 
-            for (const directory of directories) {
-                await this.processDirectoryUpdate(directory);
-            }
+                    for (const directory of directories) {
+                        await this.processDirectoryUpdate(directory);
+                    }
 
-            this.logger.log('Website template update check completed');
-        } catch (error) {
-            this.logger.error('Error during scheduled template update check', error.stack);
-        }
+                    this.logger.log('Website template update check completed');
+                } catch (error) {
+                    this.logger.error('Error during scheduled template update check', error.stack);
+                }
+            },
+            {
+                ttlMs: 60 * 60 * 1000,
+                onLocked: () =>
+                    this.logger.debug(
+                        'Skipping website template scheduler because another instance holds the task lock',
+                    ),
+            },
+        );
     }
 
     /**

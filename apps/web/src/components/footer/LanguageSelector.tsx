@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useRouter, usePathname } from '@/i18n/navigation';
 import { LOCALES } from '@/lib/constants';
 import {
@@ -113,6 +113,7 @@ interface LanguageSelectorProps {
 
 export function LanguageSelector({ className }: LanguageSelectorProps) {
     const locale = useLocale() as Locale;
+    const t = useTranslations('common.ui');
     const router = useRouter();
     const pathname = usePathname();
 
@@ -142,7 +143,7 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                         'cursor-pointer',
                         className,
                     )}
-                    aria-label="Select language"
+                    aria-label={t('selectLanguage')}
                 >
                     <FlagImage locale={locale} className="mr-2" width={18} height={14} />
                     <span className="text-xs leading-tight whitespace-nowrap">

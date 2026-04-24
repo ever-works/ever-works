@@ -38,9 +38,9 @@ const STATUS_CONFIGS: Record<string, GenerationStatusConfig> = {
         icon: Loader2,
         animate: true,
         labelKey: 'generating',
-        badge: 'bg-gray-900 text-gray-100 dark:bg-white/10 dark:text-white/90',
+        badge: 'bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-white/90',
         card: {
-            borderBg: 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03]',
+            borderBg: 'border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/[0.03]',
             iconBg: 'bg-gray-100 dark:bg-white/8',
             iconColor: 'text-gray-700 dark:text-white/80',
         },
@@ -53,7 +53,7 @@ const STATUS_CONFIGS: Record<string, GenerationStatusConfig> = {
         icon: CheckCircle2,
         animate: false,
         labelKey: 'generated',
-        badge: 'bg-gray-900 text-gray-100 dark:bg-white/10 dark:text-white/90',
+        badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
         card: {
             borderBg: 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03]',
             iconBg: 'bg-success/10 dark:bg-success/20',
@@ -68,7 +68,7 @@ const STATUS_CONFIGS: Record<string, GenerationStatusConfig> = {
         icon: AlertTriangle,
         animate: false,
         labelKey: 'generatedWithWarnings',
-        badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+        badge: 'bg-amber-100/70 text-amber-800 dark:bg-amber-900/70 dark:text-amber-200',
         card: {
             borderBg:
                 'border-amber-500/20 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-900/10',
@@ -99,7 +99,7 @@ const STATUS_CONFIGS: Record<string, GenerationStatusConfig> = {
         icon: XCircle,
         animate: false,
         labelKey: 'cancelled',
-        badge: 'bg-gray-200 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+        badge: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
         card: {
             borderBg: 'border-border dark:border-border-dark bg-gray-50 dark:bg-gray-900/40',
             iconBg: 'bg-gray-200 dark:bg-gray-800',
@@ -116,7 +116,7 @@ const NOT_STARTED_CONFIG: GenerationStatusConfig = {
     icon: CircleDashed,
     animate: false,
     labelKey: 'notStarted',
-    badge: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+    badge: 'bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-400',
     card: {
         borderBg:
             'border-border dark:border-border-dark bg-surface-secondary/50 dark:bg-surface-secondary-dark/50',

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { themeInitScript } from '@/lib/theme-init';
 
 export default function GlobalError({
@@ -10,6 +11,8 @@ export default function GlobalError({
     error: Error & { digest?: string };
     reset: () => void;
 }) {
+    const t = useTranslations('errors.global');
+
     useEffect(() => {
         console.error('Global error:', error);
     }, [error]);
@@ -45,14 +48,13 @@ export default function GlobalError({
                             </div>
                         </div>
 
-                        <h1 className="text-2xl font-semibold mb-3">Something went wrong</h1>
+                        <h1 className="text-2xl font-semibold mb-3">{t('title')}</h1>
                         <p className="text-[#94a3b8] dark:text-[#cbd5e1] mb-8 leading-relaxed">
-                            An unexpected error occurred. Please try again or contact support if the
-                            problem persists.
+                            {t('description')}
                         </p>
                         {error.digest && (
                             <p className="text-xs text-[#94a3b8] dark:text-[#cbd5e1] mb-6 font-mono bg-[#f1f5f9] dark:bg-[#1e293b] px-3 py-1.5 rounded-md inline-block">
-                                Error ID: {error.digest}
+                                {t('errorId')}: {error.digest}
                             </p>
                         )}
                         <button
@@ -72,7 +74,7 @@ export default function GlobalError({
                                     d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"
                                 />
                             </svg>
-                            Try again
+                            {t('tryAgain')}
                         </button>
                     </div>
                 </div>

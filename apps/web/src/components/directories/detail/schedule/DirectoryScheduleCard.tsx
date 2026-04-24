@@ -379,12 +379,12 @@ function ScheduleFormContent({
     );
 
     return (
-        <section className="rounded-2xl border border-card-border dark:border-border-secondary-dark bg-card dark:bg-card-primary-dark/10 p-6 shadow-sm space-y-6">
+        <section className="rounded-xl border border-card-border dark:border-border-secondary-dark bg-card dark:bg-card-primary-dark/10 p-6 space-y-6">
             <header className="flex items-start justify-between gap-4">
                 <div className="space-y-2">
-                    <p className="text-lg font-semibold text-text dark:text-text-dark">
+                    <h2 className="text-lg font-semibold text-text dark:text-text-dark">
                         {t('title')}
-                    </p>
+                    </h2>
                     <p className="text-sm text-text-secondary dark:text-text-secondary-dark max-w-2xl">
                         {schedule.subscriptionsEnabled
                             ? t('subtitle.enabled')
@@ -402,36 +402,36 @@ function ScheduleFormContent({
                     disabled={controlsDisabled}
                     title={isActive ? t('actions.stopAutomation') : t('actions.startAutomation')}
                     className={cn(
-                        'p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0',
+                        'p-2 cursor-pointer rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0',
                         'border border-border dark:border-border-dark',
-                        'bg-surface-secondary dark:bg-surface-tertiary-dark',
+                        'bg-gray-100 dark:bg-white/6',
                         isActive
-                            ? 'text-danger hover:bg-surface-tertiary dark:hover:bg-card-hover-dark'
-                            : 'text-primary hover:bg-surface-tertiary dark:hover:bg-card-hover-dark',
+                            ? 'text-danger hover:bg-gray-200 dark:hover:bg-white/12'
+                            : 'text-primary hover:bg-gray-200 dark:hover:bg-white/12',
                     )}
                 >
                     {isActive ? (
-                        <Square className="h-4.5 w-4.5" aria-hidden />
+                        <Square className="h-4 w-4" aria-hidden />
                     ) : (
-                        <PlayCircle className="h-4.5 w-4.5" aria-hidden />
+                        <PlayCircle className="h-4 w-4" aria-hidden />
                     )}
                 </button>
             </header>
 
             {/* Summary chips */}
             <div className="grid gap-3 @sm/main:grid-cols-2 @3xl/main:grid-cols-4">
-                <div className="rounded-xl border border-card-border dark:border-border-secondary-dark bg-card dark:bg-card-primary-dark/10 p-4 space-y-1">
+                <div className="rounded-lg border border-card-border dark:border-border-secondary-dark bg-card dark:bg-card-primary-dark/10 p-4 space-y-1">
                     <p className="text-xs uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
                         {t('summary.status')}
                     </p>
                     <div className="flex items-center gap-2">
                         <span
                             className={cn(
-                                'h-2 w-2 rounded-full shrink-0',
+                                'h-1.5 w-1.5 rounded-full shrink-0',
                                 isActive ? 'bg-success' : 'bg-text-muted dark:bg-text-muted-dark',
                             )}
                         />
-                        <p className="text-base font-semibold text-text dark:text-text-dark">
+                        <p className="text-sm font-semibold text-text dark:text-text-dark">
                             {statusLabel}
                         </p>
                     </div>
@@ -559,7 +559,7 @@ function ScheduleFormContent({
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-                <Button onClick={saveSchedule} disabled={controlsDisabled}>
+                <Button onClick={saveSchedule} disabled={controlsDisabled} className="text-sm">
                     {isSaving ? t('actions.saving') : t('actions.save')}
                 </Button>
 
@@ -569,7 +569,7 @@ function ScheduleFormContent({
                     variant={isActive ? 'danger' : 'secondary'}
                     onClick={toggleAutomation}
                     disabled={controlsDisabled}
-                    className="gap-2"
+                    className="gap-2 text-sm"
                 >
                     {isActive ? (
                         <>
@@ -592,12 +592,12 @@ function ScheduleFormContent({
                         readOnlyReason
                             ? readOnlyReason
                             : isGenerationRunning
-                              ? 'Generation is running, please wait it to finish'
+                              ? t('errors.generationRunning')
                               : !isActive
-                                ? 'Schedule must be active to run now'
+                                ? t('errors.scheduleInactive')
                                 : undefined
                     }
-                    className="gap-2"
+                    className="gap-2 text-sm"
                 >
                     <PlayCircle className="h-4 w-4" aria-hidden />
                     {isRunning ? t('actions.starting') : t('actions.runNow')}
@@ -641,11 +641,11 @@ function PipelineOverrideField({
 
 function SummaryChip({ label, value }: { label: string; value: ReactNode | string }) {
     return (
-        <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-4 space-y-1">
+        <div className="rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-4 space-y-1">
             <p className="text-xs uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
                 {label}
             </p>
-            <p className="text-base font-semibold text-text dark:text-text-dark">{value}</p>
+            <p className="text-sm font-semibold text-text dark:text-text-dark">{value}</p>
         </div>
     );
 }

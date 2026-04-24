@@ -1,12 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { NotificationService } from '@ever-works/agent/notifications';
 
 @Injectable()
 export class NotificationCleanupService {
     private readonly logger = new Logger(NotificationCleanupService.name);
 
-    constructor(private readonly notificationService: NotificationService) {}
+    constructor(
+        private readonly notificationService: NotificationService,
+        private readonly taskLockService: DistributedTaskLockService,
+    ) {}
 
     /**
      * Run cleanup daily at 3 AM
@@ -16,15 +20,27 @@ export class NotificationCleanupService {
      */
     @Cron(CronExpression.EVERY_DAY_AT_3AM)
     async cleanupNotifications() {
-        this.logger.log('Starting notification cleanup...');
+        await this.taskLockService.runExclusive(
+            'notifications:cleanup',
+            async () => {
+                this.logger.log('Starting notification cleanup...');
 
-        try {
-            const result = await this.notificationService.cleanup();
-            this.logger.log(
-                `Notification cleanup completed: ${result.expired} expired, ${result.dismissed} dismissed (>7d), ${result.old} old (>30d)`,
-            );
-        } catch (error) {
-            this.logger.error('Notification cleanup failed:', error);
-        }
+                try {
+                    const result = await this.notificationService.cleanup();
+                    this.logger.log(
+                        `Notification cleanup completed: ${result.expired} expired, ${result.dismissed} dismissed (>7d), ${result.old} old (>30d)`,
+                    );
+                } catch (error) {
+                    this.logger.error('Notification cleanup failed:', error);
+                }
+            },
+            {
+                ttlMs: 60 * 60 * 1000,
+                onLocked: () =>
+                    this.logger.debug(
+                        'Skipping notification cleanup because another instance holds the task lock',
+                    ),
+            },
+        );
     }
 }

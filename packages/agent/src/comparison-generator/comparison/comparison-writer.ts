@@ -11,7 +11,7 @@ import { buildPairKey } from './pair-selector';
 import { PROMPT_KEYS } from './prompt-keys';
 
 export interface ComparisonAiDependencies {
-    readonly askJson: <T>(prompt: string, schema: Record<string, unknown>) => Promise<T>;
+    readonly askJson: <T>(prompt: string) => Promise<T>;
     readonly askText: (prompt: string) => Promise<string>;
 }
 
@@ -100,64 +100,6 @@ function normalizeComparisonSources(
 
     return Array.from(deduped.values());
 }
-
-const COMPARISON_JSON_SCHEMA = {
-    type: 'object',
-    properties: {
-        title: {
-            type: 'string',
-            description:
-                'SEO-optimized comparison title (e.g., "Vercel vs Netlify: Which Hosting Platform is Better?")',
-        },
-        summary: {
-            type: 'string',
-            description: '2-3 sentence overview of the comparison',
-        },
-        verdict: {
-            type: 'string',
-            description: 'AI recommendation with clear reasoning (2-4 sentences)',
-        },
-        verdict_winner: {
-            type: 'string',
-            enum: ['item_a', 'item_b', 'tie'],
-            description: 'Overall winner of the comparison',
-        },
-        dimensions: {
-            type: 'array',
-            items: {
-                type: 'object',
-                properties: {
-                    name: {
-                        type: 'string',
-                        description: 'Dimension name (e.g., "Performance", "Pricing")',
-                    },
-                    item_a_summary: {
-                        type: 'string',
-                        description: 'Summary for Item A on this dimension',
-                    },
-                    item_b_summary: {
-                        type: 'string',
-                        description: 'Summary for Item B on this dimension',
-                    },
-                    item_a_score: { type: 'number', minimum: 1, maximum: 10 },
-                    item_b_score: { type: 'number', minimum: 1, maximum: 10 },
-                    winner: { type: 'string', enum: ['item_a', 'item_b', 'tie'] },
-                },
-                required: [
-                    'name',
-                    'item_a_summary',
-                    'item_b_summary',
-                    'item_a_score',
-                    'item_b_score',
-                    'winner',
-                ],
-            },
-            minItems: 3,
-            maxItems: 8,
-        },
-    },
-    required: ['title', 'summary', 'verdict', 'verdict_winner', 'dimensions'],
-};
 
 // ── Structure Prompt ──────────────────────────────────────────────────
 
@@ -440,10 +382,7 @@ export async function generateComparison(
     );
 
     onProgress?.('analyzing');
-    const structure = await ai.askJson<AiComparisonStructure>(
-        structurePrompt,
-        COMPARISON_JSON_SCHEMA,
-    );
+    const structure = await ai.askJson<AiComparisonStructure>(structurePrompt);
     const normalizedSources = normalizeComparisonSources(pair, research);
 
     // Resolve markdown prompt
