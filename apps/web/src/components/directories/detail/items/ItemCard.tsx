@@ -50,6 +50,7 @@ const ItemCardList = memo(function ItemCardList({
     onUpdate,
 }: ItemCardViewProps) {
     const { directoryWebsite } = useItemsContext();
+    const t = useTranslations('dashboard.directoryDetail.items');
     const isFeatured = item.featured === true;
     const categoryName = getCategoryName(item.category);
 
@@ -104,7 +105,7 @@ const ItemCardList = memo(function ItemCardList({
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-1.5 rounded-lg text-text-muted dark:text-text-muted-dark hover:text-primary hover:bg-primary/10 transition-colors"
-                        aria-label="View on website"
+                        aria-label={t('viewOnWebsite')}
                     >
                         <Eye className="w-3.5 h-3.5" />
                     </Link>
@@ -115,7 +116,7 @@ const ItemCardList = memo(function ItemCardList({
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-1.5 rounded-lg text-text-muted dark:text-text-muted-dark hover:text-primary hover:bg-primary/10 transition-colors"
-                        aria-label="Open source URL"
+                        aria-label={t('openSourceUrl')}
                     >
                         <ExternalLink className="w-3.5 h-3.5" />
                     </Link>
@@ -200,7 +201,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
                             target="_blank"
                             rel="noopener noreferrer"
                             className="p-1.5 rounded-lg text-text-muted dark:text-text-muted-dark hover:text-primary hover:bg-primary/10 transition-colors"
-                            aria-label="View on website"
+                            aria-label={t('viewOnWebsite')}
                         >
                             <Eye className="w-3.5 h-3.5" />
                         </Link>

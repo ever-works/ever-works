@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils/cn';
+import { useTranslations } from 'next-intl';
 import { useBackgroundActivity } from '@/lib/hooks/use-background-activity';
 
 /**
@@ -8,6 +9,7 @@ import { useBackgroundActivity } from '@/lib/hooks/use-background-activity';
  * when a directory is generating and the user hasn't visited /directories yet.
  */
 export function SidebarActivityIndicator({ className }: { className?: string }) {
+    const t = useTranslations('dashboard.sidebar');
     const { showDirectoryIndicator } = useBackgroundActivity();
 
     if (!showDirectoryIndicator) return null;
@@ -19,7 +21,7 @@ export function SidebarActivityIndicator({ className }: { className?: string }) 
                 'bg-amber-600 dark:bg-amber-500',
                 className,
             )}
-            aria-label="Directory generating"
+            aria-label={t('activityIndicator')}
         />
     );
 }

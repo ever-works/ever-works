@@ -31,6 +31,7 @@ export function DashboardHeader({
     onboardingBadge,
 }: DashboardHeaderProps) {
     const t = useTranslations('dashboard.header');
+    const tTheme = useTranslations('common.theme');
 
     return (
         <header
@@ -44,7 +45,7 @@ export function DashboardHeader({
                 <div className="flex items-center justify-between h-16">
                     <div className="flex min-w-0 flex-1 items-center gap-3">
                         {!isSidebarOpen && (
-                            <Tooltip content="Open sidebar" position="bottom">
+                            <Tooltip content={t('tooltips.openSidebar')} position="bottom">
                                 <button
                                     onClick={onMenuClick}
                                     className={cn(
@@ -89,13 +90,13 @@ export function DashboardHeader({
                     </div>
 
                     <div className="flex shrink-0 items-center gap-4">
-                        <Tooltip content="Notifications" position="bottom">
+                        <Tooltip content={t('notifications.title')} position="bottom">
                             <div>
                                 <NotificationDropdown />
                             </div>
                         </Tooltip>
 
-                        <Tooltip content="Toggle theme" position="bottom">
+                        <Tooltip content={tTheme('toggle')} position="bottom">
                             <div>
                                 <ThemeToggle
                                     variant="inline"
@@ -104,7 +105,7 @@ export function DashboardHeader({
                             </div>
                         </Tooltip>
 
-                        <Tooltip content="Help & docs" position="bottom">
+                        <Tooltip content={t('tooltips.help')} position="bottom">
                             <button
                                 onClick={onHelpClick}
                                 className={cn(

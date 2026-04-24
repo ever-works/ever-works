@@ -135,7 +135,11 @@ export function ItemsPageClient({
 
             {/* Tabs Navigation */}
             <div className="inline-flex items-center gap-1 mb-4 rounded-lg border border-border dark:border-border-dark bg-muted/40 dark:bg-muted/10 p-1">
-                <nav ref={navRef} className="relative flex gap-1" aria-label="Tabs">
+                <nav
+                    ref={navRef}
+                    className="relative flex gap-1"
+                    aria-label={t('tabs.navigationLabel')}
+                >
                     {/* Sliding pill background */}
                     {pillStyle && (
                         <div

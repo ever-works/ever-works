@@ -75,6 +75,8 @@ function hasStructuredData(value?: Record<string, unknown>) {
 }
 
 function DetailValue({ value }: { value: unknown }) {
+    const tCommon = useTranslations('common.ui');
+
     if (value === null || value === undefined) {
         return <span className="text-text-muted dark:text-text-muted-dark">—</span>;
     }
@@ -87,7 +89,7 @@ function DetailValue({ value }: { value: unknown }) {
                         : 'bg-muted/50 text-text-muted dark:text-text-muted-dark'
                 }`}
             >
-                {value ? 'Yes' : 'No'}
+                {value ? tCommon('yes') : tCommon('no')}
             </span>
         );
     }
@@ -281,7 +283,7 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                     <thead className="bg-muted/50 dark:bg-muted/20">
                         <tr>
                             <th scope="col" className="w-8 px-3 py-3">
-                                <span className="sr-only">Expand</span>
+                                <span className="sr-only">{t('detail.expand')}</span>
                             </th>
                             <th
                                 scope="col"
@@ -487,11 +489,11 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                                         {liveLogs && liveLogs.length > 0 && (
                                                             <section className="space-y-2">
                                                                 <h5 className="text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-                                                                    Live Logs
+                                                                    {t('detail.liveLogs')}
                                                                 </h5>
                                                                 <TerminalLogViewer
                                                                     logs={liveLogs}
-                                                                    title="Generation"
+                                                                    title={t('filters.types.generation')}
                                                                     maxHeight="max-h-72"
                                                                     showCursor={
                                                                         hydratedActivity.status ===
