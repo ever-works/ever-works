@@ -276,6 +276,7 @@ describe('DirectoryImportService.initiateImport', () => {
             {} as any,
             {
                 validateSelectedProviders: jest.fn().mockResolvedValue(undefined),
+                validateRequiredProvidersForPipeline: jest.fn().mockResolvedValue(undefined),
             } as any,
             {
                 enablePluginForDirectory: jest.fn().mockResolvedValue(undefined),

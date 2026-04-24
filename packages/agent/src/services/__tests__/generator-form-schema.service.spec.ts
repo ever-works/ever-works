@@ -495,6 +495,99 @@ describe('GeneratorFormSchemaService', () => {
         });
     });
 
+    describe('validateRequiredProvidersForPipeline', () => {
+        function createProviderPlugin(
+            id: string,
+            capability: string,
+            opts?: { defaultForCapabilities?: string[]; settingsSchema?: any },
+        ) {
+            const plugin = createMockPlugin({
+                id,
+                capabilities: [capability],
+                settingsSchema: opts?.settingsSchema ?? { type: 'object', properties: {} },
+            });
+            return createRegistered(plugin, {
+                defaultForCapabilities: opts?.defaultForCapabilities,
+            });
+        }
+
+        it('should require ai, search, and contentExtractor for agent-pipeline imports', async () => {
+            const pipelinePlugin = createFormSchemaPlugin('agent-pipeline', [], {
+                category: 'pipeline',
+                capabilities: ['pipeline', 'form-schema-provider'],
+            });
+            const pipelineRegistered = createRegistered(pipelinePlugin, {
+                defaultForCapabilities: ['pipeline'],
+            });
+
+            const aiRegistered = createProviderPlugin('groq', 'ai-provider', {
+                defaultForCapabilities: ['ai-provider'],
+            });
+
+            mockRegistry.get.mockImplementation((id: string) => {
+                if (id === 'agent-pipeline') return pipelineRegistered;
+                return undefined;
+            });
+            mockRegistry.getByCapability.mockImplementation((cap: string) => {
+                if (cap === 'pipeline') return [pipelineRegistered];
+                if (cap === 'ai-provider') return [aiRegistered];
+                if (cap === 'search') return [];
+                if (cap === 'content-extractor') return [];
+                return [];
+            });
+
+            await expect(
+                service.validateRequiredProvidersForPipeline(
+                    'agent-pipeline',
+                    { pipeline: 'agent-pipeline', ai: 'groq' },
+                    { userId: 'u1' },
+                ),
+            ).rejects.toThrow('required providers');
+        });
+
+        it('should pass when all required agent-pipeline providers are explicitly configured', async () => {
+            const pipelinePlugin = createFormSchemaPlugin('agent-pipeline', [], {
+                category: 'pipeline',
+                capabilities: ['pipeline', 'form-schema-provider'],
+            });
+            const pipelineRegistered = createRegistered(pipelinePlugin, {
+                defaultForCapabilities: ['pipeline'],
+            });
+
+            const aiRegistered = createProviderPlugin('groq', 'ai-provider');
+            const searchRegistered = createProviderPlugin('tavily', 'search');
+            const extractorRegistered = createProviderPlugin('firecrawl', 'content-extractor');
+
+            mockRegistry.get.mockImplementation((id: string) => {
+                if (id === 'agent-pipeline') return pipelineRegistered;
+                if (id === 'groq') return aiRegistered;
+                if (id === 'tavily') return searchRegistered;
+                if (id === 'firecrawl') return extractorRegistered;
+                return undefined;
+            });
+            mockRegistry.getByCapability.mockImplementation((cap: string) => {
+                if (cap === 'pipeline') return [pipelineRegistered];
+                if (cap === 'ai-provider') return [aiRegistered];
+                if (cap === 'search') return [searchRegistered];
+                if (cap === 'content-extractor') return [extractorRegistered];
+                return [];
+            });
+
+            await expect(
+                service.validateRequiredProvidersForPipeline(
+                    'agent-pipeline',
+                    {
+                        pipeline: 'agent-pipeline',
+                        ai: 'groq',
+                        search: 'tavily',
+                        contentExtractor: 'firecrawl',
+                    },
+                    { userId: 'u1' },
+                ),
+            ).resolves.toBeUndefined();
+        });
+    });
+
     describe('isPluginConfigured with x-requiredGroups', () => {
         it('should mark plugin configured when at least one group field is set', async () => {
             const plugin = createMockPlugin({

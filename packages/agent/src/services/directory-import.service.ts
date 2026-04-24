@@ -408,6 +408,11 @@ export class DirectoryImportService {
                     worksConfig.providers,
                     { userId: user.id },
                 );
+                await this.generatorFormSchemaService.validateRequiredProvidersForPipeline(
+                    worksConfig.providers?.pipeline,
+                    worksConfig.providers,
+                    { userId: user.id },
+                );
             }
 
             if (dto.sourceType !== ImportSourceTypeEnum.LINK_EXISTING) {
