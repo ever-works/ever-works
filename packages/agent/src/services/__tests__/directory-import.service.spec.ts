@@ -138,4 +138,67 @@ describe('DirectoryImportService.analyzeRepository', () => {
         expect(sourceRepoAnalyzer.checkSlugConflicts).not.toHaveBeenCalled();
         expect(result.slugConflict).toBeUndefined();
     });
+
+    it('treats mixed-case source repo names as the same repo when sanitizing works config conflicts', async () => {
+        const sourceRepoAnalyzer = {
+            analyzeRepository: jest.fn().mockResolvedValue({
+                sourceUrl: 'https://github.com/Ntermast/Compare-Cloud-Pricing',
+                owner: 'Ntermast',
+                repo: 'Compare-Cloud-Pricing',
+                detectedType: ImportSourceTypeEnum.WORKS_CONFIG,
+                isPublic: true,
+                requiresAuth: false,
+                worksConfig: {
+                    initialPrompt: 'Build everything',
+                    websiteRepo: 'Ntermast/Compare-Cloud-Pricing',
+                },
+            }),
+            parseGitUrl: jest.fn(),
+            checkSlugConflicts: jest.fn().mockResolvedValue({
+                hasConflict: true,
+                conflictingRepos: ['compare-cloud-pricing'],
+                suggestedSlug: 'compare-cloud-pricing-2',
+            }),
+        };
+
+        const service = new DirectoryImportService(
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {
+                getAccessToken: jest.fn().mockResolvedValue('token'),
+            } as any,
+            sourceRepoAnalyzer as any,
+            {} as any,
+            {
+                parseRepositoryReference: jest.fn().mockImplementation((value?: string) => {
+                    if (!value) {
+                        return undefined;
+                    }
+
+                    const [owner, repo] = value.split('/');
+                    return repo ? { owner, repo } : { repo: owner };
+                }),
+            } as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+        );
+
+        const result = await service.analyzeRepository(
+            {
+                sourceUrl: 'https://github.com/Ntermast/Compare-Cloud-Pricing',
+                gitProvider: 'github',
+            },
+            {
+                id: 'user-1',
+                username: 'Ntermast',
+            } as any,
+        );
+
+        expect(result.slugConflict).toBeUndefined();
+    });
 });

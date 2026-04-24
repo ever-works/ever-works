@@ -105,6 +105,7 @@ export class DirectoryImportService {
         sourceRepoName?: string | null,
         worksConfig?: { websiteRepo?: string } | null,
     ): string[] {
+        const normalizedSourceRepoName = sourceRepoName?.toLowerCase();
         const repoNames = [`${slug}-data`];
 
         const websiteRepo =
@@ -118,7 +119,7 @@ export class DirectoryImportService {
                     (repoName) =>
                         typeof repoName === 'string' &&
                         repoName.length > 0 &&
-                        repoName !== sourceRepoName,
+                        repoName.toLowerCase() !== normalizedSourceRepoName,
                 ),
             ),
         );
@@ -138,20 +139,25 @@ export class DirectoryImportService {
         suggestedSlug: string;
     } {
         const benignRepos = new Set<string>();
+        const normalizedSourceRepoName = sourceRepoName?.toLowerCase();
 
         if (sourceRepoName) {
-            benignRepos.add(sourceRepoName);
+            benignRepos.add(sourceRepoName.toLowerCase());
         }
 
         const websiteRepo = this.worksConfigService.parseRepositoryReference(
             worksConfig?.websiteRepo,
         )?.repo;
-        if (websiteRepo && sourceRepoName && websiteRepo === sourceRepoName) {
-            benignRepos.add(websiteRepo);
+        if (
+            websiteRepo &&
+            normalizedSourceRepoName &&
+            websiteRepo.toLowerCase() === normalizedSourceRepoName
+        ) {
+            benignRepos.add(websiteRepo.toLowerCase());
         }
 
         const conflictingRepos = conflict.conflictingRepos.filter(
-            (repoName) => !benignRepos.has(repoName),
+            (repoName) => !benignRepos.has(repoName.toLowerCase()),
         );
 
         return {
