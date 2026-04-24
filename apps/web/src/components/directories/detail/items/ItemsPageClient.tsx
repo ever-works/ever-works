@@ -23,6 +23,7 @@ import { SourceValidationSettingsCard } from './SourceValidationSettingsCard';
 import { ItemsEmptyState } from './ItemsEmptyState';
 import { checkScreenshotAvailability } from '@/app/actions/dashboard/items';
 import { ItemsProvider } from './ItemsContext';
+import type { ProviderOption } from '@/lib/api/types-only';
 
 type TabType = 'items' | 'categories' | 'tags' | 'collections' | 'sourceHealth';
 
@@ -49,6 +50,10 @@ export function ItemsPageClient({
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('items');
     const [screenshotAvailable, setScreenshotAvailable] = useState(false);
+    const [screenshotProviders, setScreenshotProviders] = useState<ProviderOption[]>([]);
+    const [activeScreenshotProvider, setActiveScreenshotProvider] = useState<ProviderOption | null>(
+        null,
+    );
     const navRef = useRef<HTMLDivElement>(null);
     const [pillStyle, setPillStyle] = useState<{ left: number; width: number } | null>(null);
 
@@ -62,11 +67,13 @@ export function ItemsPageClient({
 
     useEffect(() => {
         if (permissions.canEdit) {
-            checkScreenshotAvailability().then((result) => {
+            checkScreenshotAvailability(directoryId).then((result) => {
                 setScreenshotAvailable(result.available);
+                setScreenshotProviders(result.providers ?? []);
+                setActiveScreenshotProvider(result.activeProvider ?? null);
             });
         }
-    }, [permissions.canEdit]);
+    }, [directoryId, permissions.canEdit]);
 
     // Ref to imperatively add items to the list
     const addItemRef = useRef<((item: ItemData) => void) | null>(null);
@@ -96,8 +103,17 @@ export function ItemsPageClient({
             canEdit: permissions.canEdit,
             directoryWebsite: directory.website,
             screenshotAvailable,
+            screenshotProviders,
+            activeScreenshotProvider,
         }),
-        [directoryId, permissions.canEdit, directory.website, screenshotAvailable],
+        [
+            activeScreenshotProvider,
+            directoryId,
+            permissions.canEdit,
+            directory.website,
+            screenshotAvailable,
+            screenshotProviders,
+        ],
     );
 
     const tabs = [

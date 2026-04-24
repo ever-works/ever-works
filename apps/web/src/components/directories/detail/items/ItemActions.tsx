@@ -37,6 +37,7 @@ import {
     Link2,
 } from 'lucide-react';
 import { useItemsContext } from './ItemsContext';
+import { ScreenshotProviderDialog } from './ScreenshotProviderDialog';
 
 type ItemActionsProps = {
     item: ItemData;
@@ -50,19 +51,43 @@ export const ItemActions = memo(function ItemActions({
     onUpdate,
 }: ItemActionsProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
-    const { directoryId, screenshotAvailable } = useItemsContext();
+    const { directoryId, screenshotProviders, activeScreenshotProvider } = useItemsContext();
     const [isDisplayDialogOpen, setIsDisplayDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isScreenshotDialogOpen, setIsScreenshotDialogOpen] = useState(false);
     const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);
     const [isCheckingHealth, setIsCheckingHealth] = useState(false);
     const [isApplyingSuggestedSource, setIsApplyingSuggestedSource] = useState(false);
+    const [selectedScreenshotProvider, setSelectedScreenshotProvider] = useState<string | null>(
+        null,
+    );
     const suggestedSourceUrl =
         item.source_validation?.suggested_source_url &&
         item.source_validation.suggested_source_url !== item.source_url
             ? item.source_validation.suggested_source_url
             : null;
 
-    const handleCaptureScreenshot = async () => {
+    useEffect(() => {
+        if (!isScreenshotDialogOpen) {
+            return;
+        }
+
+        const initialProvider =
+            screenshotProviders.find(
+                (provider) => provider.id === activeScreenshotProvider?.id && provider.configured,
+            )?.id ??
+            screenshotProviders.find((provider) => provider.configured)?.id ??
+            null;
+
+        setSelectedScreenshotProvider((current) =>
+            current &&
+            screenshotProviders.some((provider) => provider.id === current && provider.configured)
+                ? current
+                : initialProvider,
+        );
+    }, [activeScreenshotProvider, isScreenshotDialogOpen, screenshotProviders]);
+
+    const handleCaptureScreenshot = async (providerOverride?: string) => {
         if (!item.source_url) {
             toast.error(t('screenshot.noSourceUrl', { defaultValue: 'No source URL available' }));
             return;
@@ -70,7 +95,10 @@ export const ItemActions = memo(function ItemActions({
 
         setIsCapturingScreenshot(true);
         try {
-            const result = await captureScreenshot(item.source_url);
+            const result = await captureScreenshot(item.source_url, {
+                directoryId,
+                providerOverride,
+            });
 
             if (result.success && result.imageUrl) {
                 // Update the item's images with the new screenshot
@@ -95,6 +123,25 @@ export const ItemActions = memo(function ItemActions({
         } finally {
             setIsCapturingScreenshot(false);
         }
+    };
+
+    const handleOpenScreenshotDialog = () => {
+        if (!item.source_url) {
+            toast.error(t('screenshot.noSourceUrl'));
+            return;
+        }
+
+        setIsScreenshotDialogOpen(true);
+    };
+
+    const handleConfirmCaptureScreenshot = async () => {
+        if (!selectedScreenshotProvider) {
+            toast.error(t('screenshot.providerRequired'));
+            return;
+        }
+
+        setIsScreenshotDialogOpen(false);
+        await handleCaptureScreenshot(selectedScreenshotProvider);
     };
 
     const handleCheckHealth = async () => {
@@ -206,9 +253,9 @@ export const ItemActions = memo(function ItemActions({
                             {t('sourceValidation.useSuggestedSource')}
                         </DropdownMenuItem>
                     )}
-                    {item.source_url && screenshotAvailable && (
+                    {item.source_url && screenshotProviders.length > 0 && (
                         <DropdownMenuItem
-                            onClick={handleCaptureScreenshot}
+                            onClick={handleOpenScreenshotDialog}
                             disabled={isCapturingScreenshot}
                             className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/10 hover:text-text dark:hover:text-white focus:bg-black/5 dark:focus:bg-white/10 transition-colors"
                         >
@@ -236,6 +283,16 @@ export const ItemActions = memo(function ItemActions({
                 item={item}
                 directoryId={directoryId}
                 onUpdate={onUpdate}
+            />
+
+            <ScreenshotProviderDialog
+                open={isScreenshotDialogOpen}
+                onOpenChange={setIsScreenshotDialogOpen}
+                providers={screenshotProviders}
+                selectedProvider={selectedScreenshotProvider}
+                onSelectedProviderChange={setSelectedScreenshotProvider}
+                onConfirm={handleConfirmCaptureScreenshot}
+                isSubmitting={isCapturingScreenshot}
             />
 
             <DeleteDialog

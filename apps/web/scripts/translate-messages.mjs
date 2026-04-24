@@ -574,7 +574,9 @@ async function translateChunkWithFallback({
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        const fallbackChunks = shouldSplitChunk(message) ? createFallbackChunks(chunk, chunkBytes) : [];
+        const fallbackChunks = shouldSplitChunk(message)
+            ? createFallbackChunks(chunk, chunkBytes)
+            : [];
 
         if (fallbackChunks.length === 0) {
             throw error;
@@ -597,7 +599,11 @@ async function translateChunkWithFallback({
                 maxOutputTokens,
             });
 
-            mergeChunk(mergedValue, getRelativeChunkPath(chunk.path, fallbackChunk.path), fallbackValue);
+            mergeChunk(
+                mergedValue,
+                getRelativeChunkPath(chunk.path, fallbackChunk.path),
+                fallbackValue,
+            );
         }
 
         return mergedValue;
@@ -1002,11 +1008,7 @@ function buildZodSchema(value) {
     }
 
     if (Array.isArray(value)) {
-        if (value.length === 0) {
-            return z.tuple([]);
-        }
-
-        return z.tuple(value.map((item) => buildZodSchema(item)));
+        return buildZodArraySchema(value);
     }
 
     const shape = {};
@@ -1018,12 +1020,65 @@ function buildZodSchema(value) {
     return z.object(shape).strict();
 }
 
+function buildZodArraySchema(value) {
+    return z.array(buildLooseArrayItemSchema(value)).length(value.length);
+}
+
+function buildLooseArrayItemSchema(items) {
+    if (items.length === 0) {
+        return z.unknown();
+    }
+
+    if (items.every((item) => typeof item === 'string')) {
+        return z.string();
+    }
+
+    if (items.every((item) => typeof item === 'number')) {
+        return z.number();
+    }
+
+    if (items.every((item) => typeof item === 'boolean')) {
+        return z.boolean();
+    }
+
+    if (items.every((item) => item === null)) {
+        return z.null();
+    }
+
+    if (items.every((item) => isPlainObject(item))) {
+        const keySet = new Set(items.flatMap((item) => Object.keys(item)));
+        const shape = {};
+
+        for (const key of keySet) {
+            const childValues = items
+                .map((item) => item[key])
+                .filter((childValue) => childValue !== undefined);
+
+            shape[key] =
+                childValues.length > 0 ? buildLooseArrayItemSchema(childValues) : z.unknown();
+        }
+
+        return z.object(shape).strict();
+    }
+
+    if (items.every((item) => Array.isArray(item))) {
+        const nestedItems = items.flat();
+        return z.array(buildLooseArrayItemSchema(nestedItems));
+    }
+
+    return z.unknown();
+}
+
 function createFallbackChunks(chunk, chunkBytes) {
     if (!isPlainObject(chunk.value)) {
         return [];
     }
 
-    const smallerChunks = buildChunks(chunk.value, chunk.path, Math.max(Math.floor(chunkBytes / 2), 2000));
+    const smallerChunks = buildChunks(
+        chunk.value,
+        chunk.path,
+        Math.max(Math.floor(chunkBytes / 2), 2000),
+    );
 
     if (
         smallerChunks.length === 1 &&
@@ -1083,10 +1138,7 @@ function formatErrorDetails(error) {
         parts.add(cause);
     }
 
-    const knownFields = [
-        error,
-        cause && typeof cause === 'object' ? cause : null,
-    ];
+    const knownFields = [error, cause && typeof cause === 'object' ? cause : null];
 
     for (const candidate of knownFields) {
         if (!candidate || typeof candidate !== 'object') {
