@@ -102,6 +102,7 @@ export class DirectoryImportService {
 
     private getWorksConfigConflictRepoNames(
         slug: string,
+        sourceRepoName?: string | null,
         worksConfig?: { websiteRepo?: string } | null,
     ): string[] {
         const repoNames = [`${slug}-data`];
@@ -111,7 +112,53 @@ export class DirectoryImportService {
             `${slug}-website`;
         repoNames.push(websiteRepo);
 
-        return Array.from(new Set(repoNames.filter(Boolean)));
+        return Array.from(
+            new Set(
+                repoNames.filter(
+                    (repoName) =>
+                        typeof repoName === 'string' &&
+                        repoName.length > 0 &&
+                        repoName !== sourceRepoName,
+                ),
+            ),
+        );
+    }
+
+    private sanitizeWorksConfigConflict(
+        conflict: {
+            hasConflict: boolean;
+            conflictingRepos: string[];
+            suggestedSlug: string;
+        },
+        sourceRepoName?: string | null,
+        worksConfig?: { websiteRepo?: string } | null,
+    ): {
+        hasConflict: boolean;
+        conflictingRepos: string[];
+        suggestedSlug: string;
+    } {
+        const benignRepos = new Set<string>();
+
+        if (sourceRepoName) {
+            benignRepos.add(sourceRepoName);
+        }
+
+        const websiteRepo = this.worksConfigService.parseRepositoryReference(
+            worksConfig?.websiteRepo,
+        )?.repo;
+        if (websiteRepo && sourceRepoName && websiteRepo === sourceRepoName) {
+            benignRepos.add(websiteRepo);
+        }
+
+        const conflictingRepos = conflict.conflictingRepos.filter(
+            (repoName) => !benignRepos.has(repoName),
+        );
+
+        return {
+            hasConflict: conflictingRepos.length > 0,
+            conflictingRepos,
+            suggestedSlug: conflict.suggestedSlug,
+        };
     }
 
     private getPipelinePluginSettingsFromWorksConfig(
@@ -167,14 +214,14 @@ export class DirectoryImportService {
         const result = await this.sourceRepoAnalyzer.analyzeRepository(dto.sourceUrl, token);
 
         if (!result.error && result.repo && token) {
-            const repoOwner = user.username || result.owner;
+            const repoOwner = result.owner || user.username;
             const baseSlug = result.baseSlug || result.repo;
             const slug = slugifyText(
                 this.normalizeDirectoryName(baseSlug, ImportSourceTypeEnum.LINK_EXISTING),
             );
 
             try {
-                const conflict = await this.sourceRepoAnalyzer.checkSlugConflicts(
+                const rawConflict = await this.sourceRepoAnalyzer.checkSlugConflicts(
                     repoOwner,
                     slug,
                     token,
@@ -183,11 +230,20 @@ export class DirectoryImportService {
                         ? {
                               includeRepoNames: this.getWorksConfigConflictRepoNames(
                                   slug,
+                                  result.repo,
                                   result.worksConfig,
                               ),
                           }
                         : undefined,
                 );
+                const conflict =
+                    result.detectedType === ImportSourceTypeEnum.WORKS_CONFIG
+                        ? this.sanitizeWorksConfigConflict(
+                              rawConflict,
+                              result.repo,
+                              result.worksConfig,
+                          )
+                        : rawConflict;
                 if (conflict.hasConflict) {
                     result.slugConflict = conflict;
                 }
@@ -355,7 +411,7 @@ export class DirectoryImportService {
                     user,
                     dto.gitProvider,
                     dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG
-                        ? this.getWorksConfigConflictRepoNames(slug, worksConfig)
+                        ? this.getWorksConfigConflictRepoNames(slug, parsed.repo, worksConfig)
                         : undefined,
                 );
             }

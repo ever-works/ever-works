@@ -206,6 +206,8 @@ const createDefaultConfig = (overrides: Partial<IDataConfig> = {}): IDataConfig 
 
 export class DataRepository {
     private static readonly logger = new Logger(DataRepository.name);
+    private static readonly CONFIG_FILENAMES = ['config.yml', 'config.yaml'] as const;
+    private static readonly WORKS_CONFIG_FILENAMES = ['works.yml', 'works.yaml'] as const;
     private config?: IDataConfig;
     private categories?: Category[];
 
@@ -241,9 +243,11 @@ export class DataRepository {
         const tagsPath = await this.getCollectionPath(dir, 'tags');
         const collectionsPath = await this.getCollectionPath(dir, 'collections');
 
+        const configPath = await this.resolveConfigPath(dir);
+
         const repo = new DataRepository(
             dir,
-            path.join(dir, 'config.yml'),
+            configPath,
             categoriesPath,
             tagsPath,
             collectionsPath,
@@ -252,6 +256,26 @@ export class DataRepository {
         );
 
         return repo;
+    }
+
+    private static async resolveConfigPath(dir: string): Promise<string> {
+        for (const filename of [...this.CONFIG_FILENAMES, ...this.WORKS_CONFIG_FILENAMES]) {
+            const candidatePath = path.join(dir, filename);
+
+            try {
+                const stat = await fs.stat(candidatePath);
+                if (stat.isFile()) {
+                    return candidatePath;
+                }
+            } catch (err) {
+                if ((err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') {
+                    continue;
+                }
+                throw err;
+            }
+        }
+
+        return path.join(dir, 'config.yml');
     }
 
     private static async shouldeUseDir(dir: string, type: 'categories' | 'tags' | 'collections') {

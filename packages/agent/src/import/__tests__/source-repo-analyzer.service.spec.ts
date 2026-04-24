@@ -68,3 +68,91 @@ describe('SourceRepoAnalyzerService.checkSlugConflicts', () => {
         expect(checkedRepos).toContain('compare-cloud-pricing-2-website');
     });
 });
+
+describe('SourceRepoAnalyzerService.analyzeRepository', () => {
+    it('classifies repos with data/ and works.yml as data_repo', async () => {
+        const worksConfig = {
+            initialPrompt: 'Keep it updated',
+            raw: {},
+        };
+
+        const gitFacade = {
+            isConfigured: jest.fn().mockReturnValue(true),
+            getRepository: jest.fn().mockResolvedValue({
+                isPrivate: false,
+                permissions: { push: true },
+            }),
+            getDirectoryContents: jest
+                .fn()
+                .mockResolvedValueOnce([
+                    { name: 'works.yml', type: 'file', path: 'works.yml' },
+                    { name: 'data', type: 'dir', path: 'data' },
+                    { name: 'README.md', type: 'file', path: 'README.md' },
+                ])
+                .mockResolvedValueOnce([
+                    { name: 'item-a', type: 'dir', path: 'data/item-a' },
+                ]),
+        };
+
+        const worksConfigService = {
+            loadFromRepository: jest.fn().mockResolvedValue(worksConfig),
+        };
+
+        const service = new SourceRepoAnalyzerService(
+            gitFacade as any,
+            worksConfigService as any,
+        );
+
+        const result = await service.analyzeRepository(
+            'https://github.com/ever-works/compare-cloud-pricing-data',
+            'token',
+        );
+
+        expect(result.detectedType).toBe('data_repo');
+        expect(result.worksConfig).toMatchObject({
+            initialPrompt: 'Keep it updated',
+        });
+        expect(result.structure).toMatchObject({
+            hasDataFolder: true,
+            hasWorksConfig: true,
+            itemCount: 1,
+        });
+    });
+
+    it('classifies repos with works.yml but without data/ as works_config', async () => {
+        const gitFacade = {
+            isConfigured: jest.fn().mockReturnValue(true),
+            getRepository: jest.fn().mockResolvedValue({
+                isPrivate: false,
+                permissions: { push: true },
+            }),
+            getDirectoryContents: jest.fn().mockResolvedValue([
+                { name: 'works.yml', type: 'file', path: 'works.yml' },
+                { name: 'README.md', type: 'file', path: 'README.md' },
+            ]),
+        };
+
+        const worksConfigService = {
+            loadFromRepository: jest.fn().mockResolvedValue({
+                initialPrompt: 'Build everything',
+                raw: {},
+            }),
+        };
+
+        const service = new SourceRepoAnalyzerService(
+            gitFacade as any,
+            worksConfigService as any,
+        );
+
+        const result = await service.analyzeRepository(
+            'https://github.com/ever-works/compare-cloud-pricing',
+            'token',
+        );
+
+        expect(result.detectedType).toBe('works_config');
+        expect(result.structure).toMatchObject({
+            hasDataFolder: false,
+            hasWorksConfig: true,
+        });
+    });
+});

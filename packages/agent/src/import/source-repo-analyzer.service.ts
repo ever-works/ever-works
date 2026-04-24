@@ -290,23 +290,23 @@ export class SourceRepoAnalyzerService {
             categoryCount: undefined as number | undefined,
         };
 
+        let worksConfig: ReturnType<WorksConfigService['parse']> | undefined;
+
         if (hasWorksConfig) {
             try {
-                const worksConfig = await this.worksConfigService.loadFromRepository(
+                worksConfig =
+                    (await this.worksConfigService.loadFromRepository(
                     owner,
                     repo,
                     provider,
                     token,
-                );
-
-                return { type: 'works_config', structure, worksConfig: worksConfig ?? undefined };
+                )) ?? undefined;
             } catch (err) {
                 this.logger.warn(`Failed to parse works.yml for ${owner}/${repo}`, err);
-                return { type: 'works_config', structure };
             }
         }
 
-        if (hasConfig && hasDataFolder) {
+        if ((hasConfig || hasWorksConfig) && hasDataFolder) {
             try {
                 const dataContents = await this.gitFacade.getDirectoryContents(
                     owner,
@@ -364,7 +364,11 @@ export class SourceRepoAnalyzerService {
                 this.logger.warn(`Failed to count items in data folder: ${owner}/${repo}`, err);
             }
 
-            return { type: 'data_repo', structure };
+            return { type: 'data_repo', structure, worksConfig };
+        }
+
+        if (hasWorksConfig) {
+            return { type: 'works_config', structure, worksConfig };
         }
 
         if (hasReadme) {
