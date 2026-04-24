@@ -583,6 +583,11 @@
                 "metadata": "Metadane",
                 "rawJson": "Surowy JSON"
             },
+            "summary": {
+                "generation": {
+                    "completed": "Dodano {added}. Zmieniono {changed}. Łącznie: {total}"
+                }
+            },
             "pagination": {
                 "previous": "Poprzednia",
                 "next": "Następna",
@@ -1060,8 +1065,8 @@
                     },
                     "plans": {
                         "free": "Darmowy",
-                        "standard": "Standardowy",
                         "pro": "Pro",
+                        "standard": "Standardowy",
                         "premium": "Premium",
                         "unmetered": "Bez limitu"
                     },

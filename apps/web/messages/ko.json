@@ -583,6 +583,11 @@
                 "metadata": "메타데이터",
                 "rawJson": "원시 JSON"
             },
+            "summary": {
+                "generation": {
+                    "completed": "추가됨 {added}. 변경됨 {changed}. 총계: {total}"
+                }
+            },
             "pagination": {
                 "previous": "이전",
                 "next": "다음",
@@ -1060,8 +1065,8 @@
                     },
                     "plans": {
                         "free": "무료",
-                        "standard": "스탠다드",
                         "pro": "Pro",
+                        "standard": "스탠다드",
                         "premium": "프리미엄",
                         "unmetered": "측정 없음"
                     },

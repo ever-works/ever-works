@@ -583,6 +583,11 @@
                 "metadata": "Метадані",
                 "rawJson": "Сирий JSON"
             },
+            "summary": {
+                "generation": {
+                    "completed": "Додано {added}. Змінено {changed}. Всього: {total}"
+                }
+            },
             "pagination": {
                 "previous": "Попередня",
                 "next": "Наступна",
@@ -1060,8 +1065,8 @@
                     },
                     "plans": {
                         "free": "Безкоштовний",
-                        "standard": "Стандартний",
                         "pro": "Pro",
+                        "standard": "Стандартний",
                         "premium": "Преміум",
                         "unmetered": "Необмежений"
                     },

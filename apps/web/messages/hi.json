@@ -583,6 +583,11 @@
                 "metadata": "मेटाडेटा",
                 "rawJson": "कच्चा JSON"
             },
+            "summary": {
+                "generation": {
+                    "completed": "{added} जोड़े गए। {changed} बदले गए। कुल: {total}"
+                }
+            },
             "pagination": {
                 "previous": "पिछला",
                 "next": "अगला",
@@ -1060,8 +1065,8 @@
                     },
                     "plans": {
                         "free": "मुफ्त",
-                        "standard": "मानक",
                         "pro": "Pro",
+                        "standard": "मानक",
                         "premium": "प्रीमियम",
                         "unmetered": "असीमित"
                     },

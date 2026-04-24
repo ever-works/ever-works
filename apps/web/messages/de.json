@@ -583,6 +583,11 @@
                 "metadata": "Metadaten",
                 "rawJson": "Rohes JSON"
             },
+            "summary": {
+                "generation": {
+                    "completed": "Hinzugefügt {added}. Geändert {changed}. Gesamt: {total}"
+                }
+            },
             "pagination": {
                 "previous": "Vorherige",
                 "next": "Nächste",
@@ -1060,8 +1065,8 @@
                     },
                     "plans": {
                         "free": "Kostenlos",
-                        "standard": "Standard",
                         "pro": "Pro",
+                        "standard": "Standard",
                         "premium": "Premium",
                         "unmetered": "Unbegrenzt"
                     },

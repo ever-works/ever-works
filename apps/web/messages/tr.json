@@ -583,6 +583,11 @@
                 "metadata": "Meta Veriler",
                 "rawJson": "Ham JSON"
             },
+            "summary": {
+                "generation": {
+                    "completed": "Eklendi {added}. Değiştirildi {changed}. Toplam: {total}"
+                }
+            },
             "pagination": {
                 "previous": "Önceki",
                 "next": "Sonraki",
@@ -1060,8 +1065,8 @@
                     },
                     "plans": {
                         "free": "Ücretsiz",
-                        "standard": "Standart",
                         "pro": "Pro",
+                        "standard": "Standart",
                         "premium": "Premium",
                         "unmetered": "Sınırsız"
                     },

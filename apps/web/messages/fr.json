@@ -583,6 +583,11 @@
                 "metadata": "Métadonnées",
                 "rawJson": "JSON brut"
             },
+            "summary": {
+                "generation": {
+                    "completed": "Ajouté {added}. Modifié {changed}. Total : {total}"
+                }
+            },
             "pagination": {
                 "previous": "Précédent",
                 "next": "Suivant",

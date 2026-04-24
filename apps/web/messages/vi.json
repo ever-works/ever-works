@@ -583,6 +583,11 @@
                 "metadata": "Siêu dữ liệu",
                 "rawJson": "JSON Thô"
             },
+            "summary": {
+                "generation": {
+                    "completed": "Đã thêm {added}. Đã thay đổi {changed}. Tổng cộng: {total}"
+                }
+            },
             "pagination": {
                 "previous": "Trước",
                 "next": "Tiếp theo",
@@ -1060,8 +1065,8 @@
                     },
                     "plans": {
                         "free": "Miễn phí",
-                        "standard": "Tiêu chuẩn",
                         "pro": "Pro",
+                        "standard": "Tiêu chuẩn",
                         "premium": "Cao cấp",
                         "unmetered": "Không giới hạn"
                     },

@@ -583,6 +583,11 @@
                 "metadata": "ข้อมูลเมตา",
                 "rawJson": "JSON ดิบ"
             },
+            "summary": {
+                "generation": {
+                    "completed": "เพิ่ม {added}. เปลี่ยน {changed}. รวมทั้งหมด: {total}"
+                }
+            },
             "pagination": {
                 "previous": "ก่อนหน้า",
                 "next": "ถัดไป",
@@ -1060,8 +1065,8 @@
                     },
                     "plans": {
                         "free": "ฟรี",
-                        "standard": "มาตรฐาน",
                         "pro": "Pro",
+                        "standard": "มาตรฐาน",
                         "premium": "พรีเมียม",
                         "unmetered": "ไม่จำกัด"
                     },

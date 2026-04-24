@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { formatDistanceToNow } from 'date-fns';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
+import { formatActivitySummary } from './activity-summary';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
 import { ActivityTypeBadge } from './ActivityTypeBadge';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
@@ -174,6 +175,7 @@ function RawJsonPanel({
 
 export function ActivityTable({ activities, loading, onStopRequested }: ActivityTableProps) {
     const t = useTranslations('dashboard.activity');
+    const tSummary = useTranslations('dashboard.activity.summary');
     const [expandedIds, setExpandedIds] = useState<string[]>([]);
     const [hydratedActivities, setHydratedActivities] = useState<Record<string, ActivityLogEntry>>(
         {},
@@ -334,6 +336,10 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                             const liveLogs = hydratedActivity.details?.liveLogs as
                                 | GenerationStepLog[]
                                 | undefined;
+                            const resolvedSummary = formatActivitySummary(
+                                hydratedActivity,
+                                tSummary,
+                            );
                             const detailsWithoutLiveLogs = hydratedActivity.details
                                 ? Object.fromEntries(
                                       Object.entries(hydratedActivity.details).filter(
@@ -412,7 +418,7 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                         <td className="px-4 py-3 text-xs text-text dark:text-text-dark max-w-md">
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0 flex-1 line-clamp-3 break-words">
-                                                    {activity.summary}
+                                                    {resolvedSummary}
                                                 </div>
                                                 {activity.actionType === 'generation' &&
                                                 activity.status === 'in_progress' &&

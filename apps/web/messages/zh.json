@@ -583,6 +583,11 @@
                 "metadata": "元数据",
                 "rawJson": "原始 JSON"
             },
+            "summary": {
+                "generation": {
+                    "completed": "已添加 {added}。已更改 {changed}。总数：{total}"
+                }
+            },
             "pagination": {
                 "previous": "上一页",
                 "next": "下一页",

@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { DirectoryGenerationHistoryRepository } from '@src/database/repositories/directory-generation-history.repository';
 import { ActivityLogRepository } from '@src/database/repositories/activity-log.repository';
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
+import { formatGenerationCountsSummary, formatStoredActivitySummary } from './activity-log-summary';
 import {
     ActivityActionType,
     ActivityStatus,
@@ -33,10 +34,13 @@ export class ActivityLogService {
         updatedItemsCount?: number | null;
         totalItemsCount?: number | null;
     }): string {
-        const added = counts?.newItemsCount ?? 0;
-        const changed = counts?.updatedItemsCount ?? 0;
-        const total = counts?.totalItemsCount ?? 0;
-        return `Added ${added}. Changed ${changed}. Total: ${total}`;
+        return formatGenerationCountsSummary(counts);
+    }
+
+    formatSummary(
+        activity: Pick<ActivityLog, 'actionType' | 'status' | 'summary' | 'details'>,
+    ): string {
+        return formatStoredActivitySummary(activity);
     }
 
     private dispatchAnalytics(activity: ActivityLog) {
@@ -228,7 +232,7 @@ export class ActivityLogService {
 
         const rows = activities.map((a) => {
             const directoryName = (a.directory?.name || '').replace(/"/g, '""');
-            const summary = a.summary.replace(/"/g, '""');
+            const summary = this.formatSummary(a).replace(/"/g, '""');
             return [
                 a.createdAt.toISOString(),
                 a.actionType,

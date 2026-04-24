@@ -583,6 +583,11 @@
                 "metadata": "Metadata",
                 "rawJson": "JSON Mentah"
             },
+            "summary": {
+                "generation": {
+                    "completed": "Ditambahkan {added}. Diubah {changed}. Total: {total}"
+                }
+            },
             "pagination": {
                 "previous": "Sebelumnya",
                 "next": "Berikutnya",
@@ -1060,8 +1065,8 @@
                     },
                     "plans": {
                         "free": "Gratis",
-                        "standard": "Standar",
                         "pro": "Pro",
+                        "standard": "Standar",
                         "premium": "Premium",
                         "unmetered": "Tak Terukur"
                     },

@@ -583,6 +583,11 @@
                 "metadata": "Metadati",
                 "rawJson": "JSON Grezzo"
             },
+            "summary": {
+                "generation": {
+                    "completed": "Aggiunto {added}. Modificato {changed}. Totale: {total}"
+                }
+            },
             "pagination": {
                 "previous": "Precedente",
                 "next": "Successivo",
@@ -1060,8 +1065,8 @@
                     },
                     "plans": {
                         "free": "Gratuito",
-                        "standard": "Standard",
                         "pro": "Pro",
+                        "standard": "Standard",
                         "premium": "Premium",
                         "unmetered": "Senza limiti"
                     },

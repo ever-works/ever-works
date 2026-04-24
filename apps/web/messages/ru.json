@@ -583,6 +583,11 @@
                 "metadata": "Метаданные",
                 "rawJson": "Исходный JSON"
             },
+            "summary": {
+                "generation": {
+                    "completed": "Добавлено {added}. Изменено {changed}. Всего: {total}"
+                }
+            },
             "pagination": {
                 "previous": "Предыдущая",
                 "next": "Следующая",
@@ -1060,8 +1065,8 @@
                     },
                     "plans": {
                         "free": "Бесплатный",
-                        "standard": "Стандартный",
                         "pro": "Pro",
+                        "standard": "Стандартный",
                         "premium": "Премиум",
                         "unmetered": "Неограниченный"
                     },

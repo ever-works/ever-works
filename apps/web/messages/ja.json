@@ -583,6 +583,11 @@
                 "metadata": "メタデータ",
                 "rawJson": "生 JSON"
             },
+            "summary": {
+                "generation": {
+                    "completed": "追加 {added}。変更 {changed}。合計: {total}"
+                }
+            },
             "pagination": {
                 "previous": "前へ",
                 "next": "次へ",
@@ -1060,8 +1065,8 @@
                     },
                     "plans": {
                         "free": "無料",
-                        "standard": "スタンダード",
                         "pro": "Pro",
+                        "standard": "スタンダード",
                         "premium": "プレミアム",
                         "unmetered": "無制限"
                     },

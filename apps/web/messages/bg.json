@@ -583,6 +583,11 @@
                 "metadata": "Метаданни",
                 "rawJson": "Суров JSON"
             },
+            "summary": {
+                "generation": {
+                    "completed": "Добавени {added}. Променени {changed}. Общо: {total}"
+                }
+            },
             "pagination": {
                 "previous": "Предишна",
                 "next": "Следваща",
@@ -1060,8 +1065,8 @@
                     },
                     "plans": {
                         "free": "Безплатен",
-                        "standard": "Стандартен",
                         "pro": "Pro",
+                        "standard": "Стандартен",
                         "premium": "Премиум",
                         "unmetered": "Без лимит"
                     },
