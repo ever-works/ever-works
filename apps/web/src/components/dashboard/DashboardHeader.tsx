@@ -89,11 +89,9 @@ export function DashboardHeader({
                     </div>
 
                     <div className="flex shrink-0 items-center gap-4">
-                        <Tooltip content="Notifications" position="bottom">
-                            <div>
-                                <NotificationDropdown />
-                            </div>
-                        </Tooltip>
+                        <div className="mt-2">
+                            <NotificationDropdown />
+                        </div>
 
                         <Tooltip content="Toggle theme" position="bottom">
                             <div>

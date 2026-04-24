@@ -1317,6 +1317,7 @@
                     "plans": {
                         "free": "مجاني",
                         "standard": "قياسي",
+                        "pro": "Pro",
                         "premium": "مميز",
                         "unmetered": "غير محدود"
                     },

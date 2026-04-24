@@ -74,17 +74,23 @@ export function HistoryExpandedDetail({
                     <ChangeSection
                         label={t('detail.added')}
                         entries={addedEntries}
-                        color="text-success"
+                        headingColor="text-success"
+                        prefixColor="text-success"
+                        prefix="+"
                     />
                     <ChangeSection
                         label={t('detail.updated')}
                         entries={updatedEntries}
-                        color="text-primary"
+                        headingColor="text-primary"
+                        prefixColor="text-primary"
+                        prefix="~"
                     />
                     <ChangeSection
                         label={t('detail.removed')}
                         entries={removedEntries}
-                        color="text-danger"
+                        headingColor="text-danger"
+                        prefixColor="text-danger"
+                        prefix="−"
                     />
                 </div>
             )}
@@ -95,11 +101,15 @@ export function HistoryExpandedDetail({
 function ChangeSection({
     label,
     entries,
-    color,
+    headingColor,
+    prefixColor,
+    prefix,
 }: {
     label: string;
     entries: ChangeEntry[];
-    color: string;
+    headingColor: string;
+    prefixColor: string;
+    prefix: string;
 }) {
     const t = useTranslations('dashboard.directoryDetail.history');
 
@@ -107,31 +117,36 @@ function ChangeSection({
 
     return (
         <div>
-            <p className={cn('mb-2 text-xs font-semibold uppercase tracking-wide', color)}>
+            <p className={cn('mb-2 text-xs font-semibold uppercase tracking-wide', headingColor)}>
                 {label} ({entries.length})
             </p>
-            <div className="space-y-1">
+            <ul className="space-y-1.5">
                 {entries.map((change) => (
-                    <div
+                    <li
                         key={`${change.action}-${change.slug ?? change.name}`}
-                        className="rounded-md border border-border bg-background px-3 py-2 text-sm dark:border-border-dark dark:bg-background-dark"
+                        className="flex items-baseline gap-1.5 text-xs"
                     >
-                        <div className="font-medium text-text dark:text-text-dark">
-                            {change.name}
-                        </div>
-                        {change.slug && (
-                            <div className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                                {change.slug}
-                            </div>
-                        )}
-                        {change.fieldsChanged?.length ? (
-                            <div className="mt-1 text-xs text-text-secondary dark:text-text-secondary-dark">
-                                {t('detail.fields')}: {change.fieldsChanged.join(', ')}
-                            </div>
-                        ) : null}
-                    </div>
+                        <span className={cn('shrink-0 font-bold leading-none', prefixColor)}>
+                            {prefix}
+                        </span>
+                        <span className="min-w-0">
+                            <span className="font-medium text-text dark:text-text-dark">
+                                {change.name}
+                            </span>
+                            {change.slug && (
+                                <span className="ml-1 text-text-muted dark:text-text-muted-dark">
+                                    /{change.slug}
+                                </span>
+                            )}
+                            {change.fieldsChanged?.length ? (
+                                <span className="ml-1 text-text-secondary dark:text-text-secondary-dark">
+                                    — {change.fieldsChanged.join(', ')}
+                                </span>
+                            ) : null}
+                        </span>
+                    </li>
                 ))}
-            </div>
+            </ul>
         </div>
     );
 }

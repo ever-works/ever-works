@@ -538,6 +538,7 @@
                     "plans": {
                         "free": "Grátis",
                         "standard": "Padrão",
+                        "pro": "Pro",
                         "premium": "Premium",
                         "unmetered": "Ilimitado"
                     },

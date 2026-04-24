@@ -538,6 +538,7 @@
                     "plans": {
                         "free": "Gratis",
                         "standard": "Standar",
+                        "pro": "Pro",
                         "premium": "Premium",
                         "unmetered": "Tak terbatas"
                     },

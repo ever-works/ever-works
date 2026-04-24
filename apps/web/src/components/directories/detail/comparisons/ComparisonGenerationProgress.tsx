@@ -76,9 +76,9 @@ export function ComparisonGenerationProgress({
     );
 
     return (
-        <div className="rounded-lg border border-border dark:border-border-dark p-4 space-y-3">
+        <div className="space-y-3">
             <div className="flex items-center gap-3">
-                <div className="relative h-4 w-4 shrink-0">
+                <div className="relative h-3 w-3 shrink-0">
                     <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
                     <div className="absolute inset-0.5 rounded-full bg-primary" />
                 </div>
@@ -111,7 +111,7 @@ export function ComparisonGenerationProgress({
                             <div key={stage} className="flex items-center gap-1.5 flex-1">
                                 <div
                                     className={cn(
-                                        'h-1.5 rounded-full flex-1 transition-all duration-500',
+                                        'h-0.5 rounded-full flex-1 transition-all duration-500',
                                         isCompleted && 'bg-primary',
                                         isCurrent && 'bg-primary/60 animate-pulse',
                                         !isCompleted &&

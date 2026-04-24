@@ -1046,6 +1046,7 @@
                     },
                     "plans": {
                         "free": "Free",
+                        "pro": "Pro",
                         "standard": "Standard",
                         "premium": "Premium",
                         "unmetered": "Unmetered"
